@@ -90,11 +90,11 @@ include::{includedir}/delete-couchbase-cluster.adoc[]
 
 :leveloffset: +1
 
-include::{includedir}/logs-troubleshooting.adoc[]
+include::{includedir}/howto-troubleshooting.adoc[]
 
 include::{includedir}/conditions-and-events.adoc[]
 
-include::{includedir}/services.adoc[]
+include::{includedir}/reference-couchbasecluster-services.adoc[]
 
 include::{includedir}/reference-cbopinfo.adoc[]
 

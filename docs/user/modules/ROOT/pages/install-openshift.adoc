@@ -5,7 +5,7 @@ This guide walks through the recommended procedure for installing the Couchbase 
 
 [IMPORTANT]
 ====
-If you are looking to upgrade an existing installation of the Operator, see xref:upgrading-the-operator.adoc[Upgrading the Autonomous Operator].
+If you are looking to upgrade an existing installation of the Operator, see xref:howto-operator-upgrade.adoc[Upgrading the Autonomous Operator].
 ====
 
 == Prerequisites

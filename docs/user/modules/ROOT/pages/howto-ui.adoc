@@ -52,11 +52,11 @@ Forwarding from 127.0.0.1:8091 -> 8091
 Forwarding from [::1]:8091 -> 8091
 ----
 
-You can then connect to http://localhost:8091 to access the UI.
+You can then connect to \http://localhost:8091 to access the UI.
 
 [IMPORTANT]
 ====
-If you must connect over TLS then forward port 18091 and use the address https://localhost:18091.
+If you must connect over TLS then forward port 18091 and use the address `\https://localhost:18091`.
 Ensure your cluster administrator has provided a CA certificate to be installed into your browser's trust store.
 If certificate based authentication is used, then ensure you have installed your client certificate/key into your browser too.
 As you are connecting to `localhost` it is also important that your cluster administrator has added the `localhost` subject alternative address name into the cluster TLS certificate.
@@ -69,8 +69,8 @@ When using public networking the Couchbase administrative service is exposed as 
 This same service provides access to the UI.
 
 The connection string is determined by the xref:couchbase-cluster-comfig.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] cluster parameter.
-The connection string is in the form `https://console.${dns-domain}`.
-Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `https://console.my-cluster.acme.org:18091`.
+The connection string is in the form `\https://console.${dns-domain}`.
+Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `\https://console.my-cluster.acme.org:18091`.
 
 [NOTE]
 ====

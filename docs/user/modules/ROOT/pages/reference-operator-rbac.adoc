@@ -4,7 +4,7 @@ Kubernetes supports role-based access control (RBAC), which allows containers to
 
 RBAC is enabled by default in Kubernetes 1.10+, so you will need to take RBAC into consideration when planning a deployment. The system is flexible enough to meet the challenges of most use-cases, but that flexibility can sometimes create confusion.
 
-For a full explanation of how RBAC works in Kubernetes, refer to the https://kubernetes.io/docs/reference/access-authn-authz/authorization/[official Kubernetes documentation].
+For a full explanation of how RBAC works in Kubernetes, refer to the https://kubernetes.io/docs/reference/access-authn-authz/authorization/[official Kubernetes documentation^].
 
 A role essentially maps a name to a set of permissions that a user or service is allowed to perform on the cluster. Roles can be scoped to the entire cluster with the `ClusterRole` resource type, or to a specific namespace with the `Role` resource type.
 
@@ -47,7 +47,7 @@ _Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 pods/exec::
 The operator needs access to execute commands on Couchbase Server pods in order to flag that the pod is ready.
-This allows orchestration of xref:upgrading-kubernetes.adoc[automatic Kubernetes upgrades].
+This allows orchestration of xref:concept-kubernetes-upgrade.adoc[automatic Kubernetes upgrades].
 +
 _Required Permissions_: `create`
 
@@ -58,7 +58,7 @@ The Operator locally caches these resources, so needs to list them to get an ini
 _Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 events::
-The Operator will raise xref:conditions-and-events.adoc[events] that are associated with a `CouchbaseCluster` resource, which can be used to synchronize external operations or raise alerts.
+The Operator will raise xref:reference-couchbasecluster-events.adoc[events] that are associated with a `CouchbaseCluster` resource, which can be used to synchronize external operations or raise alerts.
 +
 _Required Permissions_: `list`, `create`, `update`
 
@@ -75,7 +75,7 @@ The Operator locally caches these resources, so needs to list them to get an ini
 _Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 policy/poddisruptionbudgets::
-The Operator need to be able to create and update pod disruption budgets to allow orchestration of xref:upgrading-kubernetes.adoc[automatic Kubernetes upgrades].
+The Operator need to be able to create and update pod disruption budgets to allow orchestration of xref:concept-kubernetes-upgrade.adoc[automatic Kubernetes upgrades].
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
 _Required Permissions_: `get`, `list`, `watch`, `create`, `delete`

@@ -5,7 +5,7 @@ Prevent Couchbase Server containers from running as root.
 
 When using Kubernetes all pods are run as root by default.
 This is a security concern for many enterprises, so they enforce pods be run as a non-root user.
-By default, Couchbase server pods will change their user to `couchbase` (uid 1000), however performing a `kubectl exec` into a pod still runs as root.
+By default, Couchbase server pods will change their user to `couchbase` (UID 1000), however performing a `kubectl exec` into a pod still runs as root.
 This how-to shows how to run as a non-root user in all circumstances.
 
 [NOTE]

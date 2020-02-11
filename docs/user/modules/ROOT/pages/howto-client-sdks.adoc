@@ -44,7 +44,7 @@ DNS based addressing with External DNS is slightly different to plain DNS.
 The External DNS controller does not support SRV records, instead we use HTTPS.
 Fault-tolerance is provided by a load balancer service.
 
-The connection string is determined by the xref:couchbase-cluster-comfig.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] cluster parameter.
+The connection string is determined by the xref:reference-couchbasecluster.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] cluster parameter.
 The connection string is in the form `\https://console.${dns-domain}`.
 Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `\https://console.my-cluster.acme.org:18091`.
 

@@ -1,7 +1,7 @@
 = About cbopcfg
 :tabs:
 
-`cbopcfg` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package].
+`cbopcfg` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package^].
 It is used to generate resource configuration to quickly configure and run the Operator.
 
 The `cbopcfg` is not intended to allow configuration of every aspect of the Operator.
@@ -9,7 +9,7 @@ We provide xref:helm-setup-guide.adoc[Helm] charts to allow more complex deploym
 
 == Installation
 
-Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package] and unpacked it.
+Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package^] and unpacked it.
 
 After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
 

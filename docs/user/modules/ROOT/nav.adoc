@@ -10,10 +10,10 @@
  ** Kubernetes Concepts
   *** xref:concept-kubernetes-networking.adoc[Kubernetes Networking]
   *** xref:concept-persistent-volumes.adoc[Persistent Volumes]
-  *** xref:upgrading-kubernetes.adoc[Kubernetes Automated Upgrade]
+  *** xref:concept-kubernetes-upgrade.adoc[Kubernetes Automated Upgrade]
  ** Operator Concepts
   *** xref:concept-operator.adoc[Couchbase Operator Architecture]
-  *** xref:concept-operator-logging.adoc[Couchbsae Operator Logging]
+  *** xref:concept-operator-logging.adoc[Couchbase Operator Logging]
  ** Couchbase Cluster Concepts
   *** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
   *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
@@ -27,8 +27,8 @@
   *** xref:concept-upgrade.adoc[Couchbase Upgrades]
 * Manage
  ** Operator
-  *** xref:upgrading-the-operator.adoc[Upgrade the Operator]
-  *** xref:logs-troubleshooting.adoc[View Operator Logs]
+  *** xref:howto-operator-upgrade.adoc[Upgrade the Operator]
+  *** xref:howto-troubleshooting.adoc[View Operator Logs]
  ** Couchbase Cluster
   *** Lifecycle
    **** xref:howto-couchbase-create.adoc[Create a Couchbase Deployment]
@@ -40,7 +40,7 @@
    **** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
    **** xref:howto-persistent-volume-resize.adoc[Resize Persistent Volumes]
    **** xref:howto-mds.adoc[Configure Multi-Dimensional Scaling]
-   **** xref:howto-xdcr-external.adoc[Configure XDCR]
+   **** xref:howto-xdcr.adoc[Configure XDCR]
    **** xref:howto-public-networking.adoc[Configure Public Networking]
    **** xref:howto-nodeport-networking.adoc[Configure Node Port Networking]
    **** xref:howto-tls.adoc[Configure TLS]
@@ -74,7 +74,7 @@
   *** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
   *** xref:reference-operator-logging.adoc[Operator Logging]
  ** Couchbase Cluster
-  *** xref:services.adoc[Monitoring Services]
+  *** xref:reference-couchbasecluster-services.adoc[CouchbaseCluster Services]
  ** Helm
   *** xref:helm-reference-operator-configuration.adoc[Operator Chart Spec]
   *** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]

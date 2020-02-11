@@ -131,7 +131,7 @@ oc create secret docker-registry rh-catalog \
   --docker-email=<docker-email>
 ----
 
-. Create a file named `openshift_values.yaml` with the following <<customize-charts,custom override values>> for the Oprator Chart:
+. Create a file named `openshift_values.yaml` with the following <<customize-charts,custom override values>> for the Operator Chart:
 +
 [source,yaml]
 ----
@@ -228,7 +228,7 @@ See <<customize-charts,Customizing Helm Charts>> for more information.
 [#release-name]
 [NOTE]
 ====
-When you install a chart, Helm autogenerates a name for the https://docs.helm.sh/glossary/#release[release^] (usually a unique set of dictionary words).
+When you install a chart, Helm auto-generates a name for the https://docs.helm.sh/glossary/#release[release^] (usually a unique set of dictionary words).
 Helm prepends this name to all of the objects and resources that the chart creates.
 
 If you plan to use Helm to install multiple instances of the Operator, you should consider giving each release a unique name to help you more easily identify the resources that are associated with each release.
@@ -274,7 +274,7 @@ couchbaseOperator:
 +
 [source,console]
 ----
-helm install --values myvalues.yaml couchbase/coucbase-operator
+helm install --values myvalues.yaml couchbase/couchbase-operator
 ----
 +
 The values in your overrides file (`myvalues.yaml`) will override their counterparts in the chart's `values.yaml` file.

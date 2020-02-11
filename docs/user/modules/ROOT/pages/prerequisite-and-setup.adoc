@@ -76,7 +76,7 @@ Review the xref:best-practices.adoc#persistent-volumes-best-practices[Operator b
 | https://kubernetes.io/docs/concepts/storage/storage-classes/#ceph-rbd[Ceph RBD^]
 | Certified
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#gce-pd[GCE PD]
+| https://kubernetes.io/docs/concepts/storage/storage-classes/#gce-pd[GCE PD^]
 | Certified
 
 | https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[GlusterFS^]
@@ -92,7 +92,8 @@ Preparing the Kubernetes cluster to run the Operator may require setting up prop
 Before moving forward, review the following documentation:
 
 * xref:reference-operator-rbac.adoc[RBAC]
-* xref:networking.adoc[Networking]
+* xref:concept-kubernetes-networking.adoc[Kubernetes Networking]
+* xref:concept-couchbase-networking.adoc[Couchbase Cluster Networking]
 
 == Next Steps
 
@@ -100,6 +101,5 @@ As you're setting up your Kubernetes environment, make sure that you're followin
 
 Once your Kubernetes environment is set up, you can move on to installing the admission controller and the Operator.
 
-* xref:install-admission-controller.adoc[Installing and Using the Admission Controller]
 * xref:install-kubernetes.adoc[Installing the Operator on Open Source Kubernetes]
 * xref:install-openshift.adoc[Installing the Operator on OpenShift]

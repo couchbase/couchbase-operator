@@ -207,4 +207,4 @@ Now you have a publicly addressable cluster you can start using it.
 Consult the following guides for details on client operations:
 
 * xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[How-to connect a client SDK]
-* xref:howto-xdcr-external.adoc#local-cluster-2[How-to configure XDCR]
+* xref:howto-xdcr.adoc#local-cluster-2[How-to configure XDCR]

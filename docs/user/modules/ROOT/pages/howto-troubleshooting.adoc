@@ -9,8 +9,6 @@ The following topics are also helpful to understand when troubleshooting the Ope
 
 * xref:reference-couchbasecluster-status.adoc[Cluster Status and Conditions]
 * xref:reference-couchbasecluster-events.adoc[Understanding Conditions and Events]
-* xref:list-and-describe.adoc[Listing And Describing Resources]
-* xref:node-recovery.adoc[Node Recovery]
 * xref:reference-operator-configuration.adoc[Operator Configuration]
 
 == Full Deployment Logs
@@ -197,10 +195,10 @@ The associated `volumes` that need to be defined for the pod can be determined b
 
 [source,console]
 ----
-kubectl get pvc -lcouchbase_node=cb-example-0005
+$ kubectl get pvc -lcouchbase_node=cb-example-0005
 ----
 
-Any returned volumes will need to be defined in `volumes` and be correctly mounted in the pod via the `volumeMounts`.  `volumeMounts` names refer to their corresponding entires in `volumes`.  The following documents the `volumeMounts` required for each entry in `volumes` given the returned persistent volume claims:
+Any returned volumes will need to be defined in `volumes` and be correctly mounted in the pod via the `volumeMounts`.  `volumeMounts` names refer to their corresponding entries in `volumes`.  The following documents the `volumeMounts` required for each entry in `volumes` given the returned persistent volume claims:
 
 pvc-couchbase-cb-example-0005-00-default::
 The `default` persistent volume claim requires two `volumeMounts`.  The _default_ `subPath` must be mounted at `/opt/couchbase/var/lib/couchbase`.  The _etc_ `subPath` must be mounted at `/opt/couchbase/etc`.
@@ -220,7 +218,7 @@ Please see the documentation for `cbcollect_info`, however a typical command to 
 
 [source,console]
 ----
-kubectl exec -ti pod/cb-example-0005 /opt/couchbase/bin/cbcollect_info /tmp/cbinfo-default-cb-example-0005-$(date +%y%m%dT%H%M%S%z)
+$ kubectl exec -ti pod/cb-example-0005 /opt/couchbase/bin/cbcollect_info /tmp/cbinfo-default-cb-example-0005-$(date +%y%m%dT%H%M%S%z)
 ----
 
 The `pod` name refers to the name given to the pod in the template.  The convention for logs is _cbinfo_, _namespace_, _pod name_, _timestamp_.
@@ -229,7 +227,7 @@ Once complete the logs can be downloaded to the local host.
 
 [source,console]
 ----
-kubectl cp default/cb-example-0005:/tmp/cbcollectinfo-default-cb-example-0005-181005T154746+0100.zip .
+$ kubectl cp default/cb-example-0005:/tmp/cbcollectinfo-default-cb-example-0005-181005T154746+0100.zip .
 ----
 
 == See Also

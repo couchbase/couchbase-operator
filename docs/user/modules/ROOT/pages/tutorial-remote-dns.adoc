@@ -361,4 +361,4 @@ Mutual TLS (mTLS) may also be employed in order to provide additional security.
 == Next Steps
 
 * xref:howto-client-sdks.adoc#dns-based-addressing[How-to connect a client SDK]
-* xref:howto-xdcr-external.adoc#dns-based-addressing[How-to configure XDCR]
+* xref:howto-xdcr.adoc#dns-based-addressing[How-to configure XDCR]

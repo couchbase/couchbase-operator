@@ -106,7 +106,7 @@ spec:
       value: value
     envFrom:
     - secretRef:
-      name: environment-secret
+        name: environment-secret
     resources:
       limits:
         cpu: 4
@@ -219,7 +219,7 @@ ____
 This field sets the name of the Couchbase cluster.
 It must be unique within the Kubernetes namespace.
 This name controls how Operator managed resources are named.
-The logical cluster name -- as displayed in the Couchbase UI -- may be changed with the <<spec-cluster-clustername>> parameter.
+The logical cluster name -- as displayed in the Couchbase UI -- may be changed with the <<spec-cluster-clustername,`spec.cluster.clusterName`>> parameter.
 
 ____
 _Field rules:_ This field must be a valid DNS hostname string.
@@ -297,7 +297,7 @@ kubectl label nodes ip-172-16-0-10 failure-domain.beta.kubernetes.io/zone=us-eas
 
 As the list of server groups to use is explicit the end user has flexibility in controlling exactly where pods will be scheduled e.g. one cluster may reside in one set of server groups, and another cluster in another set of server groups.
 
-At present the scheduling simply stripes pods across the server groups; each new pod is run in a server group with the fewest existing cluster members.  This is performed on a per-server configuration basis to ensure individual classes of servers are equally distributed for high-availability.  For each class of server configuration you may choose override the set of server groups to schedule across; see the documentation under the `spec.servers.serverGroups` configuration key.
+At present the scheduling simply stripes pods across the server groups; each new pod is run in a server group with the fewest existing cluster members.  This is performed on a per-server configuration basis to ensure individual classes of servers are equally distributed for high-availability.  For each class of server configuration you may choose override the set of server groups to schedule across; see the documentation under the <<spec-servers-servergroups,`spec.servers.serverGroups`>> configuration key.
 
 The server group feature also not support service redistribution at this time, so scaling the set of server groups will not result in any pods being 'moved' to make best use of the new topology or evacuated from a removed server group.
 
@@ -690,16 +690,16 @@ spec:
 This field specifies whether or not the Couchbase Server Web Console should be exposed externally. Exposing the web console is done using a NodePort service and the port for the service can be found in the describe output when describing this cluster. This parameter may be changed while the cluster is running and the Operator will create/destroy the NodePort service as appropriate.
 
 ____
-_Field rules:_ The `exposeAdminConsole` field is optional and defaults to `false` if not specified.  If set to `true` the specification must also have the <<spec-networking-adminconsoleservices>> property defined.
+_Field rules:_ The `exposeAdminConsole` field is optional and defaults to `false` if not specified.  If set to `true` the specification must also have the <<spec-networking-adminconsoleservices,`spec.networking.adminConsoleServices`>> property defined.
 ____
 
 === spec.networking.adminConsoleServices
 
-When the Couchbase Server Web Console is exposed with the <<spec-networking-exposeadminconsole>> property, by default, opening a browser session to the Web Console will be automatically load balanced across all pods in the cluster to provide high availability. However, the Web Console will display different features based on the services that are running on the particular pod that it's connected to.
+When the Couchbase Server Web Console is exposed with the <<spec-networking-exposeadminconsole,`spec.networking.exposeAdminConsole`>> property, by default, opening a browser session to the Web Console will be automatically load balanced across all pods in the cluster to provide high availability. However, the Web Console will display different features based on the services that are running on the particular pod that it's connected to.
 
 This property allows the UI service to be constrained to pods running one or more specific services. The services that you specify are subtractive in nature — they will only identify pods running all of those services — so care must be used. For example, if the cluster is deployed with multi-dimensional scaling, the data service on one set of pods, and the analytics service on another mutually exclusive set, then specifying `data` and `analytics` as your Web Console services list would result in the Web Console not being accessible — no pods match all the constraints, i.e. no pods are running both the data and analytics services.
 
-If you require access to a specific pod running a specific service, this can also be achieved by using the `admin` option of the <<spec-networking-exposedfeatures>> property.  This will allow access via a node port. You must connect directly to the IP address of the node that the pod is running on. The assigned node port is available via the cluster status structure returned by `kubectl describe`, or via the output of `kubectl get services`. Refer to the xref:services.adoc[services documentation] for more information.
+If you require access to a specific pod running a specific service, this can also be achieved by using the `admin` option of the <<spec-networking-exposedfeatures,`spec.networking.exposedFeatures`>> property.  This will allow access via a node port. You must connect directly to the IP address of the node that the pod is running on. The assigned node port is available via the cluster status structure returned by `kubectl describe`, or via the output of `kubectl get services`. Refer to the xref:reference-couchbasecluster-services.adoc[services documentation] for more information.
 
 ____
 _Field rules:_ The `adminConsoleServices` list is optional and defaults to an empty list. Valid item names are `data`, `index`, `query`, `search`, `eventing`, and `analytics`, and must be unique. An empty list means that any node in the cluster may be chosen when connecting to the Couchbase Server Web Console.
@@ -710,7 +710,7 @@ ____
 This field defines how the admin console service is exposed.  By default it will use a `NodePort` which exposes the console on a random port on all nodes in the cluster.  It is accessible only within the cluster or via an IP tunnel into the Kubernetes underlay network.  If set to `LoadBalancer` it will expose the default admin console port to the public internet via a load balancer on platforms which support this service type.  Only the TLS enabled port (18091) will be exposed to public networks.
 
 ____
-_Field rules:_ The `adminConsoleServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a `spec.dns.domain`.
+_Field rules:_ The `adminConsoleServiceType` field is optional and defaults to `NodePort`.  Allowed values are `NodePort` and `LoadBalancer`.  If this field is `LoadBalancer` then you must also define a <<spec-networking-dns-domainm,`spec.dns.domain`>>.
 ____
 
 === spec.networking.exposedFeatures
@@ -797,7 +797,7 @@ ____
 
 This field is optional and controls whether the Operator uses TLS for communication with the cluster.
 It also sets the TLS certificates that are used by Couchbase clients and XDCR.
-Refer to the xref:tls.adoc[TLS documentation] for more information.
+Refer to the xref:howto-tls.adoc[TLS documentation] for more information.
 
 [source,yaml]
 ----
@@ -820,7 +820,7 @@ This field defines the certificate and private key used by Couchbase Server serv
 
 This field is required if any static TLS configuration is specified under `spec.networking.tls.static`.
 This field references a secret containing a key `chain.pem` whose value is a wildcard certificate chain signed by the cluster CA defined in `spec.networking.tls.static.operatorSecret`, and `pkey.key` whose value is a private key corresponding to the leaf certificate.
-The xref:tls.adoc[TLS documentation] contains detailed information on generating valid certificates for your cluster.
+The xref:howto-tls.adoc[TLS documentation] contains detailed information on generating valid certificates for your cluster.
 
 ____
 _Field rules:_ This field is required when `spec.networking.tls.static` is defined and must be a string referencing a Kubernetes `Secret` resource.
@@ -833,7 +833,7 @@ This field defines the CA certificate and optionally a client certificate and pr
 This field is required if any static TLS configuration is specified under `spec.networking.tls.static`.
 This field references a secret containing a key `ca.crt` whose value is a CA certificate.
 The CA certificate must be the root authority for a server certificate defined in `spec.networking.tls.static.member.serverSecret`.
-The xref:tls.adoc[TLS documentation] contains detailed information on generating valid certificates for your cluster.
+The xref:howto-tls.adoc[TLS documentation] contains detailed information on generating valid certificates for your cluster.
 
 If `spec.networking.tls.clientCertificatePolicy` is set to `enable` then `operatorSecret` may contain a client certificate and private key.
 
@@ -916,7 +916,7 @@ spec:
 
 === spec.logging.logRetentionTime
 
-This field is used in conjunction with the `logs` persistent volume mount.  The value can be anything that can be parsed by the https://golang.org/pkg/time/#ParseDuration[golang ParseDuration] function.  If specified this controls the retention period that log volumes are kept for after their associated pods have been deleted.  If not specified (the default) or zero e.g. 0s, log volumes are retained indefinitely.
+This field is used in conjunction with the `logs` persistent volume mount.  The value can be anything that can be parsed by the https://golang.org/pkg/time/#ParseDuration[golang ParseDuration^] function.  If specified this controls the retention period that log volumes are kept for after their associated pods have been deleted.  If not specified (the default) or zero e.g. 0s, log volumes are retained indefinitely.
 
 It is recommended to specify this field when using ephemeral server classes so that potentially sensitive information is not retained indefinitely.  This allows compliance with data privacy legislation.
 
@@ -968,7 +968,7 @@ spec:
       value: value
     envFrom:
     - secretRef:
-      name: environment-secret
+        name: environment-secret
     resources:
       limits:
         cpu: 4
@@ -1080,7 +1080,7 @@ This field lets you reserve resources on a specific node. The requests section d
 [TIP]
 ====
 In general, CPU limits are specified as the number of threads required on physical hardware (vCPUs if in the cloud), and memory is specified in bytes.
-Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources].
+Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[managing compute resources^].
 ====
 
 == spec.servers[].volumeMounts
@@ -1559,7 +1559,7 @@ The metadata name identifies the claim template. This name is used by the `volum
 
 The `storageClassName` is optional for a claim. A `storageClassName` provides a way for administrators to describe the classes of storage they offer. If no `storageClassName` is specified, then the default storage class is used.
 
-Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/storage/storage-classes/[storage classes].
+Refer to the Kubernetes documentation for more information about https://kubernetes.io/docs/concepts/storage/storage-classes/[storage classes^].
 
 === spec.volumeClaimTemplates[].spec.resources
 

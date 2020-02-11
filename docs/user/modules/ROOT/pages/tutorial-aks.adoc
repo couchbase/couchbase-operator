@@ -7,7 +7,7 @@ This guide walks through the recommended procedure for installing the Couchbase 
 
 == Prerequisites
 
-Install the https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest[azure-cli] and login to the Azure Portal.
+Install the https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest[azure-cli^] and login to the Azure Portal.
 
 [source,console]
 ----
@@ -81,7 +81,7 @@ az aks get-versions --location eastus --query orchestrators[].orchestratorVersio
 
 == Installing the Operator and Couchbase
 
-Once you've properly deployed the Kubernetes cluster with Microsoft AKS, you can install the xref:install-admission-controller.adoc[admission controller] and the xref:install-kubernetes.adoc[Operator], and use it to xref:deploying-couchbase.adoc[deploy a Couchbase cluster] as normal.
+Once you've properly deployed the Kubernetes cluster with Microsoft AKS, you can install the xref:install-kubernetes.adoc[Operator], and use it to xref:howto-couchbase-create.adoc[deploy a Couchbase cluster] as normal.
 
 If you do not already have `kubectl` installed in your CLI, run the following command:
 
@@ -126,7 +126,7 @@ This will restrict the number of persistent volumes that can be created within a
 The limits apply on a per-node basis.
 For example, if the VM type in your AKS cluster supports a maximum of eight data disks, and you have four nodes in your cluster, then your cluster can support 32 volumes.
 +
-See the https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sizes[Azure documentation] for more information about max data disks.
+See the https://docs.microsoft.com/en-us/azure/virtual-machines/windows/sizes[Azure documentation^] for more information about max data disks.
 
 Single disk per pod::
 Given the slow mount time, it’s best to limit each pod to one disk (excluding the default disk).
@@ -150,7 +150,7 @@ At the time of this writing, AKS doesn't support Azure Availability Zones.
 Rather, AKS supports Azure Availability Sets to achieve high availability.
 +
 Availability Sets are labeled numerically (e.g. `0` and `1`).
-This means that xref:server-groups.adoc[server groups] also have to be named “0” and “1".
+This means that xref:concept-server-groups.adoc[server groups] also have to be named “0” and “1".
 
 * *Failed nodes require manual volume failover*
 +

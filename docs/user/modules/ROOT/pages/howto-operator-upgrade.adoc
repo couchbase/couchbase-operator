@@ -11,7 +11,7 @@ Upgrading the Couchbase Autonomous Operator is a four-step process:
 [#download-operator]
 == Step 1: Download the New Operator Package
 
-Download the Operator https://www.couchbase.com/downloads[package] for the version that you want to upgrade to, and unpack it on the same computer where you normally run `kubectl` or `oc`.
+Download the Operator https://www.couchbase.com/downloads[package^] for the version that you want to upgrade to, and unpack it on the same computer where you normally run `kubectl` or `oc`.
 
 The Operator package contains the YAML configuration files and command-line tools that you will use to upgrade and manage the Operator.
 
@@ -138,6 +138,4 @@ oc replace -f crd.yaml
 
 After <<update-crd, updating the CRD>>, you can move on to upgrading the Operator itself.
 Upgrading the Operator is exactly the same as the initial installation, except that you don't re-install the CRD.
-
-* Install the xref:install-admission-controller.adoc[Dynamic Admission Controller].
-* Install the Operator in all namespaces where previous instances operated on xref:install-kubernetes.adoc[Kubernetes] or xref:install-openshift.adoc[OpenShift].
+To re-install the Operator in all namespaces where previous instances operated on, see the relevant documentation for xref:install-kubernetes.adoc[Kubernetes] or xref:install-openshift.adoc[OpenShift].

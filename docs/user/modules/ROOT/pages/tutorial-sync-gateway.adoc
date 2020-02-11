@@ -177,7 +177,7 @@ spec:
 <.> `spec.template.spec.containers[0].volumeMounts[0].mountPath` mounts the configuration secret in the correct location.
     By default the Sync-Gateway container will try to load configuration from `/etc/sync_gateway/config.json`, and this is how the `Secret` and `Deployment` are configured.
 
-<.> `spec.template.spec.volumes[0].secret.secretName` references the <<configuring-syncgateway,Sync-Gateway configuration>> `Secret` that is mounted in the Sync-Gateway container.
+<.> `spec.template.spec.volumes[0].secret.secretName` references the <<configuring-sync-gateway,Sync-Gateway configuration>> `Secret` that is mounted in the Sync-Gateway container.
 
 == Templates
 

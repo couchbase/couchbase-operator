@@ -2,7 +2,7 @@
 
 This guide outlines the design and usage of the helm chart for deploying a couchbase cluster.
 This chart is especially helpful for rolling out development clusters and generating TLS certificates and keys.
-Howerver, configurations requiring server groups and persistent volumes are better expressed and managed directly using a cluster spec.
+However, configurations requiring server groups and persistent volumes are better expressed and managed directly using a cluster spec.
 Refer to the couchbase operator documentation regarding https://docs.couchbase.com/operator/1.1/howto-couchbase-create.html[deploying couchbase] directly from kubectl.
 
 [NOTE]
@@ -131,7 +131,7 @@ Refer to the couchbase operator documentation for more information about https:/
 
 === additional values
 
-All of the remaining values which can be overridden in this spec are desccribed here in the xref:reference-couchbasecluster.adoc[Couchbase Cluster Config] documentation.
+All of the remaining values which can be overridden in this spec are described here in the xref:reference-couchbasecluster.adoc[Couchbase Cluster Config] documentation.
 
 
 === Persistent Volumes

@@ -84,7 +84,7 @@ Password-protected keys are not supported by Couchbase Server or the Operator.
 
 === Private Key Formatting
 
-Due to an https://issues.couchbase.com/browse/MB-24404[issue] with Couchbase Server's private key handling, server keys need to be PKCS#1 formatted.
+Due to an https://issues.couchbase.com/browse/MB-24404[issue^] with Couchbase Server's private key handling, server keys need to be PKCS#1 formatted.
 This can be achieved with the following commands:
 
 [source,console]

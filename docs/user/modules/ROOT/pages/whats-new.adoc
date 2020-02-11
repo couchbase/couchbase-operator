@@ -55,7 +55,7 @@ The Operator now offers full production support on the following public Kubernet
 With support for automatic rolling Kubernetes upgrades, the Operator helps take the hassle and anxiety out of upgrading your Kubernetes or OpenShift cluster.
 By using disruption budgets, readiness probes, and custom Couchbase logic, the Operator ensures that your Couchbase deployment doesn't experience any downtime or data loss.
 
-See xref:upgrading-kubernetes.adoc[Upgrading the Kubernetes Cluster]
+See xref:concept-kubernetes-upgrade.adoc[Upgrading the Kubernetes Cluster]
 
 == TLS Certificate Rotation
 

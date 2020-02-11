@@ -34,7 +34,7 @@ The server group feature of the Couchbase data platform allows you group Couchba
 
 It is recommended that server groups should have an equal number of pods per server class to make it simpler to maintain server group constraints. It is also recommended that you have more server groups than replicas for the same reason.
 
-For more information, refer to xref:server-groups.adoc[About Using Couchbase Server Groups With the Operator].
+For more information, refer to xref:concept-server-groups.adoc[About Using Couchbase Server Groups With the Operator].
 
 == Storage
 
@@ -91,7 +91,7 @@ Keeping your data safe is of paramount importance. This section contains some be
 
 === Cluster Scope
 
-When you deploy a cluster, you do so in a https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespace]. The Operator needs to be given a fairly broad set of permissions in order to dynamically create pods, services, etc. It is recommended that the Operator, and the clusters that it manages, be segregated in their own name space. This limits the set of resources that the Operator can affect, and that xref:reference-cbopinfo.adoc[support tools] can collect data about, which aids in security compliance situations where confidential information may be leaked via the Kubernetes API operations.
+When you deploy a cluster, you do so in a https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespace^]. The Operator needs to be given a fairly broad set of permissions in order to dynamically create pods, services, etc. It is recommended that the Operator, and the clusters that it manages, be segregated in their own name space. This limits the set of resources that the Operator can affect, and that xref:reference-cbopinfo.adoc[support tools] can collect data about, which aids in security compliance situations where confidential information may be leaked via the Kubernetes API operations.
 
 == Node Configuration
 
@@ -108,14 +108,17 @@ Like all distributed systems, Couchbase Server needs to have synchronized time i
 
 Couchbase server has some recommended kernel parameters which should be set. These can be done via an orchestration solution or a Kubernetes `DaemonSet` resource.
 
-vm.swappiness::
-For systems with a swap file, this controls how aggressively the kernel will transfer unused application memory pages from physical RAM onto disk. It is highly recommended that this value be set to `0` to improve the data service performance, and by extension dependent services.
-
 mm.transparent_hugepage.enabled::
 Transparent huge pages (THP) attempt to allocate large areas of contiguous memory so that applications which process data sequentially, or that have high data locality, do so without causing a high number of kernel page faults. For a database such as Couchbase, this actually has a detrimental effect, since its access patterns are typically highly random. It is highly recommended that this parameter be set to `never`.
 
 mm.transparent_hugepage.defrag::
 Related to `mm.transparent_hugepage.enabled`, it is highly recommended that this parameter be set to `never`.
+
+[NOTE]
+====
+Couchbase Server recommends that `vm.swappiness` be set to zero.
+Kubernetes does not allow swap in containers therefore this parameter can be safely ignored.
+====
 
 For example, you could run something similar to the following:
 
@@ -152,7 +155,6 @@ spec:
           set -o xtrace
           while true
           do
-            sysctl -w vm.swappiness=0
             sysctl -w mm.transparent_hugepage.enabled=never
             sysctl -w mm.transparent_hugepage.defrag=never
             sleep 60

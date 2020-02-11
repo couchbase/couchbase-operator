@@ -208,7 +208,7 @@ ____
 The Couchbase cluster ID.
 
 This is a unique identifier generated during cluster initialization.
-This is required to establish xref:howto-xdcr-external.adoc[XDCR replications] to this cluster.
+This is required to establish xref:howto-xdcr.adoc[XDCR replications] to this cluster.
 
 ____
 _Field rules:_ This field will be a string.

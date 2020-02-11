@@ -37,7 +37,7 @@ View the config at `~/.kube/config` to ensure that all variables look correct:
 kubectl config view
 ----
 
-The following example shows two AWS context configurations appended to an existing minikube one:
+The following example shows two AWS context configurations appended to an existing Minikube one:
 
 [source,yaml]
 ----
@@ -122,7 +122,7 @@ Now it's important to apply the `aws-auth-cm.yaml` file so that the worker nodes
 
 Once you've properly deployed the Kubernetes cluster with Amazon EKS, you can xref:install-kubernetes.adoc[install the Operator] and use it to xref:howto-couchbase-create.adoc[deploy a Couchbase cluster] as normal.
 
-IMPORTANT: If you're using public DNS for xref:network-requirements.adoc[client connectivity], then you need to make sure that you configure the xref:reference-couchbasecluster.adoc#spec-platform[spec.platform] field in the CouchbaseCluster configuration.
+IMPORTANT: If you're using public DNS for xref:concept-couchbase-networking.adoc#public-networking-with-external-dns[client connectivity], then you need to make sure that you configure the xref:reference-couchbasecluster.adoc#spec-platform[spec.platform] field in the CouchbaseCluster configuration.
 Otherwise the load balancers won't deploy correctly, and applications won't be able to access Couchbase Server.
 
 == Configuring XDCR
@@ -138,7 +138,7 @@ You will need to then accept the connection request in the region of the _Accept
 
 === Configure Route Tables and Security Groups
 
-Once the peering connection is accepted, you must https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html[add a route] to the route tables of each of the VPCs so that they can send and receive traffic across the VPC peering connection.
+Once the peering connection is accepted, you must https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html[add a route^] to the route tables of each of the VPCs so that they can send and receive traffic across the VPC peering connection.
 To do this, go to *Route Tables* and select the route table associated with the public subnet of one of your VPCs.
 Select *Routes* and then *Edit*. Add the other VPC's CIDR block as the *Destination*, and add the `pcx-` (peering connection) as the *Target*.
 Repeat these steps for the other VPC *Public Subnet*.
@@ -153,7 +153,7 @@ This will allow nodes in each cluster to talk to each other.
 === Setup XDCR in the Admin Dashboard
 
 The last step is to xref:howto-ui.adoc[access the Couchbase Server Web Console] on each Couchbase cluster to set up and test XDCR.
-An alternative way is to access the Admin Dashboard UI as outlined in the xref:best-practices[Best Practises] section.
+An alternative way is to access the Admin Dashboard UI as outlined in the xref:best-practices[Best Practices] section.
 
 Take note of which cluster you are opening the XDCR connection on and its CIDR block.
 Switch to the context of the Accepter EKS cluster and run the following command to find the external IP of a pod of your choice to connect to:

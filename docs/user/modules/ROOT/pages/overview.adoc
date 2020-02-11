@@ -47,7 +47,7 @@ The following is a list of the management tasks that are currently supported:
 * Cluster configuration
  ** xref:howto-persistent-volumes.adoc[Persistent volumes]
  ** xref:howto-server-groups.adoc[Server groups]
- ** xref:howto-xdcr-external.adoc[Cross data center replication (XDCR)]
+ ** xref:howto-xdcr.adoc[Cross data center replication (XDCR)]
  ** xref:howto-tls.adoc[TLS and certificate rotation]
  ** User and group management
  ** Backup and restore

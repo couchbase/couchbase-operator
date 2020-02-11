@@ -1,7 +1,7 @@
 = About cbopinfo
 :tabs:
 
-`cbopinfo` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package]. It is used to collect resources and logs via the Kubernetes API in order to support the Operator and Couchbase Server.
+`cbopinfo` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package^]. It is used to collect resources and logs via the Kubernetes API in order to support the Operator and Couchbase Server.
 
 By default, `cbopinfo` will collect resources for all Couchbase clusters defined in the selected namespace. Certain resource types such as services, pods, and persistent volume claims are scoped to those created by the Operator. The scope can be further restricted to only the clusters specified on the command line.
 
@@ -13,11 +13,11 @@ The output is a compressed archive of resource YAML manifests organized by names
 
 The `cbopinfo` command can also collect and download Couchbase server logs from running pods and orphaned persistent log volumes.
 
-IMPORTANT: The `cbopinfo` command requires permission to read resources related to the cluster in order to function correctly e.g. deployments, pods, couchbaseclusters, etc.  When running this command ensure it is run by a user with sufficient permission to collect the required resources.  If permission is denied to access a particular resource type the command will notify the user and continue with the collection on a best attempt basis.  In general the required permissions are similar to those xref:reference-operator-rbac.adoc#operator-role-requirements[required by the operator] but read-only.
+IMPORTANT: The `cbopinfo` command requires permission to read resources related to the cluster in order to function correctly e.g. deployments, pods, couchbaseclusters, etc.  When running this command ensure it is run by a user with sufficient permission to collect the required resources.  If permission is denied to access a particular resource type the command will notify the user and continue with the collection on a best attempt basis.  In general the required permissions are similar to those xref:reference-operator-rbac.adoc[required by the operator] but read-only.
 
 == Installation
 
-Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package] and unpacked it on the same computer where you normally run `kubectl` or `oc`.
+Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package^] and unpacked it on the same computer where you normally run `kubectl` or `oc`.
 
 After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
 

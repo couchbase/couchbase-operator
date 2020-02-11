@@ -34,7 +34,7 @@ This is to ensure that all resources are updated appropriately.
 Upgrading the Operator and admission controller to a newer version requires that you upgrade the Operator _release_ to a newer version of its _chart_.
 This is to ensure that any other dependencies related to the Operator upgrade are also updated appropriately.
 
-NOTE: For xref:helm-setup-guide.adoc#deploy-production[production deployments] where you've manually installed the CRD, you'll need to xref:upgrading-the-operator.adoc#update-crd[manually update] the CRD before you upgrade the Operator via Helm.
+NOTE: For xref:helm-setup-guide.adoc#deploy-production[production deployments] where you've manually installed the CRD, you'll need to xref:howto-operator-upgrade.adoc#update-crd[manually update] the CRD before you upgrade the Operator via Helm.
 
 .To upgrade the Operator using Helm:
 [source,console]
@@ -44,7 +44,7 @@ helm upgrade --version <version> <release-name> couchbase/couchbase-operator
 
 ...where `<version>` is the version of the chart that you want to upgrade to, and  `<release-name>` is the name of the release that is managing the instance of the Operator that you are trying to upgrade.
 
-Refer to the xref:upgrading-the-operator.adoc[Operator upgrade documentation] for more information about the upgrade process.
+Refer to the xref:howto-operator-upgrade.adoc[Operator upgrade documentation] for more information about the upgrade process.
 
 IMPORTANT: If you didn't originally install the Operator using Helm, then you cannot upgrade the Operator using Helm.
 At this time, Operator installations that weren't created with Helm cannot be ported over to using Helm.

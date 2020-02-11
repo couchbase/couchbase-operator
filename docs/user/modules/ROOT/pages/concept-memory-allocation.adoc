@@ -159,17 +159,17 @@ However, since the application's memory requirements can vary by workload, it's 
 When a Couchbase cluster is deployed by the Autonomous Operator, each server Pod is scheduled onto its own dedicated Kubernetes node (recommended), or onto a shared Kubernetes node with other Pods.
 Depending on whether your Kubernetes nodes are dedicated or shared, there are slightly different considerations for when you go about setting memory quotas for Couchbase Pods.
 
-For shared nodes, you'll be using xref:reference-couchbasecluster.adoc#spec-servers-pod-resources[Pod resource limits and requests] for each server in the `CouchbaseCluster` configuration.
+For shared nodes, you'll be using xref:reference-couchbasecluster.adoc#spec-servers-resources[Pod resource limits and requests] for each server in the `CouchbaseCluster` configuration.
 These settings provide _hints_ for the Kubernetes scheduler to use when picking appropriate nodes to run the server Pods.
 The memory value under `requests` defines the minimum amount of memory the server Pod will reserve.
 This value needs to be the total of all memory quotas for the services in the server specification, _plus_ 25% overhead for the Couchbase Server application.
 Using the server specification from <<image-cluster-homogeneous-service-distribution>> as an example, you would add together the memory quota of all the services (256 + 256 + 256 + 1024 = 2048 MB), add 25% for application overhead, to get a total of 2560 MB.
-Specifying a value of `2560Mi` or greater for xref:reference-couchbasecluster.adoc#spec-servers-pod-resources[`spec.servers[\].pod.resources.requests.memory`] will ensure that the server pod does not get evicted for using up too much memory.
+Specifying a value of `2560Mi` or greater for xref:reference-couchbasecluster.adoc#spec-servers-resources[`spec.servers[\].resources.requests.memory`] will ensure that the server pod does not get evicted for using up too much memory.
 
 The same memory requirements that apply to shared nodes (total of all service memory quotas in the server specification, plus 25% overhead for the Couchbase Server application) also apply to dedicated nodes.
 However, instead of using resource requests/limits to ensure server Pods have enough memory to satisfy quotas, you may be using things like labels, node selectors, and taints/tolerations to ensure that server Pods get xref:concept-scheduling[scheduled] onto Kubernetes nodes that you know for sure have enough memory.
 
 [IMPORTANT]
 ====
-Even when running a Couchbase Server Pod on a dedicated Kubernetes node, it's important to remember that Kubernetes does not allow swap storage for containers, and thus a singular Pod must still remain within the bounds of the node's https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable[allocatable] memory, or else risk being evicted.
+Even when running a Couchbase Server Pod on a dedicated Kubernetes node, it's important to remember that Kubernetes does not allow swap storage for containers, and thus a singular Pod must still remain within the bounds of the node's https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable[allocatable^] memory, or else risk being evicted.
 ====

@@ -60,7 +60,7 @@ The `PodDisruptionBudget` specifies that at least the cluster size minus one nod
 This constraint allows, at most, one node to be evicted at a time.
 As a result, it's recommended that to support an automatic Kubernetes upgrade, the cluster be deployed with anti-affinity enabled to guarantee only a single eviction at a time.
 
-To ensure Couchbase Server nodes report that they are ready once they are added to the cluster and balanced in, the Couchbase server pods are created with an _exec_-based https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#define-readiness-probes[readiness probe].
+To ensure Couchbase Server nodes report that they are ready once they are added to the cluster and balanced in, the Couchbase server pods are created with an _exec_-based https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#define-readiness-probes[readiness probe^].
 The probe simply polls a file on the pod's file system.
 The file is created by the Operator only when all of the pods are balanced in and the cluster is in a stable condition.
 
@@ -87,7 +87,7 @@ This will require a maintenance window in order to ensure that all data is repli
 When you drain a Kubernetes node containing a Couchbase pod, the following sequence of events will occur:
 
 * The Operator will detect that a cluster member is down.
-You should monitor this via the xref:logs-troubleshooting.adoc#operator-logs[Operator logs] or xref:howto-ui.adoc[Couchbase Web Console].
+You should monitor this via the xref:howto-troubleshooting.adoc#operator-logs[Operator logs] or xref:howto-ui.adoc[Couchbase Web Console].
 
 * The Couchbase pod will be failed over and the Operator will create a replacement pod in order to restore server class sizing.
 

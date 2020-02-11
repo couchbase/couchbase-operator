@@ -124,7 +124,7 @@ Couchbase Autonomous Operator 1.2.0 was released in May 2019.
 
 For installation instructions, see xref:install-kubernetes.adoc[Installing on Kubernetes] and xref:install-openshift.adoc[Installing on OpenShift].
 
-For upgrade instructions, see xref:upgrading-the-operator.adoc[Upgrading the Operator].
+For upgrade instructions, see xref:howto-operator-upgrade.adoc[Upgrading the Operator].
 
 [#supported-platforms-v120]
 === Platform Support

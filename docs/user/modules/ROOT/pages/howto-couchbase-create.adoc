@@ -7,7 +7,7 @@ Before you attempt to deploy a Couchbase Server cluster with the Couchbase Auton
 
 * You have reviewed the xref:prerequisite-and-setup.adoc[prerequisites]
 * You have deployed the admission controller and the Operator, and both are up and running
-* You have downloaded the Operator https://www.couchbase.com/downloads[package]
+* You have downloaded the Operator https://www.couchbase.com/downloads[package^]
 +
 The Operator package also contains YAML configuration files that will help you set up a Couchbase cluster.
 
@@ -151,8 +151,8 @@ cb-example-0001                       1/1       Running   0          1m
 cb-example-0002                       1/1       Running   0          1m
 couchbase-operator-1917615544-pd4q6   1/1       Running   0          8m
 ----
-
-A CouchbaseCluster object is also created for the cluster and can be used to xref:list-and-describe.adoc[get health and status information] about the cluster.
+The `CouchbaseCluster` object status is continually updated during cluster operation and can be used to trigger external events.
+See the xref:reference-couchbasecluster-status.adoc[`CouchbaseCluster` status reference] for details.
 
 == Next Steps
 

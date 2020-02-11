@@ -69,7 +69,7 @@ ____
 === metadata.labels
 
 The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
-Further details about resource selection can be found on the xref:couchbase-resource-rbac.adoc[Couchbase Resources and RBAC page].
+Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____
 _Field rules:_ This field is optional and must be a map of string key/value pairs.

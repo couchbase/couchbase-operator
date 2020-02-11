@@ -27,7 +27,7 @@ TLS can be used to secure communications.
 .Learn More
 * xref:howto-ui.adoc#port-forwarding[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#dns-based-addressing[How-to connect a client SDK]
-* xref:howto-xdcr-external.adoc#dns-based-addressing[How-to configure XDCR]
+* xref:howto-xdcr.adoc#dns-based-addressing[How-to configure XDCR]
 
 == Inter-Kubernetes Networking with Forwarded DNS
 
@@ -53,7 +53,7 @@ TLS can be used to secure communications.
 .Learn More
 * xref:howto-ui.adoc#port-forwarding[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#dns-based-addressing[How-to connect a client SDK]
-* xref:howto-xdcr-external.adoc#dns-based-addressing[How-to configure XDCR]
+* xref:howto-xdcr.adoc#dns-based-addressing[How-to configure XDCR]
 * xref:tutorial-remote-dns.adoc[Inter-kubernetes networking with forwarded DNS tutorial]
 
 == Public Networking with External DNS
@@ -75,7 +75,7 @@ TLS must be used to secure communications.
 * xref:howto-public-networking.adoc[How-to configure public networking]
 * xref:howto-ui.adoc#dns-based-addressing[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[How-to connect a client SDK]
-* xref:howto-xdcr-external.adoc#dns-based-addressing-with-external-dns[How-to configure XDCR]
+* xref:howto-xdcr.adoc#dns-based-addressing-with-external-dns[How-to configure XDCR]
 * xref:tutorial-public-addressability.adoc[Public networking tutorial]
 
 == Generic Networking
@@ -95,7 +95,7 @@ TLS cannot be used to secure communications.
 * xref:howto-nodeport-networking.adoc[How-to configure node port networking]
 * xref:howto-ui.adoc#port-forwarding[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#ip-based-addressing[How-to connect a client SDK]
-* xref:howto-xdcr-external.adoc#ip-based-addressing[How-to configure XDCR]
+* xref:howto-xdcr.adoc#ip-based-addressing[How-to configure XDCR]
 
 == Exposed Features
 
@@ -147,7 +147,7 @@ NOTE: When not using the embedded `libcouchbase` and choosing to build with an e
 | 1.6.1+
 
 | Couchbase Sync Gateway
-| Not yet supported
+| 2.7.0+
 
 | Couchbase Elasticsearch Connector
 | 4.1.0+
