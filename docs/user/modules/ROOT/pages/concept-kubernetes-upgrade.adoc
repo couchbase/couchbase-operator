@@ -43,7 +43,7 @@ Before beginning an upgrade to your Kubernetes cluster, review the following con
 
 * To minimize disruption, ensure that a short failover period is configured with the xref:reference-couchbasecluster.adoc#spec-cluster-autofailovertimeout[autoFailoverTimeout parameter] to reduce down time before another node takes over the load.
 
-* Ensure that there is capacity in your Kubernetes cluster to handle the scheduling of replacement Couchbase pods.
+* Ensure that there is xref:concept-sizing.adoc[capacity] in your Kubernetes cluster to handle the scheduling of replacement Couchbase pods.
 For example, if a Couchbase cluster were running on Kubernetes nodes marked exclusively for use by Couchbase, and anti-affinity were enabled as per the deployment xref:best-practices.adoc[best practices], the Kubernetes cluster would require at least one other node capable of scheduling and running your Couchbase workload.
 For clusters deployed with server group support, this would require another node per availability zone.
 
@@ -63,24 +63,6 @@ As a result, it's recommended that to support an automatic Kubernetes upgrade, t
 To ensure Couchbase Server nodes report that they are ready once they are added to the cluster and balanced in, the Couchbase server pods are created with an _exec_-based https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#define-readiness-probes[readiness probe^].
 The probe simply polls a file on the pod's file system.
 The file is created by the Operator only when all of the pods are balanced in and the cluster is in a stable condition.
-
-[IMPORTANT]
-.About Automatically Upgrading Kubernetes Clusters Running Couchbase Clusters That Were Created Prior to Operator 1.2.0
-====
-Couchbase clusters that were created with Operator versions prior to 1.2.0 cannot have their underlying Kubernetes nodes automatically upgraded until they (the Couchbase clusters) are updated to use _exec_-based readiness checks.
-
-.To upgrade the Couchbase cluster to use the new readiness checks, first ensure the Operator has been upgraded to version 1.2.0, then choose one of the following options:
-* Change the name of all server classes (the `spec.servers[].name` attribute).
-This will swap the pods that are using old specifications with new ones, all in a single operation.
-This is an online upgrade.
-* Perform an xref:concept-upgrade.adoc[upgrade] of Couchbase server.
-This will upgrade the pods that are using old specifications with new ones via the rolling upgrade mechanism.
-This is an online upgrade.
-This is the preferred method to perform this upgrade action.
-An upgrade cannot be be performed if you are already running the latest version of Couchbase server.
-* Create a new Couchbase cluster and migrate existing data over to the new one with XDCR.
-This will require a maintenance window in order to ensure that all data is replicated successfully and to update clients to connect to the new Couchbase cluster.
-====
 
 === Manual Upgrade
 
