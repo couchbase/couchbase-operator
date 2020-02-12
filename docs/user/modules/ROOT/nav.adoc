@@ -21,6 +21,7 @@
   *** xref:concept-mds.adoc[Couchbase Multi-Dimensional Scaling]
   *** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
   *** xref:concept-sizing.adoc[Couchbase Sizing]
+  *** xref:concept-vertical-scaling.adoc[Couchbase Cluster Vertical Scaling]
   *** xref:concept-couchbase-networking.adoc[Couchbase Networking]
   *** xref:concept-tls.adoc[Couchbase TLS]
   *** xref:concept-server-groups.adoc[Couchbase Server Groups]
