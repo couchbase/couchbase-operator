@@ -93,6 +93,8 @@ There is no Kubernetes-native upgrade path, so we provide a tool to perform this
 * The supported Kubernetes versions are unable run different custom resource versions at the same time.
   Ensure all instances of the Operator in different namespaces are shut down before continuing.
 * All `CouchbaseCluster` resources in a namespace must be upgraded before restarting the Operator in that namespace.
+* Upon Operator restart, the cluster will undergo a mandatory rolling upgrade to generate required metadata.
+  Ensure your Kubernetes cluster has the required xref:concept-sizing.adoc[capacity] to support this operation.
 ====
 
 The `cbopconv` tool takes a version 1 `CouchbaseCluster` and converts it to version 2.
