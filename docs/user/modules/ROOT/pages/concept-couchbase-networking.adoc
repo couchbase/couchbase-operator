@@ -31,11 +31,12 @@ TLS can be used to secure communications.
 
 == Inter-Kubernetes Networking with Forwarded DNS
 
-Inter-Kubernetes networking allows clients to connect to Couchbase server instances in another Kubernetes cluster.
+Inter-Kubernetes networking allows clients to connect to Couchbase server instances in a remote Kubernetes cluster.
+It uses the DNS service offered by the remote Kubernetes cluster to provide addressing.
 
+A local DNS server is used by Couchbase Server and clients to forward DNS requests for a remote namespace to a remote Kubernetes cluster.
+Requests that do not fall into this DNS zone are forwarded to the local DNS service.
 Any DNS server that supports forwarding of zones to remote DNS servers can be used, but we recommend https://coredns.io[CoreDNS^] as the defacto cloud native standard.
-A local DNS server is used by Couchbase Server pods to forward DNS requests for a remote namespace to a remote cluster.
-Requests that do not fall into this zone are forwarded to the local Kubernetes cluster DNS instance.
 
 This method of communication can only be used if clients in one cluster can communicate with pods in another -- it uses xref:concept-kubernetes-networking.adoc#routed-networking[routed networking].
 For example:
@@ -44,9 +45,9 @@ For example:
 * Amazon AWS can use the https://github.com/aws/amazon-vpc-cni-k8s[VPC CNI plugin^] to create routed networks that can be peered together.
 
 .Basic Inter-Kubernetes Networking
-image::networking-basic-kubernetai.png[]
+image::networking-basic-forwarded-dns.png[]
 
-The client can use replicated endpoint DNS entries to connect to individual Couchbase nodes.
+The client can use endpoint DNS entries to connect to individual Couchbase nodes.
 Stable service discovery is provided by SRV records.
 TLS can be used to secure communications.
 
