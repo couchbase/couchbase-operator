@@ -43,12 +43,12 @@ UI access will be with port-forwarding using `localhost`.
 
 In general, the required set of DNS subject alternative names (SANs) is:
 
-* `DNS:*.${cluster}`
-* `DNS:*.${cluster}.${namespace}`
-* `DNS:*.${cluster}.${namespace}.svc`
-* `DNS:${cluster}-srv`
-* `DNS:${cluster}-srv.${namespace}`
-* `DNS:${cluster}-srv.${namespace}.svc`
+* `DNS:*.$\{cluster}`
+* `DNS:*.$\{cluster}.$\{namespace}`
+* `DNS:*.$\{cluster}.$\{namespace}.svc`
+* `DNS:$\{cluster}-srv`
+* `DNS:$\{cluster}-srv.$\{namespace}`
+* `DNS:$\{cluster}-srv.$\{namespace}.svc`
 * `DNS:localhost`
 
 [NOTE]
@@ -100,7 +100,7 @@ openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
 == Creating a Dynamic Admission Controller Server Certificate
 
 To create a server certificate that can be used by the dynamic admission controller, simply specify the service name that the Kubernetes API webhooks will connect to.
-This is in the form `${service}.${default}.svc`, so if our service is called `couchbase-operator-admission` and we were deploying it in the `operator-admission` namespace, run the following:
+This is in the form `$\{service}.$\{namespace}.svc`, so if our service is called `couchbase-operator-admission` and we were deploying it in the `operator-admission` namespace, run the following:
 
 [source,console]
 ----

@@ -1,4 +1,5 @@
 = CouchbaseCluster Resource Status
+include::partial$constants.adoc[]
 
 [abstract]
 Status fields attached to CouchbaseCluster resources by the Operator.
@@ -15,7 +16,7 @@ Any modifications will not affect the cluster and will be reverted by the Operat
 
 An example status object may look like the following, with individual attributes explained below:
 
-[source,yaml]
+[source,yaml,subs="attributes"]
 ----
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
@@ -37,7 +38,7 @@ status:
     unready:
     - my-cluster-0001
     - my-cluster-0002
-  currentVersion: 6.5.0
+  currentVersion: {couchbase-version}
   adminConsolePort: "30245"
   adminConsolePortSSL: "31749"
   exposedFeatures:
@@ -63,11 +64,11 @@ status:
 
 The `CouchbaseCluster` custom resource definition defines custom formatting that is used by the following command:
 
-[source,console]
+[source,console,subs="attributes"]
 ----
 $ kubectl get couchbaseclusters
 NAME         VERSION   SIZE   STATUS    UUID                               AGE
-cb-example   6.5.0     3      Running   91f7b67a0aa6a2e2b0ecefb63528194a   56m
+cb-example   {couchbase-version}     3      Running   91f7b67a0aa6a2e2b0ecefb63528194a   56m
 ----
 
 These fields are provided for convenience when looking up and configuring clusters and map to status variables as follows:

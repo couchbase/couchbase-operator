@@ -1,4 +1,5 @@
 = About the CouchbaseCluster Resource
+include::partial$constants.adoc[]
 
 :toc: macro
 
@@ -8,14 +9,14 @@ The following CouchbaseCluster configuration shows all of the available paramete
 (Note that this configuration is not valid and is meant for example purposes only.)
 
 .All available CouchbaseCluster configuration parameters
-[source,yaml]
+[source,yaml,subs="attributes"]
 ----
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  image: couchbase/server:6.0.3
+  image: couchbase/server:{couchbase-version}
   paused: false
   antiAffinity: true
   softwareUpdateNotifications: true
@@ -167,7 +168,7 @@ spec:
   monitoring:
     prometheus:
       enabled: true
-      image: couchbase/prometheus-exporter:1.0.0
+      image: couchbase/prometheus-exporter:{prometheus-version}
       authorizationSecret: cb-metrics-token
       resources:
         requests:
@@ -229,10 +230,10 @@ ____
 
 This section describes the top-level parameters related to a Couchbase cluster deployment.
 
-[source,yaml]
+[source,yaml,subs="attributes"]
 ----
 spec:
-  image: couchbase/server:6.0.3
+  image: couchbase/server:{couchbase-version}
   paused: false
   antiAffinity: true
   softwareUpdateNotifications: true
@@ -250,8 +251,8 @@ spec:
 === spec.image
 
 This field specifies the image that should be used.
-For docker hub images for use on Kubernetes this should be similar to `couchbase/server:6.0.3`.
-For Red Hat images for use with OCP this should be similar to `registry.connect.redhat.com/couchbase/server:6.0.3-1`.
+For docker hub images for use on Kubernetes this should be similar to `couchbase/server:{couchbase-version}`.
+For Red Hat images for use with OCP this should be similar to `registry.connect.redhat.com/couchbase/server:{couchbase-version-redhat}`.
 Please check the relevant registry for the most up to date image tags.
 You may use a different location if, for example, you have a local container registry.
 
@@ -1482,13 +1483,13 @@ ____
 
 This object defines any integrations with third party monitoring software.
 
-[source,yaml]
+[source,yaml,subs="attributes"]
 ----
 spec:
   monitoring:
     prometheus:
       enabled: true
-      image: couchbase/prometheus-exporter:1.0.0
+      image: couchbase/prometheus-exporter:{prometheus-version}
       authorizationSecret: cb-metrics-token
       resources:
         requests:

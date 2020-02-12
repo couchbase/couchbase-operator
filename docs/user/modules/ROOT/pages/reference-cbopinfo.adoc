@@ -1,4 +1,5 @@
 = About cbopinfo
+include::partial$constants.adoc[]
 :tabs:
 
 `cbopinfo` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package^]. It is used to collect resources and logs via the Kubernetes API in order to support the Operator and Couchbase Server.
@@ -181,13 +182,13 @@ all           # Collect all available logs
 If specified with the `--collectinfo` option, this will indicate that only redacted logs should be collected and downloaded.
 
 --operator-image <image>::
-If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to `couchbase/operator:1.2.2`.
+If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to `couchbase/operator:{operator-version}`.
 
 --operator-rest-port <port>::
 If specified this sets the Operator REST API port.  It is used for collection of runtime information.  If not set it will default to _8080_.
 
 --server-image <image>::
-If specified this defines the Couchbase Server image to use when collecting logs from detached log volumes.  If not set, it will default to `couchbase/server:enterprise-6.0.1`
+If specified this defines the Couchbase Server image to use when collecting logs from detached log volumes.  If not set, it will default to `couchbase/server:enterprise-{couchbase-version}`
 
 --system::
 If specified, this flag will additionally collect all resources from the `kube-system` namespace, which may be useful in diagnosing problems with cluster-level roles, custom resource definitions, or system services.
@@ -206,7 +207,7 @@ Wrote cluster information to cbopinfo-20180629T123256+0100.tar.gz
 
 To collect basic logs on OpenShift from a specific name space:
 
-[source,console]
+[source,console,subs="attributes"]
 ----
 $ oc login -u developer
 Authentication required for https://192.168.99.100:8443 (openshift)
@@ -220,7 +221,7 @@ You have access to the following projects and can switch between them with 'oc p
 
 Using project "myproject".
 
-$ cbopinfo --namespace myproject --operator-image couchbase/operator:1.2.2-1
+$ cbopinfo --namespace myproject --operator-image couchbase/operator:{operator-version-redhat}
 Wrote cluster information to cbopinfo-20180801T141838+0100.tar.gz
 ----
 

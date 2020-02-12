@@ -24,10 +24,10 @@ All that is required to calculate the connection string is the cluster name and 
 For the following examples we will use `my-cluster` and `my-namespace` respectively.
 
 Due to the fact that service discovery occurs only though the data service, we need to use a separate service to identify only these nodes.
-The service name is in the form `${cluster-name}-srv`.
+The service name is in the form `$\{cluster-name}-srv`.
 
-The complete connection string -- for clients running in Kubernetes -- is in the form `${scheme}://${cluster-name}-srv.${namespace}`.
-Due to domain search rules within Kubernetes you may use `${scheme}://${cluster-name}-srv` if the client resides in the same namespace.
+The complete connection string -- for clients running in Kubernetes -- is in the form `$\{scheme}://$\{cluster-name}-srv.$\{namespace}`.
+Due to domain search rules within Kubernetes you may use `$\{scheme}://$\{cluster-name}-srv` if the client resides in the same namespace.
 Clients running outside of Kubernetes will have to use the fully-qualified domain name.
 Given our example cluster and namespace names:
 
@@ -45,7 +45,7 @@ The External DNS controller does not support SRV records, instead we use HTTPS.
 Fault-tolerance is provided by a load balancer service.
 
 The connection string is determined by the xref:reference-couchbasecluster.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] cluster parameter.
-The connection string is in the form `\https://console.${dns-domain}`.
+The connection string is in the form `\https://console.$\{dns-domain}`.
 Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `\https://console.my-cluster.acme.org:18091`.
 
 [NOTE]

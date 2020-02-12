@@ -1,4 +1,5 @@
 = Logs and Troubleshooting
+include::partial$constants.adoc[]
 :experimental:
 
 This section provides information about how to diagnose and troubleshoot problems with the Couchbase Operator or your deployment.
@@ -155,7 +156,7 @@ The general log collection process is as follows:
 
 The basic template will look like the following:
 
-[source,yaml]
+[source,yaml,subs="attributes"]
 ----
 ---
 apiVersion: v1
@@ -167,7 +168,7 @@ spec:
   restartPolicy: never
   containers:
   - name: couchbase-server
-    image: couchbase/server:enterprise-6.0.1
+    image: couchbase/server:{couchbase-version}
     command: '/bin/sleep'
     args:
     - '86400'

@@ -1,4 +1,5 @@
 = Deploying a Couchbase Cluster Using the Operator
+include::partial$constants.adoc[]
 :tabs:
 
 == Prerequisites
@@ -20,7 +21,7 @@ To deploy a Couchbase Server cluster using the Operator, all you have to do is c
 The Operator package contains an example CouchbaseCluster configuration file (`couchbase-cluster.yaml`), also listed here:
 
 .Example CouchbaseCluster Configuration for open source Kubernetes (couchbase-cluster.yaml)
-[source,yaml]
+[source,yaml,subs="attributes,verbatim"]
 ----
 apiVersion: v1
 kind: Secret
@@ -43,7 +44,7 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example  # <.>
 spec:
-  image: couchbase/server:6.0.3  # <.>
+  image: couchbase/server:{couchbase-version}  # <.>
   security:
     adminSecret: cb-example-auth
   networking:
@@ -68,7 +69,7 @@ By taking a quick look at this configuration file, you can see that it defines a
 
 <.> Buckets: 1 bucket named `default` 
 <.> Cluster name: `cb-example`
-<.> Couchbase image: `couchbase/server:6.0.3`
+<.> Couchbase image: `couchbase/server:{couchbase-version}`
 <.> Size: 3-node cluster with all services on each node
 
 You can use this example CouchbaseCluster configuration file "as-is" to test out how the Operator deploys a Couchbase Server cluster. However, to deploy a Couchbase cluster that is more specifically tailored to your development and production needs, you need to create your own custom configuration file that conforms to the xref:reference-couchbasecluster.adoc[CouchbaseCluster specification].

@@ -1,4 +1,5 @@
 = Publicly Addressable Cluster Tutorial
+include::partial$constants.adoc[]
 
 [abstract]
 How to configure a Couchbase cluster so that is available via the public internet.
@@ -167,14 +168,14 @@ If the `rockstar-wizard.com` domain is used by multiple instances of External DN
 
 The final Couchbase cluster definition will look similar to the following:
 
-[source,yaml]
+[source,yaml,subs="attributes"]
 ----
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: couchbase
 spec:
-  image: couchbase/server:6.0.3
+  image: couchbase/server:{couchbase-version}
   security:
     adminSecret: my-admin-secret
   networking:

@@ -1,0 +1,8 @@
+:operator-version: 2.0.0
+:operator-version-redhat: 2.0.0-1
+:couchbase-version: 6.5.0
+:couchbase-version-upgrade-from: 6.0.0
+:couchbase-version-redhat: 6.5.0-1
+:couchbase-version-redhat-upgrade-from: 6.0.0-1
+:prometheus-version: 1.0.0
+:prometheus-version-redhat: 1.0.0-1

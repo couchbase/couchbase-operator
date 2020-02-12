@@ -1,4 +1,5 @@
 = About cbopcfg
+include::partial$constants.adoc[]
 :tabs:
 
 `cbopcfg` is a command-line tool that is provided in the Couchbase Autonomous Operator https://www.couchbase.com/downloads[package^].
@@ -86,10 +87,10 @@ If specified this will override the default namespace `default`.
 Specifying the namespace is especially important when installing the dynamic admission controller as this flag affects TLS certificate generation.
 
 --operator-image <string>::
-If specified this will override the default operator image `couchbase/operator:${version}`.
+If specified this will override the default operator image `couchbase/operator:{operator-version}`.
 
 --dynamic-admission-controller-image <string>::
-If specified this will override the default admission controller image `couchbase/admission-controller:${version}`.
+If specified this will override the default admission controller image `couchbase/admission-controller:{operator-version}`.
 
 --image-pull-secret <string>::
 If specified this will add the image pull secret name to all deployments.
@@ -122,10 +123,10 @@ cbopcfg > operator.yaml
 
 To create configuration to run on RedHat Openshift:
 
-[source,console]
+[source,console,subs="attributes"]
 ----
 cbopcfg --namespace myproject \
-  --operator-image registry.connect.redhat.com/couchbase/operator:1.2.2-1 \
-  --dynamic-admission-controller-image registry.connect.redhat.com/couchbase/admission-controller:1.2.2-1 \
+  --operator-image registry.connect.redhat.com/couchbase/operator:{operator-version-redhat} \
+  --dynamic-admission-controller-image registry.connect.redhat.com/couchbase/admission-controller:{operator-version-redhat} \
   --image-pull-secret my-redhat-docker-credentials > operator.yaml
 ----
