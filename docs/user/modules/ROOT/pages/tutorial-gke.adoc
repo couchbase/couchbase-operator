@@ -1,7 +1,7 @@
-= Installing on GKE
+= Installing GKE
 
 [abstract]
-Install the Couchbase Autonomous Operator on Google Kubernetes Engine (GKE).
+Prepare Google Kubernetes Engine (GKE) for the Couchbase Autonomous Operator.
 
 Examples will be illustrated with the Google Cloud SDK, however all steps can be completed via the https://console.cloud.google.com/[Google Cloud web console^].
 

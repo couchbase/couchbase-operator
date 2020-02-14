@@ -59,8 +59,19 @@ Kubernetes and the Operator are complex systems -- you shouldn't go in unprepare
 The following is a selection of documentation that should be read and understood fully before continuing:
 
 * xref:best-practices.adoc[Best practices] - understand the best way to deploy Couchbase clusters
+* xref:prerequisite-and-setup.adoc[System requirements] - understand supported platforms, software and resource requirements
+* xref:prerequisite-cloud.adoc[Public cloud prerequisites] - understand how to prepare public clouds to run the Operator
 * xref:concept-label-selection.adoc[Custom resource label selection] - understand how Couchbase cluster specifications are built
 * xref:concept-couchbase-networking.adoc[Network architectures] - understand how to correctly configure networking for the best experience
+
+== Getting Started
+
+Once you have read the essential guides, you are ready to install the Operator and create your first Couchbase cluster.
+
+* xref:install-kubernetes.adoc[Installing the Operator on Kubernetes]
+* xref:install-openshift.adoc[Installing the Operator on Red Hat Openshift]
+* xref:howto-couchbase-create.adoc[Deploying a Couchbase cluster]
+* xref:howto-ui.adoc[Connecting to the Couchbase web console]
 
 == Finding Your Way Around
 

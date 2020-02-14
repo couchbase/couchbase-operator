@@ -3,6 +3,7 @@
 * Getting Started
  ** xref:best-practices.adoc[Guidelines and Best Practices]
  ** xref:prerequisite-and-setup.adoc[System Requirements]
+ ** xref:prerequisite-cloud.adoc[Public Cloud Prerequisites]
  ** xref:install-kubernetes.adoc[Install the Operator on Kubernetes]
  ** xref:install-openshift.adoc[Install the Operator on OpenShift]
  ** xref:release-notes.adoc[Release Notes]
@@ -87,6 +88,6 @@
  ** xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS]
  ** xref:tutorial-public-addressability.adoc[Public Networking with External DNS]
  ** xref:tutorial-sync-gateway.adoc[Connecting Sync-Gateway to a Couchbase Cluster]
- ** xref:tutorial-aks.adoc[Installing on AKS]
- ** xref:tutorial-eks.adoc[Installing on EKS]
- ** xref:tutorial-gke.adoc[Installing on GKE]
+ ** xref:tutorial-aks.adoc[Installing AKS]
+ ** xref:tutorial-eks.adoc[Installing EKS]
+ ** xref:tutorial-gke.adoc[Installing GKE]

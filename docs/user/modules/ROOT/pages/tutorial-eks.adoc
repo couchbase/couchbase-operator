@@ -1,20 +1,18 @@
-= Installing on EKS
+= Installing EKS
 
 [abstract]
-Install the Couchbase Autonomous Operator on the Amazon Elastic Kubernetes Service (EKS).
-
-== Configuring Your EKS Deployment
+Prepare Amazon Elastic Kubernetes Service (EKS) for the Couchbase Autonomous Operator.
 
 This guide is meant to supplement the regular Amazon EKS https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html[setup documentation^], and provides recommendations up to setting up worker nodes.
 
-=== Prerequisites
+== Prerequisites
 
 In addition to the standard EKS https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-prereqs[prerequisites^], you must also do the following:
 
 * Install `aws-iam-authenticator` when you install `kubectl`.
 * Install the latest version of the AWS CLI.
 
-=== Create the Cluster and Configure kubectl
+== Create the Cluster and Configure kubectl
 
 Create the EKS cluster(s) according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-create-cluster[documentation^].
 Actual cluster creation in EKS can take some time (around 10-15 minutes per cluster).
@@ -106,7 +104,7 @@ kubectl config use-context arn:aws:eks:eu-west-1:705067739613:cluster/test1
 ----
 
 [#worker-nodes]
-=== Set up Worker Nodes
+== Set up Worker Nodes
 
 Launch and configure the worker nodes according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-launch-workers[documentation^].
 Note that it's important to wait for your EKS cluster status to show as ACTIVE before launching worker nodes.
@@ -118,14 +116,7 @@ Copy this value and replace the _<ARN of instance role (not instance profile)>_ 
 
 Now it's important to apply the `aws-auth-cm.yaml` file so that the worker nodes can be discovered by the control plane, otherwise the process will hang as there are no nodes to deploy onto.
 
-== Installing the Operator and Couchbase
-
-Once you've properly deployed the Kubernetes cluster with Amazon EKS, you can xref:install-kubernetes.adoc[install the Operator] and use it to xref:howto-couchbase-create.adoc[deploy a Couchbase cluster] as normal.
-
-IMPORTANT: If you're using public DNS for xref:concept-couchbase-networking.adoc#public-networking-with-external-dns[client connectivity], then you need to make sure that you configure the xref:reference-couchbasecluster.adoc#spec-platform[spec.platform] field in the CouchbaseCluster configuration.
-Otherwise the load balancers won't deploy correctly, and applications won't be able to access Couchbase Server.
-
-== Configuring XDCR
+== Configuring for XDCR
 
 If you wish to take advantage of XDCR capabilities using the Operator, there are a few extra steps to complete.
 
@@ -150,83 +141,7 @@ Do this for both clusters.
 This will allow nodes in each cluster to talk to each other.
 * Allow ICMP from the same cluster's CIDR to be able to ping the other cluster’s nodes to see if it has the desired network setup.
 
-=== Setup XDCR in the Admin Dashboard
+== Next Steps
 
-The last step is to xref:howto-ui.adoc[access the Couchbase Server Web Console] on each Couchbase cluster to set up and test XDCR.
-An alternative way is to access the Admin Dashboard UI as outlined in the xref:best-practices[Best Practices] section.
-
-Take note of which cluster you are opening the XDCR connection on and its CIDR block.
-Switch to the context of the Accepter EKS cluster and run the following command to find the external IP of a pod of your choice to connect to:
-
-[source,console]
-----
-kubectl get pod -o wide
-----
-
-In this case, it would be 192.168.87.250 and _not_ the value in the IP field:
-
-[source,console]
-----
-NAME                       READY   STATUS    RESTARTS   AGE   IP                NODE
-cb-example-0000    	1/1     Running   0          1d    192.168.84.42     ip-192-168-87-250.us-west-2.compute.internal
-----
-
-Next, run the following command to find the pod’s port that is being mapped to port 8091 (Web Console port):
-
-[source,console]
-----
-kubectl get svc
-----
-[source,console]
-----
-cb-example-0000-exposed-ports   NodePort    10.100.49.245    <none>    11210:31245/TCP,11207:31978/TCP,8091:30247/TCP,18091:30425/TCP,8092:30286/TCP,18092:31408/TCP   22h
-----
-
-Append this port to the external IP of the pod to use for the IP/Hostname field. Based on the above example, you would enter 192.168.87.250:30247 into the IP/Hostname field when adding the remote cluster.
-
-[#best-practices]
-== Best Practices
-
-* To access the Couchbase Admin Dashboard we can expose it as a LoadBalancer as outlined through Exposed Features.
-Alternatively we can simply port-forward port 8091 from a pod to our local machine.
-e.g.
-+
-[source,console]
-----
-kubectl port-forward cb-example-0000 8096:8091
-----
-
-* EBS volume type `io1` recommended with the desired IOPS over `gp2` for any Storage Classes.
-The https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html[official AWS user guide^] itself recommends `io1` for “Large database workloads”.
-
-* Using `kubectl exec` is preferred to using SSH on the public IPv4 addresses of the corresponding instances in the EC2 dashboard.
-
-[#known-issues]
-== Known Issues
-
-//K8S-933
-.Couchbase Web Console cannot be exposed using a LoadBalancer service on AWS
-The Couchbase Server Web Console cannot be exposed using a `LoadBalancer` service on AWS because the services backed by Elastic Load Balancing don't perform session stickiness, and a server-side issue caused by https://issues.couchbase.com/browse/MB-31756[MB-31756] requires clients to remain connected to a specific node.
-Therefore, the Web Console should be exposed using a `NodePort` service or through an exposed `LoadBalancer` service of a specific pod.
-
-.Setup error due to absence of default subnets
-You may encounter subnet errors similar to the following when creating the CloudFormation Stack in the first step:
-
-[source,console]
-----
-CREATE_FAILED	AWS::EC2::Subnet	Subnet03	Template error: Fn::Select cannot select nonexistent value at index 2
-----
-
-If this occurs, you will then need to create a default subnet for each availability zone in one of the three EKS-enabled regions you selected.
-These default subnets need to be associated with the default VPC.
-You can create subnets through the Amazon VPC console, however, using the following command is much simpler:
-
-[source,console]
-----
-aws ec2 create-default-subnet --availability-zone <zone_name>
-----
-
-Resources:
-
-* https://forums.aws.amazon.com/thread.jspa?threadID=284810
-* https://stackoverflow.com/a/40658335/3401979
+* xref:install-kubernetes.adoc[Install the Couchbase Autonomous Operator]
+* xref:howto-couchbase-create.adoc[Deploy a Couchbase cluster]
