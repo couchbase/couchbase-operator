@@ -3,6 +3,8 @@
 [abstract]
 Connect Couchbase Sync-Gateway to a Couchbase cluster.
 
+include::partial$tutorial.adoc[]
+
 Sync-Gateway is a service that allows mobile devices to connect to Couchbase server and continue functioning when connectivity drops.
 This tutorial defines basic connectivity between Sync-Gateway and a Couchbase Cluster deployed by the Operator.
 

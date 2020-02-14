@@ -3,6 +3,8 @@
 [abstract]
 Prepare Amazon Elastic Kubernetes Service (EKS) for the Couchbase Autonomous Operator.
 
+include::partial$tutorial.adoc[]
+
 This guide is meant to supplement the regular Amazon EKS https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html[setup documentation^], and provides recommendations up to setting up worker nodes.
 
 == Prerequisites

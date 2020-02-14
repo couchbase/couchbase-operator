@@ -3,6 +3,8 @@
 [abstract]
 Prepare Google Kubernetes Engine (GKE) for the Couchbase Autonomous Operator.
 
+include::partial$tutorial.adoc[]
+
 Examples will be illustrated with the Google Cloud SDK, however all steps can be completed via the https://console.cloud.google.com/[Google Cloud web console^].
 
 == Prerequisites

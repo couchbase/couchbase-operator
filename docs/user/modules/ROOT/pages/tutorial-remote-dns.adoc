@@ -3,6 +3,8 @@
 [abstract]
 How to configure clusters that can be used securely between different regions or clouds.
 
+include::partial$tutorial.adoc[]
+
 It is often desirable to have clients connect to a Couchbase cluster from outside of the hosting Kubernetes cluster.
 The specific scenario this tutorial will address is where a client resides within another Kubernetes instance.
 Such a topology may be used in the following situations:
@@ -38,12 +40,6 @@ Other DNS servers may be used (e.g. BIND), provided they can forward specific zo
 ====
 While this tutorial focuses on Kubernetes to Kubernetes connectivity, the client need not reside in Kubernetes.
 The same rules however apply; no DNAT between the client and Couchbase server instance, and clients use a local DNS server to separate traffic and forward to the correct recipient.
-====
-
-[IMPORTANT]
-====
-Tutorials are accurate at the time of writing but rely heavily on 3rd party software.
-For further help in the event of a problem, contact the relevant software maintainer.
 ====
 
 == Configuring the Platform

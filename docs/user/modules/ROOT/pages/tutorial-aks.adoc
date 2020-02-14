@@ -3,6 +3,8 @@
 [abstract]
 Prepare Microsoft Azure Kubernetes Service (AKS) for the Couchbase Autonomous Operator.
 
+include::partial$tutorial.adoc[]
+
 This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator on Microsoft Azure Kubernetes Service (AKS).
 
 == Prerequisites

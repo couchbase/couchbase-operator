@@ -4,6 +4,8 @@ include::partial$constants.adoc[]
 [abstract]
 How to configure a Couchbase cluster so that is available via the public internet.
 
+include::partial$tutorial.adoc[]
+
 There are numerous reasons why you would want to expose a Couchbase database on the public internet.
 Some examples could be:
 
@@ -22,12 +24,6 @@ The https://github.com/kubernetes-sigs/external-dns[External DNS^] controller is
 image::networking-basic-external-dns.png[]
 
 This tutorial will guide you through fully configuring your Couchbase cluster to use this feature and also configure the External DNS controller.
-
-[IMPORTANT]
-====
-Due to the nature of External DNS being a 3rd party product, this tutorial may not be completely accurate after the time of writing.
-For further help in the event of a problem, contact the External DNS maintainers.
-====
 
 == DDNS
 
