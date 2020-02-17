@@ -1,18 +1,25 @@
-= Sync Gateway Tutorial
+= Sync Gateway Deployment Tutorial
 
 [abstract]
-Connect Couchbase Sync-Gateway to a Couchbase cluster.
+Connect Couchbase Sync-Gateway to a Couchbase cluster and exposing it to Couchbase Lite clients
 
 include::partial$tutorial.adoc[]
 
-Sync-Gateway is a service that allows mobile devices to connect to Couchbase server and continue functioning when connectivity drops.
-This tutorial defines basic connectivity between Sync-Gateway and a Couchbase Cluster deployed by the Operator.
+Sync-Gateway is a synchronization server that is responsible for secure data synchronization and routing between Couchbase Lite enabled clients and Couchbase Server. It is an integral component of link:https://docs.couchbase.com/sync-gateway/2.7/introduction.html[Couchbase Mobile] platform.
+
+This tutorial defines best practices for deploying Sync Gateway on Kubernetes. It covers basic connectivity between Sync-Gateway and a Couchbase Cluster deployed by the Operator as well as  deployment considerations to support secure access from clients over a public network.
+
+== Prerequisites
+* A Couchbase Server cluster deployed and running. While it is _recommended_, note that it is _not required_ that Couchbase Server be deployed with Kubernetes. It is possible to deploy Sync Gateway on Kubernetes and connect it to Couchbase Server cluster that is not on Kubernetes. The instructions herein assume that Couchbase Server is deployed using the operator. 
+* A Couchbase Server RBAC user with `application access` privileges.
+Sync Gateway will connect to the Couchbase Server as this RBAC user. If server was deloyed using operator, the relevant RBAC credentials must be configured as specified in xref:reference-operator-rbac.adoc[RBAC configuration section]. Otherwise, you can manually create the RBAC user as specified in xref:getting-started.adoc#creating-an-rbac-user[this section].
+* If you have configured your Couchbase Server cluster to use link:https://docs.couchbase.com/operator/1.2/couchbase-cluster-config.html#exposedfeatures[exposedFeatures] then you *must* include "client" in the `exposedFeatures` list. This is required for Sync Gateway to be able to connect to the server. Alternatively, remove the exposedFeatures section altogether in the server configuration if you don't need it.
 
 == Configuring Sync-Gateway
 
 Sync-Gateway is configured with a configuration file within its container.
 The configuration contains sensitive data such as usernames, passwords and TLS private keys.
-We therefore should define the configuration as a secret.
+We therefore should define the configuration as a secret.Create a `sgw-config.yaml` file with the relevant configuration as shown below:
 Relevant configuration variables are documented below:
 
 [source,yaml]
@@ -75,7 +82,15 @@ stringData:
 
 <.> `databases.cb-example.password` defines the user password that will be used to connect to the cluster.
 
-=== TLS Support
+Deploy the secret using the following command
+
+[source,bash]
+----
+   kubectl apply -f sgw-config.yaml
+----
+
+
+=== TLS Support to Couchbase Server 
 
 TLS is fully supported between Sync-Gateway and Couchbase Server.
 This includes xref:concept-tls.adoc[server-side TLS or mutual TLS].
@@ -133,9 +148,16 @@ Certificates have been truncated for brevity.
 <.> **Mutual TLS Only:** The `key.pem` secret is the client key.
     The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync-Gateway configuration.
 
-== Deploying Sync-Gateway
+Deploy the secret using the following command
 
-Sync-Gateway is a simple state-less application so does not require any application specific controller like the Operator.
+[source,bash]
+----
+   kubectl apply -f sgw-config.yaml
+----
+
+== Deploying Sync Gateway
+
+Sync-Gateway is a state-less server so does not require any application specific controller like the Operator.
 An typical configuration is as described below:
 
 [source,yaml]
@@ -181,10 +203,430 @@ spec:
 
 <.> `spec.template.spec.volumes[0].secret.secretName` references the <<configuring-sync-gateway,Sync-Gateway configuration>> `Secret` that is mounted in the Sync-Gateway container.
 
+. Deploy the Sync Gateway cluster from the specified deployment controller file. Assuming that the above configuration is in a file named `sync-gateway.yaml`, the command would be as follows
+
+[source,bash]
+----
+   kubectl apply -f sync-gateway.yaml
+----
+
+If successful, you will see the following.
+[source,console]
+----
+deployment.extensions "sync-gateway" created
+----
+
+. You can check the status of the deployment with the following command until all the pods corresponding to the Sync Gateway are in the "Ready" state and the status is "Running".
+[source,console]
+----
+kubectl get pods --watch
+----
+The `--watch` option is optional but you use it to be asynchronously notified of  updates to status of the pods instead of having to repeatedly run the command.
+
+If successful, you will see a listing of the Sync Gateway pods that were deployed.
+In the sample output below, we have Couchbase Server and Sync Gateway pods running in the same https://kubernetes.io/docs/tasks/administer-cluster/namespaces-walkthrough/[namespace].
+In a production deployment, you may have Couchbase Server deployed on a separate namespace.
+[source,console]
+----
+NAME                                                  READY     STATUS    RESTARTS   AGE
+cb-example-0000                                         1/1       Running   0          3d
+cb-example-0001                                         1/1       Running   0          3d
+cb-example-0002                                         1/1       Running   0          3d
+couchbase-operator-fd8db588b-9fzsw                      1/1       Running   1          3d
+couchbase-operator-admission-5d7df4b9f8-cb2zg           1/1       Running   2          18m
+sync-gateway-7474f5df4b-p98sq                           1/1       Running   0          18m
+----
+Make sure that you have sufficient CPU resources on the node on which the pods are being deployed.
+Failure to do so will result in an "insufficient resource" exception when attempting to deploy the pods.
+
+
+At this stage, you have a Sync Gateway node configured to communicate with Couchbase Server. Now, let's look at the connectivity to Couchbase Lite clients.
+
+== Exposing Sync Gateway Cluster to the Couchbase Lite Clients
+In a production deployment, you will likely have more than one Sync Gateway nodes fronted by a link:https://docs.couchbase.com/sync-gateway/2.7/load-balancer.html[load balancer] or a reverse-proxy. Couchbase Lite clients connect to the Layer4 or Layer7 Load Balancer.
+
+In the simplest case, you will deploy a load balancer using the https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/[Kubernetes Load Balancer service].
+The load balancer service provides an externally accessible IP address and routes traffic to the right ports in the cluster. 
+
+NOTE: Load balancers only work on  Cloud Environments (e.g. AWS, GCP etc).
+So if you are deploying on premise or using something like https://github.com/kubernetes/minikube[minikube] for your test deployment, this option will not work.
+Please use a https://kubernetes.io/docs/concepts/services-networking/service/[service] such  as NodePort or Ingress instead.
+
+In addition, on production environments, it is also link:https://docs.couchbase.com/sync-gateway/2.7/load-balancer.html#transport-layer-security-https-ssl[recommended] that all communication between Couchbase Lite clients and Sync Gateway be secured using TLS. So we will discuss a few options here. 
+
+You have couple of options on how to configure your Kubernetes deployment for TLS. Here are some recommendations
+
+=== Option 1: Ingress as SSL Termination Point 
+When using Sync Gateway behind a load balancer or reverse proxy, we generally recommend that the reverse proxy be the SSL termination point for the Sync Gateway cluster in order to alleviate the load on the Sync Gateway. This is particularly relevant if you have a large number of connected clients. This option would also apply if you need Layer7 or application level load balancing such as support for sticky sessions.
+
+In this option, you cannot use the Kubernetes Load Balancer service. Instead, we recommend the use of link:https://kubernetes.io/docs/concepts/services-networking/ingress/#what-is-ingress[Ingress], which is an abstraction that manages external access to the services in a cluster. It provides out-of-box support for features like external routable URLs to services, load balancing and SSL termination etc. 
+
+image::sgw-ingress.png[]
+
+==== Expose Sync Gateway as a service
+In this section you will deploy a Kubernetes link:https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport[NodePort] type service to expose Sync Gateway cluster.
+Create a  service definition file corresponding to your deployment similar to one below.
++
+[source,bash]
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: sync-gateway-service
+spec:
+  ports:
+    - port: 4984
+      name: apiport
+      targetPort: 4984
+  type: "NodePort"
+  selector:
+    name: sync-gateway
+----
+
+This specification creates a new Service object named `sync-gateway-service`, which targets TCP port 4984 on any Pod with the `app=sync-gateway label`. 
+Port 4984 is the default public port of Sync Gateway. You can map any incoming `port` to a `targetPort`. For  convenience, the `targetPort` is set to the same value as the `port` field.
+
+
+. Deploy the Sync Gateway Nodeport service.  Assuming that the above configuration is in a file named `sync-gateway-nodeport.yaml`, the command would be as follows
+
+[source,bash]
+----
+   kubectl apply -f sync-gateway-nodeport.yaml
+----
+
+
+==== Deploy Ingress Controller as SSL Termination Point
+Kubernetes link:https://kubernetes.io/docs/concepts/services-networking/ingress/#what-is-ingress[Ingress] routes HTTP and HTTPs traffic from the Internet to services in the cluster. It also functions as a load balancer. In our deployment, we will set up an Ingress Controller that will act as SSL termination point for inbound traffic from the Internet
+
+Before you can configure the Ingress controller as the SSL termination point, you need the TLS certs.
+
+===== Prerequisites
+Create SSL certificate and Private Key as per instructions link:https://docs.couchbase.com/sync-gateway/2.7/security.html#how-to-create-an-ssl-certificate[here]. Through the remainder of the instructions, we will refer to the public certificate as `sgw-lb.crt` and the private key as `sgw-lb.key` respectively
+
+===== Create a Secret with the TLS Credentials
+
+You will use a link:https://kubernetes.io/docs/concepts/configuration/secret/[Kubernetes Secret] to pass the certificate to the Ingress Controller
+
+** Create a secret using kubectl command as follows
+[source,bash]
+----
+kubectl create secret tls sgw-lb-tls-secret --cert sgw-lb.crt --key sgw-lb.key
+----
+The above command creates a secret named sgw-lb-tls-secret using the certificate and private key
+
+** Verify that the secret was created using following command
+[source,bash]
+----
+Kubectl get secrets
+----
+
+If everything is fine, you should see `sgw-lb-tls-secret` listed in the output
+
+
+===== Create an Ingress Controller
+
+This is an example of an Ingress controller definition that is configured as SSL termination point for Sync Gateway.
+[source,bash]
+----
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: sgw-ingress #<.>
+spec:
+  tls:
+  - hosts:
+    - cbm.example.com #<.>
+    secretName: sgw-lb-tls-secret #<.>
+  rules:
+    - host: cbm.example.com 
+      http:
+        paths:
+        - path: /
+          backend: #<.>
+            serviceName: sgw-service
+            servicePort: 4984
+----
+
+<.> `metadata.name`: The name of the controller is `sgw-ingress`
+<.> `spec.tls.hosts` : Specifies the host for which the rules apply. You will replace this with the DNS address of your deployment
+<.> `spec.tls.secretName`: The name of the secret that was created in <<Create a Secret with the TLS Credentials>> step
+<.> `spec.http.backend`: HTTP (and HTTPS) requests to the Ingress that matches the host and path of the rule are sent to the listed backend. In this case, all HTTP(s) requests to the specified domain are directed to the `sgw-service`
+
+
+
+===== Deploy the Ingress Controller
+** Use kubectl to deploy the controller as follows. If the corresponding controller definition is `sync-gateway-ingress-tls.yaml`, the command would be as follows
+
+[source,bash]
+----
+kubectl apply -f sync-gateway-ingress-tls.yaml
+----
+
+** Verify the status of the deployment using following command
+[source,bash]
+----
+kubectl get ingress
+----
+
+** If things are fine you should see the equivalent of the following output
+[source,bash]
+----
+NAME            HOSTS                     ADDRESS         PORTS     AGE
+sgw-ingress   cbm.example.com            35.XXX.YYY.ZZ   80, 443   15h
+----
+The output above indicates that the host cbm.example.com is reachable via SSL port (443) .
+
+===== Try It Out
+That’s it. To verify that the SYnc Gateway , open up https://cbm.example.com in your browser. You should the equivalent of 
+[source,bash]
+----
+{"couchdb":"Welcome","vendor":{"name":"Couchbase Sync Gateway","version":"2.7"},"version":"Couchbase Sync Gateway/2.7.0(127;b4c828d) EE"}
+----
+
+=== Enabling TLS between Ingress and Sync Gateway
+If you require end-to-end security, it is recommended that you re-encrypt traffic between the controller and Sync Gateway. The details of how you do it are platform specific.
+
+
+=== Option 2: End-to-end TLS with Load Balancer as Pass-through
+This is the simplest congiguration. In this case, Sync Gateway will be configured at the SSL termination point and TLS traffic will pass through the Load Balancer. 
+
+image::sgw-e2e-tls.png[]
+
+=== Prerequisites
+* Create SSL certificate and Private Key as per instructions link:https://docs.couchbase.com/sync-gateway/2.7/security.html#how-to-create-an-ssl-certificate[here]. Through the remainder of the instructions, we will refer to the public certificate as `sgw-lb-cert.pem` and the private key as `sgw-lb-key.pem` respectively
+* Update the Sync Gateway config file described in <<Configuring Sync-Gateway>> section with the relevant properties to specify the certificate and private keys as defined link:https://docs.couchbase.com/sync-gateway/current/security.html#connection-to-sync-gateway[here]. The updated version of config file would look like the following (only relevant configuration is shown)
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sync-gateway
+stringData:
+  config.json: |-
+    {
+      "logging": {
+        "console": {
+          "enabled": true, 
+          "log_level": "info", 
+          "log_keys": [
+            "*"
+          ]
+        }
+      },
+      "databases": {
+        "cb-example": { 
+          "server": "couchbase://cb-example", 
+          "bucket": "default", 
+          "username": "Administrator", 
+          "password": "password", 
+          "SSLCert": "/home/sync_gateway/sgw-lb-cert.pem", # <.>
+          "SSLKey": "/home/sync_gateway/sgw-lb-key.pem" # <.>
+          ....
+        }
+      }
+      .....
+    }
+----
+<.> `databases.cb-example.SSLCert` : This is the path to Sync Gateway cert
+<.> `databases.cb-example.SSLKey` : This is the path to Sync Gateway private key
+
+
+* Create a secret with the updated version of config file. Assuming that the config file is 
+[source,bash]
+----
+ kubectl apply -f sgw-config-tls.yaml
+----
+
+==== Create secret with the Sync Gateway certs
+You will use a link:https://kubernetes.io/docs/concepts/configuration/secret/[Kubernetes Secret] to pass the certs and private key to Sync Gateway on launch. Create a secret using command below
+[source,bash]
+----
+  kubectl create secret generic sgw-cert-key --from-file sgw-lb-cert.pem --from-file sgw-lb-key.pem 
+----
+
+The above command creates a secret named `sgw-cert-key` with the revelant cert and private key files.
+
+=== Deploying the Sync Gateway with TLS Enabled 
+
+* Create a Deployment controler definition similar to the one described in <<Deploying Sync Gateway>> section. The controller is updated to include the secret corresponing to the SSL certs. 
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sync-gateway
+spec:
+  replicas: 2 
+  selector:
+    matchLabels:
+      app: sync-gateway
+  template:
+    metadata:
+      labels:
+        app: sync-gateway
+    spec:
+      containers:
+      - name: sync-gateway
+        image: couchbase/sync-gateway:2.7.0-enterprise 
+        volumeMounts:
+        - name: config
+          mountPath: /etc/sync_gateway 
+          readOnly: true
+        - name: sgw-cert-volume
+          mountPath: /home/sync-gateway-certs # <.>
+          readOnly: true
+        env:
+        - name: GOMAXPROCS
+          value: "1"
+        resources:
+          requests:
+            cpu: 100m
+          limits:
+            cpu: 100m
+      volumes:
+      - name: config
+        secret:
+          secretName: sync-gateway 
+      - name: sgw-cert-volume
+        secret:
+          secretName:  sgw-cert-key # <.>
+----
+
+<.> `spec.template.spec.containers[0].volumeMounts[0].mountPath` mounts the TLS secret in the relevant location.
+
+<.> `spec.template.spec.volumes[0].secret.secretName` references the <<Create secret with the Sync Gateway certs>> `Secret` that is mounted in the Sync-Gateway container.
+
+
+* Deploy the Sync Gateway using command below. If the controller definition is in a file named `sync-gateway-tls.yaml`, the command would be as follows
+
+[source,yaml]
+----
+   kubectl apply -f sync-gateway-tls.yaml
+----
+
+==== Deploying a Load Balancer
+The load balancer will pass through the TLS encrypted traffic. 
+
+You will deploy the load balancer using the https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/[Kubernetes Load Balancer service].
+The load balancer service provides an externally accessible IP address and routes traffic to the right ports in the cluster.
+
+NOTE: Load balancers only work on  Cloud Environments (e.g. AWS, GCP etc).
+So if you are deploying on premise or using something like https://github.com/kubernetes/minikube[minikube] for your test deployment, this option will not work.
+Please use a https://kubernetes.io/docs/concepts/services-networking/service/[service] such  as NodePort or Ingress instead.
+
+Follow these steps to deploy a load balancer in front of the Sync Gateway cluster.
+
+* This is an example of a Load Balancer definition fronting a Sync Gateway.  
+[source,yaml]
+----
+kind: Service
+apiVersion: v1
+metadata:
+  name: sgw-load-balancer <1>
+spec:
+  selector:
+    app: sync-gateway <2>
+  ports:
+  - protocol: TCP
+    port: 4984 <3>
+    targetPort: 4984
+  type: LoadBalancer
+----
+<1> `metadata.name`: The name of the load balancer is "sgw-load-balancer".
+<2> `spec.selector.app`: This value corresponds to the pods targeted by the load balancer.
+In this case, it targets any pods with the `app=sync-gateway` label which are the Sync Gateway nodes - this corresponds to what was specified in the deployment yaml file.
+<3> `spec.ports[].targetPort`: The load balancer service targets port 4984 on the Sync Gateway cluster.
+This is the Sync Gateway port corresponding to the xref:rest-api.adoc[REST API].
+For security purposes, it is recommended that you do not expose the admin port (4985) over the Internet.
+
+* Deploy the load balancer using following command. Assume that the Load Balancer service definition file is `sync-gateway-load-balancer.yaml`
+[source,console]
+----
+kubectl create -f sync-gateway-load-balancer.yaml
+----
+
+* If successful, you will see the following.
+[source,console]
+----
+service "sgw-load-balancer" created
+----
+
+* Verify the status of the service creation with the following.
+[source,console]
+----
+kubectl get services
+----
+
+If successful, you will see a new service corresponding to the load balancer.
+In the sample output below, we have the `sgw-load-balancer` service.
+[source,console]
+----
+NAME                TYPE           CLUSTER-IP     EXTERNAL-IP
+cb-example          ClusterIP      None           <none>
+cb-example-srv      ClusterIP      None           <none>
+cb-example-ui       NodePort       10.3.246.239   <none>
+kubernetes          ClusterIP      10.3.240.1     <none>
+sgw-load-balancer   LoadBalancer   10.3.253.17    35.184.19.17
+----
+The *sgw-load-balancer*'s `EXTERNAL-IP` is the load balancer's publicly accessible hostname. 
+
+* Verify the pods that the load balancer is targeting.
+[source,console]
+----
+kubectl describe service sgw-load-balancer
+----
+
+You should see the equivalent of the following.
+[source,console]
+----
+Name:                     sgw-load-balancer
+Namespace:                default
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=sync-gateway
+Type:                     LoadBalancer
+IP:                       10.3.253.17
+LoadBalancer Ingress:     35.184.19.17
+Port:                     <unset>  4984/TCP
+TargetPort:               4984/TCP
+NodePort:                 <unset>  32397/TCP
+Endpoints:                10.0.0.34:4984,10.0.0.35:4984
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:
+----
+Notice the "endpoints" field and confirm that it corresponds to the Sync Gateway nodes.
+In this example, we have 2 Sync Gateway nodes.
+
+* Verify the Sync Gateway cluster is accessible with the following command; where `EXTERNAL-IP` is the IP that was copied in step 3.
+[source,console]
+----
+curl  https://EXTERNAL-IP:4984
+----
+
+It should return the following.
+[source,console]
+----
+{"couchdb":"Welcome","vendor":{"name":"Couchbase Sync Gateway","version":"2.7"},"version":"Couchbase Sync Gateway/2.7(17;fea9947)"}
+----
+
+You have successfully deployed a Sync Gateway cluster on Kubernetes with end-to-end TLS enabled.
+The xref:howto-manage-syncgateway-cluster.adoc[Manage a Sync Gateway Cluster] page contains additional details related to the management of the Sync Gateway cluster.
+
+
+
 == Templates
 
-Template files are provided in the Operator binary distribution as `sync-gateway.yaml`.
-They can be deployed -- as is -- into the same namespace as the provided `couchbase-cluster.yaml` template.
+Template files are provided in the Operator binary distribution :
+
+** `sync-gateway.yaml` : Sample Deployment Controller for Sync Gateway with no TLS
+** `sync-gateway-nodeport.yaml`: Sample nodeport service definition for Sync Gateway used with Ingress Controller (Ingress as SSL termination option)
+** `sync-gateway-ingress-tls.yaml`: Sample Ingress controller definition for Sync Gateway configured as SSL termination point (Ingress as SSL termination option)
+** `sync-gateway-load-balancer.yaml`: Sample Load Balancer service definition for Sync Gateway (end-to-end TLS option)
+** `sync-gateway-tls.yaml` : Sample Deployment Controller for Sync Gateway configured for end-to-end TLS from clients (end-to-end TLS option)
+
 These files are provided as evaluation examples -- they should not be used for production workloads.
 
 [IMPORTANT]
