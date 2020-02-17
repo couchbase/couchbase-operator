@@ -29,6 +29,13 @@ const (
 	wallClockTime = `^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$`
 )
 
+var (
+	categories = []string{
+		"all",
+		"couchbase",
+	}
+)
+
 func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
@@ -42,8 +49,9 @@ func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Group: couchbasev2.SchemeGroupVersion.Group,
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: couchbasev2.BucketCRDResourcePlural,
-				Kind:   couchbasev2.BucketCRDResourceKind,
+				Plural:     couchbasev2.BucketCRDResourcePlural,
+				Kind:       couchbasev2.BucketCRDResourceKind,
+				Categories: categories,
 			},
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
@@ -158,8 +166,9 @@ func GetCouchbaseEphemeralBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 			Group: couchbasev2.SchemeGroupVersion.Group,
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: couchbasev2.EphemeralBucketCRDResourcePlural,
-				Kind:   couchbasev2.EphemeralBucketCRDResourceKind,
+				Plural:     couchbasev2.EphemeralBucketCRDResourcePlural,
+				Kind:       couchbasev2.EphemeralBucketCRDResourceKind,
+				Categories: categories,
 			},
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
@@ -271,8 +280,9 @@ func GetCouchbaseMemcachedBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 			Group: couchbasev2.SchemeGroupVersion.Group,
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: couchbasev2.MemcachedBucketCRDResourcePlural,
-				Kind:   couchbasev2.MemcachedBucketCRDResourceKind,
+				Plural:     couchbasev2.MemcachedBucketCRDResourcePlural,
+				Kind:       couchbasev2.MemcachedBucketCRDResourceKind,
+				Categories: categories,
 			},
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
@@ -335,8 +345,9 @@ func GetCouchbaseReplicationCRD() *apiextensionsv1beta1.CustomResourceDefinition
 			Group: couchbasev2.SchemeGroupVersion.Group,
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: couchbasev2.ReplicationCRDResourcePlural,
-				Kind:   couchbasev2.ReplicationCRDResourceKind,
+				Plural:     couchbasev2.ReplicationCRDResourcePlural,
+				Kind:       couchbasev2.ReplicationCRDResourceKind,
+				Categories: categories,
 			},
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
@@ -426,6 +437,7 @@ func GetCouchbaseBackupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 				Plural:     couchbasev2.BackupCRDResourcePlural,
 				Kind:       couchbasev2.BackupCRDResourceKind,
 				ShortNames: []string{couchbasev2.BackupCRDResourceShortName},
+				Categories: categories,
 			},
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
@@ -605,6 +617,7 @@ func GetCouchbaseBackupRestoreCRD() *apiextensionsv1beta1.CustomResourceDefiniti
 				Plural:     couchbasev2.BackupRestoreCRDResourcePlural,
 				Kind:       couchbasev2.BackupRestoreCRDResourceKind,
 				ShortNames: []string{couchbasev2.BackupRestoreCRDResourceShortName},
+				Categories: categories,
 			},
 			AdditionalPrinterColumns: []apiextensionsv1beta1.CustomResourceColumnDefinition{
 				{
@@ -760,7 +773,8 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 				Plural:     couchbasev2.ClusterCRDResourcePlural,
 				Kind:       couchbasev2.ClusterCRDResourceKind,
-				ShortNames: []string{"couchbase", "cbc"},
+				ShortNames: []string{"cbc"},
+				Categories: categories,
 			},
 			// Not supported by GKE 1.13 for some odd reason
 			//Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
@@ -1682,8 +1696,9 @@ func GetUserCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Group: couchbasev2.SchemeGroupVersion.Group,
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: couchbasev2.UserCRDResourcePlural,
-				Kind:   couchbasev2.UserCRDResourceKind,
+				Plural:     couchbasev2.UserCRDResourcePlural,
+				Kind:       couchbasev2.UserCRDResourceKind,
+				Categories: categories,
 			},
 			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 				{
@@ -1737,8 +1752,9 @@ func GetGroupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Group: couchbasev2.SchemeGroupVersion.Group,
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: couchbasev2.GroupCRDResourcePlural,
-				Kind:   couchbasev2.GroupCRDResourceKind,
+				Plural:     couchbasev2.GroupCRDResourcePlural,
+				Kind:       couchbasev2.GroupCRDResourceKind,
+				Categories: categories,
 			},
 			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 				{
@@ -1781,8 +1797,9 @@ func GetRoleCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Group: couchbasev2.SchemeGroupVersion.Group,
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: couchbasev2.RoleCRDResourcePlural,
-				Kind:   couchbasev2.RoleCRDResourceKind,
+				Plural:     couchbasev2.RoleCRDResourcePlural,
+				Kind:       couchbasev2.RoleCRDResourceKind,
+				Categories: categories,
 			},
 			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 				{
@@ -1848,8 +1865,9 @@ func GetRoleBindingCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Group: couchbasev2.SchemeGroupVersion.Group,
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: couchbasev2.RoleBindingCRDResourcePlural,
-				Kind:   couchbasev2.RoleBindingCRDResourceKind,
+				Plural:     couchbasev2.RoleBindingCRDResourcePlural,
+				Kind:       couchbasev2.RoleBindingCRDResourceKind,
+				Categories: categories,
 			},
 			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 				{
