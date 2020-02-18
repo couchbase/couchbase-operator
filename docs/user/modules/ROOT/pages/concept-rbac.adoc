@@ -1,4 +1,4 @@
-= About Couchbase Custom Resource RBAC
+= Couchbase Resource RBAC
 
 [abstract]
 The Autonomous Operator manages many different types of Kubernetes custom resources, giving you the ability to control access to your Couchbase deployments based on which resource type each user should have access to.

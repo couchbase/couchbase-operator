@@ -1,4 +1,4 @@
-= Sync Gateway Tutorial
+= Connecting Sync-Gateway to a Couchbase Cluster
 
 [abstract]
 Connect Couchbase Sync-Gateway to a Couchbase cluster.

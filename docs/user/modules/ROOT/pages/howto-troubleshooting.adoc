@@ -1,4 +1,4 @@
-= Logs and Troubleshooting
+= View Operator Logs
 include::partial$constants.adoc[]
 :experimental:
 

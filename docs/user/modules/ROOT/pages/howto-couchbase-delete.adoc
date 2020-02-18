@@ -1,4 +1,4 @@
-= Deleting a CouchbaseCluster
+= Delete a Couchbase Deployment
 
 You can delete a cluster either by using the cluster configuration file that you created the cluster with, or by deleting the cluster directly.
 
@@ -10,14 +10,14 @@ On Kubernetes:
 
 [source,console]
 ----
-kubectl delete -f my-cluster.yaml
+$ kubectl delete -f my-cluster.yaml
 ----
 
 On OpenShift:
 
 [source,console]
 ----
-oc delete -f my-cluster.yaml
+$ oc delete -f my-cluster.yaml
 ----
 
 == Deleting a Cluster Directly
@@ -28,12 +28,12 @@ On Kubernetes:
 
 [source,console]
 ----
-kubectl delete couchbasecluster my-cluster
+$ kubectl delete couchbasecluster my-cluster
 ----
 
 On OpenShift:
 
 [source,console]
 ----
-oc delete couchbasecluster my-cluster
+$ oc delete couchbasecluster my-cluster
 ----

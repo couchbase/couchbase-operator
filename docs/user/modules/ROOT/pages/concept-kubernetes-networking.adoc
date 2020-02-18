@@ -1,4 +1,4 @@
-= About Kubernetes Networking and Couchbase
+= Kubernetes Networking
 
 [abstract]
 Networking in a Kubernetes environment is complex.

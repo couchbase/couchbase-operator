@@ -23,7 +23,7 @@ When configuring `kubectl`, pay particular attention to the following command:
 
 [source,console]
 ----
-aws eks update-kubeconfig --name clusterName
+$ aws eks update-kubeconfig --name clusterName
 ----
 
 This command is vital as it sets the relevant Amazon Resource Name (ARN) variables in `~/.kube/config`.
@@ -34,7 +34,7 @@ View the config at `~/.kube/config` to ensure that all variables look correct:
 
 [source,console]
 ----
-kubectl config view
+$ kubectl config view
 ----
 
 The following example shows two AWS context configurations appended to an existing Minikube one:
@@ -102,7 +102,7 @@ To switch between Kubernetes contexts, use `kubectl config use-context <context-
 
 [source,console]
 ----
-kubectl config use-context arn:aws:eks:eu-west-1:705067739613:cluster/test1
+$ kubectl config use-context arn:aws:eks:eu-west-1:705067739613:cluster/test1
 ----
 
 [#worker-nodes]

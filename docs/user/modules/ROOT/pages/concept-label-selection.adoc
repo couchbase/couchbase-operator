@@ -1,4 +1,4 @@
-= About Couchbase Custom Resource Label Selection
+= Couchbase Resource Label Selection
 
 [abstract]
 The Autonomous Operator manages a Couchbase deployment by aggregating many different types of Kubernetes custom resources.

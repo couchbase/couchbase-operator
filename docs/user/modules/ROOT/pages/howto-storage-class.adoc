@@ -1,4 +1,4 @@
-= How-to Create a Lazy Bound Storage Class
+= Create a Lazy Bound Storage Class
 
 [abstract]
 The Operator requires a lazily bound storage class to function correctly.

@@ -1,4 +1,4 @@
-= About cbopinfo
+= cbopinfo
 include::partial$constants.adoc[]
 :tabs:
 
@@ -31,21 +31,21 @@ macOS::
 +
 [source,console]
 ----
-cd couchbase-autonomous-operator-kubernetes_x.x.x-macos_x86_64/bin/
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-macos_x86_64/bin/
 ----
 
 . Make the `cbopinfo` binary executable:
 +
 [source,console]
 ----
-chmod +x ./cbopinfo
+$ chmod +x ./cbopinfo
 ----
 
 . Move the binary into your PATH:
 +
 [source,console]
 ----
-sudo mv ./cbopinfo /usr/local/bin/cbopinfo
+$ sudo mv ./cbopinfo /usr/local/bin/cbopinfo
 ----
 --
 
@@ -56,21 +56,21 @@ Linux::
 +
 [source,console]
 ----
-cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
 ----
 
 . Make the `cbopinfo` binary executable:
 +
 [source,console]
 ----
-chmod +x ./cbopinfo
+$ chmod +x ./cbopinfo
 ----
 
 . Move the binary into your PATH:
 +
 [source,console]
 ----
-sudo mv ./cbopinfo /usr/local/bin/cbopinfo
+$ sudo mv ./cbopinfo /usr/local/bin/cbopinfo
 ----
 --
 
@@ -81,7 +81,7 @@ Windows::
 +
 [source,console]
 ----
-cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 ----
 
 . Add the `cbopinfo` binary into your PATH.

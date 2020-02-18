@@ -1,4 +1,4 @@
-= How-to Configure Multi-Dimensional Scaling
+= Configure Multi-Dimensional Scaling
 
 [abstract]
 How-to independently scale cluster services.

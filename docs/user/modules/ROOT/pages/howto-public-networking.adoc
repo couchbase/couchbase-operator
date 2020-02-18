@@ -1,4 +1,4 @@
-= How-to Configure Public Networking
+= Configure Public Networking
 
 [abstract]
 This guide shows you how to configure Couchbase Server to be accessible from the public internet.

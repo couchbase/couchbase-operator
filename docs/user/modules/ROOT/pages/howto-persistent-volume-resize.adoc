@@ -1,4 +1,4 @@
-= How-to Resize Persistent Volumes
+= Resize Persistent Volumes
 
 [abstract]
 How-to resize a persistent volume to either expand or contract storage.

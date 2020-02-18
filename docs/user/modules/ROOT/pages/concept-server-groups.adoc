@@ -1,4 +1,4 @@
-= About Using Couchbase Server Groups With the Operator
+= Couchbase Server Groups
 
 [abstract]
 Couchbase Server Groups are granular, logical groupings of resources that are tolerant of large scale infrastructure faults.

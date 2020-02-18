@@ -1,4 +1,4 @@
-= How-to Configure Client SDKs
+= Configure Client SDKs
 
 [abstract]
 Connecting a Couchbase SDK to an Operator managed Couchbase cluster.

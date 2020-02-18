@@ -15,7 +15,7 @@ When the `gcloud` command has been installed and added to your PATH, log in with
 
 [source,console]
 ----
-gcloud auth login
+$ gcloud auth login
 ----
 
 
@@ -26,14 +26,14 @@ You can select the user to run as with:
 
 [source,console]
 ----
-gcloud config set account john.doe@acme.com
+$ gcloud config set account john.doe@acme.com
 ----
 
 You can also remove the login authentication locally with:
 
 [source,console]
 ----
-gcloud auth revoke john.doe@acme.com
+$ gcloud auth revoke john.doe@acme.com
 ----
 ====
 
@@ -41,7 +41,7 @@ The project must also be set so that resources are provisioned into it:
 
 [source,console]
 ----
-gcloud config set project my-project
+$ gcloud config set project my-project
 ----
 
 == GKE Setup
@@ -54,7 +54,7 @@ For most users, it will suffice to use automatic subnet provisioning with the fo
 
 [source,console]
 ----
-gcloud compute networks create my-network
+$ gcloud compute networks create my-network
 ----
 
 For the purposes of this document we will manually configure our subnets so we are able to add in the necessary firewall rules to allow XDCR between Couchbase clusters in different GKE clusters.
@@ -63,13 +63,13 @@ By default network traffic is dropped between different GKE clusters.
 
 [source,console]
 ----
-gcloud compute networks create my-network \
+$ gcloud compute networks create my-network \
   --subnet-mode custom
 ----
 
 [source,console]
 ----
-gcloud compute networks subnets create my-subnet-us-east1 \
+$ gcloud compute networks subnets create my-subnet-us-east1 \
   --network my-network \
   --region us-east1 \
   --range 10.0.0.0/12
@@ -77,7 +77,7 @@ gcloud compute networks subnets create my-subnet-us-east1 \
 
 [source,console]
 ----
-gcloud compute networks subnets create my-subnet-us-west1 \
+$ gcloud compute networks subnets create my-subnet-us-west1 \
   --network my-network \
   --region us-west1 \
   --range 10.16.0.0/12
@@ -85,7 +85,7 @@ gcloud compute networks subnets create my-subnet-us-west1 \
 
 [source,console]
 ----
-gcloud compute firewall-rules create my-network-allow-all-private \
+$ gcloud compute firewall-rules create my-network-allow-all-private \
   --network my-network \
   --direction INGRESS \
   --source-ranges 10.0.0.0/8 \
@@ -99,7 +99,7 @@ For example:
 
 [source,console]
 ----
-gcloud container clusters create my-cluster-us-east1 \
+$ gcloud container clusters create my-cluster-us-east1 \
   --cluster-version 1.11.8-gke.6 \
   --region us-east1 \
   --network my-network \
@@ -108,7 +108,7 @@ gcloud container clusters create my-cluster-us-east1 \
 
 [source,console]
 ----
-gcloud container clusters create my-cluster-us-west1 \
+$ gcloud container clusters create my-cluster-us-west1 \
   --cluster-version 1.11.8-gke.6 \
   --region us-west1 \
   --network my-network \
@@ -119,14 +119,14 @@ When the clusters are running (the `gcloud` command will block and complete when
 
 [source,console]
 ----
-gcloud container clusters get-credentials my-cluster-us-east1 \
+$ gcloud container clusters get-credentials my-cluster-us-east1 \
   --region us-east1 \
   --project my-project
 ----
 
 [source,console]
 ----
-gcloud container clusters get-credentials my-cluster-us-west1 \
+$ gcloud container clusters get-credentials my-cluster-us-west1 \
   --region us-west1 \
   --project my-project
 ----
@@ -135,7 +135,7 @@ You can select which cluster context to use by default with the following Kubern
 
 [source,console]
 ----
-kubectl config use-context gke_my-project_us-east1_my-cluster-us-east1
+$ kubectl config use-context gke_my-project_us-east1_my-cluster-us-east1
 ----
 
 Other contexts you may have created can be seen with the `kubectl config get-contexts` command.
@@ -147,7 +147,7 @@ To enable these privileges run the following command on each cluster:
 
 [source,console]
 ----
-kubectl create clusterrolebinding john-doe-admin-binding \
+$ kubectl create clusterrolebinding john-doe-admin-binding \
   --clusterrole cluster-admin \
   --user john.doe@acme.com
 ----

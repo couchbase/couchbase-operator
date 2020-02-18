@@ -1,4 +1,4 @@
-= Couchbase Server Deployment Best Practices
+= Guidelines and Best Practices
 
 The Couchbase Autonomous Operator makes deploying Couchbase Server incredibly simple. However, there are some external influences and configurations that can cause issues. This topic outlines some of the deployment best practices that can help you avoid some of the most common pitfalls.
 

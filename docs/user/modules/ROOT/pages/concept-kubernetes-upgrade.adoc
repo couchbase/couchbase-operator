@@ -1,4 +1,4 @@
-= Upgrading the Kubernetes Cluster
+= Kubernetes Automated Upgrade
 
 During your normal course of operations, you'll no doubt need to upgrade the Kubernetes cluster on which your Couchbase deployment resides.
 This page details the requirements and considerations that you'll need to take into account when performing an online upgrade of a Kubernetes cluster that's hosting a stateful application like Couchbase Server.

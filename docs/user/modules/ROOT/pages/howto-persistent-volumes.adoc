@@ -1,4 +1,4 @@
-= How-to Configure Persistent Volumes
+= Configure Persistent Volumes
 
 [abstract]
 How to use persistent volumes with a Couchbase cluster.

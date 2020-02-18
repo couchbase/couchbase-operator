@@ -1,4 +1,4 @@
-= Publicly Addressable Cluster Tutorial
+= Public Networking with External DNS
 include::partial$constants.adoc[]
 
 [abstract]

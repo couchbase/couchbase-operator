@@ -1,4 +1,4 @@
-= How-to Configure Node Port Networking
+= Configure Node Port Networking
 
 [abstract]
 This guide shows you how to configure node port networking.

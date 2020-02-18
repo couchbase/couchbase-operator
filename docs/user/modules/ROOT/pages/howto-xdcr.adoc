@@ -1,4 +1,4 @@
-= How-to Configure XDCR to a Different Kubernetes Cluster
+= Configure XDCR
 
 [abstract]
 How to set up unidirectional replication to another Couchbase cluster in a different Kubernetes cluster.

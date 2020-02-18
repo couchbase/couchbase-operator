@@ -1,4 +1,4 @@
-= How-to Access the Couchbase Server User Interface
+= Access the Couchbase Server User Interface
 
 [abstract]
 Connect to the Couchbase Server user interface.

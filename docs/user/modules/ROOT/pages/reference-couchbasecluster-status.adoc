@@ -1,4 +1,4 @@
-= CouchbaseCluster Resource Status
+= CouchbaseCluster Status
 include::partial$constants.adoc[]
 
 [abstract]

@@ -1,4 +1,4 @@
-= TLS Certificate Tutorial
+= Creating TLS Certificates
 
 [abstract]
 This section shows a simple way to create and manage a TLS certificate hierarchy.
@@ -91,12 +91,12 @@ This can be achieved with the following commands:
 
 [source,console]
 ----
-openssl rsa -in pkey.key -out pkey.key.der -outform DER
+$ openssl rsa -in pkey.key -out pkey.key.der -outform DER
 ----
 
 [source,console]
 ----
-openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
+$ openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
 ----
 
 == Creating a Dynamic Admission Controller Server Certificate
@@ -106,7 +106,7 @@ This is in the form `$\{service}.$\{namespace}.svc`, so if our service is called
 
 [source,console]
 ----
-./easyrsa --subject-alt-name=couchbase-operator-admission.operator-admission.svc build-server-full couchbase-admission-controller nopass`
+$ ./easyrsa --subject-alt-name=couchbase-operator-admission.operator-admission.svc build-server-full couchbase-admission-controller nopass`
 ----
 
 == Creating a Client Certificate
@@ -116,7 +116,7 @@ Assuming the administrative user defined for Couchbase Server is `Administrator`
  
 [source,console]
 ----
-./easyrsa build-client-full Administrator nopass
+$ ./easyrsa build-client-full Administrator nopass
 ----
 
 The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `couchbase-operator.key` and `couchbase-operator.crt` respectively when specifying the `CouchbaseCluster` `spec.networking.tls.static.operatorSecret`.

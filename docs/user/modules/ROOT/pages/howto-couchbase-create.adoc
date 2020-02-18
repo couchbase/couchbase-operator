@@ -1,4 +1,4 @@
-= Deploying a Couchbase Cluster Using the Operator
+= Create a Couchbase Deployment
 include::partial$constants.adoc[]
 :tabs:
 
@@ -100,7 +100,7 @@ Kubernetes::
 --
 [source,console]
 ----
-kubectl create -f couchbase-cluster.yaml
+$ kubectl create -f couchbase-cluster.yaml
 ----
 --
 
@@ -109,7 +109,7 @@ OpenShift::
 --
 [source,console]
 ----
-oc create -f couchbase-cluster.yaml
+$ oc create -f couchbase-cluster.yaml
 ----
 --
 ====
@@ -129,7 +129,7 @@ Kubernetes::
 --
 [source,console]
 ----
-kubectl get pods
+$ kubectl get pods
 ----
 --
 
@@ -138,7 +138,7 @@ OpenShift::
 --
 [source,console]
 ----
-oc get pods
+$ oc get pods
 ----
 --
 ====

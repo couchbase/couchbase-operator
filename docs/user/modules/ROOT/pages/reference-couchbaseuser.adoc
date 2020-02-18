@@ -1,4 +1,4 @@
-= About the CouchbaseUser Resource
+= CouchbaseUser Resource
 
 :toc: macro
 

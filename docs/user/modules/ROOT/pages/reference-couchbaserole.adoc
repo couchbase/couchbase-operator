@@ -1,4 +1,4 @@
-= About the CouchbaseRole Resource
+= CouchbaseRole Resource
 
 :toc: macro
 

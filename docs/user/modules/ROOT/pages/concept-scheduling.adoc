@@ -1,4 +1,4 @@
-= Couchbase Pod Scheduling
+= Couchbase Scheduling and Isolation
 
 [abstract]
 Scheduling Couchbase pods across a Kubernetes cluster in a predictable manner is essential to guarantee consistent performance.

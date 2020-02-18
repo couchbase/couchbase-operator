@@ -1,4 +1,4 @@
-= How-to Rotate TLS Certificates
+= Rotate TLS Certificates
 
 [abstract]
 How-to rotate TLS certificates.
@@ -52,7 +52,7 @@ First, get the existing secret and direct it into a new YAML file (`resource.yam
 
 [source, console]
 ----
-kubectl get secret couchbase-server-tls -o yaml > resource.yaml
+$ kubectl get secret couchbase-server-tls -o yaml > resource.yaml
 ----
 
 The contents of the new file will look similar to the following:
@@ -76,14 +76,14 @@ Certificate chain:
 
 [source,console]
 ----
-base64 -i chain.pem
+$ base64 -i chain.pem
 ----
 
 Private key:
 
 [source,console]
 ----
-base64 -i pkey.key
+$ base64 -i pkey.key
 ----
 
 Then replace the relevant fields under `data` with the new base64 values:
@@ -104,14 +104,14 @@ Finish the certificate rotation by pushing the new secret to Kubernetes:
 
 [source,console]
 ----
-kubectl replace -f resource.yaml
+$ kubectl replace -f resource.yaml
 ----
 
 You can then check that the new secret has been applied:
 
 [source,console]
 ----
-kubectl get secret couchbase-server-tls -o yaml
+$ kubectl get secret couchbase-server-tls -o yaml
 ----
 
 [source,yaml]

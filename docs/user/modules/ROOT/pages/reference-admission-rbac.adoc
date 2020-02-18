@@ -1,4 +1,4 @@
-= Dynamic Admission Controller RBAC Reference
+= Dynamic Admission Controller RBAC Settings
 
 The admission controller requires read-only access to several resource types in order to function.
 

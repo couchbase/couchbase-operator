@@ -1,4 +1,4 @@
-= About Couchbase Memory Allocation
+= Couchbase Memory Allocation
 
 [abstract]
 Couchbase memory allocation is configured in the `CouchbaseCluster` resource.

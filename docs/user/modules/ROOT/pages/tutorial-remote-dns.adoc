@@ -1,4 +1,4 @@
-= Inter-Kubernetes Networking with Forwarded DNS Tutorial
+= Inter-Kubernetes Networking with Forwarded DNS
 
 [abstract]
 How to configure clusters that can be used securely between different regions or clouds.

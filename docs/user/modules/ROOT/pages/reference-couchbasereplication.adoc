@@ -1,4 +1,4 @@
-= About the CouchbaseReplication Resource
+= CouchbaseReplication Resource
 
 :toc: macro
 

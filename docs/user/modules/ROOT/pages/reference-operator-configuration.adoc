@@ -1,4 +1,4 @@
-= Operator Configuration
+= Operator Deployment Settings
 
 The Couchbase Autonomous Operator configuration is defined below.
 
@@ -62,9 +62,10 @@ You can specify a list of command-line flags to pass on to the Operator to modif
 
 [source,yaml]
 ----
+spec:
+  template:
     spec:
       containers:
-      ...
         args:
         - --zap-level=info
         - --concurrency=4

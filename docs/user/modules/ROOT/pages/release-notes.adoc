@@ -1,4 +1,4 @@
-= Release Notes for Couchbase Autonomous Operator 1.2
+= Release Notes
 
 Couchbase Autonomous Operator 1.2 is a substantial update that introduces several new manageability and automation features, including the ability to automatically upgrade Couchbase Server clusters.
 

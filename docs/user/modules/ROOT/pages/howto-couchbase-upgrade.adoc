@@ -1,4 +1,4 @@
-= How-to Upgrade a Couchbase Cluster
+= Upgrade a Couchbase Deployment
 include::partial$constants.adoc[]
   
 [abstract]

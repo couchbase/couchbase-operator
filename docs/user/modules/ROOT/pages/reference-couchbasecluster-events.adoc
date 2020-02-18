@@ -1,4 +1,4 @@
-= CouchbaseCluster Resource Events
+= CouchbaseCluster Events
 
 [abstract]
 Kubernetes events that are raised by the Operator for CouchbaseCluster resources.

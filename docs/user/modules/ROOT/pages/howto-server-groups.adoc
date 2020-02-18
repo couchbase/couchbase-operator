@@ -1,4 +1,4 @@
-= How-to Configure Server Groups
+= Configure Server Groups
 
 [abstract]
 How to configure server groups to provide high availability across data centers.

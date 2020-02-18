@@ -1,4 +1,4 @@
-= About the CouchbaseEphemeralBucket Resource
+= CouchbaseEphemeralBucket Resource
 
 :toc: macro
 

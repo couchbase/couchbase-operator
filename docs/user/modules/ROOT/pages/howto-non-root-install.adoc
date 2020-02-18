@@ -1,4 +1,4 @@
-= How-to Configure a Non-Root Install
+= Configure a Non-Root Install
 
 [abstract]
 Prevent Couchbase Server containers from running as root.
