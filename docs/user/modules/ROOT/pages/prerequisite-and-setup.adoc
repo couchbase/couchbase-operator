@@ -2,7 +2,7 @@
 
 To install the Couchbase Autonomous Operator, all you need is a running Kubernetes or OpenShift cluster.
 
-If you don't have access to a Kubernetes cluster, but still want to use the Operator for development, https://kubernetes.io/docs/tasks/tools/install-minikube/[Minikube^] (single-node Kubernetes cluster) and https://docs.openshift.org/latest/minishift/getting-started/installing.html[Minishift^] (single-node OpenShift cluster) make great alternatives.
+If you don't have access to a Kubernetes cluster, but still want to use the Operator for development, https://kubernetes.io/docs/tasks/tools/install-minikube/[Minikube^] (single-node Kubernetes cluster) and https://developers.redhat.com/products/codeready-containers/overview[Red Hat CodeReady Containers^] (single-node OpenShift cluster) make great free alternatives.
 Both of these products are much easier to install and deploy when compared to setting up and running an actual Kubernetes or OpenShift cluster.
 
 == Platform Compatibility

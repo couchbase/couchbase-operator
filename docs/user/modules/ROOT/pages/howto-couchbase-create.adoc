@@ -79,13 +79,14 @@ You can use this example CouchbaseCluster configuration file "as-is" to test out
 ====
 Ensure that your Kubernetes environment has the xref:server:install:sizing-general.adoc[appropriate resources] for the Couchbase cluster that you're trying to deploy.
 
-In the case of Minikube and Minishift, the default memory allocation is 2 GB. This is not sufficient for running a three-node Couchbase cluster like the one in the example configuration. If you're using the example configuration for demo purposes, you should set the memory allocation to 4 GB at a minimum (8 GB recommended). You should also increase the CPU allocation if you experience poor performance.
+In the case of Minikube, the default memory allocation is 2 GB. This is not sufficient for running a three-node Couchbase cluster like the one in the example configuration. If you're using the example configuration for demo purposes, you should set the memory allocation to 4 GB at a minimum (8 GB recommended). You should also increase the CPU allocation if you experience poor performance.
 
-You can set the recommended memory and CPU allocation when you start Minikube or Minishift:
+You can set the recommended memory and CPU allocation when you start Minikube:
 
-  minikube start --cpus 2 --memory 8192
-
-  minishift start --cpus 2 --memory 8192
+[source,console]
+----
+$ minikube start --cpus 2 --memory 8192
+----
 ====
 
 == Deploying the Couchbase Cluster
