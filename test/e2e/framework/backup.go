@@ -26,7 +26,7 @@ func CreateBackupServiceAccount(client kubernetes.Interface, namespace string) e
 }
 
 func CreateBackupRoleBinding(client kubernetes.Interface, namespace string) error {
-	backupRoleBinding := config.GetBackupRoleBinding(config.BackupResourceName)
+	backupRoleBinding := config.GetBackupRoleBinding(config.BackupResourceName, namespace)
 	_, err := client.RbacV1().RoleBindings(namespace).Create(backupRoleBinding)
 	if err != nil {
 		return err

@@ -31,6 +31,75 @@ var retryInterval = 10 * time.Second
 type filterFunc func(*v1.Pod) bool
 type filterFuncDaemonSet func(*v1beta1.DaemonSet) bool
 
+// WaitForBackupCreation waits for a backup resources associated with a cluster to be created.
+func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		// TODO: you can check more than presence, the schedule for example can allow you to wait for updates...
+		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(backup.Name+"-full", metav1.GetOptions{}); err != nil {
+			return err
+		}
+
+		if backup.Spec.Strategy != couchbasev2.FullIncremental {
+			return nil
+		}
+
+		// TODO: you can check more than presence, the schedule for example can allow you to wait for updates...
+		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(backup.Name+"-incremental", metav1.GetOptions{}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return retryutil.RetryOnErr(ctx, retryInterval, callback)
+}
+
+func MustWaitForBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) {
+	if err := WaitForBackup(k8s, backup, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// WaitForBackupRun waits for a backup run to occur.
+// TODO: This simply waits for the LastRun status field to change.  This is a hack
+// and we should be generating events for start, completion and failure.  We should
+// also make these events subject to schema validation.
+func WaitForBackupRun(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) error {
+	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		curr, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Get(backup.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if curr.Status.LastRun == nil {
+			return fmt.Errorf("backup job not run")
+		}
+
+		lastRun := *curr.Status.LastRun
+		if !lastRun.After(start) {
+			return fmt.Errorf("last run %v, started watching at %v", lastRun, start)
+		}
+
+		return nil
+	}
+
+	return retryutil.RetryOnErr(ctx, retryInterval, callback)
+}
+
+func MustWaitForBackupRun(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) {
+	if err := WaitForBackupRun(k8s, backup, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 func WaitForCronjob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -84,7 +153,7 @@ func WaitForJob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, nam
 			}
 		}
 
-		return false, nil
+		return false, err
 	})
 }
 
@@ -100,27 +169,29 @@ func MustWaitForJobCompletion(t *testing.T, k8s *types.Cluster, couchbase *couch
 	}
 }
 
-func WaitForStatusUpdate(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, backupName, statusField string, timeout time.Duration) (reflect.Value, error) {
+func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, timeout time.Duration) (reflect.Value, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	var statusFieldToCheck reflect.Value
+	var statusFieldValue reflect.Value
 
-	return statusFieldToCheck, retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
-		getOptions := metav1.GetOptions{}
-		backup, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(couchbase.Namespace).Get(backupName, getOptions)
+	return statusFieldValue, retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
+		backup, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(backupName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		statusFieldToCheck = reflect.ValueOf(backup.Status).FieldByName(statusField)
+		statusFieldValue = reflect.ValueOf(backup.Status).FieldByName(statusField)
+		if statusFieldValue == reflect.Zero(statusFieldValue.Type()) { // nil zero value
+			return false, fmt.Errorf("empty value panic, not found")
+		}
 
-		switch statusFieldToCheck.Type().Kind() {
+		switch statusFieldValue.Type().Kind() {
 		case reflect.String:
-			return !(len(statusFieldToCheck.String()) == 0), nil
-		case reflect.Struct:
-			if statusFieldToCheck.String() == "<v1.Time Value>" {
-				timeValueStr := fmt.Sprintf("%s", statusFieldToCheck.Interface())
+			return len(statusFieldValue.String()) != 0, nil
+		default:
+			if statusFieldValue.String() == "<*v1.Time Value>" {
+				timeValueStr := fmt.Sprintf("%s", statusFieldValue.Interface())
 				goTimeFmt := "2006-01-02 15:04:05 -0700 MST"
 				newTime, err := time.Parse(goTimeFmt, timeValueStr)
 				if err != nil {
@@ -130,17 +201,13 @@ func WaitForStatusUpdate(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 				return !newTime.IsZero(), nil
 			}
 			// isValid checks that v has a value, returns false if it is the 0 value
-			return statusFieldToCheck.IsValid(), nil
-		case reflect.Bool:
-			return statusFieldToCheck.Bool(), nil
+			return statusFieldValue.IsValid(), nil
 		}
-
-		return false, nil
 	})
 }
 
-func MustWaitStatusUpdate(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, backupName, statusField string, timeout time.Duration) reflect.Value {
-	s, err := WaitForStatusUpdate(k8s, couchbase, backupName, statusField, timeout)
+func MustWaitStatusUpdate(t *testing.T, k8s *types.Cluster, backupName, statusField string, timeout time.Duration) reflect.Value {
+	s, err := WaitForStatusUpdate(k8s, backupName, statusField, timeout)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1163,6 +1230,12 @@ func WaitForBackupDeletion(k8s *types.Cluster, namespace string, timeout time.Du
 	}
 
 	return retryutil.RetryOnErr(ctx, time.Second, callback)
+}
+
+func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, namespace string, timeout time.Duration) {
+	if err := WaitForBackupDeletion(k8s, namespace, timeout); err != nil {
+		Die(t, err)
+	}
 }
 
 func WaitForPrometheusReady(k8s *types.Cluster, namespace string, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {

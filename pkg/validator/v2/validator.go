@@ -35,8 +35,9 @@ const (
 	defaultAnalyticsServiceMemQuota               = "1Gi"
 	defaultFSGroup                                = 1000
 	defaultMetricsImage                           = "couchbase/exporter:1.0.0"
-	redhatMetricsImage                            = "http://registry.connect.redhat.com/couchbase/exporter:1.0.0-1"
-	defaultBackupImage                            = "couchbase/operator-backup:6.5.0-1"
+	redhatMetricsImage                            = "registry.connect.redhat.com/couchbase/exporter:1.0.0-1"
+	defaultBackupImage                            = "couchbase/operator-backup:6.5.0"
+	redhatBackupImage                             = "registry-connect.redhat.com/couchbase/operator-backup:6.5.0-1"
 	defaultBackupServiceAccount                   = "couchbase-backup"
 )
 
@@ -136,7 +137,21 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 	}
 	if managedBackup, found, _ := unstructured.NestedBool(object.Object, "spec", "backup", "managed"); found && managedBackup {
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "image"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/image", Value: defaultBackupImage})
+			backupImage := defaultBackupImage
+
+			namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
+			if !apierrors.IsForbidden(err) {
+				if namespace.Annotations != nil {
+					for _, annotation := range namespace.Annotations {
+						if strings.HasPrefix(annotation, "openshift.io") {
+							backupImage = redhatBackupImage
+							break
+						}
+					}
+				}
+			}
+
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/image", Value: backupImage})
 		}
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "serviceAccountName"); !found {
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/serviceAccountName", Value: defaultBackupServiceAccount})

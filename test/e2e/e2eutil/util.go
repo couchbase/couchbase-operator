@@ -369,11 +369,11 @@ func MustNewBucket(t *testing.T, k8s *types.Cluster, namespace string, bucket ru
 	return object
 }
 
-func NewBackup(k8s *types.Cluster, namespace string, backup runtime.Object) (runtime.Object, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).Create(backup.(*couchbasev2.CouchbaseBackup))
+func NewBackup(k8s *types.Cluster, namespace string, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseBackup, error) {
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).Create(backup)
 }
 
-func MustNewBackup(t *testing.T, k8s *types.Cluster, namespace string, backup runtime.Object) runtime.Object {
+func MustNewBackup(t *testing.T, k8s *types.Cluster, namespace string, backup *couchbasev2.CouchbaseBackup) *couchbasev2.CouchbaseBackup {
 	object, err := NewBackup(k8s, namespace, backup)
 	if err != nil {
 		Die(t, err)
@@ -381,11 +381,11 @@ func MustNewBackup(t *testing.T, k8s *types.Cluster, namespace string, backup ru
 	return object
 }
 
-func NewBackupRestore(k8s *types.Cluster, namespace string, backup runtime.Object) (runtime.Object, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(namespace).Create(backup.(*couchbasev2.CouchbaseBackupRestore))
+func NewBackupRestore(k8s *types.Cluster, namespace string, backup *couchbasev2.CouchbaseBackupRestore) (*couchbasev2.CouchbaseBackupRestore, error) {
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(namespace).Create(backup)
 }
 
-func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, namespace string, restore runtime.Object) runtime.Object {
+func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, namespace string, restore *couchbasev2.CouchbaseBackupRestore) *couchbasev2.CouchbaseBackupRestore {
 	object, err := NewBackupRestore(k8s, namespace, restore)
 	if err != nil {
 		Die(t, err)
@@ -393,24 +393,22 @@ func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, namespace string, re
 	return object
 }
 
-func DeleteBackup(k8s *types.Cluster, namespace string, backup runtime.Object) error {
-	t := backup.(*couchbasev2.CouchbaseBackup)
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
+func DeleteBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) error {
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Delete(backup.Name, metav1.NewDeleteOptions(0))
 }
 
-func MustDeleteBackup(t *testing.T, k8s *types.Cluster, namespace string, bucket runtime.Object) {
-	if err := DeleteBackup(k8s, namespace, bucket); err != nil {
+func MustDeleteBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) {
+	if err := DeleteBackup(k8s, backup); err != nil {
 		Die(t, err)
 	}
 }
 
-func DeleteBackupRestore(k8s *types.Cluster, namespace string, restore runtime.Object) error {
-	t := restore.(*couchbasev2.CouchbaseBackupRestore)
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
+func DeleteBackupRestore(k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) error {
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(restore.Namespace).Delete(restore.Name, metav1.NewDeleteOptions(0))
 }
 
-func MustDeleteBackupRestore(t *testing.T, k8s *types.Cluster, namespace string, bucket runtime.Object) {
-	if err := DeleteBackupRestore(k8s, namespace, bucket); err != nil {
+func MustDeleteBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) {
+	if err := DeleteBackupRestore(k8s, restore); err != nil {
 		Die(t, err)
 	}
 }
@@ -667,7 +665,7 @@ func CleanUpCluster(t *testing.T, k8s *types.Cluster, namespace, logDir, kubeNam
 		t.Logf("Error: %v", err)
 	}
 
-	CleanK8Cluster(k8s, namespace)
+	CleanK8sCluster(k8s, namespace)
 }
 
 func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cbCluster *couchbasev2.CouchbaseCluster) {
@@ -691,7 +689,7 @@ func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 	}
 }
 
-func CleanK8Cluster(k8s *types.Cluster, namespace string) {
+func CleanK8sCluster(k8s *types.Cluster, namespace string) {
 	if err := k8s.KubeClient.BatchV1().Jobs(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete jobs: ", err)
 	}
@@ -713,26 +711,6 @@ func CleanK8Cluster(k8s *types.Cluster, namespace string) {
 	if err == nil {
 		for _, service := range services.Items {
 			_ = k8s.KubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
-		}
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
-	} else if err := WaitForBackupDeletion(k8s, namespace, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
-	}
-
-	// Cleanup left over backup Job Pods.
-	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: "master=cb-operator"})
-	if err != nil {
-		fmt.Println("Warning: Unable to list leftover Backup Pods", err)
-	}
-	for _, pod := range pods.Items {
-		if err := k8s.KubeClient.CoreV1().Pods(namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
-			if errors.IsNotFound(err) {
-				continue
-			}
-			fmt.Println(fmt.Sprintf("Warning: Unable to delete leftover Backup Pod %s", pod.Name), err)
 		}
 	}
 
@@ -770,6 +748,16 @@ func CleanK8Cluster(k8s *types.Cluster, namespace string) {
 		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)
 	} else if err := WaitForRoleBindingDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)
+	}
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
+	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
+		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
+	}
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		fmt.Println("Warning: Unable to delete couchbasebackuprestores: ", err)
+	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
+		fmt.Println("Warning: Unable to delete couchbasebackuprestores: ", err)
 	}
 }
 

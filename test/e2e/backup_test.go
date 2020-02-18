@@ -2,6 +2,11 @@ package e2e
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -10,11 +15,8 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
-	"strings"
-	"testing"
-	"time"
 )
 
 func createTestBackup(strategy v2.Strategy, schedules []string) *v2.CouchbaseBackup {
@@ -41,12 +43,46 @@ func createTestBackup(strategy v2.Strategy, schedules []string) *v2.CouchbaseBac
 			Full: &v2.CouchbaseBackupSchedule{
 				Schedule: full,
 			},
+			Size: e2espec.NewResourceQuantityMi(2048),
 		},
 	}
 
 	return backup
 }
 
+func createTestBackupNew(strategy v2.Strategy, fullSchedule, incrementalSchedule string) *v2.CouchbaseBackup {
+	backup := &v2.CouchbaseBackup{
+		ObjectMeta: v1.ObjectMeta{
+			Name: strings.Replace(string(strategy), "_", "-", -1),
+		},
+		Spec: v2.CouchbaseBackupSpec{
+			Strategy: strategy,
+			Incremental: &v2.CouchbaseBackupSchedule{
+				Schedule: incrementalSchedule,
+			},
+			Full: &v2.CouchbaseBackupSchedule{
+				Schedule: fullSchedule,
+			},
+			Size: e2espec.NewResourceQuantityMi(2048),
+		},
+	}
+
+	return backup
+}
+
+// cronScheduleOnceIn returns a one-time, predictable cron schedule.  It is
+// highly recommended that this be at least 2 minutes to give things a chance
+// go become created.
+// TODO: how do time zones come into this??
+func cronScheduleOnceIn(duration time.Duration) string {
+	when := time.Now().Add(duration)
+	return fmt.Sprintf("%d %d * * *", when.Minute(), when.Hour())
+}
+
+// createEveryXMinutesSchedule schedules a cron job once ever N minutes.  Do not
+// use this, if something starts taking longer, then it will start failing randomly.
+// You can simulate multiple firings by calling cronScheduleOnceIn, waiting for the
+// indended result, then patching in a new firing time.
 func createEveryXMinutesSchedule(x int) string {
 	return "*/" + strconv.Itoa(x) + " * * * *"
 }
@@ -55,57 +91,32 @@ func TestFullIncremental(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	incrementalFreq := 1
-	fullFreq := 2
-
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
-	// Create a normal cluster.
+	// Static configuration.
+	clusterSize := constants.Size3
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+
+	// Create a normal cluster.
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	//time.Sleep(time.Minute) // wait for documents to be inserted
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	schedules := []string{createEveryXMinutesSchedule(incrementalFreq), createEveryXMinutesSchedule(fullFreq)}
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, schedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	backup := createTestBackupNew(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
+	backup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, backup)
+	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
 
-	// wait for backup
-	options := v1.GetOptions{}
-	backup, err := targetKube.CRClient.CouchbaseV2().CouchbaseBackups(targetKube.Namespace).Get(fullIncrementalBackup.Name, options)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	if backup.Name != fullIncrementalBackup.Name {
-		e2eutil.Die(t, fmt.Errorf("backup name actual value %s mismatch expected value %s", backup.Name, fullIncrementalBackup.Name))
-	}
-
-	// wait for cronjobs to be reconciled
-	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), 2*time.Minute)
-	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Incremental), 2*time.Minute)
-
-	// check for jobs, initial job and jobs run via Cron
-	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, "full-", time.Duration(fullFreq*2)*time.Minute)
-	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, "incremental-", time.Duration(incrementalFreq*2)*time.Minute)
-
-	// wait for jobs completion and confirm they ran without error
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 2*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "incremental-", 2*time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	// Expect the full backup to complete, followed by the the incremental.
+	e2eutil.MustWaitForBackupRun(t, targetKube, backup, 5*time.Minute)
+	e2eutil.MustWaitForBackupRun(t, targetKube, backup, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Initial job created
+	// * Bucket created
+	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -118,51 +129,32 @@ func TestFullIncremental(t *testing.T) {
 func TestFullOnly(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	fullFreq := 2
 
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
-	// Create a normal cluster.
+	// Static configuration.
+	clusterSize := constants.Size3
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+
+	// Create a normal cluster.
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	time.Sleep(time.Minute) // wait for documents to be inserted
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	schedules := []string{createEveryXMinutesSchedule(fullFreq)}
-	fullBackup := createTestBackup(v2.FullOnly, schedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	backup := createTestBackupNew(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
+	backup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, backup)
+	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
 
-	// wait for backup
-	options := v1.GetOptions{}
-	backup, err := targetKube.CRClient.CouchbaseV2().CouchbaseBackups(targetKube.Namespace).Get(fullBackup.Name, options)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	if backup.Name != fullBackup.Name {
-		e2eutil.Die(t, fmt.Errorf("backup name actual value %s mismatch expected value %s", backup.Name, fullBackup.Name))
-	}
-
-	// wait for cronjob to be reconciled
-	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
-
-	// check for jobs, initial job and job run via Cron
-	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, "full-", time.Duration(fullFreq*2)*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 2*time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	// Expect the full backup to complete.
+	e2eutil.MustWaitForBackupRun(t, targetKube, backup, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Initial job created
+	// * Bucket created
+	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -172,8 +164,8 @@ func TestFullOnly(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Cluster goes down during a backup
-// Test --purge option - this should allow us to ignore the previous backup and start anew
+// Cluster goes down during a backup (all pods go down)
+// Tests --purge behaviour is working as expected - this should allow us to ignore the previous backup and start anew
 func TestFailedBackupBehaviour(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -182,20 +174,26 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 
 	// Create cluster.
-	numOfDocs := 2000
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	numOfDocs := 200
+	testCouchbase := e2espec.NewSupportableCluster(mdsGroupSize)
+	testCouchbase.Name = clusterName
+	testCouchbase.Spec.Backup.Managed = true
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	schedules := []string{createEveryXMinutesSchedule(fullFreq)}
 	fullBackup := createTestBackup(v2.FullOnly, schedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 
 	// wait for backup
 	options := v1.GetOptions{}
@@ -213,47 +211,33 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	// wait for cronjob first run
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(fullFreq*2)*time.Minute)
 	// kill the cluster
-	fmt.Println("kill cluster")
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 2, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 3, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 1), time.Minute)
+	for i := 0; i < mdsGroupSize; i++ {
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, i, false)
+	}
 	// wait for cluster to return
-	fmt.Println("wait for cluster to return")
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// check backup and cronjob are still up
-	backup, err = targetKube.CRClient.CouchbaseV2().CouchbaseBackups(targetKube.Namespace).Get(fullBackup.Name, options)
-	if err != nil {
+	if _, err = targetKube.CRClient.CouchbaseV2().CouchbaseBackups(targetKube.Namespace).Get(fullBackup.Name, options); err != nil {
 		e2eutil.Die(t, err)
-	}
-
-	if backup.Name != fullBackup.Name {
-		e2eutil.Die(t, fmt.Errorf("backup name actual value %s mismatch expected value %s", backup.Name, fullBackup.Name))
 	}
 	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
 
 	// check for job and wait for completion
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(fullFreq*2)*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 2*time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 15*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Initial job created
-	// * Cluster created
 	// * Bucket created
+	// * Backup created
+	// * Members go down
+	// * Members recover
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, mdsGroupSize),
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -267,22 +251,22 @@ func TestBackupPVCReconcile(t *testing.T) {
 	fullFreq := 2
 
 	// Static configuration.
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
+	clusterSize := constants.Size3
 
 	// Create cluster.
-	numOfDocs := 2000
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	numOfDocs := 200
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	schedules := []string{createEveryXMinutesSchedule(fullFreq)}
 	fullBackup := createTestBackup(v2.FullOnly, schedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 
 	// wait for backup
 	options := v1.GetOptions{}
@@ -311,10 +295,7 @@ func TestBackupPVCReconcile(t *testing.T) {
 	}
 
 	// delete backup!
-	err = targetKube.CRClient.CouchbaseV2().CouchbaseBackups(targetKube.Namespace).Delete(fullBackup.Name, &v1.DeleteOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
+	e2eutil.MustDeleteBackup(t, targetKube, fullBackup)
 
 	// DELET this
 	if err := e2eutil.DeleteAndWaitForPVCDeletionSingle(targetKube, pvc.Name, targetKube.Namespace, 5*time.Minute); err != nil {
@@ -322,7 +303,7 @@ func TestBackupPVCReconcile(t *testing.T) {
 	}
 
 	// create backup again
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 
 	// wait for backup
 	backup, err = targetKube.CRClient.CouchbaseV2().CouchbaseBackups(targetKube.Namespace).Get(fullBackup.Name, options)
@@ -336,10 +317,6 @@ func TestBackupPVCReconcile(t *testing.T) {
 
 	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
 
-	// check for job and wait for completion
-	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(fullFreq*2)*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 2*time.Minute)
-
 	// check pvc exists
 	pvc, err = targetKube.KubeClient.CoreV1().PersistentVolumeClaims(targetKube.Namespace).Get(fullBackup.Name, v1.GetOptions{})
 	if err != nil {
@@ -350,18 +327,21 @@ func TestBackupPVCReconcile(t *testing.T) {
 		e2eutil.Die(t, fmt.Errorf("pvc name %s is a mismatch with backup name %s", pvc.Name, backup.Name))
 	}
 
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	// check for job and wait for completion
+	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(fullFreq*2)*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 15*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * Backup deleted
+	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted, FuzzyMessage: string(cluster.Full)},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 	}
 
@@ -378,32 +358,33 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	incrFreq := 3
-	fullFreq := 2
+	initialFullFreq := 1
+
+	incrFreq := 2
+	fullFreq := 5
 
 	// Static configuration.
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
+	clusterSize := constants.Size3
 
 	// Create a normal cluster.
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	time.Sleep(time.Minute) // wait for documents to be inserted
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create Backup objects.
-	schedules := []string{createEveryXMinutesSchedule(fullFreq)}
+	schedules := []string{createEveryXMinutesSchedule(initialFullFreq)}
 	fullBackup := createTestBackup(v2.FullOnly, schedules)
 
 	schedules = []string{createEveryXMinutesSchedule(incrFreq), createEveryXMinutesSchedule(fullFreq)}
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, schedules)
 
 	// create initial backup
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 
 	// wait for backup
 	options := v1.GetOptions{}
@@ -420,14 +401,16 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
 
 	// check for jobs, initial job and job run via Cron
-	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(fullFreq*2)*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 2*time.Minute)
+	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(initialFullFreq*2)*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 5*time.Minute)
 
 	// DELET THIS
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	e2eutil.MustDeleteBackup(t, targetKube, fullBackup)
+	// wait for backup to be deleted
+	e2eutil.MustWaitForBackupDeletion(t, targetKube, targetKube.Namespace, 2*time.Minute)
 
 	// create new backup
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
 	newBackup, err := targetKube.CRClient.CouchbaseV2().CouchbaseBackups(targetKube.Namespace).Get(fullIncrementalBackup.Name, options)
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -446,25 +429,23 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Incremental), time.Duration(incrFreq)*time.Minute)
 
 	// wait for jobs completion and confirm they ran without error
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 2*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Incremental), 2*time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 5*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Incremental), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Backup Created
-	// * Correct Cronjob(s) created
-	// * Backup Deleted
-	// * Backup Created
-	// * Correct Cronjob(s) created
+	// * Bucket created
+	// * Backup created
+	// * Backup deleted
+	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: fullBackup.Name},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
+		eventschema.Set{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted, FuzzyMessage: fullBackup.Name},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
+		}},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -480,32 +461,33 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	incrFreq := 3
-	fullFreq := 2
+	incrFreq := 2
+	fullFreq := 5
+
+	laterFullFreq := 1
 
 	// Static configuration.
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
+	clusterSize := constants.Size3
 
 	// Create a normal cluster.
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	time.Sleep(time.Minute) // wait for documents to be inserted
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create Backup objects.
-	schedules := []string{createEveryXMinutesSchedule(fullFreq)}
+	schedules := []string{createEveryXMinutesSchedule(laterFullFreq)}
 	fullBackup := createTestBackup(v2.FullOnly, schedules)
 
 	schedules = []string{createEveryXMinutesSchedule(incrFreq), createEveryXMinutesSchedule(fullFreq)}
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, schedules)
 
 	// create initial backup
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
 
 	// wait for backup
 	options := v1.GetOptions{}
@@ -527,14 +509,16 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Incremental), time.Duration(incrFreq)*time.Minute)
 
 	// wait for jobs completion and confirm they ran without error
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 2*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Incremental), 2*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 5*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Incremental), 5*time.Minute)
 
 	// DELET THIS
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	e2eutil.MustDeleteBackup(t, targetKube, fullIncrementalBackup)
+	// wait for backup to be deleted
+	e2eutil.MustWaitForBackupDeletion(t, targetKube, targetKube.Namespace, 2*time.Minute)
 
 	// create new backup
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 	newBackup, err := targetKube.CRClient.CouchbaseV2().CouchbaseBackups(targetKube.Namespace).Get(fullBackup.Name, options)
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -548,25 +532,23 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
 
 	// check for jobs, initial job and job run via Cron
-	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(fullFreq*2)*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 2*time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(laterFullFreq*2)*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Backup Created
-	// * Correct Cronjob(s) created
-	// * Backup Deleted
-	// * Backup Created
-	// * Correct Cronjob(s) created
+	// * Bucket created
+	// * Backup created
+	// * Backup deleted
+	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Set{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted, FuzzyMessage: string(cluster.Incremental)},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		}},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -575,26 +557,25 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 func TestBackupAndRestore(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	fullFreq := 3
+	fullFreq := 1
 
 	// Create a normal cluster.
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
+	clusterSize := constants.Size3
 
-	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	numOfDocs := 2000
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	time.Sleep(time.Minute) // wait for docs to be inserted
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	time.Sleep(time.Minute) // wait for documents to be inserted
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	schedules := []string{createEveryXMinutesSchedule(fullFreq)}
 	fullBackup := createTestBackup(v2.FullOnly, schedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 
 	// wait for backup
 	options := v1.GetOptions{}
@@ -612,10 +593,10 @@ func TestBackupAndRestore(t *testing.T) {
 
 	// check and wait for initial job
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(fullFreq)*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 2*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), 5*time.Minute)
 
 	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, testCouchbase, fullBackup.Name, "Repo", 2*time.Minute)
+	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
 
 	latest := "latest"
 	// Create a Restore object for later.
@@ -634,39 +615,30 @@ func TestBackupAndRestore(t *testing.T) {
 
 	// check and wait for job run via Cron
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, "full-", time.Duration(fullFreq*2)*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 2*time.Minute)
-	fmt.Println("backup should be completed")
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 5*time.Minute)
 
 	// delete bucket
 	e2eutil.MustDeleteBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 2*time.Minute)
 
 	// wait for new bucket to be created and create new bucket
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 4*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 5*time.Minute)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, targetKube.Namespace, restore)
+	_ = e2eutil.MustNewBackupRestore(t, targetKube, targetKube.Namespace, restore)
 
-	// wait for job and completion
-	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, restore.Name, time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, restore.Name, 2*time.Minute)
-
-	// check that cluster holds the correct amount of items
+	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
-	e2eutil.MustDeleteBackupRestore(t, targetKube, targetKube.Namespace, restore)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Initial job created
+	// * Bucket created
+	// * Backup created
 	// * Remove Bucket
-	// * Bucket Created
+	// * Bucket created
+	// * Restore created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -685,26 +657,24 @@ func TestBackupAndRestore(t *testing.T) {
 func TestUpdateBackupStatus(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
-	fullFreq := 3
+	fullFreq := 1
 
 	// Create a normal cluster.
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
+	clusterSize := constants.Size3
 
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	time.Sleep(time.Minute) // wait for documents to be inserted
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	schedules := []string{createEveryXMinutesSchedule(fullFreq)}
 	fullBackup := createTestBackup(v2.FullOnly, schedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 
 	// wait for backup
 	options := v1.GetOptions{}
@@ -721,30 +691,22 @@ func TestUpdateBackupStatus(t *testing.T) {
 	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
 
 	// check and wait for first cronjob run
-	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, testCouchbase, fullBackup.Name, "LastRun", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, testCouchbase, fullBackup.Name, "Running", time.Minute) // race condition issue?
+	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, string(cluster.Full), time.Duration(fullFreq)*2*time.Minute)
 	// wait for job completion
 	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "LastRun", time.Minute)
 
 	// wait for backup status update
-	archive := e2eutil.MustWaitStatusUpdate(t, targetKube, testCouchbase, fullBackup.Name, "Archive", time.Minute)
-	if archive.String() != "/data/backups/" {
-		t.FailNow()
-	}
-	e2eutil.MustWaitStatusUpdate(t, targetKube, testCouchbase, fullBackup.Name, "Repo", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, testCouchbase, fullBackup.Name, "RepoList", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, testCouchbase, fullBackup.Name, "LastSuccess", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, testCouchbase, fullBackup.Name, "Duration", time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Archive", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "RepoList", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "LastSuccess", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Duration", time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Initial job created
+	// * Bucket created
+	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -758,30 +720,29 @@ func TestMultipleBackups(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	incrementalFreq := 1
-	fullFreq := 2
+	incrementalFreq := 2
+	fullFreq := 5
 
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
+	clusterSize := constants.Size3
 	// Create a normal cluster.
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	time.Sleep(time.Minute) // wait for documents to be inserted
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create Backup object 1.
 	incrSchedules := []string{createEveryXMinutesSchedule(incrementalFreq), createEveryXMinutesSchedule(fullFreq)}
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, incrSchedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
 
 	// Create Backup object 2.
 	fullSchedules := []string{createEveryXMinutesSchedule(fullFreq)}
 	fullBackup := createTestBackup(v2.FullOnly, fullSchedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 
 	// wait for backups
 	options := v1.GetOptions{}
@@ -814,19 +775,14 @@ func TestMultipleBackups(t *testing.T) {
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, "incremental-", time.Duration(incrementalFreq*2)*time.Minute)
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, "full-", time.Duration(fullFreq*2)*time.Minute)
 
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 2*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "incremental-", 2*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 2*time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 5*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "incremental-", 5*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Initial job created
+	// * Bucket created
+	// * Backups created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -843,31 +799,19 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	incrementalFreq := 1
-	fullFreq := 2
+	incrementalFreq := 2
+	fullFreq := 5
 
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
-	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size3
 
 	// Create the cluster.
 	numOfDocs := 200
 
 	// Create the cluster.
-	tlsOptions := &e2eutil.TLSOpts{
-		ClusterName: clusterName,
-		AltNames: []string{
-			"localhost",
-			fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-			fmt.Sprintf("*.%s.%s", clusterName, domain),
-		},
-	}
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, &e2eutil.TLSOpts{})
 	defer teardown()
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
 
-	testCouchbase.Name = clusterName
+	testCouchbase := e2espec.NewBackupCluster(clusterSize)
 	testCouchbase.Spec.Networking.TLS = &v2.TLSPolicy{
 		Static: &v2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
@@ -877,16 +821,16 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	//time.Sleep(time.Minute) // wait for documents to be inserted
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	schedules := []string{createEveryXMinutesSchedule(incrementalFreq), createEveryXMinutesSchedule(fullFreq)}
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, schedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
 
 	// wait for backup
 	options := v1.GetOptions{}
@@ -908,24 +852,17 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, "incremental-", time.Duration(incrementalFreq*2)*time.Minute)
 
 	// wait for jobs completion and confirm they ran without error
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 2*time.Minute)
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "incremental-", 2*time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 5*time.Minute)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "incremental-", 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Initial job created
+	// * Bucket created
+	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
-		}},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
@@ -937,28 +874,16 @@ func TestFullOnlyOverTLS(t *testing.T) {
 
 	fullFreq := 2
 
-	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
-	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size3
 
 	// Create the cluster.
 	numOfDocs := 200
 
 	// Create the cluster.
-	tlsOptions := &e2eutil.TLSOpts{
-		ClusterName: clusterName,
-		AltNames: []string{
-			"localhost",
-			fmt.Sprintf("*.%s.%s.svc", clusterName, targetKube.Namespace),
-			fmt.Sprintf("*.%s.%s", clusterName, domain),
-		},
-	}
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, &e2eutil.TLSOpts{})
 	defer teardown()
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
 
-	testCouchbase.Name = clusterName
+	testCouchbase := e2espec.NewBackupCluster(clusterSize)
 	testCouchbase.Spec.Networking.TLS = &v2.TLSPolicy{
 		Static: &v2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
@@ -968,16 +893,16 @@ func TestFullOnlyOverTLS(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	//time.Sleep(time.Minute) // wait for documents to be inserted
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	schedules := []string{createEveryXMinutesSchedule(fullFreq)}
 	fullBackup := createTestBackup(v2.FullOnly, schedules)
-	e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
 
 	// wait for backup
 	options := v1.GetOptions{}
@@ -997,22 +922,16 @@ func TestFullOnlyOverTLS(t *testing.T) {
 	e2eutil.MustWaitForJob(t, targetKube, testCouchbase, "full-", time.Duration(fullFreq*2)*time.Minute)
 
 	// wait for jobs completion and confirm they ran without error
-	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 2*time.Minute)
-
-	// cleanup
-	e2eutil.MustDeleteBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	e2eutil.MustWaitForJobCompletion(t, targetKube, testCouchbase, "full-", 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Bucket Created
-	// * Correct Cronjob(s) created
-	// * Initial job created
+	// * Bucket created
+	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
-		}},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

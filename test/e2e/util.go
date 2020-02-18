@@ -285,6 +285,7 @@ var (
 		"TestUpdateBackupStatus":           TestUpdateBackupStatus,
 		"TestMultipleBackups":              TestMultipleBackups,
 		"TestFullIncrementalOverTLS":       TestFullIncrementalOverTLS,
+		"TestFullOnlyOverTLS":              TestFullOnlyOverTLS,
 	}
 )
 

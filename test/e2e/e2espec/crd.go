@@ -384,9 +384,8 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 }
 
 func NewBackupCluster(size int) *couchbasev2.CouchbaseCluster {
-	spec := NewSupportableCluster(size)
+	spec := NewBasicCluster(size)
 	spec.Spec.Backup.Managed = true
-
 	spec.Spec.Backup.ServiceAccount = config.BackupResourceName
 	return spec
 }

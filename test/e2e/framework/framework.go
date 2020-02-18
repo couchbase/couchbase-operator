@@ -254,7 +254,7 @@ func cleanUpNamespace() (err error) {
 		}
 
 		// Blow away any couchbase cluster resources (and friends)
-		e2eutil.CleanK8Cluster(k8s, k8s.Namespace)
+		e2eutil.CleanK8sCluster(k8s, k8s.Namespace)
 	}
 
 	// TODO: check all deleted and wait
@@ -404,7 +404,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		return err
 	}
 
-	e2eutil.CleanK8Cluster(k8s, k8s.Namespace)
+	e2eutil.CleanK8sCluster(k8s, k8s.Namespace)
 
 	logrus.Info("Deleting orphaned pods")
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})

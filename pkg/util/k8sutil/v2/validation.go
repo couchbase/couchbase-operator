@@ -456,24 +456,24 @@ func GetCouchbaseBackupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 					Name:        "Capacity Used",
 					Type:        "string",
 					Description: "total size of the backup volume",
-					JSONPath:    ".status.CapacityUsed",
+					JSONPath:    ".status.capacityUsed",
 				},
 				{
 					Name:        "Last Run",
 					Type:        "string",
 					Description: "last time backup was run",
-					JSONPath:    ".status.LastRun",
+					JSONPath:    ".status.lastRun",
 				},
 				{
 					Name:        "Last Success",
 					Type:        "string",
 					Description: "last time backup was successful",
-					JSONPath:    ".status.LastSuccess",
+					JSONPath:    ".status.lastSuccess",
 				},
 				{
 					Name:     "Running",
 					Type:     "boolean",
-					JSONPath: ".status.Running",
+					JSONPath: ".status.running",
 				},
 				{
 					Name:     "Age",
@@ -550,7 +550,7 @@ func GetCouchbaseBackupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 						"status": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-								"capacityused": apiextensionsv1beta1.JSONSchemaProps{
+								"capacityUsed": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
 								"archive": apiextensionsv1beta1.JSONSchemaProps{
@@ -559,8 +559,13 @@ func GetCouchbaseBackupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 								"repo": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"repolist": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "object",
+								"repoList": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "list",
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+									},
 								},
 								"running": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
@@ -583,13 +588,13 @@ func GetCouchbaseBackupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 								"duration": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"lastfailure": apiextensionsv1beta1.JSONSchemaProps{
+								"lastFailure": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"lastsuccess": apiextensionsv1beta1.JSONSchemaProps{
+								"lastSuccess": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"lastrun": apiextensionsv1beta1.JSONSchemaProps{
+								"lastRun": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
 							},
@@ -624,29 +629,29 @@ func GetCouchbaseBackupRestoreCRD() *apiextensionsv1beta1.CustomResourceDefiniti
 					Name:        "Capacity Used",
 					Type:        "string",
 					Description: "total size of the backup volume",
-					JSONPath:    ".status.CapacityUsed",
+					JSONPath:    ".status.capacityUsed",
 				},
 				{
 					Name:        "Last Run",
 					Type:        "string",
 					Description: "last time backup was run",
-					JSONPath:    ".status.LastRun",
+					JSONPath:    ".status.lastRun",
 				},
 				{
 					Name:        "Last Success",
 					Type:        "string",
 					Description: "last time restore was successful",
-					JSONPath:    ".status.LastSuccess",
+					JSONPath:    ".status.lastSuccess",
 				},
 				{
 					Name:     "Duration",
 					Type:     "string",
-					JSONPath: ".status.Duration",
+					JSONPath: ".status.duration",
 				},
 				{
 					Name:     "Running",
 					Type:     "boolean",
-					JSONPath: ".status.Running",
+					JSONPath: ".status.running",
 				},
 				{
 					Name:     "Age",
@@ -719,6 +724,14 @@ func GetCouchbaseBackupRestoreCRD() *apiextensionsv1beta1.CustomResourceDefiniti
 								"repo": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
+								"repoList": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "list",
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type: "string",
+										},
+									},
+								},
 								"running": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
 								},
@@ -740,13 +753,13 @@ func GetCouchbaseBackupRestoreCRD() *apiextensionsv1beta1.CustomResourceDefiniti
 								"duration": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"lastfailure": apiextensionsv1beta1.JSONSchemaProps{
+								"lastFailure": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"lastsuccess": apiextensionsv1beta1.JSONSchemaProps{
+								"lastSuccess": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"lastrun": apiextensionsv1beta1.JSONSchemaProps{
+								"lastRun": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
 							},

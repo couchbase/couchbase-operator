@@ -65,7 +65,7 @@ func GetBackupServiceAccount(name string) *v1.ServiceAccount {
 	}
 }
 
-func GetBackupRoleBinding(name string) *rbacv1.RoleBinding {
+func GetBackupRoleBinding(name, namespace string) *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -74,7 +74,7 @@ func GetBackupRoleBinding(name string) *rbacv1.RoleBinding {
 			{
 				Kind:      "ServiceAccount",
 				Name:      name,
-				Namespace: "default",
+				Namespace: namespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
