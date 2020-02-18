@@ -113,4 +113,18 @@ A replication was deleted and disassociated from a remote cluster.
 
 == Backup Lifecycle
 
-_Coming soon_
+BackupCreated::
+A periodic backup job was created.
+
+BackupEdited::
+A periodic backup job was edited.
+
+BackupDeleted::
+A periodic backup job was deleted.
+
+BackupRestoreCreated::
+A restore job was created.
+
+BackupRestoreDeleted::
+A restore job was deleted.  This condition indicates successful completion.
+
