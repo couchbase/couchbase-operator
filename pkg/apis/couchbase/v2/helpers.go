@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -415,12 +413,53 @@ func NewUpgradeStatus(message string) *UpgradeStatus {
 	return status
 }
 
-func ValidRolePattern() string {
-	return fmt.Sprintf("^%s$|^%s$", strings.Join(constants.ClusterRoles, "$|^"), strings.Join(constants.BucketRoles, "$|^"))
+// clusterRoles apply cluster wide and don't require a bucket.
+var clusterRoles = []RoleName{
+	RoleFullAdmin,
+	RoleClusterAdmin,
+	RoleSecurityAdmin,
+	RoleReadOnlyAdmin,
+	RoleXDCRAdmin,
+	RoleQueryCurlAccess,
+	RoleQuestySystemAccess,
+	RoleAnalyticsReader,
 }
 
-func IsBucketRole(role string) bool {
-	for _, r := range constants.BucketRoles {
+// bucketRoles can be bucket scoped.
+var bucketRoles = []RoleName{
+	RoleBucketAdmin,
+	RoleViewsAdmin,
+	RoleSearchAdmin,
+	RoleApplicationAccess,
+	RoleDataReader,
+	RoleDataWriter,
+	RoleDCPReader,
+	RoleBackup,
+	RoleMonitor,
+	RoleXDCRInbound,
+	RoleAnalyticsManager,
+	RoleViewsReader,
+	RoleSearchReader,
+	RoleQuerySelect,
+	RoleQueryUpdate,
+	RoleQueryInsert,
+	RoleQueryDelete,
+	RoleQueryManageIndex,
+}
+
+func ValidRolePattern() string {
+	patterns := []string{}
+	for _, role := range clusterRoles {
+		patterns = append(patterns, fmt.Sprintf("^%v$", role))
+	}
+	for _, role := range bucketRoles {
+		patterns = append(patterns, fmt.Sprintf("^%v$", role))
+	}
+	return strings.Join(patterns, "|")
+}
+
+func IsBucketRole(role RoleName) bool {
+	for _, r := range bucketRoles {
 		if r == role {
 			return true
 		}
@@ -428,8 +467,8 @@ func IsBucketRole(role string) bool {
 	return false
 }
 
-func IsClusterRole(role string) bool {
-	for _, r := range constants.ClusterRoles {
+func IsClusterRole(role RoleName) bool {
+	for _, r := range clusterRoles {
 		if r == role {
 			return true
 		}

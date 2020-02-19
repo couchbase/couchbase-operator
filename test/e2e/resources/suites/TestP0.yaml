@@ -114,6 +114,7 @@ tcGroups:
       - name: TestSyncGatewayCreateLocalTLS
       - name: TestSyncGatewayCreateLocalMutualTLS
       - name: TestSyncGatewayCreateLocalMandatoryMutualTLS
+      - name: TestSyncGatewayRBAC
 
   - name: SyncGatewayInterCluster
     clusters:

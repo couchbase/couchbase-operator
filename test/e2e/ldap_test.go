@@ -160,8 +160,8 @@ func TestLDAPUpdateRole(t *testing.T) {
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Change to bucket role user
-	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", "bucket_admin"), time.Minute)
-	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Replace("/Roles/0/Role", "bucket_admin"), time.Minute)
+	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", couchbasev2.RoleBucketAdmin), time.Minute)
+	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Replace("/Roles/0/Role", string(couchbasev2.RoleBucketAdmin)), time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

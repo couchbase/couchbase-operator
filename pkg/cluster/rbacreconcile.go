@@ -63,7 +63,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			// copy roles to group
 			for _, role := range cbGroup.Spec.Roles {
 				group.Roles = append(group.Roles, cbmgr.UserRole{
-					Role:       role.Name,
+					Role:       string(role.Name),
 					BucketName: role.Bucket,
 				})
 			}

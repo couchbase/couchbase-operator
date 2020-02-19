@@ -388,9 +388,41 @@ type CouchbaseGroupSpec struct {
 	LDAPGroupRef string `json:"ldap_group_ref"`
 }
 
+// RoleName is a type-safe enumeration of all supported role names.
+type RoleName string
+
+const (
+	RoleFullAdmin          RoleName = "admin"
+	RoleClusterAdmin       RoleName = "cluster_admin"
+	RoleSecurityAdmin      RoleName = "security_admin"
+	RoleReadOnlyAdmin      RoleName = "ro_admin"
+	RoleXDCRAdmin          RoleName = "replication_admin"
+	RoleQueryCurlAccess    RoleName = "query_external_access"
+	RoleQuestySystemAccess RoleName = "query_system_catalog"
+	RoleAnalyticsReader    RoleName = "analytics_reader"
+	RoleBucketAdmin        RoleName = "bucket_admin"
+	RoleViewsAdmin         RoleName = "views_admin"
+	RoleSearchAdmin        RoleName = "fts_admin"
+	RoleApplicationAccess  RoleName = "bucket_full_access"
+	RoleDataReader         RoleName = "data_reader"
+	RoleDataWriter         RoleName = "data_writer"
+	RoleDCPReader          RoleName = "data_dcp_reader"
+	RoleBackup             RoleName = "data_backup"
+	RoleMonitor            RoleName = "data_monitoring"
+	RoleXDCRInbound        RoleName = "replication_target"
+	RoleAnalyticsManager   RoleName = "analytics_manager"
+	RoleViewsReader        RoleName = "views_reader"
+	RoleSearchReader       RoleName = "fts_searcher"
+	RoleQuerySelect        RoleName = "query_select"
+	RoleQueryUpdate        RoleName = "query_update"
+	RoleQueryInsert        RoleName = "query_insert"
+	RoleQueryDelete        RoleName = "query_delete"
+	RoleQueryManageIndex   RoleName = "query_manage_index"
+)
+
 type Role struct {
 	// name of role
-	Name string `json:"name"`
+	Name RoleName `json:"name"`
 	// optional bucket name for bucket admin roles
 	Bucket string `json:"bucket"`
 }
@@ -418,26 +450,30 @@ type CouchbaseRoleBindingSpec struct {
 	RoleRef CouchbaseRoleBindingRef `json:"roleRef"`
 }
 
-type RoleBindingType string
+type RoleBindingSubjectType string
 
 const (
-	// RoleBindingTypeUser applies role to Couchbase User
-	RoleBindingTypeUser RoleBindingType = "CouchbaseUser"
+	// RoleBindingSubjectTypeUser applies role to Couchbase User
+	RoleBindingSubjectTypeUser RoleBindingSubjectType = "CouchbaseUser"
+)
 
-	// TODO: rm RoleBindingTypeUser applies role to Couchbase Group
-	RoleBindingTypeGroup RoleBindingType = "CouchbaseGroup"
+type RoleBindingReferenceType string
+
+const (
+	// RoleBindingReferenceTypeUser applies role to Couchbase Group
+	RoleBindingReferenceTypeGroup RoleBindingReferenceType = "CouchbaseGroup"
 )
 
 type CouchbaseRoleBindingSubject struct {
 	// Couchbase user/group kind
-	Kind RoleBindingType `json:"kind"`
+	Kind RoleBindingSubjectType `json:"kind"`
 	// Name of Couchbase user resource
 	Name string `json:"name"`
 }
 
 type CouchbaseRoleBindingRef struct {
 	// Kind of role to use for binding
-	Kind string `json:"kind"`
+	Kind RoleBindingReferenceType `json:"kind"`
 	// Name of role resource to use for binding
 	Name string `json:"name"`
 }

@@ -133,6 +133,98 @@ Certificates have been truncated for brevity.
 <.> **Mutual TLS Only:** The `key.pem` secret is the client key.
     The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync-Gateway configuration.
 
+=== RBAC Support
+
+The provided templates use the `Administrator` user to connect Sync-Gateway to the Couchbase Server cluster.
+If not using client certificate authentication, you should secure the system further by using a limited role to access Couchbase Server.
+In doing so you limit the scope of operations that can be performed in the event the Sync-Gateway configuration is compromised.
+
+First define a secret for the `sync-gateway` user that contains a password:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sync-gateway
+data:
+  password: cGFzc3dvcmQ= # <.>
+----
+
+<.> This password is the literal `password`.
+    You can generate the correctly encoded form on your command line with `echo -n 'password' | base64`.
+
+Next define the `sync-gateway` user and bind it to a group that allows it the "application access" role as defined by Couchbase Server.
+The Operator will create the required user and group on any Couchbase cluster that selects that user:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: sync-gateway
+  labels:
+    cluster: my-cluster # <.>
+spec:
+  authDomain: local # <.>
+  authSecret: sync-gateway # <.>
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: sync-gateway
+spec:
+  roles:
+  - name: bucket_full_access # <.>
+    bucket: default # <.>
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: sync-gateway
+spec:
+  subjects:
+  - kind: CouchbaseUser
+    name: sync-gateway
+  roleRef:
+  - kind: CouchbaseGroup
+    name: sync-gateway
+----
+
+<.> The `CouchbaseUser` is labeled so it can be explicitly selected by a specific cluster.
+    This is the recommended method of deployment as defined in the xref:concept-label-selection.adoc[label selection concepts].
+<.> The `CouchbaseUser` uses the `local` authentication domain, meaning that a password will be locally installed on the Couchbase cluster for authentication.
+<.> The `CouchbaseUser` references the secret we previously created so that the Operator can associate the `sync-gateway` user with its password.
+<.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of needs the `bucket_full_access` role.
+<.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of only requires access to a single bucket.
+    We therefore further limit scope to only enable modification of the `default` bucket.
+    By default this would be set to `*` granting access to all buckets.
+
+Finally, to enable Sync-Gateway to use the `sync-gateway` user, modify the configuration defined in <<configuring-sync-gateway>>:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sync-gateway
+stringData:
+  config.json: |-
+    {
+      "databases": {
+        "cb-example": {
+          "bucket": "default", # <.>
+          "username": "sync-gateway", # <.>
+          "password": "password" # <.>
+        }
+      }
+    }
+----
+
+<.> The `databases.cb-example.bucket` attribute must match the bucket granted access to in the `CouchbaseGroup`.
+<.> The `databases.cb-example.username` attribute must match the `CouchbaseUser` resource's name.
+<.> The `databases.cb-example.password` attribute must match the plain-text password associated with the `CouchbaseUser`.
+
 == Deploying Sync-Gateway
 
 Sync-Gateway is a simple state-less application so does not require any application specific controller like the Operator.

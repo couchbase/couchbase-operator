@@ -155,6 +155,7 @@ var (
 		"TestSyncGatewayCreateRemoteTLS":                TestSyncGatewayCreateRemoteTLS,
 		"TestSyncGatewayCreateRemoteMutualTLS":          TestSyncGatewayCreateRemoteMutualTLS,
 		"TestSyncGatewayCreateRemoteMandatoryMutualTLS": TestSyncGatewayCreateRemoteMandatoryMutualTLS,
+		"TestSyncGatewayRBAC":                           TestSyncGatewayRBAC,
 
 		// RBAC cases
 		"TestRBACValidationCreate":      TestRBACValidationCreate,

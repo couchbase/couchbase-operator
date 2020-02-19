@@ -263,7 +263,7 @@ func ApplyGroupDefaults(v *types.Validator, object *unstructured.Unstructured) j
 			// Apply bucket role to all buckets by default
 			bucket, ok := r["bucket"]
 			if !ok || (bucket == "") {
-				if couchbasev2.IsBucketRole(r["name"].(string)) {
+				if couchbasev2.IsBucketRole(couchbasev2.RoleName(r["name"].(string))) {
 					path := fmt.Sprintf("/spec/roles/%d/bucket", i)
 					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: path, Value: "*"})
 				}
@@ -890,7 +890,7 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 		isCluterRole := couchbasev2.IsClusterRole(role.Name)
 		// Bucket cannot be used with cluster role
 		if role.Bucket != "" && isCluterRole {
-			errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.roles[%d].bucket for cluster role", index), "", role.Name))
+			errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.roles[%d].bucket for cluster role", index), "", string(role.Name)))
 		}
 
 	}

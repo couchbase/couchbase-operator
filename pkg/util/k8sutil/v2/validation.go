@@ -1771,9 +1771,34 @@ func GetGroupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 						"spec": apiextensionsv1beta1.JSONSchemaProps{
 							Type: "object",
+							Required: []string{
+								"roles",
+							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 								"ldap_group_ref": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
+								},
+								"roles": apiextensionsv1beta1.JSONSchemaProps{
+									Type:      "array",
+									MinLength: &minimumItemLength,
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Required: []string{
+												"name",
+											},
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"name": apiextensionsv1beta1.JSONSchemaProps{
+													Type:      "string",
+													MinLength: &minimumStringLength,
+													Pattern:   couchbasev2.ValidRolePattern(),
+												},
+												"bucket": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+										},
+									},
 								},
 							},
 						},

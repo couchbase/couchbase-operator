@@ -5,13 +5,33 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// skipRBAC inhibits tests for versions below 6.5.0.
+func skipRBAC(t *testing.T) {
+	tag, err := k8sutil.CouchbaseVersion(framework.Global.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	version, err := couchbaseutil.NewVersion(tag)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	threshold, _ := couchbaseutil.NewVersion("6.5.0")
+	if version.Less(threshold) {
+		t.Skip("unsupported couchbase version")
+	}
+}
 
 // testSyncGatewayCreate is a generic creation and connectivity test.
 func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
@@ -24,7 +44,7 @@ func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes2, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.
-	e2eutil.MustCreateSyncGateway(t, kubernetes1, cluster, framework.Global.SyncGatewayImage, e2espec.DefaultBucket.Name, dns, tls, time.Minute)
+	e2eutil.MustCreateSyncGateway(t, kubernetes1, cluster, framework.Global.SyncGatewayImage, e2espec.DefaultBucket.Name, nil, dns, tls, time.Minute)
 
 	// Ensure meta-data documents appear in the Couchbase cluster.
 	e2eutil.MustVerifyDocCountInBucketNonZero(t, kubernetes2, cluster, e2espec.DefaultBucket.Name, time.Minute)
@@ -122,4 +142,91 @@ func TestSyncGatewayCreateRemoteMandatoryMutualTLS(t *testing.T) {
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	testSyncGatewayCreate(t, k8s1, k8s2, dns, tls, &policy)
+}
+
+// TestSyncGatewayRBAC tests SGW works end-to-end with the bucket_full_access role.
+func TestSyncGatewayRBAC(t *testing.T) {
+	skipRBAC(t)
+
+	// Platform configuration.
+	k8s1 := framework.Global.GetCluster(0)
+
+	// Static configuration.
+	// NOTE: the secret handling is a hack, by default the sync-gateway configuration will
+	// use the cluster's admin account secret, so while RBAC requires "password" we also put
+	// "username" in there too so that the client configuration works correctly.
+	clusterSize := 3
+	resourceName := "sync-gateway"
+	password := "4Sparta!!!!"
+	secretName := resourceName + "-" + e2eutil.RandomSuffix()
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		Data: map[string][]byte{
+			constants.AuthSecretUsernameKey: []byte(resourceName),
+			constants.AuthSecretPasswordKey: []byte(password),
+		},
+	}
+
+	user := &couchbasev2.CouchbaseUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourceName,
+		},
+		Spec: couchbasev2.CouchbaseUserSpec{
+			AuthDomain: couchbasev2.InternalAuthDomain,
+			AuthSecret: secretName,
+		},
+	}
+
+	group := &couchbasev2.CouchbaseGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourceName,
+		},
+		Spec: couchbasev2.CouchbaseGroupSpec{
+			Roles: []couchbasev2.Role{
+				{
+					Name:   couchbasev2.RoleApplicationAccess,
+					Bucket: e2espec.DefaultBucket.Name,
+				},
+			},
+		},
+	}
+
+	binding := &couchbasev2.CouchbaseRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: resourceName,
+		},
+		Spec: couchbasev2.CouchbaseRoleBindingSpec{
+			Subjects: []couchbasev2.CouchbaseRoleBindingSubject{
+				{
+					Kind: couchbasev2.RoleBindingSubjectTypeUser,
+					Name: resourceName,
+				},
+			},
+			RoleRef: couchbasev2.CouchbaseRoleBindingRef{
+				Kind: couchbasev2.RoleBindingReferenceTypeGroup,
+				Name: resourceName,
+			},
+		},
+	}
+
+	// Create the RBAC primitives and Couchbase cluster.
+	e2eutil.MustCreateSecret(t, k8s1, k8s1.Namespace, secret)
+	defer func() {
+		_ = e2eutil.DeleteSecret(k8s1.KubeClient, k8s1.Namespace, secretName, nil)
+	}()
+	e2eutil.MustNewUser(t, k8s1, k8s1.Namespace, user)
+	e2eutil.MustNewGroup(t, k8s1, k8s1.Namespace, group)
+	e2eutil.MustNewRoleBinding(t, k8s1, k8s1.Namespace, binding)
+	e2eutil.MustNewBucket(t, k8s1, k8s1.Namespace, e2espec.DefaultBucket)
+	cluster := e2eutil.MustNewXDCRCluster(t, k8s1, clusterSize, nil, nil, nil)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
+
+	// Create the sync gateway in the source cluster and insert a document.
+	e2eutil.MustCreateSyncGateway(t, k8s1, cluster, framework.Global.SyncGatewayImage, e2espec.DefaultBucket.Name, secret, nil, nil, time.Minute)
+
+	// Ensure meta-data documents appear in the Couchbase cluster.
+	e2eutil.MustVerifyDocCountInBucketNonZero(t, k8s1, cluster, e2espec.DefaultBucket.Name, time.Minute)
 }
