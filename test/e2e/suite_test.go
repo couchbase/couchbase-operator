@@ -184,7 +184,9 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 	f := framework.Global
 
 	// Do any pre-test clean up actions
-	for _, cluster := range f.ClusterSpec {
+	for clusterName, cluster := range f.ClusterSpec {
+		k8s := f.ClusterSpec[clusterName]
+		_ = e2eutil.CleanLDAPResources(k8s.KubeClient, k8s.Namespace)
 		e2eutil.DeleteSyncGateway(cluster)
 	}
 

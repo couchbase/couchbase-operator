@@ -169,6 +169,14 @@ var (
 		"TestRBACWithLDAPAuth":          TestRBACWithLDAPAuth,
 		"TestRBACSelection":             TestRBACSelection,
 
+		// LDAP cases
+		"TestLDAPCreateAdminUser": TestLDAPCreateAdminUser,
+		"TestLDAPCDeleteUser":     TestLDAPCDeleteUser,
+		"TestLDAPDeleteRole":      TestLDAPDeleteRole,
+		"TestLDAPUpdateRole":      TestLDAPUpdateRole,
+		"TestLDAPRemoveUserFrom":  TestLDAPRemoveUserFromBinding,
+		"TestLDAPDeleteBinding":   TestLDAPDeleteBinding,
+
 		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,
 		"TestRzaCreateClusterWithClassBasedConfig": TestRzaCreateClusterWithClassBasedConfig,

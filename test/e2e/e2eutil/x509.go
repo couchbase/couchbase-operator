@@ -24,6 +24,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
@@ -395,10 +396,14 @@ const (
 )
 
 func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, certPEM, keyPEM []byte) *corev1.Secret {
+
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      secretName,
+			Labels: map[string]string{
+				"group": constants.LDAPLabelSelector,
+			},
 		},
 		Data: map[string][]byte{
 			operatorTLSSecretCA:    caCertData,

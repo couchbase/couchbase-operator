@@ -359,7 +359,7 @@ type AuthDomain string
 
 const (
 	InternalAuthDomain AuthDomain = "local"
-	LDAPAuthDomain     AuthDomain = "ldap"
+	LDAPAuthDomain     AuthDomain = "external"
 )
 
 type CouchbaseUserSpec struct {
@@ -466,7 +466,7 @@ const (
 type RoleBindingReferenceType string
 
 const (
-	// RoleBindingReferenceTypeUser applies role to Couchbase Group
+	// RoleBindingReferenceTypeGroup applies role to Couchbase Group
 	RoleBindingReferenceTypeGroup RoleBindingReferenceType = "CouchbaseGroup"
 )
 

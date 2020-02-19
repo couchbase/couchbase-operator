@@ -97,7 +97,7 @@ metadata:
   name: user2
 spec:
   fullName: Administrator
-  authDomain: ldap
+  authDomain: external
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseGroup

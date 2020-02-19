@@ -39,23 +39,9 @@ func MustNewLDAPService(t *testing.T, kubeClient kubernetes.Interface, namespace
 	return service
 }
 
-func CleanLDAPResources(kubeClient kubernetes.Interface, namespace string) error {
-
+// Delete LDAP Service
+func DeleteLDAPService(kubeClient kubernetes.Interface, namespace string) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
-
-	// Delete LDAP Server Pod
-	podList, err := kubeClient.CoreV1().Pods(namespace).List(opts)
-	if err != nil {
-		return err
-	}
-	for _, pod := range podList.Items {
-		err := kubeClient.CoreV1().Pods(namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
-		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return err
-		}
-	}
-
-	// Delete LDAP Service
 	svcList, err := kubeClient.CoreV1().Services(namespace).List(opts)
 	if err != nil {
 		return err
@@ -66,6 +52,49 @@ func CleanLDAPResources(kubeClient kubernetes.Interface, namespace string) error
 			return err
 		}
 	}
-
 	return nil
+}
+
+// Delete LDAP Server
+func DeleteLDAPServer(kubeClient kubernetes.Interface, namespace string) error {
+	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
+	podList, err := kubeClient.CoreV1().Pods(namespace).List(opts)
+	if err != nil {
+		return err
+	}
+	for _, pod := range podList.Items {
+		err := kubeClient.CoreV1().Pods(namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// Delete LDAP Secret
+func DeleteLDAPSecret(kubeClient kubernetes.Interface, namespace string) error {
+	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
+	secretList, err := kubeClient.CoreV1().Secrets(namespace).List(opts)
+	if err != nil {
+		return err
+	}
+	for _, secret := range secretList.Items {
+		err := kubeClient.CoreV1().Secrets(namespace).Delete(secret.Name, metav1.NewDeleteOptions(0))
+		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// Clean up ldap service and server
+func CleanLDAPResources(kubeClient kubernetes.Interface, namespace string) error {
+
+	if err := DeleteLDAPServer(kubeClient, namespace); err != nil {
+		return nil
+	}
+	if err := DeleteLDAPSecret(kubeClient, namespace); err != nil {
+		return nil
+	}
+	return DeleteLDAPService(kubeClient, namespace)
 }

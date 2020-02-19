@@ -1725,7 +1725,7 @@ func GetUserCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 								},
 								"authDomain": apiextensionsv1beta1.JSONSchemaProps{
 									Type:    "string",
-									Pattern: "^local|ldap$",
+									Pattern: "^local|external$",
 								},
 								"authSecret": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",

@@ -21,11 +21,13 @@ import (
 func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseGroup, *couchbasev2.CouchbaseRoleBinding) {
 	user := e2eutil.MustNewUser(t, k8s, namespace, e2espec.NewDefaultLDAPUser())
 	group := e2eutil.MustNewGroup(t, k8s, namespace, e2espec.NewClusterAdminGroup())
-	binding := e2eutil.MustNewRoleBinding(t, k8s, namespace, e2espec.NewClusterRoleBinding())
+	bindSpec := e2espec.NewRoleBinding(e2e_constants.RoleBindingName, []string{user.Name}, group.Name)
+	binding := e2eutil.MustNewRoleBinding(t, k8s, namespace, bindSpec)
 	return user, group, binding
 }
 
 func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.CouchbaseCluster {
+
 	// Static configuration.
 	clusterSize := 1
 
@@ -37,8 +39,8 @@ func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.
 	tlsOpts := &e2eutil.TLSOpts{
 		AltNames: e2espec.LDAPAltNames(namespace),
 	}
-	ctx, teardown := e2eutil.MustInitLDAPTLS(t, k8s, namespace, tlsOpts)
-	defer teardown()
+	ctx, _ := e2eutil.MustInitLDAPTLS(t, k8s, namespace, tlsOpts)
+
 	pod := e2espec.NewLDAPServerTLS(namespace, ctx.LDAPSecretName)
 	_ = e2eutil.MustNewLDAPServer(t, k8s.KubeClient, namespace, pod)
 
@@ -51,6 +53,7 @@ func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.
 	e2eutil.MustCheckLDAPStatus(t, k8s, testCouchbase, 2*time.Minute)
 	return testCouchbase
 }
+
 func TestLDAPCreateAdminUser(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -119,7 +122,7 @@ func TestLDAPDeleteRole(t *testing.T) {
 	timeout := 2 * time.Minute
 
 	// Expect user delete event to occur
-	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
+	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
@@ -170,7 +173,7 @@ func TestLDAPUpdateRole(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonUserEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonGroupEdited},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
@@ -249,7 +252,7 @@ func TestLDAPDeleteBinding(t *testing.T) {
 	testCouchbase := setupLDAP(t, targetKube, targetKube.Namespace)
 
 	// Expect user delete event to eventually occur
-	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
+	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
@@ -268,7 +271,6 @@ func TestLDAPDeleteBinding(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonGroupDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

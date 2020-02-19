@@ -1416,7 +1416,7 @@ func TestRBACValidationCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name:       "TestValidateLDAPDomain",
-			mutations:  patchMap{"user2": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "ldap")},
+			mutations:  patchMap{"user2": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "external")},
 			shouldFail: false,
 		}, {
 			name:        "TestValidateClusterRole",
@@ -1442,7 +1442,7 @@ func TestRBACValidationCreate(t *testing.T) {
 			name:           "TestValidateUnkownDomain",
 			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "unknown")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.authDomain in body should match '^local|ldap$'"},
+			expectedErrors: []string{"spec.authDomain in body should match '^local|external$'"},
 		},
 		{
 			name:           "TestValidateSecretRequired",
@@ -1497,7 +1497,7 @@ func TestRBACValidationLDAP(t *testing.T) {
 			name:           "TestValidateAuthDomain",
 			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "upnorth")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.authDomain in body should match '^local|ldap$'"},
+			expectedErrors: []string{"spec.authDomain in body should match '^local|external$'"},
 		},
 	}
 

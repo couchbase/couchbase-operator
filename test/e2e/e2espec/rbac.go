@@ -31,7 +31,6 @@ func NewDefaultLDAPUser() *couchbasev2.CouchbaseUser {
 			AuthDomain: couchbasev2.LDAPAuthDomain,
 		},
 	}
-
 }
 
 // NewClusterAdminGroup creates group to grant user cluster admin privilege
@@ -79,29 +78,29 @@ func NewBucketAdminGroup() *couchbasev2.CouchbaseGroup {
 // NewClusterRoleBinding creates spec with default user bound to the cluster admin role
 func NewClusterRoleBinding() *couchbasev2.CouchbaseRoleBinding {
 	users := []string{e2e_constants.CouchbaseUserName}
-	return newRoleBinding(e2e_constants.RoleBindingName, users, e2e_constants.ClusterRoleName)
+	return NewRoleBinding(e2e_constants.RoleBindingName, users, e2e_constants.ClusterRoleName)
 }
 
 // NewBucketRoleBinding creates spec with default user bound to the bucket admin role
 func NewBucketRoleBinding() *couchbasev2.CouchbaseRoleBinding {
 	users := []string{e2e_constants.CouchbaseUserName}
-	return newRoleBinding(e2e_constants.RoleBindingName, users, e2e_constants.BucketRoleName)
+	return NewRoleBinding(e2e_constants.RoleBindingName, users, e2e_constants.BucketRoleName)
 }
 
-// newDefaultRoleBinding binds list of users to a role
-func newRoleBinding(name string, users []string, role string) *couchbasev2.CouchbaseRoleBinding {
+// NewDefaultRoleBinding binds list of users to a role
+func NewRoleBinding(name string, users []string, role string) *couchbasev2.CouchbaseRoleBinding {
 
 	subjects := []couchbasev2.CouchbaseRoleBindingSubject{}
 
 	for _, user := range users {
 		subjects = append(subjects,
 			couchbasev2.CouchbaseRoleBindingSubject{
-				Kind: e2e_constants.CouchbaseSubjectUserKind,
+				Kind: couchbasev2.RoleBindingSubjectTypeUser,
 				Name: user,
 			})
 	}
 	roleRef := couchbasev2.CouchbaseRoleBindingRef{
-		Kind: e2e_constants.CouchbaseRoleRefKind,
+		Kind: couchbasev2.RoleBindingReferenceTypeGroup,
 		Name: role,
 	}
 
