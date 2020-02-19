@@ -69,7 +69,7 @@
   *** xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
   *** xref:reference-couchbasereplication.adoc[CouchbaseReplication Resource]
   *** xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
-  *** xref:reference-couchbaserole.adoc[CouchbaseRole Resource]
+  *** xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
   *** xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding Resource]
  ** Operator
   *** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]

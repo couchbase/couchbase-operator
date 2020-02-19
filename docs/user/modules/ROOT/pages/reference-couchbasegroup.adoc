@@ -1,28 +1,30 @@
-= CouchbaseRole Resource
+= CouchbaseGroup Resource
 
 :toc: macro
 
 The Couchbase Autonomous Operator operates on `CouchbaseCluster` objects.
-Roles are decoupled from this configuration and are selected for inclusion within a cluster with configurable label selectors.
+Groups are decoupled from this configuration and are selected for inclusion within a cluster with configurable label selectors.
 
-`CouchbaseRole` resources are analogous to Kubernetes `Role` resources.
+The `CouchbaseGroup` resource contains a set of roles that are to be applied to users.
+`CouchbaseGroup` resources are analogous to Kubernetes `Role` resources.
 
-The following YAML shows all possible fields that may be configured for a `CouchbaseRole`.
+The following YAML shows all possible fields that may be configured for a `CouchbaseGroup`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseRole configuration parameters
+.All available CouchbaseGroup configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
-kind: CouchbaseRole
+kind: CouchbaseGroup
 metadata:
-  name: my-role
+  name: my-group
   labels:
     cluster: my-cluster
 spec:
   roles:
   - name: bucket_admin
     bucket: my-bucket
+  ldap_group_ref: cn=users,ou=Groups,dc=example,dc=com
 ----
 
 toc::[]
@@ -34,9 +36,9 @@ The following are relevant generic parameters that can be defined:
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
-kind: CouchbaseRole
+kind: CouchbaseGroup
 metadata:
-  name: my-bucket
+  name: my-group
   labels:
     cluster: my-cluster
 ----
@@ -54,7 +56,7 @@ ____
 The kind defines the type of resource this configuration refers to.
 
 ____
-_Field rules:_ This field is required and must be set to `CouchbaseRole`
+_Field rules:_ This field is required and must be set to `CouchbaseGroup`
 ____
 
 === metadata.name
@@ -69,7 +71,7 @@ ____
 === metadata.labels
 
 The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
-Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
+Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources] and xref:concept-user-rbac.adoc[RBAC page].
 
 ____
 _Field rules:_ This field is optional and must be a map of string key/value pairs.
@@ -95,15 +97,25 @@ This field is a list of roles to be associated with a user or group of users.
 
 This field defines a Couchbase role to grant to a user.
 
+____
 _Field rules:_ This field is required and must be either `admin`, `cluster_admin`, `security_admin`, `ro_admin`, `replication_admin`, `query_external_access`, `query_system_catalog`, `analytics_reader`, `bucket_admin`, `views_admin`, `fts_admin`, `bucket_full_access`, `data_reader`, `data_writer`, `data_dcp_reader`, `data_backup`, `data_monitoring`, `replication_target`, `analytics_manager`, `views_reader`, `fts_searcher`, `query_select`, `query_update`, `query_insert`, `query_delete` or `query_manage_index`.
+____
 
 === spec.roles[].bucket
 
 This field defines the scope to which a role applies.
 Non-cluster roles may be limited to a specific bucket.
-This field is only relevant when used with the roles `bucket_admin`, `views_admin`, `fts_admin`, `bucket_full_access`, `data_reader`, `data_writer`, `data_dcp_reader`, `data_backup`, `data_monitoring`, `replication_target`, `analytics_manager`, `views_reader`, `fts_searcher`, `query_select`, `query_update`, `query_insert`, `query_delete` or `query_manage_index`.
 If specified the bucket must exist on the related `CouchbaseCluster` resource.
 
 ____
 _Field rules:_ This field is required and must be a bucket name string.
+This field is only relevant when used with the roles `bucket_admin`, `views_admin`, `fts_admin`, `bucket_full_access`, `data_reader`, `data_writer`, `data_dcp_reader`, `data_backup`, `data_monitoring`, `replication_target`, `analytics_manager`, `views_reader`, `fts_searcher`, `query_select`, `query_update`, `query_insert`, `query_delete` or `query_manage_index`.
+____
+
+=== spec.ldap_group_ref
+
+This field defines the distinguished name (DN) of an external ldap group to use for authentication.
+
+____
+_Field rules:_ This field is optional and must be a string. If set, the roles of this group will be applied to users within the referenced LDAP group.
 ____
