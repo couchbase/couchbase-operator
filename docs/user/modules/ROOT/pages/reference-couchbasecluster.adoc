@@ -1257,7 +1257,7 @@ ____
 
 Pods created by the Operator need to have permission to access the container images they run.
 Normally Kubernetes will use public images hosted on https://hub.docker.com[Docker hub^] that do not require authentication and authorization.
-When using private repositories -- especially on Redhat OpenShift -- you will need to specify credentials to allow container image access.
+When using private repositories -- especially on Red Hat OpenShift -- you will need to specify credentials to allow container image access.
 
 This can be achieved in a number of different ways:
 
@@ -1288,7 +1288,7 @@ ____
 
 Pods created by the Operator need to have permission to access the container images they run.
 Normally Kubernetes will use public images hosted on https://hub.docker.com[Docker hub^] that do not require authentication and authorization.
-When using private repositories -- especially on Redhat OpenShift -- you will need to specify credentials to allow container image access.
+When using private repositories -- especially on Red Hat OpenShift -- you will need to specify credentials to allow container image access.
 
 This can be achieved in a number of different ways:
 

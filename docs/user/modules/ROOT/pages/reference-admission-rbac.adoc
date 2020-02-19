@@ -19,7 +19,7 @@ _Required Permissions_: `list`
 
 namespaces::
 Used the the DAC to lookup the namespace a cluster is running in.
-This is used on determine whether the cluster is running on Redhat OpenShift.
+This is used on determine whether the cluster is running on Red Hat OpenShift.
 This information is used to determine correct defaults for the platform.
 +
 _Required Permissions_: `get`

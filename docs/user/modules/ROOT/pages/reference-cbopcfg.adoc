@@ -94,7 +94,7 @@ If specified this will override the default admission controller image `couchbas
 
 --image-pull-secret <string>::
 If specified this will add the image pull secret name to all deployments.
-This is required when pulling images from private container repositories such as the RedHat container registry.
+This is required when pulling images from private container repositories such as the Red Hat container registry.
 
 --no-operator::
 If specified the command will not emit operator configuration.
@@ -121,7 +121,7 @@ To create a configuration file:
 $ cbopcfg > operator.yaml
 ----
 
-To create configuration to run on RedHat Openshift:
+To create configuration to run on Red Hat Openshift:
 
 [source,console,subs="attributes"]
 ----

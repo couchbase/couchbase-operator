@@ -189,8 +189,8 @@ These files are provided as evaluation examples -- they should not be used for p
 
 [IMPORTANT]
 ====
-Redhat OCP users will need to modify the provided template to reference an image pull secret.
-This must grant permission to pull container images from the Redhat Container Registry.
+Red Hat OCP users will need to modify the provided template to reference an image pull secret.
+This must grant permission to pull container images from the Red Hat Container Registry.
 ====
 
 == Further Reading

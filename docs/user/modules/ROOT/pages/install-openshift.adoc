@@ -39,7 +39,7 @@ Refer to the xref:concept-operator.adoc[operator architecture document] for addi
 The DAC and Operator will be installed into the current project/namespace selected by the `oc` command.
 Ensure you have created and selected the correct namespace to install into.
 
-The Redhat container catalog requires that deployments have login credentials that allow access to container images; these are provided by a secret:
+The Red Hat container catalog requires that deployments have login credentials that allow access to container images; these are provided by a secret:
 
 [source,console]
 ----
@@ -50,7 +50,7 @@ $ oc create secret docker-registry rh-catalog --docker-server=registry.connect.r
 [IMPORTANT]
 ====
 This command uses 3rd party resources and is subject to change.
-Consult the documentation provided by Redhat for up to date instructions.
+Consult the documentation provided by Red Hat for up to date instructions.
 ====
 
 The following command will install both the DAC and the Operator:

@@ -58,7 +58,7 @@ This fulfills the requirement for xref:concept-kubernetes-networking.adoc#routed
 
 [IMPORTANT]
 ====
-Redhat OpenShift users should be aware that the default is to use an based overlay network.
+Red Hat OpenShift users should be aware that the default is to use an based overlay network.
 This prohibits you from performing inter-Kubernetes networking, and connecting external Couchbase clients to a cluster securely.
 Please consult your platform vendor for advice.
 ====

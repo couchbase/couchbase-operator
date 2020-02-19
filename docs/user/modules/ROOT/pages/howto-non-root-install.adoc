@@ -10,7 +10,7 @@ This how-to shows how to run as a non-root user in all circumstances.
 
 [NOTE]
 ====
-Redhat OpenShift users should already have mandatory user randomization, so can ignore this guide.
+Red Hat OpenShift users should already have mandatory user randomization, so can ignore this guide.
 ====
 
 == Couchbase Cluster Configuration
