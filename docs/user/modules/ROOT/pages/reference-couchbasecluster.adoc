@@ -62,6 +62,13 @@ spec:
       selector:
         matchLabels:
           cluster: cb-example
+    ldap:
+      hosts:
+      - ldap.example.com
+      bindDN: "cn=admin,dc=example,dc=com"
+      bindSecret: cb-example-auth
+      userDNMapping:
+        template: "uid=%s,ou=People,dc=example,dc=com"
   networking:
     exposeAdminConsole: true
     adminConsoleServices:
@@ -609,7 +616,7 @@ spec:
           cluster: cb-example
 ----
 
-=== spec.security.adminSecret 
+=== spec.security.adminSecret
 
 This field specifies the name of a Kubernetes Secret that should be used as the user name and password of the Couchbase super-user.
 
@@ -651,6 +658,118 @@ For additional information, see the xref:concept-label-selection.adoc[Couchbase 
 ____
 _Field rules_: This field is optional and must be a Kubernetes `LabelSelector` object.
 ____
+
+== spec.security.ldap
+
+[source,yaml]
+----
+spec:
+  security:
+    ldap:
+      hosts:
+      - ldap.example.com
+      port: 389
+      bindDN: "cn=admin,dc=example,dc=com"
+      bindSecret: cb-example-auth
+      authenticationEnabled: true
+      userDNMapping:
+        template: "uid=%s,ou=People,dc=example,dc=com"
+      authorizationEnabled: true
+      groupsQuery: "cn=users,ou=Groups,dc=example,dc=com??base?"
+      nestedGroupsEnabled: true
+      encryption: StartTLSExtension
+      tlsSecret: ldap-secret
+----
+
+=== spec.security.ldap.hosts
+
+This field specifies list of LDAP hosts Operator should connect to for authentication.
+
+____
+_Field rules:_ This field is required and must be a list of at least one hostname.
+____
+
+=== spec.security.ldap.port
+
+This field specifies the port Operator should use connect when connecting to hosts.
+
+____
+_Field rules:_ This field is optional and default to `389` if not specified.
+____
+
+=== spec.security.ldap.bindDN
+
+This field specifies the Distinguished Name (DN) to bind to on the LDAP server for performing administrative tasks such as query and authentication.
+If not specified, the operator will attempt to connect anonymously to the specified LDAP host(s).
+____
+_Field rules:_ This field is optional and must be a string.
+____
+
+=== spec.security.ldap.bindSecret
+
+This field specifies the secret containing the password that the Operator should use to perform LDAP queries and authentication.
+If specified the secret must refer to a Kubernetes secret containing a key named `password`.
+If not specified, the operator will attempt to connect anonymously to the specified LDAP host(s).
+
+____
+_Field rules:_ This field is optional and must be a string.
+____
+
+=== spec.security.ldap.authenticationEnabled
+
+This field specifies whether or not the Couchbase Server allows user authentication.
+This defaults to `true` and the template specified in the `spec.security.ldap.userDNMapping` field will be used to search for the LDAP user to authenticate as an associated Couchbase Server user.
+
+____
+_Field rules:_ This field is optional and must be a boolean.  The default value is `true`.
+____
+
+
+=== spec.security.ldap.userDNMapping.template
+
+This field specifies list of templates to use for providing username to DN mapping.
+The template may contain a placeholder specified as `%u` to represent the Couchbase user who is attempting to gain access.
+
+____
+_Field rules:_ This field is optional and must be a string.  The `spec.secure.ldap.authenticationEnabled` field must also be `true`.
+____
+
+=== spec.security.ldap.authorizationEnabled
+
+This field specifies whether or not the Couchbase Server is allowed to authorize authenticated LDAP users.
+If set to `true`, the value of `spec.security.ldap.groupsQuery` will be used to check the LDAP group membership of a user in order to authorize them.
+
+____
+_Field rules:_ This field is optional and must be a boolean.  The default value is `true`.
+____
+
+=== spec.security.ldap.groupsQuery
+
+This field specifies the Distinguished Name (DN) of the LDAP group containing users which can be authorized.
+
+____
+_Field rules:_ This field is optional and must be a string. The `spec.secure.ldap.authorizationEnabled` field must also be `true`.
+____
+
+
+=== spec.security.ldap.encryption
+
+This field specifies the type of encryption to use for connection with the LDAP server.  If this value is set to `TLS` or `StartTLSExtension`, and a certificate is not specified for `spec.security.ldap.tlsSecret`, then the couchbase server will attempt to use its own certificate for encryption.
+
+____
+_Field rules:_ This field is optional and must be either `None`, `TLS`, `StartTLSExtension`.
+The default value is `None` (to connect without encryption — this is insecure, and therefore is not recommended).
+____
+
+
+=== spec.security.ldap.tlsSecret
+
+This field specifies the Certificate to use for connecting with LDAP server when `spec.security.ldap.encryption` is either TLS or StartTLSExtension.
+
+____
+_Field rules:_ This field is optional and must be a kubernetes secret containing a certificate in PEM format.
+____
+
 
 == spec.networking
 
