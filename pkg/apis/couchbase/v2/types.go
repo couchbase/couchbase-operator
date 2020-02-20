@@ -95,6 +95,10 @@ type CouchbaseBackupSpec struct {
 	// Amount of failed jobs to keep
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
+	// Number of times a backup job should try to execute.
+	// Once it hits the BackoffLimit it will not run until the next scheduled job
+	BackoffLimit int32 `json:"backoffLimit,omitempty"`
+
 	// Number of hours to hold backups for, everything older will be deleted
 	BackupRetention *metav1.Duration `json:"backupRetention,omitempty"`
 
@@ -180,6 +184,8 @@ type CouchbaseBackupRestoreSpec struct {
 	End   *StrOrInt `json:"end,omitempty"`
 	// Number of hours to hold restore script logs for, everything older will be deleted
 	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
+	// Number of times the restore job should try to execute.
+	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 }
 
 // struct we use in CouchbaseBackupRestoreSpec to enforce type-safeness

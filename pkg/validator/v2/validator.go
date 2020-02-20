@@ -290,6 +290,10 @@ func ApplyBackupDefaults(object *unstructured.Unstructured) jsonpatch.PatchList 
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/failedJobsHistoryLimit", Value: 5})
 	}
 
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "backoffLimit"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backoffLimit", Value: 2})
+	}
+
 	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "backupRetention"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backupRetention", Value: "720h"})
 	}
@@ -316,6 +320,10 @@ func ApplyBackupRestoreDefaults(object *unstructured.Unstructured) jsonpatch.Pat
 
 	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "logRetention"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/logRetention", Value: "168h"})
+	}
+
+	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "backoffLimit"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backoffLimit", Value: 2})
 	}
 
 	return patch

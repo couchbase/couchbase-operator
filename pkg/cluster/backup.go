@@ -153,6 +153,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 			ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
 			JobTemplate: batchv1beta1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
+					BackoffLimit: &backup.Spec.BackoffLimit,
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
@@ -225,8 +226,6 @@ func (c *Cluster) generateBackupContainer(containerName string, strategy couchba
 
 // generateRestoreJob returns a job that performs a cbbackupmgr restore command
 func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore) (*batchv1.Job, error) {
-	backoffLimit := int32(3)
-
 	var start string
 	var end string
 
@@ -258,7 +257,7 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 			},
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: &backoffLimit,
+			BackoffLimit: &restore.Spec.BackoffLimit,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
