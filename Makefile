@@ -56,13 +56,18 @@ container: build
 container-rhel: build
 	docker build -f Dockerfile.rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-rhel:v1 .
 
-tools: build
+tools: tools-common
+
+tools-rhel: GO_BUILD_FLAGS=-tags redhat
+tools-rhel: tools-common
+
+tools-common: build
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopinfo ./cmd/cbopinfo/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopinfo ./cmd/cbopinfo/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopinfo.exe ./cmd/cbopinfo/
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopcfg ./cmd/cbopcfg/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopcfg ./cmd/cbopcfg/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopcfg.exe ./cmd/cbopcfg/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopcfg ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopcfg ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopcfg.exe ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopconv ./cmd/cbopconv
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopconv ./cmd/cbopconv
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopconv.exe ./cmd/cbopconv
@@ -107,7 +112,7 @@ dist: artifacts image-artifacts
 
 prod: container tools artifacts
 
-prod-rhel: container-rhel tools artifacts
+prod-rhel: container-rhel tools-rhel artifacts
 
 test-operator:
 	go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race -timeout 240m

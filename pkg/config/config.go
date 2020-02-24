@@ -3,8 +3,6 @@ package config
 import (
 	"flag"
 	"os"
-
-	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
 // Config contains command line configuration
@@ -29,8 +27,8 @@ type Config struct {
 func (c *Config) ParseArgs() error {
 	flagSet := flag.NewFlagSet("cbopcfg", flag.ExitOnError)
 	flagSet.StringVar(&c.Namespace, "namespace", "default", "Operator/dynamic admission controller namespace")
-	flagSet.StringVar(&c.OperatorImage, "operator-image", "couchbase/operator:"+version.Version, "Couchbase operator container image")
-	flagSet.StringVar(&c.AdmissionImage, "dynamic-admission-controller-image", "couchbase/admission-controller:"+version.Version, "Couchbase dynamic admission controller image")
+	flagSet.StringVar(&c.OperatorImage, "operator-image", operatorImageDefault, "Couchbase operator container image")
+	flagSet.StringVar(&c.AdmissionImage, "dynamic-admission-controller-image", admissionImageDefault, "Couchbase dynamic admission controller image")
 	flagSet.StringVar(&c.ImagePullSecret, "image-pull-secret", "", "Image pull secret (for private repos or RedHat container registry)")
 	flagSet.BoolVar(&c.NoOperator, "no-operator", false, "Don't generate operator configuration")
 	flagSet.BoolVar(&c.NoAdmission, "no-admission", false, "Dont generate dynamic admission controller configuration")
