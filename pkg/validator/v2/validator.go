@@ -162,6 +162,33 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 		}
 	}
 
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "security", "ldap"); found {
+		// enable authentication if not specified but ldap settings exist
+		if _, found, _ := unstructured.NestedBool(object.Object, "spec", "security", "ldap", "authenticationEnabled"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/authenticationEnabled", Value: true})
+		}
+
+		// enable authorization if not specified but groupsQuery also exists.
+		// otherwise this can remain false since authorization can still be
+		// done for external users with names that already exist in the cluster
+		if _, found, _ := unstructured.NestedBool(object.Object, "spec", "security", "ldap", "authorizationEnabled"); !found {
+			if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "security", "ldap", "groupsQuery"); found {
+				patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/authorizationEnabled", Value: true})
+			}
+		}
+
+		// enable cert validation if encryption type is not None
+		if encryption, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "security", "ldap", "encryption"); found {
+			if encryption != string(couchbasev2.LDAPEncryptionNone) {
+				if _, found, _ := unstructured.NestedBool(object.Object, "spec", "security", "ldap", "serverCertValidation"); !found {
+					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/serverCertValidation", Value: true})
+				}
+			}
+		} else {
+			// encryption is disabled by default
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/encryption", Value: couchbasev2.LDAPEncryptionNone})
+		}
+	}
 	return patch
 }
 
@@ -663,6 +690,15 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 		// ca is required when tls is enabled
 		if ldap.EnableCertValidation {
+
+			// encryption type must be set
+			if ldap.Encryption == couchbasev2.LDAPEncryptionNone {
+
+				errs = append(errs, fmt.Errorf("encryption must be one of %s | %s, when serverCertValidation is enabled",
+					couchbasev2.LDAPEncryptionTLS, couchbasev2.LDAPEncryptionStartTLS))
+			}
+
+			// If encryption enabled then require cert secret
 			tlsSecretName := customResource.Spec.Security.LDAP.TLSSecret
 			if tlsSecretName == "" {
 				errs = append(errs, errors.Required("spec.security.ldap.tlsSecret", "body"))

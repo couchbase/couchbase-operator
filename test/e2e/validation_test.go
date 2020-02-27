@@ -1492,6 +1492,28 @@ func TestRBACValidationLDAP(t *testing.T) {
 			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "upnorth")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.authDomain in body should match '^local|external$'"},
+		}, {
+			name:        "TestValidateAuthenticationDefault",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/authenticationEnabled")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/authenticationEnabled", true)},
+			shouldFail:  false,
+		}, {
+			name:        "TestValidateAuthorizationDefault",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/authorizationEnabled")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/authorizationEnabled", true)},
+			shouldFail:  false,
+		},
+		{
+			name:        "TestValidateCertValidationDefault",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/serverCertValidation")},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/serverCertValidation", true)},
+			shouldFail:  false,
+		},
+		{
+			name:           "TestValidateCertValidationFails",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/security/ldap/encryption", "None")},
+			expectedErrors: []string{"encryption must be one of TLS | StartTLSExtension, when serverCertValidation is enabled"},
+			shouldFail:     true,
 		},
 	}
 

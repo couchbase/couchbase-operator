@@ -629,7 +629,7 @@ type LDAPEncryption string
 
 // LDAP Encryption types
 const (
-	LDAPEncryptionNone     LDAPEncryption = "false"
+	LDAPEncryptionNone     LDAPEncryption = "None"
 	LDAPEncryptionStartTLS LDAPEncryption = "StartTLSExtension"
 	LDAPEncryptionTLS      LDAPEncryption = "TLS"
 )
