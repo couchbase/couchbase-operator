@@ -35,7 +35,7 @@ required = [
 
 [[constraint]]
   name = "github.com/couchbase/gocbmgr"
-  revision = "c3cf6dbc8591ba7a50e58a057fb104c25f71d4fd"
+  revision = "0b17f7a94c521cad16f3dccff04eb3bf5da1bf95"
 
 [[constraint]]
   name = "github.com/ghodss/yaml"

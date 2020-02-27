@@ -1477,12 +1477,6 @@ func TestRBACValidationLDAP(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/tlsSecret")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.security.ldap.tlsSecret in body is required"},
-		},
-		{
-			name:        "TestValidateDefaultRegex",
-			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/userDNMapping/0/re")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/userDNMapping/0/re", "(.+)")},
-			shouldFail:  false,
 		}, {
 			name:           "TestValidateGroupRequired",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/groupsQuery")},

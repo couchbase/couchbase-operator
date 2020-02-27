@@ -40,12 +40,9 @@ func newLDAPSettings(namespace string) *couchbasev2.CouchbaseClusterLDAPSpec {
 
 	basedn := fmt.Sprintf("dc=%s,dc=%s,dc=svc", ldapSubdomain, namespace)
 	binddn := fmt.Sprintf("cn=%s,%s", commonName, basedn)
-	userDnTemplate := fmt.Sprintf("uid={0},ou=People,%s", basedn)
-	dnMapping := &[]couchbasev2.LDAPUserDNMapping{
-		{
-			Regex:    "(.+)",
-			Template: userDnTemplate,
-		},
+	userDnTemplate := fmt.Sprintf("uid=%%u,ou=People,%s", basedn)
+	dnMapping := couchbasev2.LDAPUserDNMapping{
+		Template: userDnTemplate,
 	}
 
 	host := fmt.Sprintf("%s.%s.%s.svc", ldapHostName, ldapSubdomain, namespace)

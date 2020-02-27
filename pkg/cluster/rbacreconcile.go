@@ -264,12 +264,6 @@ func (c *Cluster) reconcileLDAPSettings() error {
 	} else {
 
 		// Convert requested ldap spec
-		updatedUserDNMapping := []cbmgr.LDAPUserDNMapping{}
-		if specDNMapping := ldap.UserDNMapping; specDNMapping != nil {
-			for _, dn := range *specDNMapping {
-				updatedUserDNMapping = append(updatedUserDNMapping, cbmgr.LDAPUserDNMapping(dn))
-			}
-		}
 		specLDAPSettings := cbmgr.LDAPSettings{
 			AuthenticationEnabled: ldap.AuthenticationEnabled,
 			AuthorizationEnabled:  ldap.AuthorizationEnabled,
@@ -279,7 +273,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 			EnableCertValidation:  ldap.EnableCertValidation,
 			GroupsQuery:           ldap.GroupsQuery,
 			BindDN:                ldap.BindDN,
-			UserDNMapping:         &updatedUserDNMapping,
+			UserDNMapping:         cbmgr.LDAPUserDNMapping(ldap.UserDNMapping),
 			NestedGroupsEnabled:   ldap.NestedGroupsEnabled,
 			NestedGroupsMaxDepth:  ldap.NestedGroupsMaxDepth,
 			CacheValueLifetime:    ldap.CacheValueLifetime,

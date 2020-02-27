@@ -161,18 +161,7 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/monitoring/prometheus/image", Value: metricsImage})
 		}
 	}
-	if dn, found, _ := unstructured.NestedSlice(object.Object, "spec", "security", "ldap", "userDNMapping"); found {
-		for i, mapping := range dn {
-			if dnMap, ok := mapping.(map[string]interface{}); ok {
-				regex, ok := dnMap["regex"]
-				if !ok || regex == "" {
-					// default is to match everything
-					path := fmt.Sprintf("/spec/security/ldap/userDNMapping/%d/re", i)
-					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: path, Value: "(.+)"})
-				}
-			}
-		}
-	}
+
 	return patch
 }
 
@@ -667,16 +656,11 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 		// If authentication enabled then require username mapping
 		if ldap.AuthenticationEnabled {
-			if ldap.UserDNMapping == nil {
+			if ldap.UserDNMapping.Template == "" {
 				errs = append(errs, errors.Required("spec.security.ldap.userDNMapping", "body"))
-			} else {
-				for i, mapping := range *ldap.UserDNMapping {
-					if mapping.Template == "" {
-						errs = append(errs, errors.Required(fmt.Sprintf("ldap.userDNMapping.template[%d]", i), "body"))
-					}
-				}
 			}
 		}
+
 		// ca is required when tls is enabled
 		if ldap.EnableCertValidation {
 			tlsSecretName := customResource.Spec.Security.LDAP.TLSSecret

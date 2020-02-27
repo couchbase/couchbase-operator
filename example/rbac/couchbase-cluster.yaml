@@ -1,5 +1,10 @@
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: default
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: cb-example
@@ -10,16 +15,15 @@ spec:
     rbac:
       managed: true
     ldap:
+      bindSecret: cb-ldap-auth
       hosts:
-      - ldap.example.com
+      - ldap.default.svc
       port: 389
       encryption: None
-      bindSecret: cb-example-auth
-      bindDN: "cn=admin,dc=example,dc=com"
+      bindDN: "cn=admin,dc=default,dc=svc"
       authenticationEnabled: true
       userDNMapping:
-      - template: "uid={0},ou=People,dc=example,dc=com"
-        re: "(.+)"
+        template: "uid=%u,ou=People,dc=openldap,dc=default,dc=svc"
       authorizationEnabled: true
       groupsQuery: "cn=mygroup,ou=Groups,dc=example,dc=com??base?"
   networking:
@@ -30,18 +34,6 @@ spec:
       - xdcr
     exposedFeatureServiceType: NodePort
     adminConsoleServiceType: NodePort
-  cluster:
-    dataServiceMemoryQuota: 256
-    indexServiceMemoryQuota: 256
-    searchServiceMemoryQuota: 256
-    eventingServiceMemoryQuota: 256
-    analyticsServiceMemoryQuota: 1024
-    indexStorageSetting: memory_optimized
-    autoFailoverTimeout: 120
-    autoFailoverMaxCount: 3
-    autoFailoverOnDataDiskIssues: true
-    autoFailoverOnDataDiskIssuesTimePeriod: 120
-    autoFailoverServerGroup: false
   buckets:
     managed: true
   servers:
@@ -50,3 +42,4 @@ spec:
       services:
         - data
         - index
+        - query

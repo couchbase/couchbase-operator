@@ -672,7 +672,7 @@ type CouchbaseClusterLDAPSpec struct {
 
 	// User to distinguished name (DN) mapping. If none is specified,
 	// the username is used as the user’s distinguished name.
-	UserDNMapping *[]LDAPUserDNMapping `json:"userDNMapping,omitempty"`
+	UserDNMapping LDAPUserDNMapping `json:"userDNMapping,omitempty"`
 
 	// If enabled Couchbase server will try to recursively search for groups
 	// for every discovered ldap group. groups_query will be user for the search.
@@ -687,7 +687,6 @@ type CouchbaseClusterLDAPSpec struct {
 }
 
 type LDAPUserDNMapping struct {
-	Regex    string `json:"re"`
 	Template string `json:"template"`
 }
 

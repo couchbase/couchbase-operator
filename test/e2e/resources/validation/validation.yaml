@@ -176,8 +176,7 @@ spec:
       query_dn: "cn=admin,dc=cb-ldap,dc=default,dc=svc"
       authenticationEnabled: true
       userDNMapping:
-      - template: "uid={0},ou=People,dc=example,dc=com"
-        re: "(.+)"
+        template: "uid=%u,ou=People,dc=example,dc=com"
       authorizationEnabled: true
       groupsQuery: "cn=mygroup,ou=Groups,dc=example,dc=com??base?"
       serverCertValidation: true

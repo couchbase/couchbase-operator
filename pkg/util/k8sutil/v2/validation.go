@@ -908,21 +908,13 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 													Type: "string",
 												},
 												"userDNMapping": apiextensionsv1beta1.JSONSchemaProps{
-													Type: "array",
-													Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-														Schema: &apiextensionsv1beta1.JSONSchemaProps{
-															Type: "object",
-															Required: []string{
-																"template",
-															},
-															Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-																"template": apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "string",
-																},
-																"re": apiextensionsv1beta1.JSONSchemaProps{
-																	Type: "string",
-																},
-															},
+													Type: "object",
+													Required: []string{
+														"template",
+													},
+													Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+														"template": apiextensionsv1beta1.JSONSchemaProps{
+															Type: "string",
 														},
 													},
 												},
