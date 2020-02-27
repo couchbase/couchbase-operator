@@ -116,11 +116,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
-	if err := c.reconcileLDAPSettings(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileRBACResources(); err != nil {
+	if err := c.reconcileRBAC(); err != nil {
 		return err
 	}
 
@@ -1892,6 +1888,33 @@ Outerloop:
 		}
 		log.Info("Restore deleted", "cbrestore", job.Name)
 		c.raiseEvent(k8sutil.BackupRestoreDeleteEvent(job.Name, c.cluster))
+	}
+
+	return nil
+}
+
+// reconcileRBAC reconciles users, groups, along with ldap settings
+func (c *Cluster) reconcileRBAC() error {
+
+	// rbac features require 6.5
+	version, _ := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
+	required, _ := couchbaseutil.NewVersion(constants.CouchbaseVersion650)
+	if version.GreaterEqual(required) {
+		if err := c.reconcileLDAPSettings(); err != nil {
+			return err
+		}
+		if err := c.reconcileRBACResources(); err != nil {
+			return err
+		}
+	} else {
+
+		// Warn if user is attempting to use rbac feature with an unsupported version
+		if c.cluster.Spec.Security.LDAP != nil {
+			log.V(1).Info("LDAP security settings are not allowed", "cluster", c.namespacedName(), "cluster_version", version, "required_version", constants.CouchbaseVersion650)
+		}
+		if len(c.k8s.CouchbaseGroups.List()) > 0 {
+			log.V(1).Info("RBAC is not allowed", "cluster", c.namespacedName(), "cluster_version", version, "required_version", constants.CouchbaseVersion650)
+		}
 	}
 
 	return nil
