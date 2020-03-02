@@ -1,18 +1,31 @@
-= Connecting Sync-Gateway to a Couchbase Cluster
+= Connecting Sync Gateway to a Couchbase Cluster
 
 [abstract]
-Connect Couchbase Sync-Gateway to a Couchbase cluster.
+Connect the Couchbase Sync Gateway to a Couchbase cluster
 
 include::partial$tutorial.adoc[]
 
-Sync-Gateway is a service that allows mobile devices to connect to Couchbase server and continue functioning when connectivity drops.
-This tutorial defines basic connectivity between Sync-Gateway and a Couchbase Cluster deployed by the Operator.
+Sync Gateway is a synchronization server that is responsible for secure data synchronization and routing between Couchbase Lite enabled clients and Couchbase Server.
+It is an integral component of link:https://docs.couchbase.com/sync-gateway/2.7/introduction.html[Couchbase Mobile] platform.
 
-== Configuring Sync-Gateway
+This tutorial defines best practices for deploying Sync Gateway on Kubernetes.
+It covers basic connectivity between Sync Gateway and a Couchbase Cluster deployed by the Operator.
 
-Sync-Gateway is configured with a configuration file within its container.
+== Prerequisites
+* A Couchbase Server cluster deployed and running.
+While it is _recommended_, note that it is _not required_ that Couchbase Server be deployed with Kubernetes.
+It is possible to deploy Sync Gateway on Kubernetes and connect it to Couchbase Server cluster that is not on Kubernetes.
+The instructions herein assume that Couchbase Server is deployed using the operator.
+* This step is optional and only required if the environment is not setup DNS.
+If the Couchbase Server cluster is configured to use link:https://docs.couchbase.com/operator/1.2/couchbase-cluster-config.html#exposedfeatures[exposedFeatures] then the value of "client" must be included in the `exposedFeatures` list.
+This is required for Sync Gateway to be able to connect to the server.
+Alternatively, remove the exposedFeatures section altogether in the server configuration if it is not needed.
+
+== Configuring a Sync Gateway
+
+Sync Gateway is configured with a configuration file within its container.
 The configuration contains sensitive data such as usernames, passwords and TLS private keys.
-We therefore should define the configuration as a secret.
+We therefore should define the configuration as a secret. Create a `sgw-config.yaml` file with the relevant configuration as shown below:
 Relevant configuration variables are documented below:
 
 [source,yaml]
@@ -67,7 +80,7 @@ stringData:
 
 <.> `databases.cb-example.server` defines the Couchbase server instance to connect to.
     The connection string may be determined the same way as for xref:howto-client-sdks.adoc[client SDKs].
-    The connection options are dependent on your chosen xref:concept-couchbase-networking.adoc[network architecture].
+    The connection options are dependent on the chosen xref:concept-couchbase-networking.adoc[network architecture].
 
 <.> `databases.cb-example.bucket` defines the xref:reference-couchbasebucket.adoc#metadata-name[bucket name] to connect to and use to store mobile data.
 
@@ -75,12 +88,19 @@ stringData:
 
 <.> `databases.cb-example.password` defines the user password that will be used to connect to the cluster.
 
-=== TLS Support
+Deploy the secret using the following command. If the config file is `sgw-config.yaml`, the command would be as follows
 
-TLS is fully supported between Sync-Gateway and Couchbase Server.
+[source,console]
+----
+$ kubectl create -f sgw-config.yaml
+----
+
+=== Enabling TLS Connectivity to Couchbase Server
+
+TLS is fully supported between Sync Gateway and Couchbase Server.
 This includes xref:concept-tls.adoc[server-side TLS or mutual TLS].
 
-Your Sync-Gateway configuration can be modified to allow use of TLS as follows:
+Your Sync Gateway configuration can be modified to allow use of TLS as follows:
 
 [source,yaml]
 ----
@@ -125,19 +145,29 @@ Certificates have been truncated for brevity.
     This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
 
 <.> The `ca.pem` secret is the CA certificate.
-    The name of this secret data item defines the file name as used by `databases.cb-example.cacertpath` in the Sync-Gateway configuration.
+    The name of this secret data item defines the file name as used by `databases.cb-example.cacertpath` in the Sync Gateway configuration.
 
 <.> **Mutual TLS Only:** The `cert.pem` secret is the client certificate chain.
-    The name of this secret data item defines the file name as used by `databases.cb-example.certpath` in the Sync-Gateway configuration.
+    The name of this secret data item defines the file name as used by `databases.cb-example.certpath` in the Sync Gateway configuration.
 
 <.> **Mutual TLS Only:** The `key.pem` secret is the client key.
-    The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync-Gateway configuration.
+    The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync Gateway configuration.
 
-=== RBAC Support
+Deploy the secret using the following command. If the config file is `sgw-config.yaml`, the command would be as follows
 
-The provided templates use the `Administrator` user to connect Sync-Gateway to the Couchbase Server cluster.
-If not using client certificate authentication, you should secure the system further by using a limited role to access Couchbase Server.
-In doing so you limit the scope of operations that can be performed in the event the Sync-Gateway configuration is compromised.
+[source,console]
+----
+$ kubectl create -f sgw-config.yaml
+----
+
+=== Configuring RBAC User for Sync Gateway
+
+If not using client certificate authentication, secure the system further by using a limited role to access Couchbase Server.
+In doing so, the scope of operations that can be performed in the event the Sync Gateway configuration is compromised is limited.
+The RBAC user corresponding to Sync Gateway can be manually configured as specified in link:https://docs.couchbase.com/sync-gateway/2.7/getting-started.html#creating-an-rbac-user[Getting Started Guide].
+The steps discussed below is the preferred option for creatig sync gateway user and binding it to a specified role.
+
+==== Creating a Sync Gateway RBAC User
 
 First define a secret for the `sync-gateway` user that contains a password:
 
@@ -150,9 +180,19 @@ metadata:
 data:
   password: cGFzc3dvcmQ= # <.>
 ----
-
 <.> This password is the literal `password`.
-    You can generate the correctly encoded form on your command line with `echo -n 'password' | base64`.
+    The correctly encoded form can be generated on a "UNIX-like" command line terminal with `echo -n 'password' | base64`.
+
+Deploy the secret using the following command.
+This creates a sync gateway user with specified password.
+If the config file is `sync-gateway-rbac-user.yaml`, the command would be as follows
+
+[source,console]
+----
+$ kubectl create -f sync-gateway-rbac-user.yaml
+----
+
+==== Role Binding of Sync Gateway User
 
 Next define the `sync-gateway` user and bind it to a group that allows it the "application access" role as defined by Couchbase Server.
 The Operator will create the required user and group on any Couchbase cluster that selects that user:
@@ -187,7 +227,7 @@ spec:
   - kind: CouchbaseUser
     name: sync-gateway
   roleRef:
-  - kind: CouchbaseGroup
+    kind: CouchbaseGroup
     name: sync-gateway
 ----
 
@@ -200,7 +240,16 @@ spec:
     We therefore further limit scope to only enable modification of the `default` bucket.
     By default this would be set to `*` granting access to all buckets.
 
-Finally, to enable Sync-Gateway to use the `sync-gateway` user, modify the configuration defined in <<configuring-sync-gateway>>:
+Deploy the Sync Gateway RBAC user using the following command.
+If the config file is `sync-gateway-user-rolebinding.yaml`, the command would be as follows
+
+[source,console]
+----
+$ kubectl create -f sync-gateway-user-rolebinding.yaml
+----
+
+==== Configure Sync Gateway with the RBAC User
+Finally, to enable Sync Gateway to use the `sync-gateway` user, modify the configuration defined in <<configuring-a-sync-gateway>>:
 
 [source,yaml]
 ----
@@ -225,9 +274,17 @@ stringData:
 <.> The `databases.cb-example.username` attribute must match the `CouchbaseUser` resource's name.
 <.> The `databases.cb-example.password` attribute must match the plain-text password associated with the `CouchbaseUser`.
 
-== Deploying Sync-Gateway
+Deploy the secret using the following command.
+If the config file is `sgw-config.yaml`, the command would be as follows
 
-Sync-Gateway is a simple state-less application so does not require any application specific controller like the Operator.
+[source,console]
+----
+$ kubectl create -f sgw-config.yaml
+----
+
+== Deploying Sync Gateway
+
+Sync Gateway is a simple state-less application so does not require any application specific controller like the Operator.
 An typical configuration is as described below:
 
 [source,yaml]
@@ -262,22 +319,63 @@ spec:
           secretName: sync-gateway # <.>
 ----
 
-<.> `spec.replicas` defines how many Sync-Gateway pods to create.
-    As Sync-Gateway is stateless you can modify this attribute to horizontally scale your deployment as needs require.
+<.> `spec.replicas` defines how many Sync Gateway pods to create.
+    As Sync Gateway is stateless. This attribute can be modified to horizontally scale the deployment as needs require.
 
 <.> `spec.template.spec.containers[0].image` defines the container image to deploy.
     Version 2.7.0 or higher is recommended in order to support connecting to a cluster using xref:concept-couchbase-networking.adoc#public-networking-with-external-dns[public networking with external-DNS] or xref:concept-couchbase-networking.adoc#generic-networking[generic networking].
 
 <.> `spec.template.spec.containers[0].volumeMounts[0].mountPath` mounts the configuration secret in the correct location.
-    By default the Sync-Gateway container will try to load configuration from `/etc/sync_gateway/config.json`, and this is how the `Secret` and `Deployment` are configured.
+    By default the Sync Gateway container will try to load configuration from `/etc/sync_gateway/config.json`, and this is how the `Secret` and `Deployment` are configured.
 
-<.> `spec.template.spec.volumes[0].secret.secretName` references the <<configuring-sync-gateway,Sync-Gateway configuration>> `Secret` that is mounted in the Sync-Gateway container.
+<.> `spec.template.spec.volumes[0].secret.secretName` references the <<configuring-sync-gateway,Sync Gateway configuration>> `Secret` that is mounted in the Sync Gateway container.
+
+
+Deploy the Sync Gateway cluster from the specified deployment controller file.
+If the above configuration is in a file named `sync-gateway.yaml`, the command would be as follows
+
+[source,console]
+----
+$ kubectl create -f sync-gateway.yaml
+----
+
+If successful, the equivalent of the following will be returned.
+In sample output below, the deployment with name `sync-gateway` was created
+[source,console]
+----
+deployment.extensions "sync-gateway" created
+----
+
+You can check the status of the deployment with the following command
+[source,console]
+----
+$ kubectl get deployments sync-gateway
+----
+
+If successful, a listing of the Sync Gateway pods that were deployed is returned.
+In the sample output below, 2 out of 2 requested Sync Gateway pods up and running
+
+[source,console]
+----
+NAME           READY   UP-TO-DATE   AVAILABLE   AGE
+sync-gateway   2/2     2            2           24d
+----
+
+At this stage, the Sync Gateway node is configured to communicate with Couchbase Server.
+
+Now, let's look at the xref:tutorial-sync-gateway-clients.adoc[connectivity to Couchbase Lite clients].
 
 == Templates
 
-Template files are provided in the Operator binary distribution as `sync-gateway.yaml`.
-They can be deployed -- as is -- into the same namespace as the provided `couchbase-cluster.yaml` template.
-These files are provided as evaluation examples -- they should not be used for production workloads.
+Template files are provided in the Operator binary distribution :
+
+** `sgw-config.yaml` : Sync Gateway config secret
+** `sync-gateway.yaml` : Sample Deployment Controller for Sync Gateway with no TLS
+** `sync-gateway-rbac-user.yaml` : Sample config to create Sync Gateway user
+** `sync-gateway-user-rolebinding.yaml` : Sample config file to bind sync gateway user to appropriate role
+
+These files are provided as *evaluation examples* -- they should be modified to suit production deployments.
+
 
 [IMPORTANT]
 ====
@@ -287,4 +385,5 @@ This must grant permission to pull container images from the Red Hat Container R
 
 == Further Reading
 
-* xref:sync-gateway::introduction.adoc[Sync-Gateway Documentation]
+* xref:sync-gateway::introduction.adoc[Sync Gateway Documentation]
+* xref:tutorial-sync-gateway-clients.adoc[Connecting Couchbase Lite Clients]
