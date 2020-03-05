@@ -31,6 +31,7 @@
  ** Operator
   *** xref:howto-operator-upgrade.adoc[Upgrade the Operator]
   *** xref:howto-troubleshooting.adoc[View Operator Logs]
+  *** xref:howto-roll-your-own.adoc[Create Your Own Operator Images]
  ** Couchbase Cluster
   *** Lifecycle
    **** xref:howto-couchbase-create.adoc[Create a Couchbase Deployment]
