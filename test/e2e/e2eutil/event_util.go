@@ -100,6 +100,18 @@ func ReplicationRemovedEvent(c *couchbasev2.CouchbaseCluster, remote, source, de
 	return k8sutil.ReplicationRemovedEvent(c, name)
 }
 
+func BackupStartedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event {
+	return k8sutil.BackupStartEvent(backup, c)
+}
+
+func BackupCompletedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event {
+	return k8sutil.BackupCompleteEvent(backup, c)
+}
+
+func BackupFailedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event {
+	return k8sutil.BackupFailEvent(backup, c)
+}
+
 // ClusterCreateSequence is a common function for generating cluster creation events.
 func ClusterCreateSequence(size int) eventschema.Validatable {
 	if size == 1 {

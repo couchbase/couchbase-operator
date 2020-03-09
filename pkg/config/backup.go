@@ -39,6 +39,17 @@ func GetBackupRole(name string) *rbacv1.Role {
 			},
 			{
 				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
+					"events",
+				},
+				Verbs: []string{
+					"create",
+				},
+			},
+			{
+				APIGroups: []string{
 					"couchbase.com",
 				},
 				Resources: []string{

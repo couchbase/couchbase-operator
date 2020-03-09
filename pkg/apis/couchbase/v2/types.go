@@ -118,7 +118,7 @@ type CouchbaseBackupStatus struct {
 	Repo string `json:"repo,omitempty"`
 	// RepoList gives us the complete list of Repos in the Backup Archive,
 	// useful for selecting a restore Repo
-	RepoList []string `json:"repoList,omitempty"`
+	RepoList string `json:"repoList,omitempty"`
 	// Running indicates whether a backup is currently being performed
 	Running bool `json:"running"`
 	// Failed indicates whether the most recent backup has failed
@@ -201,7 +201,7 @@ type CouchbaseBackupRestoreStatus struct {
 	Repo string `json:"repo,omitempty"`
 	// RepoList gives us the complete list of Repos in the Backup Archive,
 	// useful for selecting a restore Repo
-	RepoList []string `json:"repoList,omitempty"`
+	RepoList string `json:"repoList,omitempty"`
 	// Running indicates whether a restore is currently being performed
 	Running bool `json:"running"`
 	// Failed indicates whether the most recent restore has failed

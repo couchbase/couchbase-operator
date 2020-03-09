@@ -91,14 +91,14 @@ func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) err
 			// add --cacert argument to backup_script
 			containerArgs := job.Template.Spec.Containers[0].Args
 			containerArgs = append(containerArgs, "--cacert")
-			containerArgs = append(containerArgs, "/root/tls-mount/ca.crt")
+			containerArgs = append(containerArgs, "/var/run/secrets/couchbase.com/tls-mount/ca.crt")
 			job.Template.Spec.Containers[0].Args = containerArgs
 
 			// Mount the secret volume in Couchbase's inbox
 			volumeMount := corev1.VolumeMount{
 				Name:      "couchbase-operator-tls",
 				ReadOnly:  true,
-				MountPath: "/root/tls-mount",
+				MountPath: "/var/run/secrets/couchbase.com/tls-mount",
 			}
 
 			containerName := job.Template.Spec.Containers[0].Name
@@ -156,6 +156,9 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 					BackoffLimit: &backup.Spec.BackoffLimit,
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
+							SecurityContext: &corev1.PodSecurityContext{
+								FSGroup: c.cluster.Spec.SecurityContext.FSGroup,
+							},
 							ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
 							Containers: []corev1.Container{
 								container,

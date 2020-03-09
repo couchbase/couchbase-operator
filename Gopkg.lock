@@ -64,7 +64,7 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:649ba1d573cf06fb80a74544030983fbeaa853d943eaba32708033759645dc65"
+  digest = "1:afab32e18d4b4ba261d205a401e641490e7008b8acfe1cbcc831e4d858762d9b"
   name = "github.com/couchbase/gocbmgr"
   packages = [
     ".",
@@ -719,14 +719,6 @@
   version = "v0.9.1"
 
 [[projects]]
-  digest = "1:d37c61a335d13bc49b3f90e9e13c8686e4548839b69c58549e727afb2245c454"
-  name = "gopkg.in/ini.v1"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "c85607071cf08ca1adaf48319cd1aa322e81d8c1"
-  version = "v1.42.0"
-
-[[projects]]
   digest = "1:4d2e5a73dc1500038e504a8d78b986630e3626dc027bc030ba5c75da257cdb96"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
@@ -1074,7 +1066,6 @@
     "github.com/sirupsen/logrus",
     "github.com/spf13/pflag",
     "golang.org/x/time/rate",
-    "gopkg.in/ini.v1",
     "gopkg.in/yaml.v2",
     "k8s.io/api/admission/v1beta1",
     "k8s.io/api/admissionregistration/v1beta1",

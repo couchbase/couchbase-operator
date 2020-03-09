@@ -56,6 +56,9 @@ const (
 	EventReasonBackupCreated         = "BackupCreated"
 	EventReasonBackupUpdated         = "BackupUpdated"
 	EventReasonBackupDeleted         = "BackupDeleted"
+	EventReasonBackupStarted         = "BackupStarted"
+	EventReasonBackupCompleted       = "BackupCompleted"
+	EventReasonBackupFailed          = "BackupFailed"
 	EventReasonBackupRestoreCreated  = "BackupRestoreCreated"
 	EventReasonBackupRestoreDeleted  = "BackupRestoreDeleted"
 
@@ -174,6 +177,30 @@ func BackupDeleteEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Even
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonBackupDeleted
 	event.Message = fmt.Sprintf("Backup `%s` was deleted", backup)
+	return event
+}
+
+func BackupStartEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupStarted
+	event.Message = fmt.Sprintf("Backup `%s` started", backup)
+	return event
+}
+
+func BackupCompleteEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupCompleted
+	event.Message = fmt.Sprintf("Backup `%s` completed", backup)
+	return event
+}
+
+func BackupFailEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupFailed
+	event.Message = fmt.Sprintf("Backup `%s` failed", backup)
 	return event
 }
 

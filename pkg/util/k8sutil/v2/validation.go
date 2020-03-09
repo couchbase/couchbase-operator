@@ -560,12 +560,7 @@ func GetCouchbaseBackupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 									Type: "string",
 								},
 								"repoList": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "list",
-									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-										Schema: &apiextensionsv1beta1.JSONSchemaProps{
-											Type: "string",
-										},
-									},
+									Type: "string",
 								},
 								"running": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
@@ -725,12 +720,7 @@ func GetCouchbaseBackupRestoreCRD() *apiextensionsv1beta1.CustomResourceDefiniti
 									Type: "string",
 								},
 								"repoList": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "list",
-									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-										Schema: &apiextensionsv1beta1.JSONSchemaProps{
-											Type: "string",
-										},
-									},
+									Type: "string",
 								},
 								"running": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",

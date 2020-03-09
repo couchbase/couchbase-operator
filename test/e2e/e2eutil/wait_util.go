@@ -18,7 +18,7 @@ import (
 	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,43 +59,6 @@ func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, time
 
 func MustWaitForBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) {
 	if err := WaitForBackup(k8s, backup, timeout); err != nil {
-		Die(t, err)
-	}
-}
-
-// WaitForBackupRun waits for a backup run to occur.
-// TODO: This simply waits for the LastRun status field to change.  This is a hack
-// and we should be generating events for start, completion and failure.  We should
-// also make these events subject to schema validation.
-func WaitForBackupRun(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) error {
-	start := time.Now()
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		curr, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Get(backup.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		if curr.Status.LastRun == nil {
-			return fmt.Errorf("backup job not run")
-		}
-
-		lastRun := *curr.Status.LastRun
-		if !lastRun.After(start) {
-			return fmt.Errorf("last run %v, started watching at %v", lastRun, start)
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, retryInterval, callback)
-}
-
-func MustWaitForBackupRun(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) {
-	if err := WaitForBackupRun(k8s, backup, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -189,6 +152,8 @@ func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, tim
 		switch statusFieldValue.Type().Kind() {
 		case reflect.String:
 			return len(statusFieldValue.String()) != 0, nil
+		case reflect.Bool:
+			return statusFieldValue.Bool(), nil
 		default:
 			if statusFieldValue.String() == "<*v1.Time Value>" {
 				timeValueStr := fmt.Sprintf("%s", statusFieldValue.Interface())
@@ -495,7 +460,7 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.Couchb
 		return err
 	}
 	defer func() {
-		// There is a race when you call stop, but the watcher is tring to send
+		// There is a race when you call stop, but the watcher is trying to send
 		// on the result channel, so drain any events to cause the routine to exit
 		// cleanly.
 		watch.Stop()
@@ -532,6 +497,56 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.Couchb
 
 func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
 	if err := WaitForClusterEvent(k8s.KubeClient, cl, event, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func WaitForBackupEvent(kubeClient kubernetes.Interface, b *couchbasev2.CouchbaseBackup, event *v1.Event, timeout time.Duration) error {
+	opts := metav1.ListOptions{
+		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.BackupCRDResourceKind},
+	}
+	watch, err := kubeClient.CoreV1().Events(b.Namespace).Watch(opts)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		// There is a race when you call stop, but the watcher is trying to send
+		// on the result channel, so drain any events to cause the routine to exit
+		// cleanly.
+		watch.Stop()
+		for {
+			if _, ok := <-watch.ResultChan(); !ok {
+				break
+			}
+		}
+	}()
+
+	now := metav1.Now()
+
+	resultChan := watch.ResultChan()
+	timeoutChan := time.After(timeout)
+	for {
+		select {
+		case <-timeoutChan:
+			return fmt.Errorf("time out waiting for backup event %s, %s", event.Reason, event.Message)
+
+		case watchEvent := <-resultChan:
+			crdEvent := watchEvent.Object.(*v1.Event)
+			// Watch() returns every event since the dawn of time, so ensure we
+			// only return things after we started the wait.  This avoids matching
+			// events that may have already occurred
+			if crdEvent.LastTimestamp.Before(&now) {
+				continue
+			}
+			if EqualEvent(event, crdEvent) {
+				return nil
+			}
+		}
+	}
+}
+
+func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, b *couchbasev2.CouchbaseBackup, event *v1.Event, timeout time.Duration) {
+	if err := WaitForBackupEvent(k8s.KubeClient, b, event, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -697,6 +712,24 @@ func WaitForExternalLoadBalancer(t *testing.T, kubeClient kubernetes.Interface, 
 				}
 			}
 		}
+	}
+}
+
+func WaitForPVC(k8s *types.Cluster, name, namespace string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		_, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
+		return err
+	}
+
+	return retryutil.RetryOnErr(ctx, retryInterval, callback)
+}
+
+func MustWaitForPVC(t *testing.T, k8s *types.Cluster, name, namespace string, timeout time.Duration) {
+	if err := WaitForPVC(k8s, name, namespace, timeout); err != nil {
+		Die(t, err)
 	}
 }
 
@@ -1229,7 +1262,7 @@ func WaitForBackupDeletion(k8s *types.Cluster, namespace string, timeout time.Du
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
+	return retryutil.RetryOnErr(ctx, retryInterval, callback)
 }
 
 func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, namespace string, timeout time.Duration) {

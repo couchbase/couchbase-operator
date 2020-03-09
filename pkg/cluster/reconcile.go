@@ -1734,13 +1734,12 @@ func (c *Cluster) reconcileBackup() error {
 	// existing backups tells us about the state of the backup CRDs
 	existing := map[string]bool{}
 	// mutated tracks if a backup has been created/updated (aka mutated)
-	// and so  what events need to be raised
+	// and so what events need to be raised
 	mutated := map[string]bool{}
 
 	for _, cronjob := range cronjobs {
 		if current, ok := c.k8s.CronJobs.Get(cronjob.Name); ok {
 			// if a backup cronjob needs editing (a backup can have max 2 cronjobs),
-			// add to list and break from the outer backup loop
 			existing[cronjob.Labels[constants.LabelBackup]] = true
 
 			actualSpec := &v1beta1.CronJobSpec{}
