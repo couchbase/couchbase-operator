@@ -1,4 +1,4 @@
-= nstall the Operator on OpenShift
+= Install the Operator on OpenShift
 
 [abstract]
 This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator on a Red Hat OpenShift project.
