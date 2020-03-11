@@ -6,3 +6,4 @@
 :couchbase-version-redhat-upgrade-from: 6.0.0-1
 :prometheus-version: 1.0.0
 :prometheus-version-redhat: 1.0.0-1
+:tutorial-gke-version: 1.14.10-gke.17
