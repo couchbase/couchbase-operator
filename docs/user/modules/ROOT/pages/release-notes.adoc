@@ -1,282 +1,101 @@
-= Release Notes
+= Release Notes for Couchbase Autonomous Operator {operator-version-minor}
+include::partial$constants.adoc[]
 
-Couchbase Autonomous Operator 1.2 is a substantial update that introduces several new manageability and automation features, including the ability to automatically upgrade Couchbase Server clusters.
+Couchbase Autonomous Operator {operator-version-minor} is a landmark release that's built to take advantage of the latest Kubernetes improvements in the areas of security and custom resources.
+The changes in this release enable several advancements in how you can manage, monitor, and deploy Couchbase clusters.
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
-[#release-v122]
-== Release 1.2.2
+[#release-v200]
+== Release 2.0.0 Beta
 
-Couchbase Autonomous Operator 1.2.2, released in November 2019, is the second maintenance release in the 1.2.x series for Couchbase Autonomous Operator.
-This release further fortifies the previously released 1.2.x series with bug fixes to improve product stability.
+Couchbase Autonomous Operator 2.0.0 Beta was released in March 2020.
 
-[#fixed-issues-v122]
-=== Fixed Issues
-
-[#table-fixed-issues-v122,cols="25,66"]
-|===
-| Issue | Description
-
-| https://issues.couchbase.com/browse/K8S-1125[K8S-1125]
-| An issue occurred in environments where the https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#limitranger[LimitRanger] admission controller was enabled and LimitRange objects were present in the namespace that the Operator is deployed into.
-Specifically, the issue occurred when the LimitRange specifies requests and/or limits but no default was given (i.e. Pod resource requests are mandatory) and a `CouchbaseCluster` resource was using `PersistentVolume` backing storage.
-
-Although the `CouchbaseCluster` does allow the setting of Pod resources with the `spec.servers[*].pod.requests` attribute, it is not applied to init containers used to bootstrap the Couchbase Server instances for use with `PersistentVolumes`.
-A deployment that exhibited this defect would report that Pods cannot be created due to the required resource limits not being set even when the corresponding configuration is specified in the `CouchbaseCluster` resource.
-
-| https://issues.couchbase.com/browse/K8S-1073[K8S-1073]
-a| The Operator contains logic to xref:reference-operator-configuration.adoc#command-line-arguments[control the period to wait before declaring `Pod` creation failed].
-This allows the underlying platform sufficient time to provision `PersistentVolume` storage, provision the Pod itself, and to establish network connectivity.
-
-In certain circumstances this time period would not be honored, declaring a Pod as failed when -- if it had been left alone -- it would have eventually provisioned successfully.
-
-| https://issues.couchbase.com/browse/K8S-1084[K8S-1084] and https://issues.couchbase.com/browse/K8S-1126[K8S-1126]
-a| A `CouchbaseCluster` deployment using xref:network-requirements.adoc#public-connectivity-ddns[public connectivity] would balance new nodes into a cluster without first establishing whether the advertised address was reachable by a connected client.
-As a result, when documents were migrated onto the new node, there was a high likelihood those documents would not be able to be accessed by the client until network connectivity was established by the platform and DNS entries were propagated -- potentially causing application disruption.
-
-The Operator now asserts that the advertised address is reachable before allowing the nodes to be added to the cluster.
-
-NOTE: This feature requires that traffic be allowed to egress from the Operator, out of the Kubernetes cluster and back to either a load-balancer or node port.
-External firewall policies may block this traffic and prevent the Operator from functioning.
-The `spec.exposedFeatureTrafficPolicy` attribute may be set to `Cluster` to avoid this issue by masquerading reachability checks as standard Kubernetes node-to-node traffic.
-|===
-
-[#known-issues-v122]
-=== Known Issues
-
-[#table-known-issues-v122,cols="25,66"]
-|===
-| Issue | Description
-
-| https://issues.couchbase.com/browse/K8S-1169[K8S-1169]
-a| When creating a Couchbase cluster on OperatorHub using the Operator Lifecycle Manager (OLM), the *Couchbase Cluster Overview* screen may report the following errors:
-
-* Under *Member Status*:
-+
-`The field status.members is invalid`
-
-* Under *Conditions*:
-+
-`The field status.conditions is invalid`
-
-These errors occur because the format of these particular fields in the cluster spec — while still valid — are not in the format that OpenShift expects.
-You can safely ignore these errors.
-|===
-
-[#release-v121]
-== Release 1.2.1
-
-Couchbase Autonomous Operator 1.2.1, released in August 2019, is the first maintenance release in the 1.2.x series for Couchbase Autonomous Operator.
-This release further fortifies the previously released 1.2.x series with bug fixes to improve product stability.
-
-[#behavior-changes-v121]
-=== Behavior Changes
-
-[#table_behavior_changes_v121,cols="25,66"]
-|===
-| Issue | Description
-
-| https://issues.couchbase.com/browse/K8S-965[K8S-965]
-| The Operator now uses the default Storage Class of the Kubernetes cluster if none is specified in the CouchbaseCluster configuration.
-In previous releases, you were required to specify xref:reference-couchbasecluster.adoc#spec-volumeclaimtemplates-spec-storageclassname[`spec.volumeClaimTemplates.storageClassName`] even if a default Storage Class was defined in your Kubernetes cluster.
-
-| https://issues.couchbase.com/browse/K8S-1017[K8S-1017]
-| Specifying `client` for the xref:reference-couchbasecluster.adoc#spec-networking-exposedfeatures[`exposedFeatures`] property in the CouchbaseCluster configuration now exposes the Couchbase admin ports, including 8091.
-In previous releases, you would need to specify both `client` and `admin` to ensure proper communication with the Couchbase SDK, or for performing administration tasks like creating buckets or users via an application.
-|===
-
-[#fixed-issues-v121]
-=== Fixed Issues
-
-[#table_fixed_issues_v121,cols="25,66"]
-|===
-| Issue | Description
-
-| https://issues.couchbase.com/browse/K8S-992[K8S-992]
-| *Summary*: The `LoadBalancer` ports are set incorrectly after a topology change (for example after a failover) for clusters using the `LoadBalancer` `exposedFeatureServiceType`.
-This causes any applications or XDCR replications attempting to connect via the `LoadBalancer` to fail.
-Clusters that do not use `exposedFeatures` or have the `exposedFeatureServiceType` set to `NodePort` (this is the default) are not affected by this issue.
-
-| https://issues.couchbase.com/browse/K8S-1011[K8S-1011]
-| *Summary*: Under any load, an issue can occur that prevents certain Couchbase operations from executing, the results of which include logs full of entries about being unable to decode JSON.
-|===
-
-[#known-issues-v121]
-=== Known Issues and Limitations
-
-[#table_known_issues_v121,cols="25,66"]
-|===
-| Issue | Description
-
-| https://issues.couchbase.com/browse/K8S-964[K8S-964]
-| *Summary*: Due to a known issue in Helm 2.14.0, attempting to install the Couchbase cluster can result in validation errors, even for correctly-configured charts.
-
-*Workaround*: Use a version of Helm other than 2.14.0.
-|===
-
-[#release-v120]
-== Release 1.2.0
-
-Couchbase Autonomous Operator 1.2.0 was released in May 2019.
-
-[#install-upgrade-v120]
+[#install-upgrade-v200]
 === Installation and Upgrade
 
 For installation instructions, see xref:install-kubernetes.adoc[Installing on Kubernetes] and xref:install-openshift.adoc[Installing on OpenShift].
 
 For upgrade instructions, see xref:howto-operator-upgrade.adoc[Upgrading the Operator].
 
-[#supported-platforms-v120]
+CAUTION: The Autonomous Operator 2.0.0 Beta is not production-ready software, and therefore upgrading from the Beta to the final GA version will not be supported.
+You should only install the Beta software in development environments for testing purposes.
+
+[#supported-platforms-v200]
 === Platform Support
 
 For the latest platform support information, see xref:prerequisite-and-setup.adoc[Prerequisites].
 
-==== New Supported Platforms
+==== New Platform Support
 
 This release adds support for the following platforms:
 
-* Open Source Kubernetes 1.12, 1.13
-* Amazon EKS
-* Google GKE
-* Microsoft AKS
+* Open Source Kubernetes 1.15
 
 ==== Removed Platform Support:
 
 This release drops support for the following platforms:
 
-* Open Source Kubernetes 1.9, 1.10
-* Red Hat OpenShift 3.9
+* Red Hat OpenShift Container Platform 3.x
 
-[#changes-in-behavior-v120]
+[#changes-in-behavior-v200]
 === Major Behavior Changes
 
-* The Operator now requires the installation of an xref:install-admission-controller.adoc[admission controller].
-The admission controller is installed separately and replaces the `cbopctl` command line client that was distributed in Operator releases prior to version 1.2.
-+
-The primary purpose of the admission controller is to validate Couchbase cluster configuration changes before the Operator acts on them, thus protecting your Couchbase deployment (and the Operator) from any accidental damage that might arise from an invalid configuration.
+==== New Couchbase Custom Resource Model
 
-* This release introduces support for connecting clients to the Couchbase cluster over the internet via public IP-based addressing and dynamic DNS, also known as public connectivity.
-+
-Couchbase clients must meet certain requirements to support public connectivity, and not all clients are supported at this time.
-Refer to xref:network-requirements.adoc#table-public-connectivity[Supported Clients for Public Connectivity] for more information.
+As discussed on the xref:whats-new.adoc[What's New] page, this release introduces a new model for deploying and managing Couchbase custom resources.
+Previously, you would deploy a cluster using a single, monolithic `CouchbaseCluster` resource configuration that defined everything about a cluster (e.g. nodes, buckets, XDCR, etc).
+Starting with Autonomous Operator 2.0, parts of the `CouchbaseCluster` resource have been separated into their own custom resource types, which the Autonomous Operator aggregates together using xref:concept-label-selection.adoc[label selection].
 
-* The log collection experience for xref:reference-cbopinfo.adoc[cbopinfo --collectinfo] has been unified for stateful and stateless deployments.
- ** A new table column defines the type of log collection that is applicable, along with a column specifying the detachment time of the logs persistent volume (stateless deployments only).
- ** Selection now defaults to all logs.
- ** Log redaction is now an explicit prompt that defaults to `Yes`.
- ** Logs from running pods and detached volumes are now collected in parallel, improving performance.
- ** Logs collected on running pods are automatically deleted to avoid exhausting ephemeral disk space.
+The available set of Couchbase custom resource types include:
 
-[#fixed-issues-v120]
-=== Fixed Issues
+* xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
+* xref:reference-couchbasebucket.adoc[CouchbaseBucket Resource]
+* xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
+* xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
+* xref:reference-couchbasereplication.adoc[CouchbaseReplication Resource]
+* xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
+* xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
+* xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding]
 
-.Issues Fixed in Version 1.2.0
-[#table_fixedissues_v120,cols="25,66"]
-|===
-| Issue | Description
+Autonomous Operator {operator-version-minor} requires that all Couchbase custom resources use the new format.
+Couchbase custom resources -- such as `CouchbaseCluster` -- are not backwards compatible between Autonomous Operator versions 1 and 2.
+If you're upgrading from Autonomous Operator 1.x, a tool (`cbopconv`) has been provided in the standard Autonomous Operator download package to convert your existing `CouchbaseCluster` resources to version 2.
 
-| General
-a| Upgrading Couchbase Server using the Operator is not currently supported.
+Read more about how to use the `cbopconv` tool in the xref:howto-operator-upgrade.adoc[upgrade documentation].
 
-[NOTE]
-.Fixed
-====
-You can now use the Operator to xref:concept-upgrade.adoc[automatically upgrade Couchbase Server].
-====
+==== Installation Procedure
 
-| General 
-a| Couchbase client access is only supported locally within the Kubernetes cluster or where cluster DNS can be accessed by, or replicated to, a remote network.
+The documented installation procedures now take advantage of the `cbopcfg` tool for installing both the Dynamic Admission Controller and the Autonomous Operator.
+This tool greatly simplifies the installation process and accommodates most environments.
 
-For more information, see xref:networking.adoc[About Kubernetes Networking and Couchbase].
+Read more about the xref:reference-cbopcfg.adoc[`cbopcfg` tool], as well as xref:install-kubernetes.adoc[Installing on Kubernetes] and xref:install-openshift.adoc[Installing on OpenShift].
 
 [NOTE]
-.Fixed
 ====
-The Operator now supports xref:network-requirements.adoc#public-connectivity-ddns[Public Connectivity].
+If the `cbopcfg` tool doesn't suit your environment, you can still manually install the Dynamic Admission Controller and Autonomous Operator using YAML configs:
+
+* xref:reference-admission-rbac.adoc[Dynamic Admission Controller spec]
+* xref:reference-operator-configuration.adoc[Autonomous Operator spec]
 ====
 
-| https://issues.couchbase.com/browse/K8S-702[K8S-702]
-a| *Summary*: When multiple Couchbase clusters are running in the same namespace, the log volume janitor process can behave improperly. The behavior can manifest in the following ways:
+==== Couchbase Pod Upgrades
 
-* The janitor process for one Couchbase cluster (that has, for example, a 1-day retention period) may delete the log volumes of another Couchbase cluster (that has, for example, a 7-day retention period).
-* The janitor process may select volumes that don't belong to the Operator. Nothing is deleted, but the janitor process will error continuously. This effectively stops the janitor process from working and fills the logs with errors that are similar to the following:
-+
-[source,console]
-----
-time="2018-12-14T09:41:53Z" level=error msg="janitor error:path annotation missing for pvc some-other-information-volume" cluster-name=cb-example module=cluster
-----
+The Autonomous Operator can now better handle certain configuration changes that require pods to be replaced.
+Some of these configuration changes include:
 
-These issues can only occur when multiple Couchbase clusters in the same namespace are using persistent log volumes.
-|===
+* Modification of environment variables
+* xref:concept-scheduling.adoc[Modification of scheduling constraints]
+* xref:concept-memory-allocation.adoc[Modification of memory constraints]
+* xref:concept-tls.adoc[Enabling and disabling of TLS]
+* xref:concept-persistent-volumes.adoc[Enabling and disabling of persistent storage]
 
-[#known-issues-v120]
-=== Known Issues and Limitations
+Read more about xref:concept-upgrade[Couchbase Pod Upgrades].
 
-.Known Issues and Limitations
-[#table_knownissues_v120,cols="25,66"]
-|===
-| Issue | Description
+==== Logging
 
-| General
-| The Operator manages the state of the Couchbase Server cluster.
-Therefore, at this time, all cluster configuration changes must be made by modifying the CouchbaseCluster configuration file and pushing it to Kubernetes.
-Any manual changes to the configuration that are made using the Couchbase Server Web Console, CLI, REST API, or SDK will be reverted by the Operator.
-This includes things like adding a node or creating a server group.
-
-The one exception is when `disableBucketManagement` is set to `true` in the CouchbaseCluster configuration (the default is `false`).
-If this is the case, the creation and deletion of Couchbase buckets must be done manually.
-Refer to the CouchbaseCluster xref:reference-couchbasecluster.adoc[documentation] for more information.
-
-| https://issues.couchbase.com/browse/K8S-992[K8S-992]
-| *Summary*: The `LoadBalancer` ports are set incorrectly after a topology change (for example after a failover) for clusters using the `LoadBalancer` `exposedFeatureServiceType`.
-This causes any applications or XDCR replications attempting to connect via the `LoadBalancer` to fail.
-Clusters that do not use `exposedFeatures` or have the `exposedFeatureServiceType` set to `NodePort` (this is the default) are not affected by this issue.
-
-| https://issues.couchbase.com/browse/K8S-928[K8S-928]
-| *Summary*: When a bucket replica is disabled in a cluster with persistent volumes, a down pod may not automatically join the cluster after recovery.
-
-*Workaround*: To complete the recovery process, you need to manually rebalance the cluster using the Couchbase Server Web Console. 
-
-| https://issues.couchbase.com/browse/K8S-919[K8S-919]
-| *Summary*: The Operator uses a Kubernetes client library to raise some events.
-This performs an aggregation function.
-It also, however, performs throttling to protect the Kubernetes API from event floods.
-As a result, some events should not be relied upon by external monitoring solutions.
-These include `MemberDown` and `MemberFailedOver`.
-
-| https://issues.couchbase.com/browse/K8S-899[K8S-899]
-| *Summary*: Some cloud providers use OIDC authentication.  
-This is not currently supported by the Operator's external tooling, in particular the `cbopinfo` support tool.
-
-| https://issues.couchbase.com/browse/K8S-640[K8S-640]
-| *Summary*: The node disk storage statistic that is displayed in the Couchbase Server Web Console may appear to be inaccurate when using persistent volumes.
-This is because the calculation that formulates this statistic does not properly support persistent volumes.
-
-| https://issues.couchbase.com/browse/K8S-622[K8S-622]
-| *Summary*: Clusters without persistent volumes require manual failover when nodes are down and auto-failover cannot be performed.
-In the event that the Operator also crashes before nodes have been failed over, the Operator will require manual failover of down nodes before proceeding to reconcile any changes made to the cluster.
-
-| https://issues.couchbase.com/browse/K8S-556[K8S-556]
-| *Summary*: Only dynamic volume provisioning via storage classes is supported.
-
-*Workaround*: Create/define persistent volumes with an explicit storage class name.That storage class name can be used in place of a dynamic provisioner.
-
-| https://issues.couchbase.com/browse/K8S-421[K8S-421]
-| *Summary*: If a cluster is scaling up when not enough nodes are present, the Operator will not rebalance the cluster even if some nodes can be added.
-
-*Workaround*: You should ensure that sufficient resources are present in the Kubernetes cluster before scaling a Couchbase cluster.
-
-| https://issues.couchbase.com/browse/K8S-389[K8S-389]
-| *Summary*: Kubernetes doesn't allow the setting of ulimit parameters on individual containers.
-
-*Workaround*: You can set ulimits on the physical machine that Kubernetes is running on; the ulimit parameters will be inherited by the containers.
-
-| https://issues.couchbase.com/browse/K8S-89[K8S-89]
-| *Summary*: If you manually increase the number of replicas of a bucket, then the Operator may rebalance the cluster before reverting the bucket's changes.
-
-*Workaround*: You should always change the CouchbaseCluster configuration through the Operator.
-If you change the CouchbaseCluster configuration directly on the cluster (such as through the Couchbase Server Web Console), then the Operator will revert those changes.
-|===
+The Autonomous Operator and Dynamic Admission Controller now use JSON logging. 
+This change includes some helpful enhancements, such as pod status outputs no longer spanning multiple lines, and rebalance status now being labelled with proper cluster context.
 
 == Feedback
 

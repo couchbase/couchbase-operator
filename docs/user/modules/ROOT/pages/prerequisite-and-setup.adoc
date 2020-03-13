@@ -7,7 +7,8 @@ Both of these products are much easier to install and deploy when compared to se
 
 == Platform Compatibility
 
-.Support Level Definitions:
+=== Support Definitions
+
 Certified:: Couchbase has performed an extensive testing and review process to make sure that the Operator runs well out of the box on the specified platform.
 
 Supported:: Couchbase believes that the Operator will run well out of the box on the specified platform, but extensive testing has not been performed.
@@ -15,33 +16,33 @@ Couchbase will make a best effort to investigate issues on a Supported platform 
 
 Developer Preview:: Couchbase is still developing functionality for the specified platform, but you are encouraged to start your own testing and provide early feedback.
 
-.Couchbase Software Compatibility
+=== Couchbase Server Compatibility
+
 [#table-operator-compatibility-couchbase,cols="1,1",options="header"]
 |===
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-a| Certified 5.5, 6.0
+a| Certified 6.0.4+, 6.5.0
 
-_Unless otherwise stated, maintenance releases (x.x.x) are supported._
+_Unless otherwise stated, maintenance releases (x.x.x.x) are supported._
 |===
 
+=== Kubernetes Platform Compatibility
 
-.Kubernetes Platform Compatibility List
 [#table-operator-compatibility,cols="1,1",options="header"]
 |===
 | Platform | Version
 
 | Open Source Kubernetes
-| Certified 1.11, 1.12, 1.13
+| Certified 1.13, 1.14
 
 | Red Hat OpenShift Container Platform
-| Certified 3.11
-
-Supported 3.10
+| Certified 4.1
 |===
 
-.Public Kubernetes Service Compatibility List
+=== Public Kubernetes Service Compatibility
+
 [#table-operator-compatibility-public,cols="1,1",options="header"]
 |===
 | Service | Support Level

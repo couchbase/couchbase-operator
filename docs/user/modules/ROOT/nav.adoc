@@ -6,7 +6,6 @@
  ** xref:prerequisite-cloud.adoc[Public Cloud Prerequisites]
  ** xref:install-kubernetes.adoc[Install the Operator on Kubernetes]
  ** xref:install-openshift.adoc[Install the Operator on OpenShift]
- ** xref:release-notes.adoc[Release Notes]
 * Learn
  ** Kubernetes Concepts
   *** xref:concept-kubernetes-networking.adoc[Kubernetes Networking]
@@ -94,3 +93,4 @@
  ** xref:tutorial-aks.adoc[Installing AKS]
  ** xref:tutorial-eks.adoc[Installing EKS]
  ** xref:tutorial-gke.adoc[Installing GKE]
+* xref:release-notes.adoc[Release Notes]

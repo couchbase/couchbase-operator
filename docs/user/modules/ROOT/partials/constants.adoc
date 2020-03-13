@@ -1,4 +1,5 @@
 :operator-version: 2.0.0-beta
+:operator-version-minor: 2.0
 :operator-version-redhat: 2.0.0-Beta-3
 :couchbase-version: 6.5.0
 :couchbase-version-upgrade-from: 6.0.0
