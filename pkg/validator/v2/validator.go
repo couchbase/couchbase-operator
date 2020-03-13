@@ -142,7 +142,7 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
 			if !apierrors.IsForbidden(err) {
 				if namespace.Annotations != nil {
-					for _, annotation := range namespace.Annotations {
+					for annotation := range namespace.Annotations {
 						if strings.HasPrefix(annotation, "openshift.io") {
 							backupImage = redhatBackupImage
 							break
@@ -164,7 +164,7 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
 			if !apierrors.IsForbidden(err) {
 				if namespace.Annotations != nil {
-					for _, annotation := range namespace.Annotations {
+					for annotation := range namespace.Annotations {
 						if strings.HasPrefix(annotation, "openshift.io") {
 							metricsImage = redhatMetricsImage
 							break
