@@ -56,21 +56,27 @@ container: build
 container-rhel: build
 	docker build -f Dockerfile.rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-rhel:v1 .
 
-tools: tools-common
+tools-kubernetes: PLATFORM=kubernetes
+tools-kubernetes: tools-platform-specific
 
-tools-rhel: GO_BUILD_FLAGS=-tags redhat
-tools-rhel: tools-common
+tools-openshift: PLATFORM=openshift
+tools-openshift: GO_BUILD_FLAGS=-tags redhat
+tools-openshift: tools-platform-specific
 
-tools-common: build
+tools: build
+	$(MAKE) tools-kubernetes
+	$(MAKE) tools-openshift
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopinfo ./cmd/cbopinfo/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopinfo ./cmd/cbopinfo/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopinfo.exe ./cmd/cbopinfo/
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopcfg ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopcfg ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopcfg.exe ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopconv ./cmd/cbopconv
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopconv ./cmd/cbopconv
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopconv.exe ./cmd/cbopconv
+
+tools-platform-specific:
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/bin/cbopcfg ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/linux/bin/cbopcfg ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/windows/bin/cbopcfg.exe ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 
 artifacts: tools
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(version) --bld_num $(bldNum)

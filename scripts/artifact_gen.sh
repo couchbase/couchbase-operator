@@ -69,6 +69,7 @@ cp ${WORKSPACE_DIR}/example/crd.yaml ${ARTIFACTS_DIR}
 cp ${WORKSPACE_DIR}/docs/License.txt ${ARTIFACTS_DIR}
 cp ${WORKSPACE_DIR}/docs/README.txt ${ARTIFACTS_DIR}
 cp -r ${BUILD_DIR}/${OS}/* ${ARTIFACTS_DIR}
+cp -r ${BUILD_DIR}/${PLATFORM}/${OS}/* ${ARTIFACTS_DIR}
 
 # Package contents
 case $OS in
