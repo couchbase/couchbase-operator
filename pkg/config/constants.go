@@ -7,6 +7,6 @@ import (
 )
 
 const (
-	admissionImageDefault = "couchbase/admission-controller:" + version.Version
-	operatorImageDefault  = "couchbase/operator:" + version.Version
+	admissionImageDefault = "couchbase/admission-controller:" + version.Version + version.DockerBuild
+	operatorImageDefault  = "couchbase/operator:" + version.Version + version.DockerBuild
 )
