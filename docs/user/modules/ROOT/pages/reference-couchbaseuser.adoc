@@ -36,7 +36,7 @@ The following are relevant generic parameters that can be defined:
 apiVersion: couchbase.com/v2
 kind: CouchbaseUser
 metadata:
-  name: my-bucket
+  name: my-user
   labels:
     cluster: my-cluster
 ----
