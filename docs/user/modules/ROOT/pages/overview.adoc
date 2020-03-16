@@ -50,7 +50,7 @@ The following is a list of the management tasks that are currently supported:
  ** xref:howto-xdcr.adoc[Cross data center replication (XDCR)]
  ** xref:howto-tls.adoc[TLS and certificate rotation]
  ** User and group management
- ** Backup and restore
+ ** xref:howto-backup.adoc[Backup and restore]
  ** xref:howto-prometheus.adoc[Prometheus monitoring]
 
 == Essential Reading

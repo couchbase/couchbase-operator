@@ -172,6 +172,17 @@ spec:
         selector:
           matchLabels:
             cluster: cb-example
+  backup:
+    managed: true
+    image: couchbase/operator-backup:{backup-version}
+    serviceAccountName: couchbase-backup
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    selector:
+      matchLabels:
+        cluster: cb-example
   monitoring:
     prometheus:
       enabled: true
@@ -1592,6 +1603,80 @@ This field is a list of replications from the local cluster to the remote cluste
 === spec.xdcr.remoteClusters[].replications[].selector
 
 This field defines a label selector to choose which xref:reference-couchbasereplication.adoc[`CouchbaseReplication`] resources should be included for this remote cluster.
+
+____
+_Field rules:_ This field is optional and must be a Kubernetes https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[label selector^].
+____
+
+[#spec-backup]
+== spec.backup
+
+This object defines parameters and variables for automated backup.
+
+[source,yaml,subs="attributes"]
+----
+spec:
+  backup:
+    managed: true
+    image: couchbase/operator-backup:{backup-version}
+    serviceAccountName: couchbase-backup
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    selector:
+      matchLabels:
+        cluster: cb-example
+----
+
+=== spec.backup.managed
+
+This field defines whether the Automated Backup feature is enabled for the cluster.
+
+____
+_Field rules:_ This field is optional and must be a boolean value.
+____
+
+=== spec.backup.image
+
+This field defines the path to the Couchbase Operator Backup image that the Autonomous Operator will run to perform a backup or restore.
+
+If left unspecified, the dynamic admission controller will automatically default to the most recent container image from Docker Hub (open source Kubernetes) or Red Hat Container Catalog (OpenShift) that was available when the installed version of the Autonomous Operator was released.
+Refer to xref:howto-backup.adoc[Configure Automated Backup] for more detailed instructions.
+
+____
+_Field rules:_ This field is optional and must be a valid path to a valid container image.
+____
+
+=== spec.backup.serviceAccountName
+
+This field specifies the name of a Kubernetes Service Account Name that gives the backup and restore pods permissions to read and create the necessary backup objects.
+These being running pods, cronjobs, jobs, events and CouchbaseBackups and CouchbaseBackupRestores.
+
+If left unspecified, the dynamic admission controller will automatically default to the value of `couchbase-backup`.
+
+____
+_Field rules:_ This field is optional and must be the name of a valid Kubernetes Service Account.
+____
+
+=== spec.backup.resources
+
+This field defines resource requests and limits for the backup pods that performs backup operations.
+Some environments may require these fields to be explicitly set when using Kubernetes `LimitRange` resources without namespace defaults.
+
+____
+_Field rules:_ This field is optional and must be a valid Kubernetes https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/[resource descriptor^].
+____
+
+=== spec.backup.selector
+
+This field defines a label selector to choose which xref:reference-couchbasebackup.adoc[`CouchbaseBackup`] and xref:reference-couchbasebackuprestore.adoc[`CouchbaseBackupRestore`] resources should be included for this cluster.
+
+This field specifies which `CouchbaseBackup` and `CouchbaseBackupRestore` resources are considered when the <<spec-backup-managed,`spec.backup.managed`>> field is set to `true`.
+If not specified all `CouchbaseBackup` and `CouchbaseBackupRestore` resources are selected.
+If specified, then only `CouchbaseBackup` and `CouchbaseBackupRestore` resources containing the same labels as specified in the label selector are selected.
+
+For additional information, see the xref:concept-label-selection.adoc[Couchbase resource label selection] documentation.
 
 ____
 _Field rules:_ This field is optional and must be a Kubernetes https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[label selector^].

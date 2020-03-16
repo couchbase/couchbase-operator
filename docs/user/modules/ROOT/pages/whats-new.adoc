@@ -22,6 +22,13 @@ If you're upgrading from Autonomous Operator 1.x, a tool (`cbopconv`) has been p
 
 Read more about how to xref:howto-operator-upgrade.adoc[Upgrade the Operator].
 
+== Automated Backup and Restore
+
+Autonomous Operator {operator-version-minor} provides automated backup and restore capabilities through a native integration with the Couchbase Server tool xref:server:backup-restore:enterprise-backup-restore.adoc[cbbackupmgr].
+Backups can be scheduled using the new xref:reference-couchbasebackup.adoc[`CouchbaseBackup` resource], which allows the functionality of `cbbackupmgr` to be configured in a similar way to any other resource managed by the Operator.
+
+Read more about how to xref:howto-backup.adoc[Configure Backup & Restore].
+
 == Couchbase XDCR Management
 
 The Autonomous Operator can now directly manage Cross Data Center Replication (XDCR) using the new xref:reference-couchbasereplication.adoc[CouchbaseReplication] resource.
@@ -35,7 +42,7 @@ When combined with xref:concept-label-selection.adoc[label selection], the new x
 
 Read more about managing xref:concept-user-rbac.adoc[Couchbase User RBAC].
 
-NOTE: Support for LDAP and RBAC requires Couchbase Server 6.5. 
+NOTE: Support for LDAP and RBAC requires Couchbase Server 6.5.
 
 == Prometheus Metrics Collection
 
@@ -54,5 +61,3 @@ Read more about xref:concept-tls.adoc#tls-client-authentication[TLS Client Authe
 == Global Auto-Compaction Management
 
 Global Auto-Compaction settings can now be managed directly from the xref:reference-couchbasecluster.adoc#spec-cluster-autocompaction[CouchbaseCluster] resource.
-
-

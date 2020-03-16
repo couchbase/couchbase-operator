@@ -42,6 +42,7 @@
   *** Configure
    **** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
    **** xref:howto-persistent-volume-resize.adoc[Resize Persistent Volumes]
+   **** xref:howto-backup.adoc[Configure Backup & Restore]
    **** xref:howto-mds.adoc[Configure Multi-Dimensional Scaling]
    **** xref:howto-xdcr.adoc[Configure XDCR]
    **** xref:howto-public-networking.adoc[Configure Public Networking]
@@ -65,6 +66,9 @@
   *** xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
    **** xref:reference-couchbasecluster-status.adoc[CouchbaseCluster Status]
    **** xref:reference-couchbasecluster-events.adoc[CouchbaseCluster Events]
+  *** xref:reference-couchbasebackup.adoc[CouchbaseBackup Resource]
+   **** xref:reference-couchbasebackuprestore.adoc[CouchbaseBackupRestore Resource]
+   **** xref:reference-couchbasebackup-status.adoc[CouchbaseBackup and CouchbaseBackupRestore Status]
   *** xref:reference-couchbasebucket.adoc[CouchbaseBucket Resource]
   *** xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
   *** xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
