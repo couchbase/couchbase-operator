@@ -6,8 +6,35 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// BackupResource is the name used for all resources involving automated backup
+	BackupResourceName = "couchbase-backup"
+)
+
+// DumpAdmissionYAML dumps all operator resources to standard out.
+func DumpBackupYAML(conf *Config) error {
+	if !conf.Backup {
+		return nil
+	}
+
+	if err := DumpYAML(conf, "backup-service-account", GetBackupServiceAccount(BackupResourceName)); err != nil {
+		return err
+	}
+	if err := DumpYAML(conf, "backup-role", GetBackupRole(BackupResourceName)); err != nil {
+		return err
+	}
+	if err := DumpYAML(conf, "backup-role-binding", GetBackupRoleBinding(BackupResourceName, conf.Namespace)); err != nil {
+		return err
+	}
+	return nil
+}
+
 func GetBackupRole(name string) *rbacv1.Role {
 	return &rbacv1.Role{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "rbac.authorization.k8s.io/v1",
+			Kind:       "Role",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -70,6 +97,10 @@ func GetBackupRole(name string) *rbacv1.Role {
 
 func GetBackupServiceAccount(name string) *v1.ServiceAccount {
 	return &v1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ServiceAccount",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -78,6 +109,10 @@ func GetBackupServiceAccount(name string) *v1.ServiceAccount {
 
 func GetBackupRoleBinding(name, namespace string) *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "rbac.authorization.k8s.io/v1",
+			Kind:       "RoleBinding",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

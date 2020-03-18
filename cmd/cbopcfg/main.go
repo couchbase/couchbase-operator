@@ -17,6 +17,7 @@ func main() {
 	configurators := []func(*config.Config) error{
 		config.DumpAdmissionYAML,
 		config.DumpOperatorYAML,
+		config.DumpBackupYAML,
 	}
 
 	for _, configurator := range configurators {
