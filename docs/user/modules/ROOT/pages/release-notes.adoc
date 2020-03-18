@@ -31,11 +31,13 @@ For the latest platform support information, see xref:prerequisite-and-setup.ado
 This release adds support for the following platforms:
 
 * Open Source Kubernetes 1.15
+* Red Hat OpenShift 4.2
 
 ==== Removed Platform Support:
 
 This release drops support for the following platforms:
 
+* Couchbase Server 5.5
 * Red Hat OpenShift Container Platform 3.x
 
 [#changes-in-behavior-v200]
