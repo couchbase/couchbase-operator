@@ -122,6 +122,7 @@ func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) err
 func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction, strategy couchbasev2.Strategy) *batchv1beta1.CronJob {
 	var schedule string
 	var container corev1.Container
+	var affinity *corev1.Affinity
 
 	switch action {
 	case Incremental:
@@ -134,7 +135,11 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 			*backup.Spec.LogRetention, *backup.Spec.BackupRetention)
 	}
 
-	return &batchv1beta1.CronJob{
+	if c.cluster.Spec.AntiAffinity {
+		affinity = k8sutil.AntiAffinityForCluster(c.cluster.Name)
+	}
+
+	cronjob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: backup.Name + "-" + string(action),
 			Labels: map[string]string{
@@ -161,14 +166,17 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 							},
 						},
 						Spec: corev1.PodSpec{
+							Affinity: affinity,
+							Containers: []corev1.Container{
+								container,
+							},
+							NodeSelector:  c.cluster.Spec.Backup.NodeSelector,
+							RestartPolicy: corev1.RestartPolicyNever,
 							SecurityContext: &corev1.PodSecurityContext{
 								FSGroup: c.cluster.Spec.SecurityContext.FSGroup,
 							},
 							ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
-							Containers: []corev1.Container{
-								container,
-							},
-							RestartPolicy: corev1.RestartPolicyNever,
+							Tolerations:        c.cluster.Spec.Backup.Tolerations,
 							Volumes: []corev1.Volume{
 								{
 									Name: "couchbase-cluster-backup-volume",
@@ -194,6 +202,8 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 			},
 		},
 	}
+
+	return cronjob
 }
 
 // generateBackupContainer returns the actual backup container

@@ -625,13 +625,18 @@ type Backup struct {
 	// The Service Account to run backup (and restore) pods under.
 	// Without this backup pods will not be able to update status
 	ServiceAccount string `json:"serviceAccountName,omitempty"`
+	// NodeSelector defines which nodes to constrain the pods that
+	// run any backup operations to
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// Resources is the resource requirements for the backup container.
 	// This field cannot be updated once the cluster is created.
 	// Will be populated by defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
-	// Selector allows CouchbaseBackup resources to be filtered
-	// based on labels.
+	// Selector allows CouchbaseBackup and CouchbaseBackupRestore
+	// resources to be filtered based on labels.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	// Tolerations specifies all backup pod tolerations.
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
 type LDAPEncryption string

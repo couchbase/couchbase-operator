@@ -441,20 +441,7 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	// If anti-affinity is set then ensure no two pods from the same cluster
 	// run on the same hosts.
 	if cluster.Spec.AntiAffinity {
-		pod.Spec.Affinity = &v1.Affinity{
-			PodAntiAffinity: &v1.PodAntiAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								constants.LabelCluster: cluster.Name,
-							},
-						},
-						TopologyKey: "kubernetes.io/hostname",
-					},
-				},
-			},
-		}
+		pod.Spec.Affinity = AntiAffinityForCluster(cluster.Name)
 	}
 
 	// If persistent volumes are specified then add them.
@@ -1112,4 +1099,21 @@ func FlagPodReady(client *client.Client, name string) error {
 		return err
 	}
 	return nil
+}
+
+func AntiAffinityForCluster(clusterName string) *v1.Affinity {
+	return &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							constants.LabelCluster: clusterName,
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
 }
