@@ -116,9 +116,9 @@ type CouchbaseBackupStatus struct {
 	Archive string `json:"archive,omitempty"`
 	// Repo is where we are currently performing operations
 	Repo string `json:"repo,omitempty"`
-	// RepoList gives us the complete list of Repos in the Backup Archive,
-	// useful for selecting a restore Repo
-	RepoList string `json:"repoList,omitempty"`
+	// Backups gives us a full list of all backups
+	// and their respective repo locations
+	Backups []BackupStatus `json:"backups,omitempty"`
 	// Running indicates whether a backup is currently being performed
 	Running bool `json:"running"`
 	// Failed indicates whether the most recent backup has failed
@@ -159,8 +159,17 @@ type CouchbaseBackupList struct {
 }
 
 type CouchbaseBackupSchedule struct {
-	// Schedule takes a cronjob string
+	// Schedule takes a cron schedule in string format
 	Schedule string `json:"schedule"`
+}
+
+type BackupStatus struct {
+	// name of the repo
+	Name string `json:"name"`
+	// the full backup inside the repo
+	Full string `json:"full,omitempty"`
+	// incremental backups inside the repo
+	Incrementals []string `json:"incrementals,omitempty"`
 }
 
 // +genclient
@@ -199,9 +208,9 @@ type CouchbaseBackupRestoreStatus struct {
 	Archive string `json:"archive,omitempty"`
 	// Repo is where we are currently performing operations
 	Repo string `json:"repo,omitempty"`
-	// RepoList gives us the complete list of Repos in the Backup Archive,
-	// useful for selecting a restore Repo
-	RepoList string `json:"repoList,omitempty"`
+	// Backups gives us a full list of all backups
+	// and their respective repo locations
+	Backups []BackupStatus `json:"backups,omitempty"`
 	// Running indicates whether a restore is currently being performed
 	Running bool `json:"running"`
 	// Failed indicates whether the most recent restore has failed
