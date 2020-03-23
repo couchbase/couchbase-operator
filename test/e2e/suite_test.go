@@ -179,7 +179,7 @@ func operatorRestarted(before map[string]int) bool {
 }
 
 // runTest runs a named test once, spotting bugs in the operator, the test itself and
-// performing cleanup and looging duties.
+// performing cleanup and logging duties.
 func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 	f := framework.Global
 

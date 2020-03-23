@@ -155,6 +155,11 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 				Spec: batchv1.JobSpec{
 					BackoffLimit: &backup.Spec.BackoffLimit,
 					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								constants.LabelBackup: backup.Name,
+							},
+						},
 						Spec: corev1.PodSpec{
 							SecurityContext: &corev1.PodSecurityContext{
 								FSGroup: c.cluster.Spec.SecurityContext.FSGroup,

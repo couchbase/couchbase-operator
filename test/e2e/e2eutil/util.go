@@ -749,6 +749,10 @@ func CleanK8sCluster(k8s *types.Cluster, namespace string) {
 	} else if err := WaitForRoleBindingDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)
 	}
+
+	// remove any left over jobs and pods related to backup before deleting the Backup CRDs
+	CleanupBackup(k8s, namespace)
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
 	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
@@ -1423,4 +1427,30 @@ func MustGetUUID(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 		Die(t, err)
 	}
 	return uuid
+}
+
+func CleanupBackup(k8s *types.Cluster, namespace string) {
+	backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		fmt.Println("Warning: Unable to list couchbasebackups: ", err)
+	}
+
+	for _, backup := range backups.Items {
+		listOptions := metav1.ListOptions{LabelSelector: operator_constants.LabelBackup + "=" + backup.Name}
+
+		if err := k8s.KubeClient.BatchV1().Jobs(namespace).DeleteCollection(metav1.NewDeleteOptions(0), listOptions); err != nil {
+			fmt.Println("Warning: Unable to delete backup jobs: ", err)
+		}
+
+		pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(listOptions)
+		if err != nil {
+			fmt.Println("Warning: Unable to list backup pods: ", err)
+		}
+
+		for _, pod := range pods.Items {
+			if err := k8s.KubeClient.CoreV1().Pods(namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+				fmt.Println("Warning: Unable to delete backup pods: ", err)
+			}
+		}
+	}
 }
