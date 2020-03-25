@@ -413,19 +413,6 @@ You have successfully deployed a Sync Gateway cluster on Kubernetes with end-to-
 The xref:tutorial-sync-gateway-manage.adoc[Manage a Sync Gateway Cluster] page contains additional details related to the management of the Sync Gateway cluster.
 
 
-
-== Templates
-
-Template files are provided in the Operator binary distribution :
-
-** `sync-gateway.yaml` : Sample Deployment Controller for Sync Gateway with no TLS
-** `sync-gateway-nodeport.yaml`: Sample nodeport service definition for Sync Gateway used with Ingress Controller (Ingress as TLS termination option)
-** `sync-gateway-ingress-tls.yaml`: Sample Ingress controller definition for Sync Gateway configured as SSL termination point (Ingress as TLS termination option)
-** `sync-gateway-load-balancer.yaml`: Sample Load Balancer service definition for Sync Gateway (end-to-end TLS option)
-** `sync-gateway-tls.yaml` : Sample Deployment Controller for Sync Gateway configured for end-to-end TLS from clients (end-to-end TLS option)
-
-These files are provided as *evaluation examples* -- they should not be used for production workloads.
-
 [IMPORTANT]
 ====
 Redhat OCP users will need to modify the provided template to reference an image pull secret.

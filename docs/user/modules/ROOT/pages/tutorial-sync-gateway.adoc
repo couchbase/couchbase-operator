@@ -369,10 +369,7 @@ Now, let's look at the xref:tutorial-sync-gateway-clients.adoc[connectivity to C
 
 Template files are provided in the Operator binary distribution :
 
-** `sgw-config.yaml` : Sync Gateway config secret
-** `sync-gateway.yaml` : Sample Deployment Controller for Sync Gateway with no TLS
-** `sync-gateway-rbac-user.yaml` : Sample config to create Sync Gateway user
-** `sync-gateway-user-rolebinding.yaml` : Sample config file to bind sync gateway user to appropriate role
+** `sync-gateway.yaml` : Sample Deployment Controller for Sync Gateway using RBAC for server connectivity
 
 These files are provided as *evaluation examples* -- they should be modified to suit production deployments.
 
