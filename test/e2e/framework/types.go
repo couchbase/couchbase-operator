@@ -39,7 +39,16 @@ type Framework struct {
 	// PodCreateTimeout is the time we expect to wait when pods are failing to be
 	// created.
 	PodCreateTimeout time.Duration
+	// tracks what clusters have already been initialized by the testing framework
+	initializedClusters initializedClusterList
 }
+
+type initializedCluster struct {
+	host       string
+	namespaces []string
+}
+
+type initializedClusterList []initializedCluster
 
 // Runtime configuration
 type KubeConfData struct {

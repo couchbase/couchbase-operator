@@ -384,23 +384,80 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	})
 }
 
+// tells us if the underlying physical cluster on a host exists
+func (l initializedClusterList) isClusterInitialized(host string) bool {
+	for _, cluster := range l {
+		if cluster.host == host {
+			return true
+		}
+	}
+	return false
+}
+
+// check that the namespace for this host is already initialized
+func (l initializedClusterList) isClusterNamespaceInitialized(host, namespace string) bool {
+	for _, cluster := range l {
+		if cluster.host == host {
+			for _, ns := range cluster.namespaces {
+				if ns == namespace {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// add initializedCluster to the initializedClusterList
+func (l initializedClusterList) initializeClusterNamespace(host, namespace string) (initializedClusterList, error) {
+	for _, cluster := range l {
+		if cluster.host == host {
+			for _, ns := range cluster.namespaces {
+				if ns == namespace {
+					return nil, fmt.Errorf("requested namespace already exists on the requested host")
+				}
+			}
+
+			cluster.namespaces = append(cluster.namespaces, namespace)
+			return l, nil
+		}
+	}
+
+	return append(l, initializedCluster{
+		host:       host,
+		namespaces: []string{namespace},
+	}), nil
+}
+
 func (f *Framework) SetupFramework(k8s *types.Cluster) error {
-	if err := f.RemoveK8SNodeTaints(k8s.KubeClient); err != nil {
-		return err
+	if !f.initializedClusters.isClusterInitialized(k8s.Config.Host) {
+		if err := f.RemoveK8SNodeTaints(k8s.KubeClient); err != nil {
+			return err
+		}
+
+		// delete and recreate CRDs
+		logrus.Info("Recreating CRD")
+		if err := recreateCRDs(k8s); err != nil {
+			return err
+		}
+
+		// delete and recreate DAC
+		logrus.Infof("Deleting admission controller")
+		if err := deleteAdmissionController(k8s.KubeClient); err != nil {
+			return err
+		}
+		logrus.Infof("Creating admission controller")
+		if err := createAdmissionController(k8s.KubeClient); err != nil {
+			return err
+		}
+	}
+
+	if f.initializedClusters.isClusterNamespaceInitialized(k8s.Config.Host, k8s.Namespace) {
+		return nil
 	}
 
 	// Creating required namespaces and cluster roles before deploying the operator
 	if err := createK8SNamespace(k8s.KubeClient, k8s.Namespace); err != nil {
-		return err
-	}
-
-	logrus.Infof("Cleaning up namespace %s before deployment in %s", k8s.Namespace, k8s.Name)
-	if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
-		return fmt.Errorf("failed to delete operator: %v", err)
-	}
-
-	logrus.Infof("Deleting admission controller")
-	if err := deleteAdmissionController(k8s.KubeClient); err != nil {
 		return err
 	}
 
@@ -436,17 +493,10 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
 		logrus.Infof("Secret deleted: %v", "basic-test-secret")
 	}
-
-	logrus.Info("Recreating CRD")
-	if err := recreateCRDs(k8s); err != nil {
-		return err
-	}
-
 	logrus.Info("Recreating docker auth secret")
 	if err := recreateDockerAuthSecret(k8s); err != nil {
 		return err
 	}
-
 	logrus.Info("Recreating role")
 	if err := recreateRoles(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
@@ -464,16 +514,22 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		return err
 	}
 
-	logrus.Infof("Creating admission controller")
-	if err := createAdmissionController(k8s.KubeClient); err != nil {
-		return err
+	// delete and create operator
+	logrus.Infof("Cleaning up namespace %s before deployment in %s", k8s.Namespace, k8s.Name)
+	if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
+		return fmt.Errorf("failed to delete operator: %v", err)
 	}
-
 	logrus.Info("Setting up operator")
 	if err := f.SetupCouchbaseOperator(k8s); err != nil {
 		return fmt.Errorf("failed to setup couchbase operator: %v", err)
 	}
 	logrus.Info("Couchbase operator created successfully")
+
+	f.initializedClusters, err = f.initializedClusters.initializeClusterNamespace(k8s.Config.Host, k8s.Namespace)
+	if err != nil {
+		return err
+	}
+
 	logrus.Info("E2E setup successfully")
 	return nil
 }
