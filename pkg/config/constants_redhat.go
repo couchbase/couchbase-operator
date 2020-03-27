@@ -7,7 +7,10 @@ import (
 )
 
 const (
-	imageRepo             = "registry.connect.redhat.com"
-	admissionImageDefault = imageRepo + "/couchbase/admission-controller:" + version.Version + "-" + version.RedHatBuild
-	operatorImageDefault  = imageRepo + "/couchbase/operator:" + version.Version + "-" + version.RedHatBuild
+	imageRepo = "registry.connect.redhat.com"
+)
+
+var (
+	admissionImageDefault = imageRepo + "/couchbase/admission-controller:" + version.VersionWithRevisionRedHat()
+	operatorImageDefault  = imageRepo + "/couchbase/operator:" + version.VersionWithRevisionRedHat()
 )

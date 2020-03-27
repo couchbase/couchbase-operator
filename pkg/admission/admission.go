@@ -288,7 +288,7 @@ func serveCouchbaseClustersMutate(w http.ResponseWriter, r *http.Request) {
 
 // main initializes the system then starts a HTTPS server to process requests
 func Serve(config *Config) {
-	glog.Infof("couchbase-operator-admission %s (%s)", version.Version, revision.Revision())
+	glog.Infof("couchbase-operator-admission %s (%s)", version.VersionWithBuildNumber(), revision.Revision())
 
 	if err := addToScheme(scheme); err != nil {
 		glog.Error(err)

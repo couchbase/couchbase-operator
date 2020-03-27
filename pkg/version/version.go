@@ -1,13 +1,39 @@
 package version
 
-const (
-	Application = "couchbase-operator"
-	Version     = "2.0.0"
-	RedHatBuild = "Beta-3"
+import (
+	"fmt"
 )
 
-// Optional tag for specifying one-off builds
-// Should be set to an empty string for GA
 const (
-	DockerBuild = "-beta"
+	Application = "couchbase-operator"
 )
+
+var (
+	Version        string
+	Revision       string
+	RevisionRedHat string
+	BuildNumber    string
+)
+
+// This will generate things like 1.0.0 and 1.0.0-beta1 and should be used
+// for things like docker images.
+func VersionWithRevision() string {
+	v := Version
+	if Revision != "" {
+		v = v + "-" + Revision
+	}
+	return v
+}
+
+// This will do as above, but also adds in the Red Hat container tag revision
+// e.g. 1.0.0-beta1-1.
+func VersionWithRevisionRedHat() string {
+	return VersionWithRevision() + "-" + RevisionRedHat
+}
+
+// This will generate things like "1.0.0 (build 123)" and should be used for
+// binary version strings so we can tell exactly which build (and by extension
+// commit) is being used.
+func VersionWithBuildNumber() string {
+	return fmt.Sprintf("%s (build %s)", VersionWithRevision(), BuildNumber)
+}

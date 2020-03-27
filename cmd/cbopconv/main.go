@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/x509"
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
+	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/pflag"
@@ -100,6 +102,15 @@ func validateTLS(kubeclient kubernetes.Interface, cluster *couchbasev1.Couchbase
 }
 
 func main() {
+	printVersion := false
+	flag.BoolVar(&printVersion, "v", false, "Displays the version and exits")
+	flag.Parse()
+
+	if printVersion {
+		fmt.Println("cbopconv", version.VersionWithBuildNumber())
+		os.Exit(0)
+	}
+
 	// Parse the command line arguments.
 	config := Configuration{
 		ConfigFlags: genericclioptions.NewConfigFlags(),

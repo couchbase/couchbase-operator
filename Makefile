@@ -10,9 +10,22 @@ operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-ope
 namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
 deploymentSpec = $(if $(DEPLOYMENTSPEC),$(DEPLOYMENTSPEC),$(PREFIX)/example/deployment.yaml)
 bldNum = $(if $(BLD_NUM),$(BLD_NUM),999)
-version = $(if $(VERSION),$(VERSION),1.2.1)
+version = $(if $(VERSION),$(VERSION),2.0.0)
 productVersion = $(version)-$(bldNum)
 testname = $(E2E_TEST)
+
+# Set this to, for example beta1, for a beta release.
+# This will affect the "-v" version strings and docker images.
+# This is analogous to revisions in DEB and RPM archives.
+revision = $(if $(REVISION),$(REVISION),)
+
+# Red Hat CC has its own revisioning system that adds another one
+# on above and beyond ours.  This should always be 1
+revisionRedHat = $(if $(REVISION_REDHAT),$(REVISION_REDHAT),1)
+
+# These are propagated into each binary so we can tell for sure the exact build
+# that a binary came from.
+LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(version) -X github.com/couchbase/couchbase-operator/pkg/version.Revision=$(revision) -X github.com/couchbase/couchbase-operator/pkg/version.RevisionRedHat=$(revisionRedHat) -X github.com/couchbase/couchbase-operator/pkg/version.BuildNumber=$(bldNum)"
 
 .PHONY: all dep build container dist test test-indv
 
@@ -29,12 +42,12 @@ $(BINARY): $(SOURCE)
 	./scripts/codegen/revision
 	rm -rf pkg/generated
 	./scripts/codegen/update-generated.sh
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator ./cmd/operator/main.go
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator-admission ./cmd/admission
-	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/crdgen ./cmd/crdgen/
-	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopinfo ./cmd/cbopinfo
-	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopcfg ./cmd/cbopcfg
-	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopconv ./cmd/cbopconv
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator -ldflags $(LDFLAGS) ./cmd/operator/main.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/couchbase-operator-admission -ldflags $(LDFLAGS) ./cmd/admission
+	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/crdgen -ldflags $(LDFLAGS) ./cmd/crdgen/
+	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo
+	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopcfg -ldflags $(LDFLAGS) ./cmd/cbopcfg
+	GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/cbopconv -ldflags $(LDFLAGS) ./cmd/cbopconv
 	build/bin/crdgen > example/crd.yaml
 
 # NOTE: This target is only for local development. While we use this Dockerfile
@@ -66,17 +79,17 @@ tools-openshift: tools-platform-specific
 tools: build
 	$(MAKE) tools-kubernetes
 	$(MAKE) tools-openshift
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopinfo ./cmd/cbopinfo/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopinfo ./cmd/cbopinfo/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopinfo.exe ./cmd/cbopinfo/
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopconv ./cmd/cbopconv
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopconv ./cmd/cbopconv
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopconv.exe ./cmd/cbopconv
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopinfo.exe -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopconv -ldflags $(LDFLAGS) ./cmd/cbopconv
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopconv -ldflags $(LDFLAGS) ./cmd/cbopconv
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopconv.exe -ldflags $(LDFLAGS) ./cmd/cbopconv
 
 tools-platform-specific:
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/bin/cbopcfg ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/linux/bin/cbopcfg ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/windows/bin/cbopcfg.exe ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/linux/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/windows/bin/cbopcfg.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 
 artifacts: tools
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(version) --bld_num $(bldNum)

@@ -6,7 +6,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
-const (
-	admissionImageDefault = "couchbase/admission-controller:" + version.Version + version.DockerBuild
-	operatorImageDefault  = "couchbase/operator:" + version.Version + version.DockerBuild
+var (
+	admissionImageDefault = "couchbase/admission-controller:" + version.VersionWithRevision()
+	operatorImageDefault  = "couchbase/operator:" + version.VersionWithRevision()
 )

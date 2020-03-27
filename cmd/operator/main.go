@@ -57,7 +57,7 @@ func main() {
 	// * Version feature set
 	// * Whether this is an official or development branch
 	// * The exact commit defects are raised against
-	log.Info(version.Application, "version", version.Version, "revision", revision.Revision())
+	log.Info(version.Application, "version", version.VersionWithBuildNumber(), "revision", revision.Revision())
 	if printVersion {
 		os.Exit(0)
 	}
