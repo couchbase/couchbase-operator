@@ -75,7 +75,7 @@ spec:
 === Referencing LDAP Groups
 
 Couchbase Server provides LDAP integration which allows external user authentication.
-The Autonomous Operator can be used to enable this functionality when an `ldap_group_ref` is specified within the `CouchbaseGroup` resource.
+The Autonomous Operator can be used to enable this functionality when an `ldapGroupRef` is specified within the `CouchbaseGroup` resource.
 
 [source,yaml]
 ----
@@ -84,7 +84,7 @@ kind: CouchbaseGroup
 metadata:
   name: data_role
 spec:
-  ldap_group_ref: cn=mygroup,ou=Groups,dc=example,dc=com
+  ldapGroupRef: cn=mygroup,ou=Groups,dc=example,dc=com
   roles:
   - name: cluster_admin
 ----

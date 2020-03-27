@@ -1770,7 +1770,7 @@ func GetGroupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 								"roles",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-								"ldap_group_ref": apiextensionsv1beta1.JSONSchemaProps{
+								"ldapGroupRef": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
 								"roles": apiextensionsv1beta1.JSONSchemaProps{

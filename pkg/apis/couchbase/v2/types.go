@@ -400,7 +400,7 @@ type CouchbaseGroupSpec struct {
 	// role identifier
 	Roles []Role `json:"roles"`
 	// optional reference to LDAP group
-	LDAPGroupRef string `json:"ldap_group_ref"`
+	LDAPGroupRef string `json:"ldapGroupRef"`
 }
 
 // RoleName is a type-safe enumeration of all supported role names.
