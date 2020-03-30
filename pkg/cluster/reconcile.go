@@ -942,7 +942,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	// has no way of addressing individual cluster nodes).
 	for _, member := range c.members {
 		// Grab the current configuration
-		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
+		existingAddresses, err := c.getAlternateAddressesExternal(member)
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
 			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name)
@@ -992,7 +992,7 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 	// has no way of addressing individual cluster nodes).
 	for _, member := range c.members {
 		// Grab the current configuration
-		existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
+		existingAddresses, err := c.getAlternateAddressesExternal(member)
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
 			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name)
@@ -1023,6 +1023,22 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// Get alternate addresses from server, when server is
+// exposed over LoadBalancer then Ports can be ignored
+func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
+	existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
+	if err != nil {
+		return nil, err
+	}
+	// Remove Ports if member features are exposed with a loadbalancer
+	if svc, found := c.k8s.Services.Get(member.Name); found {
+		if svc.Spec.Type == v1.ServiceTypeLoadBalancer {
+			existingAddresses.Ports = nil
+		}
+	}
+	return existingAddresses, nil
 }
 
 func (c *Cluster) reconcileClusterSettings() error {
