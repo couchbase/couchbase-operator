@@ -15,6 +15,7 @@ var (
 	minimumStringLength          int64   = 1
 	minimumBucketReplicas        float64 = 0
 	maximumBucketReplicas        float64 = 3
+	maximumBucketNameLength      int64   = 100
 	minimumJobsHistorySize       float64 = 0
 	minimumBackupIndexSize       float64 = 1
 	minimumAutofailoverMaxCount  float64 = 1
@@ -27,6 +28,7 @@ var (
 const (
 	ImagePattern  = `^[\w_\.\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$`
 	wallClockTime = `^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$`
+	BucketPattern = `^\*$|^[a-zA-Z0-9-_%\.]+$`
 )
 
 var (
@@ -1789,7 +1791,9 @@ func GetGroupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 													Pattern:   couchbasev2.ValidRolePattern(),
 												},
 												"bucket": apiextensionsv1beta1.JSONSchemaProps{
-													Type: "string",
+													Type:      "string",
+													Pattern:   BucketPattern,
+													MaxLength: &maximumBucketNameLength,
 												},
 											},
 										},

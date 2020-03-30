@@ -439,7 +439,7 @@ type Role struct {
 	// name of role
 	Name RoleName `json:"name"`
 	// optional bucket name for bucket admin roles
-	Bucket string `json:"bucket"`
+	Bucket string `json:"bucket,omitempty"`
 }
 
 // CouchbaseGroupList is a list of Couchbase users.

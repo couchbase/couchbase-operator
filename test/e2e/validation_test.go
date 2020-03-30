@@ -1418,7 +1418,8 @@ func TestRBACValidationCreate(t *testing.T) {
 			name:       "TestValidateLDAPDomain",
 			mutations:  patchMap{"user2": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "external")},
 			shouldFail: false,
-		}, {
+		},
+		{
 			name:        "TestValidateClusterRole",
 			mutations:   patchMap{"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", "cluster_admin")},
 			validations: patchMap{"admin-group": jsonpatch.NewPatchSet().Test("/spec/roles/0/name", "cluster_admin")},
@@ -1431,13 +1432,6 @@ func TestRBACValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.roles[0].bucket for cluster role.admin is a forbidden property"},
 		},
-		/* Unknown role is caught by CRD validation which returns expectError that isn't being matched
-		{
-			name:           "TestUnknownRole",
-			mutations:      patchMap{"role": jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", "jabroni")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.roles[0].name in body should match '" + couchbasev2.ValidRolePattern() + "'"},
-		}*/
 		{
 			name:           "TestValidateUnkownDomain",
 			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "unknown")},
@@ -1454,6 +1448,22 @@ func TestRBACValidationCreate(t *testing.T) {
 			name:        "TestValidateDefaultBucketRole",
 			validations: patchMap{"data-group": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "*")},
 			shouldFail:  false,
+		},
+		{
+			name:       "TestValidateBucketName",
+			mutations:  patchMap{"data-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "99.buckets-0nthe_w%ll")},
+			shouldFail: false,
+		},
+		{
+			name:       "TestValidateAllBucketSelector",
+			mutations:  patchMap{"data-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "*")},
+			shouldFail: false,
+		},
+		{
+			name:           "TestRejectInvalidBucketName",
+			mutations:      patchMap{"data-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "default#bucket")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.roles.bucket in body should match '^\\*$|^[a-zA-Z0-9-_%\\.]+$'"},
 		},
 	}
 
