@@ -86,7 +86,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			// update changed group
 			rolesMatch := reflect.DeepEqual(cbmgr.RolesToStr(r.Roles), cbmgr.RolesToStr(e.Roles))
 			if !rolesMatch || r.LDAPGroupRef != e.LDAPGroupRef {
-				if err := c.client.CreateGroup(c.readyMembers(), r); err != nil {
+				if err := c.createGroup(r); err != nil {
 					return existingGroupNames, err
 				}
 				c.raiseEvent(k8sutil.GroupEditEvent(e.ID, c.cluster))
@@ -106,7 +106,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 	// create requested groups that do not exist
 	for _, group := range requestedGroups {
 		if _, found := couchbasev2.HasItem(group.ID, existingGroupNames); !found {
-			if err := c.client.CreateGroup(c.readyMembers(), group); err != nil {
+			if err := c.createGroup(group); err != nil {
 				return existingGroupNames, err
 			}
 			c.raiseEvent(k8sutil.GroupCreateEvent(group.ID, c.cluster))
@@ -229,6 +229,18 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		}
 	}
 	return existingUserNames, nil
+}
+
+// create couchbase group with verification
+func (c *Cluster) createGroup(group cbmgr.Group) error {
+	for _, role := range group.Roles {
+		if role.BucketName != "" {
+			if _, err := c.client.GetBucket(c.readyMembers(), role.BucketName); err != nil {
+				return fmt.Errorf("group `%s` with role `%s` references a bucket which does not exist: %s", role.Role, group.ID, role.BucketName)
+			}
+		}
+	}
+	return c.client.CreateGroup(c.readyMembers(), group)
 }
 
 // Get auth password to be set for user

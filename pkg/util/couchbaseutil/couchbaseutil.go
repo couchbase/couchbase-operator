@@ -747,6 +747,11 @@ func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucket cbmgr.Bucket) error 
 	return c.client.DeleteBucket(bucket.BucketName)
 }
 
+func (c *CouchbaseClient) GetBucket(ms MemberSet, name string) (*cbmgr.Bucket, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetBucket(name)
+}
+
 func (c *CouchbaseClient) GetUser(ms MemberSet, id string, domain couchbasev2.AuthDomain) (*cbmgr.User, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetUser(id, cbmgr.AuthDomain(domain))
