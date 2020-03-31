@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -10,19 +9,16 @@ import (
 )
 
 func main() {
-	printVersion := false
-	flag.BoolVar(&printVersion, "v", false, "Displays the version and exits")
-	flag.Parse()
-
-	if printVersion {
-		fmt.Println("cbopcfg", version.VersionWithBuildNumber())
-		os.Exit(0)
-	}
 
 	c := &config.Config{}
 	if err := c.ParseArgs(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	if c.Version {
+		fmt.Println("cbopcfg", version.VersionWithBuildNumber())
+		os.Exit(0)
 	}
 
 	configurators := []func(*config.Config) error{

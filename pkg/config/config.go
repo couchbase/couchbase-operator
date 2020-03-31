@@ -21,8 +21,10 @@ type Config struct {
 	NoAdmission bool
 	// Backup specifies whether to dump operator-backup configuration.
 	Backup bool
-	// File specified whether to create files rather than emit to stdout.
+	// File specifies whether to create files rather than emit to stdout.
 	File bool
+	// Version specifies whether to print out the version string.
+	Version bool
 }
 
 // ParseArgs parses command line arguments into a Config struct.
@@ -36,5 +38,6 @@ func (c *Config) ParseArgs() error {
 	flagSet.BoolVar(&c.NoAdmission, "no-admission", false, "Dont generate dynamic admission controller configuration")
 	flagSet.BoolVar(&c.NoAdmission, "backup", false, "Generate backup configuration")
 	flagSet.BoolVar(&c.File, "file", false, "Create separate files rather than echo to standard out")
+	flagSet.BoolVar(&c.Version, "version", false, "Displays the version and exits")
 	return flagSet.Parse(os.Args[1:])
 }
