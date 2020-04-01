@@ -271,8 +271,9 @@ var (
 		"TestStatusRecovery": TestStatusRecovery,
 
 		// Monitoring tests
-		"TestPrometheusMetrics":       TestPrometheusMetrics,
-		"TestPrometheusMetricsEnable": TestPrometheusMetricsEnable,
+		"TestPrometheusMetrics":                    TestPrometheusMetrics,
+		"TestPrometheusMetricsEnable":              TestPrometheusMetricsEnable,
+		"TestPrometheusMetricsEnableAndPerformOps": TestPrometheusMetricsEnableAndPerformOps,
 
 		// Backup tests
 		"TestFullIncremental":              TestFullIncremental,

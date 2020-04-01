@@ -15,9 +15,9 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-	"github.com/couchbase/gocbmgr"
+	cbmgr "github.com/couchbase/gocbmgr"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1271,7 +1271,7 @@ func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, namespace strin
 	}
 }
 
-func WaitForPrometheusReady(k8s *types.Cluster, namespace string, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -1279,7 +1279,7 @@ func WaitForPrometheusReady(k8s *types.Cluster, namespace string, couchbase *cou
 		listOptions := &metav1.ListOptions{
 			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 		}
-		pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(*listOptions)
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(*listOptions)
 		if err != nil {
 			return false, err
 		}
@@ -1306,8 +1306,8 @@ func WaitForPrometheusReady(k8s *types.Cluster, namespace string, couchbase *cou
 	})
 }
 
-func MustWaitForPrometheusReady(t *testing.T, k8s *types.Cluster, namespace string, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	err := WaitForPrometheusReady(k8s, namespace, couchbase, timeout)
+func MustWaitForPrometheusReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	err := WaitForPrometheusReady(k8s, couchbase, timeout)
 	if err != nil {
 		Die(t, err)
 	}

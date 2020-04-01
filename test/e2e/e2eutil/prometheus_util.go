@@ -1,15 +1,18 @@
 package e2eutil
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
@@ -18,21 +21,23 @@ import (
 
 // check that prometheus sidecar container is exporting the correct metrics
 // on all pods in the operator
-func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) error {
+func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) (string, error) {
+	// storing the prometheus metrics
+	responseDataStr := ""
 
 	listOptions := &metav1.ListOptions{
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
 	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(*listOptions)
 	if err != nil {
-		return err
+		return responseDataStr, err
 	}
 
 	// check all pods
 	for _, pod := range pods.Items {
 		port, err := netutil.GetFreePort()
 		if err != nil {
-			return fmt.Errorf("unable to allocate port %v", err)
+			return responseDataStr, fmt.Errorf("unable to allocate port %v", err)
 		}
 
 		pf := portforward.PortForwarder{
@@ -43,7 +48,7 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 			Port:      port + ":9091",
 		}
 		if err := pf.ForwardPorts(); err != nil {
-			return err
+			return responseDataStr, err
 		}
 		defer pf.Close()
 
@@ -63,24 +68,46 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("remote call failed with response: %s %s", resp.Status, string(body))
+			return responseDataStr, fmt.Errorf("remote call failed with response: %s %s", resp.Status, string(body))
 		}
 
-		responseDataStr := string(body)
+		responseDataStr = string(body)
 		if len(responseDataStr) == 0 {
-			return fmt.Errorf("empty response")
+			return responseDataStr, fmt.Errorf("empty response")
 		}
 
 		if !strings.Contains(responseDataStr, "couchbase") {
-			return fmt.Errorf("response data does not contain any couchbase metrics")
+			return responseDataStr, fmt.Errorf("response data does not contain any couchbase metrics")
 		}
 	}
 
-	return nil
+	return responseDataStr, nil
 }
 
-func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
-	if err := CheckPrometheus(k8s, couchbase); err != nil {
+func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) string {
+	responseDataStr, err := CheckPrometheus(k8s, couchbase)
+	if err != nil {
+		Die(t, err)
+	}
+	return responseDataStr
+}
+
+func ExposeMetric(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, metric, value string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		responseDataStr, _ := CheckPrometheus(k8s, couchbase)
+		if !strings.Contains(responseDataStr, fmt.Sprintf("%s %s", metric, value)) {
+			return fmt.Errorf("response data does not contain expected value of the metric")
+		}
+		return nil
+	})
+}
+
+// MustExposeMetric checks if the value of metric obtained from response data matches with the given value of that metric.
+func MustExposeMetric(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, metric, value string, timeout time.Duration) {
+	if err := ExposeMetric(k8s, couchbase, metric, value, timeout); err != nil {
 		Die(t, err)
 	}
 }
