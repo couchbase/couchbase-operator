@@ -1,0 +1,265 @@
+---
+suite: TestPlatformCert
+timeout: 12h
+tcGroups:
+  - name: Group1
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestValidationCreate
+      - name: TestNegValidationCreate
+      - name: TestRBACValidationCreate
+      - name: TestRBACValidationLDAP
+
+  - name: ClusterTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestCreateCluster
+      - name: TestResizeCluster
+      - name: TestEditClusterSettings
+
+  - name: BucketTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestBucketAddRemoveBasic
+
+  - name: RecoveryTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestRecoveryAfterOnePodFailureNoBucket
+
+  - name: TlsTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestTlsCreateCluster
+
+  - name: XdcrTests
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestXdcrCreateCluster
+
+  - name: PersistentVolumeTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestPersistentVolumeCreateCluster
+
+  - name: SupportabilityTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestLogCollectWithDefaultRetentionAndSize
+
+  - name: CouchbaseServerServiceTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestAnalyticsCreateDataSet
+      - name: TestEventingCreateEventingCluster
+
+  - name: ClusterTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestResizeClusterWithBucket
+
+  - name: ServiceTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestEditServiceConfig
+      - name: TestSwapNodesBetweenServices
+
+  - name: PodTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestPodResourcesCannotBePlaced
+      - name: TestFirstNodePodResourcesCannotBePlaced
+      - name: TestRemoveServerClassWithNodeService
+
+  - name: RecoveryTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestRecoveryAfterOnePodFailureBucketOneReplica
+
+  - name: OperatorTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestKillOperator
+      - name: TestKillOperatorAndUpdateClusterConfig
+
+  - name: TLS case
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestTlsResizeCluster
+      - name: TestTLSRotateCA
+      - name: TestMutualTLSCreateCluster
+      - name: TestMutualTLSEnable
+      - name: TestMutualTLSRotateCA
+      - name: TestMutualTLSRotateInvalid
+      - name: TestMandatoryMutualTLSCreateCluster
+      - name: TestMandatoryMutualTLSDisable
+      - name: TestMandatoryMutualTLSRotateCA
+
+  - name: XdcrCasesIntraCluster
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestXdcrCreateClusterLocalTLS
+
+  - name: XdcrCases
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestXdcrCreateClusterRemote
+      - name: TestXdcrCreateClusterRemoteTLS
+      - name: TestXdcrSourceNodeAdd
+
+  - name: SyncGatewayIntraCluster
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestSyncGatewayCreateLocal
+      - name: TestSyncGatewayRBAC
+
+  - name: SyncGatewayInterCluster
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestSyncGatewayCreateRemote
+
+  - name: PersistentVolumeTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestPersistentVolumeAutoRecovery
+
+  - name: FailoverTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestMultiNodeAutoFailover
+
+  - name: SupportabilityTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestExtendedDebugWithNonDefaultValues
+      - name: TestLogCollectListJson
+
+  - name: UpgradeTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestUpgrade
+      - name: TestUpgradeSupportableKillStatefulPodOnCreate
+
+  - name: RBACTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestRBACDeleteUser
+      - name: TestRBACUpdateRole
+
+  - name: LDAPTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestLDAPCreateAdminUser
+      - name: TestLDAPCDeleteUser
+
+  - name: AutomatedBackupTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestFullIncremental
+      - name: TestFullOnly
+
+  - name: ClusterTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestInvalidBaseImage
+      - name: TestInvalidVersion
+
+  - name: NodeTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestNodeServiceDownRecovery
+
+  - name: RecoveryTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestNodeRecoveryAfterMemberAdd
+
+  - name: TlsTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestTlsRemoveOperatorCertificateAndAddBack
+      - name: TestTLSRotateCAAndKillOperator
+
+  - name: XdcrCases
+    clusters:
+      - BasicCluster
+      - NewCluster1
+    testcases:
+      - name: TestXdcrRebalanceOutSourceClusterNodes
+      - name: TestXDCRDeleteReplication
+
+  - name: PersistentVolumeTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestPersistentVolumeKillAllPods
+
+  - name: SupportabilityTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestLogCollectRbacPermission
+      - name: TestLogCollectInvalid
+
+  - name: UpgradeTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestUpgradeSupportableKillStatelessPodOnCreate
+      - name: TestUpgradeKillPodOnCreate
+      - name: TestUpgradeEnv
+      - name: TestUpgradeToTLS
+      - name: TestUpgradePVC
+
+  - name: RBACTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestRBACRemoveUserFromBinding
+      - name: TestRBACWithLDAPAuth
+      - name: TestRBACSelection
+
+  - name: LDAPTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestLDAPRemoveUserFromBinding
+
+  - name: AutomatedBackupTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestReplaceFullOnlyBackup
