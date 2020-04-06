@@ -441,11 +441,25 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 			return err
 		}
 
-		// delete and recreate DAC
+		// delete DAC
 		logrus.Infof("Deleting admission controller")
 		if err := deleteAdmissionController(k8s.KubeClient); err != nil {
 			return err
 		}
+
+		// deleting secrets
+		logrus.Info("Deleting secrets")
+		if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
+			logrus.Infof("Secret deleted: %v", "basic-test-secret")
+		}
+
+		// re-creating docker secrets
+		logrus.Info("Recreating docker auth secret")
+		if err := recreateDockerAuthSecret(k8s); err != nil {
+			return err
+		}
+
+		// creating DAC
 		logrus.Infof("Creating admission controller")
 		if err := createAdmissionController(k8s.KubeClient); err != nil {
 			return err
@@ -489,14 +503,6 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		logrus.Infof("Endpoint deleted: %v", endpoint.Name)
 	}
 
-	logrus.Info("Deleting secrets")
-	if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
-		logrus.Infof("Secret deleted: %v", "basic-test-secret")
-	}
-	logrus.Info("Recreating docker auth secret")
-	if err := recreateDockerAuthSecret(k8s); err != nil {
-		return err
-	}
 	logrus.Info("Recreating role")
 	if err := recreateRoles(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
