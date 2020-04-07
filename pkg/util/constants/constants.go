@@ -90,7 +90,7 @@ func (v KubernetesVersion) String() string {
 }
 
 const (
-	CouchbaseVersionMin = "enterprise-5.5.0"
+	CouchbaseVersionMin = "enterprise-6.0.4"
 	CouchbaseVersion650 = "enterprise-6.5.0"
 )
 

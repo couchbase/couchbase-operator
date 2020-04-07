@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -645,9 +646,19 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 
 	// version check
-	_, err := k8sutil.CouchbaseVersion(customResource.Spec.Image)
+	currentVersionString, err := k8sutil.CouchbaseVersion(customResource.Spec.Image)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("unsupported Couchbase version"))
+	}
+	currentVersion, err := couchbaseutil.NewVersion(currentVersionString)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("unsupported Couchbase version"))
+	} else {
+		// current version must be equal or greater than min version
+		minVersion, _ := couchbaseutil.NewVersion(constants.CouchbaseVersionMin)
+		if currentVersion.Less(minVersion) {
+			errs = append(errs, fmt.Errorf("unsupported Couchbase version: %s, minimum version required: %s", currentVersion, constants.CouchbaseVersionMin))
+		}
 	}
 
 	// Record the zones that the server certificate needs to support as we look at the network configuration.
