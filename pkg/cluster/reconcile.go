@@ -1035,7 +1035,9 @@ func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*
 	// Remove Ports if member features are exposed with a loadbalancer
 	if svc, found := c.k8s.Services.Get(member.Name); found {
 		if svc.Spec.Type == v1.ServiceTypeLoadBalancer {
-			existingAddresses.Ports = nil
+			if existingAddresses != nil {
+				existingAddresses.Ports = nil
+			}
 		}
 	}
 	return existingAddresses, nil
