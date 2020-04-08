@@ -39,6 +39,26 @@ If ImagePullSecrets are required to access the image, they are inherited from th
 
 <.> You can optionally specify a Kubernetes Secret that contains a bearer token value that clients will need to use to gain access to the Prometheus metrics.
 
+[NOTE]
+====
+
+If you wish to create a Kubernetes secret with a bearer token, simply edit and create the following definition:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cb-metrics-token
+type: Opaque
+stringData:
+  token: your-plain-text-bearer-token-here
+----
+
+The `stringData` field allows you to put a non-base64 encoded string directly into the Secret, and Kubernetes will then encode the string for you when the Secret is created or updated.
+
+====
+
 .Important Considerations
 * You can enable/disable Prometheus metric collection at any time during the cluster's lifecycle.
 However, since `Pod` resources are immutable, enabling or disabling metric collection will require a rolling upgrade of the cluster.
