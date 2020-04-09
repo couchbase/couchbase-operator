@@ -453,6 +453,11 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 			logrus.Infof("Secret deleted: %v", "basic-test-secret")
 		}
 
+		// Creating required namespaces and cluster roles before deploying the operator
+		if err := createK8SNamespace(k8s.KubeClient, k8s.Namespace); err != nil {
+			return err
+		}
+
 		// re-creating docker secrets
 		logrus.Info("Recreating docker auth secret")
 		if err := recreateDockerAuthSecret(k8s); err != nil {
