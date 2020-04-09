@@ -24,7 +24,7 @@ As such TLS support outside of the Kubernetes cluster is driven by DNS.
 Consider the following architecture diagram:
 
 .Basic Inter-Kubernetes Networking
-image::networking-basic-kubernetai.png[]
+image::networking-basic-forwarded-dns.png[]
 
 The client uses DNS addresses served by its local Kubernetes DNS server for normal in-cluster operation.
 It also uses those in a remote Kubernetes DNS server in order to resolve the IP addresses of the remote Couchbase cluster.
