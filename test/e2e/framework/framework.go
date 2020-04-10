@@ -459,9 +459,15 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		}
 
 		// re-creating docker secrets
-		logrus.Info("Recreating docker auth secret")
-		if err := recreateDockerAuthSecret(k8s); err != nil {
+		logrus.Info("Recreating docker auth secret in default namespace")
+		if err := recreateDockerAuthSecret(k8s.KubeClient, "default"); err != nil {
 			return err
+		}
+		if k8s.Namespace != "default" {
+			logrus.Infof("Recreating docker auth secret in %v namespace", k8s.Namespace)
+			if err := recreateDockerAuthSecret(k8s.KubeClient, k8s.Namespace); err != nil {
+				return err
+			}
 		}
 
 		// creating DAC

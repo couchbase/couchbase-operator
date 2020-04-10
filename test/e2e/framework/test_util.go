@@ -204,9 +204,9 @@ func RemoveServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAcc
 // RecreateDockerAuthSecret deletes existing secrets and creates a new one if specified.
 // This secret, if defined, will be added to the operator and admission controllers in
 // order to pull from a private repository.
-func recreateDockerAuthSecret(k8s *types.Cluster) error {
+func recreateDockerAuthSecret(kubeClient kubernetes.Interface, namespace string) error {
 	// Clean up the old authentication secret if it exists
-	if err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(dockerPullSecretName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := kubeClient.CoreV1().Secrets(namespace).Delete(dockerPullSecretName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -237,14 +237,13 @@ func recreateDockerAuthSecret(k8s *types.Cluster) error {
 				".dockerconfigjson": []byte(data),
 			},
 		}
-		if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(secret); err != nil {
+		if _, err := kubeClient.CoreV1().Secrets(namespace).Create(secret); err != nil {
 			return err
 		}
 
 		// Register with the cluster creation module that we have a pull secret.
 		e2espec.SetImagePullSecret(dockerPullSecretName)
 	}
-
 	return nil
 }
 
