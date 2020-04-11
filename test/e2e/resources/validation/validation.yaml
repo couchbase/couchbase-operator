@@ -159,7 +159,7 @@ metadata:
   name: cluster
   namespace: default
 spec:
-  image: couchbase/server:enterprise-5.5.0
+  image: couchbase/server:enterprise-6.5.0
   antiAffinity: false
   paused: false
   security:
