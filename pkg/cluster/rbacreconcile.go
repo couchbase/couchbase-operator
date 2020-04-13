@@ -234,9 +234,9 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 // create couchbase group with verification
 func (c *Cluster) createGroup(group cbmgr.Group) error {
 	for _, role := range group.Roles {
-		if role.BucketName != "" {
+		if role.BucketName != "" && role.BucketName != "*" {
 			if _, err := c.client.GetBucket(c.readyMembers(), role.BucketName); err != nil {
-				return fmt.Errorf("group `%s` with role `%s` references a bucket which does not exist: %s", role.Role, group.ID, role.BucketName)
+				return fmt.Errorf("group `%s` with role `%s` references a bucket which does not exist: %s", group.ID, role.Role, role.BucketName)
 			}
 		}
 	}
