@@ -221,7 +221,7 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	e2eutil.MustNewGroup(t, k8s1, k8s1.Namespace, group)
 	e2eutil.MustNewRoleBinding(t, k8s1, k8s1.Namespace, binding)
 	e2eutil.MustNewBucket(t, k8s1, k8s1.Namespace, e2espec.DefaultBucket)
-	cluster := e2eutil.MustNewXDCRCluster(t, k8s1, clusterSize, nil, nil, nil)
+	cluster := e2eutil.MustNewClusterBasic(t, k8s1, k8s1.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.

@@ -9,12 +9,12 @@ const (
 	// CommunityEditionImage is a version of CE that exists.  Sadly we have to
 	// hard code this (not do a regex replace) as this only gets major releases,
 	// mo minors or patches.
-	CommunityEditionImage = "couchbase/server:community-6.0.0"
+	CommunityEditionImage = "couchbase/server:community-6.0.4"
 )
 
 // These values can be updated from e2espec/crd.go
 var (
-	CouchbaseServerImage = "couchbase/server:enterprise-5.5.3"
+	CouchbaseServerImage = "couchbase/server:enterprise-6.0.4"
 )
 
 // Const Ansible setting string

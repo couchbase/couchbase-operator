@@ -154,7 +154,7 @@ func TestInvalidBaseImage(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
-	testCouchbase.Spec.Image = "basecouch/123:enterprise-5.5.0"
+	testCouchbase.Spec.Image = "basecouch/123:enterprise-6.0.4"
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
