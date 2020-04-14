@@ -145,7 +145,7 @@ func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, tim
 		}
 
 		statusFieldValue = reflect.ValueOf(backup.Status).FieldByName(statusField)
-		if statusFieldValue == reflect.Zero(statusFieldValue.Type()) { // nil zero value
+		if reflect.DeepEqual(statusFieldValue, reflect.Zero(reflect.TypeOf(statusFieldValue)).Interface()) { // nil zero value
 			return false, fmt.Errorf("empty value panic, not found")
 		}
 

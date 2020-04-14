@@ -510,9 +510,10 @@ func TestUpdateBackupStatus(t *testing.T) {
 	// wait for backup status update
 	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Archive", time.Minute)
 	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "RepoList", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Backups", time.Minute)
 	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "LastSuccess", time.Minute)
 	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Duration", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Output", time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
