@@ -230,7 +230,9 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 
 	image := cs.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
-		image = annotatedImage
+		if annotatedImage != "" {
+			image = annotatedImage
+		}
 	}
 
 	return image
@@ -243,7 +245,9 @@ func (cs *ClusterSpec) BackupImage() string {
 
 	image := cs.Backup.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvBackupImageName); ok {
-		image = annotatedImage
+		if annotatedImage != "" {
+			image = annotatedImage
+		}
 	}
 	return image
 }
@@ -254,7 +258,9 @@ func (m *CouchbaseClusterMonitoringPrometheusSpec) MetricsImage() string {
 
 	image := m.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvMetricsImageName); ok {
-		image = annotatedImage
+		if annotatedImage != "" {
+			image = annotatedImage
+		}
 	}
 	return image
 }
