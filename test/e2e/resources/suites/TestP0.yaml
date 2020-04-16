@@ -213,3 +213,11 @@ tcGroups:
       - name: TestFullIncrementalOverTLS
       - name: TestFullOnlyOverTLS
       - name: TestMultipleBackups
+
+  - name: MonitoringTests
+    clusters:
+      - NewCluster1
+    testcases:
+      - name: TestPrometheusMetrics
+      - name: TestPrometheusMetricsEnable
+      - name: TestPrometheusMetricsEnableAndPerformOps
