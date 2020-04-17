@@ -18,8 +18,30 @@ These backup jobs execute a helper script which performs logging and cleanup, an
 TIP: Because backup policies are configured with a separate resource, you can use xref:concept-rbac.adoc[custom resource RBAC] to allow individuals who may not have access to `CouchbaseCluster` resources to still perform backup administration.
 
 The Autonomous Operator supports two of the backup strategies available in `cbbackupmgr`: _Full Only_ and _Full/Incremental_.
-Complete descriptions of these strategies can be found in the xref:server:backup-restore:cbbackupmgr-strategies.adoc[cbbackupmgr documentation].
+Complete descriptions and explanations of these strategies can be found in the xref:server:backup-restore:cbbackupmgr-strategies.adoc[cbbackupmgr documentation].
 The examples on this page assume a backup schedule based on the Full/Incremental strategy for both creating backups and performing restores.
+
+== Important Considerations
+
+* Only the official Autonomous Operator Backup image provided by Couchbase is supported.
+Note that this image is designed to only ever be pulled and run by the Autonomous Operator -- it should not be used in any other context.
++
+In addition, you should ensure that your image source is trusted.
+The backup image requires access to the Couchbase cluster administrative credentials in order to login and perform collection.
+Granting these credentials to arbitrary code is potentially harmful.
+
+* The Autonomous Operator runs the backup utility in a separate Pod.
+Where this Pod is scheduled can have implications on backup performance, and can affect whether backup jobs are able to complete within the desired time window.
++
+You should schedule backup Pods onto Kubernetes nodes that have enough resources to successfully fulfill your backup schedule.
+It is also recommended that you do not schedule backup Pods onto Kubernetes nodes that host Couchbase cluster Pods, since your Couchbase cluster would be competing for resources with the backup utility.
+Refer to the <<pod-scheduling,Pod Scheduling>> section on this page for further details.
+
+* Backup Pods require access permissions that necessitate the creation of `ServiceAccount`, `Role`, and `RoleBinding` resources.
+This is covered in the <<grant-backup-permissions,Grant Access Permissions>> section on this page.
+
+* You can enable and disable automated backup at any time in the `CouchbaseCluster` configuration.
+Disabling automated backup does not delete `CouchbaseBackup` resources. When you re-enabled automated backup, any applicable `CouchbaseBackup` resources will continue to be used.
 
 == Enable Automated Backup
 
@@ -34,13 +56,6 @@ spec:
     managed: true # <.>
     image: couchbase/operator-backup:{backup-version} # <.>
     serviceAccountName: couchbase-backup # <.>
-    resources:
-      requests:
-        cpu: 100m
-        memory: 100Mi # <.>
-    selector:
-      matchLabels:
-        cluster: my-cluster # <.>
 ----
 
 <.> The only required field to enable automated backup is xref:reference-couchbasecluster.adoc#spec-backup-managed[`spec.backup.managed`].
@@ -52,21 +67,15 @@ If pulling directly from the the Red Hat Container Catalog, then the path will b
 If ImagePullSecrets are required to access the image, they are inherited from the Couchbase Server Pod and can be set explicitly with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-imagepullsecrets[`spec.servers[\].pod.spec.imagePullSecrets`] field or implicitly with a service account specified with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-serviceaccountname[`spec.servers[\].pod.spec.serviceAccountName`] field.
 
 <.> If left unspecified, xref:reference-couchbasecluster.adoc#spec-backup-serviceAccountName[`spec.backup.serviceAccountName`] will default to the value of `couchbase-backup`.
-//The included default YAML file of `backup-init.yaml` will create this Service Account along with the relevant role and role binding.
 These Kubernetes resources *must* exist, otherwise backup jobs will not have the required permissions to complete successfully.
+This will be covered in the next xref:howto-backup.adoc#grant-backup-permissions[section].
 
-<.> If your Kubernetes environment requires it, you can set requests and limits for the pods that run the backup and restore jobs.
-Refer to `spec.backup.resources` in the xref:reference-couchbasecluster.adoc#spec-backup-resources[`CouchbaseCluster` resource configuration].
+=== Grant Backup Permissions
 
-<.> If you have more than one `CouchbaseCluster` resource deployed in the same namespace, you’ll need to use xref:concept-label-selection.adoc[resource label selection] to ensure that `CouchbaseBackup` and `CouchbaseBackupRestore` resources get created on the correct cluster.
-Like with other Couchbase custom resources, this means specifying a label for RBAC resources which matches the corresponding label selector of the `CouchbaseCluster` resource that you want the resources aggregated to.
-Refer to `spec.backup.selector` in the xref:reference-couchbasecluster.adoc#spec-backup-selector[`CouchbaseCluster` resource configuration].
+Backup Pods need read-only access to Kubernetes resources such as Pods, Cronjobs, and Jobs.
+They also need write access to Events and the `CouchbaseBackup`/`CouchbaseBackupRestore` custom resources.
 
-[IMPORTANT]
-.Required for Beta
-====
-For Autonomous Operator 2.0.0 Beta, you'll need to run an extra command to generate the Service Account, Role, and RoleBinding that are needed to grant backup the relevant permissions.
-This command won't be necessary in the full GA release.
+To grant these permissions, run the following command that creates the required resources.
 
 [source,bash]
 ----
@@ -140,20 +149,12 @@ metadata:
 ---
 EOF
 ----
-====
-
-.Important Considerations
-* You can enable/disable automated backup at any time during the cluster's lifecycle.
-* Only the official Autonomous Operator Backup image provided by Couchbase is supported.
-Note that this image is designed to only ever be pulled and run by the Autonomous Operator -- it should not be run separately.
-+
-In addition, you should ensure that your image source is trusted.
-The backup image requires access to the Couchbase cluster administrative credentials in order to login and perform collection.
-Granting these credentials to arbitrary code is potentially harmful.
+Without these resources, backup jobs will still run as scheduled, but they will ultimately fail as the pods won't have the required permissions.
 
 == Configure Backups
 
 After automated backup is enabled for the cluster, individual backup policies can be configured using xref:reference-couchbasebackup.adoc[`CouchbaseBackup` resources].
+The following is a very simple configuration with only the minimum required fields set.
 
 [source,yaml]
 ----
@@ -164,10 +165,9 @@ metadata:
 spec:
   strategy: full_incremental
   full:
-    schedule: "0 3 * * 7" # <1>
+    schedule: "0 3 * * 0" # <1>
   incremental:
     schedule: "0 3 * * 1-6" # <1>
-  failedJobsHistoryLimit: 3
   size: 20Gi # <2>
 ----
 
@@ -178,21 +178,84 @@ In this example a full backup would be performed at 3:00AM on a Sunday and then 
 So if a PVC called "my-backup" does not yet exist in this case, one will be created.
 This would also happen if for some reason the PVC was deleted.
 
+Once you have created a `CouchbaseBackup`, we can check that for the expected behaviour by viewing the Operator logs.
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+$ kubectl logs -f deployments/couchbase-operator
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+$ oc logs deployments/couchbase-operator
+----
+--
+====
+
+You should observe that a Persistent Volume Claim and the correct number of CronJobs have been created along with the `CouchbaseBackup` itself. The output should be similar to:
+
+[source,console]
+----
+{"level":"info","ts":1587134718.3592374,"logger":"cluster","msg":"Backup Cronjob created","cbbackup":"my-backup","cronjob":"my-backup-incremental"}
+{"level":"info","ts":1587134718.3727212,"logger":"cluster","msg":"Backup Cronjob created","cbbackup":"my-backup","cronjob":"my-backup-full"}
+{"level":"info","ts":1587134718.3722592,"logger":"cluster","msg":"Backup PVC created","cbbackup":"my-backup"}
+{"level":"info","ts":1587134718.3727608,"logger":"cluster","msg":"Backup created","cbbackup":"my-backup"}
+----
+
+You can then validate for yourself that these resources exist and check that their details match up with what was defined in the `CouchbaseBackup` configuration.
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+$ kubectl get cronjob
+$ kubectl get pvc
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+$ oc get cronjob
+$ oc get pvc
+----
+--
+====
+
+For example, the output should look like:
+[source,console]
+----
+NAME                        SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+my-backup-full              0 3 * * 0     False     0        <none>          18s
+my-backup-incremental       0 3 * * 1-6   False     0        <none>          18s
+----
+
+[source%nowrap,console]
+----
+NAME        STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+my-backup   Bound    pvc-0c3c717f-e10b-423e-9279-a99edf81019b   5Gi        RWO            standard       14s
+----
+
 [CAUTION]
 ====
 Deleting Persistent Volume Claims or Persistent Volumes will delete the backup data and backup log data permanently.
 ====
 
-=== Editing a Backup Configuration
-
-`CouchbaseBackup` resources cannot be edited, and once created, will need to be deleted and recreated if any edits wish to be made.
-
-[TIP]
-====
-The shortnames `cbbackup` and `cbrestore` are available for `CouchbaseBackup` and `CouchbaseBackupRestore` respectively.
-So instead of executing `kubectl get couchbasebackup` you can instead write `kubectl get cbbackup`.
-To find out if any other of your current Kubernetes resources support a shortname, run `kubectl api-resources`.
-====
+Once the first Job has been spawned by a backup CronJob, the status fields of a `CouchbaseBackup` resource will update, and you can start <<monitor-and-manage-backups,monitoring backup progress>>.
 
 == Restoring From a Backup
 
@@ -237,3 +300,288 @@ spec:
 In this example above, the Autonomous Operator would restore a range of backups from the latest backup repo.
 The omission of the `spec.repo` field means that the Autonomous Operator will look for the most recent backup repo either from the `CouchbaseBackup` object defined by `spec.backup` or from the PVC of the same name.
 If the `spec.repo` field is unable to be populated by the Autonomous Operator, then the resource will be rejected and no restore job will be created.
+
+== Monitor and Manage Backups
+
+It's important to regularly monitor backup performance to ensure you’re backing up all the required data within your desired time window.
+
+For the simplest overview, run `get` commands on the `CouchbaseBackup` resources.
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+$ kubectl get coucbasebackup my-backup -o yaml
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+$ oc get couchbasebackup my-backup -o yaml
+----
+--
+====
+
+[TIP]
+====
+The shortnames `cbbackup` and `cbrestore` are available for `CouchbaseBackup` and `CouchbaseBackupRestore` respectively.
+So instead of executing `kubectl get couchbasebackup` you can instead write `kubectl get cbbackup`.
+To find out if any other of your current Kubernetes resources support a shortname, run `kubectl api-resources`.
+====
+
+The command output should show the given `CouchbaseBackup` specification and also a xref:reference-couchbasebackup-status.adoc[status section] containing useful information similar to the following output.
+
+[source,console]
+----
+status:
+  archive: /data/backups
+  backups:
+  - full: 2020-02-12T15_25_10.712665995Z
+    incrementals:
+    - 2020-02-12T15_28_11.986341497Z
+    - 2020-02-12T15_26_09.875255309Z
+    name: cb-example-2020-02-12T15_25_09
+  - full: 2020-02-12T15_15_08.443231128Z
+    incrementals:
+    - 2020-02-12T15_18_12.465643387Z
+    - 2020-02-12T15_16_08.037612813Z
+    - 2020-02-12T15_24_10.264088039Z
+    - 2020-02-12T15_22_11.215924706Z
+    name: cb-example-2020-02-12T15_15_07
+  capacityUsed: 1.47Gi
+  cronjob: cbbackup-full-incr-incremental
+  duration: 17s
+  job: cbbackup-full-incr-incremental-1587137280
+  lastRun: "2020-02-12T15:28:11Z"
+  lastSuccess: "2020-02-12T15:28:28Z"
+  output: '{"location": "2020-02-12T15_28_11.986341497Z", "duration_seconds": "15.429305462",
+    "avg_data_transfer_rate_bytes_sec": 1853, "total_items": 0, "total_items_size_bytes":
+    28672, "buckets": {"default": {"mutations_backedup": "0", "mutations_failed":
+    "0", "deletions_backedup": "0", "deletions_failed": "0"}}}'
+  pod: cbbackup-full-incr-incremental-1581521912-mnng9
+  repo: repo
+  running: false
+----
+
+Furthermore you can check that the Cronjobs have updated and their status fields look correct.
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+$ kubectl get cronjob
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+$ oc get cronjob
+----
+--
+====
+
+[source,console]
+----
+NAME                        SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+my-backup-full              0 3 * * 0     False     0        2d              2d
+my-backup-incremental       0 3 * * 1-6   False     0        16h             2d
+----
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+$ kubectl get cronjob my-backup-full -o yaml
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+$ oc get cronjob my-backup-full -o yaml
+----
+--
+====
+
+And finally we can check that the backup Jobs and their respective pods are there, and there is no more than the set limit specified in xref:reference-couchbasebackup.adoc#failedJobsHistoryLimit[`spec.failedJobsHistoryLimit`] and xref:reference-couchbasebackup.adoc#successfulJobsHistoryLimit[`spec.successfulJobsHistorylimit`].
+These default to 5 and 3 respectively.
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+$ kubectl get jobs
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+$ oc get jobs
+----
+--
+====
+
+[source,console]
+----
+NAME                                        COMPLETIONS   DURATION   AGE
+cbbackup-full-incr-full-1587138300          1/1           33s        11m
+cbbackup-full-incr-incremental-1587138600   1/1           43s        6m8s
+----
+
+[{tabs}]
+====
+Kubernetes::
++
+--
+[source,console]
+----
+$ kubectl get pods
+----
+--
+
+OpenShift::
++
+--
+[source,console]
+----
+$ oc get pods
+----
+--
+====
+
+[source,console]
+----
+NAME                                              READY   STATUS      RESTARTS   AGE
+cb-example-0000                                   1/1     Running     0          72m
+cb-example-0001                                   1/1     Running     0          72m
+cb-example-0002                                   1/1     Running     0          72m
+cbbackup-full-incr-full-1587138300-92rfp          0/1     Completed   0          11m
+cbbackup-full-incr-incremental-1587138600-vzmd2   0/1     Completed   0          6m5s
+couchbase-operator-admission-7ccbd85455-6g64p     1/1     Running     0          73m
+couchbase-operator-b6496564f-qpqsb                1/1     Running     0          73m
+----
+
+
+=== Editing a Backup Configuration
+
+`CouchbaseBackup` resources cannot be edited, and once created, will need to be deleted and recreated if any edits wish to be made.
+
+=== Viewing Detailed Logs
+
+If anything goes wrong during a backup job, and backup pods return the `Error` status, detailed logging is stored on the Persistent Volume Claim for the backup.
+You can access these logs by creating a Kubernetes job that creates a pod that mounts this PVC and then running `kubectl exec` to shell into this pod.
+From there you can access the logs and backup data directly.
+
+The following is an example file that creates such a Kubernetes job.
+The job creates a pod and mounts the PVC on the path `/data` as the backup and restore pods themselves would.
+
+[source,yaml]
+----
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: backup-exec
+spec:
+  template:
+    spec:
+      containers:
+        - name: couchbase-cluster-backup-create
+          image: couchbase/operator-backup:{backup-version}
+          command: ["sleep"]
+          args: ["30000"] # <.>
+          volumeMounts:
+            - name: "couchbase-cluster-backup-volume"
+              mountPath: "/data" # <.>
+      volumes:
+        - name: couchbase-cluster-backup-volume
+          persistentVolumeClaim:
+            claimName: my-backup # <.>
+      restartPolicy: Never
+      serviceAccountName: couchbase-backup
+----
+
+<.> The time in seconds to keep the pod running -- make sure you give this argument sufficient time so you are not interrupted by the pod completing and any `exec` connection shutting down.
+
+<.> The `mountPath` may be any valid path, but for purposes of consistency it should be set to `/data`.
+
+<.> The `claimName` refers to the name of the PVC to be accessed, and also the same name of the `CouchbaseBackup` resource.
+
+Backups are available to view at `/data/backups` and their respective logs at `/data/scriptlogs`.
+Inside `/data/scriptlogs` will be three folders, `full_only`, `incremental`, and `restore`.
+The first two folders correspond to any logs run under the relevant `CouchbaseBackup` strategy and the last folder is for `CouchbaseBackupRestore` operations exclusively.
+
+== Advanced Backup Management
+
+=== Backup Scheduling
+
+As backups are performed on separate pods you will need to consider careful node scheduling when it comes to these pods in order to avoid performance issues and noisy neighbour problems.
+The following YAML example builds upon the initial YAML in xref:howto-backup.adoc#enable-automated-backup[Enable Automated Backup].
+
+[source,yaml,subs="attributes,verbatim"]
+----
+apiVersion: couchbase/v2
+kind: CouchbaseCluster
+spec:
+  backup:
+    managed: true
+    image: couchbase/operator-backup:{backup-version}
+    serviceAccountName: couchbase-backup
+    nodeSelector:
+      instanceType: large # <.>
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi # <.>
+    selector:
+      matchLabels:
+        cluster: my-cluster # <.>
+    tolerations: # <.>
+     - key: app
+       operator: Equal
+       value: cbbackup
+       effect: NoSchedule
+----
+
+<.> The `nodeSelector` field defines which Kubernetes nodes the pods running the automated backup process will be constrained to.
+In this case we have specified that backup pods will be constrained to running on nodes of `instanceType` large.
+
+<.> If your Kubernetes environment requires it, you can set requests and limits for the pods that run the backup and restore jobs.
+
+<.> If you have more than one `CouchbaseCluster` resource deployed in the same namespace, you’ll need to use xref:concept-label-selection.adoc[resource label selection] to ensure that `CouchbaseBackup` and `CouchbaseBackupRestore` resources get created on the correct cluster.
+Like with other Couchbase custom resources, this means specifying a label for RBAC resources which matches the corresponding label selector of the `CouchbaseCluster` resource that you want the resources aggregated to.
+
+<.> Tolerations are applied to pods, and allow (but do not require) the pods to be scheduled onto nodes with matching taints.
+With taints and tolerations, you can grant backup pods exclusive access to specific nodes.
+In this example, if we wish to run all backup pods on a dedicated node and isolate them from the rest of the Autonomous Operator pods, we can do this by tainting a node with the key-value of `app:cbbackup` and defining a matching toleration.
+
+Further reference on all of these fields can be found in the xref:reference-couchbasecluster.adoc#spec-backup[`CouchbaseCluster` resource configuration].
+For more overall information please see xref:concept-scheduling[Couchbase Scheduling and Isolation].
+
+=== Backup Time Scheduling
+
+When deciding on the Cron schedules for the Full/Incremental strategy, you should take care that the schedules are not defined in a way for a potential clash between Full and Incremental backups.
+For the example given in this documentation and the `cbbackupmgr` documentation, this is obviously very unlikely but in a scenario where a backup is not given enough of a time window to complete, this could cause problems.
+This particularly common in situations where backups have been scheduled too frequently.
