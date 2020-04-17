@@ -57,7 +57,7 @@ The following command will install both the DAC and the Operator:
 
 [source,console]
 ----
-$ ./cbopcfg --image-pull-secret rh-catalog | kubectl create -f -
+$ bin/cbopcfg --image-pull-secret rh-catalog | kubectl create -f -
 ----
 
 === Custom Installation
@@ -67,7 +67,7 @@ Alternatively, you may wish to install just the DAC in the `camelot` namespace:
 [source,console]
 ----
 $ oc project camelot
-$ ./cbopcfg --no-operator --image-pull-secret rh-catalog | oc create -f -
+$ bin/cbopcfg --no-operator --image-pull-secret rh-catalog | oc create -f -
 ----
 
 And then install just the Operator into the `asgard` namespace:
@@ -75,7 +75,7 @@ And then install just the Operator into the `asgard` namespace:
 [source,console]
 ----
 $ oc project asgard
-$ ./cbopcfg --no-admission --image-pull-secret rh-catalog | oc create -f -
+$ bin/cbopcfg --no-admission --image-pull-secret rh-catalog | oc create -f -
 ----
 
 For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
@@ -120,7 +120,7 @@ Uninstalling the DAC and Operator is the reverse of the installation process:
 
 [source,console]
 ----
-$ ./cbopcfg | kubectl delete -f -
+$ bin/cbopcfg | kubectl delete -f -
 $ oc delete -f crd.yaml
 ----
 
