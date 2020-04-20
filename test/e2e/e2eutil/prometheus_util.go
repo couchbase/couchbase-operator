@@ -111,3 +111,84 @@ func MustExposeMetric(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.C
 		Die(t, err)
 	}
 }
+
+func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, token []byte) (string, error) {
+	// storing the prometheus metrics
+	responseDataStr := ""
+
+	listOptions := &metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(*listOptions)
+	if err != nil {
+		return responseDataStr, err
+	}
+
+	// check all pods
+	for _, pod := range pods.Items {
+		port, err := netutil.GetFreePort()
+		if err != nil {
+			return responseDataStr, fmt.Errorf("unable to allocate port %v", err)
+		}
+
+		pf := portforward.PortForwarder{
+			Config:    k8s.Config,
+			Client:    k8s.KubeClient,
+			Namespace: k8s.Namespace,
+			Pod:       pod.Name,
+			Port:      port + ":9091",
+		}
+		if err := pf.ForwardPorts(); err != nil {
+			return responseDataStr, err
+		}
+		defer pf.Close()
+
+		// Create a Bearer string by appending string access token
+		bearer := fmt.Sprintf("Bearer %s", token)
+		// Create a new request using http
+		uri := fmt.Sprintf("http://localhost:%s%s", port, "/metrics")
+		req, _ := http.NewRequest("GET", uri, nil)
+		// add authorization header to the req
+		req.Header.Add("Authorization", bearer)
+
+		// Send request using http Client
+		client := &http.Client{}
+		resp, err := client.Do(req)
+
+		if err != nil {
+			fmt.Printf("unable to collect %s for pod %s\n", uri, pod.Name)
+			continue
+		}
+		defer resp.Body.Close()
+
+		// Buffer up the responses
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Printf("unable to read response %s for pod %s\n", uri, pod.Name)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return responseDataStr, fmt.Errorf("remote call failed with response: %s %s", resp.Status, string(body))
+		}
+
+		responseDataStr = string(body)
+		if len(responseDataStr) == 0 {
+			return responseDataStr, fmt.Errorf("empty response")
+		}
+
+		if !strings.Contains(responseDataStr, "couchbase") {
+			return responseDataStr, fmt.Errorf("response data does not contain any couchbase metrics")
+		}
+	}
+
+	return responseDataStr, nil
+}
+
+func MustCheckPrometheusWithAuthSecret(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, token []byte) string {
+	responseDataStr, err := CheckPrometheusWithAuthSecret(k8s, couchbase, token)
+	if err != nil {
+		Die(t, err)
+	}
+	return responseDataStr
+}

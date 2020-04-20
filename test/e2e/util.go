@@ -274,6 +274,7 @@ var (
 		"TestPrometheusMetrics":                    TestPrometheusMetrics,
 		"TestPrometheusMetricsEnable":              TestPrometheusMetricsEnable,
 		"TestPrometheusMetricsEnableAndPerformOps": TestPrometheusMetricsEnableAndPerformOps,
+		"TestPrometheusMetricsBearerTokenAuth":     TestPrometheusMetricsBearerTokenAuth,
 
 		// Backup tests
 		"TestFullIncremental":              TestFullIncremental,

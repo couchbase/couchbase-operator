@@ -221,3 +221,4 @@ tcGroups:
       - name: TestPrometheusMetrics
       - name: TestPrometheusMetricsEnable
       - name: TestPrometheusMetricsEnableAndPerformOps
+      - name: TestPrometheusMetricsBearerTokenAuth
