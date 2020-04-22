@@ -392,10 +392,13 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 	return spec
 }
 
-func NewBackupCluster(size int) *couchbasev2.CouchbaseCluster {
+func NewBackupCluster(size int, imageName string) *couchbasev2.CouchbaseCluster {
 	spec := NewBasicClusterSpec(size)
 	spec.Spec.Backup.Managed = true
 	spec.Spec.Backup.ServiceAccount = config.BackupResourceName
+	if imageName = strings.TrimSpace(imageName); imageName != "" {
+		spec.Spec.Backup.Image = imageName
+	}
 	return spec
 }
 
