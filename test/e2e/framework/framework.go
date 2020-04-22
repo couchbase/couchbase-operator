@@ -170,6 +170,8 @@ func Setup(t *testing.T) (err error) {
 		TestRetries:                 testRetries,
 		PodCreateTimeout:            5 * time.Minute,
 		SyncGatewayImage:            runtimeParams.SyncGatewayImage,
+		CouchbaseExporterImage:      runtimeParams.CouchbaseExporterImage,
+		CouchbaseBackupImage:        runtimeParams.CouchbaseBackupImage,
 	}
 
 	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0, Global.PodCreateTimeout)
@@ -210,6 +212,8 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase server: " + runtimeParams.CouchbaseServerImage)
 	logrus.Info(" →  couchbase server upgrade: " + runtimeParams.CouchbaseServerImageUpgrade)
 	logrus.Info(" →  couchbase sync gateway: " + Global.SyncGatewayImage)
+	logrus.Info(" →  couchbase exporter: " + runtimeParams.CouchbaseExporterImage)
+	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
 	for _, config := range Global.ClusterSpec {
 		logrus.Info("Cluster: ", config.Name)
 		logrus.Info(" →  path: " + config.KubeConfPath)

@@ -54,3 +54,9 @@ serviceAccountName: default
 
 # Retries of the test, useful to mitigate Couchbase server misbehaviour
 testRetries: 2
+
+# Couchbase backup image to use
+couchbase-backup-image: couchbase/operator-backup:6.5.0
+
+# Couchbase Exporter image to use
+couchbase-exporter-image: couchbase/exporter:1.0.0

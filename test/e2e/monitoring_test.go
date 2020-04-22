@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,26 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// enableMonitoring enables monitoring
+func enableMonitoring(t *testing.T, f *framework.Framework) *couchbasev2.CouchbaseClusterMonitoringSpec {
+	if imageName := strings.TrimSpace(f.CouchbaseExporterImage); imageName != "" {
+		monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
+			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
+				Enabled: true,
+				Image:   imageName,
+			},
+		}
+		return monitoring
+	}
+
+	monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
+		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
+			Enabled: true,
+		},
+	}
+	return monitoring
+}
 
 func TestPrometheusMetrics(t *testing.T) {
 	// Platform configuration.
@@ -65,11 +86,8 @@ func TestPrometheusMetricsEnable(t *testing.T) {
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Enable monitoring
-	monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
-		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-			Enabled: true,
-		},
-	}
+	monitoring := enableMonitoring(t, f)
+
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
@@ -103,11 +121,8 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Enable monitoring
-	monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
-		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-			Enabled: true,
-		},
-	}
+	monitoring := enableMonitoring(t, f)
+
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
@@ -169,12 +184,8 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	}
 
 	// Enable monitoring
-	monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
-		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-			Enabled:             true,
-			AuthorizationSecret: &monitoringAuthSecret,
-		},
-	}
+	monitoring := enableMonitoring(t, f)
+	monitoring.Prometheus.AuthorizationSecret = &monitoringAuthSecret
 
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)

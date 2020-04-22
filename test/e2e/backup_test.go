@@ -18,6 +18,13 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func getBackupImage(t *testing.T, f *framework.Framework) string {
+	if f.CouchbaseBackupImage != "" {
+		return f.CouchbaseBackupImage
+	}
+	return ""
+}
+
 func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule string) *v2.CouchbaseBackup {
 	backup := &v2.CouchbaseBackup{
 		ObjectMeta: v1.ObjectMeta{
@@ -55,7 +62,8 @@ func TestFullIncremental(t *testing.T) {
 	numOfDocs := 200
 
 	// Create a normal cluster.
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
@@ -96,7 +104,8 @@ func TestFullOnly(t *testing.T) {
 	numOfDocs := 200
 
 	// Create a normal cluster.
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
@@ -142,6 +151,10 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	testCouchbase := e2espec.NewSupportableCluster(mdsGroupSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Backup.Managed = true
+	imageName := getBackupImage(t, f)
+	if imageName = strings.TrimSpace(imageName); imageName != "" {
+		testCouchbase.Spec.Backup.Image = imageName
+	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
@@ -202,7 +215,8 @@ func TestBackupPVCReconcile(t *testing.T) {
 
 	// Create cluster.
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
@@ -270,7 +284,8 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 
 	// Create a normal cluster.
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
@@ -339,7 +354,8 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 
 	// Create a normal cluster.
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
@@ -402,7 +418,8 @@ func TestBackupAndRestore(t *testing.T) {
 	clusterSize := constants.Size3
 
 	numOfDocs := 2000
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
@@ -484,7 +501,8 @@ func TestUpdateBackupStatus(t *testing.T) {
 	clusterSize := constants.Size3
 
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
@@ -535,7 +553,8 @@ func TestMultipleBackups(t *testing.T) {
 	clusterSize := constants.Size3
 	// Create a normal cluster.
 	numOfDocs := 200
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
@@ -592,7 +611,8 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, &e2eutil.TLSOpts{})
 	defer teardown()
 
-	testCouchbase := e2espec.NewBackupCluster(clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2espec.NewBackupCluster(clusterSize, imageName)
 	testCouchbase.Name = ctx.ClusterName
 	testCouchbase.Spec.Networking.TLS = &v2.TLSPolicy{
 		Static: &v2.StaticTLS{
@@ -647,7 +667,8 @@ func TestFullOnlyOverTLS(t *testing.T) {
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, &e2eutil.TLSOpts{})
 	defer teardown()
 
-	testCouchbase := e2espec.NewBackupCluster(clusterSize)
+	imageName := getBackupImage(t, f)
+	testCouchbase := e2espec.NewBackupCluster(clusterSize, imageName)
 	testCouchbase.Name = ctx.ClusterName
 	testCouchbase.Spec.Networking.TLS = &v2.TLSPolicy{
 		Static: &v2.StaticTLS{
