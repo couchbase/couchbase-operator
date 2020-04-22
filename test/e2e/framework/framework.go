@@ -447,12 +447,6 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 			return err
 		}
 
-		// deleting secrets
-		logrus.Info("Deleting secrets")
-		if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
-			logrus.Infof("Secret deleted: %v", "basic-test-secret")
-		}
-
 		// Creating required namespaces and cluster roles before deploying the operator
 		if err := createK8SNamespace(k8s.KubeClient, k8s.Namespace); err != nil {
 			return err
@@ -525,6 +519,12 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	logrus.Info("Recreating role binding")
 	if err := recreateRoleBindings(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
+	}
+
+	// deleting secrets
+	logrus.Info("Deleting secrets")
+	if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
+		logrus.Infof("Secret deleted: %v", "basic-test-secret")
 	}
 	logrus.Info("Creating secret")
 	if err = f.CreateSecretInKubeCluster(k8s); err != nil {

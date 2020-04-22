@@ -1022,3 +1022,44 @@ func MustCheckLDAPStatus(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.
 		Die(t, err)
 	}
 }
+
+// CheckN2N checks that all nodes are in the requested encryption state.
+func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled bool, timeout time.Duration) error {
+	callback := func() error {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+
+		clusterInfo, err := client.ClusterInfo()
+		if err != nil {
+			return err
+		}
+
+		for _, node := range clusterInfo.Nodes {
+			if node.NodeEncryption != enabled {
+				return fmt.Errorf("node %s encryption %v, expected %v", node.HostName, node.NodeEncryption, enabled)
+			}
+		}
+
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, callback)
+}
+
+func MustCheckN2NEnabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := CheckN2N(k8s, cluster, true, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustCheckN2NDisabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := CheckN2N(k8s, cluster, false, timeout); err != nil {
+		Die(t, err)
+	}
+}

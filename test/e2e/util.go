@@ -290,6 +290,22 @@ var (
 		"TestMultipleBackups":              TestMultipleBackups,
 		"TestFullIncrementalOverTLS":       TestFullIncrementalOverTLS,
 		"TestFullOnlyOverTLS":              TestFullOnlyOverTLS,
+
+		// Node-to-node Encryption
+		"TestCreateClusterWithTLSAndControlPlaneNodeToNode":                            TestCreateClusterWithTLSAndControlPlaneNodeToNode,
+		"TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenScale":                   TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenScale,
+		"TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenKillPod":                 TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenKillPod,
+		"TestCreateClusterWithTLSThenEnableControlPlaneNodeToNode":                     TestCreateClusterWithTLSThenEnableControlPlaneNodeToNode,
+		"TestCreateClusterWithTLSAnControlPlanedNodeToNodeThenDisableNodeToNode":       TestCreateClusterWithTLSAnControlPlanedNodeToNodeThenDisableNodeToNode,
+		"TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToFullNodeToNode":  TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToFullNodeToNode,
+		"TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificate": TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificate,
+		"TestCreateClusterWithTLSAndFullNodeToNode":                                    TestCreateClusterWithTLSAndFullNodeToNode,
+		"TestCreateClusterWithTLSAndFullNodeToNodeThenScale":                           TestCreateClusterWithTLSAndFullNodeToNodeThenScale,
+		"TestCreateClusterWithTLSAndFullNodeToNodeThenKillPod":                         TestCreateClusterWithTLSAndFullNodeToNodeThenKillPod,
+		"TestCreateClusterWithTLSThenEnableFullNodeToNode":                             TestCreateClusterWithTLSThenEnableFullNodeToNode,
+		"TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode":               TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode,
+		"TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode":  TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode,
+		"TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate":         TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate,
 	}
 )
 

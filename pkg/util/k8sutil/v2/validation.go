@@ -1006,6 +1006,10 @@ func GetCouchbaseClusterCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 														},
 													},
 												},
+												"nodeToNodeEncryption": apiextensionsv1beta1.JSONSchemaProps{
+													Type:    "string",
+													Pattern: "^(All|ControlPlaneOnly)$",
+												},
 											},
 										},
 										"exposeAdminConsole": apiextensionsv1beta1.JSONSchemaProps{

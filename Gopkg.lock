@@ -64,14 +64,14 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:afab32e18d4b4ba261d205a401e641490e7008b8acfe1cbcc831e4d858762d9b"
+  digest = "1:588b245572359c19994b40acd38fb6d52b51e853c91b1365e5202013220d6ad4"
   name = "github.com/couchbase/gocbmgr"
   packages = [
     ".",
     "urlencoding",
   ]
   pruneopts = "UT"
-  revision = "0b17f7a94c521cad16f3dccff04eb3bf5da1bf95"
+  revision = "199df471c414da26e1ed99d5dd5206f5e436450c"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"

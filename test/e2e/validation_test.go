@@ -983,6 +983,12 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.name in body should be at most 100 chars long`},
 		},
+		{
+			name:           "TestValidateN2NEncryptionIllegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/nodeToNodeEncryption", "illegal")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.tls.nodeToNodeEncryption in body should match '^(All|ControlPlaneOnly)$'`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]

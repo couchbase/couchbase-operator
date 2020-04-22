@@ -15,52 +15,53 @@ import (
 )
 
 const (
-	EventReasonMemberCreationFailed  = "MemberCreationFailed"
-	EventReasonNewMemberAdded        = "NewMemberAdded"
-	EventReasonMemberRemoved         = "MemberRemoved"
-	EventReasonMemberDown            = "MemberDown"
-	EventReasonMemberRecovered       = "MemberRecovered"
-	EventReasonMemberFailedOver      = "MemberFailedOver"
-	EventReasonRebalanceStarted      = "RebalanceStarted"
-	EventReasonRebalanceIncomplete   = "RebalanceIncomplete"
-	EventReasonRebalanceCompleted    = "RebalanceCompleted"
-	EventReasonFailedAddNode         = "FailedAddNode"
-	EventReasonFailedAddBackNode     = "FailedAddBackNode"
-	EventReasonBucketCreated         = "BucketCreated"
-	EventReasonBucketDeleted         = "BucketDeleted"
-	EventReasonBucketEdited          = "BucketEdited"
-	EventReasonUserCreated           = "UserCreated"
-	EventReasonUserDeleted           = "UserDeleted"
-	EventReasonUserEdited            = "UserEdited"
-	EventReasonGroupCreated          = "GroupCreated"
-	EventReasonGroupDeleted          = "GroupDeleted"
-	EventReasonGroupEdited           = "GroupEdited"
-	EventReasonServiceCreated        = "ServiceCreated"
-	EventReasonServiceDeleted        = "ServiceDeleted"
-	EventReasonNodeServiceCreated    = "NodeServiceCreated"
-	EventReasonNodeServiceDeleted    = "NodeServiceDeleted"
-	EventReasonUpgradeStarted        = "UpgradeStarted"
-	EventReasonUpgradeFinished       = "UpgradeFinished"
-	EventReasonRollbackStarted       = "RollbackStarted"
-	EventReasonRollbackFinished      = "RollbackFinished"
-	EventReasonClusterSettingsEdited = "ClusterSettingsEdited"
-	EventReasonTLSUpdated            = "TLSUpdated"
-	EventReasonTLSInvalid            = "TLSInvalid"
-	EventReasonTLSUpdateFailed       = "TLSUpdateFailed"
-	EventReasonClientTLSUpdated      = "ClientTLSUpdated"
-	EventReasonClientTLSInvalid      = "ClientTLSInvalid"
-	EventReasonRemoteClusterAdded    = "RemoteClusterAdded"
-	EventReasonRemoteClusterRemoved  = "RemoteClusterRemoved"
-	EventReasonReplicationAdded      = "ReplicationAdded"
-	EventReasonReplicationRemoved    = "ReplicationRemoved"
-	EventReasonBackupCreated         = "BackupCreated"
-	EventReasonBackupUpdated         = "BackupUpdated"
-	EventReasonBackupDeleted         = "BackupDeleted"
-	EventReasonBackupStarted         = "BackupStarted"
-	EventReasonBackupCompleted       = "BackupCompleted"
-	EventReasonBackupFailed          = "BackupFailed"
-	EventReasonBackupRestoreCreated  = "BackupRestoreCreated"
-	EventReasonBackupRestoreDeleted  = "BackupRestoreDeleted"
+	EventReasonMemberCreationFailed    = "MemberCreationFailed"
+	EventReasonNewMemberAdded          = "NewMemberAdded"
+	EventReasonMemberRemoved           = "MemberRemoved"
+	EventReasonMemberDown              = "MemberDown"
+	EventReasonMemberRecovered         = "MemberRecovered"
+	EventReasonMemberFailedOver        = "MemberFailedOver"
+	EventReasonRebalanceStarted        = "RebalanceStarted"
+	EventReasonRebalanceIncomplete     = "RebalanceIncomplete"
+	EventReasonRebalanceCompleted      = "RebalanceCompleted"
+	EventReasonFailedAddNode           = "FailedAddNode"
+	EventReasonFailedAddBackNode       = "FailedAddBackNode"
+	EventReasonBucketCreated           = "BucketCreated"
+	EventReasonBucketDeleted           = "BucketDeleted"
+	EventReasonBucketEdited            = "BucketEdited"
+	EventReasonUserCreated             = "UserCreated"
+	EventReasonUserDeleted             = "UserDeleted"
+	EventReasonUserEdited              = "UserEdited"
+	EventReasonGroupCreated            = "GroupCreated"
+	EventReasonGroupDeleted            = "GroupDeleted"
+	EventReasonGroupEdited             = "GroupEdited"
+	EventReasonServiceCreated          = "ServiceCreated"
+	EventReasonServiceDeleted          = "ServiceDeleted"
+	EventReasonNodeServiceCreated      = "NodeServiceCreated"
+	EventReasonNodeServiceDeleted      = "NodeServiceDeleted"
+	EventReasonUpgradeStarted          = "UpgradeStarted"
+	EventReasonUpgradeFinished         = "UpgradeFinished"
+	EventReasonRollbackStarted         = "RollbackStarted"
+	EventReasonRollbackFinished        = "RollbackFinished"
+	EventReasonClusterSettingsEdited   = "ClusterSettingsEdited"
+	EventReasonTLSUpdated              = "TLSUpdated"
+	EventReasonTLSInvalid              = "TLSInvalid"
+	EventReasonTLSUpdateFailed         = "TLSUpdateFailed"
+	EventReasonClientTLSUpdated        = "ClientTLSUpdated"
+	EventReasonClientTLSInvalid        = "ClientTLSInvalid"
+	EventReasonRemoteClusterAdded      = "RemoteClusterAdded"
+	EventReasonRemoteClusterRemoved    = "RemoteClusterRemoved"
+	EventReasonReplicationAdded        = "ReplicationAdded"
+	EventReasonReplicationRemoved      = "ReplicationRemoved"
+	EventReasonBackupCreated           = "BackupCreated"
+	EventReasonBackupUpdated           = "BackupUpdated"
+	EventReasonBackupDeleted           = "BackupDeleted"
+	EventReasonBackupStarted           = "BackupStarted"
+	EventReasonBackupCompleted         = "BackupCompleted"
+	EventReasonBackupFailed            = "BackupFailed"
+	EventReasonBackupRestoreCreated    = "BackupRestoreCreated"
+	EventReasonBackupRestoreDeleted    = "BackupRestoreDeleted"
+	EventReasonSecuritySettingsUpdated = "SecuritySettingsUpdated"
 
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )
@@ -425,6 +426,19 @@ func ReplicationRemovedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonReplicationRemoved
 	event.Message = fmt.Sprintf("XDCR replication %s removed", name)
+	return event
+}
+
+const (
+	SecuritySettingUpdatedN2NEncryptionModified     = "Node-to-Node encryption modified"
+	SecuritySettingUpdatedN2NEncryptionModeModified = "Node-to-Node encryption mode modified"
+)
+
+func SecuritySettingsUpdatedEvent(cl *couchbasev2.CouchbaseCluster, message string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonSecuritySettingsUpdated
+	event.Message = message
 	return event
 }
 
