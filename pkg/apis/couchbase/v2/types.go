@@ -247,6 +247,7 @@ type CouchbaseBucket struct {
 }
 
 type CouchbaseBucketSpec struct {
+	Name               string                            `json:"name,omitempty"`
 	MemoryQuota        *resource.Quantity                `json:"memoryQuota,omitempty"`
 	Replicas           int                               `json:"replicas,omitempty"`
 	IoPriority         CouchbaseBucketIOPriority         `json:"ioPriority,omitempty"`
@@ -273,6 +274,7 @@ type CouchbaseEphemeralBucket struct {
 }
 
 type CouchbaseEphemeralBucketSpec struct {
+	Name               string                                 `json:"name,omitempty"`
 	MemoryQuota        *resource.Quantity                     `json:"memoryQuota,omitempty"`
 	Replicas           int                                    `json:"replicas,omitempty"`
 	IoPriority         CouchbaseBucketIOPriority              `json:"ioPriority,omitempty"`
@@ -298,6 +300,7 @@ type CouchbaseMemcachedBucket struct {
 }
 
 type CouchbaseMemcachedBucketSpec struct {
+	Name        string             `json:"name,omitempty"`
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
 	EnableFlush bool               `json:"enableFlush,omitempty"`
 }

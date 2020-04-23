@@ -400,3 +400,90 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
+
+// TestBucketWithExplicitName checks that overriding the resource name works.
+func TestBucketWithExplicitName(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.GetCluster(0)
+
+	// Constants
+	clusterSize := 1
+	bucketName := "Sweet_Carabine_Bah_Bah_Bah"
+
+	// Create the cluster.
+	bucketTyped := e2espec.DefaultBucket.DeepCopy()
+	bucketTyped.Spec.Name = bucketName
+	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, bucketTyped)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, kubernetes.Namespace, constants.Size1)
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucketName}, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket added with the correct name
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucketName},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestBucketWithSameExplicitNameAndDifferentType checks that buckets can have different
+// types but the same name in the same namespace.
+func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.GetCluster(0)
+
+	// Constants
+	clusterSize := 1
+	bucketName := "Sweet_Carabine_Bah_Bah_Bah"
+	labels1 := map[string]string{
+		"name": "thor",
+	}
+	labels2 := map[string]string{
+		"name": "scarlet-witch",
+	}
+
+	// Create the first cluster with a couchbase bucket.
+	bucketTyped1 := e2espec.DefaultBucket.DeepCopy()
+	bucketTyped1.Name = ""
+	bucketTyped1.GenerateName = "bucket-"
+	bucketTyped1.Labels = labels1
+	bucketTyped1.Spec.Name = bucketName
+
+	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, bucketTyped1)
+	cluster1 := e2espec.NewBasicCluster(clusterSize)
+	cluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
+		MatchLabels: labels1,
+	}
+	cluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, kubernetes.Namespace, cluster1)
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster1, []string{bucketName}, time.Minute)
+
+	// Create the second cluster with an ephemeral bucket.
+	bucketTyped2 := e2espec.DefaultEphemeralBucket.DeepCopy()
+	bucketTyped2.Name = ""
+	bucketTyped2.GenerateName = "bucket-"
+	bucketTyped2.Labels = labels2
+	bucketTyped2.Spec.Name = bucketName
+
+	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, bucketTyped2)
+	cluster2 := e2espec.NewBasicCluster(clusterSize)
+	cluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
+		MatchLabels: labels2,
+	}
+	cluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, kubernetes.Namespace, cluster2)
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster2, []string{bucketName}, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket added with the correct name
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucketName},
+	}
+
+	ValidateEvents(t, kubernetes, cluster1, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster2, expectedEvents)
+}

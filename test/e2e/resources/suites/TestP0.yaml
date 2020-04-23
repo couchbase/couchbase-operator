@@ -17,6 +17,8 @@ tcGroups:
     testcases:
       - name: TestBucketUnmanaged
       - name: TestBucketSelection
+      - name: TestBucketWithExplicitName
+      - name: TestBucketWithSameExplicitNameAndDifferentType
 
   - name: ServiceTests
     clusters:

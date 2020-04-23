@@ -24,6 +24,8 @@ var (
 		"TestEditBucket":                                      TestEditBucket,
 		"TestBucketUnmanaged":                                 TestBucketUnmanaged,
 		"TestBucketSelection":                                 TestBucketSelection,
+		"TestBucketWithExplicitName":                          TestBucketWithExplicitName,
+		"TestBucketWithSameExplicitNameAndDifferentType":      TestBucketWithSameExplicitNameAndDifferentType,
 		"TestDeltaRecoveryImpossible":                         TestDeltaRecoveryImpossible,
 		"TestResizeCluster":                                   TestResizeCluster,
 		"TestEditClusterSettings":                             TestEditClusterSettings,

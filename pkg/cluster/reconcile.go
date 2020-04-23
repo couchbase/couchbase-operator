@@ -411,8 +411,13 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			continue
 		}
 
+		name := bucket.Name
+		if bucket.Spec.Name != "" {
+			name = bucket.Spec.Name
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
-			BucketName:         bucket.Name,
+			BucketName:         name,
 			BucketType:         constants.BucketTypeCouchbase,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
@@ -429,8 +434,13 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			continue
 		}
 
+		name := bucket.Name
+		if bucket.Spec.Name != "" {
+			name = bucket.Spec.Name
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
-			BucketName:         bucket.Name,
+			BucketName:         name,
 			BucketType:         constants.BucketTypeEphemeral,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
@@ -446,8 +456,13 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			continue
 		}
 
+		name := bucket.Name
+		if bucket.Spec.Name != "" {
+			name = bucket.Spec.Name
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
-			BucketName:        bucket.Name,
+			BucketName:        name,
 			BucketType:        constants.BucketTypeMemcached,
 			BucketMemoryQuota: k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			EnableFlush:       bucket.Spec.EnableFlush,

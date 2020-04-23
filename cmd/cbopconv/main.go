@@ -186,21 +186,6 @@ func main() {
 		clusters = append(clusters, cluster)
 	}
 
-	// Do safety checks, this is going to be irreversable.  We need to be sure that
-	// when we migrate buckets out of their clusters we are not going to have a
-	// namespace clash.  Note this doesn't handle if someone has already created
-	// a bucket of the same name, this is your own fault as a result.
-	bucketNames := map[string]string{}
-	for _, cluster := range clusters {
-		for _, bucket := range cluster.Spec.BucketSettings {
-			if clusterName, ok := bucketNames[bucket.BucketName]; ok {
-				fmt.Println("bucket name collision detected: bucket", bucket.BucketName, "already defined by cluster", clusterName)
-				os.Exit(1)
-			}
-			bucketNames[bucket.BucketName] = cluster.Name
-		}
-	}
-
 	// Work through the clusters one by one.  Then we need to, safely,
 	// separate out the buckets and ensure they are only picked up by the correct cluster.
 	// Unavoidably if you have multiple buckets of the same name in the same namespace you
@@ -355,12 +340,13 @@ func main() {
 							Kind:       "CouchbaseBucket",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: bucket.BucketName,
+							GenerateName: cluster.Name + "bucket-",
 							Labels: map[string]string{
 								"cluster.couchbase.com": cluster.Name,
 							},
 						},
 						Spec: couchbasev2.CouchbaseBucketSpec{
+							Name:               bucket.BucketName,
 							MemoryQuota:        k8sutil.NewResourceQuantityMi(int64(bucket.BucketMemoryQuota)),
 							Replicas:           bucket.BucketReplicas,
 							IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
@@ -380,12 +366,13 @@ func main() {
 							Kind:       "CouchbaseEphemeralBucket",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: bucket.BucketName,
+							GenerateName: cluster.Name + "bucket-",
 							Labels: map[string]string{
 								"cluster.couchbase.com": cluster.Name,
 							},
 						},
 						Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+							Name:               bucket.BucketName,
 							MemoryQuota:        k8sutil.NewResourceQuantityMi(int64(bucket.BucketMemoryQuota)),
 							Replicas:           bucket.BucketReplicas,
 							IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
@@ -404,12 +391,13 @@ func main() {
 							Kind:       "CouchbaseMemcachedBucket",
 						},
 						ObjectMeta: metav1.ObjectMeta{
-							Name: bucket.BucketName,
+							GenerateName: cluster.Name + "bucket-",
 							Labels: map[string]string{
 								"cluster.couchbase.com": cluster.Name,
 							},
 						},
 						Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
+							Name:        bucket.BucketName,
 							MemoryQuota: k8sutil.NewResourceQuantityMi(int64(bucket.BucketMemoryQuota)),
 							EnableFlush: bucket.EnableFlush,
 						},

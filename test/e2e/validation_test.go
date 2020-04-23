@@ -947,6 +947,42 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`cronjob schedule spec.incremental cannot be empty`},
 		},
+		{
+			name:           "TestValidateExplicitBucketNameIllegalCharacter",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Add("/spec/name", "!@#$%^&*()")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should match '^[a-zA-Z0-9-_%\.]+$'`},
+		},
+		{
+			name:           "TestValidateExplicitBucketNameIllegalLength",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Add("/spec/name", "000000000011111111111222222222223333333333344444444444455555555555666666666667777777777778888888888889999999999OVERFLOW")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should be at most 100 chars long`},
+		},
+		{
+			name:           "TestValidateExplicitEphemeralBucketNameIllegalCharacter",
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Add("/spec/name", "!@#$%^&*()")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should match '^[a-zA-Z0-9-_%\.]+$'`},
+		},
+		{
+			name:           "TestValidateExplicitEphemeralBucketNameIllegalLength",
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Add("/spec/name", "000000000011111111111222222222223333333333344444444444455555555555666666666667777777777778888888888889999999999OVERFLOW")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should be at most 100 chars long`},
+		},
+		{
+			name:           "TestValidateExplicitMemcachedBucketNameIllegalCharacter",
+			mutations:      patchMap{"bucket2": jsonpatch.NewPatchSet().Add("/spec/name", "!@#$%^&*()")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should match '^[a-zA-Z0-9-_%\.]+$'`},
+		},
+		{
+			name:           "TestValidateExplicitMemcachedBucketNameIllegalLength",
+			mutations:      patchMap{"bucket2": jsonpatch.NewPatchSet().Add("/spec/name", "000000000011111111111222222222223333333333344444444444455555555555666666666667777777777778888888888889999999999OVERFLOW")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should be at most 100 chars long`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]

@@ -26,9 +26,10 @@ var (
 )
 
 const (
-	ImagePattern  = `^[\w_\.\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$`
-	wallClockTime = `^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$`
-	BucketPattern = `^\*$|^[a-zA-Z0-9-_%\.]+$`
+	ImagePattern      = `^[\w_\.\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$`
+	wallClockTime     = `^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$`
+	bucketNamePattern = `^[a-zA-Z0-9-_%\.]+$`
+	BucketPattern     = `^\*$|^[a-zA-Z0-9-_%\.]+$`
 )
 
 var (
@@ -116,6 +117,11 @@ func GetCouchbaseBucketCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 								"compressionMode",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"name": apiextensionsv1beta1.JSONSchemaProps{
+									Type:      "string",
+									Pattern:   bucketNamePattern,
+									MaxLength: &maximumBucketNameLength,
+								},
 								"memoryQuota": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
@@ -233,6 +239,11 @@ func GetCouchbaseEphemeralBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 								"compressionMode",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"name": apiextensionsv1beta1.JSONSchemaProps{
+									Type:      "string",
+									Pattern:   bucketNamePattern,
+									MaxLength: &maximumBucketNameLength,
+								},
 								"memoryQuota": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
@@ -319,6 +330,11 @@ func GetCouchbaseMemcachedBucketCRD() *apiextensionsv1beta1.CustomResourceDefini
 								"memoryQuota",
 							},
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"name": apiextensionsv1beta1.JSONSchemaProps{
+									Type:      "string",
+									Pattern:   bucketNamePattern,
+									MaxLength: &maximumBucketNameLength,
+								},
 								"memoryQuota": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},

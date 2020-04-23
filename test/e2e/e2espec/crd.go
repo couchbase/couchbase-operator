@@ -65,6 +65,15 @@ var (
 			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
+
+	DefaultEphemeralBucket = &couchbasev2.CouchbaseEphemeralBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.DefaultBucket,
+		},
+		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+			MemoryQuota: NewResourceQuantityMi(256),
+		},
+	}
 )
 
 func GetReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseReplication {
