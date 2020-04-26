@@ -36,7 +36,7 @@ func (c *Config) ParseArgs() error {
 	flagSet.StringVar(&c.ImagePullSecret, "image-pull-secret", "", "Image pull secret (for private repos or RedHat container registry)")
 	flagSet.BoolVar(&c.NoOperator, "no-operator", false, "Don't generate operator configuration")
 	flagSet.BoolVar(&c.NoAdmission, "no-admission", false, "Dont generate dynamic admission controller configuration")
-	flagSet.BoolVar(&c.NoAdmission, "backup", false, "Generate backup configuration")
+	flagSet.BoolVar(&c.Backup, "backup", false, "Generate backup configuration")
 	flagSet.BoolVar(&c.File, "file", false, "Create separate files rather than echo to standard out")
 	flagSet.BoolVar(&c.Version, "version", false, "Displays the version and exits")
 	return flagSet.Parse(os.Args[1:])
