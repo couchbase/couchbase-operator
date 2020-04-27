@@ -186,7 +186,7 @@ spec:
   monitoring:
     prometheus:
       enabled: true
-      image: couchbase/prometheus-exporter:{prometheus-version}
+      image: couchbase/exporter:{prometheus-version}
       authorizationSecret: cb-metrics-token
       resources:
         requests:
@@ -1693,7 +1693,7 @@ spec:
   monitoring:
     prometheus:
       enabled: true
-      image: couchbase/prometheus-exporter:{prometheus-version}
+      image: couchbase/exporter:{prometheus-version}
       authorizationSecret: cb-metrics-token
       resources:
         requests:

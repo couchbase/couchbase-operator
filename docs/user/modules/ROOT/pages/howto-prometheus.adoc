@@ -25,7 +25,7 @@ spec:
   monitoring:
     prometheus:
       enabled: true # <.>
-      image: couchbase/prometheus-exporter:{prometheus-version} # <.>
+      image: couchbase/exporter:{prometheus-version} # <.>
       authorizationSecret: cb-metrics-token # <.>
 ----
 
@@ -34,7 +34,7 @@ spec:
 <.> If the xref:reference-couchbasecluster.adoc#spec-monitoring-prometheus-image[`spec.monitoring.prometheus.image`] field is left unspecified, then the dynamic admission controller will automatically populate it with the most recent container image that was available when the installed version of the Autonomous Operator was released.
 The default image for open source Kubernetes comes from https://hub.docker.com/r/couchbase/exporter[Docker Hub^], and the default image for OpenShift comes from https://access.redhat.com/containers/#/vendor/couchbase[Red Hat Container Catalog^].
 +
-If pulling directly from the the Red Hat Container Catalog, then the path will be something similar to `registry.connect.redhat.com/couchbase/prometheus-exporter:{prometheus-version-redhat}` (you can refer to the catalog for the most recent images).
+If pulling directly from the the Red Hat Container Catalog, then the path will be something similar to `registry.connect.redhat.com/couchbase/exporter:{prometheus-version-redhat}` (you can refer to the catalog for the most recent images).
 If ImagePullSecrets are required to access the image, they are inherited from the Couchbase Server pod and can be set explicitly with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-imagepullsecrets[`spec.servers[\].pod.spec.imagePullSecrets`] field or implicitly with a service account specified with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-serviceaccountname[`spec.servers[\].pod.spec.serviceAccountName`] field.
 
 <.> You can optionally specify a Kubernetes Secret that contains a bearer token value that clients will need to use to gain access to the Prometheus metrics.
