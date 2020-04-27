@@ -1,6 +1,7 @@
 name: operator
 title: Autonomous Operator
 version: '2.0'
+prerelease: Beta
 start_page: ROOT:overview.adoc
 nav:
 - modules/ROOT/nav.adoc
