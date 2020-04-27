@@ -1,4 +1,5 @@
 = Configure Client SDKs
+:page-aliases: couchbase-clients
 
 [abstract]
 Connecting a Couchbase SDK to an Operator managed Couchbase cluster.

@@ -1,4 +1,5 @@
 = Delete a Couchbase Deployment
+:page-aliases: delete-couchbase-cluster
 
 You can delete a cluster either by using the cluster configuration file that you created the cluster with, or by deleting the cluster directly.
 

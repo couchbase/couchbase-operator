@@ -1,4 +1,5 @@
 = CouchbaseCluster Status
+:page-aliases: cluster-status-guide
 include::partial$constants.adoc[]
 
 [abstract]

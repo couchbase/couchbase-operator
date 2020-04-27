@@ -1,4 +1,5 @@
 = CouchbaseCluster Events
+:page-aliases: conditions-and-events
 
 [abstract]
 Kubernetes events that are raised by the Operator for CouchbaseCluster resources.

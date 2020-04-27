@@ -1,4 +1,5 @@
 = Access the Couchbase Server User Interface
+:page-aliases: accessing-couchbase
 
 [abstract]
 Connect to the Couchbase Server user interface.

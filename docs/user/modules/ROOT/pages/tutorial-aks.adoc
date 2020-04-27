@@ -1,4 +1,5 @@
 = Installing AKS
+:page-aliases: install-aks
 
 [abstract]
 Prepare Microsoft Azure Kubernetes Service (AKS) for the Couchbase Autonomous Operator.

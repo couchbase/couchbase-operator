@@ -1,4 +1,5 @@
 = cbopinfo
+:page-aliases: cbopinfo
 include::partial$constants.adoc[]
 :tabs:
 

@@ -1,4 +1,5 @@
 = Upgrade the Operator
+:page-aliases: upgrading-the-operator
 :tabs:
 
 [IMPORTANT]

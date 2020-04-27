@@ -1,4 +1,5 @@
 = Upgrade a Couchbase Deployment
+:page-aliases: upgrading-couchbase
 include::partial$constants.adoc[]
   
 [abstract]
