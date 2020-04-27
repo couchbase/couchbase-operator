@@ -16,9 +16,6 @@ Couchbase will make a best effort to investigate issues on a Supported platform 
 
 Developer Preview:: Couchbase is still developing functionality for the specified platform, but you are encouraged to start your own testing and provide early feedback.
 
-NOTE: _Unless otherwise stated, maintenance/patch releases (x.x**.x**) inherit the same support level._
-
-
 === Couchbase Server Compatibility
 
 [#table-operator-compatibility-couchbase,cols="1,1",options="header"]
@@ -27,6 +24,8 @@ NOTE: _Unless otherwise stated, maintenance/patch releases (x.x**.x**) inherit t
 
 | Couchbase Server Enterprise Edition
 a| Certified 6.0.4, 6.5
+
+_Unless otherwise stated, maintenance/patch releases (x.x**.x**) inherit the same support level._
 |===
 
 === Kubernetes Platform Compatibility
