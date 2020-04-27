@@ -38,7 +38,7 @@ const (
 	defaultMetricsImage                           = "couchbase/exporter:1.0.0"
 	redhatMetricsImage                            = "registry.connect.redhat.com/couchbase/exporter:1.0.0-2"
 	defaultBackupImage                            = "couchbase/operator-backup:6.5.0"
-	redhatBackupImage                             = "registry.connect.redhat.com/couchbase/operator-backup:6.5.0-4"
+	redhatBackupImage                             = "registry.connect.redhat.com/couchbase/operator-backup:6.5.0-5"
 	defaultBackupServiceAccount                   = "couchbase-backup"
 )
 
