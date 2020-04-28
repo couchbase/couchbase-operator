@@ -17,6 +17,8 @@ tcGroups:
     testcases:
       - name: TestBucketUnmanaged
       - name: TestBucketSelection
+      - name: TestBucketWithExplicitName
+      - name: TestBucketWithSameExplicitNameAndDifferentType
 
   - name: ServiceTests
     clusters:
@@ -222,3 +224,22 @@ tcGroups:
       - name: TestPrometheusMetricsEnable
       - name: TestPrometheusMetricsEnableAndPerformOps
       - name: TestPrometheusMetricsBearerTokenAuth
+
+  - name: NodeToNodeEncryptionTests
+    clusters:
+    - BasicCluster
+    testcases:
+    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNode
+    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenScale
+    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenKillPod
+    - name: TestCreateClusterWithTLSThenEnableControlPlaneNodeToNode
+    - name: TestCreateClusterWithTLSAnControlPlanedNodeToNodeThenDisableNodeToNode
+    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToFullNodeToNode
+    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificate
+    - name: TestCreateClusterWithTLSAndFullNodeToNode
+    - name: TestCreateClusterWithTLSAndFaullNodeToNodeThenScale
+    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenKillPod
+    - name: TestCreateClusterWithTLSThenEnableFullNodeToNode
+    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode
+    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode
+    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate

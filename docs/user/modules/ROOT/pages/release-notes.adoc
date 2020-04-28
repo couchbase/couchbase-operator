@@ -7,9 +7,9 @@ The changes in this release enable several advancements in how you can manage, m
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
 [#release-v200]
-== Release 2.0.0 Beta
+== Release 2.0.0
 
-Couchbase Autonomous Operator 2.0.0 Beta was released in March 2020.
+Couchbase Autonomous Operator 2.0.0 was released in April 2020.
 
 [#install-upgrade-v200]
 === Installation and Upgrade
@@ -18,8 +18,10 @@ For installation instructions, see xref:install-kubernetes.adoc[Installing on Ku
 
 For upgrade instructions, see xref:howto-operator-upgrade.adoc[Upgrading the Operator].
 
+////
 CAUTION: The Autonomous Operator 2.0.0 Beta is not production-ready software, and therefore upgrading from the Beta to the final GA version will not be supported.
 You should only install the Beta software in development environments for testing purposes.
+////
 
 [#supported-platforms-v200]
 === Platform Support
@@ -98,6 +100,58 @@ Read more about xref:concept-upgrade[Couchbase Pod Upgrades].
 
 The Autonomous Operator and Dynamic Admission Controller now use JSON logging. 
 This change includes some helpful enhancements, such as pod status outputs no longer spanning multiple lines, and rebalance status now being labelled with proper cluster context.
+
+[#fixed-issues-v200]
+=== Fixed Issues
+
+[#table-fixed-issues-v200,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-1329[K8S-1329^]
+a| In releases prior to 2.0.0, removing a server class with a `NodePort` would fail.
+As a workaround, it was recommended to not use `NodePorts`.
+Starting in 2.0.0, the Autonomous Operator will remove server classes using `NodePorts`.
+
+a| https://issues.couchbase.com/browse/K8S-1189[K8S-1189^]
+a| Helm no longer merges Exposed Feature Sets when editing.
+In releases prior to 2.0.0, editing the Exposed Features, such as "client" and "admin", would be merged to "clientadmin" incorrectly.
+This is no longer the case with Helm Charts for 2.0 and later.
+
+a| https://issues.couchbase.com/browse/K8S-1169[K8S-1169^]
+a| When deploying on Red Hat OpenShift using the Operator Lifecycle Manager (OLM), you may see the error messages `The field status.members is invalid` or `The field status.conditions is invalid`.
+This has been corrected in the 2.0 release.
+
+a| https://issues.couchbase.com/browse/K8S-1111[K8S-1111^]
+a| In releases prior to 2.0, running `kubctl wait` on a Couchbase Cluster resource-based deployment may have resulted in errors such as `error: .status.conditions accessor error`.
+Starting in 2.0, it is possible to run `kubectl wait` on Couchbase Cluster defined resources to wait until Pods are ready, etc.
+|===
+
+[#known-issues-v200]
+=== Known Issues
+
+[#table-known-issues-v200,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-1449[K8S-1449^]
+a| *Summary:* Running `cbopcfg` with the intention of generating backup resources will not result in the expected behavior.
+
+*Workaround:* Until `cbopcfg` is fixed, a workaround for creating backup resources is provided in the documentation for xref:howto-backup.adoc[configuring backups].
+
+a| https://issues.couchbase.com/browse/K8S-1437[K8S-1437^]
+a| *Summary:* The current operator-backup image in the Red Hat Container Catalog has a security grade of C due to being built on an older RHEL base image.
+A new image will be built to resolve this security grade and the default value for this image will be reflected in the next maintenance release.
+The reported vulnerability, CVE-2019-13734, is low risk in this use, as the Autonomous Operator does not use the RHEL-supplied Chrome or sqlite as described in the vulnerability.
+
+*Workaround:* Ensure you do not use Chrome from backup jobs to access websites.
+Edit the image tag under `spec.backup.image` in the running `CouchbaseCluster` resource configuration from revision `-4` to revision `-5`.
+
+a| https://issues.couchbase.com/browse/K8S-1395[K8S-1395^]
+a| *Summary:* On macOS 10.15 (Catalina), you may see an error such as `./cbopcfg: cannot execute binary file` when trying to execute commands included in the Autonomous Operator download package.
+
+*Workaround:* Update the macOS security settings to allow *Allow apps downloaded from - App store and identified developer* as outlined in the https://support.apple.com/en-us/HT202491[Apple Mac OS article on Gatekeeper].
+|===
 
 == Feedback
 

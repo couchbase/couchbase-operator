@@ -48,6 +48,11 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
+	// And make sure we have security guarantees in place.
+	if err := c.reconcileSecuritySettings(); err != nil {
+		return err
+	}
+
 	// Initialize the scheduler each time around, this saves us having to update
 	// internal state in all the cases when a pod fails to be created, deleted,
 	// or disappears
@@ -275,9 +280,16 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil
 		return nil, err
 	}
 
+	// TODO: 6.5.0+ probably allows HTTPS bootstrap all the time, not just
+	// when N2N is enabled...
+	url := newMember.ClientURLPlaintext()
+	if c.supportsNodeToNode() && c.nodeToNodeEnabled() {
+		url = newMember.ClientURL()
+	}
+
 	// Add to the cluster. Note we have to use the plain text url as
 	// /controller/addNode will not work with a https reference
-	if err := c.client.AddNode(ms, newMember.ClientURLPlaintext(), serverSpec.Services); err != nil {
+	if err := c.client.AddNode(ms, url, serverSpec.Services); err != nil {
 		return newMember, err
 	}
 
@@ -411,8 +423,13 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			continue
 		}
 
+		name := bucket.Name
+		if bucket.Spec.Name != "" {
+			name = bucket.Spec.Name
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
-			BucketName:         bucket.Name,
+			BucketName:         name,
 			BucketType:         constants.BucketTypeCouchbase,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
@@ -429,8 +446,13 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			continue
 		}
 
+		name := bucket.Name
+		if bucket.Spec.Name != "" {
+			name = bucket.Spec.Name
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
-			BucketName:         bucket.Name,
+			BucketName:         name,
 			BucketType:         constants.BucketTypeEphemeral,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
@@ -446,8 +468,13 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			continue
 		}
 
+		name := bucket.Name
+		if bucket.Spec.Name != "" {
+			name = bucket.Spec.Name
+		}
+
 		buckets = append(buckets, cbmgr.Bucket{
-			BucketName:        bucket.Name,
+			BucketName:        name,
 			BucketType:        constants.BucketTypeMemcached,
 			BucketMemoryQuota: k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			EnableFlush:       bucket.Spec.EnableFlush,
@@ -1936,6 +1963,176 @@ func (c *Cluster) reconcileRBAC() error {
 			log.V(1).Info("RBAC is not allowed", "cluster", c.namespacedName(), "cluster_version", version, "required_version", constants.CouchbaseVersion650)
 		}
 	}
+
+	return nil
+}
+
+// supportsNodeToNode tells us whether the current version supports N2N encryption.
+func (c *Cluster) supportsNodeToNode() bool {
+	version, err := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
+	if err != nil {
+		return false
+	}
+
+	return version.GreaterEqualString("6.5.1")
+}
+
+// nodeToNodeEnabled tells us whether N2N encyption is enabled.
+func (c *Cluster) nodeToNodeEnabled() bool {
+	return c.cluster.Spec.Networking.TLS != nil && c.cluster.Spec.Networking.TLS.NodeToNodeEncryption != nil
+}
+
+// reconcileSecuritySettings is just concerned with N2N at present.  It will need to be
+// refactored at some point to take into account other settings e.g. turning off TLS1.0
+// and TLS1.1.
+func (c *Cluster) reconcileSecuritySettings() error {
+	if !c.supportsNodeToNode() {
+		return nil
+	}
+
+	// Work out whether encryption is enabled?
+	requestedEncryption := c.nodeToNodeEnabled()
+
+	// See if any nodes are in the wrong state.
+	updatableMembers := couchbaseutil.NewMemberSet()
+
+	for _, m := range c.members {
+		s, err := c.client.GetNodeNetworkConfiguration(m)
+		if err != nil {
+			// As the message says, this is "fine"
+			log.Info("failed to get node network configuration", "cluster", c.namespacedName(), "pod", m.Name, "error", err)
+			return nil
+		}
+
+		if (s.NodeEncryption == cbmgr.On) != requestedEncryption {
+			updatableMembers.Add(m)
+		}
+	}
+
+	// If we are disabling encryption then we need to set the mode to control plane only first...
+	if !requestedEncryption {
+		securitySettings, err := c.client.GetSecuritySettings(c.readyMembers())
+		if err != nil {
+			return err
+		}
+
+		// Only update if the current setting is not null (which defaults to..) or not control plane.
+		if securitySettings.ClusterEncryptionLevel != "" && securitySettings.ClusterEncryptionLevel != cbmgr.ClusterEncryptionControl {
+			requestedSecuritySettings := *securitySettings
+			requestedSecuritySettings.ClusterEncryptionLevel = cbmgr.ClusterEncryptionControl
+
+			if err := c.client.SetSecuritySettings(c.readyMembers(), &requestedSecuritySettings); err != nil {
+				return err
+			}
+
+			c.raiseEvent(k8sutil.SecuritySettingsUpdatedEvent(c.cluster, k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified))
+		}
+	}
+
+	// Modify encryption settings for each node.
+	if !updatableMembers.Empty() {
+		// For some reasons you need to disable failover because server is
+		// incapable of doing this itself...
+		failoverSettings, err := c.client.GetAutoFailoverSettings(c.readyMembers())
+		if err != nil {
+			return err
+		}
+
+		failoverSettings.Enabled = false
+
+		if err := c.client.SetAutoFailoverSettings(c.readyMembers(), failoverSettings); err != nil {
+			return err
+		}
+
+		// Booleans obviously don't exist in serverland...
+		encryptionEnabledString := cbmgr.Off
+		encryptionDisabledString := cbmgr.On
+		if requestedEncryption {
+			encryptionEnabledString = cbmgr.On
+			encryptionDisabledString = cbmgr.Off
+		}
+
+		networkSettings := &cbmgr.NodeNetworkConfiguration{
+			AddressFamily:  cbmgr.AddressFamilyIPV4,
+			NodeEncryption: encryptionEnabledString,
+		}
+
+		antiNetworkSettings := &cbmgr.NodeNetworkConfiguration{
+			AddressFamily:  cbmgr.AddressFamilyIPV4,
+			NodeEncryption: encryptionDisabledString,
+		}
+
+		// Update one API per node...
+		for _, m := range updatableMembers {
+			if err := c.client.EnableExternalListener(m, networkSettings); err != nil {
+				return err
+			}
+		}
+
+		// Update another API per node, with exactly the same configuration...
+		for _, m := range updatableMembers {
+			if err := c.client.SetNodeNetworkConfiguration(m, networkSettings); err != nil {
+				return err
+			}
+		}
+
+		// And another API per node...
+		// The prior command does seem to trigger a network restart and may cause the
+		// following calls to fail, so retry.
+		ctx, cancel := context.WithTimeout(c.ctx, time.Minute)
+		defer cancel()
+
+		for _, m := range updatableMembers {
+			callback := func() error {
+				return c.client.DisableExternalListener(m, antiNetworkSettings)
+			}
+
+			if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+				return err
+			}
+		}
+
+		// Reenable auto failover
+		failoverSettings.Enabled = true
+
+		if err := c.client.SetAutoFailoverSettings(c.readyMembers(), failoverSettings); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.SecuritySettingsUpdatedEvent(c.cluster, k8sutil.SecuritySettingUpdatedN2NEncryptionModified))
+	}
+
+	// Encryption is not enabled, ignore any further settings.
+	if !requestedEncryption {
+		return nil
+	}
+
+	securitySettings, err := c.client.GetSecuritySettings(c.readyMembers())
+	if err != nil {
+		return err
+	}
+
+	requestedSecuritySettings := *securitySettings
+
+	switch *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption {
+	case couchbasev2.NodeToNodeControlPlaneOnly:
+		requestedSecuritySettings.ClusterEncryptionLevel = cbmgr.ClusterEncryptionControl
+	case couchbasev2.NodeToNodeAll:
+		requestedSecuritySettings.ClusterEncryptionLevel = cbmgr.ClusterEncryptionAll
+	default:
+		return fmt.Errorf("illegal cluster encryption level '%s'", *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption)
+	}
+
+	// Nothing has changed, ignore.
+	if reflect.DeepEqual(securitySettings, &requestedSecuritySettings) {
+		return nil
+	}
+
+	if err := c.client.SetSecuritySettings(c.readyMembers(), &requestedSecuritySettings); err != nil {
+		return err
+	}
+
+	c.raiseEvent(k8sutil.SecuritySettingsUpdatedEvent(c.cluster, k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified))
 
 	return nil
 }

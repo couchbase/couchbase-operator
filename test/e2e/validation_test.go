@@ -693,7 +693,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateMissingDNSSubjectAltName",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", "acme.com")},
 			shouldFail:     true,
-			expectedErrors: []string{`certificate is valid for *.cluster, *.cluster.default, *.cluster.default.svc, cluster-srv, cluster-srv.default, cluster-srv.default.svc, localhost, *.example.com, not host.acme.com`},
+			expectedErrors: []string{`certificate is valid for *.cluster, *.cluster.remote, *.cluster.remote.svc, cluster-srv, cluster-srv.remote, cluster-srv.remote.svc, localhost, *.example.com, not host.acme.com`},
 		},
 		{
 			name:           "TestValidateAutoCompactionMinimum",
@@ -946,6 +946,48 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/incremental/schedule", "")},
 			shouldFail:     true,
 			expectedErrors: []string{`cronjob schedule spec.incremental cannot be empty`},
+		},
+		{
+			name:           "TestValidateExplicitBucketNameIllegalCharacter",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Add("/spec/name", "!@#$%^&*()")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should match '^[a-zA-Z0-9-_%\.]+$'`},
+		},
+		{
+			name:           "TestValidateExplicitBucketNameIllegalLength",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Add("/spec/name", "000000000011111111111222222222223333333333344444444444455555555555666666666667777777777778888888888889999999999OVERFLOW")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should be at most 100 chars long`},
+		},
+		{
+			name:           "TestValidateExplicitEphemeralBucketNameIllegalCharacter",
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Add("/spec/name", "!@#$%^&*()")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should match '^[a-zA-Z0-9-_%\.]+$'`},
+		},
+		{
+			name:           "TestValidateExplicitEphemeralBucketNameIllegalLength",
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Add("/spec/name", "000000000011111111111222222222223333333333344444444444455555555555666666666667777777777778888888888889999999999OVERFLOW")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should be at most 100 chars long`},
+		},
+		{
+			name:           "TestValidateExplicitMemcachedBucketNameIllegalCharacter",
+			mutations:      patchMap{"bucket2": jsonpatch.NewPatchSet().Add("/spec/name", "!@#$%^&*()")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should match '^[a-zA-Z0-9-_%\.]+$'`},
+		},
+		{
+			name:           "TestValidateExplicitMemcachedBucketNameIllegalLength",
+			mutations:      patchMap{"bucket2": jsonpatch.NewPatchSet().Add("/spec/name", "000000000011111111111222222222223333333333344444444444455555555555666666666667777777777778888888888889999999999OVERFLOW")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name in body should be at most 100 chars long`},
+		},
+		{
+			name:           "TestValidateN2NEncryptionIllegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/nodeToNodeEncryption", "illegal")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.tls.nodeToNodeEncryption in body should match '^(All|ControlPlaneOnly)$'`},
 		},
 	}
 

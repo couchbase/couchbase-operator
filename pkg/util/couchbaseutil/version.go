@@ -147,6 +147,11 @@ func (v *Version) GreaterEqual(o *Version) bool {
 	return !v.Less(o)
 }
 
+func (v *Version) GreaterEqualString(o string) bool {
+	ov, _ := NewVersion(o)
+	return v.GreaterEqual(ov)
+}
+
 func VerifyVersion(version string) error {
 	v, err := NewVersion(version)
 	if err != nil {

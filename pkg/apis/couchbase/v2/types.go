@@ -247,6 +247,7 @@ type CouchbaseBucket struct {
 }
 
 type CouchbaseBucketSpec struct {
+	Name               string                            `json:"name,omitempty"`
 	MemoryQuota        *resource.Quantity                `json:"memoryQuota,omitempty"`
 	Replicas           int                               `json:"replicas,omitempty"`
 	IoPriority         CouchbaseBucketIOPriority         `json:"ioPriority,omitempty"`
@@ -273,6 +274,7 @@ type CouchbaseEphemeralBucket struct {
 }
 
 type CouchbaseEphemeralBucketSpec struct {
+	Name               string                                 `json:"name,omitempty"`
 	MemoryQuota        *resource.Quantity                     `json:"memoryQuota,omitempty"`
 	Replicas           int                                    `json:"replicas,omitempty"`
 	IoPriority         CouchbaseBucketIOPriority              `json:"ioPriority,omitempty"`
@@ -298,6 +300,7 @@ type CouchbaseMemcachedBucket struct {
 }
 
 type CouchbaseMemcachedBucketSpec struct {
+	Name        string             `json:"name,omitempty"`
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
 	EnableFlush bool               `json:"enableFlush,omitempty"`
 }
@@ -1011,6 +1014,17 @@ type VolumeMounts struct {
 	LogsClaim string `json:"logs,omitempty"`
 }
 
+// NodeToNodeEncryptionType is used to define the level of node-to-node encryption.
+type NodeToNodeEncryptionType string
+
+const (
+	// NodeToNodeControlPlaneOnly is faster but at the expense of exposing your data.
+	NodeToNodeControlPlaneOnly NodeToNodeEncryptionType = "ControlPlaneOnly"
+
+	// NodeToNodeAll all traffic should be over TLS.
+	NodeToNodeAll NodeToNodeEncryptionType = "All"
+)
+
 // TLSPolicy defines the TLS policy of an couchbase cluster
 type TLSPolicy struct {
 	// StaticTLS enables user to generate static x509 certificates and keys,
@@ -1025,6 +1039,10 @@ type TLSPolicy struct {
 	// ClientCertificatePaths optionally defines where to look in client
 	// certificates to extract the user name.
 	ClientCertificatePaths []ClientCertificatePath `json:"clientCertificatePaths,omitempty"`
+
+	// NodeToNodeEncryption specifies whether to encrypt data between Couchbase nodes
+	// within the same cluster.  This may come at the expense of performance.
+	NodeToNodeEncryption *NodeToNodeEncryptionType `json:"nodeToNodeEncryption,omitempty"`
 }
 
 type StaticTLS struct {

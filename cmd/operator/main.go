@@ -20,6 +20,7 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -52,6 +53,12 @@ func main() {
 	pflag.Parse()
 
 	logf.SetLogger(zap.Logger())
+
+	// Some 3rd party libraries try to write to a file on error, which it cannot do
+	// when using scratch containers, so route those errors to standard error.  Not
+	// doing so results in operator restarts after said 3rd party loggers panic on
+	// error...
+	klog.SetOutput(os.Stderr)
 
 	// Log the version, branch and revision so we know
 	// * Version feature set

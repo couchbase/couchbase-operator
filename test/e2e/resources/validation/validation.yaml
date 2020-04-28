@@ -204,6 +204,7 @@ spec:
         - path: subject.cn
           prefix: prefix
           delimiter: .
+      nodeToNodeEncryption: All
     loadBalancerSourceRanges:
     - 10.0.0.0/8
     - 172.16.0.0/12

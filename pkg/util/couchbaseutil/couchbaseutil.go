@@ -1021,3 +1021,37 @@ func (c *CouchbaseClient) GetLDAPSettings(ms MemberSet) (*cbmgr.LDAPSettings, er
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetLDAPSettings()
 }
+
+func (c *CouchbaseClient) GetSecuritySettings(ms MemberSet) (*cbmgr.SecuritySettings, error) {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetSecuritySettings()
+}
+
+func (c *CouchbaseClient) SetSecuritySettings(ms MemberSet, s *cbmgr.SecuritySettings) error {
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.SetSecuritySettings(s)
+}
+
+func (c *CouchbaseClient) GetNodeNetworkConfiguration(m *Member) (*cbmgr.NodeNetworkConfiguration, error) {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.GetNodeNetworkConfiguration()
+}
+
+func (c *CouchbaseClient) SetNodeNetworkConfiguration(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.SetNodeNetworkConfiguration(s)
+}
+
+func (c *CouchbaseClient) EnableExternalListener(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.EnableExternalListener(s)
+}
+
+func (c *CouchbaseClient) DisableExternalListener(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
+	ms := NewMemberSet(m)
+	c.client.SetEndpoints(ms.ClientURLs())
+	return c.client.DisableExternalListener(s)
+}

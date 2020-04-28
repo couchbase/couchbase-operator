@@ -22,7 +22,7 @@ import (
 // we don't redefine if the same cluster is used for source and target couchbase instances.
 func mustCreateXDCRBuckets(t *testing.T, k8s1, k8s2 *types.Cluster) {
 	e2eutil.MustNewBucket(t, k8s1, k8s1.Namespace, e2espec.DefaultBucket)
-	if k8s1.Config.Host != k8s2.Config.Host {
+	if k8s1.Config.Host != k8s2.Config.Host || k8s1.Namespace != k8s2.Namespace {
 		e2eutil.MustNewBucket(t, k8s2, k8s2.Namespace, e2espec.DefaultBucket)
 	}
 }
