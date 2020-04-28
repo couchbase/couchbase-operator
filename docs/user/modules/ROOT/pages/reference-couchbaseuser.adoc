@@ -100,11 +100,11 @@ ____
 
 This field defines how to authenticate the user.
 If set to `local` the user will be authenticated against a local password.
-If set to `ldap` the user will be authenticated against a remote LDAP server.
+If set to `external` the user will be authenticated against a remote LDAP server.
 LDAP authentication requires the `spec.security.rbac.ldap` object to be configured in a related `CouchbaseCluster` resource.
 
 ____
-_Field rules:_ This field is required and must be either `local` or `ldap`.
+_Field rules:_ This field is required and must be either `local` or `exteternal`.
 ____
 
 === spec.authSecret

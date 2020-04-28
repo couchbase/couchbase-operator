@@ -59,8 +59,8 @@
  ** Kubernetes
   *** xref:howto-storage-class.adoc[Create a Lazy Bound Storage Class]
  ** Helm
-  *** xref:helm-setup-guide.adoc[Install Helm]
-  *** xref:helm-managing-guide.adoc[Manage Helm]
+  *** xref:helm-setup-guide.adoc[Helm Deployment]
+  *** xref:helm-managing-guide.adoc[Helm Management]
 * Reference
  ** Resource Types
   *** xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
@@ -84,8 +84,7 @@
  ** Couchbase Cluster
   *** xref:reference-couchbasecluster-services.adoc[CouchbaseCluster Services]
  ** Helm
-  *** xref:helm-operator-config.adoc[Operator Chart Spec]
-  *** xref:helm-cluster-config.adoc[Couchbase Cluster Chart Spec]
+  *** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]
  ** Tools
   *** xref:reference-cbopcfg.adoc[cbopcfg]
   *** xref:reference-cbopinfo.adoc[cbopinfo]
