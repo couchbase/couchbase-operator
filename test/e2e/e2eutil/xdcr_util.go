@@ -13,6 +13,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -183,38 +184,78 @@ func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseClus
 // getRemoteUUIDAndHostGeneric returns the remote hostname, based on IP and node port, and the cluster UUID.
 // Used for generic XDCR testing.
 func getRemoteUUIDAndHostGeneric(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
-	// List the pods on the remote cluster and pick one
-	svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name+"-ui", metav1.GetOptions{})
+	options := metav1.ListOptions{
+		LabelSelector: constants.LabelCluster + "=" + cluster.Name,
+	}
+
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(options)
 	if err != nil {
 		return "", "", err
 	}
 
-	nodePort := -1
+	if len(pods.Items) == 0 {
+		return "", "", fmt.Errorf("no pods selected")
+	}
+
+	pod := pods.Items[0]
+
+	ip := pod.Status.HostIP
+	if ip == "" {
+		return "", "", fmt.Errorf("no pod host IP defined")
+	}
+
+	svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+
+	var nodePort int32
 	for _, port := range svc.Spec.Ports {
 		if port.Port == 8091 {
-			nodePort = int(port.NodePort)
-			break
+			nodePort = port.NodePort
 		}
 	}
-	if nodePort == -1 {
-		return "", "", fmt.Errorf("admin service port not exposed")
+
+	if nodePort == 0 {
+		return "", "", fmt.Errorf("unable to determine pod service node port for admin")
 	}
 
-	nodes, err := kubernetes.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return "", "", err
-	}
+	/*
+		// High-availability/load-balancing is broken in 6.5.1
 
-	ip := ""
-	for _, address := range nodes.Items[0].Status.Addresses {
-		if address.Type == "InternalIP" {
-			ip = address.Address
-			break
+		// List the pods on the remote cluster and pick one
+		svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name+"-ui", metav1.GetOptions{})
+		if err != nil {
+			return "", "", err
 		}
-	}
-	if ip == "" {
-		return "", "", fmt.Errorf("unable to determine node IP address")
-	}
+
+		nodePort := -1
+		for _, port := range svc.Spec.Ports {
+			if port.Port == 8091 {
+				nodePort = int(port.NodePort)
+				break
+			}
+		}
+		if nodePort == -1 {
+			return "", "", fmt.Errorf("admin service port not exposed")
+		}
+
+		nodes, err := kubernetes.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil {
+			return "", "", err
+		}
+
+		ip := ""
+		for _, address := range nodes.Items[0].Status.Addresses {
+			if address.Type == "InternalIP" {
+				ip = address.Address
+				break
+			}
+		}
+		if ip == "" {
+			return "", "", fmt.Errorf("unable to determine node IP address")
+		}
+	*/
 
 	uuid, err := getRemoteUUID(kubernetes, cluster)
 	if err != nil {
