@@ -851,7 +851,6 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 				},
 			},
 		},
-		Command: []string{"couchbase-exporter"},
 		Ports: []v1.ContainerPort{
 			{
 				Name:          "prometheus",
