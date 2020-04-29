@@ -7,6 +7,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"strconv"
 
 	"github.com/couchbase/couchbase-operator/pkg/apis"
 	"github.com/couchbase/couchbase-operator/pkg/chaos"
@@ -16,12 +17,12 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
-	"github.com/operator-framework/operator-sdk/pkg/leader"
-	"github.com/operator-framework/operator-sdk/pkg/log/zap"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	zapf "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
@@ -38,13 +39,49 @@ var (
 	metricsPort int32 = 8383
 )
 
+// This is done for us by controller runtime v0.8.0, however the changes to
+// the v0.18.0 client libraries are quite large, so do it manually for now.
+type logLevel struct {
+	level zapcore.Level
+}
+
+func (l *logLevel) Type() string {
+	return "logLevel"
+}
+
+func (l *logLevel) String() string {
+	return l.level.String()
+}
+
+func (l *logLevel) Set(s string) error {
+	switch s {
+	case "debug":
+		l.level = zapcore.DebugLevel
+	case "info":
+		l.level = zapcore.InfoLevel
+	case "error":
+		l.level = zapcore.ErrorLevel
+	default:
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			return err
+		}
+
+		l.level = zapcore.Level(i)
+	}
+
+	return nil
+}
+
 var log = logf.Log.WithName("main")
 
 // create controller from initialised config
 func main() {
-	pflag.CommandLine.AddFlagSet(zap.FlagSet())
+	var level logLevel
+
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
+	pflag.Var(&level, "zap-level", "The log level ('info', 'error', 'debug' or an integer >= 0)")
 	pflag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
 	pflag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
 	pflag.BoolVar(&printVersion, "version", false, "Show version and quit")
@@ -52,7 +89,9 @@ func main() {
 	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
 	pflag.Parse()
 
-	logf.SetLogger(zap.Logger())
+	atomicLevel := zap.NewAtomicLevelAt(level.level)
+
+	logf.SetLogger(zapf.New(zapf.Level(&atomicLevel)))
 
 	// Some 3rd party libraries try to write to a file on error, which it cannot do
 	// when using scratch containers, so route those errors to standard error.  Not
@@ -69,9 +108,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	namespace, err := k8sutil.GetWatchNamespace()
-	if err != nil {
-		log.Error(err, "Failed to get watch namespace")
+	namespace, ok := os.LookupEnv("WATCH_NAMESPACE")
+	if !ok {
+		log.Error(fmt.Errorf("WATCH_NAMESPACE must be set"), "Failed to get watch namespace")
 		os.Exit(1)
 	}
 
@@ -81,16 +120,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := leader.Become(context.Background(), "couchbase-operator"); err != nil {
-		log.Error(err, "Error becoming leader")
-		os.Exit(1)
-	}
-
 	log.V(1).Info("Initializing resource manager.")
 
 	mgr, err := manager.New(cfg, manager.Options{
 		Namespace:          namespace,
 		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+		LeaderElection: true,
+		LeaderElectionNamespace: namespace,
+		LeaderElectionID: "couchbase-operator",
 	})
 	if err != nil {
 		log.Error(err, "Error initializing manager")

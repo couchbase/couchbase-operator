@@ -113,7 +113,7 @@ func main() {
 
 	// Parse the command line arguments.
 	config := Configuration{
-		ConfigFlags: genericclioptions.NewConfigFlags(),
+		ConfigFlags: genericclioptions.NewConfigFlags(true),
 	}
 	flagSet := pflag.NewFlagSet("cbopconv", pflag.ExitOnError)
 	config.ConfigFlags.AddFlags(flagSet)

@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -10,9 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // Variable to store random suffix for couchbase-server name & tls certificates
@@ -320,23 +316,6 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 	if err := v.Validate(os.Stdout); err != nil {
 		t.Error(err)
 	}
-}
-
-// Remove specified label from all k8s nodes identified by kubeName
-func K8SNodesRemoveLabel(nodeLabelName string, kubeClient kubernetes.Interface) error {
-	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get k8s nodes: %v", err)
-	}
-	for _, k8sNode := range k8sNodeList.Items {
-		nodeLabels := k8sNode.GetLabels()
-		delete(nodeLabels, nodeLabelName)
-		k8sNode.SetLabels(nodeLabels)
-		if _, err = kubeClient.CoreV1().Nodes().Update(&k8sNode); err != nil {
-			return fmt.Errorf("failed to delete label for node %s: %v", k8sNode.Name, err)
-		}
-	}
-	return nil
 }
 
 // skipEnterpriseOnlyPlatform skips the test if it's Enterprise Edition only e.g.

@@ -10,6 +10,8 @@ linters:
     - interfacer
     - unconvert
     - misspell
+  disable:
+    - staticcheck
 
 issues:
   exclude-rules:

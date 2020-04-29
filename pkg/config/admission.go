@@ -302,7 +302,7 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistra
 		ObjectMeta: metav1.ObjectMeta{
 			Name: AdmissionResourceName,
 		},
-		Webhooks: []admissionregistrationv1beta1.Webhook{
+		Webhooks: []admissionregistrationv1beta1.MutatingWebhook{
 			{
 				Name: AdmissionResourceName + "." + namespace + ".svc",
 				Rules: []admissionregistrationv1beta1.RuleWithOperations{
@@ -358,7 +358,7 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte) *admissionregist
 		ObjectMeta: metav1.ObjectMeta{
 			Name: AdmissionResourceName,
 		},
-		Webhooks: []admissionregistrationv1beta1.Webhook{
+		Webhooks: []admissionregistrationv1beta1.ValidatingWebhook{
 			{
 				Name: AdmissionResourceName + "." + namespace + ".svc",
 				Rules: []admissionregistrationv1beta1.RuleWithOperations{

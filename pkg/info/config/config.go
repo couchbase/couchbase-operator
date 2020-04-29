@@ -69,7 +69,7 @@ const (
 // Configuration object
 func Parse() Configuration {
 	c := Configuration{
-		ConfigFlags: genericclioptions.NewConfigFlags(),
+		ConfigFlags: genericclioptions.NewConfigFlags(true),
 	}
 
 	flagSet := pflag.NewFlagSet("cbopinfo", pflag.ExitOnError)
