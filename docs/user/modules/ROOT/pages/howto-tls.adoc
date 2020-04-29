@@ -1,4 +1,5 @@
 = Configure TLS
+:page-aliases: tls
 
 [abstract]
 How to configure Couchbase Server with basic TLS.

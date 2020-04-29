@@ -1,4 +1,5 @@
 = Configure XDCR
+:page-aliases: xdcr
 
 [abstract]
 How to set up unidirectional replication to another Couchbase cluster in a different Kubernetes cluster.

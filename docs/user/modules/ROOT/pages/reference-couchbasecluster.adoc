@@ -1,4 +1,5 @@
 = CouchbaseCluster Resource
+:page-aliases: couchbase-cluster-config
 include::partial$constants.adoc[]
 
 :toc: macro
@@ -80,8 +81,7 @@ spec:
     exposedFeatureTrafficPolicy: Local
     tls:
       static:
-        member:
-          serverSecret: couchbase-server-tls
+        serverSecret: couchbase-server-tls
         operatorSecret: couchbase-operator-tls
       clientCertificatePolicy: mandatory
       clientCertificatePaths:

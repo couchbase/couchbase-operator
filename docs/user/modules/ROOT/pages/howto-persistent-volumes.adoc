@@ -1,4 +1,5 @@
 = Configure Persistent Volumes
+:page-aliases: persistent-volumes-setup
 
 [abstract]
 How to use persistent volumes with a Couchbase cluster.

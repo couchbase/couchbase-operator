@@ -1,4 +1,5 @@
 = Operator RBAC Settings
+:page-aliases: kubernetes-rbac
 
 Kubernetes supports role-based access control (RBAC), which allows containers to be bound to roles which give them permissions to operate on various resources. This topic aims to give a general overview of RBAC in the context of deploying the Operator and managing Couchbase Server clusters.
 

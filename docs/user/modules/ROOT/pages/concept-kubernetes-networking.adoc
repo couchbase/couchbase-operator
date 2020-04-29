@@ -1,4 +1,5 @@
 = Kubernetes Networking
+:page-aliases: networking
 
 [abstract]
 Networking in a Kubernetes environment is complex.

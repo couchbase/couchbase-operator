@@ -1,4 +1,5 @@
 = Installing GKE
+:page-aliases: install-gke
 
 [abstract]
 Prepare Google Kubernetes Engine (GKE) for the Couchbase Autonomous Operator.

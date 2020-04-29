@@ -99,7 +99,7 @@ Read more about xref:concept-upgrade[Couchbase Pod Upgrades].
 ==== Logging
 
 The Autonomous Operator and Dynamic Admission Controller now use JSON logging. 
-This change includes some helpful enhancements, such as pod status outputs no longer spanning multiple lines, and rebalance status now being labelled with proper cluster context.
+This change includes some helpful enhancements, such as pod status outputs no longer spanning multiple lines, and rebalance status now being labeled with proper cluster context.
 
 [#fixed-issues-v200]
 === Fixed Issues
@@ -123,7 +123,7 @@ a| When deploying on Red Hat OpenShift using the Operator Lifecycle Manager (OLM
 This has been corrected in the 2.0 release.
 
 a| https://issues.couchbase.com/browse/K8S-1111[K8S-1111^]
-a| In releases prior to 2.0, running `kubctl wait` on a Couchbase Cluster resource-based deployment may have resulted in errors such as `error: .status.conditions accessor error`.
+a| In releases prior to 2.0, running `kubectl wait` on a Couchbase Cluster resource-based deployment may have resulted in errors such as `error: .status.conditions accessor error`.
 Starting in 2.0, it is possible to run `kubectl wait` on Couchbase Cluster defined resources to wait until Pods are ready, etc.
 |===
 
@@ -142,7 +142,7 @@ a| *Summary:* Running `cbopcfg` with the intention of generating backup resource
 a| https://issues.couchbase.com/browse/K8S-1437[K8S-1437^]
 a| *Summary:* The current operator-backup image in the Red Hat Container Catalog has a security grade of C due to being built on an older RHEL base image.
 A new image will be built to resolve this security grade and the default value for this image will be reflected in the next maintenance release.
-The reported vulnerability, CVE-2019-13734, is low risk in this use, as the Autonomous Operator does not use the RHEL-supplied Chrome or sqlite as described in the vulnerability.
+The reported vulnerability, CVE-2019-13734, is low risk in this use, as the Autonomous Operator does not use the RHEL-supplied Chrome or SQLite as described in the vulnerability.
 
 *Workaround:* Ensure you do not use Chrome from backup jobs to access websites.
 Edit the image tag under `spec.backup.image` in the running `CouchbaseCluster` resource configuration from revision `-4` to revision `-5`.
@@ -151,6 +151,14 @@ a| https://issues.couchbase.com/browse/K8S-1395[K8S-1395^]
 a| *Summary:* On macOS 10.15 (Catalina), you may see an error such as `./cbopcfg: cannot execute binary file` when trying to execute commands included in the Autonomous Operator download package.
 
 *Workaround:* Update the macOS security settings to allow *Allow apps downloaded from - App store and identified developer* as outlined in the https://support.apple.com/en-us/HT202491[Apple Mac OS article on Gatekeeper].
+
+a| https://issues.couchbase.com/browse/K8S-1451[K8S-1451^]
+a| *Summary:* A behavioral change to XDCR in Couchbase Server 6.5.1 means that the documented method for generating connection strings will not work.
+This applies to incoming XDCR connections that are external to the Kubernetes cluster i.e. xref:concept-couchbase-networking.adoc#public-networking-with-external-dns[public networking with External DNS] and xref:concept-couchbase-networking.adoc#generic-networking[generic networking].
+
+*Workaround:* We advise the use of load-balanced XDCR endpoints as they have stable names and provide high-availability.
+Couchbase Server 6.5.1, however, requires that the connection string exactly matches a Couchbase Server node hostname.
+Additional instructions are xref:howto-client-sdks.adoc#cbs-651[provided] to allow successful configuration of XDCR connections.
 |===
 
 == Feedback

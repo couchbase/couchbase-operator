@@ -1,4 +1,5 @@
 = View Operator Logs
+:page-aliases: logs-troubleshooting
 include::partial$constants.adoc[]
 :experimental:
 

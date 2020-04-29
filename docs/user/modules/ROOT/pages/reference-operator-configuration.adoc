@@ -1,4 +1,5 @@
 = Operator Deployment Settings
+:page-aliases: operator-config
 
 The Couchbase Autonomous Operator configuration is defined below.
 

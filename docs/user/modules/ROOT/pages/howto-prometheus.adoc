@@ -76,7 +76,7 @@ The Autonomous Operator does not create or manage resources for third-party soft
 Prometheus scrape targets must be manually created by the user.
 However, you might find the following resources helpful when setting up your Prometheus environment:
 
+* Couchbase Blog -- https://blog.couchbase.com/step-by-step-guide-for-running-couchbase-autonomous-operator-2-0-with-prometheus-part-1/[Part 1^] & https://blog.couchbase.com/step-by-step-guide-for-running-couchbase-autonomous-operator-2-0-with-prometheus-part-2/[Part 2^]
 * https://github.com/couchbase/couchbase-exporter[Couchbase Prometheus Exporter Project^]
 * https://github.com/coreos/prometheus-operator[CoreOS Prometheus Operator Project^]
 * https://github.com/helm/charts/tree/master/stable/prometheus-operator[Prometheus Operator Helm Chart^]
-* https://blog.couchbase.com/couchbase-monitoring-integration-with-prometheus-and-grafana/[Couchbase Blog^]

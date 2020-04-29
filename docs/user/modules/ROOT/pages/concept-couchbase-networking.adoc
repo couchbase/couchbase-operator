@@ -1,4 +1,5 @@
 = Couchbase Networking
+:page-aliases: network-requirements
 
 [abstract]
 Connecting to a Couchbase cluster in Kubernetes is challenging.

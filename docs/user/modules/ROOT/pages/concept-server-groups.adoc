@@ -1,4 +1,5 @@
 = Couchbase Server Groups
+:page-aliases: server-groups
 
 [abstract]
 Couchbase Server Groups are granular, logical groupings of resources that are tolerant of large scale infrastructure faults.

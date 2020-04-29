@@ -1,4 +1,5 @@
 = Installing EKS
+:page-aliases: install-eks
 
 [abstract]
 Prepare Amazon Elastic Kubernetes Service (EKS) for the Couchbase Autonomous Operator.
