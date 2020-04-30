@@ -454,7 +454,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateExposedFeaturesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/exposedFeatures", couchbasev2.ExposedFeatureList{couchbasev2.FeatureAdmin, "cleint", couchbasev2.FeatureXDCR})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.networking.exposedFeatures in body should match '^admin|xdcr|client$'"},
+			expectedErrors: []string{"spec.networking.exposedFeatures in body should be one of [admin xdcr client]"},
 		},
 		{
 			name:           "TestValidateExposedFeaturesUnique",
@@ -466,25 +466,25 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_1",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
+			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral_2",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
+			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidInvalidForCouchbase_1",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", "noEviction")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
+			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidInvalidForCouchbase_2",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
+			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
 		},
 		// Hard problem.
 		//		{
@@ -502,19 +502,19 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionMode("invalid"))},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.compressionMode in body should match '^off|passive|active$'"},
+			expectedErrors: []string{"spec.compressionMode in body should be one of [off passive active]"},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionMode("invalid"))},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.compressionMode in body should match '^off|passive|active$'"},
+			expectedErrors: []string{"spec.compressionMode in body should be one of [off passive active]"},
 		},
 		{
 			name:           "TestValidateServerServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.Service("indxe"), couchbasev2.QueryService, couchbasev2.SearchService})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers.services in body should match '^data|index|query|search|eventing|analytics$'"},
+			expectedErrors: []string{"spec.servers.services in body should be one of [admin data index query search eventing analytics]"},
 		},
 		{
 			name:           "TestValidateServerNameUnique",
@@ -562,7 +562,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateAdminConsoleServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/adminConsoleServices", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.Service("indxe"), couchbasev2.QueryService, couchbasev2.SearchService})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.networking.adminConsoleServices in body should match '^data|index|query|search|eventing|analytics$'"},
+			expectedErrors: []string{"spec.networking.adminConsoleServices in body should be one of [admin data index query search eventing analytics]"},
 		},
 		{
 			name:           "TestValidateVolumeClaimTemplatesStorageClassMustExist",
@@ -637,7 +637,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateTLSClientCertificatePolicyInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/clientCertificatePolicy", "invalid")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.networking.tls.clientCertificatePolicy in body should match '^enable|mandatory$'`},
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePolicy in body should be one of [enable mandatory]`},
 		},
 		{
 			name:           "TestValidateTLSClientCertificatePathInvalid",
@@ -759,7 +759,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateXDCRReplicationCompressionTypeInvalid",
 			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/compressionType", couchbasev2.CompressionType("huggy-bear"))},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.compressionType in body should match '^None|Auto|Snappy$'`},
+			expectedErrors: []string{`spec.compressionType in body should be one of [None Auto Snappy]`},
 		},
 		{
 			name:           "TestValidateXDCRTLSSecretMissing",
@@ -777,7 +777,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateExposedFeatureTrafficPolicyInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/exposedFeatureTrafficPolicy", &invalidExternalTraficPolicy)},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.networking.exposedFeatureTrafficPolicy in body should match '^Cluster|Local$'`},
+			expectedErrors: []string{`spec.networking.exposedFeatureTrafficPolicy in body should be one of [Cluster Local]`},
 		},
 		{
 			name:           "TestValidateLoadBalancerSourceRanges",
@@ -873,7 +873,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateBackupInvalidStrategy",
 			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/strategy", "tumbleweed")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.strategy in body should match '^full_incremental|full_only$'`},
+			expectedErrors: []string{`spec.strategy in body should be one of [full_incremental full_only]`},
 		},
 		{
 			name:           "TestValidateBackupSizeZero",
@@ -886,12 +886,6 @@ func TestNegValidationCreate(t *testing.T) {
 			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", "-2")},
 			shouldFail:     true,
 			expectedErrors: []string{`size: -2 must be greater than 0`},
-		},
-		{
-			name:           "TestValidateBackupSizeInteger",
-			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", 21)},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.size in body must be of type string: "integer"`},
 		},
 		{
 			name:           "TestValidateBackupRestoreMissingBackupField",
@@ -987,7 +981,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateN2NEncryptionIllegal",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/nodeToNodeEncryption", "illegal")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.networking.tls.nodeToNodeEncryption in body should match '^(All|ControlPlaneOnly)$'`},
+			expectedErrors: []string{`spec.networking.tls.nodeToNodeEncryption in body should be one of [ControlPlaneOnly All]`},
 		},
 	}
 
@@ -1173,31 +1167,31 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			name:           "TestValidateAdminConsoleServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/adminConsoleServices", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.Service("xxxxx")})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.networking.adminConsoleServices in body should match '^data|index|query|search|eventing|analytics$'"},
+			expectedErrors: []string{"spec.networking.adminConsoleServices in body should be one of [admin data index query search eventing analytics]"},
 		},
 		{
 			name:           "TestValidateBucketIOPriorityEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/ioPriority", "lighow")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.ioPriority in body should match '^high|low$'"},
+			expectedErrors: []string{"spec.ioPriority in body should be one of [low high]"},
 		},
 		{
 			name:           "TestValidateBucketConflictResolutionEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/conflictResolution", "selwwno")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.conflictResolution in body should match '^seqno|lww$'"},
+			expectedErrors: []string{"spec.conflictResolution in body should be one of [seqno lww]"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
+			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
 		},
 		{
 			name:           "TestValidateBucketEvictionPolicyEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
+			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1330,26 +1324,26 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			name:           "TestValidateApplyAdminConsoleServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/adminConsoleServices", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.QueryService, couchbasev2.Service("xxxxx")})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.networking.adminConsoleServices in body should match '^data|index|query|search|eventing|analytics$'"},
+			expectedErrors: []string{"spec.networking.adminConsoleServices in body should be one of [admin data index query search eventing analytics]"},
 		},
 		{
 			name:           "TestValidateApplyBucketIOPriorityEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/ioPriority", "lighow")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.ioPriority in body should match '^high|low$'"},
+			expectedErrors: []string{"spec.ioPriority in body should be one of [low high]"},
 		},
 		{
 			name:           "TestValidateApplyBucketEvictionPolicyEnumInvalidForEphemeral",
 			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should match '^noEviction|nruEviction$'"},
+			expectedErrors: []string{"spec.evictionPolicy in body should be one of [noEviction nruEviction]"},
 		},
 
 		{
 			name:           "TestValidateApplyBucketEvictionPolicyEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy in body should match '^valueOnly|fullEviction$'"},
+			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
 		},
 	}
 	kubeName := framework.Global.TestClusters[0]
@@ -1369,7 +1363,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name:           "TestValidateApplyBucketConflictResolutionEnumInvalidForCouchbase",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/conflictResolution", "selwwno")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.conflictResolution in body should match '^seqno|lww$'"},
+			expectedErrors: []string{"spec.conflictResolution in body should be one of [seqno lww]"},
 		},
 		{
 			name:           "TestValidateApplyBucketConflictResolutionImmutableForCouchbase",
@@ -1478,7 +1472,7 @@ func TestRBACValidationCreate(t *testing.T) {
 			name:           "TestValidateUnkownDomain",
 			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "unknown")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.authDomain in body should match '^local|external$'"},
+			expectedErrors: []string{"spec.authDomain in body should be one of [local external]"},
 		},
 		{
 			name:           "TestValidateSecretRequired",
@@ -1543,7 +1537,7 @@ func TestRBACValidationLDAP(t *testing.T) {
 			name:           "TestValidateAuthDomain",
 			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "upnorth")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.authDomain in body should match '^local|external$'"},
+			expectedErrors: []string{"spec.authDomain in body should be one of [local external]"},
 		}, {
 			name:        "TestValidateAuthenticationDefault",
 			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/authenticationEnabled")},

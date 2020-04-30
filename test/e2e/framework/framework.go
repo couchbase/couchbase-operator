@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,19 +19,20 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	validationv2 "github.com/couchbase/couchbase-operator/pkg/util/k8sutil/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	"github.com/ghodss/yaml"
+	"github.com/sirupsen/logrus"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -334,36 +336,28 @@ func recreateCRDs(k8s *types.Cluster) error {
 		}
 	}
 
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseClusterCRD()); err != nil {
+	crdsRaw, err := ioutil.ReadFile("../../example/crd.yaml")
+	if err != nil {
 		return err
 	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseBucketCRD()); err != nil {
-		return err
+
+	crdYAMLs := strings.Split(string(crdsRaw), "---\n")
+
+	for _, crdYAML := range crdYAMLs {
+		if strings.TrimSpace(crdYAML) == "" {
+			continue
+		}
+
+		crd := &apiextensionsv1beta1.CustomResourceDefinition{}
+		if err := yaml.Unmarshal([]byte(crdYAML), crd); err != nil {
+			return err
+		}
+
+		if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
+			return err
+		}
 	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseEphemeralBucketCRD()); err != nil {
-		return err
-	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseMemcachedBucketCRD()); err != nil {
-		return err
-	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseReplicationCRD()); err != nil {
-		return err
-	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetUserCRD()); err != nil {
-		return err
-	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetGroupCRD()); err != nil {
-		return err
-	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetRoleBindingCRD()); err != nil {
-		return err
-	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseBackupCRD()); err != nil {
-		return err
-	}
-	if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(validationv2.GetCouchbaseBackupRestoreCRD()); err != nil {
-		return err
-	}
+
 	return nil
 }
 

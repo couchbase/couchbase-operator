@@ -95,7 +95,7 @@ func (l ServiceList) StringSlice() []string {
 	return slice
 }
 
-var SupportedFeatures = []string{
+var SupportedFeatures = []ExposedFeature{
 	FeatureAdmin,
 	FeatureXDCR,
 	FeatureClient,
@@ -104,7 +104,7 @@ var SupportedFeatures = []string{
 // Contains returns true if a requested feature is enabled
 func (efl ExposedFeatureList) Contains(feature string) bool {
 	for _, f := range efl {
-		if f == feature {
+		if string(f) == feature {
 			return true
 		}
 	}
@@ -276,6 +276,24 @@ func MissingItems(a1, a2 []string) []string {
 		}
 	}
 	return missingItems
+}
+
+// StringSlice strips an IPv4 prefix list of type.
+func (l IPV4PrefixList) StringSlice() []string {
+	s := make([]string, len(l))
+	for i := range l {
+		s[i] = string(l[i])
+	}
+	return s
+}
+
+// StringSlice strips an exposed feature list of type.
+func (l ExposedFeatureList) StringSlice() []string {
+	s := make([]string, len(l))
+	for i := range l {
+		s[i] = string(l[i])
+	}
+	return s
 }
 
 // HasExposedFeatures returns whether we need to expose ports and update the

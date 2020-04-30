@@ -194,7 +194,9 @@ func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, s
 	clusterSpec := e2espec.NewBasicXdcrCluster(size)
 	clusterSpec.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
 		ExposeAdminConsole: true,
-		ExposedFeatures:    []string{"xdcr"},
+		ExposedFeatures: couchbasev2.ExposedFeatureList{
+			couchbasev2.FeatureXDCR,
+		},
 	}
 	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
 	if err != nil {

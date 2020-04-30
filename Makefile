@@ -3,7 +3,6 @@ GOPATH = $(shell echo $${PWD%/src/*})
 SOURCE = $(shell find . -name *.go -type f)
 OPERATOR_BINARY = build/bin/couchbase-operator
 ADMISSION_BINARY = build/bin/couchbase-operator-admission
-CRDGEN_BINARY = build/bin/crdgen
 CBOPCFG_BINARY = build/bin/cbopcfg
 CBOPINFO_BINARY = build/bin/cbopinfo
 CBOPCONV_BINARY = build/bin/cbopconv
@@ -138,16 +137,14 @@ $(CBOPINFO_BINARY): $(GENERATED_FILES) $(SOURCE)
 $(CBOPCONV_BINARY): $(GENERATED_FILES) $(SOURCE)
 	$(GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/cbopconv
 
-# crdgen binary build target.
-$(CRDGEN_BINARY): $(GENERATED_FILES) $(SOURCE)
-	$(GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/crdgen
-
 # Build target for the CRD files.
 crd: $(CRD_FILE)
 
 # Build the CRDs from the binary when the binary updates.
-$(CRD_FILE): $(CRDGEN_BINARY)
-	$< > $@
+$(CRD_FILE): $(APISRC_V2)
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen crd paths=./pkg/apis/couchbase/v2 output:dir=example
+	@cat example/couchbase.com_*.yaml > $@
+	@rm example/couchbase.com_*.yaml
 
 # Build target to test that e2e testing compiles.
 build-test: $(GENERATED_FILES) $(SOURCE)

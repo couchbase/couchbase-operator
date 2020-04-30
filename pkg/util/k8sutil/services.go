@@ -502,7 +502,7 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 			service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		}
 
-		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges
+		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges.StringSlice()
 	} else {
 		// Ensure client sessions are maintained by routing to the same backend node based
 		// on the client IP address.
@@ -605,7 +605,7 @@ func GetExposedServiceName(nodeName string) string {
 }
 
 // exposedfeatureSets is a mapping from feature name to a list of host ports to expose
-var exposedfeatureSets = map[string][]couchbasev2.Service{
+var exposedfeatureSets = map[couchbasev2.ExposedFeature][]couchbasev2.Service{
 	couchbasev2.FeatureAdmin: []couchbasev2.Service{
 		couchbasev2.AdminService,
 	},
@@ -790,7 +790,7 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 	service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
 
 	if cluster.Spec.IsExposedFeatureServiceTypePublic() {
-		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges
+		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges.StringSlice()
 	}
 
 	// If a DNS domain is specified annotate with the pod DNS name.

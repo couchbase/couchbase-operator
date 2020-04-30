@@ -239,7 +239,6 @@ func main() {
 				},
 				Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
 					ExposeAdminConsole:        cluster.Spec.ExposeAdminConsole,
-					ExposedFeatures:           couchbasev2.ExposedFeatureList(cluster.Spec.ExposedFeatures),
 					ExposedFeatureServiceType: cluster.Spec.ExposedFeatureServiceType,
 					AdminConsoleServiceType:   cluster.Spec.AdminConsoleServiceType,
 				},
@@ -248,6 +247,10 @@ func main() {
 					LogRetentionCount: cluster.Spec.LogRetentionCount,
 				},
 			},
+		}
+
+		for _, feature := range cluster.Spec.ExposedFeatures {
+			newCluster.Spec.Networking.ExposedFeatures = append(newCluster.Spec.Networking.ExposedFeatures, couchbasev2.ExposedFeature(feature))
 		}
 
 		// Do attributes that require type conversion or involve pointers.

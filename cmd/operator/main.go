@@ -123,11 +123,11 @@ func main() {
 	log.V(1).Info("Initializing resource manager.")
 
 	mgr, err := manager.New(cfg, manager.Options{
-		Namespace:          namespace,
-		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
-		LeaderElection: true,
+		Namespace:               namespace,
+		MetricsBindAddress:      fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+		LeaderElection:          true,
 		LeaderElectionNamespace: namespace,
-		LeaderElectionID: "couchbase-operator",
+		LeaderElectionID:        "couchbase-operator",
 	})
 	if err != nil {
 		log.Error(err, "Error initializing manager")

@@ -8,6 +8,7 @@ import (
 
 // CouchbaseBucketCompressionMode defines the available compression modes for Couchbase
 // and Ephemeral bucket types.
+// +kubebuilder:validation:Enum=off;passive;active
 type CouchbaseBucketCompressionMode string
 
 const (
@@ -18,6 +19,7 @@ const (
 
 // CouchbaseBucketEvictionPolicy defines the available eviction policies for
 // Couchbase bucket types.
+// +kubebuilder:validation:Enum=valueOnly;fullEviction
 type CouchbaseBucketEvictionPolicy string
 
 const (
@@ -32,6 +34,7 @@ const (
 
 // CouchbaseEphemeralBucketEvictionPolicy defines the available eviction
 // policies for ephemeral bucket types.
+// +kubebuilder:validation:Enum=noEviction;nruEviction
 type CouchbaseEphemeralBucketEvictionPolicy string
 
 const (
@@ -45,6 +48,7 @@ const (
 )
 
 // CouchbaseBucketIOPriority defines the priority of a bucket.
+// +kubebuilder:validation:Enum=low;high
 type CouchbaseBucketIOPriority string
 
 const (
@@ -56,6 +60,7 @@ const (
 )
 
 // CouchbsaeBucketConflictResolution defines the XDCR conflict resolution for a bucket.
+// +kubebuilder:validation:Enum=seqno;lww
 type CouchbaseBucketConflictResolution string
 
 const (
@@ -70,11 +75,20 @@ const (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="strategy",type="string",JSONPath=".spec.strategy"
+// +kubebuilder:printcolumn:name="volume size",type="string",JSONPath=".spec.size"
+// +kubebuilder:printcolumn:name="capacity used",type="string",JSONPath=".status.capacityUsed"
+// +kubebuilder:printcolumn:name="last run",type="string",JSONPath=".status.lastRun"
+// +kubebuilder:printcolumn:name="last success",type="string",JSONPath=".status.lastSuccess"
+// +kubebuilder:printcolumn:name="running",type="boolean",JSONPath=".status.running"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type CouchbaseBackup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CouchbaseBackupSpec   `json:"spec"`
-	Status            CouchbaseBackupStatus `json:"status"`
+	Status            CouchbaseBackupStatus `json:"status,omitempty"`
 }
 
 type CouchbaseBackupSpec struct {
@@ -90,9 +104,11 @@ type CouchbaseBackupSpec struct {
 	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
 
 	// Amount of successful jobs to keep
+	// +kubebuilder:validation:Minimum=0
 	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit,omitempty"`
 
 	// Amount of failed jobs to keep
+	// +kubebuilder:validation:Minimum=0
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
 	// Number of times a backup job should try to execute.
@@ -141,6 +157,7 @@ type CouchbaseBackupStatus struct {
 	LastRun *metav1.Time `json:"lastRun,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=full_incremental;full_only
 type Strategy string
 
 const (
@@ -174,11 +191,19 @@ type BackupStatus struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="capacity used",type="string",JSONPath=".status.capacityUsed"
+// +kubebuilder:printcolumn:name="last run",type="string",JSONPath=".status.lastRun"
+// +kubebuilder:printcolumn:name="last success",type="string",JSONPath=".status.lastSuccess"
+// +kubebuilder:printcolumn:name="duration",type="string",JSONPath=".status.duration"
+// +kubebuilder:printcolumn:name="running",type="boolean",JSONPath=".status.running"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type CouchbaseBackupRestore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CouchbaseBackupRestoreSpec   `json:"spec"`
-	Status            CouchbaseBackupRestoreStatus `json:"status"`
+	Status            CouchbaseBackupRestoreStatus `json:"status,omitempty"`
 }
 
 type CouchbaseBackupRestoreSpec struct {
@@ -200,7 +225,8 @@ type CouchbaseBackupRestoreSpec struct {
 // struct we use in CouchbaseBackupRestoreSpec to enforce type-safeness
 type StrOrInt struct {
 	Str *string `json:"str,omitempty"`
-	Int *int    `json:"int,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	Int *int `json:"int,omitempty"`
 }
 
 type CouchbaseBackupRestoreStatus struct {
@@ -240,6 +266,14 @@ type CouchbaseBackupRestoreList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="memory quota",type="string",JSONPath=".spec.memoryQuota"
+// +kubebuilder:printcolumn:name="replicas",type="integer",JSONPath=".spec.replicas"
+// +kubebuilder:printcolumn:name="io priority",type="string",JSONPath=".spec.ioPriority"
+// +kubebuilder:printcolumn:name="eviction policy",type="string",JSONPath=".spec.evictionPolicy"
+// +kubebuilder:printcolumn:name="conflict resolution",type="string",JSONPath=".spec.conflictResolution"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type CouchbaseBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -247,8 +281,12 @@ type CouchbaseBucket struct {
 }
 
 type CouchbaseBucketSpec struct {
-	Name               string                            `json:"name,omitempty"`
-	MemoryQuota        *resource.Quantity                `json:"memoryQuota,omitempty"`
+	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
+	// +kubebuilder:validation:MaxLength=100
+	Name        string             `json:"name,omitempty"`
+	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=3
 	Replicas           int                               `json:"replicas,omitempty"`
 	IoPriority         CouchbaseBucketIOPriority         `json:"ioPriority,omitempty"`
 	EvictionPolicy     CouchbaseBucketEvictionPolicy     `json:"evictionPolicy,omitempty"`
@@ -267,6 +305,14 @@ type CouchbaseBucketList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="memory quota",type="string",JSONPath=".spec.memoryQuota"
+// +kubebuilder:printcolumn:name="replicas",type="integer",JSONPath=".spec.replicas"
+// +kubebuilder:printcolumn:name="io priority",type="string",JSONPath=".spec.ioPriority"
+// +kubebuilder:printcolumn:name="eviction policy",type="string",JSONPath=".spec.evictionPolicy"
+// +kubebuilder:printcolumn:name="conflict resolution",type="string",JSONPath=".spec.conflictResolution"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type CouchbaseEphemeralBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -274,8 +320,12 @@ type CouchbaseEphemeralBucket struct {
 }
 
 type CouchbaseEphemeralBucketSpec struct {
-	Name               string                                 `json:"name,omitempty"`
-	MemoryQuota        *resource.Quantity                     `json:"memoryQuota,omitempty"`
+	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
+	// +kubebuilder:validation:MaxLength=100
+	Name        string             `json:"name,omitempty"`
+	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=3
 	Replicas           int                                    `json:"replicas,omitempty"`
 	IoPriority         CouchbaseBucketIOPriority              `json:"ioPriority,omitempty"`
 	EvictionPolicy     CouchbaseEphemeralBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
@@ -293,6 +343,10 @@ type CouchbaseEphemeralBucketList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="memory quota",type="string",JSONPath=".spec.memoryQuota"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type CouchbaseMemcachedBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -300,6 +354,8 @@ type CouchbaseMemcachedBucket struct {
 }
 
 type CouchbaseMemcachedBucketSpec struct {
+	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
+	// +kubebuilder:validation:MaxLength=100
 	Name        string             `json:"name,omitempty"`
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
 	EnableFlush bool               `json:"enableFlush,omitempty"`
@@ -314,6 +370,12 @@ type CouchbaseMemcachedBucketList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="bucket",type="string",JSONPath=".spec.bucket"
+// +kubebuilder:printcolumn:name="remote bucket",type="string",JSONPath=".spec.remoteBucket"
+// +kubebuilder:printcolumn:name="paused",type="boolean",JSONPath=".spec.paused"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type CouchbaseReplication struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -343,6 +405,7 @@ type CouchbaseReplicationSpec struct {
 	RemoteBucket string `json:"remoteBucket,omitempty"`
 
 	// CompressionType is the type of compression to apply to the replication.
+	// +kubebuilder:validation:Enum=None;Auto;Snappy
 	CompressionType CompressionType `json:"compressionType,omitempty"`
 
 	// FilterExpression allows certain documents to be filtered out of the replication.
@@ -361,6 +424,8 @@ type CouchbaseReplicationList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
 type CouchbaseUser struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -378,9 +443,10 @@ type CouchbaseUserSpec struct {
 	// (Optional) Full Name of Couchbase user
 	FullName string `json:"fullName"`
 	// The domain which provides user auth
+	// +kubebuilder:validation:Enum=local;external
 	AuthDomain AuthDomain `json:"authDomain"`
 	// Name of kubernetes secret with password for couchbase domain
-	AuthSecret string `json:"authSecret"`
+	AuthSecret string `json:"authSecret,omitempty"`
 }
 
 // CouchbaseUserList is a list of Couchbase users.
@@ -393,6 +459,8 @@ type CouchbaseUserList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
 type CouchbaseGroup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -403,7 +471,7 @@ type CouchbaseGroupSpec struct {
 	// role identifier
 	Roles []Role `json:"roles"`
 	// optional reference to LDAP group
-	LDAPGroupRef string `json:"ldapGroupRef"`
+	LDAPGroupRef string `json:"ldapGroupRef,omitempty"`
 }
 
 // RoleName is a type-safe enumeration of all supported role names.
@@ -440,8 +508,10 @@ const (
 
 type Role struct {
 	// name of role
+	// +kubebuilder:validation:Enum=admin;cluster_admin;security_admin;ro_admin;replication_admin;query_external_access;query_system_catalog;analytics_reader;bucket_admin;views_admin;fts_admin;bucket_full_access;data_reader;data_writer;data_dcp_reader;data_backup;data_monitoring;replication_target;analytics_manager;views_reader;fts_searcher;query_select;query_update;query_insert;query_delete;query_manage_index
 	Name RoleName `json:"name"`
 	// optional bucket name for bucket admin roles
+	// +kubebuilder:validation:Pattern="^\\*$|^[a-zA-Z0-9-_%\\.]+$"
 	Bucket string `json:"bucket,omitempty"`
 }
 
@@ -455,6 +525,8 @@ type CouchbaseGroupList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
 type CouchbaseRoleBinding struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -514,14 +586,22 @@ type CouchbaseClusterList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="version",type="string",JSONPath=".status.currentVersion"
+// +kubebuilder:printcolumn:name="size",type="string",JSONPath=".status.size"
+// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="uuid",type="string",JSONPath=".status.clusterId"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type CouchbaseCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              ClusterSpec   `json:"spec"`
-	Status            ClusterStatus `json:"status"`
+	Status            ClusterStatus `json:"status,omitempty"`
 }
 
 // Supported services
+// +kubebuilder:validation:Enum=admin;data;index;query;search;eventing;analytics
 type Service string
 
 const (
@@ -536,21 +616,25 @@ const (
 
 type ServiceList []Service
 
+// +kubebuilder:validation:Enum=admin;xdcr;client
+type ExposedFeature string
+
 // Supported features
 const (
 	// Exposes the admin port/UI
-	FeatureAdmin = "admin"
+	FeatureAdmin ExposedFeature = "admin"
 	// Exposes ports necessary for XDCR
-	FeatureXDCR = "xdcr"
+	FeatureXDCR ExposedFeature = "xdcr"
 	// Exposes all client ports for services
-	FeatureClient = "client"
+	FeatureClient ExposedFeature = "client"
 )
 
 // A list of exposed features e.g. admin,xdcr
-type ExposedFeatureList []string
+type ExposedFeatureList []ExposedFeature
 
 // PlatformType defines the platform you are running on which provides explicit
 // control over how resources are configured.
+// +kubebuilder:validation:Enum=aws;gce;azure
 type PlatformType string
 
 const (
@@ -572,10 +656,10 @@ type ClusterSpec struct {
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// Cluster specific settings
-	ClusterSettings ClusterConfig `json:"cluster"`
+	ClusterSettings ClusterConfig `json:"cluster,omitempty"`
 
 	// Enables software update notifications in the UI
-	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications"`
+	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications,omitempty"`
 
 	// VolumeClaimTemplates define the desired characteristics of a volume
 	// that can be requested/claimed by a pod.
@@ -599,25 +683,26 @@ type ClusterSpec struct {
 	Security CouchbaseClusterSecuritySpec `json:"security"`
 
 	// Networking groups together related networking options.
-	Networking CouchbaseClusterNetworkingSpec `json:"networking"`
+	Networking CouchbaseClusterNetworkingSpec `json:"networking,omitempty"`
 
 	// Logging groups together logging related options.
-	Logging CouchbaseClusterLoggingSpec `json:"logging"`
+	Logging CouchbaseClusterLoggingSpec `json:"logging,omitempty"`
 
 	// Servers specifies
-	Servers []ServerConfig `json:"servers,omitempty"`
+	// +kubebuilder:validation:MinItems=1
+	Servers []ServerConfig `json:"servers"`
 
 	// Bucket specific settings
 	Buckets Buckets `json:"buckets,omitempty"`
 
 	// XDCR specific settings.
-	XDCR XDCR `json:"xdcr"`
+	XDCR XDCR `json:"xdcr,omitempty"`
 
 	// Prometheus Monitoring settings.
 	Monitoring *CouchbaseClusterMonitoringSpec `json:"monitoring,omitempty"`
 
 	// Backup specific settings
-	Backup Backup `json:"backup"`
+	Backup Backup `json:"backup,omitempty"`
 }
 
 type Backup struct {
@@ -642,6 +727,7 @@ type Backup struct {
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=None;StartTLSExtension;TLS
 type LDAPEncryption string
 
 // LDAP Encryption types
@@ -716,6 +802,11 @@ type CouchbaseClusterSecuritySpec struct {
 	LDAP *CouchbaseClusterLDAPSpec `json:"ldap,omitempty"`
 }
 
+// +kubebuilder:validation:Pattern="^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}$"
+type IPv4Prefix string
+
+type IPV4PrefixList []IPv4Prefix
+
 type CouchbaseClusterNetworkingSpec struct {
 	// ExposeAdminConsole creates a service referencing the admin console.
 	ExposeAdminConsole bool `json:"exposeAdminConsole,omitempty"`
@@ -724,6 +815,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	AdminConsoleServices ServiceList `json:"adminConsoleServices,omitempty"`
 
 	// AdminConsoleServiceType defines whether to create a NodePort or LoadBalancer service.
+	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
 
 	// ExposedFeatures is a list of features to expose on the K8S node
@@ -732,9 +824,11 @@ type CouchbaseClusterNetworkingSpec struct {
 	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
 
 	// ExposedFeatureServiceType defines whether to create a NodePort or LoadBalancer service.
+	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	ExposedFeatureServiceType v1.ServiceType `json:"exposedFeatureServiceType,omitempty"`
 
 	// ExposedFeatureTrafficPolicy defines how packets should be routed.
+	// +kubebuilder:validation:Enum=Cluster;Local
 	ExposedFeatureTrafficPolicy *v1.ServiceExternalTrafficPolicyType `json:"exposedFeatureTrafficPolicy,omitempty"`
 
 	// TLS contains the TLS configuration for the cluster.
@@ -751,14 +845,16 @@ type CouchbaseClusterNetworkingSpec struct {
 	// LoadBalancerSourceRanges applies only when an exposed service is of type
 	// LoadBalancer and limits the source IP ranges that are allowed to use the
 	// service.
-	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty"`
+	LoadBalancerSourceRanges IPV4PrefixList `json:"loadBalancerSourceRanges,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
 	// LogRetentionTime gives the time to keep persistent log PVCs alive for.
+	// +kubebuilder:validation:Pattern="^\\d+(ns|us|ms|s|m|h)$"
 	LogRetentionTime string `json:"logRetentionTime,omitempty"`
 
 	// LogRetentionCount gives the number of persistent log PVCs to keep.
+	// +kubebuilder:validation:Minimum=0
 	LogRetentionCount int `json:"logRetentionCount,omitempty"`
 }
 
@@ -824,6 +920,8 @@ type ClusterConfig struct {
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.
 type DatabaseFragmentationThreshold struct {
 	// Percent is the percentage of disk fragmentation (2-100).
+	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
 
 	// Size is the size of disk framentation.
@@ -833,6 +931,8 @@ type DatabaseFragmentationThreshold struct {
 // ViewFragmentationThreshold lists triggers for when view compaction should start.
 type ViewFragmentationThreshold struct {
 	// Percent is the percentage of disk fragmentation (2-100).
+	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
 
 	// Size is the size of disk framentation.
@@ -842,9 +942,11 @@ type ViewFragmentationThreshold struct {
 // TimeWindow allows the user to restrict when compaction can occur.
 type TimeWindow struct {
 	// Start is a string in the form HH:MM.
+	// +kubebuilder:validation:Pattern="^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$"
 	Start string `json:"start,omitempty"`
 
 	// End is a string in the form HH:MM.
+	// +kubebuilder:validation:Pattern="^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$"
 	End string `json:"end,omitempty"`
 
 	// AbortCompactionOutsideWindow stops compaction processes when the
@@ -906,9 +1008,11 @@ type RemoteCluster struct {
 	Name string `json:"name,omitempty"`
 
 	// UUID of the remote cluster.
+	// +kubebuilder:validation:Pattern="^[0-9a-f]{32}$"
 	UUID string `json:"uuid,omitempty"`
 
 	// Hostname is the connection string to use to connect the remote cluster.
+	// +kubebuilder:validation:Pattern="^[0-9a-zA-Z\\-\\.]+(:\\d+)?$"
 	Hostname string `json:"hostname,omitempty"`
 
 	// AuthenticationSecret is a secret used to authenticate when establishing a
@@ -916,7 +1020,7 @@ type RemoteCluster struct {
 	AuthenticationSecret *string `json:"authenticationSecret,omitempty"`
 
 	// Replications are replication streams from this cluster to the remote one.
-	Replications Replications `json:"replications"`
+	Replications Replications `json:"replications,omitempty"`
 
 	// TLS if specified references a resource containing the necessary certificate
 	// data.
@@ -953,6 +1057,7 @@ type ServerConfig struct {
 	// couchbase-operator will eventually make the size of the running
 	// cluster equal to the expected size. The vaild range of the size is
 	// from 1 to 50.
+	// +kubebuilder:validation:Minimum=1
 	Size int `json:"size"`
 
 	// A name for the server configuration. It must be unique.
@@ -1015,6 +1120,7 @@ type VolumeMounts struct {
 }
 
 // NodeToNodeEncryptionType is used to define the level of node-to-node encryption.
+// +kubebuilder:validation:Enum=ControlPlaneOnly;All
 type NodeToNodeEncryptionType string
 
 const (
@@ -1057,6 +1163,7 @@ type StaticTLS struct {
 
 // ClientCertificatePolicy defines the type of TLS policy to apply.  The default
 // "disable" is implicit when the policy is not set.
+// +kubebuilder:validation:Enum=enable;mandatory
 type ClientCertificatePolicy string
 
 const (
@@ -1074,7 +1181,8 @@ const (
 type ClientCertificatePath struct {
 	// Path defines where in the X.509 specification to extract the username from.
 	// Valid values are subject.cn, san.uri, san.dnsname, san.email.
-	Path string `json:"path,omitempty"`
+	// +kubebuilder:validation:Pattern="^subject\\.cn|san\\.uri|san\\.dnsname|san\\.email$"
+	Path string `json:"path"`
 
 	// Prefix if specified allows a prefix to be stripped from the username.
 	Prefix string `json:"prefix,omitempty"`
@@ -1083,6 +1191,7 @@ type ClientCertificatePath struct {
 	Delimiter string `json:"delimiter,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=Creating;Running;Failed
 type ClusterPhase string
 
 const (
@@ -1107,6 +1216,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;Upgrading
 type ClusterConditionType string
 
 const (
@@ -1210,6 +1320,7 @@ type CouchbaseClusterMonitoringPrometheusSpec struct {
 	// Enabled is a boolean that enables/disables the metrics sidecar container.
 	Enabled bool `json:"enabled,omitempty"`
 	// Image is the metrics image to be used to collect metrics.
+	// +kubebuilder:validation:Pattern="^[\\w_\\.\\-/]+:([\\w\\d]+-)?\\d+\\.\\d+.\\d+(-[\\w\\d]+)?$"
 	Image string `json:"image,omitempty"`
 	// Resources is the resource requirements for the metrics container.
 	// This field cannot be updated once the cluster is created.

@@ -67,10 +67,10 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 
 		pods := &corev1.PodList{}
 		options := &client.ListOptions{
-			Namespace: c.Namespace,
+			Namespace:     c.Namespace,
 			LabelSelector: c.Selector.AsSelector(),
 		}
-		err = cli.List(ctx, pods, options/*client.InNamespace(c.Namespace).MatchingLabels(c.Selector)*/)
+		err = cli.List(ctx, pods, options /*client.InNamespace(c.Namespace).MatchingLabels(c.Selector)*/)
 		if err != nil {
 			log.Error(err, "failed to list pods", "selector", c.Selector.String())
 			continue
