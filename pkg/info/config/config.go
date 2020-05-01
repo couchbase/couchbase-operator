@@ -102,7 +102,7 @@ func Parse() Configuration {
 
 	// Echo out version if requested
 	if c.Version {
-		fmt.Printf("cbopinfo version %s (%s)\n", version.VersionWithBuildNumber(), revision.Revision())
+		fmt.Printf("cbopinfo version %s (%s)\n", version.WithBuildNumber(), revision.Revision())
 		os.Exit(0)
 	}
 

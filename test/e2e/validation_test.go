@@ -412,7 +412,9 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				if len(test.expectedErrors) > 0 {
 					for _, message := range test.expectedErrors {
 						if !strings.Contains(err.Error(), message) || message == "" {
-							e2eutil.Die(t, fmt.Errorf("expected message: %+v \n returned message: %v \n", message, err))
+							t.Logf("expected message: %v", message)
+							t.Logf("actual message: %v", err)
+							e2eutil.Die(t, fmt.Errorf("expected message not encountered"))
 						}
 					}
 				}

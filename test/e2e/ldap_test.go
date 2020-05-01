@@ -27,7 +27,6 @@ func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster, namespace string)
 }
 
 func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.CouchbaseCluster {
-
 	// Static configuration.
 	clusterSize := 1
 
@@ -185,7 +184,6 @@ func TestLDAPUpdateRole(t *testing.T) {
 // removed from the binding and since it doesn't have a role
 // in any other binding the user is also deleted
 func TestLDAPRemoveUserFromBinding(t *testing.T) {
-
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	timeout := 2 * time.Minute
@@ -235,13 +233,11 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-
 }
 
 // TestLDAPDeleteBinding tests that user is deleted when entire
 // rolebinding is deleted
 func TestLDAPDeleteBinding(t *testing.T) {
-
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 

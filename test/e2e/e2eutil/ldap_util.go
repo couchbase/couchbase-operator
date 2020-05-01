@@ -89,7 +89,6 @@ func DeleteLDAPSecret(kubeClient kubernetes.Interface, namespace string) error {
 
 // Clean up ldap service and server
 func CleanLDAPResources(kubeClient kubernetes.Interface, namespace string) error {
-
 	if err := DeleteLDAPServer(kubeClient, namespace); err != nil {
 		return nil
 	}

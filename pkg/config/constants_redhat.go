@@ -11,6 +11,6 @@ const (
 )
 
 var (
-	admissionImageDefault = imageRepo + "/couchbase/admission-controller:" + version.VersionWithRevisionRedHat()
-	operatorImageDefault  = imageRepo + "/couchbase/operator:" + version.VersionWithRevisionRedHat()
+	admissionImageDefault = imageRepo + "/couchbase/admission-controller:" + version.WithRevisionRedHat()
+	operatorImageDefault  = imageRepo + "/couchbase/operator:" + version.WithRevisionRedHat()
 )

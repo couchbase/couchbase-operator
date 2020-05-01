@@ -86,8 +86,8 @@ func TestReplaceScalarSliceMemberAdd(t *testing.T) {
 }
 
 func TestReplaceJsonPointerSlice(t *testing.T) {
-	mustReplace(t, fixture, "/G", []Fixture{Fixture{A: 1}})
-	mustTest(t, fixture, "/G", []Fixture{Fixture{A: 1}})
+	mustReplace(t, fixture, "/G", []Fixture{{A: 1}})
+	mustTest(t, fixture, "/G", []Fixture{{A: 1}})
 }
 
 func TestReplaceJsonPointerSliceMember(t *testing.T) {
@@ -106,8 +106,8 @@ func TestReplaceJsonPointerSliceMemberProperty(t *testing.T) {
 }
 
 func TestReplaceJsonPointerPointerSlice(t *testing.T) {
-	mustReplace(t, fixture, "/H", []*Fixture{&Fixture{A: 1}})
-	mustTest(t, fixture, "/H", []*Fixture{&Fixture{A: 1}})
+	mustReplace(t, fixture, "/H", []*Fixture{{A: 1}})
+	mustTest(t, fixture, "/H", []*Fixture{{A: 1}})
 }
 
 func TestReplaceJsonPointerPointerSliceMember(t *testing.T) {
@@ -131,13 +131,13 @@ func TestReplaceScalarMap(t *testing.T) {
 }
 
 func TestReplaceJsonPointerMap(t *testing.T) {
-	mustReplace(t, fixture, "/J", map[string]Fixture{"jsonpatch1": Fixture{A: 1}})
-	mustTest(t, fixture, "/J", map[string]Fixture{"jsonpatch1": Fixture{A: 1}})
+	mustReplace(t, fixture, "/J", map[string]Fixture{"jsonpatch1": {A: 1}})
+	mustTest(t, fixture, "/J", map[string]Fixture{"jsonpatch1": {A: 1}})
 }
 
 func TestReplaceJsonPointerPointerMap(t *testing.T) {
-	mustReplace(t, fixture, "/K", map[string]*Fixture{"jsonpatch1": &Fixture{A: 1}})
-	mustTest(t, fixture, "/K", map[string]*Fixture{"jsonpatch1": &Fixture{A: 1}})
+	mustReplace(t, fixture, "/K", map[string]*Fixture{"jsonpatch1": {A: 1}})
+	mustTest(t, fixture, "/K", map[string]*Fixture{"jsonpatch1": {A: 1}})
 }
 
 func TestReplaceJsonPointerPointerMapMemberProperty(t *testing.T) {

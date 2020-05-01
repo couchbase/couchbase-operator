@@ -22,10 +22,10 @@ import (
 
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	zapf "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (
@@ -103,7 +103,7 @@ func main() {
 	// * Version feature set
 	// * Whether this is an official or development branch
 	// * The exact commit defects are raised against
-	log.Info(version.Application, "version", version.VersionWithBuildNumber(), "revision", revision.Revision())
+	log.Info(version.Application, "version", version.WithBuildNumber(), "revision", revision.Revision())
 	if printVersion {
 		os.Exit(0)
 	}

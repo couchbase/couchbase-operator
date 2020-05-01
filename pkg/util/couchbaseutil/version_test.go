@@ -7,7 +7,6 @@ import (
 )
 
 func TestCouchbaseVersionEnterprise(t *testing.T) {
-
 	versionStr := "enterprise-5.5.0"
 	version, err := NewVersion(versionStr)
 	if err != nil {
@@ -27,7 +26,6 @@ func TestCouchbaseVersionEnterprise(t *testing.T) {
 }
 
 func TestCouchbaseVersionBeta(t *testing.T) {
-
 	versionStr := "5.5.0-beta"
 	version, err := NewVersion(versionStr)
 	if err != nil {
@@ -47,7 +45,6 @@ func TestCouchbaseVersionBeta(t *testing.T) {
 }
 
 func TestCouchbaseVersionOnly(t *testing.T) {
-
 	versionStr := "5.5.0"
 	version, err := NewVersion(versionStr)
 	if err != nil {
@@ -67,7 +64,6 @@ func TestCouchbaseVersionOnly(t *testing.T) {
 }
 
 func TestCouchbaseVersionMin(t *testing.T) {
-
 	versionStr := "enterprise-5.0.1"
 	err := VerifyVersion(versionStr)
 	if err == nil {

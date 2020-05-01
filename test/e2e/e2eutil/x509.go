@@ -62,7 +62,7 @@ const (
 
 // KeyPairRequest contains the necessary configuration to generate
 // a private key and signed public key pair by a CA
-type keyPairRequest struct {
+type KeyPairRequest struct {
 	keyType  KeyType
 	certType CertType
 	req      *x509.CertificateRequest
@@ -70,7 +70,7 @@ type keyPairRequest struct {
 
 // Generate returns a PEM encoded private key and signed certificate
 // from the specified CA
-func (req *keyPairRequest) Generate(ca *CertificateAuthority, certValidFrom, certValidTo time.Time) (key, cert []byte, err error) {
+func (req *KeyPairRequest) Generate(ca *CertificateAuthority, certValidFrom, certValidTo time.Time) (key, cert []byte, err error) {
 	// Generate the private key
 	var pkey crypto.PrivateKey
 	if pkey, err = GeneratePrivateKey(req.keyType); err != nil {
@@ -379,8 +379,8 @@ func CreateIntermedateCACertReq(commonName string) *x509.CertificateRequest {
 	}
 }
 
-func CreateKeyPairReqData(keyType KeyType, certType CertType, certReq *x509.CertificateRequest) *keyPairRequest {
-	return &keyPairRequest{
+func CreateKeyPairReqData(keyType KeyType, certType CertType, certReq *x509.CertificateRequest) *KeyPairRequest {
+	return &KeyPairRequest{
 		keyType:  keyType,
 		certType: certType,
 		req:      certReq,
@@ -396,7 +396,6 @@ const (
 )
 
 func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, certPEM, keyPEM []byte) *corev1.Secret {
-
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -989,7 +988,6 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 // InitLDAPTLS accepts a key type (only RSA works for now) and returns a context
 // containing all the certificates, and a tear down function to be deferred.
 func InitLDAPTLS(client kubernetes.Interface, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
-
 	// Create the context
 	ctx = &TLSContext{
 		Client:    client,

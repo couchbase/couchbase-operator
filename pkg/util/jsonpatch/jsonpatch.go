@@ -11,9 +11,10 @@ package jsonpatch
 
 import (
 	"fmt"
-	"github.com/couchbase/couchbase-operator/pkg/util/jsonpointer"
 	"reflect"
 	"strconv"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpointer"
 )
 
 // Operation defines valid operation types.

@@ -318,7 +318,6 @@ func ApplyGroupDefaults(v *types.Validator, object *unstructured.Unstructured) j
 					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: path, Value: "*"})
 				}
 			}
-
 		}
 	}
 
@@ -734,10 +733,8 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 		// ca is required when tls is enabled
 		if ldap.EnableCertValidation {
-
 			// encryption type must be set
 			if ldap.Encryption == couchbasev2.LDAPEncryptionNone {
-
 				errs = append(errs, fmt.Errorf("encryption must be one of %s | %s, when serverCertValidation is enabled",
 					couchbasev2.LDAPEncryptionTLS, couchbasev2.LDAPEncryptionStartTLS))
 			}
@@ -964,7 +961,6 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 		if role.Bucket != "" && isCluterRole {
 			errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.roles[%d].bucket for cluster role", index), "", string(role.Name)))
 		}
-
 	}
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)

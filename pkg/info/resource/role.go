@@ -51,6 +51,6 @@ func (r *RoleResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *RoleResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *RoleResource) References() []Reference {
+	return []Reference{}
 }

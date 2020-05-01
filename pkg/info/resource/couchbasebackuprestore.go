@@ -48,6 +48,6 @@ func (r *couchbaseBackupRestoreResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *couchbaseBackupRestoreResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *couchbaseBackupRestoreResource) References() []Reference {
+	return []Reference{}
 }

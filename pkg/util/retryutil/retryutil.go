@@ -39,7 +39,6 @@ func Retry(ctx context.Context, interval time.Duration, f func() (bool, error)) 
 // Retry function that can return an error.
 func RetryOnErr(ctx context.Context, interval time.Duration, f func() error) error {
 	return Retry(ctx, interval, func() (bool, error) {
-
 		// run f() and check for err
 		if err := f(); err != nil {
 			return false, RetryOkError(err)

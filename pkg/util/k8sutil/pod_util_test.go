@@ -46,7 +46,6 @@ func TestPathsToPersist(t *testing.T) {
 
 // Test that expected path is returned for the specified volume mount
 func TestPathsForVolumeMountName(t *testing.T) {
-
 	path := pathForVolumeMountName(couchbasev2.DefaultVolumeMount)
 	if path != couchbaseVolumeDefaultConfigDir {
 		t.Fatalf(`invalid path for default volume: "%s", expected: "%s"`, path, couchbaseVolumeDefaultConfigDir)

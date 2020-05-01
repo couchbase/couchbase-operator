@@ -73,10 +73,10 @@ func (r *couchbaseClusterResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *couchbaseClusterResource) References() []ResourceReference {
-	references := []ResourceReference{}
+func (r *couchbaseClusterResource) References() []Reference {
+	references := []Reference{}
 	for _, couchbaseCluster := range r.couchbaseClusters {
-		references = append(references, newResourceReference(r.Kind(), couchbaseCluster.Name))
+		references = append(references, newReference(r.Kind(), couchbaseCluster.Name))
 	}
 	return references
 }

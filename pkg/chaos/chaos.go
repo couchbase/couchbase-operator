@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 var log = logf.Log.WithName("chaos")
@@ -86,7 +86,7 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 			max = kmax
 		}
 		if len(pods.Items)-max < c.MinPods {
-			max -= 1
+			max--
 			if max == 0 {
 				log.Info("Too few pods to kill", "minimum_alive", c.MinPods, "pods_total", len(pods.Items), "pods_to_kill", max)
 				continue

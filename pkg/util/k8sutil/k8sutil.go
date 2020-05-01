@@ -254,9 +254,9 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 	if _, err := kubeCli.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{}); err != nil {
 		if IsKubernetesResourceNotFoundError(err) {
 			return nil
-		} else {
-			return err
 		}
+
+		return err
 	}
 
 	// watch for pod deletion event

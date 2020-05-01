@@ -282,15 +282,17 @@ func NewBasicCluster(size int) *couchbasev2.CouchbaseCluster {
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
-		Servers: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
-			Size: size,
-			Name: "test_config_1",
-			Services: couchbasev2.ServiceList{
-				couchbasev2.DataService,
-				couchbasev2.QueryService,
-				couchbasev2.IndexService,
+		Servers: []couchbasev2.ServerConfig{
+			{
+				Size: size,
+				Name: "test_config_1",
+				Services: couchbasev2.ServiceList{
+					couchbasev2.DataService,
+					couchbasev2.QueryService,
+					couchbasev2.IndexService,
+				},
 			},
-		}},
+		},
 	}
 	if platform != "" {
 		spec.Platform = platform
@@ -307,15 +309,17 @@ func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
-		Servers: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
-			Size: size,
-			Name: "test_config_1",
-			Services: couchbasev2.ServiceList{
-				couchbasev2.DataService,
-				couchbasev2.QueryService,
-				couchbasev2.IndexService,
+		Servers: []couchbasev2.ServerConfig{
+			{
+				Size: size,
+				Name: "test_config_1",
+				Services: couchbasev2.ServiceList{
+					couchbasev2.DataService,
+					couchbasev2.QueryService,
+					couchbasev2.IndexService,
+				},
 			},
-		}},
+		},
 	}
 	if platform != "" {
 		spec.Platform = platform
@@ -420,15 +424,17 @@ func NewBasicXdcrCluster(size int) *couchbasev2.CouchbaseCluster {
 		Buckets: couchbasev2.Buckets{
 			Managed: true,
 		},
-		Servers: []couchbasev2.ServerConfig{couchbasev2.ServerConfig{
-			Size: size,
-			Name: "test_config_1",
-			Services: couchbasev2.ServiceList{
-				couchbasev2.DataService,
-				couchbasev2.QueryService,
-				couchbasev2.IndexService,
+		Servers: []couchbasev2.ServerConfig{
+			{
+				Size: size,
+				Name: "test_config_1",
+				Services: couchbasev2.ServiceList{
+					couchbasev2.DataService,
+					couchbasev2.QueryService,
+					couchbasev2.IndexService,
+				},
 			},
-		}},
+		},
 	}
 	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
 	spec.ClusterSettings.AutoFailoverMaxCount = 3
@@ -445,7 +451,6 @@ func CreateClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2
 // Stateful 3 node cluster with a single volume.
 // Spec will request 1Gb of storage (minikube default is 5gb).
 func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
-
 	crd := NewBasicCluster(size)
 	couchbase := "couchbase"
 	crd.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{

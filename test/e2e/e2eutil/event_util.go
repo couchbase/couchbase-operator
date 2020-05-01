@@ -287,7 +287,7 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 	events := eventschema.Sequence{}
 	if victims == clusterSize {
 		events.Validators = append(events.Validators, eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered})
-		victims -= 1
+		victims--
 	}
 	events.Validators = append(events.Validators, eventschema.Sequence{
 		Validators: []eventschema.Validatable{

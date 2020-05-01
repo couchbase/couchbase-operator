@@ -6,7 +6,6 @@ import (
 )
 
 func TestKubernetesVersion(t *testing.T) {
-
 	version, err := ParseKubernetesVersion("1", "9", "d283541654")
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +80,6 @@ func TestKubernetesVersion(t *testing.T) {
 }
 
 func TestNegKubernetesVersion(t *testing.T) {
-
 	version, err := ParseKubernetesVersion("1", "", "d283541654")
 	if err == nil || version != constants.KubernetesVersionUnknown {
 		t.Errorf("expected parse error for unknown version =%s", version)
@@ -110,5 +108,4 @@ func TestNegKubernetesVersion(t *testing.T) {
 	if err == nil || version != constants.KubernetesVersionUnknown {
 		t.Errorf("expected parse error for unknown version =%s", version)
 	}
-
 }

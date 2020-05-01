@@ -54,10 +54,10 @@ func (r *serviceResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *serviceResource) References() []ResourceReference {
-	references := []ResourceReference{}
+func (r *serviceResource) References() []Reference {
+	references := []Reference{}
 	for _, service := range r.services.Items {
-		references = append(references, newResourceReference(r.Kind(), service.Name))
+		references = append(references, newReference(r.Kind(), service.Name))
 	}
 	return references
 }

@@ -54,6 +54,6 @@ func (r *configMapResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *configMapResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *configMapResource) References() []Reference {
+	return []Reference{}
 }

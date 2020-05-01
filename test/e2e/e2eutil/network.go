@@ -330,7 +330,6 @@ func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev2.Couchb
 			return fmt.Errorf("loadbalancer service %s failed to create an ingress route", service.Name)
 		}
 		return nil
-
 	})
 }
 

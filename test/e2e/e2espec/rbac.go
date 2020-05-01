@@ -18,7 +18,6 @@ func NewDefaultUser() *couchbasev2.CouchbaseUser {
 			AuthSecret: e2e_constants.KubeTestSecretName,
 		},
 	}
-
 }
 
 // NewDefaultLDAPUser creates a new LDAP user
@@ -35,7 +34,6 @@ func NewDefaultLDAPUser() *couchbasev2.CouchbaseUser {
 
 // NewClusterAdminGroup creates group to grant user cluster admin privilege
 func NewClusterAdminGroup() *couchbasev2.CouchbaseGroup {
-
 	// couchbase cluster privilege
 	clusterAdminRole := couchbasev2.Role{
 		Name: e2e_constants.ClusterAdminRole,
@@ -55,7 +53,6 @@ func NewClusterAdminGroup() *couchbasev2.CouchbaseGroup {
 
 // NewBucketAdminGroup creates group to grant user admin privilege to all bucket
 func NewBucketAdminGroup() *couchbasev2.CouchbaseGroup {
-
 	// couchbase bucket role
 	bucketAdminRole := couchbasev2.Role{
 		Name:   e2e_constants.BucketAdminRole,
@@ -89,7 +86,6 @@ func NewBucketRoleBinding() *couchbasev2.CouchbaseRoleBinding {
 
 // NewDefaultRoleBinding binds list of users to a role
 func NewRoleBinding(name string, users []string, role string) *couchbasev2.CouchbaseRoleBinding {
-
 	subjects := []couchbasev2.CouchbaseRoleBindingSubject{}
 
 	for _, user := range users {

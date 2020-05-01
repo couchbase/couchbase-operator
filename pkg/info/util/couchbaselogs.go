@@ -118,7 +118,7 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 		if err != nil {
 			return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
 		}
-		if err := ioutil.WriteFile(filepath.Base(header.Name), stdout.Bytes(), 0644); err != nil {
+		if err := ioutil.WriteFile(filepath.Base(header.Name), stdout.Bytes(), 0600); err != nil {
 			return err
 		}
 	}

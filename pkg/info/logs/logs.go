@@ -360,7 +360,6 @@ func gatherLogs(context *context.Context) (LogEntryList, error) {
 	}
 
 	return logEntries, nil
-
 }
 
 // renderPVCs takes a list of PVCs and renders them as a table containing their
@@ -449,9 +448,9 @@ func configureNonInteractive(context *context.Context, logEntries LogEntryList) 
 func configure(context *context.Context, logEntries LogEntryList) indexSet {
 	if context.Config.CollectInfoCollect == "" {
 		return configureInteractive(context, logEntries)
-	} else {
-		return configureNonInteractive(context, logEntries)
 	}
+
+	return configureNonInteractive(context, logEntries)
 }
 
 // Collect is the top level server log collection function.

@@ -107,7 +107,7 @@ func main() {
 	flag.Parse()
 
 	if printVersion {
-		fmt.Println("cbopconv", version.VersionWithBuildNumber())
+		fmt.Println("cbopconv", version.WithBuildNumber())
 		os.Exit(0)
 	}
 

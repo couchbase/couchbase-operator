@@ -47,7 +47,7 @@ type scope struct {
 }
 
 // this function will substitute scope information into a generic command
-func SupplyScope(testScope scope, testOp operation) operation {
+func supplyScope(testScope scope, testOp operation) operation {
 	testOp.cmd = ConvertTemplate(testScope, testOp.cmd)
 	testOp.args = ConvertTemplate(testScope, testOp.args)
 	return testOp
@@ -395,7 +395,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	// apply scope to generic commands for all operations
 	t.Logf("supplying scope to test ops")
 	for i, op := range testDef.ops {
-		op = SupplyScope(testScope, op)
+		op = supplyScope(testScope, op)
 		testDef.ops[i] = op
 	}
 	t.Logf("test ops: %v", testDef.ops)
@@ -408,7 +408,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		timeout: 2,
 		wait:    true,
 	}
-	rbacOp = SupplyScope(testScope, rbacOp)
+	rbacOp = supplyScope(testScope, rbacOp)
 	jobSpec := CreateJobSpec(rbacOp)
 	job := CreateJob(t, f, kubeName, jobSpec)
 	// wait for job to succeed
@@ -426,7 +426,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		timeout: 2,
 		wait:    true,
 	}
-	rbacOp = SupplyScope(testScope, rbacOp)
+	rbacOp = supplyScope(testScope, rbacOp)
 	jobSpec = CreateJobSpec(rbacOp)
 	job = CreateJob(t, f, kubeName, jobSpec)
 	// wait for job to succeed
@@ -498,7 +498,6 @@ outerLoop:
 
 		cycles++
 		time.Sleep(1 * time.Second)
-
 	}
 }
 

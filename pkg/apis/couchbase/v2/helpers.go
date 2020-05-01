@@ -102,8 +102,8 @@ var SupportedFeatures = []ExposedFeature{
 }
 
 // Contains returns true if a requested feature is enabled
-func (efl ExposedFeatureList) Contains(feature string) bool {
-	for _, f := range efl {
+func (l ExposedFeatureList) Contains(feature string) bool {
+	for _, f := range l {
 		if string(f) == feature {
 			return true
 		}
@@ -227,7 +227,6 @@ func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 // Couchbase Image represents the image that will actually be deployed by cluster.
 // Defaults to Spec.Image unless image is provided by env variable
 func (cs *ClusterSpec) CouchbaseImage() string {
-
 	image := cs.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
 		if annotatedImage != "" {
@@ -242,7 +241,6 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 // defaults to Backup.Image when provided then falls back to
 // relatedImage env variable
 func (cs *ClusterSpec) BackupImage() string {
-
 	image := cs.Backup.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvBackupImageName); ok {
 		if annotatedImage != "" {
@@ -255,7 +253,6 @@ func (cs *ClusterSpec) BackupImage() string {
 // Monitoring Image represents the image to use for metrics exporter for monitoring.
 // defaults to Spec.Image when provided then falls back to relatedImage env variable
 func (m *CouchbaseClusterMonitoringPrometheusSpec) MetricsImage() string {
-
 	image := m.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvMetricsImageName); ok {
 		if annotatedImage != "" {

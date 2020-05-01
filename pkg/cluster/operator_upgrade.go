@@ -40,7 +40,6 @@ func (u upgradeRange) actionable(v string) (bool, error) {
 	// We only consider running the upgrade if the current version is greater
 	// than or equal to the lower bound, and less than the upper bound.
 	return version.GreaterEqual(from) && version.Less(to), nil
-
 }
 
 // upgradableResource is an abstraction around an upgradable resource type.

@@ -1,21 +1,21 @@
 package resource
 
-type resourceReferenceImpl struct {
+type referenceImpl struct {
 	kind string
 	name string
 }
 
-func newResourceReference(kind, name string) ResourceReference {
-	return &resourceReferenceImpl{
+func newReference(kind, name string) Reference {
+	return &referenceImpl{
 		kind: kind,
 		name: name,
 	}
 }
 
-func (r resourceReferenceImpl) Kind() string {
+func (r referenceImpl) Kind() string {
 	return r.kind
 }
 
-func (r resourceReferenceImpl) Name() string {
+func (r referenceImpl) Name() string {
 	return r.name
 }

@@ -473,13 +473,13 @@ func (sc *ServerConfig) GetDefaultVolumeClaim() string {
 	return ""
 }
 
-func (c *ClusterSpec) Cleanup() {
+func (cs *ClusterSpec) Cleanup() {
 
 }
 
-func (c *ClusterSpec) TotalSize() int {
+func (cs *ClusterSpec) TotalSize() int {
 	size := 0
-	for _, server := range c.ServerSettings {
+	for _, server := range cs.ServerSettings {
 		size += server.Size
 	}
 	return size

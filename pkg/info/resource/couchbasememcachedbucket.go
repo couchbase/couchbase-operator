@@ -51,6 +51,6 @@ func (r *couchbaseMemcachedBucketResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *couchbaseMemcachedBucketResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *couchbaseMemcachedBucketResource) References() []Reference {
+	return []Reference{}
 }

@@ -51,6 +51,6 @@ func (r *ServiceAccountResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *ServiceAccountResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *ServiceAccountResource) References() []Reference {
+	return []Reference{}
 }

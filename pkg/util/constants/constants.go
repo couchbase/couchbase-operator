@@ -111,7 +111,7 @@ const (
 	LDAPSecretPassword = "password"
 )
 
-// sha256 to image conversion map
+// ImageDigests is a sha256 to image conversion map
 // ¯\_(ツ)_/¯
 //
 // TODO: Use downward api to VolumeMount annotations into Pod and do this lookup because

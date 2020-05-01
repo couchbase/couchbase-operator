@@ -89,7 +89,6 @@ func PatchGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup, patches j
 	defer cancel()
 
 	return group, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
-
 		// get the group
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Get(group.Name, metav1.GetOptions{})
 		if err != nil {
@@ -134,7 +133,6 @@ func PatchRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBind
 	defer cancel()
 
 	return binding, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
-
 		// get the binding
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(binding.Namespace).Get(binding.Name, metav1.GetOptions{})
 		if err != nil {

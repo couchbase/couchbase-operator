@@ -14,9 +14,9 @@ type Collector interface {
 	// Kind returns the Kubernetes kind of the resource
 	Kind() string
 	// Fetch collects resource instances for a specific involved object
-	Fetch(resource.ResourceReference) error
+	Fetch(resource.Reference) error
 	// Write writes collected resources to the specified backend
 	Write(backend.Backend) error
 }
 
-type CollectorInitializer func(*context.Context) Collector
+type Initializer func(*context.Context) Collector

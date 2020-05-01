@@ -53,7 +53,7 @@ func InitContext(context *context.Context) error {
 
 // GetPod takes a resource reference and returns a pod from which we are able to collect logs,
 // For collections such as deployments it simply picks one.
-func GetPod(context *context.Context, resource resource.ResourceReference) (*corev1.Pod, error) {
+func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod, error) {
 	// Inspect the resource kind and perform type specific processing
 	switch resource.Kind() {
 	case "Pod":

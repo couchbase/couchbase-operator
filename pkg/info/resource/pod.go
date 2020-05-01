@@ -54,10 +54,10 @@ func (r *podResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *podResource) References() []ResourceReference {
-	references := []ResourceReference{}
+func (r *podResource) References() []Reference {
+	references := []Reference{}
 	for _, pod := range r.pods.Items {
-		references = append(references, newResourceReference(r.Kind(), pod.Name))
+		references = append(references, newReference(r.Kind(), pod.Name))
 	}
 	return references
 }

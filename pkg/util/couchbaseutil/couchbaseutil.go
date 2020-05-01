@@ -15,7 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/couchbase/gocbmgr"
 
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var log = logf.Log.WithName("couchbaseutil")
@@ -103,20 +103,20 @@ func NewClusterStatus() *ClusterStatus {
 
 // Reset replaces all sets in the cluster status with empty versions
 // and returns scalars to the zero state
-func (c *ClusterStatus) Reset() {
-	c.NodeStateMap = NodeStateMap{}
-	c.managedNodes = NewMemberSet()
-	c.ActiveNodes = NewMemberSet()
-	c.PendingAddNodes = NewMemberSet()
-	c.AddBackNodes = NewMemberSet()
-	c.FailedAddNodes = NewMemberSet()
-	c.WarmupNodes = NewMemberSet()
-	c.DownNodes = NewMemberSet()
-	c.FailedNodes = NewMemberSet()
-	c.UnclusteredNodes = NewMemberSet()
-	c.UnmanagedNodes = []string{}
-	c.IsRebalancing = false
-	c.NeedsRebalance = false
+func (cs *ClusterStatus) Reset() {
+	cs.NodeStateMap = NodeStateMap{}
+	cs.managedNodes = NewMemberSet()
+	cs.ActiveNodes = NewMemberSet()
+	cs.PendingAddNodes = NewMemberSet()
+	cs.AddBackNodes = NewMemberSet()
+	cs.FailedAddNodes = NewMemberSet()
+	cs.WarmupNodes = NewMemberSet()
+	cs.DownNodes = NewMemberSet()
+	cs.FailedNodes = NewMemberSet()
+	cs.UnclusteredNodes = NewMemberSet()
+	cs.UnmanagedNodes = []string{}
+	cs.IsRebalancing = false
+	cs.NeedsRebalance = false
 }
 
 // CouchbaseClient encapsulates Couchbase API operations.
@@ -198,7 +198,6 @@ func (cs *ClusterStatus) getNode(hostname string) (*cbmgr.NodeInfo, error) {
 
 // KnownNodes returns all nodes that the cluster is tracking
 func (cs *ClusterStatus) KnownNodes() []string {
-
 	knownNodes := []string{}
 	for _, node := range cs.info.Nodes {
 		memberName := strings.Split(node.HostName, ".")[0]

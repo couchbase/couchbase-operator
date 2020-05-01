@@ -44,7 +44,7 @@ const (
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m *couchbaseutil.Member, config couchbasev2.ServerConfig, ctx context.Context) (*v1.Pod, error) {
+func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m *couchbaseutil.Member, config couchbasev2.ServerConfig) (*v1.Pod, error) {
 	// First work out what persistent volumes we need.
 	pvcState, err := GetPodVolumes(client, m.Name, cluster, config)
 	if err != nil {
@@ -99,9 +99,9 @@ func CreateCouchbasePod(client *client.Client, scheduler scheduler.Scheduler, cl
 	return CreatePod(client, cluster.Namespace, pod)
 }
 
-// persistentVolumeClaimState contains all the information we could ever need about
+// PersistentVolumeClaimState contains all the information we could ever need about
 // persistent volumes relating to a pod.
-type persistentVolumeClaimState struct {
+type PersistentVolumeClaimState struct {
 	// pvcs is an ordered list of all PVCs.
 	pvcs []*v1.PersistentVolumeClaim
 
@@ -125,25 +125,25 @@ type persistentVolumeClaimState struct {
 }
 
 // NeedsUpdate indicates whether any PVCs need updating.
-func (p *persistentVolumeClaimState) NeedsUpdate() bool {
+func (p *PersistentVolumeClaimState) NeedsUpdate() bool {
 	return len(p.update) != 0 || len(p.create) != 0
 }
 
 // Diff returns a diff of changes when PVCs are created or updated.
-func (p *persistentVolumeClaimState) Diff() string {
+func (p *PersistentVolumeClaimState) Diff() string {
 	return p.diff
 }
 
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused
-func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*persistentVolumeClaimState, error) {
+func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*PersistentVolumeClaimState, error) {
 	// No mounts are required, do nothing
 	if config.GetVolumeMounts() == nil {
 		return nil, nil
 	}
 
-	state := &persistentVolumeClaimState{}
+	state := &PersistentVolumeClaimState{}
 
 	mountPaths, err := getPathsToPersist(config.VolumeMounts)
 	if err != nil {
@@ -249,7 +249,6 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 
 		// Mount point for Pod Container spec to reference volume by name.
 		if mountName == couchbasev2.DefaultVolumeMount {
-
 			// Default mount consists of 2 mounts for default(config) and etc data
 			configMount := v1.VolumeMount{
 				Name:      volume.Name,
@@ -333,7 +332,6 @@ func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
 
 // Creates custom PVC from the generic spec
 func createPersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
-
 	// can be mounted read/write mode to exactly 1 host
 	addOwnerRefToObject(claim, owner)
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
@@ -357,7 +355,6 @@ func podVolumeSpecForClaim(claimName string) v1.Volume {
 // Delete pod and any associated persisted volumes
 // when removeVolumes is 'true'
 func DeleteCouchbasePod(client *client.Client, namespace, name string, opts *metav1.DeleteOptions, removeVolumes bool) error {
-
 	var errs []string
 
 	if err := DeletePod(client, namespace, name, opts); err != nil {
@@ -409,7 +406,7 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 // in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
-func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *persistentVolumeClaimState) (*v1.Pod, error) {
+func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
 	container := couchbaseContainer(cluster.Spec.CouchbaseImage(), &config)
 	container.ReadinessProbe = couchbaseReadinessProbe()
@@ -547,7 +544,6 @@ func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod
 			// add the TLS server flags to the couchbase-exporter binary
 			container.Command = append(container.Command,
 				"--ca", operatorSecretMountPath+"/ca.crt")
-
 		}
 
 		if cs.Networking.TLS.ClientCertificatePolicy != nil {
@@ -607,7 +603,6 @@ func CouchbaseContainer(image string) v1.Container {
 }
 
 func couchbaseContainer(image string, config *couchbasev2.ServerConfig) v1.Container {
-
 	c := v1.Container{
 		Name:  constants.CouchbaseContainerName,
 		Image: image,
@@ -980,7 +975,6 @@ func findMemberPVC(client *client.Client, memberName, path string) (*v1.Persiste
 func PVCToMemberset(client *client.Client, namespace string, secure bool) (couchbaseutil.MemberSet, error) {
 	ms := couchbaseutil.MemberSet{}
 	for _, pvc := range client.PersistentVolumeClaims.List() {
-
 		// claim must be bound to a volume
 		if pvc.Status.Phase != v1.ClaimBound {
 			continue
@@ -1023,25 +1017,26 @@ func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, po
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return cberrors.ErrNoVolumeMounts{}
-	} else {
-		// default volume claim is required for recovery
-		defaultClaim := mounts.DefaultClaim
-		if defaultClaim == "" {
-			return fmt.Errorf("no claim defined for default volume")
-		}
-		// all volume mounts must be healthy
-		mountPaths, err := getPathsToPersist(mounts)
+	}
+
+	// default volume claim is required for recovery
+	defaultClaim := mounts.DefaultClaim
+	if defaultClaim == "" {
+		return fmt.Errorf("no claim defined for default volume")
+	}
+	// all volume mounts must be healthy
+	mountPaths, err := getPathsToPersist(mounts)
+	if err != nil {
+		return err
+	}
+	for mountName := range mountPaths {
+		mountPath := pathForVolumeMountName(mountName)
+		_, err := findMemberPVC(client, podName, mountPath)
 		if err != nil {
 			return err
 		}
-		for mountName := range mountPaths {
-			mountPath := pathForVolumeMountName(mountName)
-			_, err := findMemberPVC(client, podName, mountPath)
-			if err != nil {
-				return err
-			}
-		}
 	}
+
 	return nil
 }
 

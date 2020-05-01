@@ -89,12 +89,12 @@ func Silent() func() {
 		handlers = runtime.ErrorHandlers
 		runtime.ErrorHandlers = []func(error){}
 	}
-	instances += 1
+	instances++
 	mutex.Unlock()
 	return func() {
 		// Only perform the restore on the last call.
 		mutex.Lock()
-		instances -= 1
+		instances--
 		if instances == 0 {
 			runtime.ErrorHandlers = handlers
 		}

@@ -269,7 +269,6 @@ func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
 }
 
 func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
-
 	if r.couchbase.DownNodes.Size() > 0 {
 		// Ensure the cluster is visibly unhealthy before triggering any events
 		c.cluster.Status.SetUnavailableCondition(r.couchbase.DownNodes.ClientURLs())
@@ -382,10 +381,10 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 				log.Error(err, "Pending add pod cannot be recovered", "cluster", c.namespacedName(), "name", m.Name)
 				r.transitionState(ReconcileNotifyFinished)
 				return nil
-			} else {
-				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-				return fmt.Errorf("recovering pending add node %s", m.ClientURL())
 			}
+
+			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
+			return fmt.Errorf("recovering pending add node %s", m.ClientURL())
 		}
 		err := c.cancelAddMember(r.knownNodes, m)
 		if err != nil {
@@ -406,7 +405,6 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 // otherwise a full recovery is performed
 func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 	for _, m := range r.couchbase.AddBackNodes {
-
 		err := c.verifyMemberVolumes(m)
 		if err != nil {
 			log.Error(err, "Failed pod cannot be recovered, volumes unhealthy", "cluster", c.namespacedName(), "name", m.Name)
@@ -467,10 +465,10 @@ func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 				log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name, "reason", err)
 				r.transitionState(ReconcileNotifyFinished)
 				return nil
-			} else {
-				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-				return fmt.Errorf("recovering node %s", m.ClientURL())
 			}
+
+			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
+			return fmt.Errorf("recovering node %s", m.ClientURL())
 		}
 
 		log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", m.Name)
@@ -539,7 +537,6 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 				r.removeVolumes[server] = true
 			}
 		}
-
 	}
 
 	// If we are performing any scaling update the status and request a rebalance

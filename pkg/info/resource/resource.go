@@ -10,9 +10,9 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 )
 
-// ResourceReference contains data so other modules can extract data associated
+// Reference contains data so other modules can extract data associated
 // with discovered associated with resource instances
-type ResourceReference interface {
+type Reference interface {
 	// Kind is the Kubernetes kind of a resource
 	Kind() string
 	// Name is the name of the resource
@@ -31,11 +31,11 @@ type Resource interface {
 	// Write writes the resources to the requested backend
 	Write(backend.Backend) error
 	// References returns a list of resources that were discovered by a Fetch
-	References() []ResourceReference
+	References() []Reference
 }
 
-// ResourceInitializer is a function signature used to get resource handlers
-type ResourceInitializer func(*context.Context) Resource
+// Initializer is a function signature used to get resource handlers
+type Initializer func(*context.Context) Resource
 
 // getResourceSelector returns a label selector which will scope the resources we
 // can collect in the requested namespace based on configuration directives.
@@ -49,19 +49,21 @@ func getResourceSelector(c *config.Configuration, all bool) (labels.Selector, er
 	requirements := []labels.Requirement{}
 
 	// By default we only collect items labeled as couchbase
-	if req, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App}); err != nil {
+	req, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App})
+	if err != nil {
 		return nil, err
-	} else {
-		requirements = append(requirements, *req)
 	}
+
+	requirements = append(requirements, *req)
 
 	// If we specify specific clusters add this requirement
 	if len(c.Clusters) != 0 {
-		if req, err := labels.NewRequirement(constants.LabelCluster, selection.In, c.Clusters); err != nil {
+		req, err := labels.NewRequirement(constants.LabelCluster, selection.In, c.Clusters)
+		if err != nil {
 			return nil, err
-		} else {
-			requirements = append(requirements, *req)
 		}
+
+		requirements = append(requirements, *req)
 	}
 
 	// Create and return the selector

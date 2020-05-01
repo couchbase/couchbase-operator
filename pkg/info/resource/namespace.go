@@ -48,6 +48,6 @@ func (r *namespaceResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *namespaceResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *namespaceResource) References() []Reference {
+	return []Reference{}
 }

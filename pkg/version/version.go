@@ -17,7 +17,7 @@ var (
 
 // This will generate things like 1.0.0 and 1.0.0-beta1 and should be used
 // for things like docker images.
-func VersionWithRevision() string {
+func WithRevision() string {
 	v := Version
 	if Revision != "" {
 		v = v + "-" + Revision
@@ -27,13 +27,13 @@ func VersionWithRevision() string {
 
 // This will do as above, but also adds in the Red Hat container tag revision
 // e.g. 1.0.0-beta1-1.
-func VersionWithRevisionRedHat() string {
-	return VersionWithRevision() + "-" + RevisionRedHat
+func WithRevisionRedHat() string {
+	return WithRevision() + "-" + RevisionRedHat
 }
 
 // This will generate things like "1.0.0 (build 123)" and should be used for
 // binary version strings so we can tell exactly which build (and by extension
 // commit) is being used.
-func VersionWithBuildNumber() string {
-	return fmt.Sprintf("%s (build %s)", VersionWithRevision(), BuildNumber)
+func WithBuildNumber() string {
+	return fmt.Sprintf("%s (build %s)", WithRevision(), BuildNumber)
 }

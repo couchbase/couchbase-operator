@@ -70,10 +70,10 @@ func (r *deploymentResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *deploymentResource) References() []ResourceReference {
-	references := []ResourceReference{}
+func (r *deploymentResource) References() []Reference {
+	references := []Reference{}
 	for _, deployment := range r.deployments {
-		references = append(references, newResourceReference(r.Kind(), deployment.Name))
+		references = append(references, newReference(r.Kind(), deployment.Name))
 	}
 	return references
 }

@@ -1071,7 +1071,6 @@ func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*
 }
 
 func (c *Cluster) reconcileClusterSettings() error {
-
 	if err := c.reconcileAutoFailoverSettings(); err != nil {
 		return err
 	}
@@ -1094,7 +1093,6 @@ func (c *Cluster) reconcileClusterSettings() error {
 
 // ensure autofailover timeout matches spec setting
 func (c *Cluster) reconcileAutoFailoverSettings() error {
-
 	// Get the existing settings
 	failoverSettings, err := c.client.GetAutoFailoverSettings(c.readyMembers())
 	if err != nil {
@@ -1939,7 +1937,6 @@ Outerloop:
 
 // reconcileRBAC reconciles users, groups, along with ldap settings
 func (c *Cluster) reconcileRBAC() error {
-
 	// rbac features require 6.5
 	version, err := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
 	if err != nil {
@@ -1954,7 +1951,6 @@ func (c *Cluster) reconcileRBAC() error {
 			return err
 		}
 	} else {
-
 		// Warn if user is attempting to use rbac feature with an unsupported version
 		if c.cluster.Spec.Security.LDAP != nil {
 			log.V(1).Info("LDAP security settings are not allowed", "cluster", c.namespacedName(), "cluster_version", version, "required_version", constants.CouchbaseVersion650)

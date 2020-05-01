@@ -51,10 +51,10 @@ func (r *nodeResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *nodeResource) References() []ResourceReference {
-	references := []ResourceReference{}
+func (r *nodeResource) References() []Reference {
+	references := []Reference{}
 	for _, node := range r.nodes.Items {
-		references = append(references, newResourceReference(r.Kind(), node.Name))
+		references = append(references, newReference(r.Kind(), node.Name))
 	}
 	return references
 }

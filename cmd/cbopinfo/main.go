@@ -23,7 +23,7 @@ import (
 
 var (
 	// Define all of the resource types we can collect information for
-	resourceInitializers = []resource.ResourceInitializer{
+	resourceInitializers = []resource.Initializer{
 		resource.NewConfigMapResource,
 		resource.NewCouchbaseClusterResource,
 		resource.NewCouchbaseBackupResource,
@@ -49,14 +49,14 @@ var (
 	}
 
 	// Define all implied sub-resources we can collect information for
-	collectorInitializers = []collector.CollectorInitializer{
+	collectorInitializers = []collector.Initializer{
 		collector.NewEventCollector,
 		collector.NewLogCollector,
 		collector.NewOperatorCollector,
 	}
 
 	// Define all cluster scoped resource types
-	clusterResourceInitializers = []resource.ResourceInitializer{
+	clusterInitializers = []resource.Initializer{
 		resource.NewClusterRoleResource,
 		resource.NewClusterRoleBindingResource,
 		resource.NewCustomResourceDefinitionResource,
@@ -66,7 +66,7 @@ var (
 )
 
 // harvestSub collects resources implicitly associated with a resource type e.g. logs/events
-func harvestSub(context *context.Context, backend backend.Backend, references []resource.ResourceReference) error {
+func harvestSub(context *context.Context, backend backend.Backend, references []resource.Reference) error {
 	// For all sub resource types create a handler, fetch and write to the backend
 	for _, initializer := range collectorInitializers {
 		for _, ref := range references {
@@ -86,7 +86,7 @@ func harvestSub(context *context.Context, backend backend.Backend, references []
 }
 
 // harvest collects all resources the context allows and writes to the backend
-func harvest(context *context.Context, backend backend.Backend, initializers []resource.ResourceInitializer) error {
+func harvest(context *context.Context, backend backend.Backend, initializers []resource.Initializer) error {
 	// Main loop, create the resource handler, fetch and write to the backend
 	for _, initializer := range initializers {
 		resource := initializer(context)
@@ -130,8 +130,7 @@ func main() {
 	// Before we do anything further ensure we've been correctly configured.
 	// Check basic connectivity via the discovery API.  This is plain text
 	// TODO: Use the resource list to filter the resources we gather
-	_, err := context.KubeClient.Discovery().ServerResources()
-	if err != nil {
+	if _, _, err := context.KubeClient.Discovery().ServerGroupsAndResources(); err != nil {
 		fmt.Println("unable to discover cluster resources:", err)
 		os.Exit(1)
 	}
@@ -206,7 +205,7 @@ func main() {
 	}
 
 	// Harvest unscoped cluster content
-	if err := harvest(context, backend, clusterResourceInitializers); err != nil {
+	if err := harvest(context, backend, clusterInitializers); err != nil {
 		fmt.Println(err)
 	}
 

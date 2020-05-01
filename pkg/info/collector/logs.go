@@ -19,7 +19,7 @@ type logCollector struct {
 	// logs is the raw output from listing logs
 	logs map[string]*bytes.Buffer
 	// resource keeps a record of what the logs are for
-	resource resource.ResourceReference
+	resource resource.Reference
 }
 
 // NewLogCollector initializes a new logs resource
@@ -34,7 +34,7 @@ func (r *logCollector) Kind() string {
 }
 
 // Fetch collects all logs as defined for the resource
-func (r *logCollector) Fetch(resource resource.ResourceReference) error {
+func (r *logCollector) Fetch(resource resource.Reference) error {
 	// Get a pod from the resource kind
 	pod, err := k8s.GetPod(r.context, resource)
 	if err != nil {

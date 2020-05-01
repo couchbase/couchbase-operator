@@ -713,12 +713,8 @@ func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[s
 			}
 		}
 	}
-	eq := reflect.DeepEqual(clusterServices, servicesMap)
-	if eq {
-		return true
-	} else {
-		return false
-	}
+
+	return reflect.DeepEqual(clusterServices, servicesMap)
 }
 
 func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) {
@@ -1010,7 +1006,6 @@ func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 		} else if status.Reason != "" {
 			err = fmt.Errorf("failed to connect to LDAP server: %s", status.Reason)
 			return false, retryutil.RetryOkError(err)
-
 		}
 		return false, nil
 	})

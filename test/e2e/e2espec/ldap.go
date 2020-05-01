@@ -37,7 +37,6 @@ var (
 
 // LDAP Settings
 func newLDAPSettings(namespace string) *couchbasev2.CouchbaseClusterLDAPSpec {
-
 	basedn := fmt.Sprintf("dc=%s,dc=%s,dc=svc", ldapSubdomain, namespace)
 	binddn := fmt.Sprintf("cn=%s,%s", commonName, basedn)
 	userDnTemplate := fmt.Sprintf("uid=%%u,ou=People,%s", basedn)
@@ -80,7 +79,6 @@ func ldapPodLabels() map[string]string {
 
 // LDAP Server Pod Spec
 func NewLDAPServer(namespace string) *v1.Pod {
-
 	container := openLDAPContainer(namespace)
 
 	pod := &v1.Pod{
@@ -101,7 +99,6 @@ func NewLDAPServer(namespace string) *v1.Pod {
 
 // LDAP Server Pod Spec with TLS
 func NewLDAPServerTLS(namespace, ldapSecret string) *v1.Pod {
-
 	pod := NewLDAPServer(namespace)
 
 	// add init container to copy certs
@@ -131,7 +128,6 @@ func NewLDAPServerTLS(namespace, ldapSecret string) *v1.Pod {
 
 // OpenLDAP container spec
 func openLDAPContainer(namespace string) v1.Container {
-
 	ldapDomain := fmt.Sprintf("%s.%s.svc", ldapSubdomain, namespace)
 	ldapFQDN := fmt.Sprintf("%s.%s", ldapHostName, ldapDomain)
 
@@ -227,7 +223,6 @@ func openLDAPInitContainer() v1.Container {
 
 // Headless service exposing ldap container
 func NewLDAPService() *v1.Service {
-
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   ldapSubdomain,

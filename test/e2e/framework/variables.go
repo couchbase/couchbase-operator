@@ -4,5 +4,5 @@ package framework
 var runtimeParams TestRunParam
 var suiteData SuiteData
 
-// Exported variables
+// Global holds contextual information for all tests.
 var Global *Framework

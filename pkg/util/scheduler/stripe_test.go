@@ -5,6 +5,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -52,10 +53,10 @@ var (
 				serverGroup2,
 			},
 			Servers: []couchbasev2.ServerConfig{
-				couchbasev2.ServerConfig{
+				{
 					Name: serverClass1,
 				},
-				couchbasev2.ServerConfig{
+				{
 					Name: serverClass2,
 					ServerGroups: []string{
 						serverGroup2,
@@ -75,10 +76,10 @@ var (
 		},
 		Spec: couchbasev2.ClusterSpec{
 			Servers: []couchbasev2.ServerConfig{
-				couchbasev2.ServerConfig{
+				{
 					Name: serverClass1,
 				},
-				couchbasev2.ServerConfig{
+				{
 					Name: serverClass2,
 					ServerGroups: []string{
 						serverGroup1,

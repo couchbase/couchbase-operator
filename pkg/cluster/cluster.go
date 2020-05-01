@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 var log = logf.Log.WithName("cluster")
@@ -319,7 +319,6 @@ func (c *Cluster) create() error {
 // It accepts a flag forcing it update internal state from Kubernetes, and returns a
 // similar flag to indicate we require a forced update with the next invocation.
 func (c *Cluster) runReconcile() {
-
 	// Always update the cluster status and reconcile loop time.
 	start := time.Now()
 	defer func() {
@@ -425,14 +424,13 @@ func (c *Cluster) isSecureClient() bool {
 
 func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
 	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name, "image", c.cluster.Spec.CouchbaseImage())
-	_, err := k8sutil.CreateCouchbasePod(c.k8s, c.scheduler, c.cluster, m, serverSpec, ctx)
+	_, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec)
 	return err
 }
 
 // Remove Pod and any volumes associated with pod if requested
 // ore volumes are associated with default claim
 func (c *Cluster) removePod(name string, removeVolumes bool) error {
-
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
 	err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, opts, removeVolumes)
 	if err != nil {
@@ -514,11 +512,11 @@ func (c *Cluster) recoverClusterDown() error {
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				return fmt.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
-			} else {
-				log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name)
-				c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
-				break
 			}
+
+			log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name)
+			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
+			break
 		}
 	}
 	return nil

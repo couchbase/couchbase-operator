@@ -51,6 +51,6 @@ func (r *couchbaseBucketResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *couchbaseBucketResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *couchbaseBucketResource) References() []Reference {
+	return []Reference{}
 }

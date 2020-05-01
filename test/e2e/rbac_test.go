@@ -165,7 +165,6 @@ func TestRBACUpdateRole(t *testing.T) {
 // removed from the binding and since it doesn't have a role
 // in any other binding the user is also deleted
 func TestRBACRemoveUserFromBinding(t *testing.T) {
-
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	timeout := 2 * time.Minute
@@ -215,13 +214,11 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUserDeleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-
 }
 
 // TestRBACDeleteBinding tests that user is deleted when entire
 // rolebinding is deleted
 func TestRBACDeleteBinding(t *testing.T) {
-
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 

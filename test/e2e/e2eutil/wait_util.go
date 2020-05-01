@@ -736,7 +736,7 @@ func MustWaitForPVC(t *testing.T, k8s *types.Cluster, name, namespace string, ti
 
 // WaitForPVCDeletion is used as synchronization between runs, especially in the cloud
 // as PVC reclaim is not instant.
-func WaitForPVCDeletion(k8s *types.Cluster, namespace string, ctx context.Context) error {
+func WaitForPVCDeletion(ctx context.Context, k8s *types.Cluster, namespace string) error {
 	requirements := []labels.Requirement{}
 	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
 	if err != nil {
@@ -810,7 +810,7 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 		waitContext, waitCancel := context.WithTimeout(ctx, time.Minute)
 		defer waitCancel()
 
-		if err := WaitForPVCDeletion(k8s, namespace, waitContext); err != nil {
+		if err := WaitForPVCDeletion(waitContext, k8s, namespace); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 		return true, nil
@@ -869,7 +869,7 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName, namespace st
 		waitContext, waitCancel := context.WithTimeout(ctx, time.Minute)
 		defer waitCancel()
 
-		if err := WaitForPVCDeletion(k8s, namespace, waitContext); err != nil {
+		if err := WaitForPVCDeletion(waitContext, k8s, namespace); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 		return true, nil
@@ -1073,7 +1073,6 @@ func MustWaitUntilUserExists(t *testing.T, k8s *types.Cluster, couchbase *couchb
 // WaitForClusterUserDeletion waits user to be deleted
 // from couchbase cluster
 func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, timeout time.Duration) error {
-
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

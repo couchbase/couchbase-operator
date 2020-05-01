@@ -12,9 +12,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -91,7 +91,6 @@ func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (recon
 // AddToManager registers a controller reconciler with the manager and triggers updates
 // when CouchbaseCluster objects are modified.
 func AddToManager(mgr manager.Manager, timeout string, concurrency int) error {
-
 	r := &CouchbaseClusterReconciler{
 		client:           mgr.GetClient(),
 		clusters:         CreateManagedClusters(),

@@ -18,7 +18,7 @@ type eventCollector struct {
 	// events is the raw output from listing events
 	events []v1.Event
 	// resource keeps a record of what the logs are for
-	resource resource.ResourceReference
+	resource resource.Reference
 }
 
 // NewEventCollector initializes a new event resource
@@ -33,7 +33,7 @@ func (r *eventCollector) Kind() string {
 }
 
 // Fetch collects all events as defined for the resource
-func (r *eventCollector) Fetch(resource resource.ResourceReference) error {
+func (r *eventCollector) Fetch(resource resource.Reference) error {
 	events, err := k8sutil.GetEventsForResource(r.context.KubeClient, r.context.Namespace(), resource.Kind(), resource.Name())
 	if err != nil {
 		return err

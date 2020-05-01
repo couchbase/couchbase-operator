@@ -55,6 +55,6 @@ func (r *podDisruptionBudgetResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *podDisruptionBudgetResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *podDisruptionBudgetResource) References() []Reference {
+	return []Reference{}
 }

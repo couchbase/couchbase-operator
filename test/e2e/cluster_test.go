@@ -144,7 +144,6 @@ func TestEditClusterSettings(t *testing.T) {
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-
 }
 
 // TestInvalidBaseImage tests cluster with invalid image repos fail

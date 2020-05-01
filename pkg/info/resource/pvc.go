@@ -54,6 +54,6 @@ func (r *persistentVolumeClaimResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *persistentVolumeClaimResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *persistentVolumeClaimResource) References() []Reference {
+	return []Reference{}
 }

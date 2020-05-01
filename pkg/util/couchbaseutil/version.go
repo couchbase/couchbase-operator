@@ -69,22 +69,20 @@ func IsSHA256Version(version string) bool {
 
 // Get readable version from sha256
 func GetSHA256Version(version string) (string, error) {
-
 	if v, ok := constants.ImageDigests[version]; ok {
 		return v, nil
-	} else {
+	}
 
-		// attempt additional lookup on associated config map
-		if digests, ok := os.LookupEnv(constants.EnvDigestsConfigMap); ok {
-
-			// match against digests presented as list of equalities
-			re := regexp.MustCompile(version + `=(.*)\s?\n`)
-			parts := re.FindStringSubmatch(digests)
-			if len(parts) == 2 {
-				return parts[1], nil
-			}
+	// attempt additional lookup on associated config map
+	if digests, ok := os.LookupEnv(constants.EnvDigestsConfigMap); ok {
+		// match against digests presented as list of equalities
+		re := regexp.MustCompile(version + `=(.*)\s?\n`)
+		parts := re.FindStringSubmatch(digests)
+		if len(parts) == 2 {
+			return parts[1], nil
 		}
 	}
+
 	return "", fmt.Errorf("unknown version digest: %s", version)
 }
 
@@ -156,11 +154,12 @@ func VerifyVersion(version string) error {
 	v, err := NewVersion(version)
 	if err != nil {
 		return err
-	} else {
-		minVersion, _ := NewVersion(constants.CouchbaseVersionMin)
-		if v.Compare(minVersion) == -1 {
-			return cberrors.ErrUnsupportedVersion{Version: version}
-		}
 	}
+
+	minVersion, _ := NewVersion(constants.CouchbaseVersionMin)
+	if v.Compare(minVersion) == -1 {
+		return cberrors.ErrUnsupportedVersion{Version: version}
+	}
+
 	return nil
 }

@@ -51,5 +51,4 @@ func TestStatusRecovery(t *testing.T) {
 		Test("/Status/CurrentVersion", version)
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, tests, time.Minute)
-
 }

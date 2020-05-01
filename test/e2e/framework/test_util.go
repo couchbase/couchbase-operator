@@ -27,7 +27,7 @@ const (
 	dockerPullSecretName = "test-docker-pull-secret"
 )
 
-// Variable to store the results globally
+// Results is a global result store.
 var Results = []TestResult{}
 
 // analyzeResults accepts a list of test results and displays success rates
@@ -59,7 +59,6 @@ func AnalyzeResults(t *testing.T) {
 	testcases := []TestCase{}
 
 	for i, result := range Results {
-
 		if result.Result {
 			t.Logf("%d: %s...PASS", i+1, result.Name)
 			testcases = append(testcases, TestCase{Name: result.Name, Time: "0"})
@@ -68,6 +67,7 @@ func AnalyzeResults(t *testing.T) {
 			testcases = append(testcases, TestCase{Name: result.Name, Time: "0", Error: "fail"})
 			failures = append(failures, result.Name)
 		}
+
 		if result.Unstable {
 			testcases = append(testcases, TestCase{Name: result.Name, Time: "0", Error: "unstable"})
 			instabilities = append(instabilities, result.Name)
@@ -196,7 +196,6 @@ func RemoveServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAcc
 				return err
 			}
 		}
-
 	}
 	return nil
 }
@@ -328,7 +327,6 @@ func waitForServiceAccountDeleted(kubeClient kubernetes.Interface, serviceAccoun
 				if svcAcc.GetName() == serviceAccountName {
 					break
 				}
-
 			}
 			return nil
 		}

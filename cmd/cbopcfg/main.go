@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-
 	c := &config.Config{}
 	if err := c.ParseArgs(); err != nil {
 		fmt.Println(err)
@@ -17,7 +16,7 @@ func main() {
 	}
 
 	if c.Version {
-		fmt.Println("cbopcfg", version.VersionWithBuildNumber())
+		fmt.Println("cbopcfg", version.WithBuildNumber())
 		os.Exit(0)
 	}
 

@@ -54,6 +54,6 @@ func (r *endpointResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *endpointResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *endpointResource) References() []Reference {
+	return []Reference{}
 }

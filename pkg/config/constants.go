@@ -7,6 +7,6 @@ import (
 )
 
 var (
-	admissionImageDefault = "couchbase/admission-controller:" + version.VersionWithRevision()
-	operatorImageDefault  = "couchbase/operator:" + version.VersionWithRevision()
+	admissionImageDefault = "couchbase/admission-controller:" + version.WithRevision()
+	operatorImageDefault  = "couchbase/operator:" + version.WithRevision()
 )

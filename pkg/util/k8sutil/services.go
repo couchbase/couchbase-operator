@@ -171,7 +171,7 @@ var (
 	// the generation of node ports to allow cluster access from outside of the
 	// pod (overlay) network.
 	servicePorts = map[couchbasev2.Service][]v1.ServicePort{
-		couchbasev2.AdminService: []v1.ServicePort{
+		couchbasev2.AdminService: {
 			{
 				Name:     adminServicePortName,
 				Port:     adminServicePort,
@@ -183,7 +183,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev2.IndexService: []v1.ServicePort{
+		couchbasev2.IndexService: {
 			{
 				Name:     indexServicePortName,
 				Port:     indexServicePort,
@@ -195,7 +195,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev2.QueryService: []v1.ServicePort{
+		couchbasev2.QueryService: {
 			{
 				Name:     queryServicePortName,
 				Port:     queryServicePort,
@@ -207,7 +207,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev2.SearchService: []v1.ServicePort{
+		couchbasev2.SearchService: {
 			{
 				Name:     searchServicePortName,
 				Port:     searchServicePort,
@@ -219,7 +219,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev2.AnalyticsService: []v1.ServicePort{
+		couchbasev2.AnalyticsService: {
 			{
 				Name:     analyticsServicePortName,
 				Port:     analyticsServicePort,
@@ -231,7 +231,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev2.EventingService: []v1.ServicePort{
+		couchbasev2.EventingService: {
 			{
 				Name:     eventingServicePortName,
 				Port:     eventingServicePort,
@@ -243,7 +243,7 @@ var (
 				Protocol: v1.ProtocolTCP,
 			},
 		},
-		couchbasev2.DataService: []v1.ServicePort{
+		couchbasev2.DataService: {
 			{
 				Name:     dataServicePortName,
 				Port:     dataServicePort,
@@ -606,15 +606,15 @@ func GetExposedServiceName(nodeName string) string {
 
 // exposedfeatureSets is a mapping from feature name to a list of host ports to expose
 var exposedfeatureSets = map[couchbasev2.ExposedFeature][]couchbasev2.Service{
-	couchbasev2.FeatureAdmin: []couchbasev2.Service{
+	couchbasev2.FeatureAdmin: {
 		couchbasev2.AdminService,
 	},
-	couchbasev2.FeatureXDCR: []couchbasev2.Service{
+	couchbasev2.FeatureXDCR: {
 		couchbasev2.AdminService,
 		couchbasev2.IndexService,
 		couchbasev2.DataService,
 	},
-	couchbasev2.FeatureClient: []couchbasev2.Service{
+	couchbasev2.FeatureClient: {
 		couchbasev2.AdminService,
 		couchbasev2.IndexService,
 		couchbasev2.QueryService,

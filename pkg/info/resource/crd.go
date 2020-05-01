@@ -62,6 +62,6 @@ func (r *crdResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *crdResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *crdResource) References() []Reference {
+	return []Reference{}
 }

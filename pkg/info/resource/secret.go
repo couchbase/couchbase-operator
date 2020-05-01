@@ -64,6 +64,6 @@ func (r *secretResource) Write(b backend.Backend) error {
 	return nil
 }
 
-func (r *secretResource) References() []ResourceReference {
-	return []ResourceReference{}
+func (r *secretResource) References() []Reference {
+	return []Reference{}
 }

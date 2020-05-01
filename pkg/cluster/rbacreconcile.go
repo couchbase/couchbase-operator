@@ -24,7 +24,6 @@ const (
 // reconcileRBACResources compares requested and actual rbac resources
 // creates, updates, and deletes where necessary
 func (c *Cluster) reconcileRBACResources() error {
-
 	if !c.cluster.Spec.Security.RBAC.Managed {
 		return nil
 	}
@@ -48,7 +47,6 @@ func (c *Cluster) reconcileRBACResources() error {
 
 // reconcileGroups creates, edits, removes server groups according to requested configuration
 func (c *Cluster) reconcileGroups() ([]string, error) {
-
 	// gather selected groups
 	selector := labels.Everything()
 	if c.cluster.Spec.Security.RBAC.Selector != nil {
@@ -120,14 +118,12 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 
 // reconcileUsers creates, edits, removes server users according to requested configuration
 func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
-
 	// Map of requested users by name
 	requestedUsers := make(map[string]cbmgr.User)
 
 	// get rolebindings
 	couchbaseRoleBindings := c.k8s.CouchbaseRoleBindings.List()
 	for _, roleBinding := range couchbaseRoleBindings {
-
 		roleRef := roleBinding.Spec.RoleRef
 		groupName := roleRef.Name
 
@@ -141,7 +137,6 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 
 		// Gather users bound to group
 		for _, roleSubject := range roleBinding.Spec.Subjects {
-
 			selector := labels.Everything()
 			if c.cluster.Spec.Security.RBAC.Selector != nil {
 				var err error
@@ -220,7 +215,6 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	// create requested groups that do not exist
 	for _, r := range requestedUsers {
 		if _, found := couchbasev2.HasItem(r.ID, existingUserNames); !found {
-
 			if err := c.client.CreateUser(c.readyMembers(), r); err != nil {
 				return existingUserNames, err
 			}
@@ -263,13 +257,14 @@ func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
 
 // reconcileLDAPSettings synchronizes couchbase ldap settings with requested settings
 func (c *Cluster) reconcileLDAPSettings() error {
-
 	// Get current ldap cluster spec
 	apiLDAPSettings, err := c.client.GetLDAPSettings(c.readyMembers())
 	if err != nil {
 		return err
 	}
-	if ldap := c.cluster.Spec.Security.LDAP; ldap == nil {
+
+	ldap := c.cluster.Spec.Security.LDAP
+	if ldap == nil {
 		if len(apiLDAPSettings.Hosts) > 0 {
 			// Reset settings to default
 			settings := cbmgr.LDAPSettings{Encryption: cbmgr.LDAPEncryptionNone}
@@ -277,59 +272,58 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		}
 		// nothing to reconcile
 		return nil
-	} else {
+	}
 
-		// Convert requested ldap spec
-		specLDAPSettings := cbmgr.LDAPSettings{
-			AuthenticationEnabled: ldap.AuthenticationEnabled,
-			AuthorizationEnabled:  ldap.AuthorizationEnabled,
-			Hosts:                 ldap.Hosts,
-			Port:                  ldap.Port,
-			Encryption:            cbmgr.LDAPEncryption(ldap.Encryption),
-			EnableCertValidation:  ldap.EnableCertValidation,
-			GroupsQuery:           ldap.GroupsQuery,
-			BindDN:                ldap.BindDN,
-			UserDNMapping:         cbmgr.LDAPUserDNMapping(ldap.UserDNMapping),
-			NestedGroupsEnabled:   ldap.NestedGroupsEnabled,
-			NestedGroupsMaxDepth:  ldap.NestedGroupsMaxDepth,
-			CacheValueLifetime:    ldap.CacheValueLifetime,
-		}
+	// Convert requested ldap spec
+	specLDAPSettings := cbmgr.LDAPSettings{
+		AuthenticationEnabled: ldap.AuthenticationEnabled,
+		AuthorizationEnabled:  ldap.AuthorizationEnabled,
+		Hosts:                 ldap.Hosts,
+		Port:                  ldap.Port,
+		Encryption:            cbmgr.LDAPEncryption(ldap.Encryption),
+		EnableCertValidation:  ldap.EnableCertValidation,
+		GroupsQuery:           ldap.GroupsQuery,
+		BindDN:                ldap.BindDN,
+		UserDNMapping:         cbmgr.LDAPUserDNMapping(ldap.UserDNMapping),
+		NestedGroupsEnabled:   ldap.NestedGroupsEnabled,
+		NestedGroupsMaxDepth:  ldap.NestedGroupsMaxDepth,
+		CacheValueLifetime:    ldap.CacheValueLifetime,
+	}
 
-		// set cacert if provided and validation cert is enabled
-		if specLDAPSettings.EnableCertValidation {
-			tlsSecretName := ldap.TLSSecret
-			if tlsSecretName != "" {
-				tlsSecret, found := c.k8s.Secrets.Get(tlsSecretName)
-				if !found {
-					return fmt.Errorf("unable to get ldap tls secret `%s`", tlsSecretName)
-				}
-				ca, ok := tlsSecret.Data[constants.LDAPSecretCACert]
-				if !ok {
-					return fmt.Errorf("unable to find %s in tls ldap secret", constants.LDAPSecretCACert)
-				}
-				specLDAPSettings.CACert = string(ca)
+	// set cacert if provided and validation cert is enabled
+	if specLDAPSettings.EnableCertValidation {
+		tlsSecretName := ldap.TLSSecret
+		if tlsSecretName != "" {
+			tlsSecret, found := c.k8s.Secrets.Get(tlsSecretName)
+			if !found {
+				return fmt.Errorf("unable to get ldap tls secret `%s`", tlsSecretName)
 			}
-		}
-
-		if !reflect.DeepEqual(*apiLDAPSettings, specLDAPSettings) {
-
-			// reconcile and set bind password if provided
-			bindSecretName := c.cluster.Spec.Security.LDAP.BindSecret
-			if bindSecretName != "" {
-				bindSecret, found := c.k8s.Secrets.Get(bindSecretName)
-				if !found {
-					return fmt.Errorf("unable to get ldap bind secret `%s`", bindSecretName)
-				}
-				password, ok := bindSecret.Data[constants.LDAPSecretPassword]
-				if !ok {
-					return fmt.Errorf("unable to find %s in ldap bind secret", constants.LDAPSecretPassword)
-				}
-				specLDAPSettings.BindPass = string(password)
+			ca, ok := tlsSecret.Data[constants.LDAPSecretCACert]
+			if !ok {
+				return fmt.Errorf("unable to find %s in tls ldap secret", constants.LDAPSecretCACert)
 			}
-
-			// Update ldap settings according requested spec
-			return c.client.SetLDAPSettings(c.readyMembers(), &specLDAPSettings)
+			specLDAPSettings.CACert = string(ca)
 		}
 	}
+
+	if !reflect.DeepEqual(*apiLDAPSettings, specLDAPSettings) {
+		// reconcile and set bind password if provided
+		bindSecretName := c.cluster.Spec.Security.LDAP.BindSecret
+		if bindSecretName != "" {
+			bindSecret, found := c.k8s.Secrets.Get(bindSecretName)
+			if !found {
+				return fmt.Errorf("unable to get ldap bind secret `%s`", bindSecretName)
+			}
+			password, ok := bindSecret.Data[constants.LDAPSecretPassword]
+			if !ok {
+				return fmt.Errorf("unable to find %s in ldap bind secret", constants.LDAPSecretPassword)
+			}
+			specLDAPSettings.BindPass = string(password)
+		}
+
+		// Update ldap settings according requested spec
+		return c.client.SetLDAPSettings(c.readyMembers(), &specLDAPSettings)
+	}
+
 	return nil
 }
