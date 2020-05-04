@@ -19,7 +19,7 @@ import (
 )
 
 // enableMonitoring enables monitoring.
-func enableMonitoring(t *testing.T, f *framework.Framework) *couchbasev2.CouchbaseClusterMonitoringSpec {
+func enableMonitoring(f *framework.Framework) *couchbasev2.CouchbaseClusterMonitoringSpec {
 	if imageName := strings.TrimSpace(f.CouchbaseExporterImage); imageName != "" {
 		monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
 			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
@@ -86,7 +86,7 @@ func TestPrometheusMetricsEnable(t *testing.T) {
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Enable monitoring
-	monitoring := enableMonitoring(t, f)
+	monitoring := enableMonitoring(f)
 
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
@@ -121,7 +121,7 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Enable monitoring
-	monitoring := enableMonitoring(t, f)
+	monitoring := enableMonitoring(f)
 
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
@@ -184,7 +184,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	}
 
 	// Enable monitoring
-	monitoring := enableMonitoring(t, f)
+	monitoring := enableMonitoring(f)
 	monitoring.Prometheus.AuthorizationSecret = &monitoringAuthSecret
 
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)

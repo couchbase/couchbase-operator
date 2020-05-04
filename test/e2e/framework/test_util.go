@@ -284,7 +284,7 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 	return err
 }
 
-func recreateRoleBindings(k8s *types.Cluster, clusterRoleName string) error {
+func recreateRoleBindings(k8s *types.Cluster) error {
 	if err := removeRoleBinding(k8s.KubeClient, k8s.Namespace, config.OperatorResourceName); err != nil {
 		return err
 	}

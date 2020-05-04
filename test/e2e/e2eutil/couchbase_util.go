@@ -221,7 +221,7 @@ func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 		}
 		defer cleanup()
 
-		before, err := getBucket(t, client, bucketName)
+		before, err := getBucket(client, bucketName)
 		if err != nil {
 			return false, err
 		}
@@ -249,7 +249,7 @@ func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 }
 
 // Get Bucket from couchbase cluster.
-func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr.Bucket, error) {
+func getBucket(client *cbmgr.Couchbase, bucketName string) (*cbmgr.Bucket, error) {
 	buckets, err := client.GetBuckets()
 	if err == nil {
 		for _, b := range buckets {

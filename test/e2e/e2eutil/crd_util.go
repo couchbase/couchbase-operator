@@ -34,7 +34,7 @@ func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubern
 	if err != nil {
 		return err
 	}
-	return waitResourcesDeleted(t, kubeClient, cl)
+	return waitResourcesDeleted(kubeClient, cl)
 }
 
 func getClusterCRD(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {

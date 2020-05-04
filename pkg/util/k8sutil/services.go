@@ -759,7 +759,7 @@ type UpdateExposedFeatureStatus struct {
 }
 
 // listExposedServices returns all services which are associated with specific pod ports.
-func listExposedServices(c *client.Client, cluster *couchbasev2.CouchbaseCluster) (services []*v1.Service) {
+func listExposedServices(c *client.Client) (services []*v1.Service) {
 	// Filter out non-node services
 	for _, service := range c.Services.List() {
 		if _, ok := service.Labels[constants.LabelNode]; ok {
@@ -951,7 +951,7 @@ func UpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cl
 	ports = filterInsecurePorts(ports, cluster.Spec.IsExposedFeatureServiceTypePublic())
 
 	// Get a list of pre-existing external services that belong to our members.
-	services := listExposedServices(c, cluster)
+	services := listExposedServices(c)
 
 	// Calculate the services that need creating  based on the member status and
 	// cluster specification.
@@ -1030,7 +1030,7 @@ func WouldUpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSe
 	ports = filterInsecurePorts(ports, cluster.Spec.IsExposedFeatureServiceTypePublic())
 
 	// Get a list of all cluster services that belong to a specific nodes
-	services := listExposedServices(c, cluster)
+	services := listExposedServices(c)
 
 	// Calculate the services that need creating  based on the member status and
 	// cluster specification.

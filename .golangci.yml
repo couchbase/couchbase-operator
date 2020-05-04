@@ -28,7 +28,6 @@ linters:
   - godox # TODOs are bad, it suggests it's not finished
   - maligned # memory alingment - this is fine
   - funlen # complicated functions
-  - unparam # unused parameters
   - gochecknoglobals # global variables
   - lll # long lines
   - gochecknoinits # init functions
@@ -51,3 +50,8 @@ issues:
   - text: ST1016
     linters:
     - stylecheck
+  # Things that are parametrized, and don't need to be.  This is probably
+  # a gap in testing.
+  - text: always receives
+    linters:
+    - unparam

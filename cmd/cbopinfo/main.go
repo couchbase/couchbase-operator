@@ -66,7 +66,7 @@ var (
 )
 
 // harvestSub collects resources implicitly associated with a resource type e.g. logs/events.
-func harvestSub(context *context.Context, backend backend.Backend, references []resource.Reference) error {
+func harvestSub(context *context.Context, backend backend.Backend, references []resource.Reference) {
 	// For all sub resource types create a handler, fetch and write to the backend
 	for _, initializer := range collectorInitializers {
 		for _, ref := range references {
@@ -81,12 +81,10 @@ func harvestSub(context *context.Context, backend backend.Backend, references []
 			}
 		}
 	}
-
-	return nil
 }
 
 // harvest collects all resources the context allows and writes to the backend.
-func harvest(context *context.Context, backend backend.Backend, initializers []resource.Initializer) error {
+func harvest(context *context.Context, backend backend.Backend, initializers []resource.Initializer) {
 	// Main loop, create the resource handler, fetch and write to the backend
 	for _, initializer := range initializers {
 		resource := initializer(context)
@@ -98,12 +96,8 @@ func harvest(context *context.Context, backend backend.Backend, initializers []r
 			fmt.Printf("unable to write resources for type %s: %v\n", resource.Kind(), err)
 			continue
 		}
-		if err := harvestSub(context, backend, resource.References()); err != nil {
-			continue
-		}
+		harvestSub(context, backend, resource.References())
 	}
-
-	return nil
 }
 
 // clusterExists is a helper to see if a named cluster exists in the supplied list.
@@ -200,14 +194,10 @@ func main() {
 	}
 
 	// Harvest the content defined by the user context
-	if err := harvest(context, backend, resourceInitializers); err != nil {
-		fmt.Println(err)
-	}
+	harvest(context, backend, resourceInitializers)
 
 	// Harvest unscoped cluster content
-	if err := harvest(context, backend, clusterInitializers); err != nil {
-		fmt.Println(err)
-	}
+	harvest(context, backend, clusterInitializers)
 
 	// If system collections are allowed harvest from explicitly from that namespace
 	if context.Config.System {
@@ -217,8 +207,6 @@ func main() {
 		context.Config.All = true
 
 		// Harvest and restore
-		if err := harvest(context, backend, resourceInitializers); err != nil {
-			fmt.Println(err)
-		}
+		harvest(context, backend, resourceInitializers)
 	}
 }

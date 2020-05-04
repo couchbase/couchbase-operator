@@ -456,9 +456,7 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 		if cluster.Spec.Monitoring.Prometheus.Enabled {
 			metricsContainer := createMetricsContainer(cluster.Spec)
 			applyMetricsPodSecurity(cluster.Spec, &metricsContainer, pod)
-			if err := applyMetricsPodTLS(cluster.Spec, &metricsContainer, pod); err != nil {
-				return nil, err
-			}
+			applyMetricsPodTLS(cluster.Spec, &metricsContainer, pod)
 			pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
 		}
 	}
@@ -489,7 +487,7 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	return pod, nil
 }
 
-func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) error {
+func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) {
 	if cs.Networking.TLS != nil {
 		// Static configuration:
 		// * Defines a (new) volume which contains the secrets necessary
@@ -553,8 +551,6 @@ func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod
 				"--client-key", operatorSecretMountPath+"/couchbase-operator.key")
 		}
 	}
-
-	return nil
 }
 
 func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) {

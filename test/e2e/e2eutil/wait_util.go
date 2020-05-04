@@ -361,7 +361,7 @@ func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
-func waitResourcesDeleted(t *testing.T, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster) error {
+func waitResourcesDeleted(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	err := retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {

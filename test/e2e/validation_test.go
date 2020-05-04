@@ -143,7 +143,7 @@ func getResource(k8s *types.Cluster, object *unstructured.Unstructured) (*schema
 }
 
 // createResources iterates over every resource and creates them in the requested namespace.
-func createResources(k8s *types.Cluster, namespace string, resources resourceList) error {
+func createResources(k8s *types.Cluster, resources resourceList) error {
 	for i, resource := range resources {
 		object := &unstructured.Unstructured{}
 		if err := json.Unmarshal(resource, object); err != nil {
@@ -238,7 +238,7 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 }
 
 // patchResources applies JSON patches to all defined resources.
-func patchResources(k8s *types.Cluster, resources resourceList, patches patchMap) error {
+func patchResources(resources resourceList, patches patchMap) error {
 	for i, resource := range resources {
 		_, name, err := getResourceMeta(resource)
 		if err != nil {
@@ -370,14 +370,14 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 			// If we are applying a change or deleting a cluster we first need to create it...
 			if command == "apply" {
-				if err := createResources(targetKube, targetKube.Namespace, objects); err != nil {
+				if err := createResources(targetKube, objects); err != nil {
 					e2eutil.Die(t, err)
 				}
 			}
 
 			// Patch the cluster specification
 			if test.mutations != nil {
-				if err := patchResources(targetKube, objects, test.mutations); err != nil {
+				if err := patchResources(objects, test.mutations); err != nil {
 					e2eutil.Die(t, err)
 				}
 			}
@@ -385,7 +385,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 			// Execute the main test, update the new resource for verification.
 			switch command {
 			case "create":
-				err = createResources(targetKube, targetKube.Namespace, objects)
+				err = createResources(targetKube, objects)
 			case "apply":
 				err = updateResources(targetKube, objects)
 			}
@@ -397,7 +397,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 					e2eutil.Die(t, fmt.Errorf("test unexpectedly succeeded"))
 				}
 				if test.validations != nil {
-					if err := patchResources(targetKube, objects, test.validations); err != nil {
+					if err := patchResources(objects, test.validations); err != nil {
 						e2eutil.Die(t, err)
 					}
 				}

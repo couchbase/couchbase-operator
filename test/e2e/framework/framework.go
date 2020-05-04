@@ -514,7 +514,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		return err
 	}
 	logrus.Info("Recreating role binding")
-	if err := recreateRoleBindings(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := recreateRoleBindings(k8s); err != nil {
 		return err
 	}
 

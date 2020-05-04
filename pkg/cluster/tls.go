@@ -42,7 +42,7 @@ func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
 }
 
 // reloadChain does an insecure reload of the TLS certificates and keys.
-func (c *Cluster) reloadChain(member *couchbaseutil.Member, cacert []byte) error {
+func (c *Cluster) reloadChain(member *couchbaseutil.Member) error {
 	if err := c.client.ReloadNodeCert(member); err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert, cli
 	// Reloading the chain will sometimes not work and need to be repeatedly prodded until it decides
 	// to obey our command.  It will also take a few tries to verify.
 	callback := func() error {
-		if err := c.reloadChain(member, cacert); err != nil {
+		if err := c.reloadChain(member); err != nil {
 			return err
 		}
 		if !tlsValid(member, cacert, clientCert, clientKey, cert) {
@@ -110,7 +110,7 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 }
 
 // getTLSClientData returns the PEM files required for client authentication.
-func (c *Cluster) getTLSClientData() (ca []byte, chain []byte, key []byte, err error) {
+func (c *Cluster) getTLSClientData() (chain []byte, key []byte, err error) {
 	// Load the TLS data from kubernetes.
 	operatorSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 	if !found {
@@ -119,11 +119,6 @@ func (c *Cluster) getTLSClientData() (ca []byte, chain []byte, key []byte, err e
 	}
 
 	var ok bool
-	ca, ok = operatorSecret.Data[tlsOperatorSecretCACert]
-	if !ok {
-		err = fmt.Errorf("operator secret missing ca.crt")
-		return
-	}
 	chain, ok = operatorSecret.Data[tlsOperatorSecretCert]
 	if !ok {
 		err = fmt.Errorf("operator secret missing " + tlsOperatorSecretCert)
@@ -291,7 +286,7 @@ func (c *Cluster) reconcileTLS() error {
 	var clientKey []byte
 	if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
 		// Load client TLS data from kubernetes and verify.
-		_, clientCert, clientKey, err = c.getTLSClientData()
+		clientCert, clientKey, err = c.getTLSClientData()
 		if err != nil {
 			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
 			return err

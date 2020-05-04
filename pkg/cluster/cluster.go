@@ -620,7 +620,7 @@ func (c *Cluster) initCouchbaseClient() error {
 
 		// Optionally enable client authentication
 		if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
-			_, clientCert, clientKey, err := c.getTLSClientData()
+			clientCert, clientKey, err := c.getTLSClientData()
 			if err != nil {
 				return err
 			}
