@@ -162,11 +162,9 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 		existingCouchbaseCluser, err := decodeObject(ar, ar.Request.OldObject)
 		if err != nil {
 			glog.Error(err)
-		} else {
-			if err := validator.CheckImmutableFields(existingCouchbaseCluser, couchbaseCluster); err != nil {
-				glog.Errorf("Rejecting resource: %v", err)
-				return errorResponse(err)
-			}
+		} else if err := validator.CheckImmutableFields(existingCouchbaseCluser, couchbaseCluster); err != nil {
+			glog.Errorf("Rejecting resource: %v", err)
+			return errorResponse(err)
 		}
 	}
 

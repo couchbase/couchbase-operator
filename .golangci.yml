@@ -22,7 +22,6 @@ linters:
   - nestif # complicated code
   - gomnd # magic numbers
   - testpackage # packages for test, need to be marked as test
-  - gocritic # pedantry
   - gocognit # complicated functions
   - gocyclo # complicated functions
   - godox # TODOs are bad, it suggests it's not finished

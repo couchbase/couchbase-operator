@@ -90,7 +90,7 @@ func GetDuration(timeoutStr string) time.Duration {
 	// Default timeout to 2 hours
 	durationToReturn := (2 * time.Hour)
 
-	pattern, _ := regexp.Compile("^([0-9]+)([mhd])$")
+	pattern := regexp.MustCompile("^([0-9]+)([mhd])$")
 
 	// Calculates only if valid pattern exists
 	if pattern.MatchString(timeoutStr) {

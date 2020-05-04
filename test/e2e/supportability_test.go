@@ -166,12 +166,9 @@ func mustVerifyArchiveContents(t *testing.T, archive string, expected []string) 
 
 // extractTimestamp extract the timestamp portion of the input file name e.g. cbopinfo-20180919T092607+0100.tar.gz
 // will return 20180919T092607+0100.
-func extractTimestamp(filename string) (string, error) {
-	re, err := regexp.Compile(`\d{8}T\d{6}(\+|-)\d{4}`)
-	if err != nil {
-		return "", err
-	}
-	return re.FindString(filename), nil
+func extractTimestamp(filename string) string {
+	re := regexp.MustCompile(`\d{8}T\d{6}(\+|-)\d{4}`)
+	return re.FindString(filename)
 }
 
 // archiveName returns the expected archive name for the specified parameters.
@@ -227,10 +224,7 @@ func mustVerifyServerLogs(t *testing.T, k8s *types.Cluster, namespace, archive s
 	}
 
 	// Grab the timestamp from the archive, all files share this across a cbopinfo run.
-	timestamp, err := extractTimestamp(archive)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
+	timestamp := extractTimestamp(archive)
 
 	// For each pod, ensure the associated server log exists.
 	errs := []error{}
@@ -529,10 +523,7 @@ func cbopinfo(t *testing.T, args argumentList) string {
 	if err != nil {
 		e2eutil.Die(t, fmt.Errorf("cbopinfo command failed: %v: %s", err, string(stdout)))
 	}
-	re, err := regexp.Compile(`Wrote cluster information to (\S+)`)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
+	re := regexp.MustCompile(`Wrote cluster information to (\S+)`)
 	matches := re.FindStringSubmatch(string(stdout))
 	if len(matches) != 2 {
 		e2eutil.Die(t, fmt.Errorf("failed to extract archive"))

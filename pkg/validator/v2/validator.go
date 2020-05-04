@@ -464,10 +464,8 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				}
 			} else if secret == nil {
 				errs = append(errs, fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", *customResource.Spec.Monitoring.Prometheus.AuthorizationSecret))
-			} else {
-				if _, ok := secret.Data["token"]; !ok {
-					errs = append(errs, fmt.Errorf("monitoring authorization secret %s must contain key 'token'", *authSecret))
-				}
+			} else if _, ok := secret.Data["token"]; !ok {
+				errs = append(errs, fmt.Errorf("monitoring authorization secret %s must contain key 'token'", *authSecret))
 			}
 		}
 	}
@@ -540,12 +538,9 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			// Volume mounts must be specified if any others are supportable
 			if class.VolumeMounts == nil {
 				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d]", index)))
-			} else {
+			} else if class.Services.ContainsAny(couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.AnalyticsService) && class.VolumeMounts.DefaultClaim == "" {
 				// These stateful services must have a "default" mount
-				if class.Services.ContainsAny(couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.AnalyticsService) &&
-					class.VolumeMounts.DefaultClaim == "" {
-					errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
-				}
+				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
 			}
 		}
 	}
@@ -586,7 +581,8 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				templateNamesEnum = append(templateNamesEnum, name)
 			}
 
-			if mounts.LogsOnly() {
+			switch {
+			case mounts.LogsOnly():
 				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.LogsClaim); template == nil {
 					errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].logs", index), "", mounts.LogsClaim, templateNamesEnum))
 				}
@@ -598,7 +594,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].volumeMounts", index), "", secondaryMount))
 					}
 				}
-			} else if mounts.DefaultClaim != "" {
+			case mounts.DefaultClaim != "":
 				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DefaultClaim); template == nil {
 					errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].default", index), "", mounts.DefaultClaim, templateNamesEnum))
 				}
@@ -619,7 +615,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 						}
 					}
 				}
-			} else if hasSecondaryMounts {
+			case hasSecondaryMounts:
 				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
 			}
 		}
@@ -755,10 +751,8 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				errs = append(errs, err)
 			} else if tlsSecret == nil {
 				errs = append(errs, fmt.Errorf("secret %s referenced by security.ldap.tlsSecret must exist", tlsSecretName))
-			} else {
-				if _, ok := tlsSecret.Data["ca.crt"]; !ok {
-					errs = append(errs, fmt.Errorf("ldap tls secret %s must contain key 'ca.crt'", tlsSecretName))
-				}
+			} else if _, ok := tlsSecret.Data["ca.crt"]; !ok {
+				errs = append(errs, fmt.Errorf("ldap tls secret %s must contain key 'ca.crt'", tlsSecretName))
 			}
 		}
 
@@ -846,7 +840,8 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 
 	// only 'local' and 'ldap' auth domains accepted
 	domain := user.Spec.AuthDomain
-	if domain == couchbasev2.InternalAuthDomain {
+	switch domain {
+	case couchbasev2.InternalAuthDomain:
 		// password is required for internal auth domain
 		authSecretName := user.Spec.AuthSecret
 		if authSecretName == "" {
@@ -863,18 +858,16 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 				errs = append(errs, err)
 			} else if authSecret == nil {
 				errs = append(errs, fmt.Errorf("secret %s referenced by user.spec.authSecret for `%s` must exist", authSecretName, user.Name))
-			} else {
-				if _, ok := authSecret.Data["password"]; !ok {
-					errs = append(errs, fmt.Errorf("ldap auth secret %s must contain password", authSecretName))
-				}
+			} else if _, ok := authSecret.Data["password"]; !ok {
+				errs = append(errs, fmt.Errorf("ldap auth secret %s must contain password", authSecretName))
 			}
 		}
-	} else if domain == couchbasev2.LDAPAuthDomain {
+	case couchbasev2.LDAPAuthDomain:
 		// authSecret not accepted for LDAP user
 		if authSecretName := user.Spec.AuthSecret; authSecretName != "" {
 			errs = append(errs, fmt.Errorf("secret %s not allowed for LDAP user `%s`", authSecretName, user.Name))
 		}
-	} else {
+	default:
 		return fmt.Errorf("unknown auth domain: %s", user.Spec.AuthDomain)
 	}
 
@@ -912,11 +905,9 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 	// start is required
 	if start == nil {
 		errs = append(errs, fmt.Errorf("specify a start point or backup"))
-	} else {
+	} else if start.Str != nil && start.Int != nil {
 		// both str and int are specified
-		if start.Str != nil && start.Int != nil {
-			errs = append(errs, fmt.Errorf("specify just one value, either Str or Int"))
-		}
+		errs = append(errs, fmt.Errorf("specify just one value, either Str or Int"))
 	}
 
 	end := restore.Spec.End
@@ -997,10 +988,8 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 			errs = append(errs, err)
 		} else if operatorSecret == nil {
 			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.operatorSecret must exist", operatorSecretName))
-		} else {
-			if ca, ok = operatorSecret.Data["ca.crt"]; !ok {
-				errs = append(errs, fmt.Errorf("tls operator secret %s must contain ca.crt", operatorSecretName))
-			}
+		} else if ca, ok = operatorSecret.Data["ca.crt"]; !ok {
+			errs = append(errs, fmt.Errorf("tls operator secret %s must contain ca.crt", operatorSecretName))
 		}
 
 		// Check the server secret exists and has the correct keys
@@ -1011,7 +1000,11 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 				return
 			}
 			errs = append(errs, err)
-		} else if serverSecret == nil {
+
+			return
+		}
+
+		if serverSecret == nil {
 			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.serverSecret must exist", serverSecretName))
 		} else {
 			if chain, ok = serverSecret.Data["chain.pem"]; !ok {

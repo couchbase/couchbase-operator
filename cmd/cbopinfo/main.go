@@ -157,10 +157,13 @@ func main() {
 	}
 
 	// Check that there is an operator deployment running
-	if deployment, err := k8s.GetOperatorDeployment(context); err != nil {
+	deployment, err := k8s.GetOperatorDeployment(context)
+	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
-	} else if deployment == nil {
+	}
+
+	if deployment == nil {
 		fmt.Println("no Couchbase Operator Deployment resource discovered in name space (check the -operator-image flag is correctly set)", context.Namespace())
 	} else {
 		anythingToCollect = true

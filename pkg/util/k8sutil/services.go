@@ -879,8 +879,11 @@ func updateExposedService(service, requested *v1.Service) bool {
 	portsAdded := len(requiredPorts) != 0
 	portsRemoved := len(existingPorts) != len(service.Spec.Ports)
 	if portsAdded || portsRemoved {
+		updatedPorts := existingPorts
+		updatedPorts = append(updatedPorts, requiredPorts...)
+
 		service.Spec.Type = requested.Spec.Type
-		service.Spec.Ports = append(existingPorts, requiredPorts...)
+		service.Spec.Ports = updatedPorts
 		updated = true
 	}
 	return updated

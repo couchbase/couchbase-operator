@@ -174,12 +174,10 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 					user.Password = password
 				}
 				requestedUsers[user.ID] = user
-			} else {
+			} else if _, found := couchbasev2.HasItem(groupName, user.Groups); !found {
 				// Add additional group to user
-				if _, found := couchbasev2.HasItem(groupName, user.Groups); !found {
-					user.Groups = append(user.Groups, groupName)
-					requestedUsers[user.ID] = user
-				}
+				user.Groups = append(user.Groups, groupName)
+				requestedUsers[user.ID] = user
 			}
 		}
 	}

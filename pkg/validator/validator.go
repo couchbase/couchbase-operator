@@ -17,8 +17,7 @@ func New(client kubernetes.Interface, couchbaseClient versioned.Interface) *type
 }
 
 func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	switch object.GetAPIVersion() {
-	case couchbasev2.GroupName + "/v2":
+	if object.GetAPIVersion() == couchbasev2.GroupName+"/v2" {
 		switch object.GetKind() {
 		case couchbasev2.ClusterCRDResourceKind:
 			return validationv2.ApplyDefaults(v, object)
@@ -68,33 +67,27 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) error {
 func CheckImmutableFields(current, updated runtime.Object) error {
 	switch t := current.(type) {
 	case *couchbasev2.CouchbaseCluster:
-		switch t2 := updated.(type) {
-		case *couchbasev2.CouchbaseCluster:
+		if t2, ok := updated.(*couchbasev2.CouchbaseCluster); ok {
 			return validationv2.CheckImmutableFields(t, t2)
 		}
 	case *couchbasev2.CouchbaseBucket:
-		switch t2 := updated.(type) {
-		case *couchbasev2.CouchbaseBucket:
+		if t2, ok := updated.(*couchbasev2.CouchbaseBucket); ok {
 			return validationv2.CheckImmutableFieldsBucket(t, t2)
 		}
 	case *couchbasev2.CouchbaseEphemeralBucket:
-		switch t2 := updated.(type) {
-		case *couchbasev2.CouchbaseEphemeralBucket:
+		if t2, ok := updated.(*couchbasev2.CouchbaseEphemeralBucket); ok {
 			return validationv2.CheckImmutableFieldsEphemeralBucket(t, t2)
 		}
 	case *couchbasev2.CouchbaseMemcachedBucket:
-		switch t2 := updated.(type) {
-		case *couchbasev2.CouchbaseMemcachedBucket:
+		if t2, ok := updated.(*couchbasev2.CouchbaseMemcachedBucket); ok {
 			return validationv2.CheckImmutableFieldsMemcachedBucket(t, t2)
 		}
 	case *couchbasev2.CouchbaseReplication:
-		switch t2 := updated.(type) {
-		case *couchbasev2.CouchbaseReplication:
+		if t2, ok := updated.(*couchbasev2.CouchbaseReplication); ok {
 			return validationv2.CheckImmutableFieldsReplication(t, t2)
 		}
 	case *couchbasev2.CouchbaseBackup:
-		switch t2 := updated.(type) {
-		case *couchbasev2.CouchbaseBackup:
+		if t2, ok := updated.(*couchbasev2.CouchbaseBackup); ok {
 			return validationv2.CheckImmutableFieldsBackup(t, t2)
 		}
 	}
