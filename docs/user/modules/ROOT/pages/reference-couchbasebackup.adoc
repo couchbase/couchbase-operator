@@ -21,7 +21,7 @@ metadata:
 spec:
   strategy: full_incremental
   full:
-    schedule: "0 3 * * 7"
+    schedule: "0 3 * * 0"
   incremental:
     schedule: "0 3 * * 1-6"
   successfulJobsHistoryLimit: 1
@@ -91,7 +91,7 @@ The following are parameters that may be set on the CouchbaseBackup:
 spec:
   strategy: full_incremental
   full:
-    schedule: "0 3 * * 7"
+    schedule: "0 3 * * 0"
   incremental:
     schedule: "0 3 * * 1-6"
   successfulJobsHistoryLimit: 1
