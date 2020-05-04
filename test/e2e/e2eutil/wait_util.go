@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"github.com/go-openapi/errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -1289,17 +1290,20 @@ func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 		for _, pod := range pods.Items {
 			for _, status := range pod.Status.ContainerStatuses {
 				if status.Name == k8sutil.MetricsContainerName && status.Image == couchbase.Spec.Monitoring.Prometheus.Image {
-					if status.Ready {
-						ready[pod.Name] = true
-					}
+					ready[pod.Name] = status.Ready
 				}
 			}
 		}
 
+		errs := []error{}
 		for s, b := range ready {
 			if !b {
-				return false, fmt.Errorf("prometheus container belonging to pod %s is not ready", s)
+				errs = append(errs, fmt.Errorf("prometheus container belonging to pod %s is not ready", s))
 			}
+		}
+
+		if len(errs) > 0 {
+			return false, errors.CompositeValidationError(errs...)
 		}
 
 		return true, nil

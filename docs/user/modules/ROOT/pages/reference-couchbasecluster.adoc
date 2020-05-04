@@ -1639,21 +1639,23 @@ ____
 
 === spec.backup.image
 
-This field defines the path to the Couchbase Operator Backup image that the Autonomous Operator will run to perform a backup or restore.
+This field defines the path to the backup utility image that the Autonomous Operator will run to perform a backup or restore.
 
-If left unspecified, the dynamic admission controller will automatically default to the most recent container image from Docker Hub (open source Kubernetes) or Red Hat Container Catalog (OpenShift) that was available when the installed version of the Autonomous Operator was released.
-Refer to xref:howto-backup.adoc[Configure Automated Backup] for more detailed instructions.
+If left unspecified, the dynamic admission controller will automatically populate it with the most recent container image that was available when the installed version of the Autonomous Operator was released.
+The default image for open source Kubernetes comes from https://hub.docker.com/r/couchbase/operator-backup[Docker Hub^], and the default image for OpenShift comes from the https://access.redhat.com/containers/#/vendor/couchbase[Red Hat Container Catalog^].
 
+If pulling directly from the the Red Hat Container Catalog, then the path will be something similar to `registry.connect.redhat.com/couchbase/operator-backup:{backup-version-redhat}` (you can refer to the catalog for the most recent images).
+If ImagePullSecrets are required to access the image, they are inherited from the Couchbase Server Pod and can be set explicitly with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-imagepullsecrets[`spec.servers[\].pod.spec.imagePullSecrets`] field or implicitly with a service account specified with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-serviceaccountname[`spec.servers[\].pod.spec.serviceAccountName`] field.
 ____
 _Field rules:_ This field is optional and must be a valid path to a valid container image.
 ____
 
 === spec.backup.serviceAccountName
 
-This field specifies the name of a Kubernetes Service Account Name that gives the backup and restore pods permissions to read and create the necessary backup objects.
-These being running pods, cronjobs, jobs, events and CouchbaseBackups and CouchbaseBackupRestores.
+This field specifies the name of a Kubernetes `ServiceAccount` that gives the backup and restore Pods the necessary permissions to read and create the required backup objects (running pods, jobs, CronJobs, events, etc).
 
 If left unspecified, the dynamic admission controller will automatically default to the value of `couchbase-backup`.
+(This is the default name given to the `ServiceAccount` when you run `cbopcfg` as part of the automated backup xref:howto-backup.adoc[setup procedure].
 
 ____
 _Field rules:_ This field is optional and must be the name of a valid Kubernetes Service Account.

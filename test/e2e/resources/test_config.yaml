@@ -59,4 +59,4 @@ testRetries: 2
 couchbase-backup-image: couchbase/operator-backup:6.5.0
 
 # Couchbase Exporter image to use
-couchbase-exporter-image: couchbase/exporter:1.0.0
+couchbase-exporter-image: couchbase/exporter:1.0.1

@@ -55,16 +55,14 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 		uri := fmt.Sprintf("http://localhost:%s%s", port, "/metrics")
 		resp, err := http.Get(uri)
 		if err != nil {
-			fmt.Printf("unable to collect %s for pod %s\n", uri, pod.Name)
-			continue
+			return "", fmt.Errorf("unable to collect %s for pod %s", uri, pod.Name)
 		}
 		defer resp.Body.Close()
 
 		// Buffer up the responses
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			fmt.Printf("unable to read response %s for pod %s\n", uri, pod.Name)
-			continue
+			return "", fmt.Errorf("unable to read response %s for pod %s", uri, pod.Name)
 		}
 
 		if resp.StatusCode != http.StatusOK {
