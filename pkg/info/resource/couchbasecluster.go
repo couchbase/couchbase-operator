@@ -18,7 +18,7 @@ type couchbaseClusterResource struct {
 	couchbaseClusters []couchbasev2.CouchbaseCluster
 }
 
-// NewCouchbaseClusterResource initializes a new pod resource
+// NewCouchbaseClusterResource initializes a new pod resource.
 func NewCouchbaseClusterResource(context *context.Context) Resource {
 	return &couchbaseClusterResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *couchbaseClusterResource) Kind() string {
 	return "CouchbaseCluster"
 }
 
-// Fetch collects all pods as defined by the configuration
+// Fetch collects all pods as defined by the configuration.
 func (r *couchbaseClusterResource) Fetch() error {
 	// We have to manually filter here as couchbaseCluster are not labelled and field
 	// selectors aren't up to matching based on name (multiple couchbaseClusters that is)

@@ -22,7 +22,7 @@ type logCollector struct {
 	resource resource.Reference
 }
 
-// NewLogCollector initializes a new logs resource
+// NewLogCollector initializes a new logs resource.
 func NewLogCollector(context *context.Context) Collector {
 	return &logCollector{
 		context: context,
@@ -33,7 +33,7 @@ func (r *logCollector) Kind() string {
 	return "Logs"
 }
 
-// Fetch collects all logs as defined for the resource
+// Fetch collects all logs as defined for the resource.
 func (r *logCollector) Fetch(resource resource.Reference) error {
 	// Get a pod from the resource kind
 	pod, err := k8s.GetPod(r.context, resource)

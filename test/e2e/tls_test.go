@@ -17,7 +17,7 @@ import (
 )
 
 // Create couchbase cluster over TLS certificates
-// Check TLS handshake is successful with all nodes
+// Check TLS handshake is successful with all nodes.
 func TestTlsCreateCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -47,7 +47,7 @@ func TestTlsCreateCluster(t *testing.T) {
 // Tests scenario where a third node is being added to a cluster, and a separate
 // node goes down immediately after the add & before the rebalance.
 // Expects: autofailover of down node occurs and a replacement node is added
-// Check TLS handshake is successful with all nodes
+// Check TLS handshake is successful with all nodes.
 func TestTlsKillClusterNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -93,9 +93,9 @@ func TestTlsKillClusterNode(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create Couchbase cluster using certificates
-// Resize cluster to different sizes in loop
-// Check TLS handshake is successful with all cluster nodes
+// Create Couchbase cluster using certificates.
+// Resize cluster to different sizes in loop.
+// Check TLS handshake is successful with all cluster nodes.
 func TestTlsResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -133,10 +133,10 @@ func TestTlsResizeCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Remove Operator certificate after cluster deployment
+// Remove Operator certificate after cluster deployment.
 // Delete the operator secret and kill a node from cluster.  The cluster should
 // raise an invalid TLS event.
-// Add the operator certificate back and check new node addition is successful
+// Add the operator certificate back and check new node addition is successful.
 func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -222,9 +222,9 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy cluster using valid TLS certificates
-// Remove the cluster certificate from the cluster and kill one of the cluster pod
-// The cluster should raise a TLS invalid event, then reconcile once the valid cluster certificate is available
+// Deploy cluster using valid TLS certificates.
+// Remove the cluster certificate from the cluster and kill one of the cluster pod.
+// The cluster should raise a TLS invalid event, then reconcile once the valid cluster certificate is available.
 func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -267,8 +267,8 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy cluster using valid TLS certificates
-// Remove the cluster certificate from the cluster and scale up the cluster
+// Deploy cluster using valid TLS certificates.
+// Remove the cluster certificate from the cluster and scale up the cluster.
 func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -310,8 +310,8 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy cluster using invalid DNS name value in the certificate
-// Cluster creation should fail due to the invalid DNS value
+// Deploy cluster using invalid DNS name value in the certificate.
+// Cluster creation should fail due to the invalid DNS value.
 func TestTlsNegRSACertificateDnsName(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -328,10 +328,10 @@ func TestTlsNegRSACertificateDnsName(t *testing.T) {
 	e2eutil.MustNotNewTLSClusterBasic(t, targetKube, targetKube.Namespace, constants.Size3, ctx)
 }
 
-// Deploy cluster using a TLS certificates which will expire after few minutes
+// Deploy cluster using a TLS certificates which will expire after few minutes.
 // Cluster creation will be successful.
-// Wait for certificate to expire and try to scale up the cluster
-// Cluster scaling will fail due to new pod creation failure
+// Wait for certificate to expire and try to scale up the cluster.
+// Cluster scaling will fail due to new pod creation failure.
 func TestTlsCertificateExpiry(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -367,8 +367,8 @@ func TestTlsCertificateExpiry(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy a couchbase cluster using a expired TLS certificate
-// Cluster creation should fail
+// Deploy a couchbase cluster using a expired TLS certificate.
+// Cluster creation should fail.
 func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -387,8 +387,8 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 	e2eutil.MustNotNewTLSClusterBasic(t, targetKube, targetKube.Namespace, constants.Size3, ctx)
 }
 
-// Deploy the cluster using the certificate which is not yet valid
-// Cluster creation should not happen until the validity time crosses the current time
+// Deploy the cluster using the certificate which is not yet valid.
+// Cluster creation should not happen until the validity time crosses the current time.
 func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -403,8 +403,8 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	e2eutil.MustNotNewTLSClusterBasic(t, targetKube, targetKube.Namespace, constants.Size3, ctx)
 }
 
-// Create a couchbase cluster using the wrong CA certificate type
-// Cluster deployment should fail
+// Create a couchbase cluster using the wrong CA certificate type.
+// Cluster deployment should fail.
 func TestTlsGenerateWrongCACertType(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -420,8 +420,8 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 	e2eutil.MustNotNewTLSClusterBasic(t, targetKube, targetKube.Namespace, constants.Size3, ctx)
 }
 
-// Create a couchbase cluster using the wrong certificate type
-// Cluster deployment should fail
+// Create a couchbase cluster using the wrong certificate type.
+// Cluster deployment should fail.
 func TestTlsGenerateWrongCertType(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -437,7 +437,7 @@ func TestTlsGenerateWrongCertType(t *testing.T) {
 }
 
 // TestTLSRotate tests a certificate can be reissued by a CA.
-// * Ensures new certifcate is loaded from the inbox on update
+// * Ensures new certifcate is loaded from the inbox on update.
 func TestTLSRotate(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -469,7 +469,7 @@ func TestTLSRotate(t *testing.T) {
 }
 
 // TestTLSRotateChain tests a certificate can be reissued by a CA with a new sub-CA.
-// * Ensures new certifcate chain is loaded from the inbox on update
+// * Ensures new certifcate chain is loaded from the inbox on update.
 func TestTLSRotateChain(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -1042,7 +1042,7 @@ func TestMandatoryMutualTLSRotateInvalid(t *testing.T) {
 	testMutualTLSRotateInvalid(t, couchbasev2.ClientCertificatePolicyMandatory)
 }
 
-// skipN2NCheck doesn't run these tests unless using 6.5.1+
+// skipN2NCheck doesn't run these tests unless using 6.5.1+.
 func skipN2NCheck(t *testing.T) {
 	f := framework.Global
 

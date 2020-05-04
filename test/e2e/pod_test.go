@@ -79,7 +79,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 // 2. Calculate the maximum number of pods which can be allocated on the k8s cluster
 // 3. Create a Couchbase cluster with this number of pods, saturating memory
 // 4. Try scaling up by one pod
-// 5. Expect to see an event indicating that pod creation failed
+// 5. Expect to see an event indicating that pod creation failed.
 func TestPodResourcesCannotBePlaced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

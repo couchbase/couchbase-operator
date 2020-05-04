@@ -46,7 +46,7 @@ type scope struct {
 	buckets []string
 }
 
-// this function will substitute scope information into a generic command
+// this function will substitute scope information into a generic command.
 func supplyScope(testScope scope, testOp operation) operation {
 	testOp.cmd = ConvertTemplate(testScope, testOp.cmd)
 	testOp.args = ConvertTemplate(testScope, testOp.args)
@@ -83,7 +83,7 @@ func ConvertTemplate(testScope scope, templates []string) []string {
 	return templates
 }
 
-// this function will create a kubernetes job from an operation
+// this function will create a kubernetes job from an operation.
 func CreateJobSpec(op operation) *batchv1.Job {
 	privilegedVal := true
 	labels := make(map[string]string)
@@ -131,7 +131,7 @@ func CreateJobSpec(op operation) *batchv1.Job {
 	return batchJob
 }
 
-// this function will be used to wait for a job to finish
+// this function will be used to wait for a job to finish.
 func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interface, duration int, timeout int, results chan<- map[string]string) {
 	jobInfo := make(map[string]string)
 	jobInfo["jobName"] = jobName
@@ -210,7 +210,7 @@ func CreateJob(t *testing.T, f *framework.Framework, kubeName string, jobSpec *b
 	return job
 }
 
-// runs a system test based on a sysTestDef
+// runs a system test based on a sysTestDef.
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
 	kubeName := f.TestClusters[0]

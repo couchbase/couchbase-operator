@@ -22,7 +22,7 @@ const (
 	Full        CBBackupmgrAction = "full"
 )
 
-// generateCronJobs generates the appropriate backup Cronjobs for a CouchbaseBackup
+// generateCronJobs generates the appropriate backup Cronjobs for a CouchbaseBackup.
 func (c *Cluster) generateCronJobs(backups []couchbasev2.CouchbaseBackup) ([]*batchv1beta1.CronJob, error) {
 	var cronjobs []*batchv1beta1.CronJob
 
@@ -56,7 +56,7 @@ func (c *Cluster) generateCronJobs(backups []couchbasev2.CouchbaseBackup) ([]*ba
 	return cronjobs, nil
 }
 
-// Given a podSpec, return a pointer to the backup container
+// Given a podSpec, return a pointer to the backup container.
 func getBackupContainerForTLS(podSpec corev1.PodSpec, containerName string) (*corev1.Container, error) {
 	for index := range podSpec.Containers {
 		if podSpec.Containers[index].Name == containerName {
@@ -66,7 +66,7 @@ func getBackupContainerForTLS(podSpec corev1.PodSpec, containerName string) (*co
 	return nil, fmt.Errorf("unable to locate backup container")
 }
 
-// Adds any necessary pod prerequisites before enabling TLS
+// Adds any necessary pod prerequisites before enabling TLS.
 func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) error {
 	if cs.Networking.TLS != nil {
 		// Static configuration:
@@ -118,7 +118,7 @@ func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) err
 	return nil
 }
 
-// generateBackupCronjob generates a backup cronjob taking into account the backup strategy and the cbbackupmgr action
+// generateBackupCronjob generates a backup cronjob taking into account the backup strategy and the cbbackupmgr action.
 func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction, strategy couchbasev2.Strategy) *batchv1beta1.CronJob {
 	var schedule string
 	var container corev1.Container
@@ -209,7 +209,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 // generateBackupContainer returns the actual backup container
 // with the correct image and executable command and arguments
 // config is a boolean that determines whether we take want to config a new repo
-// and then take a Full backup (true) or just an incremental backup (false)
+// and then take a Full backup (true) or just an incremental backup (false).
 func (c *Cluster) generateBackupContainer(containerName string, strategy couchbasev2.Strategy, config bool, logRetention, backupRetention metav1.Duration) corev1.Container {
 	var resources corev1.ResourceRequirements
 	if c.cluster.Spec.Backup.Resources != nil {
@@ -242,7 +242,7 @@ func (c *Cluster) generateBackupContainer(containerName string, strategy couchba
 	}
 }
 
-// generateRestoreJob returns a job that performs a cbbackupmgr restore command
+// generateRestoreJob returns a job that performs a cbbackupmgr restore command.
 func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore) (*batchv1.Job, error) {
 	var start string
 	var end string
@@ -316,7 +316,7 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 }
 
 // generateRestoreContainer returns a container that uses the operator-backup image
-// but specifies the restore mode to the backup_script instead of the backup mode
+// but specifies the restore mode to the backup_script instead of the backup mode.
 func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupRestoreSpec, start, end string) corev1.Container {
 	var resources corev1.ResourceRequirements
 	if c.cluster.Spec.Backup.Resources != nil {
@@ -347,7 +347,7 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 	}
 }
 
-// get the Repo value from a Backup Object to use in a Restore object
+// get the Repo value from a Backup Object to use in a Restore object.
 func (c *Cluster) getBackupRepo(restore *couchbasev2.CouchbaseBackupRestore) error {
 	var backupFound bool
 
@@ -385,7 +385,7 @@ func generateBackupPVCs(backups []couchbasev2.CouchbaseBackup, clusterName strin
 	return pvcs
 }
 
-// generateBackupPVC returns the PVC that backups will be stored on
+// generateBackupPVC returns the PVC that backups will be stored on.
 func generateBackupPVC(pvcName, clusterName string, storage *resource.Quantity) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

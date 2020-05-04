@@ -18,7 +18,7 @@ type serviceResource struct {
 	services *v1.ServiceList
 }
 
-// NewServiceResource initializes a new service resource
+// NewServiceResource initializes a new service resource.
 func NewServiceResource(context *context.Context) Resource {
 	return &serviceResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *serviceResource) Kind() string {
 	return "Service"
 }
 
-// Fetch collects all services as defined by the configuration
+// Fetch collects all services as defined by the configuration.
 func (r *serviceResource) Fetch() error {
 	selector, err := GetResourceSelector(&r.context.Config)
 	if err != nil {

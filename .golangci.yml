@@ -28,13 +28,11 @@ linters:
   - godox # TODOs are bad, it suggests it's not finished
   - maligned # memory alingment - this is fine
   - funlen # complicated functions
-  - stylecheck # inconsitent code
   - unparam # unused parameters
   - gochecknoglobals # global variables
   - lll # long lines
   - gochecknoinits # init functions
   - goconst # repeated things that should be constants
-  - godot # Sentences end in full stops
   - prealloc # constant sized arrays can be preallocated
   - nakedret # using naked returns in complicated functions
   - wsl # cuddliness (this is a big one)
@@ -45,3 +43,11 @@ linters-settings:
   # this needs refactoring at some point.
   dupl:
     threshold: 300
+
+issues:
+  exclude-rules:
+  # Deep copies have 'in' as the receiver, ours have something else.
+  # This linter should ignore the auto generated stuff, but doesn't.
+  - text: ST1016
+    linters:
+    - stylecheck

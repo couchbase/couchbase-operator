@@ -24,15 +24,7 @@ const (
 )
 
 // createAdmissionController creates all the necessary resources to deploy the
-// admission controller.  These are:
-//
-// * Service account
-// * Role
-// * Role binding
-// * Deployment
-// * Service
-// * Mutating webhook
-// * Validating webhook
+// admission controller.
 func createAdmissionController(client kubernetes.Interface) error {
 	validFrom := time.Now()
 	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)

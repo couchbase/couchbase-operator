@@ -18,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// enableMonitoring enables monitoring
+// enableMonitoring enables monitoring.
 func enableMonitoring(t *testing.T, f *framework.Framework) *couchbasev2.CouchbaseClusterMonitoringSpec {
 	if imageName := strings.TrimSpace(f.CouchbaseExporterImage); imageName != "" {
 		monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
@@ -71,7 +71,7 @@ func TestPrometheusMetrics(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// create a cluster and then enable prometheus monitoring after its creation
+// create a cluster and then enable prometheus monitoring after its creation.
 func TestPrometheusMetricsEnable(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

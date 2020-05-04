@@ -30,7 +30,7 @@ const (
 // Results is a global result store.
 var Results = []TestResult{}
 
-// analyzeResults accepts a list of test results and displays success rates
+// analyzeResults accepts a list of test results and displays success rates.
 func AnalyzeResults(t *testing.T) {
 	t.Logf("Suite Test Results: \n")
 
@@ -118,7 +118,7 @@ func AnalyzeResults(t *testing.T) {
 	}
 }
 
-// Read Test run params from test_config yaml file
+// Read Test run params from test_config yaml file.
 func readRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err error) {
 	ymlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
@@ -138,7 +138,7 @@ func readRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err erro
 	return
 }
 
-// Function to read Suite and required cluster info from suite.yaml file
+// Function to read Suite and required cluster info from suite.yaml file.
 func getSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {

@@ -136,7 +136,7 @@ func (p *PersistentVolumeClaimState) Diff() string {
 
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
-// Volumes that already exist are reused
+// Volumes that already exist are reused.
 func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*PersistentVolumeClaimState, error) {
 	// No mounts are required, do nothing
 	if config.GetVolumeMounts() == nil {
@@ -270,7 +270,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 	return state, nil
 }
 
-// Get all paths to that should be persisted within pod
+// Get all paths to that should be persisted within pod.
 func getPathsToPersist(mounts *couchbasev2.VolumeMounts) (map[couchbasev2.VolumeMountName]string, error) {
 	mountPaths := make(map[couchbasev2.VolumeMountName]string)
 	defaultClaim := mounts.DefaultClaim
@@ -330,7 +330,7 @@ func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
 	return path
 }
 
-// Creates custom PVC from the generic spec
+// Creates custom PVC from the generic spec.
 func createPersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
 	// can be mounted read/write mode to exactly 1 host
 	addOwnerRefToObject(claim, owner)
@@ -353,7 +353,7 @@ func podVolumeSpecForClaim(claimName string) v1.Volume {
 }
 
 // Delete pod and any associated persisted volumes
-// when removeVolumes is 'true'
+// when removeVolumes is 'true'.
 func DeleteCouchbasePod(client *client.Client, namespace, name string, opts *metav1.DeleteOptions, removeVolumes bool) error {
 	var errs []string
 
@@ -373,7 +373,7 @@ func DeleteCouchbasePod(client *client.Client, namespace, name string, opts *met
 	return nil
 }
 
-// list and delete persistent volumes associated with the member
+// list and delete persistent volumes associated with the member.
 func deletePodVolumes(client *client.Client, memberName string) error {
 	for _, pvc := range listMemberPVCS(client, memberName) {
 		if err := client.KubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, CascadeDeleteOptions(0)); err != nil {
@@ -383,7 +383,7 @@ func deletePodVolumes(client *client.Client, memberName string) error {
 	return nil
 }
 
-// list all PVC's belonging to the member
+// list all PVC's belonging to the member.
 func listMemberPVCS(client *client.Client, memberName string) (pvcs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range client.PersistentVolumeClaims.List() {
 		if name, ok := pvc.Labels[constants.LabelNode]; ok && name == memberName {
@@ -395,7 +395,7 @@ func listMemberPVCS(client *client.Client, memberName string) (pvcs []*v1.Persis
 
 // Names of persistent volume claims are combinations of
 // Member name, mount type, and mount index.
-// ie...: cb-example-0000-default-00, pvc-data-cb-example-0000-01-index
+// ie...: cb-example-0000-default-00, pvc-data-cb-example-0000-01-index.
 func NameForPersistentVolumeClaim(memberName string, index int, mountName couchbasev2.VolumeMountName) string {
 	return fmt.Sprintf("%s-%s-%02d", memberName, mountName, index)
 }
@@ -801,7 +801,7 @@ func couchbaseContainer(image string, config *couchbasev2.ServerConfig) v1.Conta
 
 // Init container is same as runtime container except it used
 // to copy the etc dir into a persisted volume which will be
-// shared with with the Pod's main container
+// shared with with the Pod's main container.
 func couchbaseInitContainer(image, claimName string, config couchbasev2.ServerConfig) v1.Container {
 	initContainer := couchbaseContainer(image, &config)
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
@@ -871,7 +871,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 	}
 }
 
-// Given a pod, return a pointer to the couchbase container
+// Given a pod, return a pointer to the couchbase container.
 func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 	for index := range pod.Spec.Containers {
 		if pod.Spec.Containers[index].Name == constants.CouchbaseContainerName {
@@ -881,7 +881,7 @@ func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 	return nil, fmt.Errorf("unable to locate couchbase container")
 }
 
-// Adds any necessary pod prerequisites before enabling TLS
+// Adds any necessary pod prerequisites before enabling TLS.
 func applyPodTLSConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 	if cs.Networking.TLS != nil {
 		// Static configuration:
@@ -932,7 +932,7 @@ func couchbaseReadinessProbe() *v1.Probe {
 	}
 }
 
-// IsPodReady returns false if the Pod Status is nil
+// IsPodReady returns false if the Pod Status is nil.
 func IsPodReady(pod *v1.Pod) bool {
 	condition := getPodReadyCondition(&pod.Status)
 	return condition != nil && condition.Status == v1.ConditionTrue
@@ -948,7 +948,7 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 }
 
 // Find the PVC belonging to a member that was mounted at the specified path.
-// It's not considered an error in the case that PVC cannot be found
+// It's not considered an error in the case that PVC cannot be found.
 func findMemberPVC(client *client.Client, memberName, path string) (*v1.PersistentVolumeClaim, error) {
 	for _, pvc := range listMemberPVCS(client, memberName) {
 		if pvcPath, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; ok {
@@ -971,7 +971,7 @@ func findMemberPVC(client *client.Client, memberName, path string) (*v1.Persiste
 	return nil, cberrors.ErrVolumeClaimMissing{Path: path}
 }
 
-// Recreate list of members from persistent volumes
+// Recreate list of members from persistent volumes.
 func PVCToMemberset(client *client.Client, namespace string, secure bool) (couchbaseutil.MemberSet, error) {
 	ms := couchbaseutil.MemberSet{}
 	for _, pvc := range client.PersistentVolumeClaims.List() {
@@ -1012,7 +1012,7 @@ func PVCToMemberset(client *client.Client, namespace string, secure bool) (couch
 // pod is recoverable if it has volume mounts with existing
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
-// to an underlying PersistentVolume
+// to an underlying PersistentVolume.
 func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, podName string) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {

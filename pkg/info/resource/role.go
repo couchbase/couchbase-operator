@@ -18,7 +18,7 @@ type RoleResource struct {
 	Roles *v1.RoleList
 }
 
-// NewRoleResource initializes a new Role resource
+// NewRoleResource initializes a new Role resource.
 func NewRoleResource(context *context.Context) Resource {
 	return &RoleResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *RoleResource) Kind() string {
 	return "Role"
 }
 
-// Fetch collects all Roles as defined by the configuration
+// Fetch collects all Roles as defined by the configuration.
 func (r *RoleResource) Fetch() error {
 	var err error
 	r.Roles, err = r.context.KubeClient.RbacV1().Roles(r.context.Namespace()).List(metav1.ListOptions{})

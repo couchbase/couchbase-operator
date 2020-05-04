@@ -18,7 +18,7 @@ type couchbaseRoleBindingResource struct {
 	couchbaseRoleBindings []couchbasev2.CouchbaseRoleBinding
 }
 
-// NewCouchbaseRoleBindingResource initializes a new pod resource
+// NewCouchbaseRoleBindingResource initializes a new pod resource.
 func NewCouchbaseRoleBindingResource(context *context.Context) Resource {
 	return &couchbaseRoleBindingResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *couchbaseRoleBindingResource) Kind() string {
 	return "CouchbaseRoleBinding"
 }
 
-// Fetch collects all rolebindings as defined in the namespace
+// Fetch collects all rolebindings as defined in the namespace.
 func (r *couchbaseRoleBindingResource) Fetch() error {
 	couchbaseRoleBindings, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseRoleBindings(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {

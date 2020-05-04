@@ -13,7 +13,7 @@ import (
 
 // Wait for a TCP port to become available
 // Checks the port once a second until success or cancelled by the context.
-// Returns nil on success or the last error on failure
+// Returns nil on success or the last error on failure.
 func WaitForHostPort(ctx context.Context, hostport string) error {
 	// Setup a ticker to retry every second
 	ticker := time.NewTicker(time.Second)
@@ -38,7 +38,7 @@ func WaitForHostPort(ctx context.Context, hostport string) error {
 
 // Wait for a TCP port to become available and for a TLS handshake to succeed
 // Checks the port once a second until success or cancelled by the context.
-// Returns nil on success or the last error on failure
+// Returns nil on success or the last error on failure.
 func WaitForHostPortTLS(ctx context.Context, hostport string, cacert []byte) error {
 	// Configure TLS with our CA certificate
 	tlsClientConfig := tls.Config{

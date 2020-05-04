@@ -19,7 +19,7 @@ func GetCouchbaseCluster(crClient versioned.Interface, name, namespace string) (
 	return crClient.CouchbaseV2().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
 }
 
-// Gets events for a CouchbaseCluster and returns them sorted by time (oldest to newest)
+// Gets events for a CouchbaseCluster and returns them sorted by time (oldest to newest).
 func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (EventList, error) {
 	list, err := kubeCli.CoreV1().Events(namespace).List(metav1.ListOptions{FieldSelector: "involvedObject.name=" + name})
 	if err != nil {
@@ -39,7 +39,7 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (E
 	return events, nil
 }
 
-// Updates K8S nodes with given Unschedulable and Taint values
+// Updates K8S nodes with given Unschedulable and Taint values.
 func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnschedulable bool, podTaintList []v1.Taint, nodeIndex int) (err error) {
 	for retryCount := 0; retryCount < 3; retryCount++ {
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})

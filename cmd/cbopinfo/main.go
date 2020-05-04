@@ -65,7 +65,7 @@ var (
 	}
 )
 
-// harvestSub collects resources implicitly associated with a resource type e.g. logs/events
+// harvestSub collects resources implicitly associated with a resource type e.g. logs/events.
 func harvestSub(context *context.Context, backend backend.Backend, references []resource.Reference) error {
 	// For all sub resource types create a handler, fetch and write to the backend
 	for _, initializer := range collectorInitializers {
@@ -85,7 +85,7 @@ func harvestSub(context *context.Context, backend backend.Backend, references []
 	return nil
 }
 
-// harvest collects all resources the context allows and writes to the backend
+// harvest collects all resources the context allows and writes to the backend.
 func harvest(context *context.Context, backend backend.Backend, initializers []resource.Initializer) error {
 	// Main loop, create the resource handler, fetch and write to the backend
 	for _, initializer := range initializers {
@@ -106,7 +106,7 @@ func harvest(context *context.Context, backend backend.Backend, initializers []r
 	return nil
 }
 
-// clusterExists is a helper to see if a named cluster exists in the supplied list
+// clusterExists is a helper to see if a named cluster exists in the supplied list.
 func clusterExists(clusters *couchbasev2.CouchbaseClusterList, name string) bool {
 	for _, cluster := range clusters.Items {
 		if cluster.Name == name {
@@ -116,7 +116,7 @@ func clusterExists(clusters *couchbasev2.CouchbaseClusterList, name string) bool
 	return false
 }
 
-// main is the entry point of this application
+// main is the entry point of this application.
 func main() {
 	// Parse our configuration
 	context := &context.Context{Config: config.Parse()}

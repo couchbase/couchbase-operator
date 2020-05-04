@@ -136,7 +136,7 @@ func TestFullOnly(t *testing.T) {
 }
 
 // Cluster goes down during a backup (all pods go down)
-// Tests --purge behaviour is working as expected - this should allow us to ignore the previous backup and start anew
+// Tests --purge behaviour is working as expected - this should allow us to ignore the previous backup and start anew.
 func TestFailedBackupBehaviour(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -205,7 +205,7 @@ func TestFailedBackupBehaviour(t *testing.T) {
 }
 
 // Make sure a new Backup PVC comes up if the Backup PVC is deleted (stupidly)
-// N.B. Obviously all old data on the old PVC is gone forever and cannot be recovered
+// N.B. Obviously all old data on the old PVC is gone forever and cannot be recovered.
 func TestBackupPVCReconcile(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -274,7 +274,7 @@ func TestBackupPVCReconcile(t *testing.T) {
 // create new full-only CouchbaseBackup
 // wait for backup to perform
 // delete backup
-// create new full/incremental CouchbaseBackup
+// create new full/incremental CouchbaseBackup.
 func TestReplaceFullOnlyBackup(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -344,7 +344,7 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 // create new full/incremental CouchbaseBackup
 // wait for backup to perform
 // delete backup
-// create new full-only CouchbaseBackup
+// create new full-only CouchbaseBackup.
 func TestReplaceFullIncrementalBackup(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -492,7 +492,7 @@ func TestBackupAndRestore(t *testing.T) {
 
 // Test that CouchbaseBackup Status fields update when the initial backup job is created
 // Archive, Repo, RepoList, LastRun, Running will be updated once the job is started
-// LastSuccess, RepoList and Duration fields will be updated once the job is finished
+// LastSuccess, RepoList and Duration fields will be updated once the job is finished.
 func TestUpdateBackupStatus(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)

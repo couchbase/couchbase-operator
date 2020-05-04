@@ -36,7 +36,7 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 	return
 }
 
-// Verify checks the given chain and CA are valid to be installed
+// Verify checks the given chain and CA are valid to be installed.
 func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string) (errors []error) {
 	// Decode CA certificate
 	caPem := DecodePEM(caData)

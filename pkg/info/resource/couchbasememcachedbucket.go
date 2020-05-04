@@ -18,7 +18,7 @@ type couchbaseMemcachedBucketResource struct {
 	couchbaseMemcachedBuckets []couchbasev2.CouchbaseMemcachedBucket
 }
 
-// NewCouchbaseMemcachedBucketResource initializes a new pod resource
+// NewCouchbaseMemcachedBucketResource initializes a new pod resource.
 func NewCouchbaseMemcachedBucketResource(context *context.Context) Resource {
 	return &couchbaseMemcachedBucketResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *couchbaseMemcachedBucketResource) Kind() string {
 	return "CouchbaseMemcachedBucket"
 }
 
-// Fetch collects all buckets as defined in the namespace
+// Fetch collects all buckets as defined in the namespace.
 func (r *couchbaseMemcachedBucketResource) Fetch() error {
 	couchbaseMemcachedBuckets, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {

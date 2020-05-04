@@ -28,7 +28,7 @@ type Context struct {
 	NamespaceOverride string
 }
 
-// Copy makes a shallow copy of a Context object
+// Copy makes a shallow copy of a Context object.
 func (c *Context) Copy() *Context {
 	cpy := *c
 	return &cpy

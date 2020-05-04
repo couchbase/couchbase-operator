@@ -81,7 +81,7 @@ func (e *compoundError) Error() string {
 }
 
 // removeServerLogs is invoked when we run with server log collection to clean the
-// working directory
+// working directory.
 func removeServerLogs() {
 	files, err := filepath.Glob("*.zip")
 	if err != nil {
@@ -517,7 +517,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	return files
 }
 
-// Generic function to run cbopinfo command
+// Generic function to run cbopinfo command.
 func runCbopinfoCmd(cmdArgs []string) ([]byte, error) {
 	return exec.Command(framework.Global.CbopinfoPath, cmdArgs...).CombinedOutput()
 }
@@ -606,7 +606,7 @@ func (a argumentList) clone() argumentList {
 }
 
 // Run cbopinfo command with all valid arguments
-// and validate the exit status of the commands
+// and validate the exit status of the commands.
 func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -707,7 +707,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	}
 }
 
-// Negative test scenarios with command argument
+// Negative test scenarios with command argument.
 func TestNegLogCollectValidateArgs(t *testing.T) {
 	// Invent a kubernetes configuration, using an address from TEST-NET-1 will
 	// ensure it's always going to be unreachable.
@@ -803,9 +803,9 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 	errMsgList.CheckFailures(t)
 }
 
-// Create a couchbase cluster
-// Get the logs from the desired clustername and namespace and verify
-// Get logs from multiple / all clusters and verify the files
+// Create a couchbase cluster.
+// Get the logs from the desired clustername and namespace and verify.
+// Get logs from multiple / all clusters and verify the files.
 func TestLogCollect(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -920,9 +920,9 @@ func TestLogCollect(t *testing.T) {
 	})
 }
 
-// Create couchbase cluster
-// Create Rbac user with reduced k8s cluster access
-// Verify collected log file list with reduced cluster access
+// Create couchbase cluster.
+// Create Rbac user with reduced k8s cluster access.
+// Verify collected log file list with reduced cluster access.
 func TestLogCollectRbacPermission(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -1042,8 +1042,8 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
    Operator extended debug cases
 ***********************************/
 
-// Generic function to re-deploy the operator with given image name and rest-port
-// Collect logs with appropriate cbopinfo arguments and verify the collected info
+// Generic function to re-deploy the operator with given image name and rest-port.
+// Collect logs with appropriate cbopinfo arguments and verify the collected info.
 func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorImage string, operatorPort int, args argumentList) {
 	f := framework.Global
 	targetKube := k8s
@@ -1090,7 +1090,7 @@ func TestExtendedDebugWithDefaultValues(t *testing.T) {
 }
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
-// with custom values and validate the logs collected
+// with custom values and validate the logs collected.
 func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -1106,7 +1106,7 @@ func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 }
 
 // Collect cbopinfo with '--operator-image' & '-operator-rest-port'
-// with invalid values and validate the log collection
+// with invalid values and validate the log collection.
 func TestLogCollectInvalid(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -1154,7 +1154,7 @@ func TestLogCollectInvalid(t *testing.T) {
 }
 
 // Collect cbopinfo with '-operator-image' & '-operator-rest-port'
-// and kill the operator pod during log collection in parallel
+// and kill the operator pod during log collection in parallel.
 func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -1189,7 +1189,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 ***************************************/
 
 // Generic function to kill couchbase server pod and operator with log PVs defined for server pods
-// 'podDownMethod' argument with either one of ['deletePod', 'killServerProcess']
+// 'podDownMethod' argument with either one of ['deletePod', 'killServerProcess'].
 func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podDownMethod string, isOperatorKilledWithServerPod bool) {
 	targetKube := k8s
 
@@ -1251,7 +1251,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 }
 
 // Generic function to kill Cb server pod and update the server class in parallel
-// and check how operator handles the log retention as expected
+// and check how operator handles the log retention as expected.
 func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperatorKilledWithServerPod bool) {
 	// Platform configuration.
 	f := framework.Global
@@ -1306,7 +1306,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 }
 
 // Define log mount for ephemeral pods and validate the logs are preserved
-// even after abnormal pod removal
+// even after abnormal pod removal.
 func TestCollectLogFromEphemeralPodsUsingLogPV(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -1330,7 +1330,7 @@ func TestCollectLogFromEphemeralPodsUsingLogPVKillProcess(t *testing.T) {
 }
 
 // Define log mount for ephemeral pods and validate the logs are preserved
-// even after abnormal pod removal
+// even after abnormal pod removal.
 func TestCollectLogFromEphemeralPodsWithOperatorKilled(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -1354,7 +1354,7 @@ func TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess(t *testing.T) 
 }
 
 // Deploys Couchbase server with log PV defined for server pods
-// Scale down the couchbase cluster and check log PVs cleanup has happened
+// Scale down the couchbase cluster and check log PVs cleanup has happened.
 func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -1410,21 +1410,21 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 }
 
 // Kill Cb server pod and update the server class in parallel
-// and check how operator handles the log retention
+// and check how operator handles the log retention.
 func TestLogCollectWithClusterResizeAndServerPodKilled(t *testing.T) {
 	isOperatorKilledWithServerPod := false
 	LogCollectWithClusterResizeAndServerPodKilledGeneric(t, isOperatorKilledWithServerPod)
 }
 
 // Kill Operator, Cb server pod anb update the server class all in parallel
-// and check how operator handles the log retention
+// and check how operator handles the log retention.
 func TestLogCollectWithClusterResizeAndOperatorPodKilled(t *testing.T) {
 	isOperatorKilledWithServerPod := true
 	LogCollectWithClusterResizeAndServerPodKilledGeneric(t, isOperatorKilledWithServerPod)
 }
 
-// Collect logs from ephemeral log PVs
-// using default log retention time and size values
+// Collect logs from ephemeral log PVs.
+// using default log retention time and size values.
 func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -1471,8 +1471,8 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-// Collect logs from ephemeral log PVs
-// using custom log retention time and size values
+// Collect logs from ephemeral log PVs.
+// using custom log retention time and size values.
 func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

@@ -24,7 +24,7 @@ var (
 // Timestamp returns an ISO8601 formatted timestamp suitable for
 // use in generated file names.  These include the time zone for ease of
 // use by end users.  This is a 'singleton' style function whose subsequent
-// invocations return the same result
+// invocations return the same result.
 func Timestamp() string {
 	if timestamp != "" {
 		return timestamp
@@ -50,17 +50,17 @@ func Salt() string {
 	return salt
 }
 
-// ArchiveName returns an archive name for an archive type.  The suffix is back end dependant
+// ArchiveName returns an archive name for an archive type.  The suffix is back end dependant.
 func ArchiveName() string {
 	return Application + "-" + Timestamp()
 }
 
-// ArchivePath returns the required path for an archive type
+// ArchivePath returns the required path for an archive type.
 func ArchivePath(namespace, kind, name, filename string) string {
 	return ArchiveName() + "/" + namespace + "/" + strings.ToLower(kind) + "/" + name + "/" + filename
 }
 
-// ArchivePathUnscoped returns the required path for an archive type
+// ArchivePathUnscoped returns the required path for an archive type.
 func ArchivePathUnscoped(kind, name, filename string) string {
 	return ArchiveName() + "/" + strings.ToLower(kind) + "/" + name + "/" + filename
 }

@@ -38,7 +38,7 @@ import (
 )
 
 // randomSuffix generates a 5 character random suffix to be appended to
-// k8s resources to avoid namespace collisions (especially events)
+// k8s resources to avoid namespace collisions (especially events).
 func RandomSuffix() string {
 	// Seed the PRNG so we get vagely random suffixes across runs
 	rand.Seed(time.Now().UnixNano())
@@ -62,7 +62,7 @@ func RandomSuffix() string {
 }
 
 // newClusterFromSpec creates a cluster and waits for various ready conditions.
-// Performs retries and garbage collection in the event of transient failure
+// Performs retries and garbage collection in the event of transient failure.
 func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	// Create the cluster.
 	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
@@ -107,7 +107,7 @@ func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace str
 }
 
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and
-// performing garbage collection
+// performing garbage collection.
 func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
@@ -121,7 +121,7 @@ func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 	return cluster
 }
 
-// NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
+// NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered.
 func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Name = ctx.ClusterName
@@ -142,7 +142,7 @@ func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	return cluster
 }
 
-// NewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
+// NewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered.
 func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Name = ctx.ClusterName
@@ -169,7 +169,7 @@ func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace st
 	return cluster
 }
 
-// NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously
+// NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously.
 func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Name = ctx.ClusterName
@@ -182,14 +182,14 @@ func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string
 	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
-// MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification
+// MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification.
 func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) {
 	if _, err := NewTLSClusterBasicNoWait(t, k8s, namespace, size, ctx); err == nil {
 		Die(t, fmt.Errorf("cluster created unexpectedly"))
 	}
 }
 
-// NewXDCRrClusterGeneric creates a cluster for use with generic, IP-based networking (DEPRECATED)
+// NewXDCRrClusterGeneric creates a cluster for use with generic, IP-based networking (DEPRECATED).
 func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(size)
 	clusterSpec.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
@@ -279,7 +279,7 @@ func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, s
 }
 
 // NewStatefulCluster creates a cluster with persistent block storage, retrying if an
-// error is encountered and performing garbage collection
+// error is encountered and performing garbage collection.
 func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewStatefulCluster(size)
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
@@ -507,7 +507,7 @@ func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchba
 	return couchbase
 }
 
-// PatchCluster updates the specified cluster with a list of JSON patch objects, returning the updated cluster
+// PatchCluster updates the specified cluster with a list of JSON patch objects, returning the updated cluster.
 func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -542,7 +542,7 @@ func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, pat
 	})
 }
 
-// MustPatchCluster patches the cluster with a list of JSON patch objects, returning the updated cluster and dying on error
+// MustPatchCluster patches the cluster with a list of JSON patch objects, returning the updated cluster and dying on error.
 func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseCluster {
 	cluster, err := PatchCluster(k8s, cluster, patches, timeout)
 	if err != nil {
@@ -776,7 +776,7 @@ func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName str
 	return nil
 }
 
-// Kill member deletes Pod and optionally checks for any associated Volume to delete
+// Kill member deletes Pod and optionally checks for any associated Volume to delete.
 func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name string, removeVolumes bool) error {
 	if err := kubecli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil {
 		return err
@@ -1191,7 +1191,7 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 
 // Construct expected name for the PersistentVolumeClaim which belongs to member
 // where 'index' specifies the Nth claim generated from the specs template.
-// Only specs with multiple VolumeMounts should return volumes with index > 0
+// Only specs with multiple VolumeMounts should return volumes with index > 0.
 func GetMemberPVC(kubeCli kubernetes.Interface, namespace, memberName string, index int, mountName couchbasev2.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
 	name := k8sutil.NameForPersistentVolumeClaim(memberName, index, mountName)
 	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
@@ -1309,7 +1309,7 @@ func Die(t *testing.T, err error) {
 }
 
 // MustKillCouchbaseService kills the couchbase service depending on the platform type
-// TODO: Find a generic way of doing this on OpenShift
+// TODO: Find a generic way of doing this on OpenShift.
 func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, member, kubernetesType string) {
 	if kubernetesType == "kubernetes" {
 		MustExecShellInPod(t, k8s, namespace, member, "mv /etc/service/couchbase-server /tmp/")
@@ -1396,7 +1396,7 @@ func MustGenerateWorkload(t *testing.T, k8s *types.Cluster, couchbase *couchbase
 	return cleanup
 }
 
-// GetUUID returns the UUID of the cluster
+// GetUUID returns the UUID of the cluster.
 func GetUUID(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) (string, error) {
 	uuid := ""
 

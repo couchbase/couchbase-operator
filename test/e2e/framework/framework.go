@@ -85,7 +85,7 @@ func readYamlData() (err error) {
 }
 
 // Returs time.Duration from given string
-// Default return value: "2h0m0s"
+// Default return value: "2h0m0s".
 func GetDuration(timeoutStr string) time.Duration {
 	// Default timeout to 2 hours
 	durationToReturn := (2 * time.Hour)
@@ -112,7 +112,7 @@ func GetDuration(timeoutStr string) time.Duration {
 	return durationToReturn
 }
 
-// startTimeoutTimer starts timeout trigger based on given value in suiteData.Timeout
+// startTimeoutTimer starts timeout trigger based on given value in suiteData.Timeout.
 func startTimeoutTimer() {
 	go func() {
 		// In case of SystemTests, timeout will be set as part of test case
@@ -381,7 +381,7 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	})
 }
 
-// tells us if the underlying physical cluster on a host exists
+// tells us if the underlying physical cluster on a host exists.
 func (l initializedClusterList) isClusterInitialized(host string) bool {
 	for _, cluster := range l {
 		if cluster.host == host {
@@ -391,7 +391,7 @@ func (l initializedClusterList) isClusterInitialized(host string) bool {
 	return false
 }
 
-// check that the namespace for this host is already initialized
+// check that the namespace for this host is already initialized.
 func (l initializedClusterList) isClusterNamespaceInitialized(host, namespace string) bool {
 	for _, cluster := range l {
 		if cluster.host == host {
@@ -405,7 +405,7 @@ func (l initializedClusterList) isClusterNamespaceInitialized(host, namespace st
 	return false
 }
 
-// add initializedCluster to the initializedClusterList
+// add initializedCluster to the initializedClusterList.
 func (l initializedClusterList) initializeClusterNamespace(host, namespace string) (initializedClusterList, error) {
 	for _, cluster := range l {
 		if cluster.host == host {

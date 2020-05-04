@@ -44,7 +44,7 @@ const (
 	ExtendedRetryPeriod = 3 * time.Minute
 )
 
-// String converts a node state into a string representation
+// String converts a node state into a string representation.
 func (s NodeState) String() string {
 	stateStrings := map[NodeState]string{
 		NodeStateWarmup:      "warmup",
@@ -92,7 +92,7 @@ type ClusterStatus struct {
 }
 
 // NewClusterStatus returns a cluster status object with all
-// lists and maps initialized
+// lists and maps initialized.
 func NewClusterStatus() *ClusterStatus {
 	status := &ClusterStatus{
 		info: &cbmgr.ClusterInfo{},
@@ -102,7 +102,7 @@ func NewClusterStatus() *ClusterStatus {
 }
 
 // Reset replaces all sets in the cluster status with empty versions
-// and returns scalars to the zero state
+// and returns scalars to the zero state.
 func (cs *ClusterStatus) Reset() {
 	cs.NodeStateMap = NodeStateMap{}
 	cs.managedNodes = NewMemberSet()
@@ -139,7 +139,7 @@ type CouchbaseClient struct {
 
 // NewCouchbaseClient allocates and initializes a new couchbase API client.
 // Connections are persistent so we only expect to create a single client
-// per cluster
+// per cluster.
 func NewCouchbaseClient(ctx context.Context, clusterName, username, password string) *CouchbaseClient {
 	c := &CouchbaseClient{
 		ctx:         ctx,
@@ -161,7 +161,7 @@ func NewCouchbaseClient(ctx context.Context, clusterName, username, password str
 	return c
 }
 
-// SetTLS sets or updates the TLS configuration for a client
+// SetTLS sets or updates the TLS configuration for a client.
 func (c *CouchbaseClient) SetTLS(tls *cbmgr.TLSAuth) {
 	c.client.SetTLS(tls)
 }
@@ -172,7 +172,7 @@ func (c *CouchbaseClient) GetTLS() *cbmgr.TLSAuth {
 }
 
 // SetUUID sets or updates the cluster UUID to be checked by new persistent
-// connections being dialed
+// connections being dialed.
 func (c *CouchbaseClient) SetUUID(uuid string) {
 	c.client.SetUUID(uuid)
 }
@@ -196,7 +196,7 @@ func (cs *ClusterStatus) getNode(hostname string) (*cbmgr.NodeInfo, error) {
 	return nil, fmt.Errorf("node %s does not exist in cluster", hostname)
 }
 
-// KnownNodes returns all nodes that the cluster is tracking
+// KnownNodes returns all nodes that the cluster is tracking.
 func (cs *ClusterStatus) KnownNodes() []string {
 	knownNodes := []string{}
 	for _, node := range cs.info.Nodes {
@@ -270,7 +270,7 @@ func (cs *ClusterStatus) addMemberToStateSet(state NodeState, member *Member) er
 	return nil
 }
 
-// logClusterStatus logs the overal cluster status e.g. balanced condition
+// logClusterStatus logs the overal cluster status e.g. balanced condition.
 func (cs *ClusterStatus) logClusterStatus(cluster string) {
 	// A cluster is either balanced or not
 	balance := "balanced"
@@ -281,7 +281,7 @@ func (cs *ClusterStatus) logClusterStatus(cluster string) {
 	log.Info("Cluster status", "cluster", cluster, "balance", balance, "rebalancing", cs.IsRebalancing)
 }
 
-// logClusterNodeStatus logs the individual node statuses
+// logClusterNodeStatus logs the individual node statuses.
 func (cs *ClusterStatus) logClusterNodeStatus(cluster string) {
 	// Sort the names so it's easier to grok
 	names := []string{}
@@ -356,13 +356,13 @@ func (cs *ClusterStatus) logClusterNodeStatus(cluster string) {
 	}
 }
 
-// Logs the cluster status
+// Logs the cluster status.
 func (cs *ClusterStatus) LogStatus(cluster string) {
 	cs.logClusterStatus(cluster)
 	cs.logClusterNodeStatus(cluster)
 }
 
-// Are all managed nodes healthy? e.g. in the active state
+// Are all managed nodes healthy? e.g. in the active state.
 func (cs *ClusterStatus) AllManagedNodesHealthy() bool {
 	for _, member := range cs.managedNodes {
 		if cs.NodeStateMap[member.Name] != NodeStateActive {
@@ -372,12 +372,12 @@ func (cs *ClusterStatus) AllManagedNodesHealthy() bool {
 	return true
 }
 
-// Do any nodes exist that we aren't managing
+// Do any nodes exist that we aren't managing.
 func (cs *ClusterStatus) AnyUnmanagedNodes() bool {
 	return len(cs.UnmanagedNodes) != 0
 }
 
-// Is the cluster as a whole healthy
+// Is the cluster as a whole healthy.
 func (cs *ClusterStatus) ClusterHealthy() bool {
 	return cs.AllManagedNodesHealthy() &&
 		!cs.AnyUnmanagedNodes() &&
@@ -385,7 +385,7 @@ func (cs *ClusterStatus) ClusterHealthy() bool {
 		!cs.NeedsRebalance
 }
 
-// Is the named node in any of the states set in the bitmap
+// Is the named node in any of the states set in the bitmap.
 func (cs *ClusterStatus) NodeInState(name string, states ...NodeState) bool {
 	// Doesn't exist, so not in that state
 	s, ok := cs.NodeStateMap[name]
@@ -429,7 +429,7 @@ func (cs *ClusterStatus) RebalanceSucceeded(members, ejected MemberSet) (bool, e
 	return true, nil
 }
 
-// Filter named nodes from a cluster status map
+// Filter named nodes from a cluster status map.
 func (nsm NodeStateMap) Exclude(excludes ...string) NodeStateMap {
 	states := NodeStateMap{}
 	for name, state := range nsm {
@@ -710,7 +710,7 @@ func (c *CouchbaseClient) StopRebalance(ms MemberSet) error {
 	return c.client.StopRebalance()
 }
 
-// Check that cluster is actively rebalancing with status 'running'
+// Check that cluster is actively rebalancing with status 'running'.
 func (c *CouchbaseClient) IsRebalanceActive(ms MemberSet) (bool, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.CompareRebalanceStatus(cbmgr.RebalanceStatusRunning)
@@ -926,7 +926,7 @@ func (c *CouchbaseClient) SetRecoveryTypeFull(ms MemberSet, hostname string) err
 }
 
 // Get RecoveryType of node if it has been set.
-// The default type is 'full'
+// The default type is 'full'.
 func (c *CouchbaseClient) GetRecoveryType(m *Member) (cbmgr.RecoveryType, error) {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())

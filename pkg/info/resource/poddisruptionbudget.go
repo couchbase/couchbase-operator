@@ -18,7 +18,7 @@ type podDisruptionBudgetResource struct {
 	pdbs *v1beta1.PodDisruptionBudgetList
 }
 
-// NewPodDisruptionBudgetResource initializes a new service resource
+// NewPodDisruptionBudgetResource initializes a new service resource.
 func NewPodDisruptionBudgetResource(context *context.Context) Resource {
 	return &podDisruptionBudgetResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *podDisruptionBudgetResource) Kind() string {
 	return "PodDisruptionBudget"
 }
 
-// Fetch collects all pod disruption budgets as defined by the configuration
+// Fetch collects all pod disruption budgets as defined by the configuration.
 func (r *podDisruptionBudgetResource) Fetch() error {
 	var err error
 	selector, err := GetResourceSelector(&r.context.Config)

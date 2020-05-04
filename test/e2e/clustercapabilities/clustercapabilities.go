@@ -85,7 +85,7 @@ func NewCapabilities(client kubernetes.Interface) (*Capabilities, error) {
 	return cluster, nil
 }
 
-// MustNewCapabilities returns a new Capabilities or dies on error
+// MustNewCapabilities returns a new Capabilities or dies on error.
 func MustNewCapabilities(t *testing.T, client kubernetes.Interface) *Capabilities {
 	cluster, err := NewCapabilities(client)
 	if err != nil {

@@ -163,7 +163,7 @@ func (ms *MembersStatus) SetReady(ready []string) {
 
 // Set Unready members from list.
 // If the member is already in the list
-// then it's old timestamp is retained
+// then it's old timestamp is retained.
 func (ms *MembersStatus) SetUnready(unready []string) {
 	sort.Strings(unready)
 	unreadyList := MemberStatusList{}
@@ -189,7 +189,7 @@ func (cs *ClusterStatus) UpdateBuckets(name string, config *BucketConfig) {
 	cs.Buckets[name] = config
 }
 
-// get index of bucket name within status and remove
+// get index of bucket name within status and remove.
 func (cs *ClusterStatus) RemoveBucket(b string) {
 	if cs.Buckets == nil {
 		cs.Buckets = make(map[string]*BucketConfig)

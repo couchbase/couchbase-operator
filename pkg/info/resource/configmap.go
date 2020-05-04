@@ -18,7 +18,7 @@ type configMapResource struct {
 	configMaps *v1.ConfigMapList
 }
 
-// NewConfigMapResource initializes a new configMap resource
+// NewConfigMapResource initializes a new configMap resource.
 func NewConfigMapResource(context *context.Context) Resource {
 	return &configMapResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *configMapResource) Kind() string {
 	return "ConfigMap"
 }
 
-// Fetch collects all configMaps as defined by the configuration
+// Fetch collects all configMaps as defined by the configuration.
 func (r *configMapResource) Fetch() error {
 	selector, err := GetResourceSelector(&r.context.Config)
 	if err != nil {

@@ -429,7 +429,7 @@ func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, server
 }
 
 // Remove Pod and any volumes associated with pod if requested
-// ore volumes are associated with default claim
+// ore volumes are associated with default claim.
 func (c *Cluster) removePod(name string, removeVolumes bool) error {
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
 	err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, opts, removeVolumes)
@@ -443,7 +443,7 @@ func (c *Cluster) removePod(name string, removeVolumes bool) error {
 }
 
 // Delete pod and create with same name.
-// Persisted members will reuse volume mounts
+// Persisted members will reuse volume mounts.
 func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
 	if config == nil {
@@ -474,7 +474,7 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 	return c.waitForCreatePod(ctx, m)
 }
 
-// wait with context
+// wait with context.
 func (c *Cluster) waitForCreatePod(ctx context.Context, member *couchbaseutil.Member) error {
 	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name, member.HostURL()); err != nil {
 		return err
@@ -504,7 +504,7 @@ func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 	return recoverable
 }
 
-// Selects any member that can be recovered and attempts to restart it
+// Selects any member that can be recovered and attempts to restart it.
 func (c *Cluster) recoverClusterDown() error {
 	// Use Names() as that returns a deterministic/sorted list for testing.
 	for _, name := range c.members.Names() {
@@ -566,14 +566,14 @@ func (c *Cluster) updateMemberStatus() error {
 }
 
 // use cluster info to set ready members from active nodes
-// and all remaining nodes as unready
+// and all remaining nodes as unready.
 func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) error {
 	c.cluster.Status.Members.SetReady(cs.ActiveNodes.Names())
 	c.cluster.Status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
 	return c.updateCRStatus()
 }
 
-// Use username and password from secret store
+// Use username and password from secret store.
 func (c *Cluster) setupAuth(authSecret string) error {
 	secret, found := c.k8s.Secrets.Get(authSecret)
 	if !found {
@@ -648,14 +648,14 @@ func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
 	return -1
 }
 
-// Adds a new member to our cluster object and updates the cluster status
+// Adds a new member to our cluster object and updates the cluster status.
 func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) error {
 	c.members.Add(member)
 	c.cluster.Status.Size = c.members.Size()
 	return c.updateMemberStatus()
 }
 
-// Removes a member from our cluster object and updates the cluster status
+// Removes a member from our cluster object and updates the cluster status.
 func (c *Cluster) clusterRemoveMember(name string) error {
 	c.members.Remove(name)
 	c.cluster.Status.Size = c.members.Size()
@@ -694,7 +694,7 @@ func (c *Cluster) raiseEvent(event *v1.Event) *v1.Event {
 }
 
 // raiseEventCached raises an event but first checks an LRU cache and optionally
-// aggregates events together
+// aggregates events together.
 func (c *Cluster) raiseEventCached(event *v1.Event) {
 	key := strings.Join([]string{event.Type, event.Reason, event.Message}, "")
 	entry, ok := c.eventCache.Get(key)
@@ -718,7 +718,7 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 }
 
 // clients should use ready members that are available to service requests
-// according to status readiness.  Otherwise, fallback to cluster members
+// according to status readiness.  Otherwise, fallback to cluster members.
 func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
 	readyNodes := c.cluster.Status.Members.Ready
@@ -743,7 +743,7 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	return members
 }
 
-// Check if volume only has log volumes mounted
+// Check if volume only has log volumes mounted.
 func (c *Cluster) memberHasLogVolumes(name string) bool {
 	if m, ok := c.members[name]; ok {
 		config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
@@ -756,7 +756,7 @@ func (c *Cluster) memberHasLogVolumes(name string) bool {
 	return false
 }
 
-// getPodIndex returns the current pod naming index
+// getPodIndex returns the current pod naming index.
 func (c *Cluster) getPodIndex() (int, error) {
 	podIndexStr, err := c.state.Get(persistence.PodIndex)
 	if err != nil {
@@ -769,12 +769,12 @@ func (c *Cluster) getPodIndex() (int, error) {
 	return podIndex, nil
 }
 
-// setPodIndex updates the current pod naming index and commits to etcd
+// setPodIndex updates the current pod naming index and commits to etcd.
 func (c *Cluster) setPodIndex(index int) error {
 	return c.state.Update(persistence.PodIndex, strconv.Itoa(index))
 }
 
-// incPodIndex gets the current pod naming index and increments it
+// incPodIndex gets the current pod naming index and increments it.
 func (c *Cluster) incPodIndex() error {
 	podIndex, err := c.getPodIndex()
 	if err != nil {
@@ -783,7 +783,7 @@ func (c *Cluster) incPodIndex() error {
 	return c.setPodIndex(podIndex + 1)
 }
 
-// decPodIndex gets the current pod naming index and decrements it
+// decPodIndex gets the current pod naming index and decrements it.
 func (c *Cluster) decPodIndex() error {
 	podIndex, err := c.getPodIndex()
 	if err != nil {

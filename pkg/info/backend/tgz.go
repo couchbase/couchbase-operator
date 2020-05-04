@@ -19,14 +19,14 @@ type tgzBackend struct {
 	writer *tar.Writer
 }
 
-// NewTGZ returns a new initialized TGZ backend
+// NewTGZ returns a new initialized TGZ backend.
 func NewTGZ(config *config.Configuration) (Backend, error) {
 	b := &tgzBackend{}
 	b.writer = tar.NewWriter(&b.buffer)
 	return b, nil
 }
 
-// WriteFile buffers up the TGZ header and data
+// WriteFile buffers up the TGZ header and data.
 func (b *tgzBackend) WriteFile(path, data string) error {
 	header := &tar.Header{
 		Name: path,
@@ -43,7 +43,7 @@ func (b *tgzBackend) WriteFile(path, data string) error {
 }
 
 // Close closes TGZ resources, compresses the output and writes it
-// to a file
+// to a file.
 func (b *tgzBackend) Close() error {
 	// Stop buffering new files
 	if err := b.writer.Close(); err != nil {

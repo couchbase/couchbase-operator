@@ -52,29 +52,29 @@ const (
 	AnalyticsService Service = "analytics"
 )
 
-// Convert from typed to string
+// Convert from typed to string.
 func (s Service) String() string {
 	return string(s)
 }
 
 type ServiceList []Service
 
-// Len returns the ServiceList length
+// Len returns the ServiceList length.
 func (l ServiceList) Len() int {
 	return len(l)
 }
 
-// Less compares two ServiceList items and returns true if a is less than b
+// Less compares two ServiceList items and returns true if a is less than b.
 func (l ServiceList) Less(a, b int) bool {
 	return l[a].String() < l[b].String()
 }
 
-// Swap swaps the position of two ServiceList elements
+// Swap swaps the position of two ServiceList elements.
 func (l ServiceList) Swap(a, b int) {
 	l[a], l[b] = l[b], l[a]
 }
 
-// Contains returns true if a service is part of a service list
+// Contains returns true if a service is part of a service list.
 func (l ServiceList) Contains(service Service) bool {
 	for _, s := range l {
 		if s == service {
@@ -84,7 +84,7 @@ func (l ServiceList) Contains(service Service) bool {
 	return false
 }
 
-// ContainsAny returns true if any service is part of a service list
+// ContainsAny returns true if any service is part of a service list.
 func (l ServiceList) ContainsAny(services ...Service) bool {
 	for _, service := range services {
 		if l.Contains(service) {
@@ -94,7 +94,7 @@ func (l ServiceList) ContainsAny(services ...Service) bool {
 	return false
 }
 
-// Sub removes members from 'other' from a ServiceList
+// Sub removes members from 'other' from a ServiceList.
 func (l ServiceList) Sub(other ServiceList) ServiceList {
 	out := ServiceList{}
 	for _, service := range l {
@@ -107,8 +107,6 @@ func (l ServiceList) Sub(other ServiceList) ServiceList {
 }
 
 func NewServiceList(services []string) ServiceList {
-	// TODO: Once the reflection stuff makes it in we can bin this
-	// as things will be happily type safe and use the enumerations
 	l := make(ServiceList, len(services))
 	for i, s := range services {
 		l[i] = Service(s)
@@ -116,7 +114,7 @@ func NewServiceList(services []string) ServiceList {
 	return l
 }
 
-// Convert from a typed array to plain string array
+// Convert from a typed array to plain string array.
 func (l ServiceList) StringSlice() []string {
 	slice := make([]string, len(l))
 	for i, s := range l {
@@ -144,7 +142,7 @@ var SupportedFeatures = []string{
 // A list of exposed features e.g. admin,xdcr
 type ExposedFeatureList []string
 
-// Contains returns true if a requested feature is enabled
+// Contains returns true if a requested feature is enabled.
 func (efl ExposedFeatureList) Contains(feature string) bool {
 	for _, f := range efl {
 		if f == feature {
@@ -430,7 +428,7 @@ type VolumeMounts struct {
 }
 
 // Get all of the volume mounts to be used for analytics service
-// as an indexed list mapped to their claims
+// as an indexed list mapped to their claims.
 func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
 	mountClaims := make(map[string]string)
 	if v.AnalyticsClaims != nil {
@@ -443,7 +441,7 @@ func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
 }
 
 // Get all of the paths which correspond to the mounts to be used
-// for analytics service
+// for analytics service.
 func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	paths := []string{}
 	for mount := range v.GetAnalyticsMountClaims() {
@@ -452,7 +450,7 @@ func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	return paths
 }
 
-// LogsOnly returns true if logs will be the only mounts applied to cluster
+// LogsOnly returns true if logs will be the only mounts applied to cluster.
 func (v *VolumeMounts) LogsOnly() bool {
 	return v.LogsClaim != ""
 }
@@ -485,7 +483,7 @@ func (cs *ClusterSpec) TotalSize() int {
 	return size
 }
 
-// list of bucket names from config
+// list of bucket names from config.
 func (cs *ClusterSpec) BucketNames() []string {
 	buckets := []string{}
 	if cs.BucketSettings != nil {
@@ -496,7 +494,7 @@ func (cs *ClusterSpec) BucketNames() []string {
 	return buckets
 }
 
-// Get bucket config by name of bucket
+// Get bucket config by name of bucket.
 func (cs *ClusterSpec) GetBucketByName(name string) *BucketConfig {
 	if cs.BucketSettings != nil {
 		for _, b := range cs.BucketSettings {
@@ -508,7 +506,7 @@ func (cs *ClusterSpec) GetBucketByName(name string) *BucketConfig {
 	return nil
 }
 
-// Get the volumeClaimTemplate with specified name
+// Get the volumeClaimTemplate with specified name.
 func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeClaim {
 	for _, claim := range cs.VolumeClaimTemplates {
 		if name == claim.Name {
@@ -528,7 +526,7 @@ func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
 }
 
 // diff spec and existing buckets to determine
-// which should be added and which removed
+// which should be added and which removed.
 func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string) {
 	specBuckets := cs.BucketNames()
 	bucketsToAdd := MissingItems(specBuckets, existingBuckets)
@@ -538,7 +536,7 @@ func (cs *ClusterSpec) BucketDiff(existingBuckets []string) ([]string, []string)
 }
 
 // ServerGroupsEnabled returns true if any server config contains server group
-// settings or it is defined globally
+// settings or it is defined globally.
 func (cs *ClusterSpec) ServerGroupsEnabled() bool {
 	for _, setting := range cs.ServerSettings {
 		if len(setting.ServerGroups) > 0 {
@@ -559,7 +557,7 @@ func (c *BucketConfig) Equals(other *BucketConfig) bool {
 	return reflect.DeepEqual(c, other)
 }
 
-// check whether item exists within array
+// check whether item exists within array.
 func HasItem(itm string, arr []string) (int, bool) {
 	for i, a := range arr {
 		if a == itm {
@@ -569,7 +567,7 @@ func HasItem(itm string, arr []string) (int, bool) {
 	return -1, false
 }
 
-// Get the server specification or nil if it doesn't exist
+// Get the server specification or nil if it doesn't exist.
 func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 	for _, spec := range cs.ServerSettings {
 		if spec.Name == name {
@@ -579,7 +577,7 @@ func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 	return nil
 }
 
-// get list of items which are in first array but not in second
+// get list of items which are in first array but not in second.
 func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}
 	for _, a := range a1 {

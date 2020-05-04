@@ -22,7 +22,7 @@ const (
 )
 
 // reconcileRBACResources compares requested and actual rbac resources
-// creates, updates, and deletes where necessary
+// creates, updates, and deletes where necessary.
 func (c *Cluster) reconcileRBACResources() error {
 	if !c.cluster.Spec.Security.RBAC.Managed {
 		return nil
@@ -45,7 +45,7 @@ func (c *Cluster) reconcileRBACResources() error {
 	return nil
 }
 
-// reconcileGroups creates, edits, removes server groups according to requested configuration
+// reconcileGroups creates, edits, removes server groups according to requested configuration.
 func (c *Cluster) reconcileGroups() ([]string, error) {
 	// gather selected groups
 	selector := labels.Everything()
@@ -116,7 +116,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 	return existingGroupNames, nil
 }
 
-// reconcileUsers creates, edits, removes server users according to requested configuration
+// reconcileUsers creates, edits, removes server users according to requested configuration.
 func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	// Map of requested users by name
 	requestedUsers := make(map[string]cbmgr.User)
@@ -225,7 +225,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	return existingUserNames, nil
 }
 
-// create couchbase group with verification
+// create couchbase group with verification.
 func (c *Cluster) createGroup(group cbmgr.Group) error {
 	for _, role := range group.Roles {
 		if role.BucketName != "" && role.BucketName != "*" {
@@ -237,7 +237,7 @@ func (c *Cluster) createGroup(group cbmgr.Group) error {
 	return c.client.CreateGroup(c.readyMembers(), group)
 }
 
-// Get auth password to be set for user
+// Get auth password to be set for user.
 func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
 	var password string
 	secret, found := c.k8s.Secrets.Get(authSecret)
@@ -255,7 +255,7 @@ func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
 	return password, nil
 }
 
-// reconcileLDAPSettings synchronizes couchbase ldap settings with requested settings
+// reconcileLDAPSettings synchronizes couchbase ldap settings with requested settings.
 func (c *Cluster) reconcileLDAPSettings() error {
 	// Get current ldap cluster spec
 	apiLDAPSettings, err := c.client.GetLDAPSettings(c.readyMembers())

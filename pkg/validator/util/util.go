@@ -31,7 +31,7 @@ func (e EnumList) Interfaces() []interface{} {
 	return i
 }
 
-// StringArrayCompareOrdered compares two arrays and ensure the elements are the same
+// StringArrayCompareOrdered compares two arrays and ensure the elements are the same.
 func StringArrayCompareOrdered(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -45,7 +45,7 @@ func StringArrayCompareOrdered(a, b []string) bool {
 }
 
 // StringArrayCompare compares two arrays and ensure the elements are the same
-// but unordered
+// but unordered.
 func StringArrayCompare(a1, a2 []string) bool {
 	m := make(map[string]int)
 	for _, val := range a1 {

@@ -119,17 +119,17 @@ type ErrUnknownMember struct {
 	member string
 }
 
-// Error returns an error string
+// Error returns an error string.
 func (e ErrUnknownMember) Error() string {
 	return fmt.Sprintf("member is unknown: %s", e.member)
 }
 
-// NewErrUnknownMember creates a new unknown member error
+// NewErrUnknownMember creates a new unknown member error.
 func NewErrUnknownMember(member string) error {
 	return &ErrUnknownMember{member: member}
 }
 
-// IsErrUnknownMember returns whether the error is an unknown member
+// IsErrUnknownMember returns whether the error is an unknown member.
 func IsErrUnknownMember(err error) bool {
 	_, ok := err.(*ErrUnknownMember)
 	return ok
@@ -158,17 +158,17 @@ type ErrUnknownServerClass struct {
 	serverClass string
 }
 
-// Error returns an error string
+// Error returns an error string.
 func (e ErrUnknownServerClass) Error() string {
 	return fmt.Sprintf("server class is unknown: %s", e.serverClass)
 }
 
-// NewErrUnknownServerClass returns a new new missing
+// NewErrUnknownServerClass returns a new new missing.
 func NewErrUnknownServerClass(serverClass string) error {
 	return &ErrUnknownServerClass{serverClass: serverClass}
 }
 
-// IsErrUnknownServerClass returns whether the error is an unknown server class
+// IsErrUnknownServerClass returns whether the error is an unknown server class.
 func IsErrUnknownServerClass(err error) bool {
 	_, ok := err.(*ErrUnknownServerClass)
 	return ok

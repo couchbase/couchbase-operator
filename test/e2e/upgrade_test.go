@@ -684,7 +684,7 @@ func TestUpgradeToSupportable(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-// TestUpgradeToTLS tests that we can take an insecure cluster and make it secure
+// TestUpgradeToTLS tests that we can take an insecure cluster and make it secure.
 func TestUpgradeToTLS(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

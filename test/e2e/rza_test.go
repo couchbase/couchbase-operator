@@ -25,7 +25,7 @@ type rzaMap map[string]int
 
 // Note: Should be used only when using static server-group configuration
 // Returns for map of expected ServerGroup names with the pod count in the group
-// assuming the CRD is having static server-group configuration in it
+// assuming the CRD is having static server-group configuration in it.
 func mustGetExpectedRzaResultMap(t *testing.T, cluster *types.Cluster, groupSize int) rzaMap {
 	// Get the sorted list of AZs and the number of them.
 	serverGroups := getAvailabilityZones(t, cluster)
@@ -35,7 +35,7 @@ func mustGetExpectedRzaResultMap(t *testing.T, cluster *types.Cluster, groupSize
 	return expected
 }
 
-// accumulateRzaServerClass adds in class based scheduling to an rzaMap
+// accumulateRzaServerClass adds in class based scheduling to an rzaMap.
 func (expected rzaMap) accumulateRzaServerClass(groupSize int, serverGroups []string) {
 	numServerGroups := len(serverGroups)
 
@@ -46,7 +46,7 @@ func (expected rzaMap) accumulateRzaServerClass(groupSize int, serverGroups []st
 	}
 }
 
-// mustValidateRzaMap accepts an expected scheduling and compares against reality
+// mustValidateRzaMap accepts an expected scheduling and compares against reality.
 func (expected rzaMap) mustValidateRzaMap(t *testing.T, cluster *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
 	pods, err := cluster.KubeClient.CoreV1().Pods(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
@@ -108,8 +108,8 @@ func chooseServerGroups(groups []string, seed string, max int) []string {
 	return output
 }
 
-// Define Static ServersGroups in the CRD
-// Deploy the cluster through operator and verify the server groups are balanced
+// Define Static ServersGroups in the CRD.
+// Deploy the cluster through operator and verify the server groups are balanced.
 func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -135,8 +135,8 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Define Class based ServersGroups config in the CRD
-// Deploy the cb cluster and verify the server groups are balanced as specified in the CRD
+// Define Class based ServersGroups config in the CRD.
+// Deploy the cb cluster and verify the server groups are balanced as specified in the CRD.
 func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -203,8 +203,8 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy couchbase cluster over multiple server-groups
-// Scale up the couchbase nodes both general scalling and service based scalling
+// Deploy couchbase cluster over multiple server-groups.
+// Scale up the couchbase nodes both general scalling and service based scalling.
 func TestRzaResizeCluster(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -246,9 +246,9 @@ func TestRzaResizeCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create cluster with AA-ON and deploy the çb cluster
-// Add nodes beyond the number of available cluster nodes
-// Expects pod creation beyond k8s cluster size should fail
+// Create cluster with AA-ON and deploy the çb cluster.
+// Add nodes beyond the number of available cluster nodes.
+// Expects pod creation beyond k8s cluster size should fail.
 func TestRzaAntiAffinityOn(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -284,9 +284,9 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create cluster with AA-OFF and deploy the çb cluster
-// Add nodes beyond the number of available cluster nodes
-// Expects pod creation beyond k8s cluster size should succeed
+// Create cluster with AA-OFF and deploy the çb cluster.
+// Add nodes beyond the number of available cluster nodes.
+// Expects pod creation beyond k8s cluster size should succeed.
 func TestRzaAntiAffinityOff(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

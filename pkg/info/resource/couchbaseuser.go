@@ -18,7 +18,7 @@ type couchbaseUserResource struct {
 	couchbaseUsers []couchbasev2.CouchbaseUser
 }
 
-// NewCouchbaseUserResource initializes a new pod resource
+// NewCouchbaseUserResource initializes a new pod resource.
 func NewCouchbaseUserResource(context *context.Context) Resource {
 	return &couchbaseUserResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *couchbaseUserResource) Kind() string {
 	return "CouchbaseUser"
 }
 
-// Fetch collects all users as defined in the namespace
+// Fetch collects all users as defined in the namespace.
 func (r *couchbaseUserResource) Fetch() error {
 	couchbaseUsers, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseUsers(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {

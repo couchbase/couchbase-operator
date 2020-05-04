@@ -47,7 +47,7 @@ type reconcileFunc func(*ReconcileMachine, *Cluster) error
 type reconcileFuncMap map[ReconcileState]reconcileFunc
 
 // lookup finds the matching reconcile function for a specific state and returns
-// a reference to it, or an error
+// a reference to it, or an error.
 func (r reconcileFuncMap) lookup(state ReconcileState) (reconcileFunc, error) {
 	f, ok := r[state]
 	if !ok {
@@ -94,7 +94,7 @@ func (r *ReconcileMachine) transitionState(to ReconcileState) {
 	r.state = to
 }
 
-// step runs a single step of the state machine
+// step runs a single step of the state machine.
 func (r *ReconcileMachine) step(c *Cluster) error {
 	f, err := reconcileFunctions.lookup(r.state)
 	if err != nil {
@@ -106,13 +106,13 @@ func (r *ReconcileMachine) step(c *Cluster) error {
 	return nil
 }
 
-// done reports whether the reconciliation has completed
+// done reports whether the reconciliation has completed.
 func (r *ReconcileMachine) done() bool {
 	return r.state == ReconcileFinished
 }
 
 // exec runs the state machine until a finished condition or error
-// is encountered
+// is encountered.
 func (r *ReconcileMachine) exec(c *Cluster) error {
 	for !r.done() {
 		if err := r.step(c); err != nil {
@@ -402,7 +402,7 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 
 // Add back failed nodes to cluster.
 // Delta recover is performed for data nodes,
-// otherwise a full recovery is performed
+// otherwise a full recovery is performed.
 func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 	for _, m := range r.couchbase.AddBackNodes {
 		err := c.verifyMemberVolumes(m)
@@ -761,7 +761,7 @@ func handleNotifyFinished(r *ReconcileMachine, c *Cluster) error {
 	return nil
 }
 
-// Check if volumes should be removed with Pod based on reconcile status
+// Check if volumes should be removed with Pod based on reconcile status.
 func shouldRemoveVolumes(r *ReconcileMachine, c *Cluster, server string) bool {
 	removeVolumes, ok := r.removeVolumes[server]
 	if !ok {

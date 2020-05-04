@@ -25,7 +25,7 @@ type operatorCollector struct {
 	resource resource.Reference
 }
 
-// NewOperatorCollector initializes a new logs resource
+// NewOperatorCollector initializes a new logs resource.
 func NewOperatorCollector(context *context.Context) Collector {
 	return &operatorCollector{
 		context: context,
@@ -83,7 +83,7 @@ func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, path
 	return nil
 }
 
-// Fetch collects all operator data as defined for the resource
+// Fetch collects all operator data as defined for the resource.
 func (r *operatorCollector) Fetch(resource resource.Reference) error {
 	// Will match both deployments and pods without this.
 	if resource.Kind() != "Deployment" {

@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// mustCreateBoundUser creates user bound to cluster and bucket admin roles
+// mustCreateBoundUser creates user bound to cluster and bucket admin roles.
 func mustCreateBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseGroup, *couchbasev2.CouchbaseRoleBinding) {
 	user := e2eutil.MustNewUser(t, k8s, namespace, e2espec.NewDefaultUser())
 	group := e2eutil.MustNewGroup(t, k8s, namespace, e2espec.NewClusterAdminGroup())
@@ -28,7 +28,7 @@ func mustCreateBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*c
 	return user, group, binding
 }
 
-// Create cluster with user and cluster admin binding
+// Create cluster with user and cluster admin binding.
 func TestRBACCreateAdminUser(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
@@ -55,7 +55,7 @@ func TestRBACCreateAdminUser(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestRBACDeleteUser verifies basic user deletion
+// TestRBACDeleteUser verifies basic user deletion.
 func TestRBACDeleteUser(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -90,7 +90,7 @@ func TestRBACDeleteUser(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestRBACDeleteRole verifies that deleting a role results in deleting User
+// TestRBACDeleteRole verifies that deleting a role results in deleting User.
 func TestRBACDeleteRole(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -128,7 +128,7 @@ func TestRBACDeleteRole(t *testing.T) {
 }
 
 // TestRBACUpdateRole changes cluster role to a bucket role and verifies
-// reconciliation with couchbase
+// reconciliation with couchbase.
 func TestRBACUpdateRole(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -159,11 +159,11 @@ func TestRBACUpdateRole(t *testing.T) {
 }
 
 // TestRBACRemoveUserFromBinding tests that a user is deleted
-// when it is no longer referenced as a subject to any roles
+// when it is no longer referenced as a subject to any roles.
 //
 // Test binds 2 users to the same role.  One of the user is
 // removed from the binding and since it doesn't have a role
-// in any other binding the user is also deleted
+// in any other binding the user is also deleted.
 func TestRBACRemoveUserFromBinding(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -217,7 +217,7 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 }
 
 // TestRBACDeleteBinding tests that user is deleted when entire
-// rolebinding is deleted
+// rolebinding is deleted.
 func TestRBACDeleteBinding(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -253,7 +253,7 @@ func TestRBACDeleteBinding(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Verify RBAC auth can be applied to LDAP users
+// Verify RBAC auth can be applied to LDAP users.
 func TestRBACWithLDAPAuth(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global

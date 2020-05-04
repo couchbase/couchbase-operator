@@ -60,7 +60,7 @@ func UpdateSecret(kubeClient kubernetes.Interface, namespace string, secret *v1.
 	return err
 }
 
-// Use username and password from secret store
+// Use username and password from secret store.
 func GetClusterAuth(kubeClient kubernetes.Interface, namespace string, secretName string) (string, string, error) {
 	secret, err := GetSecret(kubeClient, namespace, secretName)
 	if err != nil {

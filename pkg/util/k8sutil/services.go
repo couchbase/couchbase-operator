@@ -599,7 +599,7 @@ func UpdateAdminConsole(c *client.Client, cluster *couchbasev2.CouchbaseCluster,
 	return ReconcileStatusUpdated, nil
 }
 
-// GetExposedServiceName returns the service name generated for each service port group
+// GetExposedServiceName returns the service name generated for each service port group.
 func GetExposedServiceName(nodeName string) string {
 	return nodeName
 }
@@ -626,7 +626,7 @@ var exposedfeatureSets = map[couchbasev2.ExposedFeature][]couchbasev2.Service{
 }
 
 // exposedFeatureSetToServiceList takes a requested feature set and returns
-// a list of unique service names
+// a list of unique service names.
 func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (couchbasev2.ServiceList, error) {
 	// Nothing to do, exit
 	serviceList := couchbasev2.ServiceList{}
@@ -663,7 +663,7 @@ func listRequestedPorts(serviceNames couchbasev2.ServiceList) []v1.ServicePort {
 }
 
 // serviceExists scans a list of services and returns true if the named
-// service exists
+// service exists.
 func serviceExists(services []*v1.Service, name string) bool {
 	for _, service := range services {
 		if service.Name == name {
@@ -673,7 +673,7 @@ func serviceExists(services []*v1.Service, name string) bool {
 	return false
 }
 
-// portExists returns true if a named port exists
+// portExists returns true if a named port exists.
 func portExists(ports []v1.ServicePort, name string) bool {
 	for _, port := range ports {
 		if port.Name == name {
@@ -684,7 +684,7 @@ func portExists(ports []v1.ServicePort, name string) bool {
 }
 
 // intersectPorts performs a boolean intersection of ports based on name.
-// It returns a subset of a
+// It returns a subset of a.
 func intersectPorts(a, b []v1.ServicePort) []v1.ServicePort {
 	d := []v1.ServicePort{}
 	for _, port := range a {
@@ -696,7 +696,7 @@ func intersectPorts(a, b []v1.ServicePort) []v1.ServicePort {
 }
 
 // subtractPorts performs a boolean subtraction of ports based on name.
-// It returns a subset of a
+// It returns a subset of a.
 func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
 	d := []v1.ServicePort{}
 	for _, port := range a {
@@ -1015,7 +1015,7 @@ func UpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cl
 }
 
 // TEMPORARY HACK
-// Does exactly the same as above but tells us if we need to do anything
+// Does exactly the same as above but tells us if we need to do anything.
 func WouldUpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster) (bool, error) {
 	// For each feature set accumulate a unique set of services to expose
 	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.Networking.ExposedFeatures)

@@ -18,7 +18,7 @@ type couchbaseReplicationResource struct {
 	couchbaseReplications []couchbasev2.CouchbaseReplication
 }
 
-// NewCouchbaseReplicationResource initializes a new pod resource
+// NewCouchbaseReplicationResource initializes a new pod resource.
 func NewCouchbaseReplicationResource(context *context.Context) Resource {
 	return &couchbaseReplicationResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *couchbaseReplicationResource) Kind() string {
 	return "CouchbaseReplication"
 }
 
-// Fetch collects all replications as defined in the namespace
+// Fetch collects all replications as defined in the namespace.
 func (r *couchbaseReplicationResource) Fetch() error {
 	couchbaseReplications, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseReplications(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {

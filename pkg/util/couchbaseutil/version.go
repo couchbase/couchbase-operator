@@ -22,7 +22,7 @@ type Version struct {
 	semver []int
 }
 
-// Initialise the version struct.  Prefix and semver are lazilly initialised
+// Initialise the version struct.  Prefix and semver are lazilly initialised.
 func NewVersion(version string) (*Version, error) {
 	if version == "" {
 		return nil, fmt.Errorf("null version")
@@ -60,14 +60,14 @@ func NewVersion(version string) (*Version, error) {
 	return &Version{version, prefix, semver}, nil
 }
 
-// Checks if version is sha256
+// Checks if version is sha256.
 func IsSHA256Version(version string) bool {
 	re := regexp.MustCompile(`^[A-Fa-f0-9]{64}$`)
 	matches := re.FindStringSubmatch(version)
 	return len(matches) != 0
 }
 
-// Get readable version from sha256
+// Get readable version from sha256.
 func GetSHA256Version(version string) (string, error) {
 	if v, ok := constants.ImageDigests[version]; ok {
 		return v, nil
@@ -86,43 +86,43 @@ func GetSHA256Version(version string) (string, error) {
 	return "", fmt.Errorf("unknown version digest: %s", version)
 }
 
-// Return the full version string
+// Return the full version string.
 func (v *Version) Version() string {
 	return v.version
 }
 
-// Get the prefix (edition) string
+// Get the prefix (edition) string.
 func (v *Version) Prefix() string {
 	return v.prefix
 }
 
-// Get the major revision
+// Get the major revision.
 func (v *Version) Major() int {
 	return v.semver[0]
 }
 
-// Get the minor revision
+// Get the minor revision.
 func (v *Version) Minor() int {
 	return v.semver[1]
 }
 
-// Get the patch revision
+// Get the patch revision.
 func (v *Version) Patch() int {
 	return v.semver[2]
 }
 
-// Semver gets the semver string
+// Semver gets the semver string.
 func (v *Version) Semver() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch())
 }
 
-// String representation of version
+// String representation of version.
 func (v *Version) String() string {
 	return v.Semver()
 }
 
-// Compare semantic versions
-// Returns -1 if v < o, 0 if v == o and 1 if v > o
+// Compare semantic versions.
+// Returns -1 if v < o, 0 if v == o and 1 if v > o.
 func (v *Version) Compare(o *Version) int {
 	for index := range v.semver {
 		if v.semver[index] > o.semver[index] {
@@ -135,12 +135,12 @@ func (v *Version) Compare(o *Version) int {
 	return 0
 }
 
-// Less returns true if v < o
+// Less returns true if v < o.
 func (v *Version) Less(o *Version) bool {
 	return v.Compare(o) < 0
 }
 
-// GreaterEqual returns true if v >= o
+// GreaterEqual returns true if v >= o.
 func (v *Version) GreaterEqual(o *Version) bool {
 	return !v.Less(o)
 }

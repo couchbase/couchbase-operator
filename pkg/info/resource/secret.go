@@ -18,7 +18,7 @@ type secretResource struct {
 	secrets *v1.SecretList
 }
 
-// NewSecretResource initializes a new secret resource
+// NewSecretResource initializes a new secret resource.
 func NewSecretResource(context *context.Context) Resource {
 	return &secretResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *secretResource) Kind() string {
 	return "Secret"
 }
 
-// Fetch collects all secrets as defined by the configuration
+// Fetch collects all secrets as defined by the configuration.
 func (r *secretResource) Fetch() error {
 	var err error
 	r.secrets, err = r.context.KubeClient.CoreV1().Secrets(r.context.Namespace()).List(metav1.ListOptions{})

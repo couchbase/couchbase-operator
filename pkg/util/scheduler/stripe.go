@@ -22,7 +22,7 @@ type stripeSchedulerImpl struct {
 }
 
 // getServerGroupsForClass gets the list of server groups to schedule pods across
-// given a specific server class name
+// given a specific server class name.
 func getServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couchbasev2.ServerConfig) ([]string, error) {
 	// Determine the server groups to use, defaulting to the global configuration
 	// if server configuration specific settings do not exist.
@@ -38,7 +38,7 @@ func getServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couch
 }
 
 // NewStripeScheduler creates an initializes a new sripe scheduler, caching
-// state from the current set of pods for the cluster
+// state from the current set of pods for the cluster.
 func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
 	// Initialize data structures, creating maps for each server class
 	// and empty lists for each server group defined for that class
@@ -128,7 +128,7 @@ func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
 	return fmt.Errorf("%s: server '%s' does not exist in class '%s'", stripeErrorHeader, name, class)
 }
 
-// LogStatus writes formatted state for debugging
+// LogStatus writes formatted state for debugging.
 func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 	// Remember the classes/groups so we can do an ordered/sorted traversal
 	mapClass := map[string]interface{}{}

@@ -86,7 +86,7 @@ func ExecWithOptions(k8s *types.Cluster, options ExecOptions) (string, string, e
 }
 
 // ExecCommandInContainerWithFullOutput executes a command in the
-// specified container and return stdout, stderr and error
+// specified container and return stdout, stderr and error.
 func ExecCommandInContainerWithFullOutput(k8s *types.Cluster, namespace, podName, containerName string, cmd ...string) (string, string, error) {
 	return ExecWithOptions(k8s, ExecOptions{
 		Command:       cmd,

@@ -18,7 +18,7 @@ type nullSchedulerImpl struct {
 	serverClasses map[string]*serverList
 }
 
-// NewNullScheduler returns a new null scheduler
+// NewNullScheduler returns a new null scheduler.
 func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
 	// Add existing servers to the server list, we need this for scheduling
 	// pod removal
@@ -44,7 +44,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 	return sched, nil
 }
 
-// Create does nothing
+// Create does nothing.
 func (sched *nullSchedulerImpl) Create(class, name, group string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
 		return "", fmt.Errorf("%s: pod %s server class '%s' undefined", stripeErrorHeader, name, class)
@@ -55,7 +55,7 @@ func (sched *nullSchedulerImpl) Create(class, name, group string) (string, error
 	return "", nil
 }
 
-// Delete removes the largest server name from the sorted list of servers
+// Delete removes the largest server name from the sorted list of servers.
 func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 	// Select the victim server group based on population
 	if _, ok := sched.serverClasses[class]; !ok {
@@ -76,6 +76,6 @@ func (sched *nullSchedulerImpl) Upgrade(class, name string) error {
 	return sched.serverClasses[class].del(name)
 }
 
-// LogStatus returns nothing
+// LogStatus returns nothing.
 func (sched *nullSchedulerImpl) LogStatus(cluster string) {
 }

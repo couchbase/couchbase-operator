@@ -75,7 +75,7 @@ func (l *logLevel) Set(s string) error {
 
 var log = logf.Log.WithName("main")
 
-// create controller from initialised config
+// create controller from initialised config.
 func main() {
 	var level logLevel
 

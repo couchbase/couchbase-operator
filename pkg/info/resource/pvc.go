@@ -18,7 +18,7 @@ type persistentVolumeClaimResource struct {
 	persistentVolumeClaims *v1.PersistentVolumeClaimList
 }
 
-// NewPersistentVolumeClaimResource initializes a new persistentVolumeClaim resource
+// NewPersistentVolumeClaimResource initializes a new persistentVolumeClaim resource.
 func NewPersistentVolumeClaimResource(context *context.Context) Resource {
 	return &persistentVolumeClaimResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *persistentVolumeClaimResource) Kind() string {
 	return "PersistentVolumeClaim"
 }
 
-// Fetch collects all persistentVolumeClaims as defined by the configuration
+// Fetch collects all persistentVolumeClaims as defined by the configuration.
 func (r *persistentVolumeClaimResource) Fetch() error {
 	selector, err := GetResourceSelector(&r.context.Config)
 	if err != nil {

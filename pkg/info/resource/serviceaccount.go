@@ -18,7 +18,7 @@ type ServiceAccountResource struct {
 	ServiceAccounts *v1.ServiceAccountList
 }
 
-// NewServiceAccountResource initializes a new ServiceAccount resource
+// NewServiceAccountResource initializes a new ServiceAccount resource.
 func NewServiceAccountResource(context *context.Context) Resource {
 	return &ServiceAccountResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *ServiceAccountResource) Kind() string {
 	return "ServiceAccount"
 }
 
-// Fetch collects all ServiceAccounts as defined by the configuration
+// Fetch collects all ServiceAccounts as defined by the configuration.
 func (r *ServiceAccountResource) Fetch() error {
 	var err error
 	r.ServiceAccounts, err = r.context.KubeClient.CoreV1().ServiceAccounts(r.context.Namespace()).List(metav1.ListOptions{})

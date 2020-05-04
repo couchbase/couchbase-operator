@@ -18,7 +18,7 @@ type persistentVolumeResource struct {
 	persistentVolumes *v1.PersistentVolumeList
 }
 
-// NewPersistentVolumeResource initializes a new persistentVolume resource
+// NewPersistentVolumeResource initializes a new persistentVolume resource.
 func NewPersistentVolumeResource(context *context.Context) Resource {
 	return &persistentVolumeResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *persistentVolumeResource) Kind() string {
 	return "PersistentVolume"
 }
 
-// Fetch collects all persistentVolumes as defined by the configuration
+// Fetch collects all persistentVolumes as defined by the configuration.
 func (r *persistentVolumeResource) Fetch() error {
 	var err error
 	r.persistentVolumes, err = r.context.KubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})

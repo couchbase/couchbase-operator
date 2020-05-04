@@ -16,7 +16,7 @@ import (
 	"strings"
 )
 
-// unescape translates escape characters back into their native form
+// unescape translates escape characters back into their native form.
 func unescape(token string) string {
 	replacer := strings.NewReplacer("~1", "/", "~0", "~")
 	return replacer.Replace(token)
@@ -24,22 +24,22 @@ func unescape(token string) string {
 
 // LookupValue return a reference to the named key in the containing object.
 func LookupValue(v reflect.Value, k string) (value reflect.Value, err error) {
-	// Reflection will panic, so be sure to catch and return an error
+	// Reflection will panic, so be sure to catch and return an error.
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("invalid token %s: %v", k, r)
 		}
 	}()
 
-	// Set default return values
+	// Set default return values.
 	value = v
 
-	// If an interface get the underlying typed value
+	// If an interface get the underlying typed value.
 	if value.Kind() == reflect.Interface {
 		value = reflect.ValueOf(value.Interface())
 	}
 
-	// Dereference if it's a pointer
+	// Dereference if it's a pointer.
 	if value.Kind() == reflect.Ptr {
 		value = value.Elem()
 	}
@@ -72,33 +72,33 @@ func LookupValue(v reflect.Value, k string) (value reflect.Value, err error) {
 // value in the pointer, and the last token so that it may be used to perform
 // specific operations e.g. add/remove on context specific types e.g. slice/map.
 func LookupPath(object interface{}, pointer string) (value reflect.Value, key string, err error) {
-	// Reflection will panic, so be sure to catch and return an error
+	// Reflection will panic, so be sure to catch and return an error.
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("invalid pointer %s: %v", pointer, r)
 		}
 	}()
 
-	// Ensure the pointer is correctly specified
+	// Ensure the pointer is correctly specified.
 	re := regexp.MustCompile(`^(/[\w\d~-]*)+$`)
 	if !re.MatchString(pointer) {
 		err = fmt.Errorf("malformed pointer %s", pointer)
 		return
 	}
 
-	// Split pointer into tokens and discard the first empty element
+	// Split pointer into tokens and discard the first empty element.
 	tokens := strings.Split(pointer, "/")[1:]
 
-	// Translate escape sequences
+	// Translate escape sequences.
 	for index, token := range tokens {
 		tokens[index] = unescape(token)
 	}
 
-	// Get the first value in the chain and the key to add/update/remove etc
+	// Get the first value in the chain and the key to add/update/remove etc.
 	value = reflect.ValueOf(object)
 	key = tokens[len(tokens)-1]
 
-	// Iteratively descend through the structure
+	// Iteratively descend through the structure.
 	for _, token := range tokens[:len(tokens)-1] {
 		value, err = LookupValue(value, token)
 		if err != nil {

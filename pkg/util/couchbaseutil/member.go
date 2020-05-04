@@ -33,7 +33,7 @@ func (m *Member) Addr() string {
 	return fmt.Sprintf("%s.%s.%s.svc", m.Name, clusterNameFromMemberName(m.Name), m.Namespace)
 }
 
-// ClientURL is the client URL for this member
+// ClientURL is the client URL for this member.
 func (m *Member) ClientURL() string {
 	return fmt.Sprintf("%s://%s:%d", m.clientScheme(), m.Addr(), m.clientPort())
 }
@@ -87,7 +87,7 @@ func (ms MemberSet) Copy() MemberSet {
 	return clone
 }
 
-// the set of all members of s1 that are not members of s2
+// the set of all members of s1 that are not members of s2.
 func (ms MemberSet) Diff(other MemberSet) MemberSet {
 	diff := MemberSet{}
 	for n, m := range ms {
@@ -141,7 +141,7 @@ func (ms MemberSet) Append(other MemberSet) {
 	}
 }
 
-// Names returns a sorted list of member names
+// Names returns a sorted list of member names.
 func (ms MemberSet) Names() []string {
 	names := []string{}
 	for _, m := range ms {
@@ -203,7 +203,7 @@ func (ms MemberSet) PickOne() *Member {
 	panic("empty")
 }
 
-// retrieve the member with lowest index
+// retrieve the member with lowest index.
 func (ms MemberSet) First(clusterName string, max int) *Member {
 	for i := 0; i < max; i++ {
 		name := CreateMemberName(clusterName, i)

@@ -6,7 +6,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/admission"
 )
 
-// main initializes the system then starts a HTTPS server to process requests
+// main initializes the system then starts a HTTPS server to process requests.
 func main() {
 	// Parse command line parameters
 	config := &admission.Config{}

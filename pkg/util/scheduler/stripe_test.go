@@ -136,19 +136,19 @@ type testPodGetter struct {
 	pods []*v1.Pod
 }
 
-// newTestStripePodGetter initialises a new testPodGetter
+// newTestStripePodGetter initialises a new testPodGetter.
 func newTestStripePodGetter(pods []*v1.Pod) PodGetter {
 	return &testPodGetter{
 		pods: pods,
 	}
 }
 
-// Get returns a list of precached pods
+// Get returns a list of precached pods.
 func (g *testPodGetter) Get() []*v1.Pod {
 	return g.pods
 }
 
-// podFixture returns a pod object with the node configuration (server class) set
+// podFixture returns a pod object with the node configuration (server class) set.
 func podFixture(name, class, group string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -171,7 +171,7 @@ func podFixture(name, class, group string) *v1.Pod {
 	return pod
 }
 
-// podFixtureFailed returns a pod object with the node configuration (server class) set
+// podFixtureFailed returns a pod object with the node configuration (server class) set.
 func podFixtureFailed(name, class, group string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -194,14 +194,14 @@ func podFixtureFailed(name, class, group string) *v1.Pod {
 	return pod
 }
 
-// checkCreateScheduling asserts that the the pod has been scheduled where we expected
+// checkCreateScheduling asserts that the the pod has been scheduled where we expected.
 func checkCreateScheduling(t *testing.T, selected, expected string) {
 	if selected != expected {
 		t.Fatalf("Scheduler created server in group '%s', expected '%s'", selected, expected)
 	}
 }
 
-// checkDeleteScheduling asserts that the selected server is as we expect
+// checkDeleteScheduling asserts that the selected server is as we expect.
 func checkDeleteScheduling(t *testing.T, selected, expected string) {
 	if selected != expected {
 		t.Fatalf("Scheduler deleted '%s', expected '%s'", selected, expected)
@@ -217,7 +217,7 @@ func mustCreate(t *testing.T, s Scheduler, name, class, group string) string {
 	return group
 }
 
-// Adds a pod to global server groups and expects it to be scheduled deterministically
+// Adds a pod to global server groups and expects it to be scheduled deterministically.
 func TestStripeCreateGlobalSingle(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsEmpty)
@@ -229,7 +229,7 @@ func TestStripeCreateGlobalSingle(t *testing.T) {
 	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup1)
 }
 
-// Adds four pods to global server groups and expects them to be scheduled deterministically
+// Adds four pods to global server groups and expects them to be scheduled deterministically.
 func TestStripeCreateGlobalMultiple(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsEmpty)
@@ -244,7 +244,7 @@ func TestStripeCreateGlobalMultiple(t *testing.T) {
 	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup1)
 }
 
-// Adds three pods to override server groups and expects them to be scheduled deterministically
+// Adds three pods to override server groups and expects them to be scheduled deterministically.
 func TestStripeCreateOverrideMultiple(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsEmpty)
@@ -258,7 +258,7 @@ func TestStripeCreateOverrideMultiple(t *testing.T) {
 	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup1)
 }
 
-// TestStripe bad configurations error
+// TestStripe bad configurations error.
 func TestStripeInvalidConfiguration(t *testing.T) {
 	c := fixtureClusterInvalid
 	g := newTestStripePodGetter(fixturePodsEmpty)
@@ -268,7 +268,7 @@ func TestStripeInvalidConfiguration(t *testing.T) {
 	}
 }
 
-// TestStripe pods missing server class labels error
+// TestStripe pods missing server class labels error.
 func TestStripeInvalidPodServerClassLabels(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsInvalidServerClassLabels)
@@ -278,7 +278,7 @@ func TestStripeInvalidPodServerClassLabels(t *testing.T) {
 	}
 }
 
-// Test pods missing server group labels error
+// Test pods missing server group labels error.
 func TestStripeInvalidPodServerGroupNodeSelector(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsInvalidServerGroupNodeSelector)
@@ -288,7 +288,7 @@ func TestStripeInvalidPodServerGroupNodeSelector(t *testing.T) {
 	}
 }
 
-// Test that pods are deterministically scheduled when initialised with existing pods
+// Test that pods are deterministically scheduled when initialised with existing pods.
 func TestStripeCreateGlobalExistingPods(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsCreate)
@@ -300,7 +300,7 @@ func TestStripeCreateGlobalExistingPods(t *testing.T) {
 	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup3)
 }
 
-// Test that pods are deterministically scheduled when initialised with existing pods
+// Test that pods are deterministically scheduled when initialised with existing pods.
 func TestStripeCreateOverrideExistingPods(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsCreate)
@@ -312,7 +312,7 @@ func TestStripeCreateOverrideExistingPods(t *testing.T) {
 	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup2)
 }
 
-// Test that scheduling a deletion of an empty server class errors
+// Test that scheduling a deletion of an empty server class errors.
 func TestStripeDeleteGlobalSingleEmptyClass(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsEmpty)
@@ -326,7 +326,7 @@ func TestStripeDeleteGlobalSingleEmptyClass(t *testing.T) {
 	}
 }
 
-// Test that scheduling a deletion of a server is deterministic
+// Test that scheduling a deletion of a server is deterministic.
 func TestStripeDeleteGlobalSingle(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsDelete)
@@ -343,7 +343,7 @@ func TestStripeDeleteGlobalSingle(t *testing.T) {
 	checkDeleteScheduling(t, server, podName6)
 }
 
-// Test that scheduling a deletion of multiple servers is deterministic
+// Test that scheduling a deletion of multiple servers is deterministic.
 func TestStripeDeleteGlobalMultiple(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsDelete)
@@ -370,7 +370,7 @@ func TestStripeDeleteGlobalMultiple(t *testing.T) {
 	checkDeleteScheduling(t, server3, podName4)
 }
 
-// Test that deletion and addition occur correctly
+// Test that deletion and addition occur correctly.
 func TestStipeDeleteCreateGlobalSingle(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsDelete)
@@ -388,7 +388,7 @@ func TestStipeDeleteCreateGlobalSingle(t *testing.T) {
 	checkCreateScheduling(t, mustCreate(t, s, serverClass1, podName7, ""), serverGroup3)
 }
 
-// Test that the scheduler correctly interrogates pod state
+// Test that the scheduler correctly interrogates pod state.
 func TestStripeAddGlobalSingleOnPodFailure(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsFailure)

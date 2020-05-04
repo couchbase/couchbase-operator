@@ -975,7 +975,7 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 // * certificates are
 //   * in date
 //   * have the correct attributes
-// * leaf certificate has the correct SANs
+// * leaf certificate has the correct SANs.
 func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subjectAltNames []string) (errs []error) {
 	if cluster.Spec.Networking.TLS != nil {
 		// CRD validation requires all the necessary fields are populated
@@ -1053,7 +1053,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 
 // validateTLSXDCR checks that TLS configuration for a remote cluster is valid.
 // * if set the secret must exist
-// * if set the secret must contain a CA
+// * if set the secret must contain a CA.
 func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) (errs []error) {
 	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
 		if remoteCluster.TLS == nil {

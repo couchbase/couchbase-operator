@@ -17,7 +17,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 )
 
-// mustCreateBoundUser creates user bound to cluster and bucket admin roles
+// mustCreateBoundUser creates user bound to cluster and bucket admin roles.
 func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseGroup, *couchbasev2.CouchbaseRoleBinding) {
 	user := e2eutil.MustNewUser(t, k8s, namespace, e2espec.NewDefaultLDAPUser())
 	group := e2eutil.MustNewGroup(t, k8s, namespace, e2espec.NewClusterAdminGroup())
@@ -75,7 +75,7 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestRBACDeleteUser verifies basic user deletion
+// TestRBACDeleteUser verifies basic user deletion.
 func TestLDAPCDeleteUser(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -110,7 +110,7 @@ func TestLDAPCDeleteUser(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestLDAPDeleteRole verifies that deleting a group results in deleting User
+// TestLDAPDeleteRole verifies that deleting a group results in deleting User.
 func TestLDAPDeleteRole(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -147,7 +147,7 @@ func TestLDAPDeleteRole(t *testing.T) {
 }
 
 // TestLDAPUpdateRole changes cluster role to a bucket role and verifies
-// reconciliation with couchbase
+// reconciliation with couchbase.
 func TestLDAPUpdateRole(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -178,11 +178,11 @@ func TestLDAPUpdateRole(t *testing.T) {
 }
 
 // TestLDAPRemoveUserFromBinding tests that a user is deleted
-// when it is no longer referenced as a subject to any roles
+// when it is no longer referenced as a subject to any roles.
 //
 // Test binds 2 users to the same role.  One of the user is
 // removed from the binding and since it doesn't have a role
-// in any other binding the user is also deleted
+// in any other binding the user is also deleted.
 func TestLDAPRemoveUserFromBinding(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -236,7 +236,7 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 }
 
 // TestLDAPDeleteBinding tests that user is deleted when entire
-// rolebinding is deleted
+// rolebinding is deleted.
 func TestLDAPDeleteBinding(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)

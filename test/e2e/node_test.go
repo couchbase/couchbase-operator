@@ -43,7 +43,7 @@ func TestDenyCommunityEdition(t *testing.T) {
 
 // Tests editing service spec
 // 1. Create 1 node cluster with single service spec
-// 2. Update service spec size from 1 to 2 (verify via rest call to cluster)
+// 2. Update service spec size from 1 to 2 (verify via rest call to cluster).
 func TestEditServiceConfig(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -74,7 +74,7 @@ func TestEditServiceConfig(t *testing.T) {
 // Tests manual failover and operator recovery of cluster
 // 1. Create 2 node cluster
 // 2. Manually failover 1 member
-// 3. Wait for operator to add back failed node
+// 3. Wait for operator to add back failed node.
 func TestNodeManualFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -164,7 +164,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 // rebalanced in.
 //
 // Expects: autofailover of down node occurs and a replacement node is added
-// in order to reach desired cluster size
+// in order to reach desired cluster size.
 func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -289,7 +289,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 // Expects: only nodes added by operator to be in cluster
 // 1. Create 1 node cluster
 // 2. Manually add 1 external member to cluster
-// 3. Verify that external member was removed
+// 3. Verify that external member was removed.
 func TestRemoveForeignNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -337,7 +337,7 @@ func TestRemoveForeignNode(t *testing.T) {
 // Tests one node failing in a cluster with no buckets
 // 1. Create a 5 node cluster with no buckets
 // 2. Kill a single node
-// 3. Wait for autofailover, rebalance, and healthy
+// 3. Wait for autofailover, rebalance, and healthy.
 func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -377,7 +377,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 // 1. Create 5 node cluster with no buckets
 // 2. Kill two nodes
 // 3. Manually failover the killed nodes
-// 4. Wait for rebalance and healthy cluster
+// 4. Wait for rebalance and healthy cluster.
 func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -419,7 +419,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 // Tests one nodes failing in a cluster with one bucket with one replica
 // 1. Create 5 node cluster with one bucket with 1 replica
 // 2. Kill one node
-// 3. Wait for rebalance and healthy cluster
+// 3. Wait for rebalance and healthy cluster.
 func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -464,7 +464,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 // 1. Create 5 node cluster with one bucket with 1 replica
 // 2. Kill two nodes
 // 3. Manually failover the two killed nodes
-// 4. Wait for rebalance and healthy cluster
+// 4. Wait for rebalance and healthy cluster.
 func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -512,7 +512,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 // Tests one node failing in a cluster with one bucket with two replicas
 // 1. Create 5 node cluster with one bucket with two replicas
 // 2. Kill one node
-// 3. Wait for rebalance and healthy cluster
+// 3. Wait for rebalance and healthy cluster.
 func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -554,7 +554,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 // 1. Create 5 node cluster with one bucket with two replicas
 // 2. Kill two nodes
 // 3. Manually failover the two killed nodes
-// 4. Wait for rebalance and healthy cluster
+// 4. Wait for rebalance and healthy cluster.
 func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

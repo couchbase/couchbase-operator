@@ -18,7 +18,7 @@ type namespaceResource struct {
 	namespace *corev1.Namespace
 }
 
-// NewNamespaceResource initializes a new namespace resource
+// NewNamespaceResource initializes a new namespace resource.
 func NewNamespaceResource(context *context.Context) Resource {
 	return &namespaceResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *namespaceResource) Kind() string {
 	return "Namespace"
 }
 
-// Fetch collects all namespaces as defined by the configuration
+// Fetch collects all namespaces as defined by the configuration.
 func (r *namespaceResource) Fetch() error {
 	var err error
 	if r.namespace, err = r.context.KubeClient.CoreV1().Namespaces().Get(r.context.Namespace(), metav1.GetOptions{}); err != nil {

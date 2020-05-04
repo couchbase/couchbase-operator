@@ -21,7 +21,7 @@ type eventCollector struct {
 	resource resource.Reference
 }
 
-// NewEventCollector initializes a new event resource
+// NewEventCollector initializes a new event resource.
 func NewEventCollector(context *context.Context) Collector {
 	return &eventCollector{
 		context: context,
@@ -32,7 +32,7 @@ func (r *eventCollector) Kind() string {
 	return "Event"
 }
 
-// Fetch collects all events as defined for the resource
+// Fetch collects all events as defined for the resource.
 func (r *eventCollector) Fetch(resource resource.Reference) error {
 	events, err := k8sutil.GetEventsForResource(r.context.KubeClient, r.context.Namespace(), resource.Kind(), resource.Name())
 	if err != nil {

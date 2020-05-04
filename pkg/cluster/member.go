@@ -82,7 +82,7 @@ func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 }
 
 // getManagedPersistedMembers gets list of members associated with
-// persisted volumes that are actually managed by active cluster
+// persisted volumes that are actually managed by active cluster.
 func (c *Cluster) getManagedPersistedMembers(knownNodes []string) couchbaseutil.MemberSet {
 	managedMembers := couchbaseutil.MemberSet{}
 	pvcMembers := c.pvcMembers()

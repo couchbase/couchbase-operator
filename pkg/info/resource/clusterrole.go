@@ -18,7 +18,7 @@ type clusterRoleResource struct {
 	clusterRoles *v1.ClusterRoleList
 }
 
-// NewClusterRoleResource initializes a new clusterRole resource
+// NewClusterRoleResource initializes a new clusterRole resource.
 func NewClusterRoleResource(context *context.Context) Resource {
 	return &clusterRoleResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *clusterRoleResource) Kind() string {
 	return "ClusterRole"
 }
 
-// Fetch collects all clusterRoles as defined by the configuration
+// Fetch collects all clusterRoles as defined by the configuration.
 func (r *clusterRoleResource) Fetch() error {
 	var err error
 	r.clusterRoles, err = r.context.KubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})

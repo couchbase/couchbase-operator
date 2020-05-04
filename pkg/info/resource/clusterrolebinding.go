@@ -18,7 +18,7 @@ type clusterRoleBindingResource struct {
 	clusterRoleBindings *v1.ClusterRoleBindingList
 }
 
-// NewClusterRoleBindingResource initializes a new clusterRoleBinding resource
+// NewClusterRoleBindingResource initializes a new clusterRoleBinding resource.
 func NewClusterRoleBindingResource(context *context.Context) Resource {
 	return &clusterRoleBindingResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *clusterRoleBindingResource) Kind() string {
 	return "ClusterRoleBinding"
 }
 
-// Fetch collects all clusterRoleBindings as defined by the configuration
+// Fetch collects all clusterRoleBindings as defined by the configuration.
 func (r *clusterRoleBindingResource) Fetch() error {
 	var err error
 	r.clusterRoleBindings, err = r.context.KubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})

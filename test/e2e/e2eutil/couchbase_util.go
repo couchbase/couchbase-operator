@@ -33,7 +33,7 @@ import (
 
 type serviceVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value map[string]int) bool
 
-// newClient returns a new Couchbase management client (internal not go SDK)
+// newClient returns a new Couchbase management client (internal not go SDK).
 func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
 	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.Security.AdminSecret)
 	if err != nil {
@@ -248,7 +248,7 @@ func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 	}
 }
 
-// Get Bucket from couchbase cluster
+// Get Bucket from couchbase cluster.
 func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr.Bucket, error) {
 	buckets, err := client.GetBuckets()
 	if err == nil {
@@ -261,7 +261,7 @@ func getBucket(t *testing.T, client *cbmgr.Couchbase, bucketName string) (*cbmgr
 	return nil, NewErrGetClusterBucket(bucketName)
 }
 
-// Inserts Json docs into couchbase bucket
+// Inserts Json docs into couchbase bucket.
 func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
 	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 	if err != nil {
@@ -305,7 +305,7 @@ func MustInsertJSONDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
-// Add a node to the cluster
+// Add a node to the cluster.
 func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member *couchbaseutil.Member) error {
 	username, password, err := GetClusterAuth(k8s.KubeClient, couchbase.Namespace, k8s.DefaultSecret.Name)
 	if err != nil {
@@ -381,7 +381,7 @@ func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	}
 }
 
-// EjectMember removes the given member index from the cluster,
+// EjectMember removes the given member index from the cluster.
 func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -985,7 +985,7 @@ func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.
 }
 
 // CheckLDAPStatus checks for successful connectivity
-// between couchbase and an LDAP server
+// between couchbase and an LDAP server.
 func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1011,7 +1011,7 @@ func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 	})
 }
 
-// MustCheckLDAPStatus checks ldap status success or dies
+// MustCheckLDAPStatus checks ldap status success or dies.
 func MustCheckLDAPStatus(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := CheckLDAPStatus(k8s, cluster, timeout); err != nil {
 		Die(t, err)

@@ -18,7 +18,7 @@ type podResource struct {
 	pods *v1.PodList
 }
 
-// NewPodResource initializes a new pod resource
+// NewPodResource initializes a new pod resource.
 func NewPodResource(context *context.Context) Resource {
 	return &podResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *podResource) Kind() string {
 	return "Pod"
 }
 
-// Fetch collects all pods as defined by the configuration
+// Fetch collects all pods as defined by the configuration.
 func (r *podResource) Fetch() error {
 	selector, err := GetResourceSelector(&r.context.Config)
 	if err != nil {

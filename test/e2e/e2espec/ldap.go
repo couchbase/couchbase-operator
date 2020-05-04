@@ -35,7 +35,7 @@ var (
 	ldapSecretMount  = "certsecret"
 )
 
-// LDAP Settings
+// LDAP Settings.
 func newLDAPSettings(namespace string) *couchbasev2.CouchbaseClusterLDAPSpec {
 	basedn := fmt.Sprintf("dc=%s,dc=%s,dc=svc", ldapSubdomain, namespace)
 	binddn := fmt.Sprintf("cn=%s,%s", commonName, basedn)
@@ -60,7 +60,7 @@ func newLDAPSettings(namespace string) *couchbasev2.CouchbaseClusterLDAPSpec {
 	}
 }
 
-// NewLDAPClusterBasic creates a new cluster with LDAP configured
+// NewLDAPClusterBasic creates a new cluster with LDAP configured.
 func NewLDAPClusterBasic(namespace string, size int, secretCa string, secretPassword string) *couchbasev2.CouchbaseCluster {
 	clusterSpec := NewBasicCluster(size)
 	clusterSpec.Spec.Security.LDAP = newLDAPSettings(namespace)
@@ -69,7 +69,7 @@ func NewLDAPClusterBasic(namespace string, size int, secretCa string, secretPass
 	return clusterSpec
 }
 
-// ldapPodLabels are labels applied to LDAP Pod and as service selector
+// ldapPodLabels are labels applied to LDAP Pod and as service selector.
 func ldapPodLabels() map[string]string {
 	return map[string]string{
 		"app":   ldapSubdomain,
@@ -77,7 +77,7 @@ func ldapPodLabels() map[string]string {
 	}
 }
 
-// LDAP Server Pod Spec
+// LDAP Server Pod Spec.
 func NewLDAPServer(namespace string) *v1.Pod {
 	container := openLDAPContainer(namespace)
 
@@ -97,7 +97,7 @@ func NewLDAPServer(namespace string) *v1.Pod {
 	return pod
 }
 
-// LDAP Server Pod Spec with TLS
+// LDAP Server Pod Spec with TLS.
 func NewLDAPServerTLS(namespace, ldapSecret string) *v1.Pod {
 	pod := NewLDAPServer(namespace)
 
@@ -126,7 +126,7 @@ func NewLDAPServerTLS(namespace, ldapSecret string) *v1.Pod {
 	return pod
 }
 
-// OpenLDAP container spec
+// OpenLDAP container spec.
 func openLDAPContainer(namespace string) v1.Container {
 	ldapDomain := fmt.Sprintf("%s.%s.svc", ldapSubdomain, namespace)
 	ldapFQDN := fmt.Sprintf("%s.%s", ldapHostName, ldapDomain)
@@ -201,7 +201,7 @@ func openLDAPContainer(namespace string) v1.Container {
 	}
 }
 
-// Init container copies certs from secret into volume mount
+// Init container copies certs from secret into volume mount.
 func openLDAPInitContainer() v1.Container {
 	command := []string{"sh", "-c", "cp /tmp/certs/* /certs; chown -R 999:999 /certs"}
 	return v1.Container{
@@ -221,7 +221,7 @@ func openLDAPInitContainer() v1.Container {
 	}
 }
 
-// Headless service exposing ldap container
+// Headless service exposing ldap container.
 func NewLDAPService() *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -248,7 +248,7 @@ func NewLDAPService() *v1.Service {
 	}
 }
 
-// LDAPAltNames specify dns name accepted from client requests
+// LDAPAltNames specify dns name accepted from client requests.
 func LDAPAltNames(namespace string) []string {
 	return []string{
 		"localhost",

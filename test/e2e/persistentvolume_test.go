@@ -25,7 +25,7 @@ import (
 )
 
 // This will create a Persistent volume claim data
-// for adding into the cluster CRD
+// for adding into the cluster CRD.
 func createPersistentVolumeClaimSpec(t *testing.T, k8s *types.Cluster, storageClass, pvcName string, resourceQtyVal int64) corev1.PersistentVolumeClaim {
 	sc, err := k8s.KubeClient.StorageV1().StorageClasses().Get(storageClass, metav1.GetOptions{})
 	if err != nil {
@@ -55,7 +55,7 @@ func createPersistentVolumeClaimSpec(t *testing.T, k8s *types.Cluster, storageCl
 	}
 }
 
-// Verifies actual PVC wrt to server pods matches the expected PVC mapping given by user
+// Verifies actual PVC wrt to server pods matches the expected PVC mapping given by user.
 func verifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string, expectedPvcMap map[string]int) (errToReturn error) {
 	pvcMappingVerify := func() error {
 		for memberName, pvcCount := range expectedPvcMap {
@@ -179,8 +179,8 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create multi-node couchbase cluster with volumeClaimTemplates
-// Create test bucket and verify
+// Create multi-node couchbase cluster with volumeClaimTemplates.
+// Create test bucket and verify.
 func TestPersistentVolumeCreateCluster(t *testing.T) {
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
@@ -501,9 +501,9 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create couchbase cluster with Persistent volumes and server groups
-// Kill couchbase server pods on a particular server group
-// Operator should replace killed pods with new one with same name and reuse PVC
+// Create couchbase cluster with Persistent volumes and server groups.
+// Kill couchbase server pods on a particular server group.
+// Operator should replace killed pods with new one with same name and reuse PVC.
 func TestPersistentVolumeRzaFailover(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -569,9 +569,9 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create 3 node couchbase cluster initially
-// Resize cluster to different size
-// Check for PVC status and cluster health condition
+// Create 3 node couchbase cluster initially.
+// Resize cluster to different size.
+// Check for PVC status and cluster health condition.
 func TestPersistentVolumeResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

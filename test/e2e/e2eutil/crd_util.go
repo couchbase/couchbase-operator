@@ -41,7 +41,7 @@ func getClusterCRD(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluste
 	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 }
 
-// NameLabelSelector returns a label selector of the form name=<name>
+// NameLabelSelector returns a label selector of the form name=<name>.
 func NameLabelSelector(label, name string) map[string]string {
 	return map[string]string{label: name}
 }

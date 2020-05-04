@@ -37,7 +37,7 @@ func skipAnalytics(t *testing.T) {
 }
 
 // Create cluster with Analytics service enabled
-// Deploy analytics bucket and verify for bucket creation and data replication
+// Deploy analytics bucket and verify for bucket creation and data replication.
 func TestAnalyticsCreateDataSet(t *testing.T) {
 	skipAnalytics(t)
 
@@ -84,9 +84,9 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create analytics enabled couchbase cluster
-// Create analytics bucket with data sets and connect with couchbase bucket
-// Resize cluster with analytics nodes and check for data and functional consistency
+// Create analytics enabled couchbase cluster.
+// Create analytics bucket with data sets and connect with couchbase bucket.
+// Resize cluster with analytics nodes and check for data and functional consistency.
 func TestAnalyticsResizeCluster(t *testing.T) {
 	skipAnalytics(t)
 
@@ -155,8 +155,8 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy analytics enabled couchbase cluster and populate data
-// Kill analytics enabled node and check the cluster status
+// Deploy analytics enabled couchbase cluster and populate data.
+// Kill analytics enabled node and check the cluster status.
 func TestAnalyticsKillPods(t *testing.T) {
 	skipAnalytics(t)
 
@@ -224,9 +224,9 @@ func TestAnalyticsKillPods(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Deploy analytics enabled couchbase cluster over PVC and populate data
-// Kill analytics enabled node and check the cluster and PVC status
-// Kill all analytics nodes at once and check for node recovery
+// Deploy analytics enabled couchbase cluster over PVC and populate data.
+// Kill analytics enabled node and check the cluster and PVC status.
+// Kill all analytics nodes at once and check for node recovery.
 func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	skipAnalytics(t)
 

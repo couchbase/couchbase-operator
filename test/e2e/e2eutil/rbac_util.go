@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewUser creates a new couchbase user
+// NewUser creates a new couchbase user.
 func NewUser(k8s *types.Cluster, namespace string, user *couchbasev2.CouchbaseUser) (*couchbasev2.CouchbaseUser, error) {
 	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(namespace).Create(user)
 }
@@ -37,7 +37,7 @@ func MustDeleteUser(t *testing.T, k8s *types.Cluster, namespace string, user *co
 	}
 }
 
-// NewRole creates a new couchbase group
+// NewRole creates a new couchbase group.
 func NewGroup(k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) (*couchbasev2.CouchbaseGroup, error) {
 	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).Create(group)
 }
@@ -60,7 +60,7 @@ func MustDeleteGroup(t *testing.T, k8s *types.Cluster, namespace string, group *
 	}
 }
 
-// NewRoleBinding creates a new couchbase role binding
+// NewRoleBinding creates a new couchbase role binding.
 func NewRoleBinding(k8s *types.Cluster, namespace string, binding *couchbasev2.CouchbaseRoleBinding) (*couchbasev2.CouchbaseRoleBinding, error) {
 	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(namespace).Create(binding)
 }
@@ -83,7 +83,7 @@ func MustDeleteRoleBinding(t *testing.T, k8s *types.Cluster, namespace string, b
 	}
 }
 
-// Patch CouchbaseGroup
+// Patch CouchbaseGroup.
 func PatchGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseGroup, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -127,7 +127,7 @@ func MustPatchGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.Couchba
 	return group
 }
 
-// Patch CouchbaseRoleBinding
+// Patch CouchbaseRoleBinding.
 func PatchRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseRoleBinding, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

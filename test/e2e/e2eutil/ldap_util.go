@@ -11,12 +11,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// NewLDAPServer creates a new LDAP server
+// NewLDAPServer creates a new LDAP server.
 func NewLDAPServer(kubeClient kubernetes.Interface, namespace string, pod *v1.Pod) (*v1.Pod, error) {
 	return kubeClient.CoreV1().Pods(namespace).Create(pod)
 }
 
-// MustNewLDAPServer create LDAP server or dies trying
+// MustNewLDAPServer create LDAP server or dies trying.
 func MustNewLDAPServer(t *testing.T, kubeClient kubernetes.Interface, namespace string, pod *v1.Pod) *v1.Pod {
 	pod, err := NewLDAPServer(kubeClient, namespace, pod)
 	if err != nil {
@@ -25,12 +25,12 @@ func MustNewLDAPServer(t *testing.T, kubeClient kubernetes.Interface, namespace 
 	return pod
 }
 
-// NewLDAPService creates headless service for accessing LDAP server
+// NewLDAPService creates headless service for accessing LDAP server.
 func NewLDAPService(kubeClient kubernetes.Interface, namespace string, service *v1.Service) (*v1.Service, error) {
 	return kubeClient.CoreV1().Services(namespace).Create(service)
 }
 
-// MustNewLDAPService creates LDAP service or dies trying
+// MustNewLDAPService creates LDAP service or dies trying.
 func MustNewLDAPService(t *testing.T, kubeClient kubernetes.Interface, namespace string, service *v1.Service) *v1.Service {
 	service, err := NewLDAPService(kubeClient, namespace, service)
 	if err != nil {
@@ -39,7 +39,7 @@ func MustNewLDAPService(t *testing.T, kubeClient kubernetes.Interface, namespace
 	return service
 }
 
-// Delete LDAP Service
+// Delete LDAP Service.
 func DeleteLDAPService(kubeClient kubernetes.Interface, namespace string) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
 	svcList, err := kubeClient.CoreV1().Services(namespace).List(opts)
@@ -55,7 +55,7 @@ func DeleteLDAPService(kubeClient kubernetes.Interface, namespace string) error 
 	return nil
 }
 
-// Delete LDAP Server
+// Delete LDAP Server.
 func DeleteLDAPServer(kubeClient kubernetes.Interface, namespace string) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
 	podList, err := kubeClient.CoreV1().Pods(namespace).List(opts)
@@ -71,7 +71,7 @@ func DeleteLDAPServer(kubeClient kubernetes.Interface, namespace string) error {
 	return nil
 }
 
-// Delete LDAP Secret
+// Delete LDAP Secret.
 func DeleteLDAPSecret(kubeClient kubernetes.Interface, namespace string) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
 	secretList, err := kubeClient.CoreV1().Secrets(namespace).List(opts)
@@ -87,7 +87,7 @@ func DeleteLDAPSecret(kubeClient kubernetes.Interface, namespace string) error {
 	return nil
 }
 
-// Clean up ldap service and server
+// Clean up ldap service and server.
 func CleanLDAPResources(kubeClient kubernetes.Interface, namespace string) error {
 	if err := DeleteLDAPServer(kubeClient, namespace); err != nil {
 		return nil

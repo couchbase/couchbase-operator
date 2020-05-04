@@ -24,27 +24,27 @@ func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	}
 }
 
-// Convert from typed to string
+// Convert from typed to string.
 func (s Service) String() string {
 	return string(s)
 }
 
-// Len returns the ServiceList length
+// Len returns the ServiceList length.
 func (l ServiceList) Len() int {
 	return len(l)
 }
 
-// Less compares two ServiceList items and returns true if a is less than b
+// Less compares two ServiceList items and returns true if a is less than b.
 func (l ServiceList) Less(a, b int) bool {
 	return l[a].String() < l[b].String()
 }
 
-// Swap swaps the position of two ServiceList elements
+// Swap swaps the position of two ServiceList elements.
 func (l ServiceList) Swap(a, b int) {
 	l[a], l[b] = l[b], l[a]
 }
 
-// Contains returns true if a service is part of a service list
+// Contains returns true if a service is part of a service list.
 func (l ServiceList) Contains(service Service) bool {
 	for _, s := range l {
 		if s == service {
@@ -54,7 +54,7 @@ func (l ServiceList) Contains(service Service) bool {
 	return false
 }
 
-// ContainsAny returns true if any service is part of a service list
+// ContainsAny returns true if any service is part of a service list.
 func (l ServiceList) ContainsAny(services ...Service) bool {
 	for _, service := range services {
 		if l.Contains(service) {
@@ -64,7 +64,7 @@ func (l ServiceList) ContainsAny(services ...Service) bool {
 	return false
 }
 
-// Sub removes members from 'other' from a ServiceList
+// Sub removes members from 'other' from a ServiceList.
 func (l ServiceList) Sub(other ServiceList) ServiceList {
 	out := ServiceList{}
 	for _, service := range l {
@@ -86,7 +86,7 @@ func NewServiceList(services []string) ServiceList {
 	return l
 }
 
-// Convert from a typed array to plain string array
+// Convert from a typed array to plain string array.
 func (l ServiceList) StringSlice() []string {
 	slice := make([]string, len(l))
 	for i, s := range l {
@@ -101,7 +101,7 @@ var SupportedFeatures = []ExposedFeature{
 	FeatureClient,
 }
 
-// Contains returns true if a requested feature is enabled
+// Contains returns true if a requested feature is enabled.
 func (l ExposedFeatureList) Contains(feature string) bool {
 	for _, f := range l {
 		if string(f) == feature {
@@ -112,7 +112,7 @@ func (l ExposedFeatureList) Contains(feature string) bool {
 }
 
 // Get all of the volume mounts to be used for analytics service
-// as an indexed list mapped to their claims
+// as an indexed list mapped to their claims.
 func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
 	mountClaims := make(map[string]string)
 	if v.AnalyticsClaims != nil {
@@ -125,7 +125,7 @@ func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
 }
 
 // Get all of the paths which correspond to the mounts to be used
-// for analytics service
+// for analytics service.
 func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	paths := []string{}
 	for mount := range v.GetAnalyticsMountClaims() {
@@ -134,7 +134,7 @@ func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	return paths
 }
 
-// LogsOnly returns true if logs will be the only mounts applied to cluster
+// LogsOnly returns true if logs will be the only mounts applied to cluster.
 func (v *VolumeMounts) LogsOnly() bool {
 	return v.LogsClaim != ""
 }
@@ -167,7 +167,7 @@ func (cs *ClusterSpec) TotalSize() int {
 	return size
 }
 
-// Get the volumeClaimTemplate with specified name
+// Get the volumeClaimTemplate with specified name.
 func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeClaim {
 	for _, claim := range cs.VolumeClaimTemplates {
 		if name == claim.Name {
@@ -187,7 +187,7 @@ func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
 }
 
 // ServerGroupsEnabled returns true if any server config contains server group
-// settings or it is defined globally
+// settings or it is defined globally.
 func (cs *ClusterSpec) ServerGroupsEnabled() bool {
 	for _, setting := range cs.Servers {
 		if len(setting.ServerGroups) > 0 {
@@ -204,7 +204,7 @@ func (cs *ClusterSpec) GetFSGroup() *int64 {
 	return nil
 }
 
-// check whether item exists within array
+// check whether item exists within array.
 func HasItem(itm string, arr []string) (int, bool) {
 	for i, a := range arr {
 		if a == itm {
@@ -214,7 +214,7 @@ func HasItem(itm string, arr []string) (int, bool) {
 	return -1, false
 }
 
-// Get the server specification or nil if it doesn't exist
+// Get the server specification or nil if it doesn't exist.
 func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 	for _, spec := range cs.Servers {
 		if spec.Name == name {
@@ -225,7 +225,7 @@ func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 }
 
 // Couchbase Image represents the image that will actually be deployed by cluster.
-// Defaults to Spec.Image unless image is provided by env variable
+// Defaults to Spec.Image unless image is provided by env variable.
 func (cs *ClusterSpec) CouchbaseImage() string {
 	image := cs.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
@@ -239,7 +239,7 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 
 // Backup Image represents the image to use for backup.
 // defaults to Backup.Image when provided then falls back to
-// relatedImage env variable
+// relatedImage env variable.
 func (cs *ClusterSpec) BackupImage() string {
 	image := cs.Backup.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvBackupImageName); ok {
@@ -251,7 +251,7 @@ func (cs *ClusterSpec) BackupImage() string {
 }
 
 // Monitoring Image represents the image to use for metrics exporter for monitoring.
-// defaults to Spec.Image when provided then falls back to relatedImage env variable
+// defaults to Spec.Image when provided then falls back to relatedImage env variable.
 func (m *CouchbaseClusterMonitoringPrometheusSpec) MetricsImage() string {
 	image := m.Image
 	if annotatedImage, ok := os.LookupEnv(constants.EnvMetricsImageName); ok {
@@ -262,7 +262,7 @@ func (m *CouchbaseClusterMonitoringPrometheusSpec) MetricsImage() string {
 	return image
 }
 
-// get list of items which are in first array but not in second
+// get list of items which are in first array but not in second.
 func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}
 	for _, a := range a1 {

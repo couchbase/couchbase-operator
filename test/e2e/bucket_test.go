@@ -237,7 +237,7 @@ func TestEditBucket(t *testing.T) {
 // 6. Verify that the operator reverts the change
 // 7. Use an external client to update the bucket IO priority parameter to default
 // 8. Verify that the operator reverts the change
-// 9. Check the events to make sure the operator took the correct actions
+// 9. Check the events to make sure the operator took the correct actions.
 func TestRevertExternalBucketUpdates(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

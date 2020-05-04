@@ -18,7 +18,7 @@ type couchbaseEphemeralBucketResource struct {
 	couchbaseEphemeralBuckets []couchbasev2.CouchbaseEphemeralBucket
 }
 
-// NewCouchbaseEphemeralBucketResource initializes a new pod resource
+// NewCouchbaseEphemeralBucketResource initializes a new pod resource.
 func NewCouchbaseEphemeralBucketResource(context *context.Context) Resource {
 	return &couchbaseEphemeralBucketResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *couchbaseEphemeralBucketResource) Kind() string {
 	return "CouchbaseEphemeralBucket"
 }
 
-// Fetch collects all buckets as defined in the namespace
+// Fetch collects all buckets as defined in the namespace.
 func (r *couchbaseEphemeralBucketResource) Fetch() error {
 	couchbaseEphemeralBuckets, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {

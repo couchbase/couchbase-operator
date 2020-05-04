@@ -35,7 +35,7 @@ type PortForwarder struct {
 }
 
 // ForwardPorts accepts a Kubernetes configuration, pod and port and forwards
-// the target port to the localhost
+// the target port to the localhost.
 func (pf *PortForwarder) ForwardPorts() error {
 	// Create the URL
 	req := pf.Client.CoreV1().RESTClient().Post().
@@ -74,7 +74,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 	}
 }
 
-// Close cleanly terminates a port forward
+// Close cleanly terminates a port forward.
 func (pf *PortForwarder) Close() error {
 	close(pf.stopChan)
 	return <-pf.errorChan

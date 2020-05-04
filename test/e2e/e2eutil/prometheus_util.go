@@ -20,7 +20,7 @@ import (
 )
 
 // check that prometheus sidecar container is exporting the correct metrics
-// on all pods in the operator
+// on all pods in the operator.
 func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) (string, error) {
 	// storing the prometheus metrics
 	responseDataStr := ""

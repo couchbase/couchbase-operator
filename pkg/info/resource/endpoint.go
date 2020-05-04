@@ -18,7 +18,7 @@ type endpointResource struct {
 	endpoints *v1.EndpointsList
 }
 
-// NewEndpointResource initializes a new endpoint resource
+// NewEndpointResource initializes a new endpoint resource.
 func NewEndpointResource(context *context.Context) Resource {
 	return &endpointResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *endpointResource) Kind() string {
 	return "Endpoints"
 }
 
-// Fetch collects all endpoints as defined by the configuration
+// Fetch collects all endpoints as defined by the configuration.
 func (r *endpointResource) Fetch() error {
 	selector, err := GetResourceSelector(&r.context.Config)
 	if err != nil {

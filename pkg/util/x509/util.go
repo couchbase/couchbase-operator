@@ -64,7 +64,7 @@ type KeyPairRequest struct {
 }
 
 // Generate returns a PEM encoded private key and signed certificate
-// from the specified CA
+// from the specified CA.
 func (req *KeyPairRequest) Generate(ca *CertificateAuthority) (key, cert []byte, err error) {
 	// Generate the private key
 	var pkey crypto.PrivateKey
@@ -110,7 +110,7 @@ func GeneratePrivateKey(keyType KeyType) (crypto.PrivateKey, error) {
 }
 
 // CreatePrivateKeyPEM takes a private key input and returns it as a PEM
-// encoded slice
+// encoded slice.
 func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 	var block *pem.Block
 	if pkcs8 {
@@ -151,7 +151,7 @@ func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-// CreateCertificate encodes ASN1 certificate data into a PEM encoded certificate
+// CreateCertificate encodes ASN1 certificate data into a PEM encoded certificate.
 func CreateCertificate(cert []byte) ([]byte, error) {
 	block := &pem.Block{
 		Type:  "CERTIFICATE",
@@ -165,7 +165,7 @@ func CreateCertificate(cert []byte) ([]byte, error) {
 }
 
 // CreateCertificateRequest applies the provided private(/public) key
-// to the CSR and returns it
+// to the CSR and returns it.
 func CreateCertificateRequest(req *x509.CertificateRequest, key crypto.PrivateKey) (*x509.CertificateRequest, error) {
 	csr, err := x509.CreateCertificateRequest(rand.Reader, req, key)
 	if err != nil {
@@ -175,7 +175,7 @@ func CreateCertificateRequest(req *x509.CertificateRequest, key crypto.PrivateKe
 }
 
 // ParseCertificate accepts a PEM encoded certificate and returns the
-// x509.Certificate representation of it
+// x509.Certificate representation of it.
 func ParseCertificate(data []byte) (*x509.Certificate, error) {
 	pem, _ := pem.Decode(data)
 	if pem == nil {
@@ -185,7 +185,7 @@ func ParseCertificate(data []byte) (*x509.Certificate, error) {
 }
 
 // CertificateAuthority represents a certificate authority with public
-// and private key pair
+// and private key pair.
 type CertificateAuthority struct {
 	// Private certificate used to sign CSRs
 	certificate *x509.Certificate
@@ -273,7 +273,7 @@ func (ca *CertificateAuthority) NewIntermediateCertificateAuthority(keyType KeyT
 }
 
 // generateSerial creates a unique certificate serial number as defined
-// in RFC 3280.  It is upto 20 octets in length and non-negative
+// in RFC 3280.  It is upto 20 octets in length and non-negative.
 func generateSerial() (*big.Int, error) {
 	serialLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialLimit)
@@ -284,7 +284,7 @@ func generateSerial() (*big.Int, error) {
 }
 
 // generateSubjectKeyIdentifier creates a hash of the public key as defined in
-// RFC3280 used to create certificate paths from a leaf to a CA
+// RFC3280 used to create certificate paths from a leaf to a CA.
 func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 	var subjectPublicKey []byte
 	var err error

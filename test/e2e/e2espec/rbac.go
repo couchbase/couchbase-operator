@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewDefaultUser creates a new default user
+// NewDefaultUser creates a new default user.
 func NewDefaultUser() *couchbasev2.CouchbaseUser {
 	return &couchbasev2.CouchbaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -20,7 +20,7 @@ func NewDefaultUser() *couchbasev2.CouchbaseUser {
 	}
 }
 
-// NewDefaultLDAPUser creates a new LDAP user
+// NewDefaultLDAPUser creates a new LDAP user.
 func NewDefaultLDAPUser() *couchbasev2.CouchbaseUser {
 	return &couchbasev2.CouchbaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -32,7 +32,7 @@ func NewDefaultLDAPUser() *couchbasev2.CouchbaseUser {
 	}
 }
 
-// NewClusterAdminGroup creates group to grant user cluster admin privilege
+// NewClusterAdminGroup creates group to grant user cluster admin privilege.
 func NewClusterAdminGroup() *couchbasev2.CouchbaseGroup {
 	// couchbase cluster privilege
 	clusterAdminRole := couchbasev2.Role{
@@ -51,7 +51,7 @@ func NewClusterAdminGroup() *couchbasev2.CouchbaseGroup {
 	}
 }
 
-// NewBucketAdminGroup creates group to grant user admin privilege to all bucket
+// NewBucketAdminGroup creates group to grant user admin privilege to all bucket.
 func NewBucketAdminGroup() *couchbasev2.CouchbaseGroup {
 	// couchbase bucket role
 	bucketAdminRole := couchbasev2.Role{
@@ -72,19 +72,19 @@ func NewBucketAdminGroup() *couchbasev2.CouchbaseGroup {
 	}
 }
 
-// NewClusterRoleBinding creates spec with default user bound to the cluster admin role
+// NewClusterRoleBinding creates spec with default user bound to the cluster admin role.
 func NewClusterRoleBinding() *couchbasev2.CouchbaseRoleBinding {
 	users := []string{e2e_constants.CouchbaseUserName}
 	return NewRoleBinding(e2e_constants.RoleBindingName, users, e2e_constants.ClusterRoleName)
 }
 
-// NewBucketRoleBinding creates spec with default user bound to the bucket admin role
+// NewBucketRoleBinding creates spec with default user bound to the bucket admin role.
 func NewBucketRoleBinding() *couchbasev2.CouchbaseRoleBinding {
 	users := []string{e2e_constants.CouchbaseUserName}
 	return NewRoleBinding(e2e_constants.RoleBindingName, users, e2e_constants.BucketRoleName)
 }
 
-// NewDefaultRoleBinding binds list of users to a role
+// NewDefaultRoleBinding binds list of users to a role.
 func NewRoleBinding(name string, users []string, role string) *couchbasev2.CouchbaseRoleBinding {
 	subjects := []couchbasev2.CouchbaseRoleBindingSubject{}
 

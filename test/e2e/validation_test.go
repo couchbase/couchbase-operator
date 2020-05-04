@@ -1200,7 +1200,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
-// CRD apply tests
+// CRD apply tests.
 func TestValidationApply(t *testing.T) {
 	supportedTimeUnits := []string{"ns", "us", "ms", "s", "m", "h"}
 
@@ -1447,9 +1447,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
 
-/*******************************************************************
-************ Test cases for RBAC testing *************
-********************************************************************/
+// Test cases for RBAC testing.
 func TestRBACValidationCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
@@ -1509,9 +1507,7 @@ func TestRBACValidationCreate(t *testing.T) {
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
-/*******************************************************************
-************ Test cases for LDAP Validation *************
-********************************************************************/
+// Test cases for LDAP Validation.
 func TestRBACValidationLDAP(t *testing.T) {
 	testDefs := []testDef{
 		{
@@ -1569,11 +1565,8 @@ func TestRBACValidationLDAP(t *testing.T) {
 	runValidationTest(t, testDefs, kubeName, "create")
 }
 
-/*******************************************************************
-************ Test cases for RZA / Server group testing *************
-********************************************************************/
-
-// Deploy couchbase cluster over non existent server group
+// Test cases for RZA / Server group testing.
+// Deploy couchbase cluster over non existent server group.
 func TestRzaNegCreateCluster(t *testing.T) {
 	testDefs := []testDef{
 		{

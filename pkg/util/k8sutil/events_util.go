@@ -154,7 +154,7 @@ func FailedAddBackNodeEvent(memberName string, cl *couchbasev2.CouchbaseCluster)
 	return event
 }
 
-// no existing backup, PVC and Cronjob(s) successfully created
+// no existing backup, PVC and Cronjob(s) successfully created.
 func BackupCreateEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
@@ -163,7 +163,7 @@ func BackupCreateEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Even
 	return event
 }
 
-// backup was either edited or a PVC and/or cronjob(s) recreated if absent
+// backup was either edited or a PVC and/or cronjob(s) recreated if absent.
 func BackupUpdateEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
@@ -172,7 +172,7 @@ func BackupUpdateEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Even
 	return event
 }
 
-// backup and its cronjob(s) deleted, PVC should remain and jobs and their pods may still remain
+// backup and its cronjob(s) deleted, PVC should remain and jobs and their pods may still remain.
 func BackupDeleteEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal

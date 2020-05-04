@@ -29,7 +29,7 @@ type Scheduler interface {
 }
 
 // New is a factory method to return the correct scheduler type for
-// the cluster configuration
+// the cluster configuration.
 func New(client *client.Client, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
 	podGetter := NewK8SPodGetter(client)
 

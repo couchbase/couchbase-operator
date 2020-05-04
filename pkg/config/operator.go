@@ -323,7 +323,7 @@ func GetOperatorDeployment(image string, imagePullSecret string, podCreateTimeou
 	return deployment
 }
 
-// Required by istio
+// Required by istio.
 func GenerateOperatorService() *corev1.Service {
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{

@@ -122,7 +122,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseReplications(namespace string, select
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseReplications(namespace).List(listOpts)
 }
 
-// GetCouchbaseUsers returns all users for a specified selector
+// GetCouchbaseUsers returns all users for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseUsers(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseUserList, error) {
 	listOpts := metav1.ListOptions{}
 	if selector != nil {
@@ -131,7 +131,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseUsers(namespace string, selector *met
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseUsers(namespace).List(listOpts)
 }
 
-// GetCouchbaseGroups returns all users for a specified selector
+// GetCouchbaseGroups returns all users for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseGroups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseGroupList, error) {
 	listOpts := metav1.ListOptions{}
 	if selector != nil {
@@ -140,7 +140,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseGroups(namespace string, selector *me
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseGroups(namespace).List(listOpts)
 }
 
-// GetCouchbaseRoleBindings returns all user role bindings for a specified selector
+// GetCouchbaseRoleBindings returns all user role bindings for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseRoleBindings(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseRoleBindingList, error) {
 	listOpts := metav1.ListOptions{}
 	if selector != nil {
@@ -171,7 +171,7 @@ type Validator struct {
 	Abstraction KubeAbstraction
 }
 
-// New instantiates a new Validator with kubeAbstractionImpl
+// New instantiates a new Validator with kubeAbstractionImpl.
 func New(client kubernetes.Interface, couchbaseClient versioned.Interface) *Validator {
 	abs := kubeAbstractionImpl{
 		client:          client,

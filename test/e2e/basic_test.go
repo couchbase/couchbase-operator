@@ -11,9 +11,9 @@ import (
 )
 
 // Tests creation of a 3 node cluster with 0 buckets
-// 1. Create a 3 node Couchbase cluster with no buckets
-// 2. Check the events to make sure the operator took the correct actions
-// 3. Verifies that the cluster is balanced and all data is available
+// 1. Create a 3 node Couchbase cluster with no buckets.
+// 2. Check the events to make sure the operator took the correct actions.
+// 3. Verifies that the cluster is balanced and all data is available.
 func TestCreateCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -34,9 +34,9 @@ func TestCreateCluster(t *testing.T) {
 }
 
 // Tests creation of a 3 node cluster with 1 bucket
-// 1. Create a 3 node Couchbase cluster with 1 bucket
-// 2. Check the events to make sure the operator took the correct actions
-// 3. Verifies that the cluster is balanced and all data is available
+// 1. Create a 3 node Couchbase cluster with 1 bucket.
+// 2. Check the events to make sure the operator took the correct actions.
+// 3. Verifies that the cluster is balanced and all data is available.
 func TestCreateBucketCluster(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global

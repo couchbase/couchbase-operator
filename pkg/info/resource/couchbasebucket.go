@@ -18,7 +18,7 @@ type couchbaseBucketResource struct {
 	couchbaseBuckets []couchbasev2.CouchbaseBucket
 }
 
-// NewCouchbaseBucketResource initializes a new pod resource
+// NewCouchbaseBucketResource initializes a new pod resource.
 func NewCouchbaseBucketResource(context *context.Context) Resource {
 	return &couchbaseBucketResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *couchbaseBucketResource) Kind() string {
 	return "CouchbaseBucket"
 }
 
-// Fetch collects all buckets as defined in the namespace
+// Fetch collects all buckets as defined in the namespace.
 func (r *couchbaseBucketResource) Fetch() error {
 	couchbaseBuckets, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseBuckets(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {

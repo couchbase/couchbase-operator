@@ -25,7 +25,7 @@ import (
 // 1. Create a one node cluster with no buckets
 // 2. Resize the cluster  1 -> 2 -> 3 -> 2 -> 1
 // 3. After each resize make sure the cluster is balanced and available
-// 4. Check the events to make sure the operator took the correct actions
+// 4. Check the events to make sure the operator took the correct actions.
 func TestResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -63,7 +63,7 @@ func TestResizeCluster(t *testing.T) {
 // 1. Create a one node cluster with one bucket
 // 2. Resize the cluster  1 -> 2 -> 3 -> 2 -> 1
 // 3. After each resize make sure the cluster is balanced and available
-// 4. Check the events to make sure the operator took the correct actions
+// 4. Check the events to make sure the operator took the correct actions.
 func TestResizeClusterWithBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -105,7 +105,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 // 2. Change data service memory quota from 256 to 257 (verify via rest call to cluster)
 // 3. Change index service memory quota from 256 to 257 (verify via rest call to cluster)
 // 4. Change search service memory quota from 256 to 257 ( verify via rest call to cluster)
-// 5. Change autofailover timeout from 30 to 31 ( verify via rest call to cluster)
+// 5. Change autofailover timeout from 30 to 31 ( verify via rest call to cluster).
 func TestEditClusterSettings(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -146,7 +146,7 @@ func TestEditClusterSettings(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestInvalidBaseImage tests cluster with invalid image repos fail
+// TestInvalidBaseImage tests cluster with invalid image repos fail.
 func TestInvalidBaseImage(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -170,7 +170,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestInvalidBaseImage tests cluster with invalid version repos fail
+// TestInvalidBaseImage tests cluster with invalid version repos fail.
 func TestInvalidVersion(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -251,7 +251,7 @@ func TestNodeUnschedulable(t *testing.T) {
 // 1. Create 3 node cluster
 // 2. stop couchbase on node-0000
 // 3. Expect down node-0000 to be removed
-// 4. Cluster should eventually reconcile as 3 nodes:
+// 4. Cluster should eventually reconcile as 3 nodes.
 func TestNodeServiceDownRecovery(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -345,7 +345,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 // 3. Externally remove a node
 // 4. Resume operator
 // 5. Expect operator to add another node
-// 6. Verify cluster is balanced with 2 nodes
+// 6. Verify cluster is balanced with 2 nodes.
 func TestReplaceManuallyRemovedNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -400,7 +400,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 // 4. Add search service to cluster (verify via rest call to cluster)
 // 5. Remove search service from cluster (verify via rest call to cluster)
 // 6. Remove index service from cluster (verify via rest call to cluster)
-// 7. Remove query service from cluster (verify via rest call to cluster)
+// 7. Remove query service from cluster (verify via rest call to cluster).
 func TestBasicMDSScaling(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -534,7 +534,7 @@ func TestBasicMDSScaling(t *testing.T) {
 // 4. Add search service to cluster, 2 nodes (verify via rest call to cluster)
 // 5. Swap node from search service to index service (verify via rest call to cluster)
 // 6. Swap node from index service to query service (verify via rest call to cluster)
-// 7. Swap node from query service to data service (verify via rest call to cluster)
+// 7. Swap node from query service to data service (verify via rest call to cluster).
 func TestSwapNodesBetweenServices(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -623,7 +623,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 
 // Tests creating a cluster where the data service is the second service listed in the spec
 // 1. Attempt to create a 2 node cluster with cluster spec order {[query,search,search], [data]}
-// 2. Verify cluster was created via rest call
+// 2. Verify cluster was created via rest call.
 func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

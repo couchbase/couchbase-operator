@@ -20,7 +20,7 @@ type deploymentResource struct {
 	deployments []v1.Deployment
 }
 
-// NewDeploymentResource initializes a new deployment resource
+// NewDeploymentResource initializes a new deployment resource.
 func NewDeploymentResource(context *context.Context) Resource {
 	return &deploymentResource{
 		context: context,
@@ -31,7 +31,7 @@ func (r *deploymentResource) Kind() string {
 	return "Deployment"
 }
 
-// Fetch collects all deployments as defined by the configuration
+// Fetch collects all deployments as defined by the configuration.
 func (r *deploymentResource) Fetch() error {
 	deployments, err := r.context.KubeClient.AppsV1().Deployments(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {

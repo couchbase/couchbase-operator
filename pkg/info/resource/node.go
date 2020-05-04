@@ -18,7 +18,7 @@ type nodeResource struct {
 	nodes *v1.NodeList
 }
 
-// NewNodeResource initializes a new node resource
+// NewNodeResource initializes a new node resource.
 func NewNodeResource(context *context.Context) Resource {
 	return &nodeResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *nodeResource) Kind() string {
 	return "Node"
 }
 
-// Fetch collects all nodes as defined by the configuration
+// Fetch collects all nodes as defined by the configuration.
 func (r *nodeResource) Fetch() error {
 	var err error
 	r.nodes, err = r.context.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})

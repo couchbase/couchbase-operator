@@ -15,9 +15,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Create 3 server groups
-// Failover all pods in selected server group
-// This should trigger server group failover in the cluster
+// Create 3 server groups.
+// Failover all pods in selected server group.
+// This should trigger server group failover in the cluster.
 func TestServerGroupAutoFailover(t *testing.T) {
 	f := framework.Global
 	targetKube := f.GetCluster(0)

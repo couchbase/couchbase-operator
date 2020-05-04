@@ -66,7 +66,7 @@ const (
 )
 
 // Parse parses configuration from the command line and returns an initialized
-// Configuration object
+// Configuration object.
 func Parse() Configuration {
 	c := Configuration{
 		ConfigFlags: genericclioptions.NewConfigFlags(true),

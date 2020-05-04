@@ -83,7 +83,7 @@ const (
 
 // Create eventing enabled cluster
 // Create 3 buckets for eventing to work
-// Deploy eventing function to verify the results in destination bucket
+// Deploy eventing function to verify the results in destination bucket.
 func TestEventingCreateEventingCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -121,8 +121,8 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create eventing enabled couchbase cluster with eventing buckets
-// Resize the cluster when the eventing deployment is active and verify the results
+// Create eventing enabled couchbase cluster with eventing buckets.
+// Resize the cluster when the eventing deployment is active and verify the results.
 func TestEventingResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -172,8 +172,8 @@ func TestEventingResizeCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// Create couchbase cluster with eventing service and required buckets
-// Kill all the eventing nodes one by one and check for eventing stability
+// Create couchbase cluster with eventing service and required buckets.
+// Kill all the eventing nodes one by one and check for eventing stability.
 func TestEventingKillEventingPods(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

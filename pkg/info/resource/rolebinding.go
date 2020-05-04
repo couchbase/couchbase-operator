@@ -18,7 +18,7 @@ type RoleBindingResource struct {
 	RoleBindings *v1.RoleBindingList
 }
 
-// NewRoleBindingResource initializes a new RoleBinding resource
+// NewRoleBindingResource initializes a new RoleBinding resource.
 func NewRoleBindingResource(context *context.Context) Resource {
 	return &RoleBindingResource{
 		context: context,
@@ -29,7 +29,7 @@ func (r *RoleBindingResource) Kind() string {
 	return "RoleBinding"
 }
 
-// Fetch collects all RoleBindings as defined by the configuration
+// Fetch collects all RoleBindings as defined by the configuration.
 func (r *RoleBindingResource) Fetch() error {
 	var err error
 	r.RoleBindings, err = r.context.KubeClient.RbacV1().RoleBindings(r.context.Namespace()).List(metav1.ListOptions{})

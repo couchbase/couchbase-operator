@@ -306,7 +306,7 @@ func MustCheckForConsoleServiceType(t *testing.T, k8s *types.Cluster, couchbase 
 	}
 }
 
-// CheckConsoleServiceStatus checks that if Console service type is LoadBalancer then an ingress route is established
+// CheckConsoleServiceStatus checks that if Console service type is LoadBalancer then an ingress route is established.
 func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

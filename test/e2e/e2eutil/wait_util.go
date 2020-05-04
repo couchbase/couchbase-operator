@@ -91,7 +91,7 @@ func MustWaitForCronjob(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 	}
 }
 
-// this function waits for a job and also waits for it to succeed
+// this function waits for a job and also waits for it to succeed.
 func WaitForJob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration, waitForComplete bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -294,7 +294,7 @@ func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *c
 }
 
 // WaitClusterPhaseFailed expects the cluster to enter a failed state, useful for passing
-// quickly rather than wating for a cluster to not become healthy
+// quickly rather than wating for a cluster to not become healthy.
 func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -451,7 +451,7 @@ func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label strin
 	return nil
 }
 
-// waits until the provided condition type occurs with associated status
+// waits until the provided condition type occurs with associated status.
 func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) error {
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
@@ -552,7 +552,7 @@ func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, b *couchbasev2.Cou
 	}
 }
 
-// waits until the provided condition type with associated status after specified timestamp
+// waits until the provided condition type with associated status after specified timestamp.
 func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	after := time.Now()
 	timeoutChan := time.After(timeout)
@@ -1071,7 +1071,7 @@ func MustWaitUntilUserExists(t *testing.T, k8s *types.Cluster, couchbase *couchb
 }
 
 // WaitForClusterUserDeletion waits user to be deleted
-// from couchbase cluster
+// from couchbase cluster.
 func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1211,7 +1211,7 @@ func WaitForRoleBindingDeletion(k8s *types.Cluster, namespace string, timeout ti
 	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
-// WaitForCRDDeletion waits until CRD is deleted
+// WaitForCRDDeletion waits until CRD is deleted.
 func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1231,7 +1231,7 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 }
 
 // WaitForPendingClusterEvent returns a channel to be
-// populated with result of a pending cluster event
+// populated with result of a pending cluster event.
 func WaitForPendingClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) chan error {
 	echan := make(chan error)
 	go func() {
@@ -1240,7 +1240,7 @@ func WaitForPendingClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2
 	return echan
 }
 
-// MustReceiveErrorValue requires error from channel is nil
+// MustReceiveErrorValue requires error from channel is nil.
 func MustReceiveErrorValue(t *testing.T, echan chan error) {
 	if err := <-echan; err != nil {
 		Die(t, err)

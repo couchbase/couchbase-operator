@@ -567,9 +567,9 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
 
-// Create two clusters and while trying to configure XDCR
-// Cluster nodes from the source bucket cluster are rebalanced out
-// one by one until there is only one node in cluster
+// Create two clusters and while trying to configure XDCR.
+// Cluster nodes from the source bucket cluster are rebalanced out.
+// one by one until there is only one node in cluster.
 func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 	f := framework.Global
 	k8s1 := f.GetCluster(0)
@@ -577,9 +577,9 @@ func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationEject)
 }
 
-// Create two clusters and while trying to configure XDCR
-// Cluster nodes from the destination bucket cluster are rebalanced out
-// one by one until there is only one node in cluster
+// Create two clusters and while trying to configure XDCR.
+// Cluster nodes from the destination bucket cluster are rebalanced out.
+// one by one until there is only one node in cluster.
 func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 	f := framework.Global
 	k8s1 := f.GetCluster(0)
@@ -587,9 +587,9 @@ func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationEject)
 }
 
-// Create two clusters and while trying to configure XDCR
-// Cluster nodes from the source bucket cluster are killed one by one
-// At the end all nodes are replaced by new nodes in the cluster
+// Create two clusters and while trying to configure XDCR.
+// Cluster nodes from the source bucket cluster are killed one by one.
+// At the end all nodes are replaced by new nodes in the cluster.
 func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
 	f := framework.Global
 	k8s1 := f.GetCluster(0)
@@ -597,9 +597,9 @@ func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationDelete)
 }
 
-// Create two clusters and while trying to configure XDCR
-// Cluster nodes from the destination bucket cluster are killed one by one
-// At the end all nodes are replaced by new nodes in the cluster
+// Create two clusters and while trying to configure XDCR.
+// Cluster nodes from the destination bucket cluster are killed one by one.
+// At the end all nodes are replaced by new nodes in the cluster.
 func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
 	f := framework.Global
 	k8s1 := f.GetCluster(0)
@@ -607,8 +607,8 @@ func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationDelete)
 }
 
-// Create two clusters and while trying to configure XDCR
-// Cluster nodes of source bucket cluster is resized to single node cluster
+// Create two clusters and while trying to configure XDCR.
+// Cluster nodes of source bucket cluster is resized to single node cluster.
 func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
 	f := framework.Global
 	k8s1 := f.GetCluster(0)
@@ -616,8 +616,8 @@ func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationScaleDown)
 }
 
-// Create two clusters and while trying to configure XDCR
-// Cluster nodes of destination bucket cluster is resized to single node cluster
+// Create two clusters and while trying to configure XDCR.
+// Cluster nodes of destination bucket cluster is resized to single node cluster.
 func TestXdcrResizedOutTargetClusterNodes(t *testing.T) {
 	f := framework.Global
 	k8s1 := f.GetCluster(0)
@@ -683,7 +683,7 @@ func TestXDCRDeleteReplication(t *testing.T) {
 }
 
 // TestXDCRFilterExp checks that the filter expressions when applied to XDCR cluster
-// is behaving as expected:
+// is behaving as expected.
 func TestXDCRFilterExp(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

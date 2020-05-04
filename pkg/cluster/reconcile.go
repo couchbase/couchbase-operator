@@ -166,7 +166,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 // 6. Run a rebalance if necessary.
 // 7. Remove any nodes from the cached member set that are not part actually
 //    part of the cluster.
-// Returns true if reconciliation completed properly
+// Returns true if reconciliation completed properly.
 func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
 	return rm.exec(c)
 }
@@ -176,7 +176,7 @@ func (c *Cluster) logFailedMember(message, name string) {
 	log.Info(message, "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, c.cluster.Namespace, name))
 }
 
-// Create a new Couchbase cluster member
+// Create a new Couchbase cluster member.
 func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbaseutil.Member, err error) {
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
@@ -269,7 +269,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	return newMember, nil
 }
 
-// Creates and adds a new Couchbase cluster member
+// Creates and adds a new Couchbase cluster member.
 func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil.Member, error) {
 	// Save the existing members now, these will be the set we use to add the new node via
 	ms := c.members.Copy()
@@ -299,7 +299,7 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil
 	return newMember, nil
 }
 
-// Destroys a Couchbase cluster member
+// Destroys a Couchbase cluster member.
 func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 	if err := c.removePod(name, removeVolumes); err != nil {
 		return err
@@ -317,7 +317,7 @@ func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 	return nil
 }
 
-// Cancel a node addition
+// Cancel a node addition.
 func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseutil.Member) error {
 	if ms == nil {
 		m := couchbaseutil.NewMemberSet(member)
@@ -330,7 +330,7 @@ func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseu
 	return nil
 }
 
-// Rebalance nodes in the cluster
+// Rebalance nodes in the cluster.
 func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged []string) error {
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
@@ -540,7 +540,7 @@ func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Buck
 
 // reconcile buckets by adding or removing
 // buckets one at a time based on comparison
-// of existing buckets to cluster spec
+// of existing buckets to cluster spec.
 func (c *Cluster) reconcileBuckets() error {
 	if !c.cluster.Spec.Buckets.Managed {
 		return nil
@@ -593,7 +593,7 @@ func (c *Cluster) reconcileBuckets() error {
 }
 
 // reconcile changes to selected pod labels for
-// the nodePort service exposing admin console
+// the nodePort service exposing admin console.
 func (c *Cluster) reconcileAdminService() error {
 	status, err := k8sutil.UpdateAdminConsole(c.k8s, c.cluster, &c.cluster.Status)
 	if err != nil {
@@ -633,7 +633,7 @@ func (c *Cluster) reconcileExposedFeatures() error {
 	return nil
 }
 
-// initializes the first member in the cluster
+// initializes the first member in the cluster.
 func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
 	log.Info("Initial pod creating", "cluster", c.namespacedName())
 	settings := c.cluster.Spec.ClusterSettings
@@ -668,7 +668,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 	return c.client.SetAutoFailoverSettings(c.readyMembers(), autoFailoverSettings)
 }
 
-// Initialize a member with TLS certificates
+// Initialize a member with TLS certificates.
 func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs couchbasev2.ClusterSpec) error {
 	if cs.Networking.TLS != nil {
 		// Static configuration:
@@ -710,7 +710,7 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 }
 
 // getServerGroups looks over the spec and collects all server groups
-// which are defined
+// which are defined.
 func (c *Cluster) getServerGroups() []string {
 	// Gather a set of unique server groups
 	serverGroups := map[string]interface{}{}
@@ -733,7 +733,7 @@ func (c *Cluster) getServerGroups() []string {
 }
 
 // createServerGroups creates any server groups defined in the specification
-// whuch Couchbase doesn't know about
+// whuch Couchbase doesn't know about.
 func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr.ServerGroups, error) {
 	serverGroups := c.getServerGroups()
 
@@ -769,7 +769,7 @@ func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr
 }
 
 // Given a server group update return the index of the named group
-// TODO: Move to gocbmgr as a receiver function
+// TODO: Move to gocbmgr as a receiver function.
 func serverGroupIndex(update *cbmgr.ServerGroupsUpdate, name string) (int, error) {
 	for index, group := range update.Groups {
 		if group.Name == name {
@@ -781,7 +781,7 @@ func serverGroupIndex(update *cbmgr.ServerGroupsUpdate, name string) (int, error
 
 // reconcileServerGroups looks at the cluster specification, if we have enabled
 // server groups, lookup the availability zone the member is in, create the server
-// group if it doesn't exist and add the member to the group
+// group if it doesn't exist and add the member to the group.
 func (c *Cluster) reconcileServerGroups() (bool, error) {
 	// Cluster not server group aware
 	if !c.cluster.Spec.ServerGroupsEnabled() {
@@ -862,7 +862,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 }
 
 // TEMPORARY HACK
-// Does exactly the same as above but tells us if we need to do anything
+// Does exactly the same as above but tells us if we need to do anything.
 func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 	// Cluster not server group aware
 	if !c.cluster.Spec.ServerGroupsEnabled() {
@@ -1012,7 +1012,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 }
 
 // TEMPORARY HACK
-// Does exactly the same as above but tells us if we need to do anything
+// Does exactly the same as above but tells us if we need to do anything.
 func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 	// Examine each member in turn as they will have different node
 	// addresses (i.e. you must be using anti affinity or kubernetes
@@ -1053,7 +1053,7 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 }
 
 // Get alternate addresses from server, when server is
-// exposed over LoadBalancer then Ports can be ignored
+// exposed over LoadBalancer then Ports can be ignored.
 func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
 	existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
 	if err != nil {
@@ -1091,7 +1091,7 @@ func (c *Cluster) reconcileClusterSettings() error {
 	return nil
 }
 
-// ensure autofailover timeout matches spec setting
+// ensure autofailover timeout matches spec setting.
 func (c *Cluster) reconcileAutoFailoverSettings() error {
 	// Get the existing settings
 	failoverSettings, err := c.client.GetAutoFailoverSettings(c.readyMembers())
@@ -1143,7 +1143,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	return nil
 }
 
-// ensure memory quota's matche spec setting
+// ensure memory quota's matche spec setting.
 func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	info, err := c.client.GetClusterInfo(c.readyMembers())
 	if err != nil {
@@ -1206,7 +1206,7 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 	return nil
 }
 
-// Compare cluster index settings with spec, reconcile if necessary
+// Compare cluster index settings with spec, reconcile if necessary.
 func (c *Cluster) reconcileIndexStorageSettings() error {
 	settings, err := c.client.GetIndexSettings(c.readyMembers(), c.username, c.password)
 	if err != nil {
@@ -1229,7 +1229,7 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 	return nil
 }
 
-// reconcileAutoCompactionSettings sets up disk defragmentation
+// reconcileAutoCompactionSettings sets up disk defragmentation.
 func (c *Cluster) reconcileAutoCompactionSettings() error {
 	current, err := c.client.GetAutoCompactionSettings(c.readyMembers())
 	if err != nil {
@@ -1309,7 +1309,7 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 	return nil
 }
 
-// Verify volumes of a single member
+// Verify volumes of a single member.
 func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
 	if config == nil {
@@ -1330,7 +1330,7 @@ func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 
 // Gets paths to use when initializing data, index, and analytics service.
 // Default paths are used unless a claim is specified for the service in which
-// case a custom mount path is used
+// case a custom mount path is used.
 func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []string) {
 	dataPath := constants.DefaultDataPath
 	indexPath := constants.DefaultDataPath
@@ -1709,7 +1709,7 @@ func (c *Cluster) reconcilePersistentStatus() error {
 	return nil
 }
 
-// gatherBackups returns CouchbaseBackups based on the cluster Spec selector
+// gatherBackups returns CouchbaseBackups based on the cluster Spec selector.
 func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
 	selector := labels.Everything()
 	if c.cluster.Spec.Backup.Selector != nil {
@@ -1732,7 +1732,7 @@ func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
 	return backups, nil
 }
 
-// gatherBackupRestores returns CouchbaseBackupRestores based on the cluster Spec selector
+// gatherBackupRestores returns CouchbaseBackupRestores based on the cluster Spec selector.
 func (c *Cluster) gatherBackupRestores() ([]couchbasev2.CouchbaseBackupRestore, error) {
 	selector := labels.Everything()
 	if c.cluster.Spec.Backup.Selector != nil {
@@ -1935,7 +1935,7 @@ Outerloop:
 	return nil
 }
 
-// reconcileRBAC reconciles users, groups, along with ldap settings
+// reconcileRBAC reconciles users, groups, along with ldap settings.
 func (c *Cluster) reconcileRBAC() error {
 	// rbac features require 6.5
 	version, err := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)

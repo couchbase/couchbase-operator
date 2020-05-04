@@ -7,7 +7,7 @@ import (
 )
 
 // Test paths to persist method returns appropriate claims
-// for known volume mounts
+// for known volume mounts.
 func TestPathsToPersist(t *testing.T) {
 	claimName := "couchbase"
 	mounts := &couchbasev2.VolumeMounts{
@@ -44,7 +44,7 @@ func TestPathsToPersist(t *testing.T) {
 	}
 }
 
-// Test that expected path is returned for the specified volume mount
+// Test that expected path is returned for the specified volume mount.
 func TestPathsForVolumeMountName(t *testing.T) {
 	path := pathForVolumeMountName(couchbasev2.DefaultVolumeMount)
 	if path != couchbaseVolumeDefaultConfigDir {

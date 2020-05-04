@@ -17,7 +17,7 @@ import (
 )
 
 // InitContext performs Kubernetes specific initialization operations on
-// a context
+// a context.
 func InitContext(context *context.Context) error {
 	// Add our CRD to the global scheme
 	if err := couchbasev2.AddToScheme(scheme.Scheme); err != nil {

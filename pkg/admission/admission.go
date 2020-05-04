@@ -33,7 +33,7 @@ var (
 	codecs = serializer.NewCodecFactory(scheme)
 )
 
-// addToScheme registers types we need to be able to decode from the raw JSON
+// addToScheme registers types we need to be able to decode from the raw JSON.
 func addToScheme(scheme *runtime.Scheme) error {
 	if err := clientscheme.AddToScheme(scheme); err != nil {
 		return err
@@ -44,7 +44,7 @@ func addToScheme(scheme *runtime.Scheme) error {
 	return nil
 }
 
-// getClient returns a new Kubernetes client
+// getClient returns a new Kubernetes client.
 func getClient() kubernetes.Interface {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -70,7 +70,7 @@ func getCouchbaseClient() versioned.Interface {
 	return clientset
 }
 
-// configTLS examines the configuration and creates a TLS configuration
+// configTLS examines the configuration and creates a TLS configuration.
 func configTLS(config *Config) *tls.Config {
 	cert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 	if err != nil {
@@ -88,7 +88,7 @@ type Config struct {
 	KeyFile  string
 }
 
-// addFlags parses command line parameters and adds them to a Config object
+// addFlags parses command line parameters and adds them to a Config object.
 func (c *Config) AddFlags() {
 	flag.StringVar(&c.Addr, "address", ":443", ""+
 		"Address the server listens on (defaults to :443).")
@@ -99,7 +99,7 @@ func (c *Config) AddFlags() {
 		"File containing the default x509 private key matching --tls-cert-file.")
 }
 
-// errorResponse takes an error and creates an admission response
+// errorResponse takes an error and creates an admission response.
 func errorResponse(err error) *admissionv1beta1.AdmissionResponse {
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: false,
@@ -218,7 +218,7 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 	return &reviewResponse
 }
 
-// admitFunc defines a callback function which accepts an admission review and returns a response
+// admitFunc defines a callback function which accepts an admission review and returns a response.
 type admitFunc func(admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse
 
 // serve is the top level handler for all admission requests.  It decodes an admission review
@@ -270,23 +270,23 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 }
 
 // serveDefault is the default handler which logs the request URI and returns
-// a 404 back to the client
+// a 404 back to the client.
 func serveDefault(w http.ResponseWriter, r *http.Request) {
 	glog.Errorf("Unexpected request %s", r.URL.String())
 	w.WriteHeader(http.StatusNotFound)
 }
 
-// serveCouchbaseClustersValidate handles CouchbaseCluster validation requests
+// serveCouchbaseClustersValidate handles CouchbaseCluster validation requests.
 func serveCouchbaseClustersValidate(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, couchbaseClustersValidate)
 }
 
-// serveCouchbaseClustersValidate handles CouchbaseCluster mutation requests
+// serveCouchbaseClustersValidate handles CouchbaseCluster mutation requests.
 func serveCouchbaseClustersMutate(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, couchbaseClustersMutate)
 }
 
-// main initializes the system then starts a HTTPS server to process requests
+// main initializes the system then starts a HTTPS server to process requests.
 func Serve(config *Config) {
 	glog.Infof("couchbase-operator-admission %s (%s)", version.WithBuildNumber(), revision.Revision())
 

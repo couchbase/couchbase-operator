@@ -20,7 +20,7 @@ type crdResource struct {
 	crds []v1beta1.CustomResourceDefinition
 }
 
-// NewCustomResourceDefinitionResource initializes a new crd resource
+// NewCustomResourceDefinitionResource initializes a new crd resource.
 func NewCustomResourceDefinitionResource(context *context.Context) Resource {
 	return &crdResource{
 		context: context,
@@ -31,7 +31,7 @@ func (r *crdResource) Kind() string {
 	return "CustomResourceDefinition"
 }
 
-// Fetch collects all crds as defined by the configuration
+// Fetch collects all crds as defined by the configuration.
 func (r *crdResource) Fetch() error {
 	// Fetch all CRDs in the system
 	crds, err := r.context.KubeExtClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
