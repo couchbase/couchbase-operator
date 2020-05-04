@@ -26,7 +26,9 @@ const (
 func (c *Cluster) generateCronJobs(backups []couchbasev2.CouchbaseBackup) ([]*batchv1beta1.CronJob, error) {
 	var cronjobs []*batchv1beta1.CronJob
 
-	for _, backup := range backups {
+	for i := range backups {
+		backup := backups[i]
+
 		if backup.Spec.Strategy == couchbasev2.FullIncremental {
 			cronjobs = append(cronjobs, c.generateBackupCronjob(&backup, Incremental, couchbasev2.FullIncremental))
 		}

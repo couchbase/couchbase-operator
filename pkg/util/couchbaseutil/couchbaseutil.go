@@ -558,7 +558,9 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 		knownNodes := NewMemberSet()
 
 		// Iterate over all of the nodes known to Couchbase server
-		for _, node := range status.info.Nodes {
+		for i := range status.info.Nodes {
+			node := status.info.Nodes[i]
+
 			// The node name should be in the form cb-pod.cb-cluster.namespace.svc:8091.
 			// By extracting the first field we can derive the pod name.  If it is not
 			// know to the operator we flag it as unmanaged.

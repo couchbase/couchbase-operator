@@ -67,7 +67,9 @@ func listDetachedLogPVCs(context *context.Context) ([]*v1.PersistentVolumeClaim,
 	}
 
 	logVolumes := []*v1.PersistentVolumeClaim{}
-	for _, pvc := range pvcs.Items {
+	for i := range pvcs.Items {
+		pvc := pvcs.Items[i]
+
 		if !k8sutil.IsLogPVC(&pvc) {
 			continue
 		}

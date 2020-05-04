@@ -278,7 +278,9 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 	_ = framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, targetKube.Namespace)
 	defer func() { _ = f.SetupCouchbaseOperator(targetKube) }()
 
-	for _, test := range testDefs {
+	for i := range testDefs {
+		test := testDefs[i]
+
 		// Run each test case defined as a separate test so we have a way
 		// of running them individually.
 		t.Run(test.name, func(t *testing.T) {

@@ -494,7 +494,9 @@ func main() {
 			fmt.Println("Listing of Pods failed:", err)
 		}
 
-		for _, pod := range pods.Items {
+		for i := range pods.Items {
+			pod := pods.Items[i]
+
 			for i := range pod.OwnerReferences {
 				pod.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
@@ -508,7 +510,9 @@ func main() {
 			fmt.Println("Listing of Services failed:", err)
 		}
 
-		for _, service := range services.Items {
+		for i := range services.Items {
+			service := services.Items[i]
+
 			for i := range service.OwnerReferences {
 				service.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
@@ -522,7 +526,9 @@ func main() {
 			fmt.Println("Listing of PersistentVolumeClaims failed:", err)
 		}
 
-		for _, pvc := range pvcs.Items {
+		for i := range pvcs.Items {
+			pvc := pvcs.Items[i]
+
 			for i := range pvc.OwnerReferences {
 				pvc.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
@@ -536,7 +542,9 @@ func main() {
 			fmt.Println("Listing of PodDisruptionBudgets failed:", err)
 		}
 
-		for _, pdb := range pdbs.Items {
+		for i := range pdbs.Items {
+			pdb := pdbs.Items[i]
+
 			for i := range pdb.OwnerReferences {
 				pdb.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}

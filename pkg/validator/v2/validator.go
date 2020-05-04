@@ -1101,7 +1101,9 @@ func validateMemoryConstraints(v *types.Validator, object runtime.Object) error 
 		return err
 	}
 
-	for _, cluster := range clusters.Items {
+	for i := range clusters.Items {
+		cluster := clusters.Items[i]
+
 		if err := validateClusterMemoryConstraints(v, &cluster); err != nil {
 			return err
 		}

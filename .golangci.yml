@@ -18,7 +18,6 @@ linters:
   # masking bugs so re-enable and fix them!
   disable:
   - gosec # insecure!
-  - scopelint # broken loops
   - nestif # complicated code
   - gomnd # magic numbers
   - testpackage # packages for test, need to be marked as test

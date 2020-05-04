@@ -741,7 +741,9 @@ func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr
 	defer cancel()
 
 	// Create any that do not exist
-	for _, serverGroup := range serverGroups {
+	for i := range serverGroups {
+		serverGroup := serverGroups[i]
+
 		if existingGroups.GetServerGroup(serverGroup) != nil {
 			continue
 		}
@@ -1615,7 +1617,9 @@ func (c *Cluster) reconcileXDCR() error {
 
 	// Create any new clusters...
 CreateNextCluster:
-	for _, requested := range requestedClusters {
+	for requestedIndex := range requestedClusters {
+		requested := requestedClusters[requestedIndex]
+
 		for _, current := range currentClusters {
 			if current.Name == requested.Name {
 				continue CreateNextCluster
@@ -1630,7 +1634,9 @@ CreateNextCluster:
 
 	// Create/update any replications...
 CreateNextReplication:
-	for _, requested := range requestedReplications {
+	for requestedIndex := range requestedReplications {
+		requested := requestedReplications[requestedIndex]
+
 		for _, current := range currentReplications {
 			if replicationKey(current) == replicationKey(requested) {
 				if !reflect.DeepEqual(current, requested) {
@@ -1652,7 +1658,9 @@ CreateNextReplication:
 
 	// Delete any orphaned replications...
 DeleteNextReplication:
-	for _, current := range currentReplications {
+	for currentIndex := range currentReplications {
+		current := currentReplications[currentIndex]
+
 		for _, requested := range requestedReplications {
 			if replicationKey(current) == replicationKey(requested) {
 				continue DeleteNextReplication
@@ -1667,7 +1675,9 @@ DeleteNextReplication:
 
 	// Delete any orphaned clusters...
 DeleteNextCluster:
-	for _, current := range currentClusters {
+	for currentIndex := range currentClusters {
+		current := currentClusters[currentIndex]
+
 		for _, requested := range requestedClusters {
 			if current.Name == requested.Name {
 				continue DeleteNextCluster
@@ -1862,7 +1872,9 @@ func (c *Cluster) reconcileBackupRestore() error {
 	}
 
 	// for the current CouchbaseBackupRestores, loop through and see if they have a Job created
-	for _, currentRestore := range currentRestores {
+	for i := range currentRestores {
+		currentRestore := currentRestores[i]
+
 		// check if Repo field is populated, if not, try and find the repo
 		if len(currentRestore.Spec.Repo) == 0 {
 			if err := c.getBackupRepo(&currentRestore); err != nil {
@@ -2078,7 +2090,9 @@ func (c *Cluster) reconcileSecuritySettings() error {
 		ctx, cancel := context.WithTimeout(c.ctx, time.Minute)
 		defer cancel()
 
-		for _, m := range updatableMembers {
+		for i := range updatableMembers {
+			m := updatableMembers[i]
+
 			callback := func() error {
 				return c.client.DisableExternalListener(m, antiNetworkSettings)
 			}

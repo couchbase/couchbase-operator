@@ -790,7 +790,9 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 		}
 
 		// If there are any finalizers make sure they aren't there, this causes most hangs
-		for _, pvc := range pvcs.Items {
+		for i := range pvcs.Items {
+			pvc := pvcs.Items[i]
+
 			if len(pvc.Finalizers) == 0 {
 				continue
 			}
@@ -844,7 +846,9 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName, namespace st
 
 		found := false
 		// If there are any finalizers make sure they aren't there, this causes most hangs
-		for _, pvc := range pvcs.Items {
+		for i := range pvcs.Items {
+			pvc := pvcs.Items[i]
+
 			if len(pvc.Finalizers) == 0 {
 				continue
 			}

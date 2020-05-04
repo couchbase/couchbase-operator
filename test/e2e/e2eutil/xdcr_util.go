@@ -55,6 +55,8 @@ func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string
 func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int) error {
 	document := RandomSuffix()
 	for i := 0; i < items; i++ {
+		index := i
+
 		callback := func() (bool, error) {
 			host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
 			if err != nil {
@@ -65,7 +67,7 @@ func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couch
 			// Note: I tried using cbworkloadgen, however it does die half way through, so say you
 			// want to add 10 docs, and it does 7, if you retry you end up with 17, which is not
 			// what we want from a test stability perspective!
-			uri := "http://" + host + "/pools/default/buckets/" + bucket + "/docs/" + document + strconv.Itoa(i)
+			uri := "http://" + host + "/pools/default/buckets/" + bucket + "/docs/" + document + strconv.Itoa(index)
 			values := url.Values{}
 			values.Add(`flags`, `24`)
 			values.Add(`value`, `{"key":"value"}`)

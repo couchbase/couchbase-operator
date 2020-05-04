@@ -655,7 +655,9 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	// Deploy cb server for cbopinfo validation
 	e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, constants.Size1)
 
-	for _, arg := range validArgumentList {
+	for i := range validArgumentList {
+		arg := validArgumentList[i]
+
 		t.Run(arg.Name, func(t *testing.T) {
 			args := argumentList{}
 			args.addClusterDefaults(targetKube)

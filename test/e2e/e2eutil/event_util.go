@@ -28,8 +28,10 @@ func (e EventList) Swap(a, b int) {
 }
 
 func EventExistsInEventList(event *v1.Event, eventList EventList) bool {
-	for _, temEvent := range eventList {
-		if EqualEvent(event, &temEvent) {
+	for i := range eventList {
+		e := eventList[i]
+
+		if EqualEvent(event, &e) {
 			return true
 		}
 	}

@@ -45,7 +45,9 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 	sched := &stripeSchedulerImpl{
 		serverClasses: serverClassGroupMap{},
 	}
-	for _, class := range cluster.Spec.Servers {
+	for i := range cluster.Spec.Servers {
+		class := cluster.Spec.Servers[i]
+
 		groups, err := getServerGroupsForClass(cluster, &class)
 		if err != nil {
 			return nil, err
