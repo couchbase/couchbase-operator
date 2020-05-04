@@ -13,20 +13,21 @@ import (
 // Main framework structure
 type Framework struct {
 	// CbopinfoPath is the absolute path to the cbopinfo binary
-	CbopinfoPath           string
-	OpImage                string
-	SyncGatewayImage       string
-	Deployment             *appsv1.Deployment
-	KubeType               string
-	KubeVersion            string
-	ClusterSpec            types.ClusterMap
-	LogDir                 string
-	SkipTeardown           bool
-	SuiteYmlData           SuiteData
-	ClusterConfFile        string
-	CollectLogs            bool
-	CouchbaseExporterImage string
-	CouchbaseBackupImage   string
+	CbopinfoPath                  string
+	OpImage                       string
+	SyncGatewayImage              string
+	Deployment                    *appsv1.Deployment
+	KubeType                      string
+	KubeVersion                   string
+	ClusterSpec                   types.ClusterMap
+	LogDir                        string
+	SkipTeardown                  bool
+	SuiteYmlData                  SuiteData
+	ClusterConfFile               string
+	CollectLogs                   bool
+	CouchbaseExporterImage        string
+	CouchbaseExporterImageUpgrade string
+	CouchbaseBackupImage          string
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
 	// tests to select the cluster configuration to use.
@@ -62,15 +63,16 @@ type KubeConfData struct {
 
 // Struct to read and store test_config yaml passed by the user during testing
 type TestRunParam struct {
-	KubeType                    string `yaml:"kube-type"`
-	OperatorImage               string `yaml:"operator-image"`
-	AdmissionControllerImage    string `yaml:"admission-controller-image"`
-	SyncGatewayImage            string `yaml:"sync-gateway-image"`
-	CouchbaseServerImage        string `yaml:"couchbase-server-image"`
-	CouchbaseServerImageUpgrade string `yaml:"couchbase-server-image-upgrade"`
-	CouchbaseExporterImage      string `yaml:"couchbase-exporter-image"`
-	CouchbaseBackupImage        string `yaml:"couchbase-backup-image"`
-	SuiteToRun                  string `yaml:"suite"`
+	KubeType                      string `yaml:"kube-type"`
+	OperatorImage                 string `yaml:"operator-image"`
+	AdmissionControllerImage      string `yaml:"admission-controller-image"`
+	SyncGatewayImage              string `yaml:"sync-gateway-image"`
+	CouchbaseServerImage          string `yaml:"couchbase-server-image"`
+	CouchbaseServerImageUpgrade   string `yaml:"couchbase-server-image-upgrade"`
+	CouchbaseExporterImage        string `yaml:"couchbase-exporter-image"`
+	CouchbaseExporterImageUpgrade string `yaml:"couchbase-exporter-image-upgrade"`
+	CouchbaseBackupImage          string `yaml:"couchbase-backup-image"`
+	SuiteToRun                    string `yaml:"suite"`
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`

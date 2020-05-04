@@ -171,22 +171,23 @@ func Setup(t *testing.T) (err error) {
 
 	// Initialize Global from runtime info
 	Global = &Framework{
-		KubeType:                    runtimeParams.KubeType,
-		KubeVersion:                 runtimeParams.KubeVersion,
-		OpImage:                     runtimeParams.OperatorImage,
-		SkipTeardown:                runtimeParams.SkipTearDown,
-		CollectLogs:                 runtimeParams.CollectLogsOnFailure,
-		SuiteYmlData:                suiteData,
-		ClusterConfFile:             runtimeParams.ClusterConfFile,
-		ClusterSpec:                 types.ClusterMap{},
-		CouchbaseServerImage:        runtimeParams.CouchbaseServerImage,
-		CouchbaseServerImageUpgrade: runtimeParams.CouchbaseServerImageUpgrade,
-		StorageClassName:            runtimeParams.StorageClassName,
-		TestRetries:                 testRetries,
-		PodCreateTimeout:            5 * time.Minute,
-		SyncGatewayImage:            runtimeParams.SyncGatewayImage,
-		CouchbaseExporterImage:      runtimeParams.CouchbaseExporterImage,
-		CouchbaseBackupImage:        runtimeParams.CouchbaseBackupImage,
+		KubeType:                      runtimeParams.KubeType,
+		KubeVersion:                   runtimeParams.KubeVersion,
+		OpImage:                       runtimeParams.OperatorImage,
+		SkipTeardown:                  runtimeParams.SkipTearDown,
+		CollectLogs:                   runtimeParams.CollectLogsOnFailure,
+		SuiteYmlData:                  suiteData,
+		ClusterConfFile:               runtimeParams.ClusterConfFile,
+		ClusterSpec:                   types.ClusterMap{},
+		CouchbaseServerImage:          runtimeParams.CouchbaseServerImage,
+		CouchbaseServerImageUpgrade:   runtimeParams.CouchbaseServerImageUpgrade,
+		StorageClassName:              runtimeParams.StorageClassName,
+		TestRetries:                   testRetries,
+		PodCreateTimeout:              5 * time.Minute,
+		SyncGatewayImage:              runtimeParams.SyncGatewayImage,
+		CouchbaseExporterImage:        runtimeParams.CouchbaseExporterImage,
+		CouchbaseExporterImageUpgrade: runtimeParams.CouchbaseExporterImageUpgrade,
+		CouchbaseBackupImage:          runtimeParams.CouchbaseBackupImage,
 	}
 
 	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0, Global.PodCreateTimeout)
@@ -229,6 +230,7 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase server upgrade: " + runtimeParams.CouchbaseServerImageUpgrade)
 	logrus.Info(" →  couchbase sync gateway: " + Global.SyncGatewayImage)
 	logrus.Info(" →  couchbase exporter: " + runtimeParams.CouchbaseExporterImage)
+	logrus.Info(" →  couchbase exporter upgrade: " + runtimeParams.CouchbaseExporterImageUpgrade)
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
 
 	for _, config := range Global.ClusterSpec {

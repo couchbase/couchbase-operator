@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -62,7 +62,7 @@ func TestPrometheusMetrics(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
-	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
+	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
 
@@ -88,14 +88,14 @@ func TestPrometheusMetricsEnable(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
-	// Enable monitoring
+	// Enable monitoring.
 	monitoring := enableMonitoring(f)
 
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
-	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
+	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
 
@@ -123,22 +123,22 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
-	// Enable monitoring
+	// Enable monitoring.
 	monitoring := enableMonitoring(f)
 
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
-	// Perform Bucket Ops: Inserting 200 documents in the default Bucket
+	// Perform Bucket Ops: Inserting 200 documents in the default Bucket.
 	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 200)
 
-	// Perform ClusterOps: Failover a given node
+	// Perform ClusterOps: Failover a given node.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 3, true)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
+	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
 
@@ -167,9 +167,9 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
-	// deleting monitoring secret
-	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(monitoringAuthSecret, nil); err != nil {
-		fmt.Println("Warning: Unable to delete monitoring secret: ", err)
+	// deleting monitoring secret.
+	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(monitoringAuthSecret, nil); err != nil && !errors.IsNotFound(err) {
+		e2eutil.Die(t, err)
 	}
 
 	// Create the cluster.
@@ -177,7 +177,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
-	// creating auth secret
+	// creating auth secret.
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: monitoringAuthSecret,
@@ -191,7 +191,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	// Enable monitoring
+	// Enable monitoring.
 	monitoring := enableMonitoring(f)
 	monitoring.Prometheus.AuthorizationSecret = &monitoringAuthSecret
 
@@ -199,7 +199,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
-	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
+	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
 	var token []byte
 
 	if authSecret, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Get(monitoringAuthSecret, metav1.GetOptions{}); err != nil {
@@ -218,6 +218,57 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+
+	// Enable monitoring.
+	monitoring := enableMonitoring(f)
+
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Monitoring", monitoring), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
+
+	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
+
+	// Upgrade the cluster with new exporter image and check again if the monitoring is enabled.
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Monitoring/Prometheus/Image", f.CouchbaseExporterImageUpgrade), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
+
+	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
+
+	// Check the events match what we expect:
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{
+			Times: 2,
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+					eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+					eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+				},
+			},
+		},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

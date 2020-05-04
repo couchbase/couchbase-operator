@@ -224,6 +224,7 @@ tcGroups:
       - name: TestPrometheusMetricsEnable
       - name: TestPrometheusMetricsEnableAndPerformOps
       - name: TestPrometheusMetricsBearerTokenAuth
+      - name: TestPrometheusMetricsEnableAndUpgrade
 
   - name: NodeToNodeEncryptionTests
     clusters:
