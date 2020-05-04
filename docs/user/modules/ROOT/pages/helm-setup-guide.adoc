@@ -202,7 +202,7 @@ To change the type of service that is used to expose Sync Gateway, you can speci
 
 [source,console]
 ----
-helm install mobile --set install.syncGateway=true --set syncGateway.ExposeServiceType=LoadBalancer couchbase/couchbase-operator
+helm install mobile --set install.syncGateway=true --set syncGateway.exposeServiceType=LoadBalancer couchbase/couchbase-operator
 ----
 
 For more information about using Sync Gateway with the Autonomous Operator, you can refer to the xref:tutorial-sync-gateway.adoc[Sync Gateway Tutorial].
