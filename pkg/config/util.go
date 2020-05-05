@@ -13,18 +13,24 @@ func DumpYAML(conf *Config, name string, object interface{}) error {
 	if err != nil {
 		return err
 	}
+
 	if conf.File {
 		file, err := os.Create(name + ".yaml")
 		if err != nil {
 			return err
 		}
+
 		defer file.Close()
+
 		if _, err := file.Write(data); err != nil {
 			return err
 		}
+
 		return nil
 	}
+
 	fmt.Println("---")
 	fmt.Println(string(data))
+
 	return nil
 }

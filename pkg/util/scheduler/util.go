@@ -29,9 +29,11 @@ func (s *serverList) pop() (string, error) {
 	if len(s.servers) == 0 {
 		return "", fmt.Errorf("pop from empty server list")
 	}
+
 	item := len(s.servers) - 1
 	server := s.servers[item]
 	s.servers = s.servers[:item]
+
 	return server, nil
 }
 
@@ -43,6 +45,7 @@ func (s *serverList) del(name string) error {
 			return nil
 		}
 	}
+
 	return fmt.Errorf("del of non-existent server from server list")
 }
 
@@ -53,9 +56,11 @@ type serverGroups map[string]*serverList
 func (s serverGroups) sizes() []int {
 	// Map from from groups of pods to a list of lengths
 	sizes := []int{}
+
 	for _, servers := range s {
 		sizes = append(sizes, len(servers.servers))
 	}
+
 	return sizes
 }
 
@@ -64,11 +69,13 @@ func (s serverGroups) sizes() []int {
 func (s serverGroups) minSize() int {
 	sizes := s.sizes()
 	min := sizes[0]
+
 	for _, size := range sizes {
 		if size < min {
 			min = size
 		}
 	}
+
 	return min
 }
 
@@ -77,11 +84,13 @@ func (s serverGroups) minSize() int {
 func (s serverGroups) maxSize() int {
 	sizes := s.sizes()
 	max := 0
+
 	for _, size := range sizes {
 		if size > max {
 			max = size
 		}
 	}
+
 	return max
 }
 
@@ -92,11 +101,13 @@ type filterPredicate func(*serverList) bool
 // based on some predicate based on the list of servers in each group.
 func (s serverGroups) filter(predicate filterPredicate) []string {
 	groups := []string{}
+
 	for group, servers := range s {
 		if predicate(servers) {
 			groups = append(groups, group)
 		}
 	}
+
 	return groups
 }
 
@@ -104,6 +115,7 @@ func (s serverGroups) filter(predicate filterPredicate) []string {
 // groups for a class.
 func (s serverGroups) smallestGroups() []string {
 	min := s.minSize()
+
 	return s.filter(func(servers *serverList) bool {
 		return len(servers.servers) == min
 	})
@@ -114,6 +126,7 @@ func (s serverGroups) smallestGroups() []string {
 func (s serverGroups) smallestGroup() string {
 	groups := s.smallestGroups()
 	sort.Strings(groups)
+
 	return groups[0]
 }
 
@@ -121,6 +134,7 @@ func (s serverGroups) smallestGroup() string {
 // groups for a class.
 func (s serverGroups) largestGroups() []string {
 	max := s.maxSize()
+
 	return s.filter(func(servers *serverList) bool {
 		return len(servers.servers) == max
 	})
@@ -131,6 +145,7 @@ func (s serverGroups) largestGroups() []string {
 func (s serverGroups) largestGroup() string {
 	groups := s.largestGroups()
 	sort.Strings(groups)
+
 	return groups[len(groups)-1]
 }
 

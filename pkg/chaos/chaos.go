@@ -41,11 +41,14 @@ type CrashConfig struct {
 // TODO: respect context in k8s operations.
 func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 	cli := m.mgr.GetClient()
+
 	burst := int(c.KillRate)
 	if burst <= 0 {
 		burst = 1
 	}
+
 	limiter := rate.NewLimiter(c.KillRate, burst)
+
 	for {
 		err := limiter.Wait(ctx)
 		if err != nil { // user cancellation
@@ -70,21 +73,25 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 			Namespace:     c.Namespace,
 			LabelSelector: c.Selector.AsSelector(),
 		}
-		err = cli.List(ctx, pods, options /*client.InNamespace(c.Namespace).MatchingLabels(c.Selector)*/)
-		if err != nil {
+
+		if err := cli.List(ctx, pods, options); err != nil {
 			log.Error(err, "failed to list pods", "selector", c.Selector.String())
 			continue
 		}
+
 		if len(pods.Items) == 0 {
 			log.Info("No pods listed", "selector", c.Selector.String())
 			continue
 		}
 
 		max := len(pods.Items)
+
 		kmax := rand.Intn(c.KillMax) + 1
+
 		if kmax < max {
 			max = kmax
 		}
+
 		if len(pods.Items)-max < c.MinPods {
 			max--
 			if max == 0 {
@@ -101,11 +108,11 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 		}
 
 		for _, tokill := range tokills {
-			err = cli.Delete(ctx, tokill)
-			if err != nil {
+			if err := cli.Delete(ctx, tokill); err != nil {
 				log.Error(err, "Failed to kill pod", "name", tokill.Name)
 				continue
 			}
+
 			log.Info("Killed pod", "name", tokill.Name, "selector", c.Selector.String())
 		}
 	}
@@ -116,7 +123,9 @@ func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) 
 	ls := labels.Set{"app": "couchbase"}
 
 	var c *CrashConfig
+
 	var wait time.Duration
+
 	switch chaosLevel {
 	case 1:
 		c = &CrashConfig{
@@ -182,6 +191,7 @@ func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) 
 
 	if c != nil {
 		log.Info("Unleashing chaos monkies.", "rate", c.KillRate, "pod_threshold", c.CbKillProbability, "operator_threshold", c.OpKillProbability, "max_kills", c.KillMax, "min_pods", c.MinPods)
+
 		go func() {
 			time.Sleep(wait)
 			m.CrushPods(ctx, c)

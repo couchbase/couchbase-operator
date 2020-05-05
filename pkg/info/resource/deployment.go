@@ -46,6 +46,7 @@ func (r *deploymentResource) Fetch() error {
 	}
 
 	r.deployments = []v1.Deployment{}
+
 	for _, deployment := range deployments.Items {
 		for _, container := range deployment.Spec.Template.Spec.Containers {
 			if strings.Contains(container.Image, r.context.Config.OperatorImage) {
@@ -67,13 +68,16 @@ func (r *deploymentResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), deployment.Name, deployment.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 
 func (r *deploymentResource) References() []Reference {
 	references := []Reference{}
+
 	for _, deployment := range r.deployments {
 		references = append(references, newReference(r.Kind(), deployment.Name))
 	}
+
 	return references
 }

@@ -68,6 +68,7 @@ func getResourceSelector(c *config.Configuration, all bool) (labels.Selector, er
 
 	// Create and return the selector
 	selector := labels.NewSelector()
+
 	return selector.Add(requirements...), nil
 }
 

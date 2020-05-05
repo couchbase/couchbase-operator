@@ -25,6 +25,7 @@ import (
 
 func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string, reqParams io.Reader) ([]byte, error) {
 	var request *http.Request
+
 	var err error
 
 	request, err = http.NewRequest(requestType, hostURL, reqParams)
@@ -39,12 +40,16 @@ func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string
 	if err != nil {
 		return nil, err
 	}
+
 	defer response.Body.Close()
+
 	responseBody := response.Body
 	responseData, _ := ioutil.ReadAll(responseBody)
+
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("remote call failed with response: %s %s", response.Status, string(responseData))
 	}
+
 	return responseData, nil
 }
 
@@ -54,6 +59,7 @@ func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string
 // of exactly how many were successfully committed.
 func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int) error {
 	document := RandomSuffix()
+
 	for i := 0; i < items; i++ {
 		index := i
 
@@ -62,6 +68,7 @@ func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couch
 			if err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
+
 			defer cleanup()
 
 			// Note: I tried using cbworkloadgen, however it does die half way through, so say you
@@ -75,6 +82,7 @@ func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couch
 			if _, err := GenerateHTTPRequest("POST", uri, "Administrator", "password", strings.NewReader(values.Encode())); err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
+
 			return true, nil
 		}
 
@@ -161,15 +169,19 @@ func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseClus
 	}
 
 	var uuid string
+
 	callback := func() error {
 		cluster, err := kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
+
 		if cluster.Status.ClusterID == "" {
 			return fmt.Errorf("remote cluster UUID not populated")
 		}
+
 		uuid = cluster.Status.ClusterID
+
 		return nil
 	}
 
@@ -212,6 +224,7 @@ func getRemoteUUIDAndHostGeneric(kubernetes *types.Cluster, cluster *couchbasev2
 	}
 
 	var nodePort int32
+
 	for _, port := range svc.Spec.Ports {
 		if port.Port == 8091 {
 			nodePort = port.NodePort
@@ -271,6 +284,7 @@ func getRemoteUUIDAndHostGeneric(kubernetes *types.Cluster, cluster *couchbasev2
 // Used for generic XDCR testing.
 func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
 	var err error
+
 	cluster, err = kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
@@ -296,6 +310,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 		},
 		Data: dstK8s.DefaultSecret.Data,
 	}
+
 	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
 		return
 	}
@@ -304,6 +319,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 	cleanup = func() {
 		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
 	}
+
 	defer func() {
 		if err != nil {
 			cleanup()
@@ -357,6 +373,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 		},
 		Data: dstK8s.DefaultSecret.Data,
 	}
+
 	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
 		return
 	}
@@ -365,6 +382,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	cleanup = func() {
 		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
 	}
+
 	defer func() {
 		if err != nil {
 			cleanup()
@@ -373,6 +391,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 
 	// Define the TLS secret if we are using it.
 	tlsSecret := ""
+
 	if ctx != nil {
 		tlsSecret = fmt.Sprintf("%s-xdcr-tls", target.Name)
 		secret = &corev1.Secret{
@@ -383,6 +402,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 				couchbasev2.RemoteClusterTLSCA: ctx.CA.Certificate,
 			},
 		}
+
 		if target.Spec.Networking.TLS.ClientCertificatePolicy != nil {
 			secret.Data[couchbasev2.RemoteClusterTLSCertificate] = ctx.ClientCert
 			secret.Data[couchbasev2.RemoteClusterTLSKey] = ctx.ClientKey
@@ -456,6 +476,7 @@ func DeleteXDCRReplication(k8s *types.Cluster, source *couchbasev2.CouchbaseClus
 		if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Delete(replication.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
+
 		// Everything successful
 		return nil
 	})
@@ -466,6 +487,7 @@ func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Clu
 	if err != nil {
 		Die(t, err)
 	}
+
 	return replication, cleanup
 }
 
@@ -474,6 +496,7 @@ func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, s
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cleanup
 }
 

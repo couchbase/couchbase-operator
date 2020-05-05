@@ -16,6 +16,7 @@ func Diff(old, new interface{}) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("diff: %v", err)
 	}
+
 	newBytes, err := yaml.Marshal(new)
 	if err != nil {
 		return "", fmt.Errorf("diff: %v", err)

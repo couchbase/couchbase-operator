@@ -27,6 +27,7 @@ func InitContext(context *context.Context) error {
 	context.KubeConfigLoader = context.Config.ConfigFlags.ToRawKubeConfigLoader()
 
 	var err error
+
 	context.KubeConfig, err = context.KubeConfigLoader.ClientConfig()
 	if err != nil {
 		return err
@@ -37,6 +38,7 @@ func InitContext(context *context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	context.KubeExtClient, err = clientset.NewForConfig(context.KubeConfig)
 	if err != nil {
 		return err
@@ -81,6 +83,7 @@ func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod,
 		if len(pods.Items) == 0 {
 			return nil, fmt.Errorf("no pods delected for Deployment %s", resource.Name())
 		}
+
 		return &pods.Items[0], nil
 	}
 
@@ -93,6 +96,7 @@ func GetDeployments(context *context.Context) (*appsv1.DeploymentList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to poll Deployment resources: %v", err)
 	}
+
 	return deployments, nil
 }
 
@@ -120,5 +124,6 @@ func GetCouchbaseClusters(context *context.Context) (*couchbasev2.CouchbaseClust
 	if err != nil {
 		return nil, fmt.Errorf("unable to poll CouchbaseCluster resources: %v", err)
 	}
+
 	return clusters, nil
 }

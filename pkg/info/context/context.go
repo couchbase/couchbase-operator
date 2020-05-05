@@ -40,6 +40,8 @@ func (c *Context) Namespace() string {
 	if c.NamespaceOverride != "" {
 		return c.NamespaceOverride
 	}
+
 	namespace, _, _ := c.KubeConfigLoader.Namespace()
+
 	return namespace
 }

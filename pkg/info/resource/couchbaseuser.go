@@ -35,7 +35,9 @@ func (r *couchbaseUserResource) Fetch() error {
 	if err != nil {
 		return err
 	}
+
 	r.couchbaseUsers = couchbaseUsers.Items
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *couchbaseUserResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), couchbaseUser.Name, couchbaseUser.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

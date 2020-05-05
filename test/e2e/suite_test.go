@@ -26,11 +26,13 @@ func collectClusterLogs(t *testing.T, logDir string) {
 		t.Errorf("Failed to create dir %s: %v", logDir, err)
 		return
 	}
+
 	pwd, err := os.Getwd()
 	if err != nil {
 		t.Errorf("Failed to get pwd: %v", err)
 		return
 	}
+
 	if err := os.Chdir(logDir); err != nil {
 		t.Errorf("Failed to change directory: %v", err)
 	}
@@ -51,6 +53,7 @@ func collectClusterLogs(t *testing.T, logDir string) {
 
 		execOut, err := runCbopinfoCmd(args.slice())
 		execOutStr := strings.TrimSpace(string(execOut))
+
 		if err != nil {
 			t.Logf("cbopinfo returned: %s", execOutStr)
 			t.Errorf("cbopinfo command failed: %v", err)
@@ -72,6 +75,7 @@ func goroutineLeakCheck(expected int) {
 
 	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
 		fmt.Println("WARN: goroutine leak detected:", expected, "vs", runtime.NumGoroutine())
+
 		trace := &bytes.Buffer{}
 		profile := pprof.Lookup("goroutine")
 		_ = profile.WriteTo(trace, 2)
@@ -97,6 +101,7 @@ func runSuite(t *testing.T) {
 				t.Logf("Skipping %s.. Undefined test", testName)
 				continue
 			}
+
 			testFunc := TestFuncMap[testName]
 			decoratorArgs := framework.DecoratorArgs{
 				KubeNames: testGroup.ClusterName,
@@ -118,11 +123,13 @@ func runSuite(t *testing.T) {
 			// on retries as it makes the tests take longer and costs us more money!
 			unstable := false
 			pass := false
+
 			for attempt := 0; attempt < f.TestRetries; attempt++ {
 				if pass = runTest(t, testName, testFunc); pass {
 					if attempt != 0 {
 						unstable = true
 					}
+
 					break
 				}
 			}
@@ -150,12 +157,15 @@ func getOperatorRestartCounts() map[string]int {
 	f := framework.Global
 
 	result := map[string]int{}
+
 	for _, cluster := range f.TestClusters {
 		k8s := f.ClusterSpec[cluster]
+
 		restarts, err := f.GetOperatorRestartCount(k8s.KubeClient, k8s.Namespace)
 		if err != nil {
 			fmt.Println("WARN: unable to get restart counts on cluster", cluster, ":", err)
 		}
+
 		result[cluster] = int(restarts)
 	}
 
@@ -168,9 +178,11 @@ func operatorRestarted(before map[string]int) bool {
 	after := getOperatorRestartCounts()
 
 	restarted := false
+
 	for cluster := range before {
 		if before[cluster] != after[cluster] {
 			fmt.Println("WARN: operator crash detected in cluster", cluster)
+
 			restarted = true
 		}
 	}
@@ -194,7 +206,9 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 	restartCounts := getOperatorRestartCounts()
 	preGoroutines := runtime.NumGoroutine()
 	pass := t.Run(name, test)
+
 	goroutineLeakCheck(preGoroutines)
+
 	if operatorRestarted(restartCounts) {
 		pass = false
 	}

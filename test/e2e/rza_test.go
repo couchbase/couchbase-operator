@@ -32,6 +32,7 @@ func mustGetExpectedRzaResultMap(t *testing.T, cluster *types.Cluster, groupSize
 
 	expected := rzaMap{}
 	expected.accumulateRzaServerClass(groupSize, serverGroups)
+
 	return expected
 }
 
@@ -70,7 +71,9 @@ func getAvailabilityZones(t *testing.T, cluster *types.Cluster) clustercapabilit
 	if !capabilities.ZonesSet {
 		t.Skip("cluster availability zones unset")
 	}
+
 	sort.Strings(capabilities.AvailabilityZones)
+
 	return capabilities.AvailabilityZones
 }
 
@@ -105,6 +108,7 @@ func chooseServerGroups(groups []string, seed string, max int) []string {
 	// Sure the list is lexically ordered so that the scheduling emulation
 	// works as desired.
 	sort.Strings(output)
+
 	return output
 }
 
@@ -225,6 +229,7 @@ func TestRzaResizeCluster(t *testing.T) {
 
 	// Starting resize cluster test
 	service := 0
+
 	clusterSizes := []int{2, 7, 4}
 	for _, clusterSize := range clusterSizes {
 		// Resize cluster and wait for healthy cluster

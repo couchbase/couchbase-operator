@@ -9,6 +9,7 @@ func UniqueString(strList []string) bool {
 	for _, str := range strList {
 		set[str] = nil
 	}
+
 	return len(set) == len(strList)
 }
 
@@ -20,6 +21,7 @@ func (e EnumList) Contains(s string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -28,6 +30,7 @@ func (e EnumList) Interfaces() []interface{} {
 	for _, element := range e {
 		i = append(i, element)
 	}
+
 	return i
 }
 
@@ -36,11 +39,13 @@ func StringArrayCompareOrdered(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
+
 	for i := range a {
 		if a[i] != b[i] {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -59,6 +64,7 @@ func StringArrayCompare(a1, a2 []string) bool {
 				continue
 			}
 		}
+
 		return false
 	}
 

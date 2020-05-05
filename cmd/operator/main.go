@@ -104,6 +104,7 @@ func main() {
 	// * Whether this is an official or development branch
 	// * The exact commit defects are raised against
 	log.Info(version.Application, "version", version.WithBuildNumber(), "revision", revision.Revision())
+
 	if printVersion {
 		os.Exit(0)
 	}

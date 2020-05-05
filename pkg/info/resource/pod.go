@@ -35,10 +35,12 @@ func (r *podResource) Fetch() error {
 	if err != nil {
 		return err
 	}
+
 	r.pods, err = r.context.KubeClient.CoreV1().Pods(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -51,13 +53,16 @@ func (r *podResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), pod.Name, pod.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 
 func (r *podResource) References() []Reference {
 	references := []Reference{}
+
 	for _, pod := range r.pods.Items {
 		references = append(references, newReference(r.Kind(), pod.Name))
 	}
+
 	return references
 }

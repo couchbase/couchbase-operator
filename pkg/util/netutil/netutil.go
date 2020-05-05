@@ -20,8 +20,10 @@ func WaitForHostPort(ctx context.Context, hostport string) error {
 	defer ticker.Stop()
 
 	var err error
+
 	for {
 		var conn net.Conn
+
 		if conn, err = net.DialTimeout("tcp", hostport, 1*time.Second); err == nil {
 			conn.Close()
 			return nil
@@ -53,10 +55,12 @@ func WaitForHostPortTLS(ctx context.Context, hostport string, cacert []byte) err
 	defer ticker.Stop()
 
 	var err error
+
 	for {
 		// Try establish a TCP connection and perform a TLS handshake which
 		// validates the host is using certificates signed by the CA
 		var conn *tls.Conn
+
 		if conn, err = tls.Dial("tcp", hostport, &tlsClientConfig); err == nil {
 			conn.Close()
 			return nil
@@ -87,6 +91,7 @@ func GetTLSState(hostport string, cacert, clientCert, clientKey []byte) ([]*x509
 		if err != nil {
 			return nil, err
 		}
+
 		tlsClientConfig.Certificates = append(tlsClientConfig.Certificates, clientCertificate)
 	}
 
@@ -94,9 +99,11 @@ func GetTLSState(hostport string, cacert, clientCert, clientKey []byte) ([]*x509
 	if err != nil {
 		return nil, err
 	}
+
 	defer conn.Close()
 
 	state := conn.ConnectionState()
+
 	return state.VerifiedChains[0], nil
 }
 
@@ -106,6 +113,7 @@ func GetFreePort() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	defer listener.Close()
 
 	_, port, err := net.SplitHostPort(listener.Addr().String())

@@ -19,10 +19,12 @@ func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string,
 	e2espec.ApplyImagePullSecret(cl)
 
 	cl.Namespace = namespace
+
 	res, err := k8sutil.CreateCouchbaseCluster(crClient, cl)
 	if err != nil {
 		return res, err
 	}
+
 	t.Logf("creating couchbase cluster: %s", res.Name)
 
 	return res, nil
@@ -30,10 +32,12 @@ func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string,
 
 func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster) error {
 	t.Logf("deleting couchbase cluster: %v", cl.Name)
+
 	err := k8sutil.DeleteCouchbaseCluster(crClient, cl)
 	if err != nil {
 		return err
 	}
+
 	return waitResourcesDeleted(kubeClient, cl)
 }
 

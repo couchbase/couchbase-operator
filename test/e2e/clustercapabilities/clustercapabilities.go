@@ -25,9 +25,11 @@ func (z zoneSet) add(zone string) {
 // toZoneList turns a set into a list.
 func (z zoneSet) toZoneList() ZoneList {
 	l := ZoneList{}
+
 	for zone := range z {
 		l = append(l, zone)
 	}
+
 	return l
 }
 
@@ -62,12 +64,14 @@ func NewCapabilities(client kubernetes.Interface) (*Capabilities, error) {
 	// Collect availability zones and zones containing masters
 	masterZones := zoneSet{}
 	availabilityZones := zoneSet{}
+
 	for _, node := range nodes.Items {
 		// All nodes must have a zone
 		zone, ok := node.Labels[constants.FailureDomainZoneLabel]
 		if !ok {
 			return nil, fmt.Errorf("node %s missing label %s", node.Name, constants.FailureDomainZoneLabel)
 		}
+
 		availabilityZones.add(zone)
 
 		// Check if this node is a master
@@ -82,6 +86,7 @@ func NewCapabilities(client kubernetes.Interface) (*Capabilities, error) {
 		MasterZones:       masterZones.toZoneList(),
 		AvailabilityZones: availabilityZones.toZoneList(),
 	}
+
 	return cluster, nil
 }
 
@@ -91,5 +96,6 @@ func MustNewCapabilities(t *testing.T, client kubernetes.Interface) *Capabilitie
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return cluster
 }

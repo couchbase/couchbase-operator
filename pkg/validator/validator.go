@@ -37,6 +37,7 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			return validationv2.ApplyGroupDefaults(v, object)
 		}
 	}
+
 	return nil
 }
 
@@ -61,6 +62,7 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) error {
 	case *couchbasev2.CouchbaseBackupRestore:
 		return validationv2.CheckConstraintsBackupRestore(v, t)
 	}
+
 	return nil
 }
 
@@ -91,5 +93,6 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 			return validationv2.CheckImmutableFieldsBackup(t, t2)
 		}
 	}
+
 	return nil
 }

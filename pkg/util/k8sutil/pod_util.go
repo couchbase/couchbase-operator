@@ -55,9 +55,11 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 	// scheduled to a specific server group we must reuse that.  If this isn't
 	// set then we use the scheduler to balance the load across AZs.
 	serverGroup := ""
+
 	if pvcState != nil {
 		serverGroup = pvcState.availabilityZone
 	}
+
 	serverGroup, err = scheduler.Create(config.Name, m.Name, serverGroup)
 	if err != nil {
 		return nil, err
@@ -99,6 +101,7 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 
 	// Add ownership information only if we are going to create the resource.
 	addOwnerRefToObject(pod, cluster.AsOwner())
+
 	return CreatePod(client, cluster.Namespace, pod)
 }
 
@@ -166,6 +169,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 	for name := range mountPaths {
 		mountNames = append(mountNames, string(name))
 	}
+
 	sort.Strings(mountNames)
 
 	for _, name := range mountNames {
@@ -200,28 +204,35 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 			constants.AnnotationVolumeNodeConf:      config.Name,
 			constants.CouchbaseVersionAnnotationKey: version,
 		})
+
 		ApplyBaseAnnotations(required)
+
 		if gid := cluster.Spec.GetFSGroup(); gid != nil {
 			required.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
 		}
+
 		required.Name = NameForPersistentVolumeClaim(memberName, claimUsageCnt[claimName], mountName)
 
 		specJSON, err := json.Marshal(required.Spec)
 		if err != nil {
 			return nil, err
 		}
+
 		required.Annotations[constants.PVCSpecAnnotation] = string(specJSON)
 
 		// If a PVC does exist and differs, mark it for update.
 		if pvc != nil {
 			existingSpec := v1.PersistentVolumeClaimSpec{}
+
 			if annotation, ok := pvc.Annotations[constants.PVCSpecAnnotation]; ok {
 				if err := json.Unmarshal([]byte(annotation), &existingSpec); err != nil {
 					return nil, err
 				}
 			}
+
 			if !reflect.DeepEqual(existingSpec, required.Spec) {
 				state.update = append(state.update, pvc)
+
 				d, err := diff.Diff(existingSpec, required.Spec)
 				if err == nil {
 					state.diff += d
@@ -233,6 +244,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 		if pvc == nil {
 			pvc = required
 			state.create = append(state.create, pvc)
+
 			d, err := diff.Diff(nil, required.Spec)
 			if err == nil {
 				state.diff += d
@@ -263,6 +275,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 				MountPath: couchbaseVolumeDefaultEtcDir,
 				SubPath:   etcSubPathName,
 			}
+
 			state.volumeMounts = append(state.volumeMounts, configMount)
 			state.volumeMounts = append(state.volumeMounts, etcMount)
 		} else {
@@ -290,17 +303,23 @@ func getPathsToPersist(mounts *couchbasev2.VolumeMounts) (map[couchbasev2.Volume
 		if defaultClaim != "" || hasSecondaryMounts {
 			return mountPaths, fmt.Errorf("other mounts cannot be used in with `logs` mount")
 		}
+
 		mountPaths[couchbasev2.LogsVolumeMount] = logsClaim
+
 		return mountPaths, nil
 	}
+
 	if defaultClaim != "" {
 		mountPaths[couchbasev2.DefaultVolumeMount] = defaultClaim
+
 		if dataClaim != "" {
 			mountPaths[couchbasev2.DataVolumeMount] = dataClaim
 		}
+
 		if indexClaim != "" {
 			mountPaths[couchbasev2.IndexVolumeMount] = indexClaim
 		}
+
 		if analyticsClaims != nil {
 			for mount, claim := range mounts.GetAnalyticsMountClaims() {
 				mountPaths[couchbasev2.VolumeMountName(mount)] = claim
@@ -310,11 +329,13 @@ func getPathsToPersist(mounts *couchbasev2.VolumeMounts) (map[couchbasev2.Volume
 		// Reutrn error if other mount paths are specified without default volume
 		return mountPaths, fmt.Errorf("other mounts cannot be used in without `default` mount")
 	}
+
 	return mountPaths, nil
 }
 
 func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
 	var path string
+
 	switch id {
 	case couchbasev2.DefaultVolumeMount:
 		return couchbaseVolumeDefaultConfigDir
@@ -330,6 +351,7 @@ func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
 			path = fmt.Sprintf("/mnt/%s", id)
 		}
 	}
+
 	return path
 }
 
@@ -337,11 +359,14 @@ func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
 func createPersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolumeClaim, namespace string, owner metav1.OwnerReference) (*v1.PersistentVolumeClaim, error) {
 	// can be mounted read/write mode to exactly 1 host
 	addOwnerRefToObject(claim, owner)
+
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+
 	pvc, err := client.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
 	if err != nil {
 		return nil, err
 	}
+
 	return pvc, nil
 }
 
@@ -373,6 +398,7 @@ func DeleteCouchbasePod(client *client.Client, namespace, name string, opts *met
 	if len(errs) > 0 {
 		return fmt.Errorf(strings.Join(errs, ","))
 	}
+
 	return nil
 }
 
@@ -383,6 +409,7 @@ func deletePodVolumes(client *client.Client, memberName string) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -393,6 +420,7 @@ func listMemberPVCS(client *client.Client, memberName string) (pvcs []*v1.Persis
 			pvcs = append(pvcs, pvc)
 		}
 	}
+
 	return
 }
 
@@ -413,6 +441,7 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	// Create the standard Couchbase container image.
 	container := couchbaseContainer(cluster.Spec.CouchbaseImage(), &config)
 	container.ReadinessProbe = couchbaseReadinessProbe()
+
 	if pvcState != nil {
 		container.VolumeMounts = pvcState.volumeMounts
 	}
@@ -474,6 +503,7 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 		if pod.Spec.NodeSelector == nil {
 			pod.Spec.NodeSelector = map[string]string{}
 		}
+
 		pod.Spec.NodeSelector[constants.ServerGroupLabel] = serverGroup
 	}
 
@@ -485,6 +515,7 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	if err != nil {
 		return nil, err
 	}
+
 	pod.Annotations[constants.PodSpecAnnotation] = string(specJSON)
 
 	return pod, nil
@@ -809,11 +840,13 @@ func couchbaseInitContainer(image, claimName string, config couchbasev2.ServerCo
 		{Name: claimName,
 			MountPath: "/mnt"},
 	}
+
 	return initContainer
 }
 
 func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 	var resources v1.ResourceRequirements
+
 	if cs.Monitoring.Prometheus.Resources != nil {
 		resources = *cs.Monitoring.Prometheus.Resources
 	}
@@ -877,6 +910,7 @@ func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 			return &pod.Spec.Containers[index], nil
 		}
 	}
+
 	return nil, fmt.Errorf("unable to locate couchbase container")
 }
 
@@ -904,16 +938,19 @@ func applyPodTLSConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 				ReadOnly:  true,
 				MountPath: couchbaseTLSVolumeMountDir,
 			}
+
 			container, err := getCouchbaseContainer(pod)
 			if err != nil {
 				return err
 			}
+
 			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 			// Annotate the pod as having TLS enabled
 			pod.Annotations[constants.PodTLSAnnotation] = "enabled"
 		}
 	}
+
 	return nil
 }
 
@@ -943,6 +980,7 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 			return &status.Conditions[i]
 		}
 	}
+
 	return nil
 }
 
@@ -973,6 +1011,7 @@ func findMemberPVC(client *client.Client, memberName, path string) (*v1.Persiste
 // Recreate list of members from persistent volumes.
 func PVCToMemberset(client *client.Client, namespace string, secure bool) (couchbaseutil.MemberSet, error) {
 	ms := couchbaseutil.MemberSet{}
+
 	for _, pvc := range client.PersistentVolumeClaims.List() {
 		// claim must be bound to a volume
 		if pvc.Status.Phase != v1.ClaimBound {
@@ -993,18 +1032,24 @@ func PVCToMemberset(client *client.Client, namespace string, secure bool) (couch
 			Namespace:    namespace,
 			SecureClient: secure,
 		}
+
 		var ok bool
+
 		if m.Name, ok = pvc.Labels[constants.LabelNode]; !ok {
 			continue
 		}
+
 		if m.ServerConfig, ok = pvc.Annotations[constants.AnnotationVolumeNodeConf]; !ok {
 			continue
 		}
+
 		if m.Version, ok = pvc.Annotations[constants.CouchbaseVersionAnnotationKey]; !ok {
 			continue
 		}
+
 		ms.Add(&m)
 	}
+
 	return ms, nil
 }
 
@@ -1023,13 +1068,16 @@ func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, po
 	if defaultClaim == "" {
 		return fmt.Errorf("no claim defined for default volume")
 	}
+
 	// all volume mounts must be healthy
 	mountPaths, err := getPathsToPersist(mounts)
 	if err != nil {
 		return err
 	}
+
 	for mountName := range mountPaths {
 		mountPath := pathForVolumeMountName(mountName)
+
 		_, err := findMemberPVC(client, podName, mountPath)
 		if err != nil {
 			return err
@@ -1045,6 +1093,7 @@ func IsLogPVC(pvc *v1.PersistentVolumeClaim) bool {
 	if !ok {
 		return false
 	}
+
 	return path == CouchbaseVolumeMountLogsDir
 }
 
@@ -1075,6 +1124,7 @@ func exec(client kubernetes.Interface, pod *v1.Pod, command []string) error {
 
 	// Finally run the command
 	stdout := &bytes.Buffer{}
+
 	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
 		return fmt.Errorf("remote command on %s failed: %v", pod.Name, err)
 	}
@@ -1089,9 +1139,11 @@ func FlagPodReady(client *client.Client, name string) error {
 	if !found {
 		return fmt.Errorf("pod %s not found", name)
 	}
+
 	if err := exec(client.KubeClient, pod, []string{"touch", readinessFile}); err != nil {
 		return err
 	}
+
 	return nil
 }
 

@@ -27,18 +27,23 @@ func DumpOperatorYAML(conf *Config) error {
 	if err := DumpYAML(conf, "operator-service-account", GetOperatorServiceAccount()); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "operator-role", GetOperatorRole()); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "operator-role-binding", GetOperatorRoleBinding(conf.Namespace)); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.OperatorImage, conf.ImagePullSecret, 10*time.Minute)); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "operator-service", GenerateOperatorService()); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -313,6 +318,7 @@ func GetOperatorDeployment(image string, imagePullSecret string, podCreateTimeou
 			},
 		},
 	}
+
 	if imagePullSecret != "" {
 		deployment.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 			{
@@ -320,6 +326,7 @@ func GetOperatorDeployment(image string, imagePullSecret string, podCreateTimeou
 			},
 		}
 	}
+
 	return deployment
 }
 

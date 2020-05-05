@@ -45,6 +45,7 @@ func RandomSuffix() string {
 
 	// Generate a random 5 character suffix for the cluster name
 	suffix := ""
+
 	for i := 0; i < 5; i++ {
 		// Our alphabet is 0-9 a-z, so 36 characters
 		ordinal := rand.Intn(36)
@@ -55,9 +56,11 @@ func RandomSuffix() string {
 		} else {
 			ordinal += int('a') - 10
 		}
+
 		// Append to the name
 		suffix += string(rune(ordinal))
 	}
+
 	return suffix
 }
 
@@ -78,6 +81,7 @@ func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clus
 	if err != nil {
 		return cluster, err
 	}
+
 	return updatedCluster, nil
 }
 
@@ -86,6 +90,7 @@ func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, 
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -95,6 +100,7 @@ func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string,
 	if err != nil {
 		return nil, err
 	}
+
 	return cluster, nil
 }
 
@@ -103,6 +109,7 @@ func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace str
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -118,6 +125,7 @@ func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -131,6 +139,7 @@ func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
+
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
@@ -139,6 +148,7 @@ func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -158,6 +168,7 @@ func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string
 			},
 		},
 	}
+
 	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
 }
 
@@ -166,6 +177,7 @@ func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace st
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -179,6 +191,7 @@ func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
+
 	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
 }
 
@@ -198,11 +211,14 @@ func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, s
 			couchbasev2.FeatureXDCR,
 		},
 	}
+
 	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
+
 	MustWaitClusterStatusHealthy(t, k8s, cluster, 5*time.Minute)
+
 	return cluster, err
 }
 
@@ -211,6 +227,7 @@ func MustNewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace strin
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -227,6 +244,7 @@ func NewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service,
 			if clusterSpec.Spec.Servers[index].Pod == nil {
 				clusterSpec.Spec.Servers[index].Pod = &v1.PodTemplateSpec{}
 			}
+
 			clusterSpec.Spec.Servers[index].Pod.Spec.DNSPolicy = v1.DNSNone
 			clusterSpec.Spec.Servers[index].Pod.Spec.DNSConfig = &v1.PodDNSConfig{
 				Nameservers: []string{
@@ -261,7 +279,9 @@ func NewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service,
 	if err != nil {
 		Die(t, err)
 	}
+
 	MustWaitClusterStatusHealthy(t, k8s, cluster, 5*time.Minute)
+
 	return cluster, err
 }
 
@@ -270,6 +290,7 @@ func MustNewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Serv
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -290,6 +311,7 @@ func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, 
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -308,6 +330,7 @@ func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace strin
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -321,6 +344,7 @@ func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, namespace string, si
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -336,6 +360,7 @@ func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
+
 	return newClusterFromSpec(t, k8s, namespace, cluster)
 }
 
@@ -346,6 +371,7 @@ func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace st
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -368,6 +394,7 @@ func MustNewBucket(t *testing.T, k8s *types.Cluster, namespace string, bucket ru
 	if err != nil {
 		Die(t, err)
 	}
+
 	return object
 }
 
@@ -380,6 +407,7 @@ func MustNewBackup(t *testing.T, k8s *types.Cluster, namespace string, backup *c
 	if err != nil {
 		Die(t, err)
 	}
+
 	return object
 }
 
@@ -392,6 +420,7 @@ func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, namespace string, re
 	if err != nil {
 		Die(t, err)
 	}
+
 	return object
 }
 
@@ -452,6 +481,7 @@ func MustGetBucketName(t *testing.T, bucket runtime.Object) string {
 	if err != nil {
 		Die(t, err)
 	}
+
 	return name
 }
 
@@ -465,16 +495,19 @@ func MustAddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchbase
 	if err != nil {
 		Die(t, err)
 	}
+
 	return couchbase
 }
 
 func RemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, removeServiceName string, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	newServiceConfig := []couchbasev2.ServerConfig{}
+
 	for _, service := range cl.Spec.Servers {
 		if service.Name != removeServiceName {
 			newServiceConfig = append(newServiceConfig, service)
 		}
 	}
+
 	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
 }
 
@@ -483,19 +516,23 @@ func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchb
 	if err != nil {
 		Die(t, err)
 	}
+
 	return couchbase
 }
 
 func ScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	newServiceConfig := []couchbasev2.ServerConfig{}
+
 	for _, service := range cl.Spec.Servers {
 		for serviceName, size := range servicesMap {
 			if serviceName == service.Name {
 				service.Size = size
 			}
 		}
+
 		newServiceConfig = append(newServiceConfig, service)
 	}
+
 	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
 }
 
@@ -504,6 +541,7 @@ func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchba
 	if err != nil {
 		Die(t, err)
 	}
+
 	return couchbase
 }
 
@@ -538,6 +576,7 @@ func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, pat
 
 		// Everything successful
 		cluster = updated
+
 		return true, nil
 	})
 }
@@ -548,6 +587,7 @@ func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -603,6 +643,7 @@ func MustPatchBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object, pa
 	if err != nil {
 		Die(t, err)
 	}
+
 	return bucket
 }
 
@@ -645,6 +686,7 @@ func MustPatchReplication(t *testing.T, k8s *types.Cluster, replication *couchba
 	if err != nil {
 		Die(t, err)
 	}
+
 	return replication
 }
 
@@ -657,6 +699,7 @@ func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient vers
 func CleanUpCluster(t *testing.T, k8s *types.Cluster, namespace, logDir, kubeName, testName string) {
 	// Creates dir for kubename
 	logDir = filepath.Join(logDir, kubeName)
+
 	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
 		t.Log(err)
 		return
@@ -672,20 +715,26 @@ func CleanUpCluster(t *testing.T, k8s *types.Cluster, namespace, logDir, kubeNam
 
 func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cbCluster *couchbasev2.CouchbaseCluster) {
 	t.Logf("Attempting to delete: [%v]", cbCluster.Name)
+
 	if err := k8sutil.DeleteCouchbaseCluster(crClient, cbCluster); err != nil {
 		t.Logf("Error: %v", err)
 	} else {
 		t.Logf("Successfully deleted: [%v]", cbCluster.Name)
 	}
+
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
 	if err != nil {
 		t.Logf("Error: Failed to get pods %v", err)
 	}
+
 	killPods := []string{}
+
 	for _, pod := range pods.Items {
 		killPods = append(killPods, pod.Name)
 	}
+
 	t.Logf("Killing pods: %v", killPods)
+
 	if err := KillMembers(kubeClient, namespace, cbCluster.Name, killPods...); err != nil {
 		t.Logf("Failed to kill members: %v", err)
 	}
@@ -695,9 +744,11 @@ func CleanK8sCluster(k8s *types.Cluster, namespace string) {
 	if err := k8s.KubeClient.BatchV1().Jobs(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete jobs: ", err)
 	}
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseclusters: ", err)
 	}
+
 	if err := WaitUntilPodDeleted(k8s.KubeClient, namespace); err != nil {
 		fmt.Println("Warning: Unable to delete pods:", err)
 	}
@@ -708,6 +759,7 @@ func CleanK8sCluster(k8s *types.Cluster, namespace string) {
 	if err := DeleteAndWaitForPVCDeletion(k8s, namespace, 5*time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete PVCs:", err)
 	}
+
 	// Should be garbage collected
 	services, err := k8s.KubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err == nil {
@@ -721,31 +773,37 @@ func CleanK8sCluster(k8s *types.Cluster, namespace string) {
 	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebuckets: ", err)
 	}
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseephemeralbuckets: ", err)
 	} else if err := WaitForEphemeralBucketDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseephemeralbuckets: ", err)
 	}
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
 	} else if err := WaitForMemcachedBucketDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
 	}
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasereplications: ", err)
 	} else if err := WaitForReplicationDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasereplications: ", err)
 	}
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
 	} else if err := WaitForAllUserDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
 	}
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasegroups: ", err)
 	} else if err := WaitForGroupDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasegroups: ", err)
 	}
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)
 	} else if err := WaitForRoleBindingDeletion(k8s, namespace, time.Minute); err != nil {
@@ -760,6 +818,7 @@ func CleanK8sCluster(k8s *types.Cluster, namespace string) {
 	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
 	}
+
 	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebackuprestores: ", err)
 	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
@@ -773,6 +832,7 @@ func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName str
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -793,6 +853,7 @@ func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name strin
 
 func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, clusterName string, memberID int) error {
 	podMemberName := couchbaseutil.CreateMemberName(clusterName, memberID)
+
 	pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + podMemberName})
 	if err != nil {
 		return fmt.Errorf("unable to fetch persistent volume list for pod %s: %v", podMemberName, err)
@@ -803,11 +864,13 @@ func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, cl
 			return fmt.Errorf("failed to delete persistent volume claim %s: %v", pvc.Name, err)
 		}
 	}
+
 	return nil
 }
 
 func WriteLogs(kubeClient kubernetes.Interface, namespace, logDir, testName string) error {
 	options := metav1.ListOptions{LabelSelector: constants.CouchbaseOperatorLabel}
+
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(options)
 	if err != nil {
 		return err
@@ -816,6 +879,7 @@ func WriteLogs(kubeClient kubernetes.Interface, namespace, logDir, testName stri
 	for _, pod := range pods.Items {
 		logOpts := &v1.PodLogOptions{}
 		req := kubeClient.CoreV1().Pods(namespace).GetLogs(pod.Name, logOpts)
+
 		data, err := req.DoRaw()
 		if err != nil {
 			return err
@@ -826,15 +890,18 @@ func WriteLogs(kubeClient kubernetes.Interface, namespace, logDir, testName stri
 		}
 
 		logFile := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", testName, pod.Name))
+
 		if err := ioutil.WriteFile(logFile, data, 0644); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
+
 	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/Servers/%d/Size", service), clusterSize), 30*time.Second)
 }
 
@@ -843,6 +910,7 @@ func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *ty
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -853,9 +921,11 @@ func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluste
 	if err != nil {
 		return cl, err
 	}
+
 	if err := WaitClusterStatusHealthy(t, k8s, cluster, timeout); err != nil {
 		return cluster, err
 	}
+
 	return cluster, nil
 }
 
@@ -864,6 +934,7 @@ func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cl
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cluster
 }
 
@@ -882,6 +953,7 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev2.Couchb
 	for i := 0; i < numToKill; i++ {
 		killPods = append(killPods, pods.Items[i].Name)
 	}
+
 	t.Logf("Killing pods: %v", killPods)
 
 	if err := KillMembers(kubeCli, cl.Namespace, cl.Name, killPods...); err != nil {
@@ -939,10 +1011,12 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m *co
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
+
 			err = k8sutil.WaitForPod(ctx, k8s.KubeClient, cl.Namespace, pod.Name, "")
 			if err != nil {
 				return nil, err
 			}
+
 			return p, nil
 		}
 	}
@@ -955,6 +1029,7 @@ func deleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) err
 	if err != nil {
 		return err
 	}
+
 	return kubeCli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
 }
 
@@ -972,6 +1047,7 @@ func KillOperatorAndWaitForRecovery(k8s *types.Cluster, namespace string) error 
 	if err := WaitUntilOperatorReady(k8s.KubeClient, namespace, constants.CouchbaseOperatorLabel); err != nil {
 		return fmt.Errorf("failed to recover couchbase operator: %v", err)
 	}
+
 	return nil
 }
 
@@ -996,12 +1072,16 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, namespace st
 			if errors.IsNotFound(err) {
 				return nil
 			}
+
 			return err
 		}
+
 		return fmt.Errorf("deployment still exists")
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
 	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
 		Die(t, err)
 	}
@@ -1020,13 +1100,17 @@ func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, er
 	defer cancel()
 
 	var pods *v1.PodList
+
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("app", "couchbase-operator")))
+
 	outerErr := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		var err error
+
 		pods, err = kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		return true, nil
 	})
 	if outerErr != nil {
@@ -1034,15 +1118,19 @@ func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, er
 	}
 
 	operatorPods := []string{}
+
 	for _, pod := range pods.Items {
 		operatorPods = append(operatorPods, pod.Name)
 	}
+
 	if len(operatorPods) == 0 {
 		return "", fmt.Errorf("no pods available")
 	}
+
 	if len(operatorPods) > 1 {
 		return "couchbase-operator", fmt.Errorf("too many couchbase operators")
 	}
+
 	return operatorPods[0], nil
 }
 
@@ -1051,22 +1139,28 @@ func MustGetOperatorName(t *testing.T, k8s *types.Cluster, namespace string) str
 	if err != nil {
 		Die(t, err)
 	}
+
 	return name
 }
 
 func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error) {
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("name", "couchbase-operator")))
+
 	pods, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return "couchbase-operator", err
 	}
+
 	operatorPods := []string{}
+
 	for i := 0; i < len(pods.Items); i++ {
 		operatorPods = append(operatorPods, pods.Items[i].Name)
 	}
+
 	if len(operatorPods) > 1 {
 		return "couchbase-operator", fmt.Errorf("too many couchbase operators")
 	}
+
 	return operatorPods[0], nil
 }
 
@@ -1078,14 +1172,17 @@ func getSchedulableNodes(k8s *types.Cluster) ([]*v1.Node, error) {
 	}
 
 	result := []*v1.Node{}
+
 	for index := range nodes.Items {
 		schedulable := true
+
 		for _, taint := range nodes.Items[index].Spec.Taints {
 			if taint.Effect == v1.TaintEffectNoSchedule {
 				schedulable = false
 				break
 			}
 		}
+
 		if schedulable {
 			result = append(result, &nodes.Items[index])
 		}
@@ -1100,6 +1197,7 @@ func MustNumNodes(t *testing.T, k8s *types.Cluster) int {
 	if err != nil {
 		Die(t, err)
 	}
+
 	return len(nodes)
 }
 
@@ -1124,6 +1222,7 @@ func getNodeAllocatableMemory(t *testing.T, k8s *types.Cluster) map[string]float
 	}
 
 	result := map[string]float64{}
+
 	for _, node := range nodes {
 		// Begin with the allocatable amount of memory on the node.  This is fixed and
 		// doesn't take in to account the running pods.
@@ -1149,6 +1248,7 @@ func MustGetMinNodeMem(t *testing.T, k8s *types.Cluster) float64 {
 	allocatable := getNodeAllocatableMemory(t, k8s)
 
 	result := math.Inf(+1)
+
 	for _, value := range allocatable {
 		result = math.Min(result, value)
 	}
@@ -1165,6 +1265,7 @@ func MustGetMaxNodeMem(t *testing.T, k8s *types.Cluster) float64 {
 	allocatable := getNodeAllocatableMemory(t, k8s)
 
 	result := 0.0
+
 	for _, value := range allocatable {
 		result = math.Max(result, value)
 	}
@@ -1182,6 +1283,7 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 	allocatable := getNodeAllocatableMemory(t, k8s)
 
 	result := 0
+
 	for _, value := range allocatable {
 		result += int(math.Floor(value / memory))
 	}
@@ -1209,6 +1311,7 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx 
 			return fmt.Errorf("TLS verification failed: %v", err)
 		}
 	}
+
 	return nil
 }
 
@@ -1220,85 +1323,105 @@ func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, ctx
 
 func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, namespace string) error {
 	t.Logf("deleting pods with label: %v", label)
+
 	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
+
 	for _, pod := range pods.Items {
 		err := deletePod(t, kubeClient, pod.Name, namespace)
 		if err != nil {
 			return err
 		}
 	}
+
 	_, err = WaitPodsDeleted(kubeClient, namespace, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func deletePod(t *testing.T, kubeClient kubernetes.Interface, podName, namespace string) error {
 	t.Logf("deleting pod: %v", podName)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
 	err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		if err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		return true, nil
 	})
+
 	return err
 }
 
 func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, namespace string) error {
 	t.Logf("deleting pods with label: %v", label)
+
 	dsList, err := kubeClient.ExtensionsV1beta1().DaemonSets(namespace).List(metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
+
 	for _, ds := range dsList.Items {
 		err := DeleteDaemonSet(t, kubeClient, ds.Name, namespace)
 		if err != nil {
 			return err
 		}
 	}
+
 	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func DeleteDaemonSet(t *testing.T, kubeClient kubernetes.Interface, dsName, namespace string) error {
 	t.Logf("deleting daemonset: %v", dsName)
+
 	err := kubeClient.ExtensionsV1beta1().DaemonSets(namespace).Delete(dsName, metav1.NewDeleteOptions(0))
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func AddLabelToNodes(t *testing.T, kubeClient kubernetes.Interface, labelKey, labelValue string) error {
 	t.Logf("adding label %v:%v to all nodes", labelKey, labelValue)
+
 	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	for _, node := range k8sNodeList.Items {
 		if err := AddLabelToNode(t, kubeClient, node, labelKey, labelValue); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
 func AddLabelToNode(t *testing.T, kubeClient kubernetes.Interface, node v1.Node, labelKey, labelValue string) error {
 	t.Logf("adding label %v:%v to node %v", labelKey, labelValue, node.Name)
+
 	currentLables := node.ObjectMeta.Labels
 	currentLables[labelKey] = labelValue
+
 	if _, err := kubeClient.CoreV1().Nodes().Update(&node); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -1325,10 +1448,12 @@ func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, membe
 // belong to individual pods.
 func MustDeletePodServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
 	selector := constants.CouchbaseServerPodLabelStr + couchbase.Name
+
 	services, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		Die(t, err)
 	}
+
 	for _, service := range services.Items {
 		if _, ok := service.Spec.Selector[operator_constants.LabelNode]; ok {
 			if err := DeleteService(k8s.KubeClient, service.Namespace, service.Name, metav1.NewDeleteOptions(0)); err != nil {
@@ -1378,6 +1503,7 @@ func GenerateWorkload(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 			},
 		},
 	}
+
 	if _, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Create(pod); err != nil {
 		return nil, err
 	}
@@ -1385,6 +1511,7 @@ func GenerateWorkload(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 	cleanup := func() {
 		_ = k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Delete(podName, metav1.NewDeleteOptions(0))
 	}
+
 	return cleanup, nil
 }
 
@@ -1393,6 +1520,7 @@ func MustGenerateWorkload(t *testing.T, k8s *types.Cluster, couchbase *couchbase
 	if err != nil {
 		Die(t, err)
 	}
+
 	return cleanup
 }
 
@@ -1408,11 +1536,13 @@ func GetUUID(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeou
 		if err != nil {
 			return err
 		}
+
 		if c.Status.ClusterID == "" {
 			return fmt.Errorf("cluster ID is not set")
 		}
 
 		uuid = c.Status.ClusterID
+
 		return nil
 	}
 
@@ -1428,6 +1558,7 @@ func MustGetUUID(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	if err != nil {
 		Die(t, err)
 	}
+
 	return uuid
 }
 

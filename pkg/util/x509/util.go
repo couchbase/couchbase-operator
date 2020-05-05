@@ -68,6 +68,7 @@ type KeyPairRequest struct {
 func (req *KeyPairRequest) Generate(ca *CertificateAuthority) (key, cert []byte, err error) {
 	// Generate the private key
 	var pkey crypto.PrivateKey
+
 	if pkey, err = GeneratePrivateKey(req.KeyType); err != nil {
 		return
 	}
@@ -79,6 +80,7 @@ func (req *KeyPairRequest) Generate(ca *CertificateAuthority) (key, cert []byte,
 
 	// Add the keying material to the CSR
 	var csr *x509.CertificateRequest
+
 	if csr, err = CreateCertificateRequest(req.Req, pkey); err != nil {
 		return
 	}
@@ -113,11 +115,13 @@ func GeneratePrivateKey(keyType KeyType) (crypto.PrivateKey, error) {
 // encoded slice.
 func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 	var block *pem.Block
+
 	if pkcs8 {
 		bytes, err := x509.MarshalPKCS8PrivateKey(key)
 		if err != nil {
 			return nil, err
 		}
+
 		block = &pem.Block{
 			Type:  "PRIVATE KEY",
 			Bytes: bytes,
@@ -134,6 +138,7 @@ func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
+
 			block = &pem.Block{
 				Type:  "EC PRIVATE KEY",
 				Bytes: bytes,
@@ -148,6 +153,7 @@ func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 	if err := pem.Encode(data, block); err != nil {
 		return nil, err
 	}
+
 	return data.Bytes(), nil
 }
 
@@ -157,10 +163,12 @@ func CreateCertificate(cert []byte) ([]byte, error) {
 		Type:  "CERTIFICATE",
 		Bytes: cert,
 	}
+
 	data := &bytes.Buffer{}
 	if err := pem.Encode(data, block); err != nil {
 		return nil, err
 	}
+
 	return data.Bytes(), nil
 }
 
@@ -171,6 +179,7 @@ func CreateCertificateRequest(req *x509.CertificateRequest, key crypto.PrivateKe
 	if err != nil {
 		return nil, err
 	}
+
 	return x509.ParseCertificateRequest(csr)
 }
 
@@ -181,6 +190,7 @@ func ParseCertificate(data []byte) (*x509.Certificate, error) {
 	if pem == nil {
 		return nil, fmt.Errorf("unable to parse PEM certificate")
 	}
+
 	return x509.ParseCertificate(pem.Bytes)
 }
 
@@ -276,10 +286,12 @@ func (ca *CertificateAuthority) NewIntermediateCertificateAuthority(keyType KeyT
 // in RFC 3280.  It is upto 20 octets in length and non-negative.
 func generateSerial() (*big.Int, error) {
 	serialLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+
 	serialNumber, err := rand.Int(rand.Reader, serialLimit)
 	if err != nil {
 		return nil, err
 	}
+
 	return new(big.Int).Abs(serialNumber), nil
 }
 
@@ -287,7 +299,9 @@ func generateSerial() (*big.Int, error) {
 // RFC3280 used to create certificate paths from a leaf to a CA.
 func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 	var subjectPublicKey []byte
+
 	var err error
+
 	switch pub := pub.(type) {
 	case *rsa.PublicKey:
 		subjectPublicKey, err = asn1.Marshal(*pub)
@@ -296,10 +310,13 @@ func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("invalid public key type")
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	sum := sha1.Sum(subjectPublicKey) // nolint:gosec
+
 	return sum[:], nil
 }
 

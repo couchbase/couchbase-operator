@@ -80,6 +80,7 @@ func (v KubernetesVersion) String() string {
 	}
 
 	vstr := string(v)
+
 	major := vstr[0:2]
 	if v[0] == '0' {
 		major = string(vstr[1])

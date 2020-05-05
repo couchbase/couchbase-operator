@@ -59,9 +59,11 @@ func (r *podUpgradableResource) lenItems() int {
 
 func (r *podUpgradableResource) itemVersion(item int) string {
 	version := "0.0.0"
+
 	if v, ok := r.pods[item].Annotations[constants.ResourceVersionAnnotation]; ok {
 		version = v
 	}
+
 	return version
 }
 
@@ -75,10 +77,12 @@ func (r *podUpgradableResource) actionVersionRange(action int) upgradeRange {
 
 func (r *podUpgradableResource) perform(item, action int) error {
 	pod := r.pods[item]
+
 	upgrade := r.actions[action].action
 	if err := upgrade(r.cluster, pod); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -87,6 +91,7 @@ func (r *podUpgradableResource) commit(item int) error {
 	if _, err := r.cluster.k8s.KubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(pod); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -98,6 +103,7 @@ func upgradePodFrom000000To010200(cluster *Cluster, pod *corev1.Pod) error {
 
 	// Add the server version annotation from the cluster's current version.
 	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = cluster.cluster.Status.CurrentVersion
+
 	delete(pod.Annotations, "couchbase.version")
 
 	return nil
@@ -121,6 +127,7 @@ func upgradePodFrom010200To020000(cluster *Cluster, pod *corev1.Pod) error {
 					break
 				}
 			}
+
 			break
 		}
 	}

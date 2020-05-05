@@ -133,6 +133,7 @@ func skipUpgrade(t *testing.T) {
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	upgradeStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImageUpgrade)
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -142,6 +143,7 @@ func skipUpgrade(t *testing.T) {
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	upgrade, err := couchbaseutil.NewVersion(upgradeStr)
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -700,6 +702,7 @@ func TestUpgradeToTLS(t *testing.T) {
 	// cluster.
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, kubernetes, kubernetes.Namespace, &e2eutil.TLSOpts{ClusterName: cluster.Name})
 	defer teardown()
+
 	tls := &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,

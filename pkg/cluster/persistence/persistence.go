@@ -116,7 +116,9 @@ func (p *persistentStorageImpl) flush() error {
 	if err != nil {
 		return err
 	}
+
 	p.configMap = configMap
+
 	return nil
 }
 
@@ -125,7 +127,9 @@ func (p *persistentStorageImpl) Insert(kind PersistentKind, value string) error 
 	if _, ok := p.configMap.Data[string(kind)]; ok {
 		return NewKeyError(fmt.Sprintf("insert: key %v exists", kind))
 	}
+
 	p.configMap.Data[string(kind)] = value
+
 	return p.flush()
 }
 
@@ -140,7 +144,9 @@ func (p *persistentStorageImpl) Update(kind PersistentKind, value string) error 
 	if _, ok := p.configMap.Data[string(kind)]; !ok {
 		return NewKeyError(fmt.Sprintf("update: key %v doesn't exist", kind))
 	}
+
 	p.configMap.Data[string(kind)] = value
+
 	return p.flush()
 }
 
@@ -150,5 +156,6 @@ func (p *persistentStorageImpl) Get(kind PersistentKind) (string, error) {
 	if !ok {
 		return "", NewKeyError(fmt.Sprintf("get: key %v doesn't exist", kind))
 	}
+
 	return value, nil
 }

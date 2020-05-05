@@ -22,6 +22,7 @@ func getBackupImage(f *framework.Framework) string {
 	if f.CouchbaseBackupImage != "" {
 		return f.CouchbaseBackupImage
 	}
+
 	return ""
 }
 
@@ -151,10 +152,12 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	testCouchbase := e2espec.NewSupportableCluster(mdsGroupSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Backup.Managed = true
+
 	imageName := getBackupImage(f)
 	if imageName = strings.TrimSpace(imageName); imageName != "" {
 		testCouchbase.Spec.Backup.Image = imageName
 	}
+
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
@@ -173,10 +176,12 @@ func TestFailedBackupBehaviour(t *testing.T) {
 
 	// wait for the backup to start
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 2*time.Minute)
+
 	// kill the cluster
 	for i := 0; i < mdsGroupSize; i++ {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, i, false)
 	}
+
 	// backup should fail
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupFailedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 
@@ -236,6 +241,7 @@ func TestBackupPVCReconcile(t *testing.T) {
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	// check pvc has same name as backup
 	if pvc.Name != fullBackup.Name {
 		e2eutil.Die(t, fmt.Errorf("pvc name %s is a mismatch with backup name %s", pvc.Name, fullBackup.Name))

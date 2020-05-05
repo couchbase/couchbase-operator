@@ -23,6 +23,7 @@ type tgzBackend struct {
 func NewTGZ(config *config.Configuration) (Backend, error) {
 	b := &tgzBackend{}
 	b.writer = tar.NewWriter(&b.buffer)
+
 	return b, nil
 }
 
@@ -36,9 +37,11 @@ func (b *tgzBackend) WriteFile(path, data string) error {
 	if err := b.writer.WriteHeader(header); err != nil {
 		return err
 	}
+
 	if _, err := b.writer.Write([]byte(data)); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -52,10 +55,12 @@ func (b *tgzBackend) Close() error {
 
 	// Create the target file
 	path := util.ArchiveName() + ".tar.gz"
+
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
+
 	defer file.Close()
 
 	// Compress the buffered output, and close to finialize the footer
@@ -63,11 +68,13 @@ func (b *tgzBackend) Close() error {
 	if _, err := lz.Write(b.buffer.Bytes()); err != nil {
 		return err
 	}
+
 	if err := lz.Close(); err != nil {
 		return err
 	}
 
 	// Notify the user
 	fmt.Println("Wrote cluster information to", path)
+
 	return nil
 }

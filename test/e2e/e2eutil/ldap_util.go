@@ -22,6 +22,7 @@ func MustNewLDAPServer(t *testing.T, kubeClient kubernetes.Interface, namespace 
 	if err != nil {
 		Die(t, err)
 	}
+
 	return pod
 }
 
@@ -36,54 +37,64 @@ func MustNewLDAPService(t *testing.T, kubeClient kubernetes.Interface, namespace
 	if err != nil {
 		Die(t, err)
 	}
+
 	return service
 }
 
 // Delete LDAP Service.
 func DeleteLDAPService(kubeClient kubernetes.Interface, namespace string) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
+
 	svcList, err := kubeClient.CoreV1().Services(namespace).List(opts)
 	if err != nil {
 		return err
 	}
+
 	for _, service := range svcList.Items {
 		err := kubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}
 	}
+
 	return nil
 }
 
 // Delete LDAP Server.
 func DeleteLDAPServer(kubeClient kubernetes.Interface, namespace string) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
+
 	podList, err := kubeClient.CoreV1().Pods(namespace).List(opts)
 	if err != nil {
 		return err
 	}
+
 	for _, pod := range podList.Items {
 		err := kubeClient.CoreV1().Pods(namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}
 	}
+
 	return nil
 }
 
 // Delete LDAP Secret.
 func DeleteLDAPSecret(kubeClient kubernetes.Interface, namespace string) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
+
 	secretList, err := kubeClient.CoreV1().Secrets(namespace).List(opts)
 	if err != nil {
 		return err
 	}
+
 	for _, secret := range secretList.Items {
 		err := kubeClient.CoreV1().Secrets(namespace).Delete(secret.Name, metav1.NewDeleteOptions(0))
 		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -92,8 +103,10 @@ func CleanLDAPResources(kubeClient kubernetes.Interface, namespace string) error
 	if err := DeleteLDAPServer(kubeClient, namespace); err != nil {
 		return nil
 	}
+
 	if err := DeleteLDAPSecret(kubeClient, namespace); err != nil {
 		return nil
 	}
+
 	return DeleteLDAPService(kubeClient, namespace)
 }

@@ -162,12 +162,15 @@ func podFixture(name, class, group string) *v1.Pod {
 			Phase: v1.PodRunning,
 		},
 	}
+
 	if class != "" {
 		pod.Labels[constants.LabelNodeConf] = class
 	}
+
 	if group != "" {
 		pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
 	}
+
 	return pod
 }
 
@@ -185,12 +188,15 @@ func podFixtureFailed(name, class, group string) *v1.Pod {
 			Phase: v1.PodFailed,
 		},
 	}
+
 	if class != "" {
 		pod.Labels[constants.LabelNodeConf] = class
 	}
+
 	if group != "" {
 		pod.Spec.NodeSelector[constants.ServerGroupLabel] = group
 	}
+
 	return pod
 }
 
@@ -214,6 +220,7 @@ func mustCreate(t *testing.T, s Scheduler, name, class, group string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return group
 }
 
@@ -221,6 +228,7 @@ func mustCreate(t *testing.T, s Scheduler, name, class, group string) string {
 func TestStripeCreateGlobalSingle(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsEmpty)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -233,6 +241,7 @@ func TestStripeCreateGlobalSingle(t *testing.T) {
 func TestStripeCreateGlobalMultiple(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsEmpty)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -248,6 +257,7 @@ func TestStripeCreateGlobalMultiple(t *testing.T) {
 func TestStripeCreateOverrideMultiple(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsEmpty)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -262,6 +272,7 @@ func TestStripeCreateOverrideMultiple(t *testing.T) {
 func TestStripeInvalidConfiguration(t *testing.T) {
 	c := fixtureClusterInvalid
 	g := newTestStripePodGetter(fixturePodsEmpty)
+
 	_, err := NewStripeScheduler(g, c)
 	if err == nil {
 		t.Fatal("Scheduler accepted invalid configuration")
@@ -272,6 +283,7 @@ func TestStripeInvalidConfiguration(t *testing.T) {
 func TestStripeInvalidPodServerClassLabels(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsInvalidServerClassLabels)
+
 	_, err := NewStripeScheduler(g, c)
 	if err == nil {
 		t.Fatal("Scheduler accepted pods with missing server class labels")
@@ -282,6 +294,7 @@ func TestStripeInvalidPodServerClassLabels(t *testing.T) {
 func TestStripeInvalidPodServerGroupNodeSelector(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsInvalidServerGroupNodeSelector)
+
 	_, err := NewStripeScheduler(g, c)
 	if err == nil {
 		t.Fatal("Scheduler accepted pods with missing server group labels")
@@ -292,6 +305,7 @@ func TestStripeInvalidPodServerGroupNodeSelector(t *testing.T) {
 func TestStripeCreateGlobalExistingPods(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsCreate)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -304,6 +318,7 @@ func TestStripeCreateGlobalExistingPods(t *testing.T) {
 func TestStripeCreateOverrideExistingPods(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsCreate)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -316,6 +331,7 @@ func TestStripeCreateOverrideExistingPods(t *testing.T) {
 func TestStripeDeleteGlobalSingleEmptyClass(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsEmpty)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -330,6 +346,7 @@ func TestStripeDeleteGlobalSingleEmptyClass(t *testing.T) {
 func TestStripeDeleteGlobalSingle(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsDelete)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -347,6 +364,7 @@ func TestStripeDeleteGlobalSingle(t *testing.T) {
 func TestStripeDeleteGlobalMultiple(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsDelete)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -356,10 +374,12 @@ func TestStripeDeleteGlobalMultiple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	server2, err := s.Delete(serverClass1)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	server3, err := s.Delete(serverClass1)
 	if err != nil {
 		t.Fatal(err)
@@ -374,6 +394,7 @@ func TestStripeDeleteGlobalMultiple(t *testing.T) {
 func TestStipeDeleteCreateGlobalSingle(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsDelete)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)
@@ -392,6 +413,7 @@ func TestStipeDeleteCreateGlobalSingle(t *testing.T) {
 func TestStripeAddGlobalSingleOnPodFailure(t *testing.T) {
 	c := fixtureCluster
 	g := newTestStripePodGetter(fixturePodsFailure)
+
 	s, err := NewStripeScheduler(g, c)
 	if err != nil {
 		t.Fatal(err)

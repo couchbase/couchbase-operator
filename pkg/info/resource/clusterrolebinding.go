@@ -32,10 +32,12 @@ func (r *clusterRoleBindingResource) Kind() string {
 // Fetch collects all clusterRoleBindings as defined by the configuration.
 func (r *clusterRoleBindingResource) Fetch() error {
 	var err error
+
 	r.clusterRoleBindings, err = r.context.KubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *clusterRoleBindingResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), clusterRoleBinding.Name, clusterRoleBinding.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

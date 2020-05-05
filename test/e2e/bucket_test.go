@@ -110,9 +110,11 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	for _, bucket := range buckets {
 		e2eutil.MustDeleteBucket(t, targetKube, targetKube.Namespace, bucket)
 	}
+
 	for _, name := range names {
 		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, name, 2*time.Minute)
 	}
+
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	currentBuckets, err := client.GetBuckets()
@@ -143,6 +145,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
 
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
+
 	buckets := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucket := range buckets {
 		name := e2eutil.MustGetBucketName(t, bucket)
@@ -454,11 +457,13 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketTyped1.Spec.Name = bucketName
 
 	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, bucketTyped1)
+
 	cluster1 := e2espec.NewBasicCluster(clusterSize)
 	cluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels1,
 	}
 	cluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, kubernetes.Namespace, cluster1)
+
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster1, []string{bucketName}, time.Minute)
 
 	// Create the second cluster with an ephemeral bucket.
@@ -469,11 +474,13 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketTyped2.Spec.Name = bucketName
 
 	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, bucketTyped2)
+
 	cluster2 := e2espec.NewBasicCluster(clusterSize)
 	cluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels2,
 	}
 	cluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, kubernetes.Namespace, cluster2)
+
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster2, []string{bucketName}, time.Minute)
 
 	// Check the events match what we expect:

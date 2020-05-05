@@ -60,12 +60,15 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if len(endpoints.Subsets) != 1 {
 		return nil, nil, fmt.Errorf("dns endpoints object contains unexpected number of subsets: %d", len(endpoints.Subsets))
 	}
+
 	if len(endpoints.Subsets[0].Addresses) == 0 {
 		return nil, nil, fmt.Errorf("dns endpoints object contains no addresses")
 	}
+
 	remoteAddress := endpoints.Subsets[0].Addresses[0].IP
 	if remoteAddress == "" {
 		return nil, nil, fmt.Errorf("dns endpoint address is empty")
@@ -76,6 +79,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 	if err != nil {
 		return nil, nil, err
 	}
+
 	localAddress := localDNSService.Spec.ClusterIP
 	if localAddress == "" {
 		return nil, nil, fmt.Errorf("dns service cluster IP is empty")
@@ -90,7 +94,9 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 			"Corefile": fmt.Sprintf(coreFileTemplate, remote.Namespace, localDNSPort, remoteAddress, localDNSPort, localAddress),
 		},
 	}
+
 	_ = local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
+
 	if _, err = local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Create(configMap); err != nil {
 		return nil, nil, err
 	}
@@ -154,6 +160,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 		},
 	}
 	_ = local.KubeClient.AppsV1().Deployments(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
+
 	if _, err := local.KubeClient.AppsV1().Deployments(local.Namespace).Create(deployment); err != nil {
 		return nil, nil, err
 	}
@@ -182,7 +189,9 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 			},
 		},
 	}
+
 	_ = local.KubeClient.CoreV1().Services(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
+
 	if service, err = local.KubeClient.CoreV1().Services(local.Namespace).Create(service); err != nil {
 		return nil, nil, err
 	}
@@ -192,6 +201,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 		_ = local.KubeClient.AppsV1().Deployments(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
 		_ = local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
 	}
+
 	return service, cleanup, nil
 }
 
@@ -204,5 +214,6 @@ func MustProvisionCoreDNS(t *testing.T, local, remote *types.Cluster) (*corev1.S
 	if err != nil {
 		Die(t, err)
 	}
+
 	return svc, cleanup
 }

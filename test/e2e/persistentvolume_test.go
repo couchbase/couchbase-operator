@@ -39,6 +39,7 @@ func createPersistentVolumeClaimSpec(t *testing.T, k8s *types.Cluster, storageCl
 	}
 
 	resourceQuantity := apiresource.NewQuantity(resourceQtyVal*1024*1024*1024, apiresource.BinarySI)
+
 	return corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        pvcName,
@@ -67,6 +68,7 @@ func verifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, namespace string,
 				return fmt.Errorf("pvc mapping verification failed")
 			}
 		}
+
 		return nil
 	}
 
@@ -96,9 +98,9 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 	victim := 1
+	pvcName := "couchbase"
 
 	// Create the cluster.
-	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
@@ -146,9 +148,9 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	clusterSize := 6
 	victim1 := 1
 	victim2 := 5
+	pvcName := "couchbase"
 
 	// Create the cluster.
-	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
@@ -227,9 +229,9 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
+	pvcName := "couchbase"
 
 	// Create the cluster.
-	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
@@ -278,9 +280,9 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	// Static configuration.
 	clusterSize := 4
 	victim := 1
+	pvcName := "couchbase"
 
 	// Create the cluster.
-	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
@@ -294,6 +296,7 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+
 	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
 
 	// When ready delete the victim node while the operator is down.  On restart
@@ -327,9 +330,9 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
+	pvcName := "couchbase"
 
 	// Create the cluster.
-	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
@@ -381,9 +384,9 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) / len(availableServerGroups) * len(availableServerGroups)
+	pvcName := "couchbase"
 
 	// Create the cluster.
-	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
@@ -405,6 +408,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 
 	// kill the first N pods where N is the no of server groups
 	victims := []int{}
+
 	for i := 0; i < len(availableServerGroups); i++ {
 		victims = append(victims, i)
 	}
@@ -451,9 +455,9 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := len(availableServerGroups) + 1
+	pvcName := "couchbase"
 
 	// Create the cluster.
-	pvcName := "couchbase"
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
@@ -474,6 +478,7 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 
 	// kill the first N pods where N is the no of server groups
 	victims := []int{}
+
 	for i := 0; i < len(availableServerGroups); i++ {
 		victims = append(victims, i)
 	}
@@ -543,6 +548,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	// Kill nodes in 1st server group
 	victimGroup := 0
 	victims := []int{}
+
 	for i := 0; i < clusterSize; i++ {
 		if i%len(availableServerGroups) == victimGroup {
 			victims = append(victims, i)
@@ -601,6 +607,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
 	expectedPvcMap := map[string]int{}
+
 	resizeClusterSizes := []int{2, 5, 1, 3}
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
@@ -612,10 +619,12 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberID)
 			expectedPvcMap[memberName] = 0
 		}
+
 		podList, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + testCouchbase.Name})
 		if err != nil {
 			e2eutil.Die(t, fmt.Errorf("Failed to fetch pod list: %v", err))
 		}
+
 		for _, pod := range podList.Items {
 			expectedPvcMap[pod.Name] = 3
 		}

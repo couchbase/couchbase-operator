@@ -39,14 +39,17 @@ func (c *Validator) Validate(out io.Writer) error {
 	if err == nil && c.index < len(c.Events) {
 		err = newUnderflowError()
 	}
+
 	if err != nil {
 		// Calculate the widths for tabulation
 		reasonWidth := 0
 		messageWidth := 0
+
 		for _, event := range c.Events {
 			if w := len(event.Reason); w > reasonWidth {
 				reasonWidth = w
 			}
+
 			if w := len(event.Message); w > messageWidth {
 				messageWidth = w
 			}
@@ -59,17 +62,21 @@ func (c *Validator) Validate(out io.Writer) error {
 		if _, err := out.Write([]byte("Event schema validation failed:\n")); err != nil {
 			return err
 		}
+
 		for index, event := range c.Events {
 			line := fmt.Sprintf(format, event.Reason, event.Message)
 			if index == c.index {
 				line += fmt.Sprintf(" <== %v", err)
 			}
+
 			line += "\n"
+
 			if _, err := out.Write([]byte(line)); err != nil {
 				return err
 			}
 		}
 	}
+
 	return err
 }
 
@@ -100,16 +107,21 @@ func (e Event) Validate(c *Validator) error {
 	if c.index >= len(c.Events) {
 		return newOverflowError()
 	}
+
 	if e.Reason != c.Events[c.index].Reason {
 		return newReasonMismatchError(e.Reason, c.Events[c.index].Reason)
 	}
+
 	if e.Message != "" && e.Message != c.Events[c.index].Message {
 		return newMessageMismatchError(e.Reason, c.Events[c.index].Reason)
 	}
+
 	if e.FuzzyMessage != "" && !regexp.MustCompile(e.FuzzyMessage).MatchString(c.Events[c.index].Message) {
 		return newFuzzyMessageMismatchError(e.Reason, c.Events[c.index].Reason)
 	}
+
 	c.index++
+
 	return nil
 }
 
@@ -128,6 +140,7 @@ func (e Repeat) Validate(c *Validator) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -144,6 +157,7 @@ func (e Sequence) Validate(c *Validator) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -168,18 +182,23 @@ func (e Set) Validate(c *Validator) error {
 	for len(indices) > 0 {
 		// Look for a matching validator with an exhaustive search
 		matched := false
+
 		for i, index := range indices {
 			// If there is a match indicate so and remove the matching index
 			if err := e.Validators[index].Validate(c); err == nil {
 				matched = true
+
 				indices = append(indices[0:i], indices[i+1:]...)
+
 				break
 			}
 		}
+
 		if !matched {
 			return newSetMismatchError()
 		}
 	}
+
 	return nil
 }
 
@@ -196,14 +215,17 @@ type AnyOf struct {
 func (e AnyOf) Validate(c *Validator) error {
 	// Remember the index for resetting
 	index := c.index
+
 	for _, validator := range e.Validators {
 		// Validates, leave the index updated and return success
 		if err := validator.Validate(c); err == nil {
 			return nil
 		}
+
 		// Roll back the index and try again
 		c.index = index
 	}
+
 	return newAnyOfError()
 }
 
@@ -218,10 +240,13 @@ type Optional struct {
 // processed.
 func (e Optional) Validate(c *Validator) error {
 	index := c.index
+
 	if err := e.Validator.Validate(c); err == nil {
 		return nil
 	}
+
 	// Roll back the index
 	c.index = index
+
 	return nil
 }

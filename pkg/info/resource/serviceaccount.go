@@ -32,10 +32,12 @@ func (r *ServiceAccountResource) Kind() string {
 // Fetch collects all ServiceAccounts as defined by the configuration.
 func (r *ServiceAccountResource) Fetch() error {
 	var err error
+
 	r.ServiceAccounts, err = r.context.KubeClient.CoreV1().ServiceAccounts(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *ServiceAccountResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), ServiceAccount.Name, ServiceAccount.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

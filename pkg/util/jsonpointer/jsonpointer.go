@@ -55,10 +55,12 @@ func LookupValue(v reflect.Value, k string) (value reflect.Value, err error) {
 		value = value.MapIndex(reflect.ValueOf(k))
 	case reflect.Slice:
 		var i int
+
 		if i, err = strconv.Atoi(k); err != nil {
 			err = fmt.Errorf("malformed array index %s", k)
 			return
 		}
+
 		value = value.Index(i)
 	default:
 		err = fmt.Errorf("unexpected kind %s in lookup", kind)

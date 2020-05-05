@@ -45,6 +45,7 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 	sched := &stripeSchedulerImpl{
 		serverClasses: serverClassGroupMap{},
 	}
+
 	for i := range cluster.Spec.Servers {
 		class := cluster.Spec.Servers[i]
 
@@ -52,7 +53,9 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 		if err != nil {
 			return nil, err
 		}
+
 		sched.serverClasses[class.Name] = serverGroups{}
+
 		for _, group := range groups {
 			sched.serverClasses[class.Name][group] = &serverList{}
 		}
@@ -64,21 +67,26 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 		if pod.Status.Phase != v1.PodPending && pod.Status.Phase != v1.PodRunning {
 			continue
 		}
+
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
 			return nil, fmt.Errorf("%s: pod %s does not have server class label", stripeErrorHeader, pod.Name)
 		}
+
 		// Class deleted, ignore the pod
 		if _, ok := sched.serverClasses[class]; !ok {
 			continue
 		}
+
 		group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
 		if !ok {
 			return nil, fmt.Errorf("%s: pod %s does not have server group selector", stripeErrorHeader, pod.Name)
 		}
+
 		if _, ok := sched.serverClasses[class][group]; !ok {
 			return nil, fmt.Errorf("%s: pod %s server group '%s' undefined", stripeErrorHeader, pod.Name, group)
 		}
+
 		sched.serverClasses[class][group].push(pod.Name)
 	}
 
@@ -99,6 +107,7 @@ func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, err
 	if group == "" {
 		group = sched.serverClasses[class].smallestGroup()
 	}
+
 	sched.serverClasses[class][group].push(name)
 
 	return group, nil
@@ -109,6 +118,7 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
 		return "", fmt.Errorf("%s: server group map missing server class '%s'", stripeErrorHeader, class)
 	}
+
 	serverGroup := sched.serverClasses[class].largestGroup()
 
 	// Select the victim server deterministically based on alphabetical order
@@ -127,6 +137,7 @@ func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
 			return nil
 		}
 	}
+
 	return fmt.Errorf("%s: server '%s' does not exist in class '%s'", stripeErrorHeader, name, class)
 }
 
@@ -138,6 +149,7 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 
 	for class, groups := range sched.serverClasses {
 		mapClass[class] = nil
+
 		for group := range groups {
 			mapGroup[group] = nil
 		}
@@ -148,10 +160,12 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 	for class := range mapClass {
 		listClass = append(listClass, class)
 	}
+
 	listGroup := []string{}
 	for group := range mapGroup {
 		listGroup = append(listGroup, group)
 	}
+
 	sort.Strings(listClass)
 	sort.Strings(listGroup)
 
@@ -163,7 +177,9 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 			if servers == nil {
 				continue
 			}
+
 			servers.sort()
+
 			for _, server := range servers.servers {
 				log.Info("Scheduler status", "cluster", cluster, "name", server, "class", class, "group", group)
 			}

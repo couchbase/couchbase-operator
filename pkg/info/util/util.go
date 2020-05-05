@@ -32,6 +32,7 @@ func Timestamp() string {
 
 	format := "20060102T150405-0700"
 	timestamp = time.Now().Format(format)
+
 	return timestamp
 }
 
@@ -47,6 +48,7 @@ func Salt() string {
 	}
 
 	salt = uuid.New().String()
+
 	return salt
 }
 

@@ -15,6 +15,7 @@ import (
 
 func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	trueVar := true
+
 	return metav1.OwnerReference{
 		APIVersion: SchemeGroupVersion.String(),
 		Kind:       ClusterCRDResourceKind,
@@ -51,6 +52,7 @@ func (l ServiceList) Contains(service Service) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -61,18 +63,22 @@ func (l ServiceList) ContainsAny(services ...Service) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 // Sub removes members from 'other' from a ServiceList.
 func (l ServiceList) Sub(other ServiceList) ServiceList {
 	out := ServiceList{}
+
 	for _, service := range l {
 		if other.Contains(service) {
 			continue
 		}
+
 		out = append(out, service)
 	}
+
 	return out
 }
 
@@ -80,18 +86,22 @@ func NewServiceList(services []string) ServiceList {
 	// TODO: Once the reflection stuff makes it in we can bin this
 	// as things will be happily type safe and use the enumerations
 	l := make(ServiceList, len(services))
+
 	for i, s := range services {
 		l[i] = Service(s)
 	}
+
 	return l
 }
 
 // Convert from a typed array to plain string array.
 func (l ServiceList) StringSlice() []string {
 	slice := make([]string, len(l))
+
 	for i, s := range l {
 		slice[i] = s.String()
 	}
+
 	return slice
 }
 
@@ -108,6 +118,7 @@ func (l ExposedFeatureList) Contains(feature string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -115,12 +126,14 @@ func (l ExposedFeatureList) Contains(feature string) bool {
 // as an indexed list mapped to their claims.
 func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
 	mountClaims := make(map[string]string)
+
 	if v.AnalyticsClaims != nil {
 		for i, claim := range v.AnalyticsClaims {
 			mount := fmt.Sprintf("%s-%02d", AnalyticsVolumeMount, i)
 			mountClaims[mount] = claim
 		}
 	}
+
 	return mountClaims
 }
 
@@ -131,6 +144,7 @@ func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	for mount := range v.GetAnalyticsMountClaims() {
 		paths = append(paths, fmt.Sprintf("/mnt/%s", mount))
 	}
+
 	return paths
 }
 
@@ -143,6 +157,7 @@ func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {
 	if sc != nil {
 		return sc.VolumeMounts
 	}
+
 	return nil
 }
 
@@ -152,6 +167,7 @@ func (sc *ServerConfig) GetDefaultVolumeClaim() string {
 			return mounts.DefaultClaim
 		}
 	}
+
 	return ""
 }
 
@@ -164,6 +180,7 @@ func (cs *ClusterSpec) TotalSize() int {
 	for _, server := range cs.Servers {
 		size += server.Size
 	}
+
 	return size
 }
 
@@ -174,15 +191,18 @@ func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeC
 			return &claim
 		}
 	}
+
 	return nil
 }
 
 // Get GetVolumeClaimTemplateNames returns all template names defined.
 func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
 	names := []string{}
+
 	for _, template := range cs.VolumeClaimTemplates {
 		names = append(names, template.Name)
 	}
+
 	return names
 }
 
@@ -194,6 +214,7 @@ func (cs *ClusterSpec) ServerGroupsEnabled() bool {
 			return true
 		}
 	}
+
 	return len(cs.ServerGroups) > 0
 }
 
@@ -201,6 +222,7 @@ func (cs *ClusterSpec) GetFSGroup() *int64 {
 	if cs.SecurityContext != nil {
 		return cs.SecurityContext.FSGroup
 	}
+
 	return nil
 }
 
@@ -211,6 +233,7 @@ func HasItem(itm string, arr []string) (int, bool) {
 			return i, true
 		}
 	}
+
 	return -1, false
 }
 
@@ -221,6 +244,7 @@ func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 			return &spec
 		}
 	}
+
 	return nil
 }
 
@@ -228,6 +252,7 @@ func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 // Defaults to Spec.Image unless image is provided by env variable.
 func (cs *ClusterSpec) CouchbaseImage() string {
 	image := cs.Image
+
 	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
 		if annotatedImage != "" {
 			image = annotatedImage
@@ -242,11 +267,13 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 // relatedImage env variable.
 func (cs *ClusterSpec) BackupImage() string {
 	image := cs.Backup.Image
+
 	if annotatedImage, ok := os.LookupEnv(constants.EnvBackupImageName); ok {
 		if annotatedImage != "" {
 			image = annotatedImage
 		}
 	}
+
 	return image
 }
 
@@ -254,17 +281,20 @@ func (cs *ClusterSpec) BackupImage() string {
 // defaults to Spec.Image when provided then falls back to relatedImage env variable.
 func (m *CouchbaseClusterMonitoringPrometheusSpec) MetricsImage() string {
 	image := m.Image
+
 	if annotatedImage, ok := os.LookupEnv(constants.EnvMetricsImageName); ok {
 		if annotatedImage != "" {
 			image = annotatedImage
 		}
 	}
+
 	return image
 }
 
 // get list of items which are in first array but not in second.
 func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}
+
 	for _, a := range a1 {
 		// checking if item from a1 is missing from a2
 		if _, ok := HasItem(a, a2); !ok {
@@ -272,6 +302,7 @@ func MissingItems(a1, a2 []string) []string {
 			missingItems = append(missingItems, a)
 		}
 	}
+
 	return missingItems
 }
 
@@ -281,6 +312,7 @@ func (l IPV4PrefixList) StringSlice() []string {
 	for i := range l {
 		s[i] = string(l[i])
 	}
+
 	return s
 }
 
@@ -290,6 +322,7 @@ func (l ExposedFeatureList) StringSlice() []string {
 	for i := range l {
 		s[i] = string(l[i])
 	}
+
 	return s
 }
 
@@ -315,13 +348,16 @@ func (tp *TLSPolicy) IsSecureClient() bool {
 	if tp == nil || tp.Static == nil {
 		return false
 	}
+
 	return len(tp.Static.OperatorSecret) != 0
 }
 
 // Set ready members from list.
 func (ms *MembersStatus) SetReady(ready []string) {
 	ms.Ready = nil
+
 	sort.Strings(ready)
+
 	for _, name := range ready {
 		ms.Ready = append(ms.Ready, name)
 	}
@@ -330,7 +366,9 @@ func (ms *MembersStatus) SetReady(ready []string) {
 // Set Unready members from list.
 func (ms *MembersStatus) SetUnready(unready []string) {
 	ms.Unready = nil
+
 	sort.Strings(unready)
+
 	for _, name := range unready {
 		ms.Unready = append(ms.Unready, name)
 	}
@@ -344,6 +382,7 @@ func (cs *ClusterStatus) IsFailed() bool {
 	if cs == nil {
 		return false
 	}
+
 	return cs.Phase == ClusterPhaseFailed
 }
 
@@ -431,6 +470,7 @@ func (cs *ClusterStatus) GetCondition(t ClusterConditionType) *ClusterCondition 
 			return &cs.Conditions[index]
 		}
 	}
+
 	return nil
 }
 
@@ -441,11 +481,13 @@ func (cs *ClusterStatus) setClusterCondition(c *ClusterCondition) {
 			return
 		}
 	}
+
 	cs.Conditions = append(cs.Conditions, *c)
 }
 
 func newClusterCondition(t ClusterConditionType, status v1.ConditionStatus, reason, message string) *ClusterCondition {
 	now := time.Now().Format(time.RFC3339)
+
 	return &ClusterCondition{
 		Type:               t,
 		Status:             status,
@@ -469,6 +511,7 @@ func (status *UpgradeStatus) Format() string {
 func NewUpgradeStatus(message string) *UpgradeStatus {
 	status := &UpgradeStatus{}
 	fmt.Sscanf(message, UpgradingMessageFormat, &status.State, &status.Source, &status.Target, &status.TargetCount, &status.TotalCount)
+
 	return status
 }
 
@@ -508,12 +551,15 @@ var bucketRoles = []RoleName{
 
 func ValidRolePattern() string {
 	patterns := []string{}
+
 	for _, role := range clusterRoles {
 		patterns = append(patterns, fmt.Sprintf("^%v$", role))
 	}
+
 	for _, role := range bucketRoles {
 		patterns = append(patterns, fmt.Sprintf("^%v$", role))
 	}
+
 	return strings.Join(patterns, "|")
 }
 
@@ -523,6 +569,7 @@ func IsBucketRole(role RoleName) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -532,5 +579,6 @@ func IsClusterRole(role RoleName) bool {
 			return true
 		}
 	}
+
 	return false
 }

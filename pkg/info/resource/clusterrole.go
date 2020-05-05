@@ -32,10 +32,12 @@ func (r *clusterRoleResource) Kind() string {
 // Fetch collects all clusterRoles as defined by the configuration.
 func (r *clusterRoleResource) Fetch() error {
 	var err error
+
 	r.clusterRoles, err = r.context.KubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *clusterRoleResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), clusterRole.Name, clusterRole.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

@@ -51,27 +51,35 @@ func DumpAdmissionYAML(conf *Config) error {
 	if err := DumpYAML(conf, "admission-service-account", GetAdmissionServiceAccount()); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "admission-cluster-role", GetAdmissionClusterRole()); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "admission-cluster-role-binding", GetAdmissionClusterRoleBinding(conf.Namespace)); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "admission-secret", GetAdmissionSecret(key, cert)); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "admission-deployment", GetAdmissionDeployment(conf.AdmissionImage, conf.ImagePullSecret)); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "admission-service", GetAdmissionService()); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "admission-mutating-webhook", GetAdmissionMutatingWebhook(conf.Namespace, ca.Certificate)); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "admission-validating-webhook", GetAdmissionValidatingWebhook(conf.Namespace, ca.Certificate)); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -256,6 +264,7 @@ func GetAdmissionDeployment(image, imagePullSecret string, extraArgs ...string) 
 			},
 		},
 	}
+
 	if imagePullSecret != "" {
 		deployment.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
 			{
@@ -263,6 +272,7 @@ func GetAdmissionDeployment(image, imagePullSecret string, extraArgs ...string) 
 			},
 		}
 	}
+
 	return deployment
 }
 
@@ -294,6 +304,7 @@ func GetAdmissionService() *corev1.Service {
 // GetAdmissionMutatingWebhook creates a mutating webhook for the admission controller.
 func GetAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistrationv1beta1.MutatingWebhookConfiguration {
 	admissionControllerMutatePath := "/couchbaseclusters/mutate"
+
 	return &admissionregistrationv1beta1.MutatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "admissionregistration.k8s.io/v1beta1",
@@ -350,6 +361,7 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistra
 // GetAdmissionValidatingWebhook creates a validating webhook for the admission controller.
 func GetAdmissionValidatingWebhook(namespace string, ca []byte) *admissionregistrationv1beta1.ValidatingWebhookConfiguration {
 	admissionControllerValidatePath := "/couchbaseclusters/validate"
+
 	return &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "admissionregistration.k8s.io/v1beta1",

@@ -32,13 +32,16 @@ func waitSyncGatewayAvailable(k8s *types.Cluster, timeout time.Duration) error {
 		if err != nil {
 			return err
 		}
+
 		for _, condition := range deployment.Status.Conditions {
 			if condition.Type == appsv1.DeploymentAvailable && condition.Status == corev1.ConditionTrue {
 				return nil
 			}
 		}
+
 		return fmt.Errorf("sync-gateway deployment not available")
 	}
+
 	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
@@ -51,12 +54,14 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 	// and client certificates as required.  As the config is going to be mounted
 	// we piggy back the certificates on this mount for simplicity.
 	scheme := "couchbase"
+
 	if tls != nil {
 		scheme = "couchbases"
 	}
 
 	username := k8s.DefaultSecret.Data[constants.SecretUsernameKey]
 	password := k8s.DefaultSecret.Data[constants.SecretPasswordKey]
+
 	if auth != nil {
 		username = auth.Data[constants.SecretUsernameKey]
 		password = auth.Data[constants.SecretPasswordKey]
@@ -82,6 +87,7 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 
 	if tls != nil {
 		databaseConfig["cacertpath"] = "/etc/sync_gateway/ca.pem"
+
 		if cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
 			databaseConfig["certpath"] = "/etc/sync_gateway/client.pem"
 			databaseConfig["keypath"] = "/etc/sync_gateway/client.key"

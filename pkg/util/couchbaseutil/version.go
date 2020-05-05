@@ -41,6 +41,7 @@ func NewVersion(version string) (*Version, error) {
 	// "<edition>-<semver>" or "<semver>-<edition>", ie:
 	//			"5.5.0" and "enterprise-5.5.0" and "5.5.0-beta"
 	re := regexp.MustCompile(`^(?:(\w+)-)?(\d+)\.(\d+)\.(\d+)(?:-(\w+))?`)
+
 	matches := re.FindStringSubmatch(version)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("malformed version '%s'", version)
@@ -52,6 +53,7 @@ func NewVersion(version string) (*Version, error) {
 	}
 
 	semver := make([]int, 3)
+
 	for i := 0; i < 3; i++ {
 		val, _ := strconv.Atoi(matches[i+2])
 		semver[i] = val
@@ -64,6 +66,7 @@ func NewVersion(version string) (*Version, error) {
 func IsSHA256Version(version string) bool {
 	re := regexp.MustCompile(`^[A-Fa-f0-9]{64}$`)
 	matches := re.FindStringSubmatch(version)
+
 	return len(matches) != 0
 }
 
@@ -77,6 +80,7 @@ func GetSHA256Version(version string) (string, error) {
 	if digests, ok := os.LookupEnv(constants.EnvDigestsConfigMap); ok {
 		// match against digests presented as list of equalities
 		re := regexp.MustCompile(version + `=(.*)\s?\n`)
+
 		parts := re.FindStringSubmatch(digests)
 		if len(parts) == 2 {
 			return parts[1], nil
@@ -128,10 +132,12 @@ func (v *Version) Compare(o *Version) int {
 		if v.semver[index] > o.semver[index] {
 			return 1
 		}
+
 		if v.semver[index] < o.semver[index] {
 			return -1
 		}
 	}
+
 	return 0
 }
 

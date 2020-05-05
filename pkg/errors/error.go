@@ -197,9 +197,11 @@ func (e ErrRunningPod) Error() string {
 func (e ErrInvalidBucketParamChange) Error() string {
 	fromStr := "unset"
 	toStr := "unset"
+
 	if hasValue(e.From) {
 		fromStr = reflect.Indirect(reflect.ValueOf(e.From)).String()
 	}
+
 	if hasValue(e.To) {
 		toStr = reflect.Indirect(reflect.ValueOf(e.To)).String()
 	}

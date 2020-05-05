@@ -317,6 +317,7 @@ func ConsoleServiceName(clusterName string) string {
 func labelsForNodeService(clusterName, nodeName string) map[string]string {
 	labels := LabelsForCluster(clusterName)
 	labels[constants.LabelNode] = nodeName
+
 	return labels
 }
 
@@ -327,6 +328,7 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 	// Create a service which defines A records for all pods, we use this internally
 	// to address nodes via stable names (IPs are not fixed)
 	ports := []v1.ServicePort{}
+
 	for _, rule := range allTheThings {
 		switch len(rule) {
 		case 1:
@@ -351,32 +353,39 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 
 func updatePeerService(current, requested *v1.Service) bool {
 	updated := false
+
 	if !reflect.DeepEqual(current.Labels, requested.Labels) {
 		current.Labels = requested.Labels
 		updated = true
 	}
+
 	if !reflect.DeepEqual(current.Annotations, requested.Annotations) {
 		current.Annotations = requested.Annotations
 		updated = true
 	}
+
 	if current.Spec.PublishNotReadyAddresses != requested.Spec.PublishNotReadyAddresses {
 		current.Spec.PublishNotReadyAddresses = requested.Spec.PublishNotReadyAddresses
 		updated = true
 	}
+
 	if !reflect.DeepEqual(current.Spec.LoadBalancerSourceRanges, requested.Spec.LoadBalancerSourceRanges) {
 		current.Spec.LoadBalancerSourceRanges = requested.Spec.LoadBalancerSourceRanges
 		updated = true
 	}
+
 	// Filled in by the API, so reset to what we generate
 	for i := range current.Spec.Ports {
 		current.Spec.Ports[i].TargetPort = intstr.IntOrString{}
 	}
+
 	// Unlike NodePort services we don't need to preserve TargetPorts so
 	// can just copy over the whole Spec.
 	if !reflect.DeepEqual(current.Spec, requested.Spec) {
 		current.Spec = requested.Spec
 		updated = true
 	}
+
 	return updated
 }
 
@@ -453,19 +462,23 @@ func ReconcilePeerServices(c *client.Client, namespace, name string, owner metav
 	if err := reconcilePeerService(c, namespace, name, owner); err != nil {
 		return err
 	}
+
 	if err := reconcileDiscoveryService(c, namespace, name, owner); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // adminConsoleSelector generates a selector matching pods running all the requested services.
 func adminConsoleSelector(cluster *couchbasev2.CouchbaseCluster) map[string]string {
 	labels := LabelsForCluster(cluster.Name)
+
 	for _, s := range cluster.Spec.Networking.AdminConsoleServices {
 		k := "couchbase_service_" + s.String()
 		labels[k] = "enabled"
 	}
+
 	return labels
 }
 
@@ -519,6 +532,7 @@ func getServiceNodePort(svc *v1.Service, portName string) string {
 			return strconv.Itoa(int(port.NodePort))
 		}
 	}
+
 	return ""
 }
 
@@ -526,20 +540,24 @@ func getServiceNodePort(svc *v1.Service, portName string) string {
 // true if anything happened.
 func updateConsoleService(service, requested *v1.Service) bool {
 	updated := false
+
 	// This handles spec.ddns.domain updates.
 	if !reflect.DeepEqual(service.Annotations, requested.Annotations) {
 		service.Annotations = requested.Annotations
 		updated = true
 	}
+
 	if service.Spec.PublishNotReadyAddresses != requested.Spec.PublishNotReadyAddresses {
 		service.Spec.PublishNotReadyAddresses = requested.Spec.PublishNotReadyAddresses
 		updated = true
 	}
+
 	// This handles spec.adminConsoleServices updates.
 	if !reflect.DeepEqual(service.Spec.Selector, requested.Spec.Selector) {
 		service.Spec.Selector = requested.Spec.Selector
 		updated = true
 	}
+
 	// This handles spec.adminConsoleServiceType updates.
 	if service.Spec.Type != requested.Spec.Type {
 		service.Spec.Type = requested.Spec.Type
@@ -562,18 +580,24 @@ func updateConsoleService(service, requested *v1.Service) bool {
 func UpdateAdminConsole(c *client.Client, cluster *couchbasev2.CouchbaseCluster, status *couchbasev2.ClusterStatus) (ReconcileStatus, error) {
 	// Lookup the console service.
 	name := cluster.Name + "-ui"
+
 	service, found := c.Services.Get(name)
 	if !found {
 		if !cluster.Spec.Networking.ExposeAdminConsole {
 			return ReconcileStatusUnchanged, nil
 		}
+
 		service = generateConsoleService(cluster)
+
 		var err error
+
 		if service, err = createService(c, cluster.Namespace, service, cluster.AsOwner()); err != nil {
 			return ReconcileStatusError, err
 		}
+
 		status.AdminConsolePort = getServiceNodePort(service, couchbaseUIPortName)
 		status.AdminConsolePortSSL = getServiceNodePort(service, couchbaseUIPortNameTLS)
+
 		return ReconcileStatusCreated, nil
 	}
 
@@ -582,8 +606,10 @@ func UpdateAdminConsole(c *client.Client, cluster *couchbasev2.CouchbaseCluster,
 		if err := deleteService(c, cluster.Namespace, name, nil); err != nil {
 			return ReconcileStatusError, err
 		}
+
 		status.AdminConsolePort = ""
 		status.AdminConsolePortSSL = ""
+
 		return ReconcileStatusDeleted, nil
 	}
 
@@ -596,6 +622,7 @@ func UpdateAdminConsole(c *client.Client, cluster *couchbasev2.CouchbaseCluster,
 	if _, err := updateService(c, cluster.Namespace, service); err != nil {
 		return ReconcileStatusError, err
 	}
+
 	return ReconcileStatusUpdated, nil
 }
 
@@ -631,6 +658,7 @@ func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (
 	// Nothing to do, exit
 	serviceList := couchbasev2.ServiceList{}
 	serviceSet := map[couchbasev2.Service]interface{}{}
+
 	if featureSet == nil || len(featureSet) == 0 {
 		return serviceList, nil
 	}
@@ -641,6 +669,7 @@ func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (
 		if !ok {
 			return nil, fmt.Errorf("feature set %s undefined", featureSet)
 		}
+
 		for _, featureSetPort := range featureSetPorts {
 			serviceSet[featureSetPort] = nil
 		}
@@ -650,15 +679,18 @@ func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (
 	for service := range serviceSet {
 		serviceList = append(serviceList, service)
 	}
+
 	return serviceList, nil
 }
 
 // listRequestedPorts return the set of ports requested by the specification.
 func listRequestedPorts(serviceNames couchbasev2.ServiceList) []v1.ServicePort {
 	ports := []v1.ServicePort{}
+
 	for _, serviceName := range serviceNames {
 		ports = append(ports, servicePorts[serviceName]...)
 	}
+
 	return ports
 }
 
@@ -670,6 +702,7 @@ func serviceExists(services []*v1.Service, name string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -680,6 +713,7 @@ func portExists(ports []v1.ServicePort, name string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -687,11 +721,13 @@ func portExists(ports []v1.ServicePort, name string) bool {
 // It returns a subset of a.
 func intersectPorts(a, b []v1.ServicePort) []v1.ServicePort {
 	d := []v1.ServicePort{}
+
 	for _, port := range a {
 		if portExists(b, port.Name) {
 			d = append(d, port)
 		}
 	}
+
 	return d
 }
 
@@ -699,11 +735,13 @@ func intersectPorts(a, b []v1.ServicePort) []v1.ServicePort {
 // It returns a subset of a.
 func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
 	d := []v1.ServicePort{}
+
 	for _, port := range a {
 		if !portExists(b, port.Name) {
 			d = append(d, port)
 		}
 	}
+
 	return d
 }
 
@@ -721,11 +759,13 @@ func GetSRVName(cluster *couchbasev2.CouchbaseCluster) string {
 // because they inscure.
 func filterInsecurePorts(ports []v1.ServicePort, secure bool) []v1.ServicePort {
 	p := []v1.ServicePort{}
+
 	for _, port := range ports {
 		if !secure || strings.HasSuffix(port.Name, tlsPortNameSuffix) {
 			p = append(p, port)
 		}
 	}
+
 	return p
 }
 
@@ -743,10 +783,12 @@ func memberServices(cluster *couchbasev2.CouchbaseCluster, members couchbaseutil
 	if !ok {
 		return nil, cberrors.NewErrUnknownMember(name)
 	}
+
 	class := cluster.Spec.GetServerConfigByName(member.ServerConfig)
 	if class == nil {
 		return nil, cberrors.NewErrUnknownServerClass(member.ServerConfig)
 	}
+
 	// Append the admin service, this is not explicitly enabled
 	return append(class.Services, couchbasev2.AdminService), nil
 }
@@ -766,6 +808,7 @@ func listExposedServices(c *client.Client) (services []*v1.Service) {
 			services = append(services, service)
 		}
 	}
+
 	return
 }
 
@@ -795,10 +838,10 @@ func generateExposedService(name string, members couchbaseutil.MemberSet, cluste
 
 	// If a DNS domain is specified annotate with the pod DNS name.
 	if cluster.Spec.Networking.DNS != nil {
-		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, name)
 		// TODO: data nodes only please
 		// TODO: await input from external-dns
 		//service.Annotations[srvAnnotaion] = GetSRVName(cluster)
+		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, name)
 	}
 
 	// Enforce that traffic has to come directly to the k8s node avoiding the
@@ -821,6 +864,7 @@ func createExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 	for _, member := range members {
 		// Generate the requested resource
 		var service *v1.Service
+
 		service, err = generateExposedService(member.Name, members, cluster, ports)
 
 		// If the server class is missing then we allow for the node to balanced out.
@@ -852,32 +896,39 @@ func createExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 // true if an update is required.
 func updateExposedService(service, requested *v1.Service) bool {
 	updated := false
+
 	// This handles spec.ddns.domain updates.
 	if !reflect.DeepEqual(service.Annotations, requested.Annotations) {
 		service.Annotations = requested.Annotations
 		updated = true
 	}
+
 	// This handles updates to the service type
 	if service.Spec.Type != requested.Spec.Type {
 		service.Spec.Type = requested.Spec.Type
 		service.Spec.Type = requested.Spec.Type
 		updated = true
 	}
+
 	// This handles traffic policy updates
 	if service.Spec.ExternalTrafficPolicy != requested.Spec.ExternalTrafficPolicy {
 		service.Spec.Type = requested.Spec.Type
 		service.Spec.ExternalTrafficPolicy = requested.Spec.ExternalTrafficPolicy
 		updated = true
 	}
+
 	if !reflect.DeepEqual(service.Spec.LoadBalancerSourceRanges, requested.Spec.LoadBalancerSourceRanges) {
 		service.Spec.LoadBalancerSourceRanges = requested.Spec.LoadBalancerSourceRanges
 		updated = true
 	}
+
 	// This handles updates to spec.exposedFeatures
 	existingPorts := intersectPorts(service.Spec.Ports, requested.Spec.Ports)
 	requiredPorts := subtractPorts(requested.Spec.Ports, existingPorts)
+
 	portsAdded := len(requiredPorts) != 0
 	portsRemoved := len(existingPorts) != len(service.Spec.Ports)
+
 	if portsAdded || portsRemoved {
 		updatedPorts := existingPorts
 		updatedPorts = append(updatedPorts, requiredPorts...)
@@ -886,6 +937,7 @@ func updateExposedService(service, requested *v1.Service) bool {
 		service.Spec.Ports = updatedPorts
 		updated = true
 	}
+
 	return updated
 }
 
@@ -903,10 +955,10 @@ func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 
 		// Generate the requested resource
 		var requested *v1.Service
-		requested, err = generateExposedService(memberName, members, cluster, ports)
 
 		// If the server class is missing then we allow for the node to balanced out.
 		// If the member is missing we delete it.
+		requested, err = generateExposedService(memberName, members, cluster, ports)
 		if err != nil {
 			switch {
 			case cberrors.IsErrUnknownServerClass(err):
@@ -915,6 +967,7 @@ func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberS
 			case cberrors.IsErrUnknownMember(err):
 				deletions = append(deletions, service)
 				err = nil
+
 				continue
 			default:
 				return
@@ -948,6 +1001,7 @@ func UpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cl
 	if err != nil {
 		return nil, err
 	}
+
 	ports := listRequestedPorts(serviceNames)
 
 	// Filter out any insecure ports if we need to
@@ -976,6 +1030,7 @@ func UpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cl
 		if _, err := createService(c, cluster.Namespace, service, cluster.AsOwner()); err != nil {
 			return nil, err
 		}
+
 		if cluster.Spec.IsExposedFeatureServiceTypePublic() {
 			continue
 		}
@@ -987,6 +1042,7 @@ func UpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cl
 		if _, err := updateService(c, cluster.Namespace, service); err != nil {
 			return nil, err
 		}
+
 		if cluster.Spec.IsExposedFeatureServiceTypePublic() {
 			continue
 		}
@@ -1004,6 +1060,7 @@ func UpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cl
 	if err != nil {
 		return nil, err
 	}
+
 	ret := &UpdateExposedFeatureStatus{
 		Added:   serviceNames.Sub(prevServiceNames),
 		Removed: prevServiceNames.Sub(serviceNames),
@@ -1070,6 +1127,7 @@ func GetAlternateAddressExternalPorts(c *client.Client, namespace, name string) 
 	}
 
 	ports := &cbmgr.AlternateAddressesExternalPorts{}
+
 	for _, port := range svc.Spec.Ports {
 		switch port.Name {
 		case adminServicePortName:

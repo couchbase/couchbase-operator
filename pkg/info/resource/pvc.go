@@ -35,10 +35,12 @@ func (r *persistentVolumeClaimResource) Fetch() error {
 	if err != nil {
 		return err
 	}
+
 	r.persistentVolumeClaims, err = r.context.KubeClient.CoreV1().PersistentVolumeClaims(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -51,6 +53,7 @@ func (r *persistentVolumeClaimResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), persistentVolumeClaim.Name, persistentVolumeClaim.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

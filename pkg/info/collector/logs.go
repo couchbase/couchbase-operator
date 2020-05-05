@@ -40,25 +40,30 @@ func (r *logCollector) Fetch(resource resource.Reference) error {
 	if err != nil {
 		return err
 	}
+
 	if pod == nil {
 		return nil
 	}
 
 	// For each container read the logs and store in a mapping keyed on container name
 	r.logs = map[string]*bytes.Buffer{}
+
 	for _, container := range pod.Spec.Containers {
 		logOptions := &v1.PodLogOptions{
 			Container: container.Name,
 		}
+
 		req := r.context.KubeClient.CoreV1().Pods(r.context.Namespace()).GetLogs(pod.Name, logOptions)
 
 		readCloser, err := req.Stream()
 		if err != nil {
 			return err
 		}
+
 		defer readCloser.Close()
 
 		buf := &bytes.Buffer{}
+
 		_, err = io.Copy(buf, readCloser)
 		if err != nil {
 			return err
@@ -71,6 +76,7 @@ func (r *logCollector) Fetch(resource resource.Reference) error {
 	}
 
 	r.resource = resource
+
 	return nil
 }
 
@@ -78,5 +84,6 @@ func (r *logCollector) Write(b backend.Backend) error {
 	for name, logs := range r.logs {
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), name+".log"), logs.String())
 	}
+
 	return nil
 }

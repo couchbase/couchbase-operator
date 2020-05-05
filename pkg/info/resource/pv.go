@@ -32,10 +32,12 @@ func (r *persistentVolumeResource) Kind() string {
 // Fetch collects all persistentVolumes as defined by the configuration.
 func (r *persistentVolumeResource) Fetch() error {
 	var err error
+
 	r.persistentVolumes, err = r.context.KubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *persistentVolumeResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), persistentVolume.Name, persistentVolume.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

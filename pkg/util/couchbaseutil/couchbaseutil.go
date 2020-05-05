@@ -56,9 +56,11 @@ func (s NodeState) String() string {
 		NodeStateFailed:      "failed",
 		NodeStateUnclustered: "unclustered",
 	}
+
 	if str, ok := stateStrings[s]; ok {
 		return str
 	}
+
 	return "invalid"
 }
 
@@ -97,7 +99,9 @@ func NewClusterStatus() *ClusterStatus {
 	status := &ClusterStatus{
 		info: &cbmgr.ClusterInfo{},
 	}
+
 	status.Reset()
+
 	return status
 }
 
@@ -193,12 +197,14 @@ func (cs *ClusterStatus) getNode(hostname string) (*cbmgr.NodeInfo, error) {
 			return &node, nil
 		}
 	}
+
 	return nil, fmt.Errorf("node %s does not exist in cluster", hostname)
 }
 
 // KnownNodes returns all nodes that the cluster is tracking.
 func (cs *ClusterStatus) KnownNodes() []string {
 	knownNodes := []string{}
+
 	for _, node := range cs.info.Nodes {
 		memberName := strings.Split(node.HostName, ".")[0]
 		knownNodes = append(knownNodes, memberName)
@@ -267,6 +273,7 @@ func (cs *ClusterStatus) addMemberToStateSet(state NodeState, member *Member) er
 	default:
 		return fmt.Errorf("unhandled node state %v", state)
 	}
+
 	return nil
 }
 
@@ -285,9 +292,11 @@ func (cs *ClusterStatus) logClusterStatus(cluster string) {
 func (cs *ClusterStatus) logClusterNodeStatus(cluster string) {
 	// Sort the names so it's easier to grok
 	names := []string{}
+
 	for name := range cs.managedNodes {
 		names = append(names, name)
 	}
+
 	sort.Strings(names)
 
 	// Collect all the node statuses, as we process check the string lengths for
@@ -318,6 +327,7 @@ func (cs *ClusterStatus) logClusterNodeStatus(cluster string) {
 		if len(name) > maxName {
 			maxName = len(name)
 		}
+
 		if len(class) > maxClass {
 			maxClass = len(class)
 		}
@@ -369,6 +379,7 @@ func (cs *ClusterStatus) AllManagedNodesHealthy() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -399,6 +410,7 @@ func (cs *ClusterStatus) NodeInState(name string, states ...NodeState) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -426,24 +438,29 @@ func (cs *ClusterStatus) RebalanceSucceeded(members, ejected MemberSet) (bool, e
 			return false, fmt.Errorf("unexpected state %s for member %s", state.String(), name)
 		}
 	}
+
 	return true, nil
 }
 
 // Filter named nodes from a cluster status map.
 func (nsm NodeStateMap) Exclude(excludes ...string) NodeStateMap {
 	states := NodeStateMap{}
+
 	for name, state := range nsm {
 		found := false
+
 		for _, exclude := range excludes {
 			if name == exclude {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			states[name] = state
 		}
 	}
+
 	return states
 }
 
@@ -454,6 +471,7 @@ func (nsm NodeStateMap) AllActive() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -465,6 +483,7 @@ func CheckHealth(url string, tc *tls.Config) (bool, error) {
 
 func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchbasev2.ServiceList) error {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
 		return err
@@ -472,6 +491,7 @@ func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchb
 
 	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.AddNode(hostname, c.username, c.password, svcs)
 	})
@@ -479,8 +499,10 @@ func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchb
 
 func (c *CouchbaseClient) CancelAddNode(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.CancelAddNode(hostname)
 	})
@@ -488,8 +510,10 @@ func (c *CouchbaseClient) CancelAddNode(ms MemberSet, hostname string) error {
 
 func (c *CouchbaseClient) CancelAddBackNode(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.CancelAddBackNode(hostname)
 	})
@@ -500,9 +524,12 @@ func (c *CouchbaseClient) ClusterUUID(m *Member) (string, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	var err error
+
 	var uuid string
+
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		uuid, err = c.client.ClusterUUID()
 		return err
@@ -517,9 +544,12 @@ func (c *CouchbaseClient) IsEnterprise(m *Member) (bool, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	var err error
+
 	var isEnterprise bool
+
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		isEnterprise, err = c.client.IsEnterprise()
 		return err
@@ -533,6 +563,7 @@ func (c *CouchbaseClient) GetClusterStatus(ms MemberSet) (*ClusterStatus, error)
 	if err := c.UpdateClusterStatus(ms, status); err != nil {
 		return nil, err
 	}
+
 	return status, nil
 }
 
@@ -543,9 +574,11 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	err := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		// Get the cluster information from Couchbase server
 		var err error
+
 		status.info, err = c.client.ClusterInfo()
 		if err != nil {
 			return err
@@ -608,6 +641,7 @@ func (c *CouchbaseClient) NodeInitialize(m *Member, clusterName string, dataPath
 
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.NodeInitialize(m.Addr(), dataPath, indexPath, analyticsPaths)
 	})
@@ -630,6 +664,7 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string
 
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.ClusterInitialize(username, password, defaults, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
 	})
@@ -647,6 +682,7 @@ func (c *CouchbaseClient) triggerRebalance(nodesToRemove []string) error {
 	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -665,6 +701,7 @@ WitnessLoop:
 		if ok {
 			return progress, status, nil
 		}
+
 		select {
 		case <-tick.C:
 		case <-ctx.Done():
@@ -700,6 +737,7 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, cluste
 		}
 
 		var ok bool
+
 		status, ok = <-progress.Status()
 		if !ok {
 			return progress.Error()
@@ -720,6 +758,7 @@ func (c *CouchbaseClient) IsRebalanceActive(ms MemberSet) (bool, error) {
 
 func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]cbmgr.Bucket, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	buckets, err := c.client.GetBuckets()
 	if err != nil {
 		return nil, err
@@ -727,9 +766,11 @@ func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]cbmgr.Bucket, error) {
 
 	// TODO: Standardize on value/pointer
 	res := []cbmgr.Bucket{}
+
 	for _, bucket := range buckets {
 		res = append(res, *bucket)
 	}
+
 	return res, nil
 }
 
@@ -760,10 +801,12 @@ func (c *CouchbaseClient) GetUser(ms MemberSet, id string, domain couchbasev2.Au
 
 func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]*cbmgr.User, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	users, err := c.client.GetUsers()
 	if err != nil {
 		return nil, err
 	}
+
 	return users, nil
 }
 
@@ -779,10 +822,12 @@ func (c *CouchbaseClient) DeleteUser(ms MemberSet, user cbmgr.User) error {
 
 func (c *CouchbaseClient) ListGroups(ms MemberSet) ([]*cbmgr.Group, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	groups, err := c.client.GetGroups()
 	if err != nil {
 		return nil, err
 	}
+
 	return groups, nil
 }
 
@@ -798,8 +843,10 @@ func (c *CouchbaseClient) DeleteGroup(ms MemberSet, group cbmgr.Group) error {
 
 func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.AutoFailoverSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.SetAutoFailoverSettings(settings)
 	})
@@ -807,10 +854,12 @@ func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.
 
 func (c *CouchbaseClient) GetAutoFailoverSettings(ms MemberSet) (*cbmgr.AutoFailoverSettings, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	var settings *cbmgr.AutoFailoverSettings
 
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	return settings, retryutil.RetryOnErr(ctx, 5*time.Second, func() (e error) {
 		settings, e = c.client.GetAutoFailoverSettings()
 		return e
@@ -830,8 +879,10 @@ func (c *CouchbaseClient) SetPoolsDefault(ms MemberSet, defaults *cbmgr.PoolsDef
 func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.UploadClusterCACert(pem)
 	})
@@ -840,15 +891,18 @@ func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {
 func (c *CouchbaseClient) GetClusterCACert(m *Member) ([]byte, error) {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	return c.client.GetClusterCACert()
 }
 
 func (c *CouchbaseClient) ReloadNodeCert(m *Member) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	// This may take ages if the CA was previously updated.
 	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.ReloadNodeCert()
 	})
@@ -887,32 +941,39 @@ func (c *CouchbaseClient) GetIndexSettings(ms MemberSet, username, password stri
 
 func (c *CouchbaseClient) SetIndexSettings(ms MemberSet, username, password, storageMode string, settings *cbmgr.IndexSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	settings.StorageMode = cbmgr.IndexStorageMode(storageMode)
+
 	return c.client.SetIndexSettings(settings)
 }
 
 func (c *CouchbaseClient) GetAlternateAddressesExternal(m *Member) (*cbmgr.AlternateAddressesExternal, error) {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	return c.client.GetAlternateAddressesExternal()
 }
 
 func (c *CouchbaseClient) SetAlternateAddressesExternal(m *Member, addresses *cbmgr.AlternateAddressesExternal) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	return c.client.SetAlternateAddressesExternal(addresses)
 }
 
 func (c *CouchbaseClient) DeleteAlternateAddressesExternal(m *Member) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	return c.client.DeleteAlternateAddressesExternal()
 }
 
 func (c *CouchbaseClient) SetRecoveryTypeDelta(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeDelta)
 	})
@@ -920,8 +981,10 @@ func (c *CouchbaseClient) SetRecoveryTypeDelta(ms MemberSet, hostname string) er
 
 func (c *CouchbaseClient) SetRecoveryTypeFull(ms MemberSet, hostname string) error {
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
+
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeFull)
 	})
@@ -932,10 +995,12 @@ func (c *CouchbaseClient) SetRecoveryTypeFull(ms MemberSet, hostname string) err
 func (c *CouchbaseClient) GetRecoveryType(m *Member) (cbmgr.RecoveryType, error) {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	info, err := c.client.ClusterInfo()
 	if err != nil {
 		return cbmgr.RecoveryTypeFull, err
 	}
+
 	for _, node := range info.Nodes {
 		member := ms[strings.Split(node.HostName, ".")[0]]
 		if member != nil && member.Name == m.Name {
@@ -951,6 +1016,7 @@ func (c *CouchbaseClient) IsRecoveryTypeDelta(m *Member) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return recoveryType == cbmgr.RecoveryTypeDelta, nil
 }
 
@@ -1036,23 +1102,27 @@ func (c *CouchbaseClient) SetSecuritySettings(ms MemberSet, s *cbmgr.SecuritySet
 func (c *CouchbaseClient) GetNodeNetworkConfiguration(m *Member) (*cbmgr.NodeNetworkConfiguration, error) {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	return c.client.GetNodeNetworkConfiguration()
 }
 
 func (c *CouchbaseClient) SetNodeNetworkConfiguration(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	return c.client.SetNodeNetworkConfiguration(s)
 }
 
 func (c *CouchbaseClient) EnableExternalListener(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	return c.client.EnableExternalListener(s)
 }
 
 func (c *CouchbaseClient) DisableExternalListener(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
+
 	return c.client.DisableExternalListener(s)
 }

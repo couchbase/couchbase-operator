@@ -50,6 +50,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	victimGroup := 0
 	victims := []int{}
+
 	for i := 0; i < clusterSize; i++ {
 		if i%len(availableServerGroupList) == victimGroup {
 			victims = append(victims, i)
@@ -104,10 +105,12 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	// in order for the condition to manifest.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/ControlPaused", true), time.Minute)
+
 	for _, victim := range victims {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, true)
 		time.Sleep(2 * autoFailoverTimeout)
 	}
+
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Minute)

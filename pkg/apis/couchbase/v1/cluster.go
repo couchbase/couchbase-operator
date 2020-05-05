@@ -30,6 +30,7 @@ type CouchbaseCluster struct {
 
 func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	trueVar := true
+
 	return metav1.OwnerReference{
 		APIVersion: SchemeGroupVersion.String(),
 		Kind:       CRDResourceKind,
@@ -81,6 +82,7 @@ func (l ServiceList) Contains(service Service) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -91,18 +93,22 @@ func (l ServiceList) ContainsAny(services ...Service) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 // Sub removes members from 'other' from a ServiceList.
 func (l ServiceList) Sub(other ServiceList) ServiceList {
 	out := ServiceList{}
+
 	for _, service := range l {
 		if other.Contains(service) {
 			continue
 		}
+
 		out = append(out, service)
 	}
+
 	return out
 }
 
@@ -111,6 +117,7 @@ func NewServiceList(services []string) ServiceList {
 	for i, s := range services {
 		l[i] = Service(s)
 	}
+
 	return l
 }
 
@@ -120,6 +127,7 @@ func (l ServiceList) StringSlice() []string {
 	for i, s := range l {
 		slice[i] = s.String()
 	}
+
 	return slice
 }
 
@@ -149,6 +157,7 @@ func (efl ExposedFeatureList) Contains(feature string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -431,12 +440,14 @@ type VolumeMounts struct {
 // as an indexed list mapped to their claims.
 func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
 	mountClaims := make(map[string]string)
+
 	if v.AnalyticsClaims != nil {
 		for i, claim := range v.AnalyticsClaims {
 			mount := fmt.Sprintf("%s-%02d", AnalyticsVolumeMount, i)
 			mountClaims[mount] = claim
 		}
 	}
+
 	return mountClaims
 }
 
@@ -447,6 +458,7 @@ func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	for mount := range v.GetAnalyticsMountClaims() {
 		paths = append(paths, fmt.Sprintf("/mnt/%s", mount))
 	}
+
 	return paths
 }
 
@@ -459,6 +471,7 @@ func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {
 	if sc != nil && sc.Pod != nil {
 		return sc.Pod.VolumeMounts
 	}
+
 	return nil
 }
 
@@ -468,6 +481,7 @@ func (sc *ServerConfig) GetDefaultVolumeClaim() string {
 			return mounts.DefaultClaim
 		}
 	}
+
 	return ""
 }
 
@@ -480,17 +494,20 @@ func (cs *ClusterSpec) TotalSize() int {
 	for _, server := range cs.ServerSettings {
 		size += server.Size
 	}
+
 	return size
 }
 
 // list of bucket names from config.
 func (cs *ClusterSpec) BucketNames() []string {
 	buckets := []string{}
+
 	if cs.BucketSettings != nil {
 		for _, b := range cs.BucketSettings {
 			buckets = append(buckets, b.BucketName)
 		}
 	}
+
 	return buckets
 }
 
@@ -503,6 +520,7 @@ func (cs *ClusterSpec) GetBucketByName(name string) *BucketConfig {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -513,6 +531,7 @@ func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeC
 			return &claim
 		}
 	}
+
 	return nil
 }
 
@@ -522,6 +541,7 @@ func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
 	for _, template := range cs.VolumeClaimTemplates {
 		names = append(names, template.Name)
 	}
+
 	return names
 }
 
@@ -543,6 +563,7 @@ func (cs *ClusterSpec) ServerGroupsEnabled() bool {
 			return true
 		}
 	}
+
 	return len(cs.ServerGroups) > 0
 }
 
@@ -550,6 +571,7 @@ func (cs *ClusterSpec) GetFSGroup() *int64 {
 	if cs.SecurityContext != nil {
 		return cs.SecurityContext.FSGroup
 	}
+
 	return nil
 }
 
@@ -564,6 +586,7 @@ func HasItem(itm string, arr []string) (int, bool) {
 			return i, true
 		}
 	}
+
 	return -1, false
 }
 
@@ -574,12 +597,14 @@ func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 			return &spec
 		}
 	}
+
 	return nil
 }
 
 // get list of items which are in first array but not in second.
 func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}
+
 	for _, a := range a1 {
 		// checking if item from a1 is missing from a2
 		if _, ok := HasItem(a, a2); !ok {
@@ -587,6 +612,7 @@ func MissingItems(a1, a2 []string) []string {
 			missingItems = append(missingItems, a)
 		}
 	}
+
 	return missingItems
 }
 

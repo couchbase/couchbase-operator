@@ -49,6 +49,7 @@ func (c *Cluster) APIHostname() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return u.Hostname(), nil
 }
 

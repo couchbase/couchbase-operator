@@ -35,10 +35,12 @@ func (r *configMapResource) Fetch() error {
 	if err != nil {
 		return err
 	}
+
 	r.configMaps, err = r.context.KubeClient.CoreV1().ConfigMaps(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -51,6 +53,7 @@ func (r *configMapResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), configMap.Name, configMap.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

@@ -35,7 +35,9 @@ func (r *couchbaseMemcachedBucketResource) Fetch() error {
 	if err != nil {
 		return err
 	}
+
 	r.couchbaseMemcachedBuckets = couchbaseMemcachedBuckets.Items
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *couchbaseMemcachedBucketResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), couchbaseMemcachedBucket.Name, couchbaseMemcachedBucket.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

@@ -24,10 +24,12 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	thresholdPercent := 69
 	thresholdSize := e2espec.NewResourceQuantityMi(69)
 	thresholdSizeInternal := int64(69 * 1024 * 1024)
+
 	purgeIntervalBase, err := time.ParseDuration("42h")
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	purgeInterval := metav1.Duration{
 		Duration: purgeIntervalBase,
 	}

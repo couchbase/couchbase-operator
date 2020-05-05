@@ -28,6 +28,7 @@ func enableMonitoring(f *framework.Framework) *couchbasev2.CouchbaseClusterMonit
 				Image:   imageName,
 			},
 		}
+
 		return monitoring
 	}
 
@@ -36,6 +37,7 @@ func enableMonitoring(f *framework.Framework) *couchbasev2.CouchbaseClusterMonit
 			Enabled: true,
 		},
 	}
+
 	return monitoring
 }
 
@@ -199,6 +201,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
 	var token []byte
+
 	if authSecret, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Get(monitoringAuthSecret, metav1.GetOptions{}); err != nil {
 		e2eutil.Die(t, err)
 	} else {

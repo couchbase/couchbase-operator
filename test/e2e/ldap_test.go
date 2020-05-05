@@ -23,6 +23,7 @@ func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster, namespace string)
 	group := e2eutil.MustNewGroup(t, k8s, namespace, e2espec.NewClusterAdminGroup())
 	bindSpec := e2espec.NewRoleBinding(e2e_constants.RoleBindingName, []string{user.Name}, group.Name)
 	binding := e2eutil.MustNewRoleBinding(t, k8s, namespace, bindSpec)
+
 	return user, group, binding
 }
 
@@ -50,6 +51,7 @@ func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.
 
 	// Verify Connectivity
 	e2eutil.MustCheckLDAPStatus(t, k8s, testCouchbase, 2*time.Minute)
+
 	return testCouchbase
 }
 

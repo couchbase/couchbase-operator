@@ -75,6 +75,7 @@ func harvestSub(context *context.Context, backend backend.Backend, references []
 				fmt.Printf("unable to fetch %s for type %s name %s: %v\n", collector.Kind(), ref.Kind(), ref.Name(), err)
 				continue
 			}
+
 			if err := collector.Write(backend); err != nil {
 				fmt.Printf("unable to write %s for type %s name %s: %v\n", collector.Kind(), ref.Kind(), ref.Name(), err)
 				continue
@@ -92,10 +93,12 @@ func harvest(context *context.Context, backend backend.Backend, initializers []r
 			fmt.Printf("unable to fetch resources for type %s: %v\n", resource.Kind(), err)
 			continue
 		}
+
 		if err := resource.Write(backend); err != nil {
 			fmt.Printf("unable to write resources for type %s: %v\n", resource.Kind(), err)
 			continue
 		}
+
 		harvestSub(context, backend, resource.References())
 	}
 }
@@ -107,6 +110,7 @@ func clusterExists(clusters *couchbasev2.CouchbaseClusterList, name string) bool
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -189,6 +193,7 @@ func main() {
 		fmt.Println("unable to initialize backend:", err)
 		os.Exit(1)
 	}
+
 	defer backend.Close()
 
 	// Store the arguments used to invoke the command

@@ -39,5 +39,6 @@ func (c *Config) ParseArgs() error {
 	flagSet.BoolVar(&c.Backup, "backup", false, "Generate backup configuration")
 	flagSet.BoolVar(&c.File, "file", false, "Create separate files rather than echo to standard out")
 	flagSet.BoolVar(&c.Version, "version", false, "Displays the version and exits")
+
 	return flagSet.Parse(os.Args[1:])
 }

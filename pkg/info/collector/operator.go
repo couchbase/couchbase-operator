@@ -55,6 +55,7 @@ func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, path
 	if err := pf.ForwardPorts(); err != nil {
 		return fmt.Errorf("unable to forward port %s for pod %s", r.context.Config.OperatorRestPort, pod.Name)
 	}
+
 	defer pf.Close()
 
 	// The port-forwarder is a bit chatty on error, but we can shut it up
@@ -64,11 +65,13 @@ func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, path
 	for name, path := range paths {
 		// Get the debug info, we need debug=1 here or it spits out binary
 		uri := fmt.Sprintf("http://localhost:%s%s", port, path)
+
 		resp, err := http.Get(uri)
 		if err != nil {
 			fmt.Printf("unable to collect %s for pod %s\n", uri, pod.Name)
 			continue
 		}
+
 		defer resp.Body.Close()
 
 		// Buffer up the responses
@@ -77,6 +80,7 @@ func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, path
 			fmt.Printf("unable to read response %s for pod %s\n", uri, pod.Name)
 			continue
 		}
+
 		r.data[name] = body
 	}
 
@@ -95,6 +99,7 @@ func (r *operatorCollector) Fetch(resource resource.Reference) error {
 	if err != nil {
 		return err
 	}
+
 	if pod == nil {
 		return err
 	}
@@ -130,6 +135,7 @@ func (r *operatorCollector) Fetch(resource resource.Reference) error {
 	}
 
 	r.resource = resource
+
 	return nil
 }
 
@@ -139,5 +145,6 @@ func (r *operatorCollector) Write(b backend.Backend) error {
 			_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), name), string(data))
 		}
 	}
+
 	return nil
 }

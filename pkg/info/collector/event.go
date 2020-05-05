@@ -41,6 +41,7 @@ func (r *eventCollector) Fetch(resource resource.Reference) error {
 
 	r.events = events
 	r.resource = resource
+
 	return nil
 }
 
@@ -55,5 +56,6 @@ func (r *eventCollector) Write(b backend.Backend) error {
 	}
 
 	_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), "events.yaml"), string(data))
+
 	return nil
 }

@@ -59,8 +59,10 @@ func newResourceCache(ctx context.Context, client cache.Getter, resource runtime
 	ready := func() (bool, error) {
 		return rc.informer.HasSynced(), nil
 	}
+
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
+
 	if err := retryutil.Retry(ctx, time.Second, ready); err != nil {
 		rc.stop()
 		return nil, err
@@ -87,6 +89,7 @@ func newPodCache(ctx context.Context, client kubernetes.Interface, namespace str
 	if err != nil {
 		return nil, err
 	}
+
 	return &PodCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -96,11 +99,13 @@ func newPodCache(ctx context.Context, client kubernetes.Interface, namespace str
 // get returns the requested pod based on name.
 func (c *PodCache) Get(name string) (*corev1.Pod, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*corev1.Pod), true
 }
 
@@ -110,6 +115,7 @@ func (c *PodCache) List() (pods []*corev1.Pod) {
 	for _, obj := range objs {
 		pods = append(pods, obj.(*corev1.Pod))
 	}
+
 	return
 }
 
@@ -131,6 +137,7 @@ func newPersistentVolumeClaimCache(ctx context.Context, client kubernetes.Interf
 	if err != nil {
 		return nil, err
 	}
+
 	return &PersistentVolumeClaimCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -140,11 +147,13 @@ func newPersistentVolumeClaimCache(ctx context.Context, client kubernetes.Interf
 // get returns the requested persistentvolumeclaim based on name.
 func (c *PersistentVolumeClaimCache) Get(name string) (*corev1.PersistentVolumeClaim, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*corev1.PersistentVolumeClaim), true
 }
 
@@ -154,6 +163,7 @@ func (c *PersistentVolumeClaimCache) List() (pvcs []*corev1.PersistentVolumeClai
 	for _, obj := range objs {
 		pvcs = append(pvcs, obj.(*corev1.PersistentVolumeClaim))
 	}
+
 	return
 }
 
@@ -175,6 +185,7 @@ func newServiceCache(ctx context.Context, client kubernetes.Interface, namespace
 	if err != nil {
 		return nil, err
 	}
+
 	return &ServiceCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -184,11 +195,13 @@ func newServiceCache(ctx context.Context, client kubernetes.Interface, namespace
 // get returns the requested service based on name.
 func (c *ServiceCache) Get(name string) (*corev1.Service, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*corev1.Service), true
 }
 
@@ -198,6 +211,7 @@ func (c *ServiceCache) List() (svcs []*corev1.Service) {
 	for _, obj := range objs {
 		svcs = append(svcs, obj.(*corev1.Service))
 	}
+
 	return
 }
 
@@ -216,10 +230,12 @@ type SecretCache struct {
 // newSecretCache creates a new synchronized cache for Secret resources.
 func newSecretCache(ctx context.Context, client kubernetes.Interface, namespace string) (*SecretCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CoreV1().RESTClient(), &corev1.Secret{}, selector, "secrets", namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &SecretCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -229,11 +245,13 @@ func newSecretCache(ctx context.Context, client kubernetes.Interface, namespace 
 // get returns the requested secret based on name.
 func (c *SecretCache) Get(name string) (*corev1.Secret, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*corev1.Secret), true
 }
 
@@ -243,6 +261,7 @@ func (c *SecretCache) List() (secrets []*corev1.Secret) {
 	for _, obj := range objs {
 		secrets = append(secrets, obj.(*corev1.Secret))
 	}
+
 	return
 }
 
@@ -264,6 +283,7 @@ func newPodDisruptionBudgetCache(ctx context.Context, client kubernetes.Interfac
 	if err != nil {
 		return nil, err
 	}
+
 	return &PodDisruptionBudgetCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -273,11 +293,13 @@ func newPodDisruptionBudgetCache(ctx context.Context, client kubernetes.Interfac
 // get returns the requested poddisruptionbudget based on name.
 func (c *PodDisruptionBudgetCache) Get(name string) (*policyv1beta1.PodDisruptionBudget, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*policyv1beta1.PodDisruptionBudget), true
 }
 
@@ -287,6 +309,7 @@ func (c *PodDisruptionBudgetCache) List() (poddisruptionbudgets []*policyv1beta1
 	for _, obj := range objs {
 		poddisruptionbudgets = append(poddisruptionbudgets, obj.(*policyv1beta1.PodDisruptionBudget))
 	}
+
 	return
 }
 
@@ -305,10 +328,12 @@ type CouchbaseBucketCache struct {
 // newCouchbaseBucketCache creates a new synchronized cache for CouchbaseBucket resources.
 func newCouchbaseBucketCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseBucketCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseBucket{}, selector, couchbasev2.BucketCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseBucketCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -318,11 +343,13 @@ func newCouchbaseBucketCache(ctx context.Context, client couchbaseclientv2.Inter
 // get returns the requested couchbasebucket based on name.
 func (c *CouchbaseBucketCache) Get(name string) (*couchbasev2.CouchbaseBucket, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseBucket), true
 }
 
@@ -332,6 +359,7 @@ func (c *CouchbaseBucketCache) List() (resources []*couchbasev2.CouchbaseBucket)
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseBucket))
 	}
+
 	return
 }
 
@@ -350,10 +378,12 @@ type CouchbaseEphemeralBucketCache struct {
 // newCouchbaseEphemeralBucketCache creates a new synchronized cache for CouchbaseEphemeralBucket resources.
 func newCouchbaseEphemeralBucketCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseEphemeralBucketCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseEphemeralBucket{}, selector, couchbasev2.EphemeralBucketCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseEphemeralBucketCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -363,11 +393,13 @@ func newCouchbaseEphemeralBucketCache(ctx context.Context, client couchbaseclien
 // get returns the requested couchbaseephemeralbucket based on name.
 func (c *CouchbaseEphemeralBucketCache) Get(name string) (*couchbasev2.CouchbaseEphemeralBucket, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseEphemeralBucket), true
 }
 
@@ -377,6 +409,7 @@ func (c *CouchbaseEphemeralBucketCache) List() (resources []*couchbasev2.Couchba
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseEphemeralBucket))
 	}
+
 	return
 }
 
@@ -395,10 +428,12 @@ type CouchbaseMemcachedBucketCache struct {
 // newCouchbaseMemcachedBucketCache creates a new synchronized cache for CouchbaseMemcachedBucket resources.
 func newCouchbaseMemcachedBucketCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseMemcachedBucketCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseMemcachedBucket{}, selector, couchbasev2.MemcachedBucketCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseMemcachedBucketCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -408,11 +443,13 @@ func newCouchbaseMemcachedBucketCache(ctx context.Context, client couchbaseclien
 // get returns the requested couchbasememcachedbucketbased on name.
 func (c *CouchbaseMemcachedBucketCache) Get(name string) (*couchbasev2.CouchbaseMemcachedBucket, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseMemcachedBucket), true
 }
 
@@ -422,6 +459,7 @@ func (c *CouchbaseMemcachedBucketCache) List() (resources []*couchbasev2.Couchba
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseMemcachedBucket))
 	}
+
 	return
 }
 
@@ -440,10 +478,12 @@ type CouchbaseReplicationCache struct {
 // newCouchbaseReplicationCache creates a new synchronized cache for CouchbaseReplication resources.
 func newCouchbaseReplicationCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseReplicationCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseReplication{}, selector, couchbasev2.ReplicationCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseReplicationCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -453,11 +493,13 @@ func newCouchbaseReplicationCache(ctx context.Context, client couchbaseclientv2.
 // get returns the requested couchbasereplication based on name.
 func (c *CouchbaseReplicationCache) Get(name string) (*couchbasev2.CouchbaseReplication, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseReplication), true
 }
 
@@ -467,6 +509,7 @@ func (c *CouchbaseReplicationCache) List() (resources []*couchbasev2.CouchbaseRe
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseReplication))
 	}
+
 	return
 }
 
@@ -485,10 +528,12 @@ type CouchbaseUserCache struct {
 // newCouchbaseiUserCache creates a new synchronized cache for CouchbaseUser resources.
 func newCouchbaseUserCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseUserCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseUser{}, selector, couchbasev2.UserCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseUserCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -498,11 +543,13 @@ func newCouchbaseUserCache(ctx context.Context, client couchbaseclientv2.Interfa
 // get returns the requested couchbaseuser based on name.
 func (c *CouchbaseUserCache) Get(name string) (*couchbasev2.CouchbaseUser, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseUser), true
 }
 
@@ -512,6 +559,7 @@ func (c *CouchbaseUserCache) List() (resources []*couchbasev2.CouchbaseUser) {
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseUser))
 	}
+
 	return
 }
 
@@ -530,10 +578,12 @@ type CouchbaseGroupCache struct {
 // newCouchbaseiGroupCache creates a new synchronized cache for CouchbaseGroup resources.
 func newCouchbaseGroupCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseGroupCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseGroup{}, selector, couchbasev2.GroupCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseGroupCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -543,11 +593,13 @@ func newCouchbaseGroupCache(ctx context.Context, client couchbaseclientv2.Interf
 // get returns the requested couchbaseuser based on name.
 func (c *CouchbaseGroupCache) Get(name string) (*couchbasev2.CouchbaseGroup, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseGroup), true
 }
 
@@ -557,6 +609,7 @@ func (c *CouchbaseGroupCache) List() (resources []*couchbasev2.CouchbaseGroup) {
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseGroup))
 	}
+
 	return
 }
 
@@ -575,10 +628,12 @@ type CouchbaseRoleBindingCache struct {
 // newCouchbaseRoleBindingCache creates a new synchronized cache for CouchbaseRoleBinding resources.
 func newCouchbaseRoleBindingCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseRoleBindingCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseRoleBinding{}, selector, couchbasev2.RoleBindingCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseRoleBindingCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -588,11 +643,13 @@ func newCouchbaseRoleBindingCache(ctx context.Context, client couchbaseclientv2.
 // get returns the requested couchbaserolebinding based on name.
 func (c *CouchbaseRoleBindingCache) Get(name string) (*couchbasev2.CouchbaseRoleBinding, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseRoleBinding), true
 }
 
@@ -602,6 +659,7 @@ func (c *CouchbaseRoleBindingCache) List() (resources []*couchbasev2.CouchbaseRo
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseRoleBinding))
 	}
+
 	return
 }
 
@@ -623,6 +681,7 @@ func newJobCache(ctx context.Context, client kubernetes.Interface, namespace str
 	if err != nil {
 		return nil, err
 	}
+
 	return &JobCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -632,11 +691,13 @@ func newJobCache(ctx context.Context, client kubernetes.Interface, namespace str
 // get returns the requested job based on name.
 func (c *JobCache) Get(name string) (*batchv1.Job, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*batchv1.Job), true
 }
 
@@ -646,6 +707,7 @@ func (c *JobCache) List() (resources []*batchv1.Job) {
 	for _, obj := range objs {
 		resources = append(resources, obj.(*batchv1.Job))
 	}
+
 	return
 }
 
@@ -667,6 +729,7 @@ func newCronJobCache(ctx context.Context, client kubernetes.Interface, namespace
 	if err != nil {
 		return nil, err
 	}
+
 	return &CronJobCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -676,11 +739,13 @@ func newCronJobCache(ctx context.Context, client kubernetes.Interface, namespace
 // get returns the requested job based on name.
 func (c *CronJobCache) Get(name string) (*v1beta1.CronJob, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*v1beta1.CronJob), true
 }
 
@@ -690,6 +755,7 @@ func (c *CronJobCache) List() (resources []*v1beta1.CronJob) {
 	for _, obj := range objs {
 		resources = append(resources, obj.(*v1beta1.CronJob))
 	}
+
 	return
 }
 
@@ -708,10 +774,12 @@ type CouchbaseBackupCache struct {
 // newCouchbaseBackupCache creates a new synchronized cache for CouchbaseBackup resources.
 func newCouchbaseBackupCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseBackupCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseBackup{}, selector, couchbasev2.BackupCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseBackupCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -721,11 +789,13 @@ func newCouchbaseBackupCache(ctx context.Context, client couchbaseclientv2.Inter
 // get returns the requested couchbasebackup based on name.
 func (c *CouchbaseBackupCache) Get(name string) (*couchbasev2.CouchbaseBackup, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseBackup), true
 }
 
@@ -735,6 +805,7 @@ func (c *CouchbaseBackupCache) List() (resources []*couchbasev2.CouchbaseBackup)
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseBackup))
 	}
+
 	return
 }
 
@@ -753,10 +824,12 @@ type CouchbaseBackupRestoreCache struct {
 // newCouchbaseBackupRestoreCache creates a new synchronized cache for CouchbaseBackupRestore resources.
 func newCouchbaseBackupRestoreCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseBackupRestoreCache, error) {
 	selector := labels.Everything()
+
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseBackupRestore{}, selector, couchbasev2.BackupRestoreCRDResourcePlural, namespace)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CouchbaseBackupRestoreCache{
 		resourceCache: resourceCache,
 		namespace:     namespace,
@@ -766,11 +839,13 @@ func newCouchbaseBackupRestoreCache(ctx context.Context, client couchbaseclientv
 // get returns the requested couchbasebackuprestore based on name.
 func (c *CouchbaseBackupRestoreCache) Get(name string) (*couchbasev2.CouchbaseBackupRestore, bool) {
 	key := c.namespace + "/" + name
+
 	// Cannot error
 	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
 	if !exists {
 		return nil, exists
 	}
+
 	return obj.(*couchbasev2.CouchbaseBackupRestore), true
 }
 
@@ -780,6 +855,7 @@ func (c *CouchbaseBackupRestoreCache) List() (resources []*couchbasev2.Couchbase
 	for _, obj := range objs {
 		resources = append(resources, obj.(*couchbasev2.CouchbaseBackupRestore))
 	}
+
 	return
 }
 

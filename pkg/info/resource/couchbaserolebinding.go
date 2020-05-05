@@ -35,7 +35,9 @@ func (r *couchbaseRoleBindingResource) Fetch() error {
 	if err != nil {
 		return err
 	}
+
 	r.couchbaseRoleBindings = couchbaseRoleBindings.Items
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *couchbaseRoleBindingResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), couchbaseRoleBinding.Name, couchbaseRoleBinding.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

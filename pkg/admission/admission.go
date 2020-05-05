@@ -38,9 +38,11 @@ func addToScheme(scheme *runtime.Scheme) error {
 	if err := clientscheme.AddToScheme(scheme); err != nil {
 		return err
 	}
+
 	if err := apis.AddToScheme(scheme); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -50,10 +52,12 @@ func getClient() kubernetes.Interface {
 	if err != nil {
 		glog.Fatal(err)
 	}
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		glog.Fatal(err)
 	}
+
 	return clientset
 }
 
@@ -63,10 +67,12 @@ func getCouchbaseClient() versioned.Interface {
 	if err != nil {
 		glog.Fatal(err)
 	}
+
 	clientset, err := versioned.NewForConfig(config)
 	if err != nil {
 		glog.Fatal(err)
 	}
+
 	return clientset
 }
 
@@ -76,6 +82,7 @@ func configTLS(config *Config) *tls.Config {
 	if err != nil {
 		glog.Fatal(err)
 	}
+
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}
@@ -117,12 +124,14 @@ func decodeObject(ar admissionv1beta1.AdmissionReview, raw runtime.RawExtension)
 		Version: ar.Request.Kind.Version,
 		Kind:    ar.Request.Kind.Kind,
 	}
+
 	object, err := scheme.New(gvk)
 	if err != nil {
 		return nil, err
 	}
 
 	deserializer := codecs.UniversalDeserializer()
+
 	object, _, err = deserializer.Decode(raw.Raw, nil, object)
 	if err != nil {
 		return nil, err
@@ -159,6 +168,7 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 		// all CRDs served by the API will appear as v2 regardless of what's actually
 		// on disk.
 		glog.V(1).Infof("Previous resource: %s", string(ar.Request.OldObject.Raw))
+
 		existingCouchbaseCluser, err := decodeObject(ar, ar.Request.OldObject)
 		if err != nil {
 			glog.Error(err)
@@ -209,6 +219,7 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 			glog.Error(err)
 			return errorResponse(err)
 		}
+
 		glog.V(1).Infof("Applying patch: %v", string(data))
 		reviewResponse.Patch = data
 	}
@@ -225,6 +236,7 @@ type admitFunc func(admissionv1beta1.AdmissionReview) *admissionv1beta1.Admissio
 func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	// Read the POST body content
 	var body []byte
+
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
 			body = data
@@ -236,12 +248,15 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	if contentType != "application/json" {
 		glog.Errorf("contentType=%s, expected application/json", contentType)
 		w.WriteHeader(http.StatusUnsupportedMediaType)
+
 		return
 	}
 
 	// Decode the admission review object and dispatch to the correct handler
 	var response *admissionv1beta1.AdmissionResponse
+
 	ar := admissionv1beta1.AdmissionReview{}
+
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
 		glog.Error(err)
@@ -252,6 +267,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 
 	// Create the admission review response
 	response.UID = ar.Request.UID
+
 	review := admissionv1beta1.AdmissionReview{
 		Response: response,
 	}
@@ -261,7 +277,9 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	if err != nil {
 		glog.Error(err)
 	}
+
 	w.Header().Set("Content-Type", "application/json")
+
 	if _, err := w.Write(resp); err != nil {
 		glog.Error(err)
 	}

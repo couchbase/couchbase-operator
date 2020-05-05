@@ -73,6 +73,7 @@ type KeyPairRequest struct {
 func (req *KeyPairRequest) Generate(ca *CertificateAuthority, certValidFrom, certValidTo time.Time) (key, cert []byte, err error) {
 	// Generate the private key
 	var pkey crypto.PrivateKey
+
 	if pkey, err = GeneratePrivateKey(req.keyType); err != nil {
 		return
 	}
@@ -84,6 +85,7 @@ func (req *KeyPairRequest) Generate(ca *CertificateAuthority, certValidFrom, cer
 
 	// Add the keying material to the CSR
 	var csr *x509.CertificateRequest
+
 	if csr, err = CreateCertificateRequest(req.req, pkey); err != nil {
 		return
 	}
@@ -118,6 +120,7 @@ func GeneratePrivateKey(keyType KeyType) (crypto.PrivateKey, error) {
 // encoded slice.
 func CreatePrivateKey(key crypto.PrivateKey) ([]byte, error) {
 	var block *pem.Block
+
 	switch t := key.(type) {
 	case *rsa.PrivateKey:
 		block = &pem.Block{
@@ -129,6 +132,7 @@ func CreatePrivateKey(key crypto.PrivateKey) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		block = &pem.Block{
 			Type:  "EC PRIVATE KEY",
 			Bytes: bytes,
@@ -142,6 +146,7 @@ func CreatePrivateKey(key crypto.PrivateKey) ([]byte, error) {
 	if err := pem.Encode(data, block); err != nil {
 		return nil, err
 	}
+
 	return data.Bytes(), nil
 }
 
@@ -151,10 +156,12 @@ func CreateCertificate(cert []byte) ([]byte, error) {
 		Type:  "CERTIFICATE",
 		Bytes: cert,
 	}
+
 	data := &bytes.Buffer{}
 	if err := pem.Encode(data, block); err != nil {
 		return nil, err
 	}
+
 	return data.Bytes(), nil
 }
 
@@ -165,6 +172,7 @@ func CreateCertificateRequest(req *x509.CertificateRequest, key crypto.PrivateKe
 	if err != nil {
 		return nil, err
 	}
+
 	return x509.ParseCertificateRequest(csr)
 }
 
@@ -175,6 +183,7 @@ func ParseCertificate(data []byte) (*x509.Certificate, error) {
 	if pem == nil {
 		return nil, fmt.Errorf("unable to parse PEM certificate")
 	}
+
 	return x509.ParseCertificate(pem.Bytes)
 }
 
@@ -270,10 +279,12 @@ func (ca *CertificateAuthority) NewIntermediateCertificateAuthority(keyType KeyT
 // in RFC 3280.  It is upto 20 octets in length and non-negative.
 func generateSerial() (*big.Int, error) {
 	serialLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+
 	serialNumber, err := rand.Int(rand.Reader, serialLimit)
 	if err != nil {
 		return nil, err
 	}
+
 	return new(big.Int).Abs(serialNumber), nil
 }
 
@@ -281,7 +292,9 @@ func generateSerial() (*big.Int, error) {
 // RFC3280 used to create certificate paths from a leaf to a CA.
 func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 	var subjectPublicKey []byte
+
 	var err error
+
 	switch pub := pub.(type) {
 	case *rsa.PublicKey:
 		subjectPublicKey, err = asn1.Marshal(*pub)
@@ -290,10 +303,13 @@ func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("invalid public key type")
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	sum := sha1.Sum(subjectPublicKey)
+
 	return sum[:], nil
 }
 
@@ -368,6 +384,7 @@ func CreateCertReq(commonName string) *x509.CertificateRequest {
 func CreateCertReqDNS(commonName string, dnsNames []string) *x509.CertificateRequest {
 	req := CreateCertReq(commonName)
 	req.DNSNames = dnsNames
+
 	return req
 }
 
@@ -497,6 +514,7 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 
 	// Generate an explicit cluster name to use
 	ctx.ClusterName = "test-couchbase-" + RandomSuffix()
+
 	if opts.ClusterName != "" {
 		ctx.ClusterName = opts.ClusterName
 	}
@@ -506,35 +524,42 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 	if len(opts.AltNames) > 0 {
 		altNames = opts.AltNames
 	}
+
 	altNames = append(altNames, opts.ExtraAltNames...)
 
 	// Set the certificate parameters
 	keyType := KeyTypeRSA
+
 	if opts.KeyType != nil {
 		keyType = *opts.KeyType
 	}
 
 	validFrom := time.Now().In(time.UTC)
+
 	if opts.ValidFrom != nil {
 		validFrom = *opts.ValidFrom
 	}
 
 	validTo := validFrom.AddDate(10, 0, 0)
+
 	if opts.ValidTo != nil {
 		validTo = *opts.ValidTo
 	}
 
 	caCertType := CertTypeCA
+
 	if opts.CaCertType != nil {
 		caCertType = *opts.CaCertType
 	}
 
 	operatorCertType := CertTypeClient
+
 	if opts.OperatorCertType != nil {
 		operatorCertType = *opts.OperatorCertType
 	}
 
 	clusterCertType := CertTypeServer
+
 	if opts.ClusterCertType != nil {
 		clusterCertType = *opts.ClusterCertType
 	}
@@ -547,14 +572,17 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 	// Create the operator secret
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(keyType, operatorCertType, operatorReq)
+
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		return
 	}
+
 	ctx.ClientKey = operatorKey
 	ctx.ClientCert = operatorCert
 
 	ctx.OperatorSecretName = "operator-secret-tls-" + RandomSuffix()
+
 	operatorSecretData := CreateOperatorSecretData(namespace, ctx.OperatorSecretName, ctx.CA.Certificate, operatorCert, operatorKey)
 	if _, err = CreateSecret(client, namespace, operatorSecretData); err != nil {
 		return
@@ -563,16 +591,19 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 	// Create the cluster secret
 	clusterReq := CreateCertReqDNS(clusterCN, altNames)
 	clusterReqKeyPair := CreateKeyPairReqData(keyType, clusterCertType, clusterReq)
+
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		_ = DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 		return
 	}
+
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
 		return
 	}
 
 	ctx.ClusterSecretName = "cluster-secret-tls-" + RandomSuffix()
+
 	clusterSecretData := CreateClusterSecretData(namespace, ctx.ClusterSecretName, clusterCert, clusterKey)
 	if _, err = CreateSecret(client, namespace, clusterSecretData); err != nil {
 		_ = DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
@@ -593,6 +624,7 @@ func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, opts
 	if err != nil {
 		Die(t, err)
 	}
+
 	return ctx, teardown
 }
 
@@ -605,12 +637,15 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, subjectAltNames 
 	if len(subjectAltNames) == 0 {
 		subjectAltNames = ctx.clusterSANs()
 	}
+
 	clusterReq := CreateCertReqDNS(clusterCN, subjectAltNames)
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
+
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
@@ -620,8 +655,10 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, subjectAltNames 
 	if err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = clusterCert
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -635,6 +672,7 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 	// Generate a new client certificate
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
@@ -645,8 +683,10 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 	if err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[operatorTLSSecretKey] = operatorKey
 	secret.Data[operatorTLSSecretChain] = operatorCert
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -666,10 +706,12 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
+
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
@@ -684,6 +726,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = chain
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -703,10 +746,12 @@ func MustRotateClientCertificateChain(t *testing.T, ctx *TLSContext) {
 	// Generate a new client certificate
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
+
 	ctx.ClientKey = operatorKey
 	ctx.ClientCert = operatorCert
 	ctx.ClientCert = append(ctx.ClientCert, []byte("\n")...)
@@ -719,8 +764,10 @@ func MustRotateClientCertificateChain(t *testing.T, ctx *TLSContext) {
 	if err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[operatorTLSSecretKey] = operatorKey
 	secret.Data[operatorTLSSecretChain] = chain
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -733,6 +780,7 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 
 	// Create a new CA
 	var err error
+
 	if ctx.CA, err = NewCertificateAuthority(KeyTypeRSA, caCN, validFrom, validTo, CertTypeCA); err != nil {
 		Die(t, err)
 	}
@@ -740,10 +788,12 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
+
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
@@ -753,7 +803,9 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 	if err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -762,8 +814,10 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 	if secret, err = GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName); err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = clusterCert
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -776,6 +830,7 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 
 	// Create a new CA
 	var err error
+
 	if ctx.CA, err = NewCertificateAuthority(KeyTypeRSA, caCN, validFrom, validTo, CertTypeCA); err != nil {
 		Die(t, err)
 	}
@@ -783,10 +838,12 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
+
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
@@ -794,10 +851,12 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	// Generate a new client certificate
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
+
 	ctx.ClientKey = operatorKey
 	ctx.ClientCert = operatorCert
 
@@ -806,9 +865,11 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	if err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
 	secret.Data[operatorTLSSecretKey] = operatorKey
 	secret.Data[operatorTLSSecretChain] = operatorCert
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -817,8 +878,10 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	if secret, err = GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName); err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = clusterCert
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -838,10 +901,12 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
+
 	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
@@ -851,8 +916,10 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	if err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[clusterTLSSecretKey] = clusterKey
 	secret.Data[clusterTLSSecretChain] = clusterCert
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -872,10 +939,12 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	// Generate a new client certificate
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
+
 	ctx.ClientKey = operatorKey
 	ctx.ClientCert = operatorCert
 
@@ -884,8 +953,10 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	if err != nil {
 		Die(t, err)
 	}
+
 	secret.Data[operatorTLSSecretKey] = operatorKey
 	secret.Data[operatorTLSSecretChain] = operatorCert
+
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
 	}
@@ -911,6 +982,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 	if err := pf.ForwardPorts(); err != nil {
 		return err
 	}
+
 	defer pf.Close()
 
 	clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
@@ -942,6 +1014,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 		t.Logf("Actual:\n")
 		t.Logf("  Issuer: %v\n", podCert.Issuer.String())
 		t.Logf("  Serial: %v\n", podCert.SerialNumber)
+
 		return fmt.Errorf("certificate mismatch")
 	}
 
@@ -954,23 +1027,29 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 			DialTLS: dialer,
 		},
 	}
+
 	request, err := http.NewRequest("GET", "https://localhost:"+sport+"/pools/default/certificate", nil)
 	if err != nil {
 		return err
 	}
+
 	response, err := client.Do(request)
 	if err != nil {
 		return err
 	}
+
 	defer response.Body.Close()
+
 	raw, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
+
 	cacert, err := ParseCertificate(raw)
 	if err != nil {
 		return err
 	}
+
 	if !cacert.Equal(ctx.CA.certificate) {
 		t.Logf("Unexpected CA certificate!\n")
 		t.Logf("Expected:\n")
@@ -979,6 +1058,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 		t.Logf("Actual:\n")
 		t.Logf("  Issuer: %v\n", cacert.Issuer.String())
 		t.Logf("  Serial: %v\n", cacert.SerialNumber)
+
 		return fmt.Errorf("certificate mismatch")
 	}
 
@@ -996,35 +1076,42 @@ func InitLDAPTLS(client kubernetes.Interface, namespace string, opts *TLSOpts) (
 
 	// Generate alt names.
 	altNames := ctx.clusterSANs()
+
 	if len(opts.AltNames) > 0 {
 		altNames = opts.AltNames
 	}
 
 	// Set the certificate parameters
 	keyType := KeyTypeRSA
+
 	if opts.KeyType != nil {
 		keyType = *opts.KeyType
 	}
 
 	validFrom := time.Now().In(time.UTC)
+
 	if opts.ValidFrom != nil {
 		validFrom = *opts.ValidFrom
 	}
 
 	validTo := validFrom.AddDate(10, 0, 0)
+
 	if opts.ValidTo != nil {
 		validTo = *opts.ValidTo
 	}
 
 	caCertType := CertTypeCA
+
 	if opts.CaCertType != nil {
 		caCertType = *opts.CaCertType
 	}
 
 	ldapCertType := CertTypeServer
+
 	if opts.LDAPCertType != nil {
 		ldapCertType = *opts.LDAPCertType
 	}
+
 	// Generate the CA
 	if ctx.CA, err = NewCertificateAuthority(keyType, caCN, validFrom, validTo, caCertType); err != nil {
 		return
@@ -1033,12 +1120,14 @@ func InitLDAPTLS(client kubernetes.Interface, namespace string, opts *TLSOpts) (
 	// Create the req
 	ldapReq := CreateCertReqDNS(operatorCN, altNames)
 	ldapReqKeyPair := CreateKeyPairReqData(keyType, ldapCertType, ldapReq)
+
 	ldapKey, ldapCert, err := ldapReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		return
 	}
 
 	ctx.LDAPSecretName = "ldap-secret-tls-" + RandomSuffix()
+
 	ldapSecretData := CreateOperatorSecretData(namespace, ctx.LDAPSecretName, ctx.CA.Certificate, ldapCert, ldapKey)
 	if _, err = CreateSecret(client, namespace, ldapSecretData); err != nil {
 		return
@@ -1057,5 +1146,6 @@ func MustInitLDAPTLS(t *testing.T, k8s *types.Cluster, namespace string, opts *T
 	if err != nil {
 		Die(t, err)
 	}
+
 	return ctx, teardown
 }

@@ -19,10 +19,12 @@ func mustValidate(t *testing.T, events []corev1.Event, schema Validatable) {
 // mustNotValidate validates an event list against a schema dying on success.
 func mustNotValidate(t *testing.T, events []corev1.Event, schema Validatable, expectedErr error) {
 	v := Validator{Events: events, Schema: schema}
+
 	err := v.Validate(ioutil.Discard)
 	if err == nil {
 		t.Fatal(err)
 	}
+
 	if reflect.TypeOf(err) != reflect.TypeOf(expectedErr) {
 		t.Fatal(err)
 	}

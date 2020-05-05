@@ -125,6 +125,7 @@ func (l MemberStatusList) GetMember(name string) *MemberTimestamp {
 			return &m
 		}
 	}
+
 	return nil
 }
 
@@ -133,6 +134,7 @@ func (l MemberStatusList) Names() []string {
 	for _, m := range l {
 		names = append(names, m.Name)
 	}
+
 	return names
 }
 
@@ -155,7 +157,9 @@ type MembersStatus struct {
 // Set ready members from list.
 func (ms *MembersStatus) SetReady(ready []string) {
 	sort.Strings(ready)
+
 	ms.Ready = MemberStatusList{}
+
 	for _, m := range ready {
 		ms.Ready.Add(m)
 	}
@@ -166,7 +170,9 @@ func (ms *MembersStatus) SetReady(ready []string) {
 // then it's old timestamp is retained.
 func (ms *MembersStatus) SetUnready(unready []string) {
 	sort.Strings(unready)
+
 	unreadyList := MemberStatusList{}
+
 	for _, m := range unready {
 		if oldMember := ms.Unready.GetMember(m); oldMember != nil {
 			unreadyList = append(unreadyList, *oldMember)
@@ -174,6 +180,7 @@ func (ms *MembersStatus) SetUnready(unready []string) {
 			unreadyList.Add(m)
 		}
 	}
+
 	ms.Unready = unreadyList
 }
 
@@ -202,6 +209,7 @@ func (cs *ClusterStatus) IsFailed() bool {
 	if cs == nil {
 		return false
 	}
+
 	return cs.Phase == ClusterPhaseFailed
 }
 
@@ -283,6 +291,7 @@ func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	if cs.Conditions == nil {
 		cs.Conditions = ClusterStatusMap{}
 	}
+
 	delete(cs.Conditions, t)
 }
 
@@ -290,6 +299,7 @@ func (cs *ClusterStatus) GetCondition(t ClusterConditionType) *ClusterCondition 
 	if cs.Conditions == nil {
 		return nil
 	}
+
 	return cs.Conditions[t]
 }
 
@@ -297,16 +307,19 @@ func (cs *ClusterStatus) setClusterCondition(t ClusterConditionType, c *ClusterC
 	if cs.Conditions == nil {
 		cs.Conditions = ClusterStatusMap{}
 	}
+
 	if cp, ok := cs.Conditions[t]; ok {
 		if cp.Status == c.Status && cp.Reason == c.Reason && cp.Message == c.Message {
 			return
 		}
 	}
+
 	cs.Conditions[t] = c
 }
 
 func newClusterCondition(status v1.ConditionStatus, reason, message string) *ClusterCondition {
 	now := time.Now().Format(time.RFC3339)
+
 	return &ClusterCondition{
 		Status:             status,
 		LastUpdateTime:     now,
@@ -352,5 +365,6 @@ func (status *UpgradeStatus) Format() string {
 func NewUpgradeStatus(message string) *UpgradeStatus {
 	status := &UpgradeStatus{}
 	fmt.Sscanf(message, UpgradingMessageFormat, &status.State, &status.Source, &status.Target, &status.TargetCount, &status.TotalCount)
+
 	return status
 }

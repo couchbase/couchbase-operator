@@ -35,7 +35,9 @@ func (r *couchbaseGroupResource) Fetch() error {
 	if err != nil {
 		return err
 	}
+
 	r.couchbaseGroups = couchbaseGroups.Items
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *couchbaseGroupResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), couchbaseGroup.Name, couchbaseGroup.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

@@ -61,21 +61,25 @@ func listDetachedLogPVCs(context *context.Context) ([]*v1.PersistentVolumeClaim,
 	if err != nil {
 		return nil, err
 	}
+
 	pvcs, err := context.KubeClient.CoreV1().PersistentVolumeClaims(context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
 
 	logVolumes := []*v1.PersistentVolumeClaim{}
+
 	for i := range pvcs.Items {
 		pvc := pvcs.Items[i]
 
 		if !k8sutil.IsLogPVC(&pvc) {
 			continue
 		}
+
 		if _, ok := pvc.Annotations["pv.couchbase.com/detached"]; !ok {
 			continue
 		}
+
 		temp := pvc
 		logVolumes = append(logVolumes, &temp)
 	}
@@ -89,12 +93,14 @@ func listRunningPods(context *context.Context) ([]*v1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	pods, err := context.KubeClient.CoreV1().Pods(context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
 
 	p := []*v1.Pod{}
+
 	for _, pod := range pods.Items {
 		temp := pod
 		p = append(p, &temp)
@@ -120,6 +126,7 @@ func parseRangeField(field string, max int, indices indexSet) error {
 	if err != nil {
 		return fmt.Errorf("invalid range start value %s", field)
 	}
+
 	end, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return fmt.Errorf("invalid range end value %s", field)
@@ -179,6 +186,7 @@ func parseIndices(input string, max int) (indexSet, error) {
 		for i := 0; i < max; i++ {
 			indices[i] = nil
 		}
+
 		return indices, nil
 	}
 
@@ -273,6 +281,7 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 	}
 
 	var err error
+
 	pod, err = context.KubeClient.CoreV1().Pods(pvc.Namespace).Create(pod)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ephemeral pod %s failed creation for log collection", podName)
@@ -282,6 +291,7 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 	// and start the containers.  It's also necessary so we don't block indefinitely and hang.
 	c, cancel := ctx.WithTimeout(ctx.Background(), 5*time.Minute)
 	defer cancel()
+
 	if err := k8sutil.WaitForPod(c, context.KubeClient, pvc.Namespace, podName, ""); err != nil {
 		_ = context.KubeClient.CoreV1().Pods(pvc.Namespace).Delete(podName, nil)
 		return nil, nil, fmt.Errorf("ephemeral pod %s failed to come up for log collection", podName)
@@ -291,6 +301,7 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 	cleanup := func() {
 		_ = context.KubeClient.CoreV1().Pods(pvc.Namespace).Delete(podName, nil)
 	}
+
 	return pod, cleanup, nil
 }
 
@@ -331,6 +342,7 @@ func gatherLogs(context *context.Context) (LogEntryList, error) {
 	sortPVCs(pvcs)
 
 	logEntries := LogEntryList{}
+
 	for _, pod := range pods {
 		logEntries = append(logEntries, LogEntry{
 			Name: pod.Name,
@@ -338,6 +350,7 @@ func gatherLogs(context *context.Context) (LogEntryList, error) {
 			pod:  pod,
 		})
 	}
+
 	for _, pvc := range pvcs {
 		logEntries = append(logEntries, LogEntry{
 			Name:     pvc.Labels["couchbase_node"],
@@ -352,12 +365,15 @@ func gatherLogs(context *context.Context) (LogEntryList, error) {
 		list := LogList{
 			Items: logEntries,
 		}
+
 		data, err := json.Marshal(&list)
 		if err != nil {
 			fmt.Println("unable to marshal log listing")
 			os.Exit(1)
 		}
+
 		fmt.Println(string(data))
+
 		os.Exit(0)
 	}
 
@@ -379,10 +395,12 @@ func render(logEntries LogEntryList) {
 	for index, logEntry := range logEntries {
 		// Format the detached time based on timestamp and elapsed duration, 'cos we are nice
 		detached := ""
+
 		if logEntry.Type == LogTypePersistentVolumeClaim {
 			t, _ := time.Parse(time.RFC3339, logEntry.Detached)
 			detached = fmt.Sprintf("%v (%v ago)", t, time.Since(t).Round(time.Second))
 		}
+
 		table.Rows = append(table.Rows, prettytable.Row{
 			strconv.Itoa(index),
 			logEntry.Name,
@@ -403,15 +421,19 @@ func configureInteractive(context *context.Context, logEntries LogEntryList) (in
 	// Get the requested set of indices to collect.
 	for {
 		fmt.Print("Please select volumes to collect [e.g. 1,2,5-6 or leave blank for all]: ")
+
 		reader := bufio.NewReader(os.Stdin)
+
 		text, err := reader.ReadString('\n')
 		if err != nil {
 			continue
 		}
+
 		if indices, err = parseIndices(text, len(logEntries)); err != nil {
 			fmt.Println(err)
 			continue
 		}
+
 		break
 	}
 
@@ -419,15 +441,19 @@ func configureInteractive(context *context.Context, logEntries LogEntryList) (in
 	if !context.Config.CollectInfoRedact {
 		for {
 			fmt.Print("Please select whether to enable log redaction [Y/n]: ")
+
 			reader := bufio.NewReader(os.Stdin)
+
 			text, err := reader.ReadString('\n')
 			if err != nil {
 				continue
 			}
+
 			if context.Config.CollectInfoRedact, err = parseYesNo(text, true); err != nil {
 				fmt.Println(err)
 				continue
 			}
+
 			break
 		}
 	}
@@ -442,6 +468,7 @@ func configureNonInteractive(context *context.Context, logEntries LogEntryList) 
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
 	return indices
 }
 
@@ -479,12 +506,14 @@ func Collect(context *context.Context) error {
 
 	// Collect the logs in parallel.
 	resultChan := make(chan *util.CollectInfoResult)
+
 	for index := range indices {
 		go func(entry LogEntry) {
 			// Always return a result.
 			result := &util.CollectInfoResult{
 				Pod: entry.pod,
 			}
+
 			defer func() {
 				resultChan <- result
 			}()
@@ -494,6 +523,7 @@ func Collect(context *context.Context) error {
 			if entry.Type == LogTypePersistentVolumeClaim {
 				// Create the temporary pod.
 				var cleanup func()
+
 				result.Pod, cleanup, result.Err = createEphemeralPod(context, entry.pvc)
 				if result.Err != nil {
 					return
@@ -525,15 +555,18 @@ func Collect(context *context.Context) error {
 
 	// Fan in the results for display.
 	results := []*util.CollectInfoResult{}
+
 	for i := 0; i < len(indices); i++ {
 		result := <-resultChan
 		if result.Err != nil {
 			fmt.Println(result.Err)
 		}
+
 		results = append(results, result)
 	}
 
 	fmt.Println("Server logs downloaded to the following files:")
+
 	for _, result := range results {
 		fmt.Println("   ", filepath.Base(result.FileName))
 	}

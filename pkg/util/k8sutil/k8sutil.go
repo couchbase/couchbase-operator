@@ -66,7 +66,9 @@ func SetCouchbaseVersion(pod *v1.Pod, image string) error {
 	if err != nil {
 		return err
 	}
+
 	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = version
+
 	return nil
 }
 
@@ -77,11 +79,14 @@ func InClusterConfig() (*rest.Config, error) {
 		if err != nil {
 			panic(err)
 		}
+
 		os.Setenv("KUBERNETES_SERVICE_HOST", addrs[0])
 	}
+
 	if len(os.Getenv("KUBERNETES_SERVICE_PORT")) == 0 {
 		os.Setenv("KUBERNETES_SERVICE_PORT", "443")
 	}
+
 	return rest.InClusterConfig()
 }
 
@@ -90,6 +95,7 @@ func MustNewKubeClient() kubernetes.Interface {
 	if err != nil {
 		panic(err)
 	}
+
 	return kubernetes.NewForConfigOrDie(cfg)
 }
 
@@ -97,10 +103,13 @@ func GetPodNames(pods []*v1.Pod) []string {
 	if len(pods) == 0 {
 		return nil
 	}
+
 	res := []string{}
+
 	for _, p := range pods {
 		res = append(res, p.Name)
 	}
+
 	return res
 }
 
@@ -113,9 +122,11 @@ func GetHostIP(client *client.Client, name string) (string, error) {
 	if !found {
 		return "", fmt.Errorf("pod %s not found", name)
 	}
+
 	if pod.Status.HostIP == "" {
 		return "", fmt.Errorf("host IP unset, pod not scheduled")
 	}
+
 	return pod.Status.HostIP, nil
 }
 
@@ -124,10 +135,13 @@ func GetServerGroup(client *client.Client, name string) (string, error) {
 	if !found {
 		return "", fmt.Errorf("pod %s not found", name)
 	}
+
 	if pod.Spec.NodeSelector == nil {
 		return "", fmt.Errorf("pod %s has no node selector", name)
 	}
+
 	serverGroup := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+
 	return serverGroup, nil
 }
 
@@ -147,6 +161,7 @@ func getNodeServiceSelectors(cluster *couchbasev2.CouchbaseCluster, nodeName str
 	// Apply to a specific couchbase pod within the named cluster
 	selectors := LabelsForCluster(cluster.Name)
 	selectors[constants.LabelNode] = nodeName
+
 	return selectors
 }
 
@@ -162,6 +177,7 @@ func LabelsForCluster(clusterName string) map[string]string {
 func NodeListOpt(clusterName, memberName string) metav1.ListOptions {
 	l := LabelsForCluster(clusterName)
 	l[constants.LabelNode] = memberName
+
 	return metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(l).String(),
 	}
@@ -192,12 +208,15 @@ func mergeLabels(l1, l2 map[string]string) map[string]string {
 	}
 
 	m := map[string]string{}
+
 	for k, v := range l1 {
 		m[k] = v
 	}
+
 	for k, v := range l2 {
 		m[k] = v
 	}
+
 	return m
 }
 
@@ -208,6 +227,7 @@ func DeletePod(client *client.Client, namespace, podName string, opts *metav1.De
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -235,6 +255,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 
 		return nil
 	}
+
 	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
 		return err
 	}
@@ -268,6 +289,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 	if err != nil {
 		return err
 	}
+
 	events := watcher.ResultChan()
 
 	done := false
@@ -281,6 +303,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 			if ev.Object == nil {
 				continue
 			}
+
 			obj := ev.Object.(*v1.Pod)
 			status := obj.Status
 
@@ -304,6 +327,7 @@ func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVer
 	if err != nil {
 		return constants.KubernetesVersionUnknown, err
 	}
+
 	return ParseKubernetesVersion(version.Major, version.Minor, version.GitVersion)
 }
 
@@ -316,6 +340,7 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 			err := fmt.Errorf("unable to get version from Kubernetes API response")
 			return constants.KubernetesVersionUnknown, err
 		}
+
 		gitVersion = rx.FindString(gitVersion)
 		parts := strings.Split(gitVersion[1:], ".")
 		versionMajor = parts[0]
@@ -328,16 +353,19 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 		err := fmt.Errorf("unable to get version from Kubernetes API response")
 		return constants.KubernetesVersionUnknown, err
 	}
+
 	major, err := strconv.Atoi(rx.FindString(versionMajor))
 	if err != nil {
 		err := fmt.Errorf("unable to get version from Kubernetes API response")
 		return constants.KubernetesVersionUnknown, err
 	}
+
 	minor, err := strconv.Atoi(rx.FindString(versionMinor))
 	if err != nil {
 		err := fmt.Errorf("unable to get version from Kubernetes API response")
 		return constants.KubernetesVersionUnknown, err
 	}
+
 	return constants.KubernetesVersion(fmt.Sprintf("%02d%02d", major, minor)), nil
 }
 
@@ -350,6 +378,7 @@ func GetPodUptime(client *client.Client, name string) int {
 	if !found {
 		return 0
 	}
+
 	return int(time.Since(pod.CreationTimestamp.Time).Seconds())
 }
 
@@ -378,6 +407,7 @@ func LogPod(client *client.Client, namespace, name string) (output string) {
 				readCloser.Close()
 				continue
 			}
+
 			readCloser.Close()
 
 			output += buffer.String() + "\n"
@@ -392,6 +422,7 @@ func LogPod(client *client.Client, namespace, name string) (output string) {
 			if err != nil {
 				continue
 			}
+
 			output += string(data) + "\n"
 		}
 	}
@@ -416,6 +447,7 @@ func LogPod(client *client.Client, namespace, name string) (output string) {
 				if err != nil {
 					continue
 				}
+
 				output += string(data) + "\n"
 			}
 		}

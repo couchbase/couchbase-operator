@@ -53,63 +53,83 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster", Value: emptyObject})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "dataServiceMemoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/dataServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexServiceMemoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "searchServiceMemoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/searchServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "eventingServiceMemoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/eventingServiceMemoryQuota", Value: defaultServiceMemQuota})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "analyticsServiceMemoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/analyticsServiceMemoryQuota", Value: defaultAnalyticsServiceMemQuota})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexStorageSetting"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexStorageSetting", Value: defaultIndexStorageSetting})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverTimeout"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverTimeout", Value: defaultAutoFailoverTimeout})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverMaxCount"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverMaxCount", Value: defaultAutoFailoverMaxCount})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverOnDataDiskIssuesTimePeriod"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", Value: defaultAutoFailoverOnDataDiskIssuesTimePeriod})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction", Value: emptyObject})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "databaseFragmentationThreshold"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/databaseFragmentationThreshold", Value: emptyObject})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "databaseFragmentationThreshold", "percent"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", Value: 30})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "viewFragmentationThreshold"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/viewFragmentationThreshold", Value: emptyObject})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "viewFragmentationThreshold", "percent"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/viewFragmentationThreshold/percent", Value: 30})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "tombstonePurgeInterval"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/tombstonePurgeInterval", Value: "72h"})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking", Value: emptyObject})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "adminConsoleServiceType"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking/adminConsoleServiceType", Value: corev1.ServiceTypeNodePort})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "exposedFeatureServiceType"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking/exposedFeatureServiceType", Value: corev1.ServiceTypeNodePort})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
 	}
+
 	// Due to recursive auto-CRD generation, pod templates need to have a containers attribute.
 	// I'd argue having these 3rd party things finally checked is worth it for the hoops we have
 	// to jump through to avoid validation errors.
@@ -127,6 +147,7 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: fmt.Sprintf("/spec/servers/%d/pod/spec/containers", index), Value: emptyArray})
 		}
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
 		fsgroup := defaultFSGroup
 
@@ -143,6 +164,7 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 					if i == -1 {
 						i = strings.Index(groups, "/")
 					}
+
 					if i != -1 {
 						if val, err := strconv.Atoi(groups[:i]); err == nil {
 							fsgroup = val
@@ -154,6 +176,7 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: fsgroup})
 	}
+
 	if managedBackup, found, _ := unstructured.NestedBool(object.Object, "spec", "backup", "managed"); found && managedBackup {
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "image"); !found {
 			backupImage := defaultBackupImage
@@ -172,10 +195,12 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/image", Value: backupImage})
 		}
+
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "serviceAccountName"); !found {
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/serviceAccountName", Value: defaultBackupServiceAccount})
 		}
 	}
+
 	if enableMonitoring, found, _ := unstructured.NestedBool(object.Object, "spec", "monitoring", "prometheus", "enabled"); found && enableMonitoring {
 		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "monitoring", "prometheus", "image"); !found {
 			metricsImage := defaultMetricsImage
@@ -223,6 +248,7 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/encryption", Value: couchbasev2.LDAPEncryptionNone})
 		}
 	}
+
 	return patch
 }
 
@@ -232,21 +258,27 @@ func ApplyBucketDefaults(v *types.Validator, object *unstructured.Unstructured) 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "replicas"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/replicas", Value: 1})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "ioPriority"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/ioPriority", Value: couchbasev2.CouchbaseBucketIOPriorityLow})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "evictionPolicy"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/evictionPolicy", Value: couchbasev2.CouchbaseBucketEvictionPolicyValueOnly})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "conflictResolution"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/conflictResolution", Value: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
 	}
@@ -260,21 +292,27 @@ func ApplyEphemeralBucketDefaults(v *types.Validator, object *unstructured.Unstr
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "replicas"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/replicas", Value: 1})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "ioPriority"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/ioPriority", Value: couchbasev2.CouchbaseBucketIOPriorityLow})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "evictionPolicy"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/evictionPolicy", Value: couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "conflictResolution"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/conflictResolution", Value: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
 	}
@@ -288,6 +326,7 @@ func ApplyMemcachedBucketDefaults(v *types.Validator, object *unstructured.Unstr
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
 	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
 	}
@@ -307,6 +346,7 @@ func ApplyReplicationDefaults(v *types.Validator, object *unstructured.Unstructu
 
 func ApplyGroupDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
+
 	roles, _, _ := unstructured.NestedSlice(object.Object, "spec", "roles")
 	for i, role := range roles {
 		if r, ok := role.(map[string]interface{}); ok {
@@ -315,6 +355,7 @@ func ApplyGroupDefaults(v *types.Validator, object *unstructured.Unstructured) j
 			if !ok || (bucket == "") {
 				if couchbasev2.IsBucketRole(couchbasev2.RoleName(r["name"].(string))) {
 					path := fmt.Sprintf("/spec/roles/%d/bucket", i)
+
 					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: path, Value: "*"})
 				}
 			}
@@ -385,16 +426,20 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	if !util.UniqueString(customResource.Spec.Networking.AdminConsoleServices.StringSlice()) {
 		errs = append(errs, errors.DuplicateItems("spec.networking.adminConsoleServices", "body"))
 	}
+
 	if !util.UniqueString(customResource.Spec.Networking.ExposedFeatures.StringSlice()) {
 		errs = append(errs, errors.DuplicateItems("spec.networking.exposedFeatures", "body"))
 	}
+
 	if !util.UniqueString(customResource.Spec.ServerGroups) {
 		errs = append(errs, errors.DuplicateItems("spec.serverGroups", "body"))
 	}
+
 	for i, class := range customResource.Spec.Servers {
 		if !util.UniqueString(class.Services.StringSlice()) {
 			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].services", i), "body"))
 		}
+
 		if !util.UniqueString(class.ServerGroups) {
 			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"))
 		}
@@ -406,38 +451,46 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			errs = append(errs, fmt.Errorf("spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256Mi"))
 		}
 	}
+
 	if customResource.Spec.ClusterSettings.IndexServiceMemQuota != nil {
 		if customResource.Spec.ClusterSettings.IndexServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256Mi"))
 		}
 	}
+
 	if customResource.Spec.ClusterSettings.SearchServiceMemQuota != nil {
 		if customResource.Spec.ClusterSettings.SearchServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256Mi"))
 		}
 	}
+
 	if customResource.Spec.ClusterSettings.EventingServiceMemQuota != nil {
 		if customResource.Spec.ClusterSettings.EventingServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.eventingServiceMemoryQuota in body should be greater than or equal to 256Mi"))
 		}
 	}
+
 	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota != nil {
 		if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.analyticsServiceMemoryQuota in body should be greater than or equal to 1Gi"))
 		}
 	}
+
 	if customResource.Spec.ClusterSettings.AutoFailoverTimeout != nil {
 		if customResource.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() < 5.0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5s"))
 		}
+
 		if customResource.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() > 3600.0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be less than or equal to 1h"))
 		}
 	}
+
 	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod != nil {
 		if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() < 5.0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be greater than or equal to 5s"))
 		}
+
 		if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() > 3600.0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h"))
 		}
@@ -501,6 +554,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// 2. The data service is specified on at least one node
 	unique := make(map[string]bool)
 	hasDataService := false
+
 	for i := range customResource.Spec.Servers {
 		if _, ok := unique[customResource.Spec.Servers[i].Name]; ok {
 			errs = append(errs, errors.DuplicateItems("spec.servers.name", "body"))
@@ -525,6 +579,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// 2. Log volumes can only be used on server classes containing query, search and eventing services.
 	//    Data, index and analytics volumes must use the default mount for data persistence.
 	anySupportable := false
+
 	for _, class := range customResource.Spec.Servers {
 		if class.VolumeMounts != nil {
 			if class.VolumeMounts.DefaultClaim != "" || class.VolumeMounts.LogsClaim != "" {
@@ -553,30 +608,37 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			mounts := config.VolumeMounts
 
 			secondaryMounts := []string{}
+
 			if mounts.DataClaim != "" {
 				secondaryMounts = append(secondaryMounts, "data")
 			}
+
 			if mounts.IndexClaim != "" {
 				secondaryMounts = append(secondaryMounts, "index")
 			}
+
 			if mounts.AnalyticsClaims != nil {
 				secondaryMounts = append(secondaryMounts, "analytics")
 			}
+
 			hasSecondaryMounts := len(secondaryMounts) > 0
 
 			// Check the associated service is enabled
 			if mounts.DataClaim != "" && !config.Services.Contains(couchbasev2.DataService) {
 				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.data requires the data service to be enabled", index))
 			}
+
 			if mounts.IndexClaim != "" && !config.Services.Contains(couchbasev2.IndexService) {
 				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.index requires the index service to be enabled", index))
 			}
+
 			if mounts.AnalyticsClaims != nil && !config.Services.Contains(couchbasev2.AnalyticsService) {
 				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.analytics requires the analytics service to be enabled", index))
 			}
 
-			templateNames := customResource.Spec.GetVolumeClaimTemplateNames()
 			templateNamesEnum := []interface{}{}
+
+			templateNames := customResource.Spec.GetVolumeClaimTemplateNames()
 			for _, name := range templateNames {
 				templateNamesEnum = append(templateNamesEnum, name)
 			}
@@ -586,10 +648,12 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.LogsClaim); template == nil {
 					errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].logs", index), "", mounts.LogsClaim, templateNamesEnum))
 				}
+
 				if mounts.DefaultClaim != "" || hasSecondaryMounts {
 					if mounts.DefaultClaim != "" {
 						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].volumeMounts", index), "", "default"))
 					}
+
 					for _, secondaryMount := range secondaryMounts {
 						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].volumeMounts", index), "", secondaryMount))
 					}
@@ -598,16 +662,19 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DefaultClaim); template == nil {
 					errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].default", index), "", mounts.DefaultClaim, templateNamesEnum))
 				}
+
 				if mounts.DataClaim != "" {
 					if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DataClaim); template == nil {
 						errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].data", index), "", mounts.DataClaim, templateNamesEnum))
 					}
 				}
+
 				if mounts.IndexClaim != "" {
 					if template := customResource.Spec.GetVolumeClaimTemplate(mounts.IndexClaim); template == nil {
 						errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].index", index), "", mounts.IndexClaim, templateNamesEnum))
 					}
 				}
+
 				if len(mounts.AnalyticsClaims) > 0 {
 					for analyticsIndex, claim := range mounts.AnalyticsClaims {
 						if template := customResource.Spec.GetVolumeClaimTemplate(claim); template == nil {
@@ -623,14 +690,18 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 	// validate claim templates such that storage class is provided along with valid request
 	pvcMap := map[string]bool{}
+
 	for i, pvc := range customResource.Spec.VolumeClaimTemplates {
 		hasStorageQuantity := false
+
 		if quantity, ok := pvc.Spec.Resources.Requests["storage"]; ok {
 			hasStorageQuantity = hasStorageQuantity || !quantity.IsZero()
 		}
+
 		if quantity, ok := pvc.Spec.Resources.Limits["storage"]; ok {
 			hasStorageQuantity = hasStorageQuantity || !quantity.IsZero()
 		}
+
 		if !hasStorageQuantity {
 			err := errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits")
 			errs = append(errs, err)
@@ -663,6 +734,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	if err != nil {
 		errs = append(errs, fmt.Errorf("unsupported Couchbase version"))
 	}
+
 	currentVersion, err := couchbaseutil.NewVersion(currentVersionString)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("unsupported Couchbase version"))
@@ -676,6 +748,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 	// Record the zones that the server certificate needs to support as we look at the network configuration.
 	subjectAltNames := util_x509.MandatorySANs(customResource.Name, customResource.Namespace)
+
 	if customResource.Spec.Networking.DNS != nil {
 		subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", customResource.Spec.Networking.DNS.Domain))
 	}
@@ -689,6 +762,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		if customResource.Spec.Networking.TLS == nil {
 			errs = append(errs, errors.Required("spec.tls", "body"))
 		}
+
 		if customResource.Spec.Networking.DNS == nil {
 			errs = append(errs, errors.Required("spec.dns", "body"))
 		}
@@ -710,6 +784,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	if purgeInterval < 1.0 {
 		errs = append(errs, fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h"))
 	}
+
 	if purgeInterval > 60.0*24.0 {
 		errs = append(errs, fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d"))
 	}
@@ -748,6 +823,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				if apierrors.IsForbidden(err) {
 					return nil
 				}
+
 				errs = append(errs, err)
 			} else if tlsSecret == nil {
 				errs = append(errs, fmt.Errorf("secret %s referenced by security.ldap.tlsSecret must exist", tlsSecretName))
@@ -855,6 +931,7 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 				if apierrors.IsForbidden(err) {
 					return nil
 				}
+
 				errs = append(errs, err)
 			} else if authSecret == nil {
 				errs = append(errs, fmt.Errorf("secret %s referenced by user.spec.authSecret for `%s` must exist", authSecretName, user.Name))
@@ -874,6 +951,7 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
+
 	return nil
 }
 
@@ -891,6 +969,7 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
+
 	return nil
 }
 
@@ -901,8 +980,8 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		errs = append(errs, fmt.Errorf("both Spec.Backup and Spec.Repo fields are empty. Please supply a value for at least one"))
 	}
 
-	start := restore.Spec.Start
 	// start is required
+	start := restore.Spec.Start
 	if start == nil {
 		errs = append(errs, fmt.Errorf("specify a start point or backup"))
 	} else if start.Str != nil && start.Int != nil {
@@ -910,8 +989,8 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		errs = append(errs, fmt.Errorf("specify just one value, either Str or Int"))
 	}
 
-	end := restore.Spec.End
 	// if end has been specified
+	end := restore.Spec.End
 	if start != nil && end != nil {
 		// both str and int are specified
 		if end.Str != nil && end.Int != nil {
@@ -939,6 +1018,7 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
+
 	return nil
 }
 
@@ -953,9 +1033,11 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 			errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.roles[%d].bucket for cluster role", index), "", string(role.Name)))
 		}
 	}
+
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
+
 	return nil
 }
 
@@ -974,8 +1056,11 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		serverSecretName := cluster.Spec.Networking.TLS.Static.ServerSecret
 
 		var key []byte
+
 		var chain []byte
+
 		var ca []byte
+
 		var ok bool
 
 		// Check the operator secret exists and has the correct keys
@@ -985,6 +1070,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 			if apierrors.IsForbidden(err) {
 				return
 			}
+
 			errs = append(errs, err)
 		} else if operatorSecret == nil {
 			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.operatorSecret must exist", operatorSecretName))
@@ -999,6 +1085,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 			if apierrors.IsForbidden(err) {
 				return
 			}
+
 			errs = append(errs, err)
 
 			return
@@ -1010,6 +1097,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 			if chain, ok = serverSecret.Data["chain.pem"]; !ok {
 				errs = append(errs, fmt.Errorf("tls server secret %s must contain chain.pem", serverSecretName))
 			}
+
 			if key, ok = serverSecret.Data["pkey.key"]; !ok {
 				errs = append(errs, fmt.Errorf("tls server secret %s must contain pkey.key", serverSecretName))
 			}
@@ -1028,6 +1116,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 			if chain, ok = operatorSecret.Data["couchbase-operator.crt"]; !ok {
 				errs = append(errs, fmt.Errorf("tls operator secret %s must contain couchbase-operator.crt", operatorSecretName))
 			}
+
 			if key, ok = operatorSecret.Data["couchbase-operator.key"]; !ok {
 				errs = append(errs, fmt.Errorf("tls operator secret %s must contain couchbase-operator.key", operatorSecretName))
 			}
@@ -1041,6 +1130,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 			errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageClientAuth, nil)
 		}
 	}
+
 	return
 }
 
@@ -1052,6 +1142,7 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 		if remoteCluster.TLS == nil {
 			continue
 		}
+
 		if remoteCluster.TLS.Secret != nil {
 			secret, err := v.Abstraction.GetSecret(cluster.Namespace, *remoteCluster.TLS.Secret)
 			if err != nil {
@@ -1059,19 +1150,24 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 				if apierrors.IsForbidden(err) {
 					return
 				}
+
 				errs = append(errs, err)
+
 				continue
 			}
+
 			if secret == nil {
 				errs = append(errs, fmt.Errorf("xdcr tls secret %s for remote cluster %s must exist", *remoteCluster.TLS.Secret, remoteCluster.Name))
 				continue
 			}
+
 			if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
 				errs = append(errs, fmt.Errorf("xdcr tls secret %s for remote cluster %s must contain key 'ca'", *remoteCluster.TLS.Secret, remoteCluster.Name))
 				continue
 			}
 		}
 	}
+
 	return
 }
 
@@ -1083,6 +1179,7 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 //   quota for each cluster.
 func validateMemoryConstraints(v *types.Validator, object runtime.Object) error {
 	var namespace string
+
 	switch t := object.(type) {
 	case *couchbasev2.CouchbaseCluster:
 		return validateClusterMemoryConstraints(v, t)
@@ -1124,22 +1221,27 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 	if err != nil {
 		return err
 	}
+
 	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
 		return err
 	}
+
 	memcachedBuckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
 		return err
 	}
 
 	allocated := resource.NewQuantity(0, resource.BinarySI)
+
 	for _, bucket := range buckets.Items {
 		allocated.Add(*bucket.Spec.MemoryQuota)
 	}
+
 	for _, bucket := range ephemeralBuckets.Items {
 		allocated.Add(*bucket.Spec.MemoryQuota)
 	}
+
 	for _, bucket := range memcachedBuckets.Items {
 		allocated.Add(*bucket.Spec.MemoryQuota)
 	}
@@ -1157,6 +1259,7 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 	if err != nil {
 		return err
 	}
+
 	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
 		return err
@@ -1167,6 +1270,7 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 			return nil
 		}
 	}
+
 	for _, bucket := range ephemeralBuckets.Items {
 		if bucket.Name == name {
 			return nil
@@ -1196,6 +1300,7 @@ func validateBackupCronSchedules(backup *couchbasev2.CouchbaseBackup) []error {
 		if err := validateCronJobString(backup.Spec.Incremental, "spec.incremental"); err != nil {
 			errs = append(errs, err)
 		}
+
 		if err := validateCronJobString(backup.Spec.Full, "spec.full"); err != nil {
 			errs = append(errs, err)
 		}
@@ -1246,6 +1351,7 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 				if !util.StringArrayCompare(cur.ServerGroups, up.ServerGroups) {
 					errs = append(errs, util.NewUpdateError(fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"))
 				}
+
 				if !util.StringArrayCompare(cur.Services.StringSlice(), up.Services.StringSlice()) {
 					err := util.NewUpdateError(fmt.Sprintf("spec.servers[%d].services", i), "body")
 					errs = append(errs, err)
@@ -1257,6 +1363,7 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 	// Check to see if either the old or new specification have the the index
 	// service defined. If they do then we cannot change the indexStorageSetting.
 	hasIndexSvc := false
+
 	for _, cur := range current.Spec.Servers {
 		for _, svc := range cur.Services {
 			if svc == couchbasev2.IndexService {
@@ -1286,6 +1393,7 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 	if err != nil {
 		errs = append(errs, err)
 	}
+
 	updatedVersion, err := k8sutil.CouchbaseVersion(updated.Spec.Image)
 	if err != nil {
 		errs = append(errs, err)
@@ -1297,18 +1405,22 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 		if err != nil {
 			errs = append(errs, err)
 		}
+
 		dst, err := couchbaseutil.NewVersion(updatedVersion)
 		if err != nil {
 			errs = append(errs, err)
 		}
+
 		if dst.Less(src) {
 			errs = append(errs, fmt.Errorf("spec.Version in body should be greater than %s", src.Semver()))
 		}
+
 		if dst.Major() > src.Major()+1 {
 			max, _ := couchbaseutil.NewVersion(fmt.Sprintf("%d.0.0", src.Major()+2))
 			errs = append(errs, fmt.Errorf("spec.Version in body should be less than %s", max.Semver()))
 		}
 	}
+
 	if upgradeCondition != nil && currentVersion != updatedVersion {
 		if updatedVersion != current.Status.CurrentVersion {
 			errs = append(errs, util.NewUpdateError("spec.version", "body"))
@@ -1360,9 +1472,11 @@ func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplicatio
 	if prev.Spec.Bucket != curr.Spec.Bucket {
 		errs = append(errs, util.NewUpdateError("spec.bucket", "body"))
 	}
+
 	if prev.Spec.RemoteBucket != curr.Spec.RemoteBucket {
 		errs = append(errs, util.NewUpdateError("spec.remoteBucket", "body"))
 	}
+
 	if prev.Spec.FilterExpression != curr.Spec.FilterExpression {
 		errs = append(errs, util.NewUpdateError("spec.filterExpression", "body"))
 	}

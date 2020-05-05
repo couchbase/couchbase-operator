@@ -19,9 +19,11 @@ var (
 // for things like docker images.
 func WithRevision() string {
 	v := Version
+
 	if Revision != "" {
 		v = v + "-" + Revision
 	}
+
 	return v
 }
 

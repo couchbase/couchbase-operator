@@ -32,10 +32,12 @@ func (r *RoleBindingResource) Kind() string {
 // Fetch collects all RoleBindings as defined by the configuration.
 func (r *RoleBindingResource) Fetch() error {
 	var err error
+
 	r.RoleBindings, err = r.context.KubeClient.RbacV1().RoleBindings(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *RoleBindingResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), RoleBinding.Name, RoleBinding.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

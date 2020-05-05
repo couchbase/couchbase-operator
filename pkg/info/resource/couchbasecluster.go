@@ -46,12 +46,14 @@ func (r *couchbaseClusterResource) Fetch() error {
 
 	// Create a set of requested couchbaseCluster names
 	requested := map[string]interface{}{}
+
 	for _, name := range r.context.Config.Clusters {
 		requested[name] = nil
 	}
 
 	// Scan the list of couchbaseClusters and select only the requested ones
 	r.couchbaseClusters = []couchbasev2.CouchbaseCluster{}
+
 	for _, couchbaseCluster := range couchbaseClusters.Items {
 		if _, ok := requested[couchbaseCluster.Name]; ok {
 			r.couchbaseClusters = append(r.couchbaseClusters, couchbaseCluster)
@@ -70,13 +72,16 @@ func (r *couchbaseClusterResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), couchbaseCluster.Name, couchbaseCluster.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 
 func (r *couchbaseClusterResource) References() []Reference {
 	references := []Reference{}
+
 	for _, couchbaseCluster := range r.couchbaseClusters {
 		references = append(references, newReference(r.Kind(), couchbaseCluster.Name))
 	}
+
 	return references
 }

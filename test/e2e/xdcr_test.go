@@ -22,6 +22,7 @@ import (
 // we don't redefine if the same cluster is used for source and target couchbase instances.
 func mustCreateXDCRBuckets(t *testing.T, k8s1, k8s2 *types.Cluster) {
 	e2eutil.MustNewBucket(t, k8s1, k8s1.Namespace, e2espec.DefaultBucket)
+
 	if k8s1.Config.Host != k8s2.Config.Host || k8s1.Namespace != k8s2.Namespace {
 		e2eutil.MustNewBucket(t, k8s2, k8s2.Namespace, e2espec.DefaultBucket)
 	}
@@ -113,14 +114,18 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 
 	// When ready, establish the XDCR connection and verify correct replication...
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+
 	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 	defer cleanup()
+
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
 
 	// ...choose the correct victim cluster...
 	var targetKubernetes *types.Cluster
+
 	var targetCouchbase *couchbasev2.CouchbaseCluster
+
 	switch cluster {
 	case xdcrClusterSource:
 		targetKubernetes = k8s1
@@ -132,6 +137,7 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 
 	// ...and perform the necessary operation on it...
 	var schema eventschema.Validatable
+
 	switch operation {
 	case xdcrOperationEject:
 		schema = ejectAllXDCRNodes(t, targetKubernetes, targetCouchbase)
@@ -190,8 +196,10 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+
 	cleanup := e2eutil.MustEstablishXDCRReplication(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication, tls)
 	defer cleanup()
+
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
 
@@ -202,6 +210,7 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 	if policy != nil {
 		k8s2CreateSequence = e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize)
 	}
+
 	expectedEvents1 := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -212,6 +221,7 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 		k8s2CreateSequence,
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
@@ -330,8 +340,10 @@ func TestXdcrCreateCluster(t *testing.T) {
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+
 	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 	defer cleanup()
+
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
 
@@ -350,6 +362,7 @@ func TestXdcrCreateCluster(t *testing.T) {
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
@@ -376,8 +389,10 @@ func TestXDCRPauseReplication(t *testing.T) {
 	// some new documents, these shouldn't be replicated until we remove the
 	// pause.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+
 	replication, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 	defer cleanup()
+
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, time.Minute)
 	replication = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
@@ -406,6 +421,7 @@ func TestXDCRPauseReplication(t *testing.T) {
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
@@ -434,8 +450,10 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	// have been replicated.  Kill a pod in the source cluster.  Add some more documents.
 	// When healthy verify the documents have been replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+
 	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 	defer cleanup()
+
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
 	e2eutil.MustKillPodForMember(t, k8s1, xdcrCluster1, nodeToKill, true)
@@ -460,6 +478,7 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(xdcrCluster2Size, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
@@ -487,8 +506,10 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 	// ensure they are replicated.  Scale up the source cluster, add some more documents
 	// and ensure they are (eventually - after 5 whole minutes) replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+
 	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 	defer cleanup()
+
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
 	xdcrCluster1 = e2eutil.MustResizeCluster(t, 0, constants.Size3, k8s1, xdcrCluster1, 5*time.Minute)
@@ -512,6 +533,7 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
@@ -539,8 +561,10 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 	// to circuit break the connection.  Add some more documents and verify they are
 	// replicated when the connection is reestablished.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+
 	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 	defer cleanup()
+
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
 	e2eutil.MustDeletePodServices(t, k8s2, xdcrCluster2)
@@ -563,6 +587,7 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
@@ -645,8 +670,10 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
+
 	replication, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 	defer cleanup()
+
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, time.Minute)
 
@@ -678,6 +705,7 @@ func TestXDCRDeleteReplication(t *testing.T) {
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
@@ -706,18 +734,22 @@ func TestXDCRFilterExp(t *testing.T) {
 	// filter expression is defined to allow docs with Key Id starting from `doc` to get replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 	threshold, _ := couchbaseutil.NewVersion("6.5.0")
+
 	tag, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	version, err := couchbaseutil.NewVersion(tag)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	replication.Spec.FilterExpression = `REGEXP_CONTAINS(META().id, "^doc.*$")`
 	if version.Less(threshold) {
 		replication.Spec.FilterExpression = `^doc.*$`
 	}
+
 	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 	defer cleanup()
 
@@ -749,6 +781,7 @@ func TestXDCRFilterExp(t *testing.T) {
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }

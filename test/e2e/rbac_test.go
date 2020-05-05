@@ -25,6 +25,7 @@ func mustCreateBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*c
 	user := e2eutil.MustNewUser(t, k8s, namespace, e2espec.NewDefaultUser())
 	group := e2eutil.MustNewGroup(t, k8s, namespace, e2espec.NewClusterAdminGroup())
 	binding := e2eutil.MustNewRoleBinding(t, k8s, namespace, e2espec.NewClusterRoleBinding())
+
 	return user, group, binding
 }
 
@@ -270,8 +271,10 @@ func TestRBACWithLDAPAuth(t *testing.T) {
 	tlsOpts := &e2eutil.TLSOpts{
 		AltNames: e2espec.LDAPAltNames(targetKube.Namespace),
 	}
+
 	ctx, teardown := e2eutil.MustInitLDAPTLS(t, targetKube, targetKube.Namespace, tlsOpts)
 	defer teardown()
+
 	pod := e2espec.NewLDAPServerTLS(targetKube.Namespace, ctx.LDAPSecretName)
 	_ = e2eutil.MustNewLDAPServer(t, targetKube.KubeClient, targetKube.Namespace, pod)
 

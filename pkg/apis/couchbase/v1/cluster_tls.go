@@ -27,8 +27,8 @@ func (tp *TLSPolicy) Validate() error {
 	if tp.Static == nil {
 		return nil
 	}
-	st := tp.Static
 
+	st := tp.Static
 	if len(st.OperatorSecret) != 0 {
 		if len(st.Member.ServerSecret) == 0 {
 			return errors.New("operator secret set but member serverSecret not set")
@@ -36,6 +36,7 @@ func (tp *TLSPolicy) Validate() error {
 	} else if st.Member != nil && len(st.Member.ServerSecret) != 0 {
 		return errors.New("member serverSecret set but operator secret not set")
 	}
+
 	return nil
 }
 
@@ -43,5 +44,6 @@ func (tp *TLSPolicy) IsSecureClient() bool {
 	if tp == nil || tp.Static == nil {
 		return false
 	}
+
 	return len(tp.Static.OperatorSecret) != 0
 }

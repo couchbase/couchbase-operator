@@ -56,9 +56,12 @@ func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (recon
 
 			cluster.Delete()
 			r.clusters.Delete(request.NamespacedName.String())
+
 			return reconcile.Result{}, nil
 		}
+
 		log.Error(err, "Failed to get CouchbaseCluster", "cluster", request.NamespacedName)
+
 		return reconcile.Result{}, err
 	}
 
@@ -75,6 +78,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (recon
 		}
 
 		r.clusters.Store(request.NamespacedName.String(), c)
+
 		return requeueResult, nil
 	}
 
@@ -101,6 +105,7 @@ func AddToManager(mgr manager.Manager, timeout string, concurrency int) error {
 		Reconciler:              r,
 		MaxConcurrentReconciles: concurrency,
 	}
+
 	c, err := controller.New("couchbase-controller", mgr, options)
 	if err != nil {
 		return err

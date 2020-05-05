@@ -68,19 +68,23 @@ func getNodeServices(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 	if err != nil {
 		return nil, err
 	}
+
 	defer cleanup()
 
 	request, err := http.NewRequest("GET", "http://"+host+"/pools/default/nodeServices", nil)
 	if err != nil {
 		return nil, err
 	}
+
 	request.SetBasicAuth("Administrator", "password")
 
 	client := http.Client{}
+
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
+
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
@@ -327,8 +331,10 @@ func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev2.Couchb
 					return nil
 				}
 			}
+
 			return fmt.Errorf("loadbalancer service %s failed to create an ingress route", service.Name)
 		}
+
 		return nil
 	})
 }

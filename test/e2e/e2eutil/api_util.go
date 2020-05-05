@@ -27,15 +27,18 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (E
 	}
 
 	events := EventList{}
+
 	for _, item := range list.Items {
 		// Filter out events we have no control over
 		if item.Reason == "FailedToUpdateEndpoint" {
 			continue
 		}
+
 		events = append(events, item)
 	}
 
 	sort.Sort(events)
+
 	return events, nil
 }
 
@@ -46,13 +49,16 @@ func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnsch
 		if err != nil {
 			continue
 		}
+
 		nodeToTaint := k8sNodeList.Items[nodeIndex]
 		nodeToTaint.Spec.Unschedulable = isUnschedulable
 		nodeToTaint.Spec.Taints = podTaintList
+
 		if _, err = kubeClient.CoreV1().Nodes().Update(&nodeToTaint); err == nil {
 			break
 		}
 	}
+
 	return err
 }
 
@@ -82,16 +88,19 @@ func MustGetNodeForPod(t *testing.T, k8s *types.Cluster, namespace, name string)
 	if err != nil {
 		Die(t, err)
 	}
+
 	return node
 }
 
 // MustGetAvailabiltyZoneForPod returns the availability zone a pod runs on.
 func MustGetAvailabiltyZoneForPod(t *testing.T, k8s *types.Cluster, namespace, name string) string {
 	node := MustGetNodeForPod(t, k8s, namespace, name)
+
 	availaibiltyZone, ok := node.Labels[constants.FailureDomainZoneLabel]
 	if !ok {
 		Die(t, fmt.Errorf("node missing availability zone label"))
 	}
+
 	return availaibiltyZone
 }
 
@@ -102,11 +111,13 @@ func MustEvacuateAvailabilityZone(t *testing.T, k8s *types.Cluster, zone string)
 	}
 
 	zoneNodes := []*v1.Node{}
+
 	for index, node := range nodes.Items {
 		nodeZone, ok := node.Labels[constants.FailureDomainZoneLabel]
 		if !ok {
 			Die(t, fmt.Errorf("node missing availability zone label"))
 		}
+
 		if nodeZone == zone {
 			zoneNodes = append(zoneNodes, &nodes.Items[index])
 		}
@@ -120,7 +131,9 @@ func MustEvacuateAvailabilityZone(t *testing.T, k8s *types.Cluster, zone string)
 				Effect: v1.TaintEffectNoExecute,
 			},
 		}
+
 		node.Spec.Unschedulable = true
+
 		if _, err := k8s.KubeClient.CoreV1().Nodes().Update(node); err != nil {
 			Die(t, err)
 		}

@@ -25,20 +25,25 @@ func TestPathsToPersist(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing default claim")
 	}
+
 	if defaultClaim != claimName {
 		t.Fatalf(`expected claim name "%s", got "%s"`, defaultClaim, claimName)
 	}
+
 	dataClaim, ok := paths[couchbasev2.DataVolumeMount]
 	if !ok {
 		t.Fatalf("missing data claim")
 	}
+
 	if dataClaim != claimName {
 		t.Fatalf(`expected claim name "%s", got "%s"`, dataClaim, claimName)
 	}
+
 	indexClaim, ok := paths[couchbasev2.IndexVolumeMount]
 	if !ok {
 		t.Fatalf("missing index claim")
 	}
+
 	if indexClaim != claimName {
 		t.Fatalf(`expected claim name "%s", got "%s"`, indexClaim, claimName)
 	}
@@ -50,10 +55,12 @@ func TestPathsForVolumeMountName(t *testing.T) {
 	if path != couchbaseVolumeDefaultConfigDir {
 		t.Fatalf(`invalid path for default volume: "%s", expected: "%s"`, path, couchbaseVolumeDefaultConfigDir)
 	}
+
 	path = pathForVolumeMountName(couchbasev2.DataVolumeMount)
 	if path != CouchbaseVolumeMountDataDir {
 		t.Fatalf(`invalid path for data volume: "%s", expected: "%s"`, path, CouchbaseVolumeMountDataDir)
 	}
+
 	path = pathForVolumeMountName(couchbasev2.IndexVolumeMount)
 	if path != CouchbaseVolumeMountIndexDir {
 		t.Fatalf(`invalid path for index volume: "%s", expected: "%s"`, path, CouchbaseVolumeMountIndexDir)

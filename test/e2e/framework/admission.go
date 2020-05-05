@@ -43,30 +43,37 @@ func createAdmissionController(client kubernetes.Interface) error {
 	if _, err := client.CoreV1().ServiceAccounts(admissionNamespace).Create(serviceAccount); err != nil {
 		return err
 	}
+
 	clusterRole := config.GetAdmissionClusterRole()
 	if _, err := client.RbacV1().ClusterRoles().Create(clusterRole); err != nil {
 		return err
 	}
+
 	clusterRoleBinding := config.GetAdmissionClusterRoleBinding(admissionNamespace)
 	if _, err := client.RbacV1().ClusterRoleBindings().Create(clusterRoleBinding); err != nil {
 		return err
 	}
+
 	secret := config.GetAdmissionSecret(key, cert)
 	if _, err := client.CoreV1().Secrets(admissionNamespace).Create(secret); err != nil {
 		return err
 	}
+
 	deployment := config.GetAdmissionDeployment(runtimeParams.AdmissionControllerImage, dockerPullSecretName, "-v", "1")
 	if _, err := client.AppsV1().Deployments(admissionNamespace).Create(deployment); err != nil {
 		return err
 	}
+
 	service := config.GetAdmissionService()
 	if _, err := client.CoreV1().Services(admissionNamespace).Create(service); err != nil {
 		return err
 	}
+
 	mutatingWebhook := config.GetAdmissionMutatingWebhook(admissionNamespace, ca.Certificate)
 	if _, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(mutatingWebhook); err != nil {
 		return err
 	}
+
 	validatingWebhook := config.GetAdmissionValidatingWebhook(admissionNamespace, ca.Certificate)
 	if _, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(validatingWebhook); err != nil {
 		return err
@@ -86,27 +93,35 @@ func deleteAdmissionController(client kubernetes.Interface) error {
 	if err := client.CoreV1().ServiceAccounts(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	if err := client.RbacV1().ClusterRoles().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	if err := client.RbacV1().ClusterRoleBindings().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	if err := client.CoreV1().Secrets(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	if err := client.AppsV1().Deployments(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	if err := client.CoreV1().Services(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	if err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	if err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	return nil
 }
 
@@ -118,12 +133,16 @@ func waitAdmissionController(client kubernetes.Interface) error {
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
 			return false, retryutil.RetryOkError(fmt.Errorf("requested %d replicas, ready replicas %d", deployment.Status.Replicas, deployment.Status.ReadyReplicas))
 		}
+
 		return true, nil
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+
 	return retryutil.Retry(ctx, time.Second, callback)
 }

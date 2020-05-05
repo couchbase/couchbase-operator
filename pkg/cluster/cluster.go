@@ -111,6 +111,7 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 
 	// Initialize Kubernetes clients and caches.
 	var err error
+
 	c.k8s, err = client.NewClient(c.ctx, c.cluster.Namespace, labels.SelectorFromSet(k8sutil.LabelsForCluster(c.cluster.Name)))
 	if err != nil {
 		return nil, err
@@ -121,9 +122,11 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	if c.state, err = persistence.New(c.k8s.KubeClient, cl); err != nil {
 		return nil, err
 	}
+
 	if err := c.state.Insert(persistence.Phase, string(couchbasev2.ClusterPhaseNone)); err != nil && !persistence.IsKeyError(err) {
 		return nil, err
 	}
+
 	if err := c.state.Insert(persistence.PodIndex, "0"); err != nil && !persistence.IsKeyError(err) {
 		return nil, err
 	}
@@ -141,10 +144,13 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 
 	if err := c.setup(); err != nil {
 		log.Error(err, "Cluster setup failed", "cluster", c.namespacedName())
+
 		c.cluster.Status.SetReason(err.Error())
+
 		if err := c.updatePhase(couchbasev2.ClusterPhaseFailed); err != nil {
 			return nil, err
 		}
+
 		return nil, err
 	}
 
@@ -153,6 +159,7 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	}
 
 	log.Info("Running", "cluster", c.namespacedName())
+
 	c.runReconcile()
 
 	return c, nil
@@ -161,6 +168,7 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 func (c *Cluster) Delete() {
 	// Notify client operations to stop what they are doing e.g. abort retry loops
 	c.cancel()
+
 	// Clean up caches.
 	c.k8s.Shutdown()
 }
@@ -170,12 +178,15 @@ func (c *Cluster) setup() error {
 	if err != nil {
 		return err
 	}
+
 	c.cluster.Status.SetPhase(couchbasev2.ClusterPhase(phase))
+
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("warning failed to update cluster status", "cluster", c.namespacedName())
 	}
 
 	var shouldCreateCluster bool
+
 	switch couchbasev2.ClusterPhase(phase) {
 	case couchbasev2.ClusterPhaseNone:
 		shouldCreateCluster = true
@@ -225,6 +236,7 @@ func (c *Cluster) setup() error {
 		// making any calls to Couchbase server.
 		running, _ := c.pollPods()
 		c.members = podsToMemberSet(running)
+
 		if err := c.reconcileTLS(); err != nil {
 			return err
 		}
@@ -251,10 +263,13 @@ func (c *Cluster) updatePhase(phase couchbasev2.ClusterPhase) error {
 	if err := c.state.Update(persistence.Phase, string(phase)); err != nil {
 		return err
 	}
+
 	c.cluster.Status.SetPhase(phase)
+
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("warning failed to update cluster status", "cluster", c.namespacedName())
 	}
+
 	return nil
 }
 
@@ -269,6 +284,7 @@ func (c *Cluster) create() error {
 	if err := c.state.Insert(persistence.Version, version); err != nil {
 		return err
 	}
+
 	c.cluster.Status.CurrentVersion = version
 
 	if err := c.updatePhase(couchbasev2.ClusterPhaseCreating); err != nil {
@@ -285,12 +301,14 @@ func (c *Cluster) create() error {
 	}
 
 	c.members = couchbaseutil.NewMemberSet()
+
 	m, err := c.createMember(c.cluster.Spec.Servers[idx])
 	if err != nil {
 		return err
 	}
 
 	log.Info("Operator added member", "cluster", c.namespacedName(), "name", m.Name)
+
 	c.raiseEvent(k8sutil.MemberAddEvent(m.Name, c.cluster))
 
 	if err := c.initMember(m, c.cluster.Spec.Servers[idx]); err != nil {
@@ -308,6 +326,7 @@ func (c *Cluster) create() error {
 
 	c.cluster.Status.SetClusterID(uuid)
 	c.cluster.Status.SetBalancedCondition()
+
 	return c.updateCRStatus()
 }
 
@@ -321,6 +340,7 @@ func (c *Cluster) create() error {
 func (c *Cluster) runReconcile() {
 	// Always update the cluster status and reconcile loop time.
 	start := time.Now()
+
 	defer func() {
 		if err := c.updateCRStatus(); err != nil {
 			log.Error(err, "Status update failed", "cluster", c.namespacedName())
@@ -335,6 +355,7 @@ func (c *Cluster) runReconcile() {
 		c.cluster.Status.PauseControl()
 		log.Info("Operator paused, skipping", "cluster", c.namespacedName())
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "paused").Inc()
+
 		return
 	}
 
@@ -347,6 +368,7 @@ func (c *Cluster) runReconcile() {
 		// deterministically become running or succeeded/failed later.
 		log.Info("Pods pending creation, skipping", "cluster", c.namespacedName(), "running", len(running), "pending", len(pending))
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "pending").Inc()
+
 		return
 	}
 
@@ -355,11 +377,14 @@ func (c *Cluster) runReconcile() {
 	// persistent volumes.
 	if c.forceUpdate || c.members.Empty() {
 		c.forceUpdate = false
+
 		if err := c.updateMembers(podsToMemberSet(running)); err != nil {
 			log.Error(err, "Failed to update members", "cluster", c.namespacedName())
 			reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
 			reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
+
 			c.forceUpdate = true
+
 			return
 		}
 	}
@@ -369,6 +394,7 @@ func (c *Cluster) runReconcile() {
 		log.Error(err, "Reconciliation failed", "cluster", c.namespacedName())
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
 		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
+
 		return
 	}
 
@@ -392,6 +418,7 @@ func (c *Cluster) logUpdate(old, new interface{}) {
 		log.Error(err, "cluster", c.namespacedName())
 		return
 	}
+
 	log.Info("Resource updated", "cluster", c.namespacedName(), "diff", d)
 }
 
@@ -412,9 +439,11 @@ func (c *Cluster) updateCRStatus() error {
 
 	// Copy the updated status to our cluster object and try update it
 	cluster.Status = c.cluster.Status
+
 	if _, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -424,7 +453,9 @@ func (c *Cluster) isSecureClient() bool {
 
 func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
 	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name, "image", c.cluster.Spec.CouchbaseImage())
+
 	_, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec)
+
 	return err
 }
 
@@ -432,6 +463,7 @@ func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, server
 // ore volumes are associated with default claim.
 func (c *Cluster) removePod(name string, removeVolumes bool) error {
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
+
 	err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, opts, removeVolumes)
 	if err != nil {
 		log.Error(err, "Pod deletion failed", "cluster", c.namespacedName())
@@ -439,6 +471,7 @@ func (c *Cluster) removePod(name string, removeVolumes bool) error {
 	}
 
 	log.Info("Pod deleted", "cluster", c.namespacedName(), "name", name)
+
 	return nil
 }
 
@@ -449,13 +482,14 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 	if config == nil {
 		return fmt.Errorf("config for pod does not exist: %s", m.ServerConfig)
 	}
+
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-	err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name, opts)
-	if err != nil {
+
+	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name, opts); err != nil {
 		return err
 	}
-	err = c.waitForDeletePod(m.Name, 120)
-	if err != nil {
+
+	if err := c.waitForDeletePod(m.Name, 120); err != nil {
 		return err
 	}
 
@@ -464,6 +498,7 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 	if err != nil {
 		return fmt.Errorf("PodCreateTimeout improperly formatted: %v", err)
 	}
+
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
 	defer cancel()
 
@@ -471,6 +506,7 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 	if err != nil {
 		return err
 	}
+
 	return c.waitForCreatePod(ctx, m)
 }
 
@@ -479,29 +515,33 @@ func (c *Cluster) waitForCreatePod(ctx context.Context, member *couchbaseutil.Me
 	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name, member.HostURL()); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
 	ctx, cancel := context.WithTimeout(c.ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
+
 	if err := k8sutil.WaitForDeletePod(ctx, c.k8s.KubeClient, c.cluster.Namespace, podName); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
-	recoverable := false
-	if config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig); config != nil {
-		err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name)
-		if err != nil {
-			log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name, "reason", err)
-		} else {
-			recoverable = true
-		}
+	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
+	if config != nil {
+		return false
 	}
-	return recoverable
+
+	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name); err != nil {
+		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name, "reason", err)
+		return false
+	}
+
+	return true
 }
 
 // Selects any member that can be recovered and attempts to restart it.
@@ -516,9 +556,11 @@ func (c *Cluster) recoverClusterDown() error {
 
 			log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name)
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
+
 			break
 		}
 	}
+
 	return nil
 }
 
@@ -530,14 +572,17 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod) {
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
+
 		if len(pod.OwnerReferences) < 1 {
 			log.Info("Pod ignored, no owner", "cluster", c.namespacedName(), "name", pod.Name)
 			continue
 		}
+
 		if pod.OwnerReferences[0].UID != c.cluster.UID {
 			log.Info("Pod ignored, invalid owner", "cluster", c.namespacedName(), "name", pod.Name, "cluster_uid", c.cluster.UID, "pod_uid", pod.OwnerReferences[0].UID)
 			continue
 		}
+
 		switch pod.Status.Phase {
 		case v1.PodRunning:
 			running = append(running, pod)
@@ -554,14 +599,17 @@ func (c *Cluster) updateMemberStatus() error {
 	// to get the cluster status will fail as it hasn't been initialized yet, so
 	// instead just return an empty status
 	var info *couchbaseutil.ClusterStatus
+
 	if c.cluster.Status.ClusterID == "" {
 		info = couchbaseutil.NewClusterStatus()
 	} else {
 		var err error
+
 		if info, err = c.client.GetClusterStatus(c.members); err != nil {
 			return err
 		}
 	}
+
 	return c.updateMemberStatusWithClusterInfo(info)
 }
 
@@ -570,6 +618,7 @@ func (c *Cluster) updateMemberStatus() error {
 func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) error {
 	c.cluster.Status.Members.SetReady(cs.ActiveNodes.Names())
 	c.cluster.Status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
+
 	return c.updateCRStatus()
 }
 
@@ -586,6 +635,7 @@ func (c *Cluster) setupAuth(authSecret string) error {
 	} else {
 		return cberrors.ErrSecretMissingUsername{Reason: authSecret}
 	}
+
 	if password, ok := data[constants.AuthSecretPasswordKey]; ok {
 		c.password = string(password)
 	} else {
@@ -603,6 +653,7 @@ func (c *Cluster) initCouchbaseClient() error {
 	if c.isSecureClient() {
 		// Grab the operator secret
 		secretName := c.cluster.Spec.Networking.TLS.Static.OperatorSecret
+
 		secret, found := c.k8s.Secrets.Get(secretName)
 		if !found {
 			return fmt.Errorf("unable to get operator secret %s", secretName)
@@ -624,6 +675,7 @@ func (c *Cluster) initCouchbaseClient() error {
 			if err != nil {
 				return err
 			}
+
 			tls.ClientAuth = &cbmgr.TLSClientAuth{
 				Cert: clientCert,
 				Key:  clientKey,
@@ -651,14 +703,18 @@ func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
 // Adds a new member to our cluster object and updates the cluster status.
 func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) error {
 	c.members.Add(member)
+
 	c.cluster.Status.Size = c.members.Size()
+
 	return c.updateMemberStatus()
 }
 
 // Removes a member from our cluster object and updates the cluster status.
 func (c *Cluster) clusterRemoveMember(name string) error {
 	c.members.Remove(name)
+
 	c.cluster.Status.Size = c.members.Size()
+
 	return c.updateMemberStatus()
 }
 
@@ -690,6 +746,7 @@ func (c *Cluster) raiseEvent(event *v1.Event) *v1.Event {
 
 	// Update the last event timestamp
 	c.lastEvent = event.FirstTimestamp.Time
+
 	return event
 }
 
@@ -697,17 +754,21 @@ func (c *Cluster) raiseEvent(event *v1.Event) *v1.Event {
 // aggregates events together.
 func (c *Cluster) raiseEventCached(event *v1.Event) {
 	key := strings.Join([]string{event.Type, event.Reason, event.Message}, "")
+
 	entry, ok := c.eventCache.Get(key)
 	if ok {
 		e := entry.(*v1.Event)
 		if time.Since(e.LastTimestamp.Time) < 10*time.Minute {
 			e.Count++
 			e.LastTimestamp = metav1.Now()
+
 			e, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Update(e)
 			if err != nil {
 				log.Error(err, "Event update failed", "cluster", c.namespacedName(), "event", event.Reason)
 			}
+
 			c.eventCache.Add(key, e)
+
 			return
 		}
 	}
@@ -726,6 +787,7 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 	// Get running pods to ensure ready nodes exists
 	running, _ := c.pollPods()
 	podMembers := podsToMemberSet(running)
+
 	for _, node := range readyNodes {
 		if m, ok := c.members[node]; ok {
 			if _, ok := podMembers[node]; ok {
@@ -733,13 +795,16 @@ func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
 			}
 		}
 	}
+
 	if members.Empty() && c.members != nil {
 		err := c.updateMembers(podMembers)
 		if err != nil {
 			log.Error(err, "Member update failed", "cluster", c.namespacedName())
 		}
+
 		members = c.members
 	}
+
 	return members
 }
 
@@ -753,6 +818,7 @@ func (c *Cluster) memberHasLogVolumes(name string) bool {
 			}
 		}
 	}
+
 	return false
 }
 
@@ -762,10 +828,12 @@ func (c *Cluster) getPodIndex() (int, error) {
 	if err != nil {
 		return -1, err
 	}
+
 	podIndex, err := strconv.Atoi(podIndexStr)
 	if err != nil {
 		return -1, err
 	}
+
 	return podIndex, nil
 }
 
@@ -780,6 +848,7 @@ func (c *Cluster) incPodIndex() error {
 	if err != nil {
 		return err
 	}
+
 	return c.setPodIndex(podIndex + 1)
 }
 
@@ -789,6 +858,7 @@ func (c *Cluster) decPodIndex() error {
 	if err != nil {
 		return err
 	}
+
 	return c.setPodIndex(podIndex - 1)
 }
 

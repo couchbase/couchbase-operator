@@ -73,6 +73,7 @@ func validateTLS(kubeclient kubernetes.Interface, cluster *couchbasev1.Couchbase
 	if err != nil {
 		return fmt.Errorf("failed to get TLS server secret for cluster %s/%s", cluster.Namespace, cluster.Name)
 	}
+
 	operatorSecret, err := kubeclient.CoreV1().Secrets(cluster.Namespace).Get(cluster.Spec.TLS.Static.OperatorSecret, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get TLS operator secret for cluster %s/%s", cluster.Namespace, cluster.Name)
@@ -82,16 +83,19 @@ func validateTLS(kubeclient kubernetes.Interface, cluster *couchbasev1.Couchbase
 	if !ok {
 		return fmt.Errorf("failed to get TLS CA certiftcate for cluster %s/%s", cluster.Namespace, cluster.Name)
 	}
+
 	cert, ok := serverSecret.Data["chain.pem"]
 	if !ok {
 		return fmt.Errorf("failed to get TLS certiftcate chain for cluster %s/%s", cluster.Namespace, cluster.Name)
 	}
+
 	key, ok := serverSecret.Data["pkey.key"]
 	if !ok {
 		return fmt.Errorf("failed to get TLS private key for cluster %s/%s", cluster.Namespace, cluster.Name)
 	}
 
 	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace)
+
 	errs := util_x509.Verify(ca, cert, key, x509.ExtKeyUsageServerAuth, subjectAltNames)
 	if len(errs) != 0 {
 		return fmt.Errorf("failed to verifiy TLS server secret for cluster %s/%s: %v", cluster.Namespace, cluster.Name, errs)
@@ -107,7 +111,9 @@ func main() {
 	config := Configuration{
 		ConfigFlags: genericclioptions.NewConfigFlags(true),
 	}
+
 	flagSet := pflag.NewFlagSet("cbopconv", pflag.ExitOnError)
+
 	config.ConfigFlags.AddFlags(flagSet)
 
 	flagSet.BoolVar(&printVersion, "version", false, "Displays the version and exits")
@@ -130,15 +136,18 @@ func main() {
 
 	// Create a client.
 	kubeConfigLoader := config.ConfigFlags.ToRawKubeConfigLoader()
+
 	kubeConfig, err := kubeConfigLoader.ClientConfig()
 	if err != nil {
 		fmt.Println("failed to get config:", err)
 		os.Exit(1)
 	}
+
 	kubeclient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		fmt.Println("failed to create Kubernetes client:", err)
 	}
+
 	clientset, err := couchbaseclient.NewForConfig(kubeConfig)
 	if err != nil {
 		fmt.Println("failed to create Couchbase client:", err)
@@ -153,6 +162,7 @@ func main() {
 	// is in, filtering out v2 CRs that have already been converted.  Remember, internally
 	// there is only the storage version, so the API does not disciminate between v1 and v2.
 	res := &unstructured.UnstructuredList{}
+
 	err = clientset.CouchbaseV2().RESTClient().
 		Get().
 		Resource("couchbaseclusters").
@@ -165,6 +175,7 @@ func main() {
 	}
 
 	unstructuredClusters := &unstructured.UnstructuredList{}
+
 	for _, item := range res.Items {
 		if _, found, _ := unstructured.NestedFieldNoCopy(item.Object, "spec", "baseImage"); found {
 			unstructuredClusters.Items = append(unstructuredClusters.Items, item)
@@ -177,12 +188,14 @@ func main() {
 	}
 
 	clusters := []*couchbasev1.CouchbaseCluster{}
+
 	for _, cluster := range unstructuredClusters.Items {
 		cluster, err := clientset.CouchbaseV1().CouchbaseClusters(namespace).Get(cluster.GetName(), metav1.GetOptions{})
 		if err != nil {
 			fmt.Println("failed to get structured cluster:", err)
 			os.Exit(1)
 		}
+
 		clusters = append(clusters, cluster)
 	}
 
@@ -257,12 +270,14 @@ func main() {
 		for _, service := range cluster.Spec.AdminConsoleServices {
 			newCluster.Spec.Networking.AdminConsoleServices = append(newCluster.Spec.Networking.AdminConsoleServices, couchbasev2.Service(service))
 		}
+
 		if cluster.Spec.TLS != nil {
 			newCluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{}
 			if cluster.Spec.TLS.Static != nil {
 				newCluster.Spec.Networking.TLS.Static = &couchbasev2.StaticTLS{
 					OperatorSecret: cluster.Spec.TLS.Static.OperatorSecret,
 				}
+
 				if cluster.Spec.TLS.Static.Member != nil {
 					newCluster.Spec.Networking.TLS.Static.ServerSecret = cluster.Spec.TLS.Static.Member.ServerSecret
 
@@ -275,20 +290,24 @@ func main() {
 				}
 			}
 		}
+
 		if cluster.Spec.DNS != nil {
 			newCluster.Spec.Networking.DNS = &couchbasev2.DNS{
 				Domain: cluster.Name + "." + cluster.Spec.DNS.Domain,
 			}
 		}
+
 		for _, class := range cluster.Spec.ServerSettings {
 			newClass := couchbasev2.ServerConfig{
 				Size:         class.Size,
 				Name:         class.Name,
 				ServerGroups: class.ServerGroups,
 			}
+
 			for _, service := range class.Services {
 				newClass.Services = append(newClass.Services, couchbasev2.Service(service))
 			}
+
 			if class.Pod != nil {
 				newClass.Pod = &corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
@@ -302,9 +321,11 @@ func main() {
 						ImagePullSecrets:             class.Pod.ImagePullSecrets,
 					},
 				}
+
 				newClass.Env = class.Pod.CouchbaseEnv
 				newClass.EnvFrom = class.Pod.EnvFrom
 				newClass.Resources = class.Pod.Resources
+
 				if class.Pod.VolumeMounts != nil {
 					newClass.VolumeMounts = &couchbasev2.VolumeMounts{
 						DefaultClaim:    class.Pod.VolumeMounts.DefaultClaim,
@@ -315,6 +336,7 @@ func main() {
 					}
 				}
 			}
+
 			newCluster.Spec.Servers = append(newCluster.Spec.Servers, newClass)
 		}
 
@@ -325,6 +347,7 @@ func main() {
 		buckets := []*couchbasev2.CouchbaseBucket{}
 		ephemeralBuckets := []*couchbasev2.CouchbaseEphemeralBucket{}
 		memcachedBuckets := []*couchbasev2.CouchbaseMemcachedBucket{}
+
 		if !cluster.Spec.DisableBucketManagement && len(cluster.Spec.BucketSettings) != 0 {
 			newCluster.Spec.Buckets = couchbasev2.Buckets{
 				Managed: true,
@@ -334,6 +357,7 @@ func main() {
 					},
 				},
 			}
+
 			for _, bucket := range cluster.Spec.BucketSettings {
 				switch bucket.BucketType {
 				case "couchbase":
@@ -360,6 +384,7 @@ func main() {
 							CompressionMode:    couchbasev2.CouchbaseBucketCompressionMode(bucket.CompressionMode),
 						},
 					}
+
 					buckets = append(buckets, newBucket)
 					objects = append(objects, newBucket)
 				case "ephemeral":
@@ -385,6 +410,7 @@ func main() {
 							CompressionMode:    couchbasev2.CouchbaseBucketCompressionMode(bucket.CompressionMode),
 						},
 					}
+
 					ephemeralBuckets = append(ephemeralBuckets, newBucket)
 					objects = append(objects, newBucket)
 				case "memcached":
@@ -405,6 +431,7 @@ func main() {
 							EnableFlush: bucket.EnableFlush,
 						},
 					}
+
 					memcachedBuckets = append(memcachedBuckets, newBucket)
 					objects = append(objects, newBucket)
 				}
@@ -425,33 +452,43 @@ func main() {
 				"version":  cluster.Status.CurrentVersion,
 			},
 		}
+
 		objects = append(objects, configMap)
 
 		yamls := []string{}
+
 		for _, object := range objects {
 			data, err := yaml.Marshal(object)
 			if err != nil {
 				fmt.Println("Failed to marshal data structure:", err)
 			}
+
 			yamls = append(yamls, string(data))
 		}
 
 		fmt.Println("Proposed update for cluster", cluster.Name)
 		fmt.Println(strings.Join(yamls, "\n---\n"))
+
 		proceed := false
+
 		for {
 			fmt.Println("Okay to proceed? (Y/n)")
+
 			reader := bufio.NewReader(os.Stdin)
+
 			text, err := reader.ReadString('\n')
 			if err != nil {
 				continue
 			}
+
 			if proceed, err = parseYesNo(text, true); err != nil {
 				fmt.Println(err)
 				continue
 			}
+
 			break
 		}
+
 		if !proceed {
 			continue
 		}
@@ -460,24 +497,28 @@ func main() {
 			fmt.Println("Update of CouchbaseCluster", cluster.Name, "failed - aborting:", err)
 			os.Exit(1)
 		}
+
 		for _, bucket := range buckets {
 			if _, err := clientset.CouchbaseV2().CouchbaseBuckets(namespace).Create(bucket); err != nil {
 				fmt.Println("Creation of CouchbaseBucket", bucket.Name, "failed")
 				fmt.Println("Bucket name may collide with existing bucket, either rename uniquely or reference existing bucket in the spec.buckets.selector.matchLabels attribute before restarting Operator")
 			}
 		}
+
 		for _, bucket := range ephemeralBuckets {
 			if _, err := clientset.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).Create(bucket); err != nil {
 				fmt.Println("Creation of CouchbaseEphemeralBucket", bucket.Name, "failed")
 				fmt.Println("Bucket name may collide with existing bucket, either rename uniquely or reference existing bucket in the spec.buckets.selector.matchLabels attribute before restarting Operator")
 			}
 		}
+
 		for _, bucket := range memcachedBuckets {
 			if _, err := clientset.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).Create(bucket); err != nil {
 				fmt.Println("Creation of CouchbaseMemcachedBucket", bucket.Name, "failed")
 				fmt.Println("Bucket name may collide with existing bucket, either rename uniquely or reference existing bucket in the spec.buckets.selector.matchLabels attribute before restarting Operator")
 			}
 		}
+
 		if _, err := kubeclient.CoreV1().ConfigMaps(namespace).Create(configMap); err != nil {
 			fmt.Println("Creation of ConfigMap failed:", err)
 		}
@@ -486,6 +527,7 @@ func main() {
 		if err != nil {
 			fmt.Println("Failed to create label requirement:", err)
 		}
+
 		selector := labels.NewSelector()
 		selector = selector.Add(*clusterRequirement)
 
@@ -500,6 +542,7 @@ func main() {
 			for i := range pod.OwnerReferences {
 				pod.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
+
 			if _, err := kubeclient.CoreV1().Pods(namespace).Update(&pod); err != nil {
 				fmt.Println("Update of Pod", pod.Name, "failed:", err)
 			}
@@ -516,6 +559,7 @@ func main() {
 			for i := range service.OwnerReferences {
 				service.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
+
 			if _, err := kubeclient.CoreV1().Services(namespace).Update(&service); err != nil {
 				fmt.Println("Update of Service", service.Name, "failed:", err)
 			}
@@ -532,6 +576,7 @@ func main() {
 			for i := range pvc.OwnerReferences {
 				pvc.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
+
 			if _, err := kubeclient.CoreV1().PersistentVolumeClaims(namespace).Update(&pvc); err != nil {
 				fmt.Println("Update of PersistentVolumeClaim", pvc.Name, "failed:", err)
 			}
@@ -548,6 +593,7 @@ func main() {
 			for i := range pdb.OwnerReferences {
 				pdb.OwnerReferences[i].APIVersion = couchbasev2.Group
 			}
+
 			if _, err := kubeclient.PolicyV1beta1().PodDisruptionBudgets(namespace).Update(&pdb); err != nil {
 				fmt.Println("Update of PodDisruptionBudgets", pdb.Name, "failed:", err)
 			}

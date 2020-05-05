@@ -25,6 +25,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 	sched := &nullSchedulerImpl{
 		serverClasses: map[string]*serverList{},
 	}
+
 	for _, class := range cluster.Spec.Servers {
 		sched.serverClasses[class.Name] = &serverList{}
 	}
@@ -34,10 +35,12 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 		if !ok {
 			return nil, fmt.Errorf("%s: pod %s does not have server class label", stripeErrorHeader, pod.Name)
 		}
+
 		// Class deleted, ignore the pod
 		if _, ok := sched.serverClasses[class]; !ok {
 			continue
 		}
+
 		sched.serverClasses[class].push(pod.Name)
 	}
 
@@ -63,6 +66,7 @@ func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 	}
 
 	sched.serverClasses[class].sort()
+
 	server, err := sched.serverClasses[class].pop()
 	if err != nil {
 		return "", fmt.Errorf("%s: %v", nullErrorHeader, err)

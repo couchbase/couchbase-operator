@@ -311,7 +311,9 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 		t.Error(err)
 		return
 	}
+
 	eventSeq := &eventschema.Sequence{Validators: events}
+
 	v := &eventschema.Validator{Events: clusterEvents, Schema: eventSeq}
 	if err := v.Validate(os.Stdout); err != nil {
 		t.Error(err)

@@ -58,9 +58,11 @@ func (r *pvcUpgradableResource) lenItems() int {
 
 func (r *pvcUpgradableResource) itemVersion(item int) string {
 	version := "0.0.0"
+
 	if v, ok := r.pvcs[item].Annotations[constants.ResourceVersionAnnotation]; ok {
 		version = v
 	}
+
 	return version
 }
 
@@ -74,10 +76,12 @@ func (r *pvcUpgradableResource) actionVersionRange(action int) upgradeRange {
 
 func (r *pvcUpgradableResource) perform(item, action int) error {
 	pvc := r.pvcs[item]
+
 	upgrade := r.actions[action].action
 	if err := upgrade(r.cluster, pvc); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -86,6 +90,7 @@ func (r *pvcUpgradableResource) commit(item int) error {
 	if _, err := r.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(pvc); err != nil {
 		return err
 	}
+
 	return nil
 }
 

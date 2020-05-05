@@ -23,10 +23,12 @@ func skipRBAC(t *testing.T) {
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	version, err := couchbaseutil.NewVersion(tag)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	threshold, _ := couchbaseutil.NewVersion("6.5.0")
 	if version.Less(threshold) {
 		t.Skip("unsupported couchbase version")
@@ -214,13 +216,16 @@ func TestSyncGatewayRBAC(t *testing.T) {
 
 	// Create the RBAC primitives and Couchbase cluster.
 	e2eutil.MustCreateSecret(t, k8s1, k8s1.Namespace, secret)
+
 	defer func() {
 		_ = e2eutil.DeleteSecret(k8s1.KubeClient, k8s1.Namespace, secretName, nil)
 	}()
+
 	e2eutil.MustNewUser(t, k8s1, k8s1.Namespace, user)
 	e2eutil.MustNewGroup(t, k8s1, k8s1.Namespace, group)
 	e2eutil.MustNewRoleBinding(t, k8s1, k8s1.Namespace, binding)
 	e2eutil.MustNewBucket(t, k8s1, k8s1.Namespace, e2espec.DefaultBucket)
+
 	cluster := e2eutil.MustNewClusterBasic(t, k8s1, k8s1.Namespace, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 

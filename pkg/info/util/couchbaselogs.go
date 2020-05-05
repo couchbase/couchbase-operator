@@ -73,6 +73,7 @@ func CollectInfo(context *context.Context, pod *v1.Pod) (result *CollectInfoResu
 	// Finally run the collection command
 	// Stdout appears to be required for this to work
 	stdout := &bytes.Buffer{}
+
 	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
 		result.Err = fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
 		return
@@ -105,23 +106,28 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 
 	// Finally run the copy command
 	stdout := &bytes.Buffer{}
+
 	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
 		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
 	}
 
 	tarReader := tar.NewReader(stdout)
+
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
 			break
 		}
+
 		if err != nil {
 			return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
 		}
+
 		if err := ioutil.WriteFile(filepath.Base(header.Name), stdout.Bytes(), 0600); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -147,6 +153,7 @@ func CleanLogs(context *context.Context, pod *v1.Pod) error {
 
 	// Finally run the delete command
 	stdout := &bytes.Buffer{}
+
 	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
 		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
 	}

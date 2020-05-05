@@ -12,7 +12,6 @@ func ExampleValidator_Validate() {
 	// In a perfect world this is what I'd expect QE to look like, we don't care about the
 	// minute details, just that things happen heuristically based on expectations and
 	// variable behaviours of Couchbase server
-
 	events := []corev1.Event{
 		{Reason: "NewMemberAdded", Message: "New member test-couchbase-jsstw-0000 added to cluster"},
 		{Reason: "NewMemberAdded", Message: "New member test-couchbase-jsstw-0001 added to cluster"},
@@ -76,7 +75,6 @@ func ExampleValidator_Validate() {
 func ExampleValidator_Validate_strict() {
 	// A strict validation eventschema which checks explicit messages.  This is more correct but
 	// suffers from the problem that messages need to remain the same or validation fails.
-
 	events := []corev1.Event{
 		{Reason: "NewMemberAdded", Message: "New member test-couchbase-jsstw-0000 added to cluster"},
 		{Reason: "NewMemberAdded", Message: "New member test-couchbase-jsstw-0001 added to cluster"},

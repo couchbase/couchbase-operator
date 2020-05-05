@@ -369,10 +369,12 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	// check that actual cluster size is only 2 nodes
 	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
 	defer cleanup()
+
 	info, err := client.ClusterInfo()
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	numNodes := len(info.Nodes)
 	if numNodes != 2 {
 		e2eutil.Die(t, fmt.Errorf("expected 2 nodes, found: %d", numNodes))
@@ -418,6 +420,7 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// adding query service
 	t.Log("adding query service")
+
 	newService := couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_2",
@@ -436,6 +439,7 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// adding index service
 	t.Log("adding index service")
+
 	newService = couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_3",
@@ -454,6 +458,7 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// adding search service
 	t.Log("adding search service")
+
 	newService = couchbasev2.ServerConfig{
 		Size:     constants.Size1,
 		Name:     "test_config_4",
@@ -472,6 +477,7 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// removing search service
 	t.Log("removing search service")
+
 	removeServiceName := "test_config_4"
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
 
@@ -487,6 +493,7 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// removing index service
 	t.Log("removing index service")
+
 	removeServiceName = "test_config_3"
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -501,6 +508,7 @@ func TestBasicMDSScaling(t *testing.T) {
 
 	// removing query service
 	t.Log("removing query service")
+
 	removeServiceName = "test_config_2"
 	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -797,11 +805,13 @@ func TestManageMultipleClusters(t *testing.T) {
 
 	// Create the clusters.
 	clusters := []*couchbasev2.CouchbaseCluster{}
+
 	for index := 0; index < 3; index++ {
 		clusters = append(clusters, e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize))
 	}
 
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+
 	for _, testCouchbase := range clusters {
 		// When each cluster is ready create a bucket and verify it appears in the
 		// cluster status.

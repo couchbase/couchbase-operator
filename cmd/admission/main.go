@@ -11,6 +11,7 @@ func main() {
 	// Parse command line parameters
 	config := &admission.Config{}
 	config.AddFlags()
+
 	flag.Parse()
 
 	// FIre up the server

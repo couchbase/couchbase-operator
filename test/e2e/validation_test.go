@@ -66,10 +66,13 @@ func (failures *failureList) AppendFailure(name string, err error) {
 
 func (failures *failureList) PrintFailures(t *testing.T) bool {
 	failureExists := false
+
 	for i, failure := range *failures {
 		t.Logf("Failure %d: %s \n Error: %v \n", i+1, failure.testName, failure.testError)
+
 		failureExists = true
 	}
+
 	return failureExists
 }
 
@@ -98,6 +101,7 @@ func loadResources(path string) (resourceList, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		res = append(res, j)
 	}
 
@@ -110,6 +114,7 @@ func getResourceMeta(resource []byte) (string, string, error) {
 	if err := json.Unmarshal(resource, object); err != nil {
 		return "", "", err
 	}
+
 	return object.GetNamespace(), object.GetName(), nil
 }
 
@@ -127,18 +132,22 @@ func getResource(k8s *types.Cluster, object *unstructured.Unstructured) (*schema
 		if err != nil {
 			return nil, err
 		}
+
 		groupresources, err := restmapper.GetAPIGroupResources(discoveryClient)
 		if err != nil {
 			return nil, err
 		}
+
 		restMapper = restmapper.NewDiscoveryRESTMapper(groupresources)
 	}
 
 	gvk := object.GroupVersionKind()
+
 	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, err
 	}
+
 	return &mapping.Resource, nil
 }
 
@@ -159,6 +168,7 @@ func createResources(k8s *types.Cluster, resources resourceList) error {
 		if err != nil {
 			return err
 		}
+
 		res, err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Create(object, metav1.CreateOptions{})
 		if err != nil {
 			return err
@@ -175,6 +185,7 @@ func createResources(k8s *types.Cluster, resources resourceList) error {
 
 		resources[i] = raw
 	}
+
 	return nil
 }
 
@@ -195,6 +206,7 @@ func updateResources(k8s *types.Cluster, resources resourceList) error {
 		if err != nil {
 			return err
 		}
+
 		res, err := client.Resource(*groupVersion).Namespace(object.GetNamespace()).Update(object, metav1.UpdateOptions{})
 		if err != nil {
 			return err
@@ -208,8 +220,10 @@ func updateResources(k8s *types.Cluster, resources resourceList) error {
 		if err != nil {
 			return err
 		}
+
 		resources[i] = raw
 	}
+
 	return nil
 }
 
@@ -230,10 +244,12 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 		if err != nil {
 			return err
 		}
+
 		if err := client.Resource(*groupVersion).Namespace(object.GetNamespace()).Delete(object.GetName(), metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -267,6 +283,7 @@ func patchResources(resources resourceList, patches patchMap) error {
 
 		resources[i] = resource
 	}
+
 	return nil
 }
 
@@ -276,6 +293,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 	// Stop the operator, we don't actually need it to validate the API and the tests will take forever.
 	_ = framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, targetKube.Namespace)
+
 	defer func() { _ = f.SetupCouchbaseOperator(targetKube) }()
 
 	for i := range testDefs {
@@ -447,6 +465,7 @@ func TestValidationCreate(t *testing.T) {
 		}
 		testDefs = append(testDefs, testDefCase)
 	}
+
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "create")
 }
@@ -1220,6 +1239,7 @@ func TestValidationApply(t *testing.T) {
 		}
 		testDefs = append(testDefs, testDefCase)
 	}
+
 	kubeName := framework.Global.TestClusters[0]
 	runValidationTest(t, testDefs, kubeName, "apply")
 }
@@ -1262,12 +1282,15 @@ func TestNegValidationApply(t *testing.T) {
 	// Cases to validate with all volume mounts present in Pod.VolumeMounts but one of the Service missing
 	for _, serviceToSkip := range constants.StatefulCbServiceList {
 		fieldValueToUse := constants.StatelessCbServiceList
+
 		for _, statefulService := range constants.StatefulCbServiceList {
 			if statefulService == serviceToSkip {
 				continue
 			}
+
 			fieldValueToUse = append(fieldValueToUse, statefulService)
 		}
+
 		testCase := testDef{
 			name:           "TestValidateApplyServerServicesImmutable_" + string(serviceToSkip),
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/services", fieldValueToUse)},
@@ -1281,6 +1304,7 @@ func TestNegValidationApply(t *testing.T) {
 	for _, serviceName := range constants.StatefulCbServiceList {
 		fieldValueToUse := constants.StatelessCbServiceList
 		fieldValueToUse = append(fieldValueToUse, serviceName)
+
 		testCase := testDef{
 			name:           "TestValidateApplyServerServicesImmutable_" + string(serviceName),
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", fieldValueToUse)},

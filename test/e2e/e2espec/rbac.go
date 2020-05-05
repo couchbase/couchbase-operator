@@ -95,6 +95,7 @@ func NewRoleBinding(name string, users []string, role string) *couchbasev2.Couch
 				Name: user,
 			})
 	}
+
 	roleRef := couchbasev2.CouchbaseRoleBindingRef{
 		Kind: couchbasev2.RoleBindingReferenceTypeGroup,
 		Name: role,

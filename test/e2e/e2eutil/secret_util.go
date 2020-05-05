@@ -21,6 +21,7 @@ func MustCreateSecret(t *testing.T, k8s *types.Cluster, namespace string, secret
 	if err != nil {
 		Die(t, err)
 	}
+
 	return secret
 }
 
@@ -30,6 +31,7 @@ func MustRecreateSecret(t *testing.T, k8s *types.Cluster, namespace string, secr
 		Labels:      secret.Labels,
 		Annotations: secret.Annotations,
 	}
+
 	return MustCreateSecret(t, k8s, namespace, secret)
 }
 
@@ -52,6 +54,7 @@ func MustGetSecret(t *testing.T, k8s *types.Cluster, namespace string, secretNam
 	if err != nil {
 		Die(t, err)
 	}
+
 	return secret
 }
 

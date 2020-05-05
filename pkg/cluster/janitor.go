@@ -36,11 +36,13 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolu
 	pvcs := j.cluster.k8s.PersistentVolumeClaims.List()
 
 	logPvcs := []*corev1.PersistentVolumeClaim{}
+
 	for _, pvc := range pvcs {
 		// If it's not a log volume ignore it.
 		if !k8sutil.IsLogPVC(pvc) {
 			continue
 		}
+
 		logPvcs = append(logPvcs, pvc)
 	}
 
@@ -52,6 +54,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCUpdate(pvc *corev1.PersistentVol
 	if _, err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(pvc); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -60,6 +63,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCDelete(name string) error {
 	if err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -69,10 +73,12 @@ func (j *janitorAbstractionInterfaceImpl) PodExists(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
+
 	// Check this isn't cbopinfo doing a collection.
 	if v, ok := pod.Labels["app"]; ok && v == "cbopinfo" {
 		return false, nil
 	}
+
 	return true, nil
 }
 
@@ -103,10 +109,12 @@ func (j *janitor) getDetachedLogPVCs() ([]*corev1.PersistentVolumeClaim, error) 
 	}
 
 	detachedPVCs := []*corev1.PersistentVolumeClaim{}
+
 	for _, pvc := range pvcs {
 		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; !ok {
 			continue
 		}
+
 		detachedPVCs = append(detachedPVCs, pvc)
 	}
 
@@ -135,15 +143,18 @@ func (j *janitor) updateDetachedAnnotation(pvc *corev1.PersistentVolumeClaim) er
 		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; !ok {
 			return nil
 		}
+
 		log.Info("PVC marked as attached", "cluster", j.cluster.namespacedName(), "name", pvc.Name)
 		delete(pvc.Annotations, constants.VolumeDetachedAnnotation)
 	} else {
 		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; ok {
 			return nil
 		}
+
 		if pvc.Annotations == nil {
 			pvc.Annotations = map[string]string{}
 		}
+
 		log.Info("PVC marked as detached", "cluster", j.cluster.namespacedName(), "name", pvc.Name)
 		pvc.Annotations[constants.VolumeDetachedAnnotation] = time.Now().Format(time.RFC3339)
 	}
@@ -163,11 +174,13 @@ func (j *janitor) updateDetachedAnnotations() error {
 	if err != nil {
 		return err
 	}
+
 	for _, pvc := range pvcs {
 		if err := j.updateDetachedAnnotation(pvc); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -178,10 +191,12 @@ func (j *janitor) deleteTimedOutVolumes() error {
 	if j.cluster.cluster.Spec.Logging.LogRetentionTime == "" {
 		return nil
 	}
+
 	logRetentionTime, err := time.ParseDuration(j.cluster.cluster.Spec.Logging.LogRetentionTime)
 	if err != nil {
 		return fmt.Errorf("logRetentionTime improperly formatted: %v", err)
 	}
+
 	if logRetentionTime == 0 {
 		return nil
 	}
@@ -190,18 +205,22 @@ func (j *janitor) deleteTimedOutVolumes() error {
 	if err != nil {
 		return err
 	}
+
 	for _, pvc := range pvcs {
 		detachedTime, err := time.Parse(time.RFC3339, pvc.Annotations[constants.VolumeDetachedAnnotation])
 		if err != nil {
 			return err
 		}
+
 		if detachedTime.Add(logRetentionTime).Before(time.Now()) {
 			log.Info("PVC retention time threshold exceeded, deleting", "cluster", j.cluster.namespacedName(), "name", pvc.Name)
+
 			if err := j.abstraction.LogPVCDelete(pvc.Name); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -229,13 +248,16 @@ func (j *janitor) deleteOverCapacityVolumes() error {
 	sorter := func(i, j int) bool {
 		a := pvcs[i].Annotations[constants.VolumeDetachedAnnotation]
 		b := pvcs[j].Annotations[constants.VolumeDetachedAnnotation]
+
 		return a < b
 	}
+
 	sort.SliceStable(pvcs, sorter)
 
 	// Finally kill off the overflow
 	for _, pvc := range pvcs[0 : logCount-logRetentionCount] {
 		log.Info("PVC count thershold exceeded, deleting", "cluster", j.cluster.namespacedName(), "name", pvc.Name)
+
 		if err := j.abstraction.LogPVCDelete(pvc.Name); err != nil {
 			return err
 		}
@@ -250,14 +272,17 @@ func (j *janitor) cleanPeriodic() error {
 	if err := j.updateDetachedAnnotations(); err != nil {
 		return err
 	}
+
 	// Second pass check for expired PVCs.
 	if err := j.deleteTimedOutVolumes(); err != nil {
 		return err
 	}
+
 	// Third pass check for too many PVCs.
 	if err := j.deleteOverCapacityVolumes(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -267,6 +292,8 @@ func (j *janitor) run() {
 
 	// Sit in a loop forever performing periodic clean up operations every
 	// minute.
+	// Note we don't do any clean up actions on cluster deletion, the owner
+	// references attached to the volumes will do this for us.
 	for {
 		select {
 		case <-j.cluster.ctx.Done():
@@ -277,7 +304,4 @@ func (j *janitor) run() {
 			}
 		}
 	}
-
-	// Note we don't do any clean up actions on cluster deletion, the owner
-	// references attached to the volumes will do this for us.
 }

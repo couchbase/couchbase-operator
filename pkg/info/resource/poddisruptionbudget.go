@@ -32,14 +32,17 @@ func (r *podDisruptionBudgetResource) Kind() string {
 // Fetch collects all pod disruption budgets as defined by the configuration.
 func (r *podDisruptionBudgetResource) Fetch() error {
 	var err error
+
 	selector, err := GetResourceSelector(&r.context.Config)
 	if err != nil {
 		return err
 	}
+
 	r.pdbs, err = r.context.KubeClient.PolicyV1beta1().PodDisruptionBudgets(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -52,6 +55,7 @@ func (r *podDisruptionBudgetResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), pdb.Name, pdb.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

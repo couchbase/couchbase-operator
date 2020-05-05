@@ -20,12 +20,15 @@ func DumpBackupYAML(conf *Config) error {
 	if err := DumpYAML(conf, "backup-service-account", GetBackupServiceAccount(BackupResourceName)); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "backup-role", GetBackupRole(BackupResourceName)); err != nil {
 		return err
 	}
+
 	if err := DumpYAML(conf, "backup-role-binding", GetBackupRoleBinding(BackupResourceName, conf.Namespace)); err != nil {
 		return err
 	}
+
 	return nil
 }
 

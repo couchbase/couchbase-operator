@@ -26,5 +26,6 @@ func TestMain(m *testing.M) {
 		logrus.Errorf("Failed to teardown framework: %v", err)
 		os.Exit(1)
 	}
+
 	os.Exit(code)
 }

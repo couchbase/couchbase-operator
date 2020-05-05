@@ -66,13 +66,17 @@ func (j *janitorAbstractionInterfaceTestImpl) LogPVCUpdate(pvc *corev1.Persisten
 	if j.pvcUpdate >= len(j.pvcUpdates) {
 		j.t.Fatalf("Update() overflow")
 	}
+
 	// Oddly reflect doesn't work here, probably nil vs empty slice
 	a, _ := json.Marshal(j.pvcUpdates[j.pvcUpdate])
 	b, _ := json.Marshal(pvc)
+
 	if string(a) != string(b) {
 		j.t.Fatalf("Update() mismatch\nexpected: %s\nactual: %s", string(a), string(b))
 	}
+
 	j.pvcUpdate++
+
 	return nil
 }
 
@@ -82,10 +86,13 @@ func (j *janitorAbstractionInterfaceTestImpl) LogPVCDelete(name string) error {
 	if j.pvcDeletion >= len(j.pvcDeletions) {
 		j.t.Fatalf("Delete() overflow")
 	}
+
 	if j.pvcDeletions[j.pvcDeletion] != name {
 		j.t.Fatalf("Delete() mismatch\nexpected: %s\nactual: %s", j.pvcDeletions[j.pvcDeletion], name)
 	}
+
 	j.pvcDeletion++
+
 	return nil
 }
 
@@ -96,8 +103,10 @@ func (j *janitorAbstractionInterfaceTestImpl) PodExists(name string) (bool, erro
 	if j.podExistsIndex >= len(j.podExists) {
 		j.t.Fatalf("Exists() overflow")
 	}
+
 	e := j.podExists[j.podExistsIndex]
 	j.podExistsIndex++
+
 	return e, nil
 }
 
@@ -106,6 +115,7 @@ func (j *janitorAbstractionInterfaceTestImpl) mustValidate() {
 	if len(j.pvcUpdates) != j.pvcUpdate {
 		j.t.Fatalf("expected pvcUpdate(s) not all seen\nexpected: %d\nactual: %d", len(j.pvcUpdates), j.pvcUpdate)
 	}
+
 	if len(j.pvcDeletions) != j.pvcDeletion {
 		j.t.Fatalf("expected pvcDeletion(s) not all seen\nexpected: %d\nactual: %d", len(j.pvcDeletions), j.pvcDeletion)
 	}
@@ -129,11 +139,13 @@ func pcvFixture(name, pod string, detached *time.Time) *corev1.PersistentVolumeC
 			},
 		},
 	}
+
 	if detached != nil {
 		pvc.Annotations = map[string]string{
 			constants.VolumeDetachedAnnotation: detached.Format(time.RFC3339),
 		}
 	}
+
 	return pvc
 }
 

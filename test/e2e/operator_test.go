@@ -32,9 +32,11 @@ func TestPauseOperator(t *testing.T) {
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
 	e2eutil.KillPods(t, targetKube.KubeClient, testCouchbase, 1)
 	e2eutil.MustWaitUntilPodSizeReached(t, targetKube, testCouchbase, constants.Size2, 2*time.Minute)
+
 	if err := e2eutil.WaitUntilPodSizeReached(targetKube, testCouchbase, constants.Size3, 2*time.Minute); err == nil {
 		e2eutil.Die(t, fmt.Errorf("cluster expectedly recovered"))
 	}
+
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Spec/Paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)

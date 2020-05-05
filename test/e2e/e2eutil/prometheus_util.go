@@ -28,6 +28,7 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 	listOptions := &metav1.ListOptions{
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
+
 	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(*listOptions)
 	if err != nil {
 		return responseDataStr, err
@@ -50,13 +51,16 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 		if err := pf.ForwardPorts(); err != nil {
 			return responseDataStr, err
 		}
+
 		defer pf.Close()
 
 		uri := fmt.Sprintf("http://localhost:%s%s", port, "/metrics")
+
 		resp, err := http.Get(uri)
 		if err != nil {
 			return "", fmt.Errorf("unable to collect %s for pod %s", uri, pod.Name)
 		}
+
 		defer resp.Body.Close()
 
 		// Buffer up the responses
@@ -87,6 +91,7 @@ func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 	if err != nil {
 		Die(t, err)
 	}
+
 	return responseDataStr
 }
 
@@ -99,6 +104,7 @@ func ExposeMetric(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, m
 		if !strings.Contains(responseDataStr, fmt.Sprintf("%s %s", metric, value)) {
 			return fmt.Errorf("response data does not contain expected value of the metric")
 		}
+
 		return nil
 	})
 }
@@ -117,6 +123,7 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 	listOptions := &metav1.ListOptions{
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
+
 	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(*listOptions)
 	if err != nil {
 		return responseDataStr, err
@@ -139,6 +146,7 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 		if err := pf.ForwardPorts(); err != nil {
 			return responseDataStr, err
 		}
+
 		defer pf.Close()
 
 		// Create a Bearer string by appending string access token
@@ -146,17 +154,19 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 		// Create a new request using http
 		uri := fmt.Sprintf("http://localhost:%s%s", port, "/metrics")
 		req, _ := http.NewRequest("GET", uri, nil)
+
 		// add authorization header to the req
 		req.Header.Add("Authorization", bearer)
 
 		// Send request using http Client
 		client := &http.Client{}
-		resp, err := client.Do(req)
 
+		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Printf("unable to collect %s for pod %s\n", uri, pod.Name)
 			continue
 		}
+
 		defer resp.Body.Close()
 
 		// Buffer up the responses
@@ -188,5 +198,6 @@ func MustCheckPrometheusWithAuthSecret(t *testing.T, k8s *types.Cluster, couchba
 	if err != nil {
 		Die(t, err)
 	}
+
 	return responseDataStr
 }

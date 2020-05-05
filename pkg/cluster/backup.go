@@ -39,10 +39,12 @@ func (c *Cluster) generateCronJobs(backups []couchbasev2.CouchbaseBackup) ([]*ba
 	// apply annotations
 	for _, cronjob := range cronjobs {
 		k8sutil.ApplyBaseAnnotations(cronjob)
+
 		specJSON, err := json.Marshal(cronjob.Spec)
 		if err != nil {
 			return nil, err
 		}
+
 		cronjob.Annotations[constants.CronjobSpecAnnotation] = string(specJSON)
 	}
 
@@ -65,6 +67,7 @@ func getBackupContainerForTLS(podSpec corev1.PodSpec, containerName string) (*co
 			return &podSpec.Containers[index], nil
 		}
 	}
+
 	return nil, fmt.Errorf("unable to locate backup container")
 }
 
@@ -104,26 +107,32 @@ func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) err
 			}
 
 			containerName := job.Template.Spec.Containers[0].Name
+
 			container, err := getBackupContainerForTLS(job.Template.Spec, containerName)
 			if err != nil {
 				return err
 			}
+
 			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 			// Annotate the podSpec as having TLS enabled
 			if job.Template.Annotations == nil {
 				job.Template.Annotations = map[string]string{}
 			}
+
 			job.Template.Annotations[constants.PodTLSAnnotation] = "enabled"
 		}
 	}
+
 	return nil
 }
 
 // generateBackupCronjob generates a backup cronjob taking into account the backup strategy and the cbbackupmgr action.
 func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction, strategy couchbasev2.Strategy) *batchv1beta1.CronJob {
 	var schedule string
+
 	var container corev1.Container
+
 	var affinity *corev1.Affinity
 
 	switch action {
@@ -214,6 +223,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 // and then take a Full backup (true) or just an incremental backup (false).
 func (c *Cluster) generateBackupContainer(containerName string, strategy couchbasev2.Strategy, config bool, logRetention, backupRetention metav1.Duration) corev1.Container {
 	var resources corev1.ResourceRequirements
+
 	if c.cluster.Spec.Backup.Resources != nil {
 		resources = *c.cluster.Spec.Backup.Resources
 	}
@@ -247,6 +257,7 @@ func (c *Cluster) generateBackupContainer(containerName string, strategy couchba
 // generateRestoreJob returns a job that performs a cbbackupmgr restore command.
 func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore) (*batchv1.Job, error) {
 	var start string
+
 	var end string
 
 	if restore.Spec.Start.Int != nil {
@@ -254,6 +265,7 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 	} else {
 		start = *restore.Spec.Start.Str
 	}
+
 	if restore.Spec.End.Int != nil {
 		end = strconv.Itoa(*restore.Spec.End.Int)
 	} else {
@@ -321,6 +333,7 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 // but specifies the restore mode to the backup_script instead of the backup mode.
 func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupRestoreSpec, start, end string) corev1.Container {
 	var resources corev1.ResourceRequirements
+
 	if c.cluster.Spec.Backup.Resources != nil {
 		resources = *c.cluster.Spec.Backup.Resources
 	}
@@ -365,6 +378,7 @@ func (c *Cluster) getBackupRepo(restore *couchbasev2.CouchbaseBackupRestore) err
 			if len(backup.Status.Repo) != 0 {
 				restore.Spec.Repo = backup.Status.Repo
 				backupFound = true
+
 				break
 			}
 		}
@@ -410,8 +424,8 @@ func generateBackupPVC(pvcName, clusterName string, storage *resource.Quantity) 
 func (c *Cluster) deleteBackups() error {
 	deletedBackups := make(map[string]bool)
 
-	actualCronjobs := c.k8s.CronJobs.List()
 	// loop over the current existing actualCronjobs
+	actualCronjobs := c.k8s.CronJobs.List()
 	for _, cronjob := range actualCronjobs {
 		// check if the job has an "owner" backup
 		backupToDelete := cronjob.Labels[constants.LabelBackup]
@@ -421,6 +435,7 @@ func (c *Cluster) deleteBackups() error {
 			if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(cronjob.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
 			}
+
 			log.Info("Backup Cronjob deleted", "cbbackup", backupToDelete, "cronjob", cronjob.Name)
 			// add and raise events later
 			deletedBackups[backupToDelete] = true

@@ -11,6 +11,7 @@ import (
 func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
 	// If we have no known members, default to an empty status
 	status := couchbaseutil.NewClusterStatus()
+
 	if !known.Empty() {
 		var err error
 		if status, err = c.client.GetClusterStatus(known); err != nil {
@@ -72,12 +73,14 @@ func (c *Cluster) newMember(id int, serverSpecName, image string) (*couchbaseuti
 
 func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
+
 	pvcMembers, err := k8sutil.PVCToMemberset(c.k8s, c.cluster.Namespace, c.isSecureClient())
 	if err != nil {
 		log.Error(err, "Member discovery failed", "cluster", c.namespacedName())
 	} else {
 		members = pvcMembers
 	}
+
 	return members
 }
 
@@ -101,13 +104,16 @@ func (c *Cluster) getManagedPersistedMembers(knownNodes []string) couchbaseutil.
 			}
 		}
 	}
+
 	return managedMembers
 }
 
 func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
+
 	for _, pod := range pods {
 		config := ""
+
 		labels := pod.GetLabels()
 		if val, ok := labels[constants.LabelNodeConf]; ok {
 			config = val
@@ -129,5 +135,6 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 		}
 		members.Add(m)
 	}
+
 	return members
 }

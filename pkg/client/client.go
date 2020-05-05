@@ -15,6 +15,7 @@ func MustNew(cfg *rest.Config) versioned.Interface {
 	if err != nil {
 		panic(err)
 	}
+
 	return cli
 }
 
@@ -84,6 +85,7 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 	c := &Client{}
 
 	var err error
+
 	c.KubeConfig, err = rest.InClusterConfig()
 	if err != nil {
 		return nil, err

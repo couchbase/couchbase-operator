@@ -69,9 +69,11 @@ func Init() error {
 
 func readYamlData() (err error) {
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
+
 	flag.Parse()
 
 	logrus.Info("Using test_config file ", *testConfigFilePath)
+
 	runtimeParams, err = readRuntimeConfig(*testConfigFilePath)
 	if err != nil {
 		return err
@@ -80,7 +82,9 @@ func readYamlData() (err error) {
 	suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
 
 	logrus.Info("Using suite file ", suiteFilePath)
+
 	suiteData, err = getSuiteDataFromYml(suiteFilePath)
+
 	return err
 }
 
@@ -95,11 +99,14 @@ func GetDuration(timeoutStr string) time.Duration {
 	// Calculates only if valid pattern exists
 	if pattern.MatchString(timeoutStr) {
 		match := pattern.FindStringSubmatch(timeoutStr)
+
 		timeoutVal, err := strconv.Atoi(match[1])
 		if err != nil {
 			return durationToReturn
 		}
+
 		timeoutDuration := time.Duration(timeoutVal)
+
 		switch match[2] {
 		case "m":
 			durationToReturn = timeoutDuration * time.Minute
@@ -109,6 +116,7 @@ func GetDuration(timeoutStr string) time.Duration {
 			durationToReturn = timeoutDuration * (time.Hour * 24)
 		}
 	}
+
 	return durationToReturn
 }
 
@@ -119,9 +127,13 @@ func startTimeoutTimer() {
 		if suiteData.SuiteName == "TestSystem" {
 			logrus.Info("Skipping setting timer")
 		}
+
 		timeoutDuration := GetDuration(suiteData.Timeout)
+
 		logrus.Infof("Setting timeout of %v from %v", timeoutDuration, time.Now())
+
 		<-time.After(timeoutDuration)
+
 		logrus.Infof("Timeout happened at %v", time.Now())
 
 		// Dump out backtraces in case this is a deadlock situation.
@@ -144,6 +156,7 @@ func CreateDeploymentObject(operatorImage string, operatorPort int, podCreateTim
 		listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(operatorPort)
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
 	}
+
 	return
 }
 
@@ -151,6 +164,7 @@ func CreateDeploymentObject(operatorImage string, operatorPort int, podCreateTim
 func Setup(t *testing.T) (err error) {
 	// Always run the test at least once, unless overridden by the config.
 	testRetries := 1
+
 	if runtimeParams.TestRetries != nil {
 		testRetries = *runtimeParams.TestRetries
 	}
@@ -190,6 +204,7 @@ func Setup(t *testing.T) (err error) {
 		if cerr != nil {
 			return cerr
 		}
+
 		Global.ClusterSpec[kubeConf.ClusterName] = clusterSpec
 	}
 
@@ -215,12 +230,14 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase sync gateway: " + Global.SyncGatewayImage)
 	logrus.Info(" →  couchbase exporter: " + runtimeParams.CouchbaseExporterImage)
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
+
 	for _, config := range Global.ClusterSpec {
 		logrus.Info("Cluster: ", config.Name)
 		logrus.Info(" →  path: " + config.KubeConfPath)
 		logrus.Info(" →  context: " + config.Context)
 		logrus.Info(" →  namespace: " + config.Namespace)
 	}
+
 	logrus.Info("Kubernetes")
 	logrus.Info(" →  storage class: " + runtimeParams.StorageClassName)
 	logrus.Info("Logs")
@@ -231,6 +248,7 @@ func Setup(t *testing.T) (err error) {
 	if oserr != nil {
 		return oserr
 	}
+
 	Global.CbopinfoPath = wd + "/../../build/bin/cbopinfo"
 
 	for _, k8s := range Global.ClusterSpec {
@@ -238,12 +256,14 @@ func Setup(t *testing.T) (err error) {
 			return err
 		}
 	}
+
 	return nil
 }
 
 func cleanUpNamespace() (err error) {
 	for _, k8s := range Global.ClusterSpec {
 		logrus.Infof("Cleaning up namespace %s in %s", k8s.Namespace, k8s.Name)
+
 		// Remove secrets
 		if k8s.DefaultSecret != nil {
 			if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, k8s.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
@@ -264,7 +284,9 @@ func cleanUpNamespace() (err error) {
 
 	// TODO: check all deleted and wait
 	Global = nil
+
 	logrus.Info("Namespace cleaned-up successfully")
+
 	return
 }
 
@@ -276,9 +298,11 @@ func Teardown() error {
 	if Global.SkipTeardown {
 		return nil
 	}
+
 	if err := cleanUpNamespace(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -308,7 +332,9 @@ func (f *Framework) CreateSecretInKubeCluster(k8s *types.Cluster) error {
 		err = fmt.Errorf("failed to create default couchbase secret: %v", err)
 		return err
 	}
+
 	k8s.DefaultSecret = secret
+
 	return err
 }
 
@@ -322,6 +348,7 @@ func recreateCRDs(k8s *types.Cluster) error {
 	if err != nil {
 		return fmt.Errorf("failed to list CRDs: %v", err)
 	}
+
 	for _, crd := range crds.Items {
 		if crd.Spec.Group == "couchbase.com" {
 			if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, metav1.NewDeleteOptions(0)); err != nil {
@@ -368,15 +395,18 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		nodeTaintList := []v1.Taint{}
+
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get node list: %v", err)
 		}
+
 		for nodeIndex := range k8sNodeList.Items {
 			if err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex); err != nil {
 				return fmt.Errorf("failed to update node taint: %v", err)
 			}
 		}
+
 		return nil
 	})
 }
@@ -388,6 +418,7 @@ func (l initializedClusterList) isClusterInitialized(host string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -402,6 +433,7 @@ func (l initializedClusterList) isClusterNamespaceInitialized(host, namespace st
 			}
 		}
 	}
+
 	return false
 }
 
@@ -416,6 +448,7 @@ func (l initializedClusterList) initializeClusterNamespace(host, namespace strin
 			}
 
 			cluster.namespaces = append(cluster.namespaces, namespace)
+
 			return l, nil
 		}
 	}
@@ -434,12 +467,14 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 		// delete and recreate CRDs
 		logrus.Info("Recreating CRD")
+
 		if err := recreateCRDs(k8s); err != nil {
 			return err
 		}
 
 		// delete DAC
 		logrus.Infof("Deleting admission controller")
+
 		if err := deleteAdmissionController(k8s.KubeClient); err != nil {
 			return err
 		}
@@ -451,11 +486,14 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 		// re-creating docker secrets
 		logrus.Info("Recreating docker auth secret in default namespace")
+
 		if err := recreateDockerAuthSecret(k8s.KubeClient, "default"); err != nil {
 			return err
 		}
+
 		if k8s.Namespace != "default" {
 			logrus.Infof("Recreating docker auth secret in %v namespace", k8s.Namespace)
+
 			if err := recreateDockerAuthSecret(k8s.KubeClient, k8s.Namespace); err != nil {
 				return err
 			}
@@ -463,6 +501,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 		// creating DAC
 		logrus.Infof("Creating admission controller")
+
 		if err := createAdmissionController(k8s.KubeClient); err != nil {
 			return err
 		}
@@ -480,17 +519,21 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	e2eutil.CleanK8sCluster(k8s, k8s.Namespace)
 
 	logrus.Info("Deleting orphaned pods")
+
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return err
 	}
+
 	for _, pod := range pods.Items {
 		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
 			if errors.IsNotFound(err) {
 				continue
 			}
+
 			return err
 		}
+
 		logrus.Infof("Pod deleted: %v", pod.Name)
 	}
 
@@ -498,45 +541,59 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	if err != nil {
 		return err
 	}
+
 	for _, endpoint := range endpoints.Items {
 		if err := k8s.KubeClient.CoreV1().Endpoints(k8s.Namespace).Delete(endpoint.Name, metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
+
 		logrus.Infof("Endpoint deleted: %v", endpoint.Name)
 	}
 
 	logrus.Info("Recreating role")
+
 	if err := recreateRoles(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
+
 	logrus.Info("Recreating service account")
+
 	if err := RecreateServiceAccount(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
 		return err
 	}
+
 	logrus.Info("Recreating role binding")
+
 	if err := recreateRoleBindings(k8s); err != nil {
 		return err
 	}
 
 	// deleting secrets
 	logrus.Info("Deleting secrets")
+
 	if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
 		logrus.Infof("Secret deleted: %v", "basic-test-secret")
 	}
+
 	logrus.Info("Creating secret")
+
 	if err = f.CreateSecretInKubeCluster(k8s); err != nil {
 		return err
 	}
 
 	// delete and create operator
 	logrus.Infof("Cleaning up namespace %s before deployment in %s", k8s.Namespace, k8s.Name)
+
 	if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
 		return fmt.Errorf("failed to delete operator: %v", err)
 	}
+
 	logrus.Info("Setting up operator")
+
 	if err := f.SetupCouchbaseOperator(k8s); err != nil {
 		return fmt.Errorf("failed to setup couchbase operator: %v", err)
 	}
+
 	logrus.Info("Couchbase operator created successfully")
 
 	f.initializedClusters, err = f.initializedClusters.initializeClusterNamespace(k8s.Config.Host, k8s.Namespace)
@@ -545,6 +602,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	}
 
 	logrus.Info("E2E setup successfully")
+
 	return nil
 }
 
@@ -552,6 +610,7 @@ func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
 	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(f.Deployment); err != nil {
 		return err
 	}
+
 	return e2eutil.WaitUntilOperatorReady(k8s.KubeClient, k8s.Namespace, constants.CouchbaseOperatorLabel)
 }
 
@@ -563,17 +622,21 @@ func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, nam
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
 	var operatorPod *v1.Pod
+
 	err = retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		operatorPod, err = kubeClient.CoreV1().Pods(namespace).Get(operatorPodName, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		return true, nil
 	})
 	if err != nil {
 		return 0, err
 	}
+
 	return operatorPod.Status.ContainerStatuses[0].RestartCount, nil
 }
 
@@ -592,22 +655,27 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, n
 		if err == nil {
 			return false, err
 		}
+
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return true, nil
 		}
+
 		return false, err
 	})
 }
 
 func deleteOperator(kubeClient kubernetes.Interface, deploymentName, namespace string) error {
 	deletePropagation := metav1.DeletePropagationForeground
+
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation
+
 	if err := kubeClient.AppsV1().Deployments(namespace).Delete(deploymentName, deleteOpts); err != nil {
 		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -620,6 +688,7 @@ func makeLogDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return dir, os.MkdirAll(dir, os.ModePerm)
 }
 
@@ -628,7 +697,9 @@ func generateLogDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	t := time.Now()
 	ts := t.Format(time.RFC3339)
+
 	return filepath.Join(cwd, "logs", ts), nil
 }

@@ -44,6 +44,7 @@ func mustVerify(t *testing.T, ca, chain, key []byte, extKeyUsage x509.ExtKeyUsag
 		for _, err := range errors {
 			t.Log(err)
 		}
+
 		t.FailNow()
 	}
 }

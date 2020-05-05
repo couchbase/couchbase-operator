@@ -86,6 +86,7 @@ func GetReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseReplicati
 			RemoteBucket: dstBucket,
 		},
 	}
+
 	return replication
 }
 func NewResourceQuantityMi(value int64) *resource.Quantity {
@@ -118,6 +119,7 @@ func SetPlatform(p couchbasev2.PlatformType) {
 
 func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 	buckets := []runtime.Object{}
+
 	for _, bucketType := range bucketTypes {
 		switch {
 		case bucketType == constants.BucketTypeCouchbase:
@@ -141,6 +143,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 			enableIndexReplicas := []bool{
 				true,
 			}
+
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, bucketReplica := range bucketReplicas {
 					for _, ioPriority := range ioPriorities {
@@ -178,6 +181,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 				true,
 				false,
 			}
+
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, enableFlush := range enableFlushes {
 					buckets = append(buckets, &couchbasev2.CouchbaseMemcachedBucket{
@@ -211,6 +215,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 				true,
 				false,
 			}
+
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {
 				for _, bucketReplica := range bucketReplicas {
 					for _, ioPriority := range ioPriorities {
@@ -260,6 +265,7 @@ func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster) {
 			if cluster.Spec.Servers[i].Pod == nil {
 				cluster.Spec.Servers[i].Pod = &v1.PodTemplateSpec{}
 			}
+
 			cluster.Spec.Servers[i].Pod.Spec.ImagePullSecrets = []v1.LocalObjectReference{
 				{
 					Name: imagePullSecret,
@@ -294,9 +300,11 @@ func NewBasicCluster(size int) *couchbasev2.CouchbaseCluster {
 			},
 		},
 	}
+
 	if platform != "" {
 		spec.Platform = platform
 	}
+
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
@@ -321,9 +329,11 @@ func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
 			},
 		},
 	}
+
 	if platform != "" {
 		spec.Platform = platform
 	}
+
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
@@ -400,9 +410,11 @@ func NewBackupCluster(size int, imageName string) *couchbasev2.CouchbaseCluster 
 	spec := NewBasicClusterSpec(size)
 	spec.Spec.Backup.Managed = true
 	spec.Spec.Backup.ServiceAccount = config.BackupResourceName
+
 	if imageName = strings.TrimSpace(imageName); imageName != "" {
 		spec.Spec.Backup.Image = imageName
 	}
+
 	return spec
 }
 
@@ -436,11 +448,14 @@ func NewBasicXdcrCluster(size int) *couchbasev2.CouchbaseCluster {
 			},
 		},
 	}
+
 	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
 	spec.ClusterSettings.AutoFailoverMaxCount = 3
+
 	if platform != "" {
 		spec.Platform = platform
 	}
+
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
@@ -453,6 +468,7 @@ func CreateClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2
 func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 	crd := NewBasicCluster(size)
 	couchbase := "couchbase"
+
 	crd.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: couchbase,
 	}
@@ -468,7 +484,9 @@ func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 			Resources:        resources,
 		},
 	}
+
 	crd.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{claim}
+
 	return crd
 }
 

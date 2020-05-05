@@ -45,6 +45,7 @@ func newLDAPSettings(namespace string) *couchbasev2.CouchbaseClusterLDAPSpec {
 	}
 
 	host := fmt.Sprintf("%s.%s.%s.svc", ldapHostName, ldapSubdomain, namespace)
+
 	return &couchbasev2.CouchbaseClusterLDAPSpec{
 		Hosts:                 []string{host},
 		BindDN:                binddn,
@@ -66,6 +67,7 @@ func NewLDAPClusterBasic(namespace string, size int, secretCa string, secretPass
 	clusterSpec.Spec.Security.LDAP = newLDAPSettings(namespace)
 	clusterSpec.Spec.Security.LDAP.BindSecret = secretPassword
 	clusterSpec.Spec.Security.LDAP.TLSSecret = secretCa
+
 	return clusterSpec
 }
 
@@ -204,6 +206,7 @@ func openLDAPContainer(namespace string) v1.Container {
 // Init container copies certs from secret into volume mount.
 func openLDAPInitContainer() v1.Container {
 	command := []string{"sh", "-c", "cp /tmp/certs/* /certs; chown -R 999:999 /certs"}
+
 	return v1.Container{
 		Name:    "init-" + ldapHostName,
 		Image:   openLDAPInitImage,

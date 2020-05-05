@@ -73,21 +73,27 @@ func (c *Cluster) operatorUpgrade() error {
 	if err != nil {
 		return err
 	}
+
 	unstructuredCluster := &unstructured.Unstructured{}
 	if err := json.Unmarshal(data, unstructuredCluster); err != nil {
 		return err
 	}
+
 	v := validator.New(c.k8s.KubeClient, c.k8s.CouchbaseClient)
 	if patches := validator.ApplyDefaults(v, unstructuredCluster); patches != nil {
 		cluster := c.cluster.DeepCopy()
+
 		log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", cluster.Kind, "name", cluster.Name, "version", version.Version)
+
 		if err := jsonpatch.Apply(cluster, patches); err != nil {
 			return err
 		}
+
 		cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
 		if err != nil {
 			return err
 		}
+
 		c.cluster = cluster
 	}
 
@@ -99,29 +105,38 @@ func (c *Cluster) operatorUpgrade() error {
 		if err := resource.fetch(); err != nil {
 			return err
 		}
+
 		upgraded := map[int]interface{}{}
+
 		for item := 0; item < resource.lenItems(); item++ {
 			for action := 0; action < resource.lenActions(); action++ {
 				versionRange := resource.actionVersionRange(action)
+
 				isActionable, err := versionRange.actionable(resource.itemVersion(item))
 				if err != nil {
 					return err
 				}
+
 				if !isActionable {
 					continue
 				}
+
 				log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", resource.kind(), "name", resource.name(item), "version", versionRange.to)
+
 				if err := resource.perform(item, action); err != nil {
 					return err
 				}
+
 				upgraded[item] = nil
 			}
 		}
+
 		for item := range upgraded {
 			if err := resource.commit(item); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }

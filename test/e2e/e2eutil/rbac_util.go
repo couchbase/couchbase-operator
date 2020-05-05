@@ -24,6 +24,7 @@ func MustNewUser(t *testing.T, k8s *types.Cluster, namespace string, user *couch
 	if err != nil {
 		Die(t, err)
 	}
+
 	return newUser
 }
 
@@ -47,6 +48,7 @@ func MustNewGroup(t *testing.T, k8s *types.Cluster, namespace string, group *cou
 	if err != nil {
 		Die(t, err)
 	}
+
 	return newGroup
 }
 
@@ -70,6 +72,7 @@ func MustNewRoleBinding(t *testing.T, k8s *types.Cluster, namespace string, bind
 	if err != nil {
 		Die(t, err)
 	}
+
 	return newBinding
 }
 
@@ -124,6 +127,7 @@ func MustPatchGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.Couchba
 	if err != nil {
 		Die(t, err)
 	}
+
 	return group
 }
 
@@ -168,5 +172,6 @@ func MustPatchRoleBinding(t *testing.T, k8s *types.Cluster, binding *couchbasev2
 	if err != nil {
 		Die(t, err)
 	}
+
 	return binding
 }

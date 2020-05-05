@@ -7,6 +7,7 @@ import (
 
 func CreateBackupRole(client kubernetes.Interface, namespace string) error {
 	backupRole := config.GetBackupRole(config.BackupResourceName)
+
 	_, err := client.RbacV1().Roles(namespace).Create(backupRole)
 	if err != nil {
 		return err
@@ -17,6 +18,7 @@ func CreateBackupRole(client kubernetes.Interface, namespace string) error {
 
 func CreateBackupServiceAccount(client kubernetes.Interface, namespace string) error {
 	backupServiceAccount := config.GetBackupServiceAccount(config.BackupResourceName)
+
 	_, err := client.CoreV1().ServiceAccounts(namespace).Create(backupServiceAccount)
 	if err != nil {
 		return err
@@ -27,6 +29,7 @@ func CreateBackupServiceAccount(client kubernetes.Interface, namespace string) e
 
 func CreateBackupRoleBinding(client kubernetes.Interface, namespace string) error {
 	backupRoleBinding := config.GetBackupRoleBinding(config.BackupResourceName, namespace)
+
 	_, err := client.RbacV1().RoleBindings(namespace).Create(backupRoleBinding)
 	if err != nil {
 		return err

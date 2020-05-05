@@ -49,6 +49,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 	if err != nil {
 		return err
 	}
+
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport, Timeout: 10 * time.Second}, "POST", req.URL())
 
 	// Finally do the actual work
@@ -63,9 +64,11 @@ func (pf *PortForwarder) ForwardPorts() error {
 	// The forwarder is blocking so run in a separate go routine
 	// then await the forwarder either erroring or becoming ready
 	pf.errorChan = make(chan error)
+
 	go func() {
 		pf.errorChan <- portForwarder.ForwardPorts()
 	}()
+
 	select {
 	case err := <-pf.errorChan:
 		return err
@@ -85,19 +88,25 @@ func (pf *PortForwarder) Close() error {
 func Silent() func() {
 	// Only perform the backup on the first call.
 	mutex.Lock()
+
 	if instances == 0 {
 		handlers = runtime.ErrorHandlers
 		runtime.ErrorHandlers = []func(error){}
 	}
+
 	instances++
+
 	mutex.Unlock()
+
 	return func() {
 		// Only perform the restore on the last call.
 		mutex.Lock()
+
 		instances--
 		if instances == 0 {
 			runtime.ErrorHandlers = handlers
 		}
+
 		mutex.Unlock()
 	}
 }

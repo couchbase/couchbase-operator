@@ -50,6 +50,7 @@ type scope struct {
 func supplyScope(testScope scope, testOp operation) operation {
 	testOp.cmd = ConvertTemplate(testScope, testOp.cmd)
 	testOp.args = ConvertTemplate(testScope, testOp.args)
+
 	return testOp
 }
 
@@ -59,27 +60,34 @@ func ConvertTemplate(testScope scope, templates []string) []string {
 			hostname := testScope.nodes1[0]
 			str = strings.Replace(str, "{{FIRST_NODE_CLUSTER1}}", hostname, -1)
 		}
+
 		if strings.Contains(str, "{{FIRST_NODE_CLUSTER2}}") {
 			hostname := testScope.nodes2[0]
 			str = strings.Replace(str, "{{FIRST_NODE_CLUSTER2}}", hostname, -1)
 		}
+
 		if strings.Contains(str, "{{FIRST_NODE_NO_PORT_CLUSTER1}}") {
 			hostname := strings.Split(testScope.nodes1[0], ":")
 			str = strings.Replace(str, "{{FIRST_NODE_NO_PORT_CLUSTER1}}", hostname[0], -1)
 		}
+
 		if strings.Contains(str, "{{FIRST_NODE_NO_PORT_CLUSTER2}}") {
 			hostname := strings.Split(testScope.nodes2[0], ":")
 			str = strings.Replace(str, "{{FIRST_NODE_NO_PORT_CLUSTER2}}", hostname[0], -1)
 		}
+
 		if strings.Contains(str, "{{SECOND_NODE_CLUSTER1}}") {
 			hostname := testScope.nodes1[1]
 			str = strings.Replace(str, "{{SECOND_NODE_CLUSTER1}}", hostname, -1)
 		}
+
 		if strings.Contains(str, "{{BUCKET}}") {
 			str = strings.Replace(str, "{{BUCKET}}", testScope.buckets[rand.Intn(len(testScope.buckets))], -1)
 		}
+
 		templates[i] = str
 	}
+
 	return templates
 }
 
@@ -128,6 +136,7 @@ func CreateJobSpec(op operation) *batchv1.Job {
 			},
 		},
 	}
+
 	return batchJob
 }
 
@@ -139,30 +148,38 @@ func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interfac
 	opTimeout := time.Duration(timeout*60) * time.Second
 	to := time.After(opTimeout)
 	dur := time.After(opDuration)
+
 	for {
 		select {
 		case <-to:
 			fmt.Printf("timeout %v\n", jobName)
+
 			jobInfo["status"] = "timeout after " + opTimeout.String() + " seconds"
 			results <- jobInfo
+
 			return
 		case <-dur:
 			fmt.Printf("duration up %v\n", jobName)
 			jobInfo["status"] = "success: " + jobName
 			results <- jobInfo
+
 			return
 		default:
 			fmt.Printf("default %v\n", jobName)
+
 			checkJob, err := kubeClient.BatchV1().Jobs(namespace).Get(jobName, metav1.GetOptions{})
 			if err != nil {
 				jobInfo["status"] = "error: failed to get job status: " + err.Error()
 				results <- jobInfo
+
 				return
 			}
+
 			if checkJob.Status.Succeeded == 1 {
 				fmt.Printf("succeeded %v\n", jobName)
 				jobInfo["status"] = "success: " + jobName
 				results <- jobInfo
+
 				return
 			}
 
@@ -170,8 +187,10 @@ func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interfac
 				fmt.Printf("failed %v\n", jobName)
 				jobInfo["status"] = "error: job failed: " + jobName
 				results <- jobInfo
+
 				return
 			}
+
 			time.Sleep(3 * time.Second)
 		}
 	}
@@ -185,15 +204,19 @@ func CheckJob(t *testing.T, jobStatus map[string]string) {
 
 func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName string) {
 	targetKube := f.ClusterSpec[kubeName]
+
 	fmt.Printf("deleting %v\n", jobName)
+
 	err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Delete(jobName, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Fatalf("failed to delete job %v \n", err)
 	}
+
 	pods, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(metav1.ListOptions{LabelSelector: "job=" + jobName})
 	if err != nil {
 		t.Fatalf("failed to list pods for cluster: " + err.Error())
 	}
+
 	for _, pod := range pods.Items {
 		_ = targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}
@@ -201,18 +224,22 @@ func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName st
 
 func CreateJob(t *testing.T, f *framework.Framework, kubeName string, jobSpec *batchv1.Job) *batchv1.Job {
 	targetKube := f.ClusterSpec[kubeName]
+
 	job, err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Create(jobSpec)
 	if err != nil {
 		t.Fatalf("failed to create job %v", err)
 	}
+
 	fmt.Printf("created %v\n", job.Name)
 	t.Logf("Created Job: %s\n", job.Name)
+
 	return job
 }
 
 // runs a system test based on a sysTestDef.
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
+
 	kubeName := f.TestClusters[0]
 	targetKube := f.ClusterSpec[kubeName]
 	clusterSize := 4
@@ -310,6 +337,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer teardown1()
 
 	testCouchbase1 := clusterTemplate.DeepCopy()
@@ -320,6 +348,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 			OperatorSecret: ctx1.OperatorSecretName,
 		},
 	}
+
 	testCouchbase1 = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase1)
 
 	// Create the second cluster.
@@ -327,6 +356,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer teardown2()
 
 	testCouchbase2 := clusterTemplate.DeepCopy()
@@ -337,24 +367,29 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 			OperatorSecret: ctx2.OperatorSecretName,
 		},
 	}
+
 	testCouchbase2 = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase2)
 
 	if err := e2eutil.TLSCheckForCluster(t, targetKube, targetKube.Namespace, ctx1); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
+
 	if err := e2eutil.TLSCheckForCluster(t, targetKube, targetKube.Namespace, ctx2); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 
 	// create connection to couchbase nodes
 	t.Logf("creating couchbase client")
+
 	client1, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase1)
 	defer cleanup()
+
 	client2, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase2)
 	defer cleanup()
 
 	// pause the operator for the test duration
 	t.Logf("Pausing operator...")
+
 	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 
@@ -363,18 +398,23 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
 
 	t.Logf("grabbing bucket info")
+
 	bucketInfo1, err := client1.GetBuckets()
 	if err != nil {
 		t.Fatalf("failed to get bucket info %v", err)
 	}
+
 	t.Logf("bucket info: %v", bucketInfo1)
+
 	bucketInfo2, err := client2.GetBuckets()
 	if err != nil {
 		t.Fatalf("failed to get bucket info %v", err)
 	}
+
 	t.Logf("bucket info: %v", bucketInfo2)
 
 	t.Logf("populating scope")
+
 	testScope := scope{
 		nodes1:  []string{},
 		nodes2:  []string{},
@@ -383,21 +423,26 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	suffix1 := "." + testCouchbase1.Name + "." + targetKube.Namespace + ".svc"
 	suffix2 := "." + testCouchbase2.Name + "." + targetKube.Namespace + ".svc"
+
 	for i := 0; i < clusterSize; i++ {
 		testScope.nodes1 = append(testScope.nodes1, couchbaseutil.CreateMemberName(testCouchbase1.Name, i)+suffix1)
 		testScope.nodes2 = append(testScope.nodes2, couchbaseutil.CreateMemberName(testCouchbase2.Name, i)+suffix2)
 	}
+
 	for _, b := range bucketInfo1 {
 		testScope.buckets = append(testScope.buckets, b.BucketName)
 	}
+
 	t.Logf("scope: %v", testScope)
 
 	// apply scope to generic commands for all operations
 	t.Logf("supplying scope to test ops")
+
 	for i, op := range testDef.ops {
 		op = supplyScope(testScope, op)
 		testDef.ops[i] = op
 	}
+
 	t.Logf("test ops: %v", testDef.ops)
 
 	//create rbac user, required for some operation to succeed
@@ -413,8 +458,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	job := CreateJob(t, f, kubeName, jobSpec)
 	// wait for job to succeed
 	singleResults := make(chan map[string]string, 1)
+
 	go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
+
 	jobStatus := <-singleResults
+
 	CheckJob(t, jobStatus)
 	DeleteJob(t, f, kubeName, jobStatus["jobName"])
 	time.Sleep(3 * time.Second)
@@ -431,8 +479,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	job = CreateJob(t, f, kubeName, jobSpec)
 	// wait for job to succeed
 	singleResults = make(chan map[string]string, 1)
+
 	go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
+
 	jobStatus = <-singleResults
+
 	CheckJob(t, jobStatus)
 	DeleteJob(t, f, kubeName, jobStatus["jobName"])
 	time.Sleep(3 * time.Second)
@@ -446,6 +497,7 @@ outerLoop:
 		results := make(chan map[string]string, len(testDef.ops))
 		jobList := map[string]*batchv1.Job{}
 		i := 0
+
 		fmt.Printf("Starting cycle %v\n", cycles)
 		t.Logf("Starting cycle %v\n", cycles)
 	innerLoop:
@@ -458,9 +510,11 @@ outerLoop:
 			case result := <-results:
 				fmt.Printf("results from %v \n", result["jobName"])
 				CheckJob(t, result)
+
 				if !leaveJobsRunning {
 					DeleteJob(t, f, kubeName, result["jobName"])
 				}
+
 				delete(jobList, result["jobName"])
 				time.Sleep(3 * time.Second)
 			//launch next job if any left
@@ -468,30 +522,38 @@ outerLoop:
 				if len(jobList) == 0 && i == len(testDef.ops) {
 					break innerLoop
 				}
+
 				if i < len(testDef.ops) {
 					op := testDef.ops[i]
 					jobSpec := CreateJobSpec(op)
 					job := CreateJob(t, f, kubeName, jobSpec)
+
 					fmt.Printf("launched: job=%v cycle=%v index:%v lastIndex:%v \n", job.Name, cycles, i, len(testDef.ops))
 					// if wait, wait for success before launching next job
 					if op.wait {
 						singleResults := make(chan map[string]string, 1)
+
 						go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, op.duration, op.timeout, singleResults)
+
 						jobStatus := <-singleResults
 						CheckJob(t, jobStatus)
+
 						if !leaveJobsRunning {
 							DeleteJob(t, f, kubeName, jobStatus["jobName"])
 						}
 					} else {
 						go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, op.duration, op.timeout, results)
+
 						jobList[job.Name] = job
 					}
+
 					i++
 				}
 
 				time.Sleep(3 * time.Second)
 			}
 		}
+
 		// make sure cluster is healthy before running next cycle
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase1, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase2, 2*time.Minute)

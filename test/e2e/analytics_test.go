@@ -64,12 +64,15 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	// When ready, insert documents into our bucket.  Create a dataset and link to our bucket.
 	// Verify the number of documents in the dataset match those in the bucket.
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
+
 	for _, query := range queries {
 		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
 	}
+
 	time.Sleep(time.Minute) // let analytics catch up
 	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, time.Minute)
 	datasetItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset, time.Minute)
+
 	if datasetItemCount != itemCount {
 		e2eutil.Die(t, fmt.Errorf("dataset item mismatch %v/%v", datasetItemCount, itemCount))
 	}
@@ -119,20 +122,26 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	for _, query := range queries {
 		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
 	}
+
 	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)
 	defer stop()
+
 	for _, newClusterSize := range []int{2, 3, 2, 1} {
 		testCouchbase = e2eutil.MustResizeCluster(t, 0, newClusterSize, targetKube, testCouchbase, 20*time.Minute)
 	}
+
 	stop()
+
 	time.Sleep(time.Minute) // let analytics catch up
 	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, time.Minute)
 	dataset1ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset1, time.Minute)
 	dataset2ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset2, time.Minute)
 	dataset3ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset3, time.Minute)
+
 	if dataset1ItemCount != itemCount {
 		e2eutil.Die(t, fmt.Errorf("dataset item mismatch %v/%v", dataset1ItemCount, itemCount))
 	}
+
 	if dataset2ItemCount+dataset3ItemCount != itemCount {
 		e2eutil.Die(t, fmt.Errorf("dataset item mismatch %v+%v/%v", dataset2ItemCount, dataset3ItemCount, itemCount))
 	}
@@ -189,22 +198,28 @@ func TestAnalyticsKillPods(t *testing.T) {
 	// 2 and 3 to equal those in the bucket.
 	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)
 	defer stop()
+
 	for _, query := range queries {
 		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
 	}
+
 	for _, victim := range []int{0, 1, 2} {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, true)
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 	}
+
 	stop()
+
 	time.Sleep(time.Minute) // let analytics catch up
 	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, time.Minute)
 	dataset1ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset1, time.Minute)
 	dataset2ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset2, time.Minute)
 	dataset3ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset3, time.Minute)
+
 	if dataset1ItemCount != itemCount {
 		e2eutil.Die(t, fmt.Errorf("dataset item mismatch %v/%v", dataset1ItemCount, itemCount))
 	}
+
 	if dataset2ItemCount+dataset3ItemCount != itemCount {
 		e2eutil.Die(t, fmt.Errorf("dataset item mismatch %v+%v/%v", dataset2ItemCount, dataset3ItemCount, itemCount))
 	}
@@ -271,22 +286,28 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	// 2 and 3 to equal those in the bucket.
 	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)
 	defer stop()
+
 	for _, query := range queries {
 		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
 	}
+
 	for _, victim := range []int{0, 1, 2} {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, false)
 		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 	}
+
 	stop()
+
 	time.Sleep(time.Minute) // let analytics catch up
 	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, time.Minute)
 	dataset1ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset1, time.Minute)
 	dataset2ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset2, time.Minute)
 	dataset3ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset3, time.Minute)
+
 	if dataset1ItemCount != itemCount {
 		e2eutil.Die(t, fmt.Errorf("dataset item mismatch %v/%v", dataset1ItemCount, itemCount))
 	}
+
 	if dataset2ItemCount+dataset3ItemCount != itemCount {
 		e2eutil.Die(t, fmt.Errorf("dataset item mismatch %v+%v/%v", dataset2ItemCount, dataset3ItemCount, itemCount))
 	}

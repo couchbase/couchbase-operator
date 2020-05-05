@@ -32,10 +32,12 @@ func (r *nodeResource) Kind() string {
 // Fetch collects all nodes as defined by the configuration.
 func (r *nodeResource) Fetch() error {
 	var err error
+
 	r.nodes, err = r.context.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,13 +50,16 @@ func (r *nodeResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), node.Name, node.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 
 func (r *nodeResource) References() []Reference {
 	references := []Reference{}
+
 	for _, node := range r.nodes.Items {
 		references = append(references, newReference(r.Kind(), node.Name))
 	}
+
 	return references
 }

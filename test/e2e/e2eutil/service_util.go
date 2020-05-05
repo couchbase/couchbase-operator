@@ -13,6 +13,7 @@ func CreateService(kubeClient kubernetes.Interface, namespace string, service *v
 	if err != nil {
 		return nil, err
 	}
+
 	return service, nil
 }
 
@@ -21,6 +22,7 @@ func UpdateService(kubeClient kubernetes.Interface, namespace string, service *v
 	if err != nil {
 		return nil, err
 	}
+
 	return service, nil
 }
 
@@ -33,6 +35,7 @@ func GetService(kubeClient kubernetes.Interface, namespace string, serviceName s
 	if err != nil {
 		return nil, err
 	}
+
 	return service, nil
 }
 
@@ -41,6 +44,7 @@ func GetServices(kubeClient kubernetes.Interface, namespace string) ([]v1.Servic
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceList.Items, nil
 }
 
@@ -49,6 +53,7 @@ func GetEventingIPAndPort(k8s *types.Cluster, namespace, pod string) (string, st
 	if err != nil {
 		return "", "", nil, err
 	}
+
 	// TODO: return a host string e.g. "127.0.0.1:8096"
 	return "127.0.0.1", port, cleanup, nil
 }
@@ -58,6 +63,7 @@ func MustGetEventingIPAndPort(t *testing.T, k8s *types.Cluster, namespace, pod s
 	if err != nil {
 		Die(t, err)
 	}
+
 	return host, port, cleanup
 }
 
@@ -66,6 +72,7 @@ func GetAnalyticsIPAndPort(k8s *types.Cluster, namespace, pod string) (string, s
 	if err != nil {
 		return "", "", nil, err
 	}
+
 	// TODO: return a host string e.g. "127.0.0.1:8095"
 	return "127.0.0.1", port, cleanup, nil
 }
@@ -75,5 +82,6 @@ func MustGetAnalyticsIPAndPort(t *testing.T, k8s *types.Cluster, namespace, pod 
 	if err != nil {
 		Die(t, err)
 	}
+
 	return host, port, cleanup
 }

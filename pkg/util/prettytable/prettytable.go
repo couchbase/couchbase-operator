@@ -69,6 +69,7 @@ func (t *Table) getStyle() *Style {
 	if t.Style != nil {
 		return t.Style
 	}
+
 	return StyleDefault
 }
 
@@ -89,16 +90,20 @@ func (t *Table) updateMaxWidths(row Row) {
 func (t *Table) formatFrame(horizontal, left, separator, right rune) string {
 	// Start with the left delimiter
 	line := string(left)
+
 	// For each column draw a horizontal line, adding a trailing
 	// separator or delimiter.  Pad each columm with 2 extra characters.
 	for index, width := range t.widths {
 		line += strings.Repeat(string(horizontal), width+2)
+
 		delimiter := string(separator)
 		if index+1 == len(t.widths) {
 			delimiter = string(right)
 		}
+
 		line += delimiter
 	}
+
 	return line
 }
 
@@ -106,27 +111,31 @@ func (t *Table) formatFrame(horizontal, left, separator, right rune) string {
 func (t *Table) formatRow(vertical rune, row Row) string {
 	// Start with the left delimiter
 	line := string(vertical)
+
 	// For each column render the left justified element, with padding,
 	// then add a trailing separator.
 	for index, element := range row {
 		format := fmt.Sprintf(" %%-%ds %%s", t.widths[index])
 		line += fmt.Sprintf(format, element, string(vertical))
 	}
+
 	return line
 }
 
 // format formats the whole table as a string array.
 func (t *Table) format() []string {
 	style := t.getStyle()
+
 	lines := []string{}
 	lines = append(lines, t.formatFrame(style.HeaderHorizontal, style.TopLeft, style.TopSeparator, style.TopRight))
 	lines = append(lines, t.formatRow(style.HeaderVertical, t.Header))
 	lines = append(lines, t.formatFrame(style.HeaderHorizontal, style.MiddleLeft, style.MiddleSeparator, style.MiddleRight))
+
 	for _, row := range t.Rows {
 		lines = append(lines, t.formatRow(style.Vertical, row))
 	}
-	lines = append(lines, t.formatFrame(style.Horizontal, style.BottomLeft, style.BottomSeparator, style.BottomRight))
-	return lines
+
+	return append(lines, t.formatFrame(style.Horizontal, style.BottomLeft, style.BottomSeparator, style.BottomRight))
 }
 
 // Write formats the table data and writes it a line at a time to the supplied writer.
@@ -134,6 +143,7 @@ func (t *Table) Write(w io.Writer) error {
 	// Calculate the number of columns raising an error if any rows
 	// are not the same size as the header.
 	columns := len(t.Header)
+
 	for _, row := range t.Rows {
 		if len(row) != columns {
 			return NewGeometryError()
@@ -143,7 +153,9 @@ func (t *Table) Write(w io.Writer) error {
 	// Calculate the character width of each column based on the largest string
 	// in each.
 	t.widths = make([]int, columns)
+
 	t.updateMaxWidths(t.Header)
+
 	for _, row := range t.Rows {
 		t.updateMaxWidths(row)
 	}
@@ -154,5 +166,6 @@ func (t *Table) Write(w io.Writer) error {
 			return err
 		}
 	}
+
 	return nil
 }

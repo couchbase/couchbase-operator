@@ -61,9 +61,11 @@ func AnalyzeResults(t *testing.T) {
 	for i, result := range Results {
 		if result.Result {
 			t.Logf("%d: %s...PASS", i+1, result.Name)
+
 			testcases = append(testcases, TestCase{Name: result.Name, Time: "0"})
 		} else {
 			t.Logf("%d: %s...FAIL", i+1, result.Name)
+
 			testcases = append(testcases, TestCase{Name: result.Name, Time: "0", Error: "fail"})
 			failures = append(failures, result.Name)
 		}
@@ -91,6 +93,7 @@ func AnalyzeResults(t *testing.T) {
 
 	if fail > 0 {
 		t.Logf("Failures: ")
+
 		for i, test := range failures {
 			t.Logf("%d: %s", i+1, test)
 		}
@@ -98,6 +101,7 @@ func AnalyzeResults(t *testing.T) {
 
 	if len(instabilities) > 0 {
 		t.Log("Unstable tests:")
+
 		for i, test := range instabilities {
 			t.Logf("%d: %s", i+1, test)
 		}
@@ -107,6 +111,7 @@ func AnalyzeResults(t *testing.T) {
 
 	if xmlstring, err := xml.MarshalIndent(testsuite, "", "    "); err == nil {
 		xmlstring = []byte(xml.Header + string(xmlstring))
+
 		err := ioutil.WriteFile("results.xml", xmlstring, 0644)
 		if err != nil {
 			t.Fatalf("Failed to write test XML: %v", err)
@@ -130,11 +135,13 @@ func readRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err erro
 		err = fmt.Errorf("unable to decode test config: %v", err)
 		return
 	}
+
 	for i, kubeConf := range runTimeConfig.KubeConfig {
 		if strings.HasPrefix(kubeConf.ClusterConfig, "~/") {
 			runTimeConfig.KubeConfig[i].ClusterConfig = strings.Replace(kubeConf.ClusterConfig, "~", os.Getenv("HOME"), 1)
 		}
 	}
+
 	return
 }
 
@@ -151,6 +158,7 @@ func getSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 		err = fmt.Errorf("unable to decode suite config: %v", err)
 		return
 	}
+
 	return
 }
 
@@ -170,8 +178,11 @@ func createK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) e
 	nsLabel := map[string]string{
 		"name": namespaceName,
 	}
+
 	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabel}}
+
 	_, err = kubeClient.CoreV1().Namespaces().Create(nsSpec)
+
 	return err
 }
 
@@ -179,6 +190,7 @@ func removeRole(k8s *types.Cluster, roleName string) error {
 	if err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Delete(roleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	return nil
 }
 
@@ -187,16 +199,19 @@ func RemoveServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAcc
 	if err != nil {
 		return err
 	}
+
 	for _, svcAcc := range svcAccList.Items {
 		if svcAcc.GetName() == serviceAccountName {
 			if err := kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{}); err != nil {
 				return err
 			}
+
 			if err := waitForServiceAccountDeleted(kubeClient, serviceAccountName, namespace, 30); err != nil {
 				return err
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -215,6 +230,7 @@ func recreateDockerAuthSecret(kubeClient kubernetes.Interface, namespace string)
 		if runtimeParams.DockerUsername == "" {
 			return fmt.Errorf("docker username must be specified with docker server")
 		}
+
 		if runtimeParams.DockerPassword == "" {
 			return fmt.Errorf("docker password must be specified with docker server")
 		}
@@ -243,6 +259,7 @@ func recreateDockerAuthSecret(kubeClient kubernetes.Interface, namespace string)
 		// Register with the cluster creation module that we have a pull secret.
 		e2espec.SetImagePullSecret(dockerPullSecretName)
 	}
+
 	return nil
 }
 
@@ -250,6 +267,7 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 	if err := removeRole(k8s, config.OperatorResourceName); err != nil {
 		return nil
 	}
+
 	if err := removeRole(k8s, config.BackupResourceName); err != nil {
 		return nil
 	}
@@ -257,9 +275,12 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 	if err := CreateBackupRole(k8s.KubeClient, k8s.Namespace); err != nil {
 		return err
 	}
+
 	roleSpec := config.GetOperatorRole()
 	roleSpec.Name = roleName
+
 	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(roleSpec)
+
 	return err
 }
 
@@ -267,9 +288,11 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 	if err := RemoveServiceAccount(k8s.KubeClient, k8s.Namespace, serviceAccountName); err != nil {
 		return err
 	}
+
 	if serviceAccountName == "default" {
 		return nil
 	}
+
 	if err := RemoveServiceAccount(k8s.KubeClient, k8s.Namespace, config.BackupResourceName); err != nil {
 		return err
 	}
@@ -277,10 +300,13 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 	if err := CreateBackupServiceAccount(k8s.KubeClient, k8s.Namespace); err != nil {
 		return err
 	}
+
 	// Create service account given by the name
 	serviceAccount := config.GetOperatorServiceAccount()
 	serviceAccount.Name = serviceAccountName
+
 	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(serviceAccount)
+
 	return err
 }
 
@@ -288,6 +314,7 @@ func recreateRoleBindings(k8s *types.Cluster) error {
 	if err := removeRoleBinding(k8s.KubeClient, k8s.Namespace, config.OperatorResourceName); err != nil {
 		return err
 	}
+
 	if err := removeRoleBinding(k8s.KubeClient, k8s.Namespace, config.BackupResourceName); err != nil {
 		return err
 	}
@@ -295,8 +322,11 @@ func recreateRoleBindings(k8s *types.Cluster) error {
 	if err := CreateBackupRoleBinding(k8s.KubeClient, k8s.Namespace); err != nil {
 		return err
 	}
+
 	clusterRoleBindingSpec := config.GetOperatorRoleBinding(k8s.Namespace)
+
 	_, err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Create(clusterRoleBindingSpec)
+
 	return err
 }
 
@@ -304,12 +334,14 @@ func removeRoleBinding(kubeClient kubernetes.Interface, namespace, roleBindingNa
 	if err := kubeClient.RbacV1().RoleBindings(namespace).Delete(roleBindingName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
+
 	return nil
 }
 
 func waitForServiceAccountDeleted(kubeClient kubernetes.Interface, serviceAccountName string, namespace string, waitTimeInSec int) error {
 	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+
 	for {
 		select {
 		case <-timeOutChan:
@@ -320,14 +352,17 @@ func waitForServiceAccountDeleted(kubeClient kubernetes.Interface, serviceAccoun
 			if err != nil {
 				return err
 			}
+
 			for _, svcAcc := range svcAccList.Items {
 				if svcAcc.GetName() == "default" {
 					break
 				}
+
 				if svcAcc.GetName() == serviceAccountName {
 					break
 				}
 			}
+
 			return nil
 		}
 	}
@@ -342,7 +377,9 @@ func RecoverDecorator(test TestFunc, args DecoratorArgs) TestFunc {
 				t.Fatal("test failed due to panic")
 			}
 		}(t)
+
 		test(t)
 	}
+
 	return wrapperFunc
 }

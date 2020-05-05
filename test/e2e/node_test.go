@@ -752,16 +752,21 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	}
 
 	nodeIndex := 2
+
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaint, nodeIndex); err != nil {
 		e2eutil.Die(t, fmt.Errorf("Failed to set node taint and schedulable property: %v", err))
 	}
+
 	defer func() {
 		_ = e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex)
 	}()
+
 	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 1, time.Minute)
+
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
 		e2eutil.Die(t, fmt.Errorf("Failed to unset node taint and schedulable property: %v", err))
 	}
+
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 

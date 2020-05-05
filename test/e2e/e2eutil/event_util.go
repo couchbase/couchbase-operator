@@ -35,6 +35,7 @@ func EventExistsInEventList(event *v1.Event, eventList EventList) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -136,6 +137,7 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 // creation events, with specific featuresets.
 func ClusterCreateSequenceWithExposedFeatures(size int, features ...couchbasev2.ExposedFeature) eventschema.Validatable {
 	services := map[string]interface{}{}
+
 	for _, feature := range features {
 		switch feature {
 		case couchbasev2.FeatureAdmin:
@@ -287,10 +289,12 @@ func ServerCrashRecoverySequence() eventschema.Validatable {
 // storage attached and they can delta-recover.
 func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Validatable {
 	events := eventschema.Sequence{}
+
 	if victims == clusterSize {
 		events.Validators = append(events.Validators, eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered})
 		victims--
 	}
+
 	events.Validators = append(events.Validators, eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Repeat{
@@ -312,6 +316,7 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 			},
 		},
 	})
+
 	return events
 }
 

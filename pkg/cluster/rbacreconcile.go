@@ -49,19 +49,23 @@ func (c *Cluster) reconcileRBACResources() error {
 func (c *Cluster) reconcileGroups() ([]string, error) {
 	// gather selected groups
 	selector := labels.Everything()
+
 	if c.cluster.Spec.Security.RBAC.Selector != nil {
 		var err error
 		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector); err != nil {
 			return nil, err
 		}
 	}
+
 	requestedGroups := make(map[string]cbmgr.Group)
+
 	for _, cbGroup := range c.k8s.CouchbaseGroups.List() {
 		if selector.Matches(labels.Set(cbGroup.Labels)) {
 			group := cbmgr.Group{
 				ID:           cbGroup.Name,
 				LDAPGroupRef: cbGroup.Spec.LDAPGroupRef,
 			}
+
 			// copy roles to group
 			for _, role := range cbGroup.Spec.Roles {
 				group.Roles = append(group.Roles, cbmgr.UserRole{
@@ -69,16 +73,19 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 					BucketName: role.Bucket,
 				})
 			}
+
 			requestedGroups[group.ID] = group
 		}
 	}
 
 	// reconcile with existing groups
-	existingGroups, err := c.client.ListGroups(c.readyMembers())
 	existingGroupNames := []string{}
+
+	existingGroups, err := c.client.ListGroups(c.readyMembers())
 	if err != nil {
 		return existingGroupNames, err
 	}
+
 	for _, e := range existingGroups {
 		if r, ok := requestedGroups[e.ID]; ok {
 			// update changed group
@@ -87,6 +94,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 				if err := c.createGroup(r); err != nil {
 					return existingGroupNames, err
 				}
+
 				c.raiseEvent(k8sutil.GroupEditEvent(e.ID, c.cluster))
 				log.Info("edit CouchbaseGroup", "name", e.ID)
 			}
@@ -95,9 +103,11 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			if err := c.client.DeleteGroup(c.readyMembers(), *e); err != nil {
 				return existingGroupNames, err
 			}
+
 			c.raiseEvent(k8sutil.GroupDeleteEvent(e.ID, c.cluster))
 			log.Info("delete CouchbaseGroup", "name", e.ID)
 		}
+
 		existingGroupNames = append(existingGroupNames, e.ID)
 	}
 
@@ -107,6 +117,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			if err := c.createGroup(group); err != nil {
 				return existingGroupNames, err
 			}
+
 			c.raiseEvent(k8sutil.GroupCreateEvent(group.ID, c.cluster))
 			log.Info("create CouchbaseGroup", "name", group.ID)
 		}
@@ -132,18 +143,22 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		if _, found := couchbasev2.HasItem(groupName, groups); !found {
 			msg := fmt.Sprintf("Rolebinding `%s` refers to a missing group `%s`", roleBinding.Name, groupName)
 			log.V(1).Info(msg, "cluster", c.namespacedName())
+
 			continue
 		}
 
 		// Gather users bound to group
 		for _, roleSubject := range roleBinding.Spec.Subjects {
 			selector := labels.Everything()
+
 			if c.cluster.Spec.Security.RBAC.Selector != nil {
 				var err error
+
 				if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector); err != nil {
 					return nil, err
 				}
 			}
+
 			cbUser, found := c.k8s.CouchbaseUsers.Get(roleSubject.Name)
 			if found {
 				if !selector.Matches(labels.Set(cbUser.Labels)) {
@@ -153,6 +168,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			} else {
 				msg := fmt.Sprintf("Rolebinding `%s` refers to a missing user `%s`", roleBinding.Name, roleSubject.Name)
 				log.V(1).Info(msg, "cluster", c.namespacedName())
+
 				continue
 			}
 
@@ -171,8 +187,10 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 					if err != nil {
 						return nil, err
 					}
+
 					user.Password = password
 				}
+
 				requestedUsers[user.ID] = user
 			} else if _, found := couchbasev2.HasItem(groupName, user.Groups); !found {
 				// Add additional group to user
@@ -187,7 +205,9 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	if err != nil {
 		return nil, nil
 	}
+
 	existingUserNames := []string{}
+
 	for _, e := range existingUsers {
 		if r, ok := requestedUsers[e.ID]; ok {
 			// requested user exists
@@ -196,6 +216,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 				if err := c.client.CreateUser(c.readyMembers(), r); err != nil {
 					return existingUserNames, err
 				}
+
 				c.raiseEvent(k8sutil.UserEditEvent(e.ID, c.cluster))
 				log.Info("edit CouchbaseUser", "name", e.ID)
 			}
@@ -204,9 +225,11 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			if err := c.client.DeleteUser(c.readyMembers(), *e); err != nil {
 				return existingUserNames, err
 			}
+
 			c.raiseEvent(k8sutil.UserDeleteEvent(e.ID, c.cluster))
 			log.Info("delete CouchbaseUser", "name", e.ID)
 		}
+
 		existingUserNames = append(existingUserNames, e.ID)
 	}
 
@@ -216,10 +239,12 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			if err := c.client.CreateUser(c.readyMembers(), r); err != nil {
 				return existingUserNames, err
 			}
+
 			c.raiseEvent(k8sutil.UserCreateEvent(r.ID, c.cluster))
 			log.Info("create CouchbaseUser", "name", r.ID)
 		}
 	}
+
 	return existingUserNames, nil
 }
 
@@ -232,12 +257,14 @@ func (c *Cluster) createGroup(group cbmgr.Group) error {
 			}
 		}
 	}
+
 	return c.client.CreateGroup(c.readyMembers(), group)
 }
 
 // Get auth password to be set for user.
 func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
 	var password string
+
 	secret, found := c.k8s.Secrets.Get(authSecret)
 	if !found {
 		return password, fmt.Errorf("unable to find secret %s", authSecret)
@@ -268,6 +295,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 			settings := cbmgr.LDAPSettings{Encryption: cbmgr.LDAPEncryptionNone}
 			return c.client.SetLDAPSettings(c.readyMembers(), &settings)
 		}
+
 		// nothing to reconcile
 		return nil
 	}
@@ -296,10 +324,12 @@ func (c *Cluster) reconcileLDAPSettings() error {
 			if !found {
 				return fmt.Errorf("unable to get ldap tls secret `%s`", tlsSecretName)
 			}
+
 			ca, ok := tlsSecret.Data[constants.LDAPSecretCACert]
 			if !ok {
 				return fmt.Errorf("unable to find %s in tls ldap secret", constants.LDAPSecretCACert)
 			}
+
 			specLDAPSettings.CACert = string(ca)
 		}
 	}
@@ -312,10 +342,12 @@ func (c *Cluster) reconcileLDAPSettings() error {
 			if !found {
 				return fmt.Errorf("unable to get ldap bind secret `%s`", bindSecretName)
 			}
+
 			password, ok := bindSecret.Data[constants.LDAPSecretPassword]
 			if !ok {
 				return fmt.Errorf("unable to find %s in ldap bind secret", constants.LDAPSecretPassword)
 			}
+
 			specLDAPSettings.BindPass = string(password)
 		}
 

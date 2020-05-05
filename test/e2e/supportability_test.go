@@ -44,10 +44,12 @@ import (
 // the persistent volumes are bound when attached to a pod.
 func lazyBoundStorageClass(t *testing.T, cluster *types.Cluster) bool {
 	f := framework.Global
+
 	sc, err := cluster.KubeClient.StorageV1().StorageClasses().Get(f.StorageClassName, metav1.GetOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
 }
 
@@ -74,9 +76,11 @@ func NewCompoundError(errs []error) error {
 
 func (e *compoundError) Error() string {
 	errs := []string{}
+
 	for _, err := range e.errs {
 		errs = append(errs, err.Error())
 	}
+
 	return strings.Join(errs, "\n")
 }
 
@@ -101,6 +105,7 @@ func mustVerifyArchiveContents(t *testing.T, archive string, expected []string) 
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	defer func() { _ = file.Close() }()
 
 	// Read each entry in the archive and store the file names.
@@ -108,52 +113,64 @@ func mustVerifyArchiveContents(t *testing.T, archive string, expected []string) 
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	defer func() { _ = gzipReader.Close() }()
 
 	tarReader := tar.NewReader(gzipReader)
 
 	actual := []string{}
+
 	for {
 		hdr, err := tarReader.Next()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
+
 			e2eutil.Die(t, err)
 		}
+
 		actual = append(actual, hdr.Name)
 	}
 
 	// Do an exhaustive search of both lists - O(N^2), I'm lazy - and accumulate
 	// any errors
 	errs := []error{}
+
 	for _, e := range expected {
 		found := false
+
 		for _, a := range actual {
 			if a == e {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			errs = append(errs, fmt.Errorf("expected file %s not found in archive", e))
 		}
 	}
+
 	for _, a := range actual {
 		// Hack: Check for and add if there are events/logs associated with the involved resource.
 		if strings.HasSuffix(a, "events.yaml") {
 			continue
 		}
+
 		if strings.HasSuffix(a, ".log") {
 			continue
 		}
+
 		found := false
+
 		for _, e := range expected {
 			if e == a {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			errs = append(errs, fmt.Errorf("unexpected file %s found in archive", a))
 		}
@@ -174,9 +191,11 @@ func extractTimestamp(filename string) string {
 // archiveName returns the expected archive name for the specified parameters.
 func archiveName(namespace, name, timestamp string, redacted bool) string {
 	archive := "cbinfo-" + namespace + "-" + name + "-" + timestamp
+
 	if redacted {
 		archive += "-redacted"
 	}
+
 	return archive
 }
 
@@ -184,23 +203,30 @@ func archiveName(namespace, name, timestamp string, redacted bool) string {
 // are scoped to a specific couchbase cluster.
 func getLabelSelector(all bool, clusters []string) (string, error) {
 	selector := labels.Everything()
+
 	if !all {
 		requirements := []labels.Requirement{}
+
 		req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
 		if err != nil {
 			return "", err
 		}
+
 		requirements = append(requirements, *req)
+
 		if len(clusters) != 0 {
 			req, err := labels.NewRequirement(operator_constants.LabelCluster, selection.In, clusters)
 			if err != nil {
 				return "", err
 			}
+
 			requirements = append(requirements, *req)
 		}
+
 		selector = labels.NewSelector()
 		selector = selector.Add(requirements...)
 	}
+
 	return selector.String(), nil
 }
 
@@ -238,9 +264,11 @@ NextPod:
 						errs = append(errs, err)
 					}
 				}
+
 				continue NextPod
 			}
 		}
+
 		errs = append(errs, fmt.Errorf("expected file %s not found", expected))
 	}
 
@@ -255,6 +283,7 @@ func verifyLogRedaction(archive string) error {
 	if err != nil {
 		return err
 	}
+
 	defer zipReader.Close()
 
 	for _, file := range zipReader.File {
@@ -277,6 +306,7 @@ func verifyLogCollectListJSON(kubeClient kubernetes.Interface, namespace, cbClus
 			errMsgList.AppendFailure("Pod missing from JSON output: "+pod.Name, fmt.Errorf("pod missing in JSON output"))
 		}
 	}
+
 	return nil
 }
 
@@ -301,38 +331,47 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	clusterRoleBindings, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	crds, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	persistentVolumes, err := k8s.KubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
 	files = append(files, fmt.Sprintf("%s/namespace/%s/%s.yaml", base, namespace, namespace))
+
 	for _, clusterRole := range clusterRoles.Items {
 		files = append(files, fmt.Sprintf("%s/clusterrole/%s/%s.yaml", base, clusterRole.Name, clusterRole.Name))
 	}
+
 	for _, clusterRoleBinding := range clusterRoleBindings.Items {
 		files = append(files, fmt.Sprintf("%s/clusterrolebinding/%s/%s.yaml", base, clusterRoleBinding.Name, clusterRoleBinding.Name))
 	}
+
 	for _, crd := range crds.Items {
 		if strings.HasSuffix(crd.Name, ".couchbase.com") {
 			files = append(files, fmt.Sprintf("%s/customresourcedefinition/%s/%s.yaml", base, crd.Name, crd.Name))
 		}
 	}
+
 	for _, node := range nodes.Items {
 		files = append(files, fmt.Sprintf("%s/node/%s/%s.yaml", base, node.Name, node.Name))
 	}
+
 	for _, persistentVolume := range persistentVolumes.Items {
 		files = append(files, fmt.Sprintf("%s/persistentvolume/%s/%s.yaml", base, persistentVolume.Name, persistentVolume.Name))
 	}
@@ -342,30 +381,37 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	ephemeralBuckets, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	memcachedBuckets, err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	replications, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	roles, err := k8s.KubeClient.RbacV1().Roles(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	rolebindings, err := k8s.KubeClient.RbacV1().RoleBindings(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	secrets, err := k8s.KubeClient.CoreV1().Secrets(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	serviceaccounts, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -374,24 +420,31 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	for _, bucket := range buckets.Items {
 		files = append(files, fmt.Sprintf("%s/%s/couchbasebucket/%s/%s.yaml", base, namespace, bucket.Name, bucket.Name))
 	}
+
 	for _, ephemeralBucket := range ephemeralBuckets.Items {
 		files = append(files, fmt.Sprintf("%s/%s/couchbaseephemeralbucket/%s/%s.yaml", base, namespace, ephemeralBucket.Name, ephemeralBucket.Name))
 	}
+
 	for _, memcachedBucket := range memcachedBuckets.Items {
 		files = append(files, fmt.Sprintf("%s/%s/couchbasememcachedbucket/%s/%s.yaml", base, namespace, memcachedBucket.Name, memcachedBucket.Name))
 	}
+
 	for _, replication := range replications.Items {
 		files = append(files, fmt.Sprintf("%s/%s/couchbasereplication/%s/%s.yaml", base, namespace, replication.Name, replication.Name))
 	}
+
 	for _, role := range roles.Items {
 		files = append(files, fmt.Sprintf("%s/%s/role/%s/%s.yaml", base, namespace, role.Name, role.Name))
 	}
+
 	for _, rolebinding := range rolebindings.Items {
 		files = append(files, fmt.Sprintf("%s/%s/rolebinding/%s/%s.yaml", base, namespace, rolebinding.Name, rolebinding.Name))
 	}
+
 	for _, secret := range secrets.Items {
 		files = append(files, fmt.Sprintf("%s/%s/secret/%s/%s.yaml", base, namespace, secret.Name, secret.Name))
 	}
+
 	for _, serviceaccount := range serviceaccounts.Items {
 		files = append(files, fmt.Sprintf("%s/%s/serviceaccount/%s/%s.yaml", base, namespace, serviceaccount.Name, serviceaccount.Name))
 	}
@@ -424,6 +477,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 					files = append(files, fmt.Sprintf("%s/%s/deployment/%s/%s", base, namespace, deployment.Name, pprofFile))
 				}
 			}
+
 			if metrics {
 				metricsFiles := []string{
 					"stats.cluster",
@@ -444,12 +498,14 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	for _, cluster := range couchbaseClusters.Items {
 		if len(clusters) != 0 {
 			found := false
+
 			for _, c := range clusters {
 				if c == cluster.Name {
 					found = true
 					break
 				}
 			}
+
 			if !found {
 				continue
 			}
@@ -468,22 +524,27 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	services, err := k8s.KubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	configMaps, err := k8s.KubeClient.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -492,18 +553,23 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	for _, endpoint := range endpoints.Items {
 		files = append(files, fmt.Sprintf("%s/%s/endpoints/%s/%s.yaml", base, namespace, endpoint.Name, endpoint.Name))
 	}
+
 	for _, pvc := range pvcs.Items {
 		files = append(files, fmt.Sprintf("%s/%s/persistentvolumeclaim/%s/%s.yaml", base, namespace, pvc.Name, pvc.Name))
 	}
+
 	for _, pod := range pods.Items {
 		files = append(files, fmt.Sprintf("%s/%s/pod/%s/%s.yaml", base, namespace, pod.Name, pod.Name))
 	}
+
 	for _, pdb := range pdbs.Items {
 		files = append(files, fmt.Sprintf("%s/%s/poddisruptionbudget/%s/%s.yaml", base, namespace, pdb.Name, pdb.Name))
 	}
+
 	for _, service := range services.Items {
 		files = append(files, fmt.Sprintf("%s/%s/service/%s/%s.yaml", base, namespace, service.Name, service.Name))
 	}
+
 	for _, configMap := range configMaps.Items {
 		files = append(files, fmt.Sprintf("%s/%s/configmap/%s/%s.yaml", base, namespace, configMap.Name, configMap.Name))
 	}
@@ -523,11 +589,14 @@ func cbopinfo(t *testing.T, args argumentList) string {
 	if err != nil {
 		e2eutil.Die(t, fmt.Errorf("cbopinfo command failed: %v: %s", err, string(stdout)))
 	}
+
 	re := regexp.MustCompile(`Wrote cluster information to (\S+)`)
+
 	matches := re.FindStringSubmatch(string(stdout))
 	if len(matches) != 2 {
 		e2eutil.Die(t, fmt.Errorf("failed to extract archive"))
 	}
+
 	return matches[1]
 }
 
@@ -536,7 +605,9 @@ func getLogFileNameFromExecOutput(outputStr string) string {
 	if startIndex == -1 {
 		return ""
 	}
+
 	outputStrArr := strings.Split(outputStr[startIndex:], " ")
+
 	return outputStrArr[len(outputStrArr)-1]
 }
 
@@ -557,12 +628,15 @@ type argumentList map[string]string
 // slice returns the flattened argumentList with empty values removed.
 func (a argumentList) slice() []string {
 	args := []string{}
+
 	for k, v := range a {
 		args = append(args, k)
+
 		if v != "" {
 			args = append(args, v)
 		}
 	}
+
 	return args
 }
 
@@ -576,6 +650,7 @@ func (a argumentList) add(k, v string) {
 func (a argumentList) addClusterDefaults(k8s *types.Cluster) {
 	a.add("--kubeconfig", k8s.KubeConfPath)
 	a.add("--namespace", k8s.Namespace)
+
 	if k8s.Context != "" {
 		a.add("--context", k8s.Context)
 	}
@@ -590,9 +665,11 @@ func (a argumentList) addEnvironmentDefaults() {
 // clone duplicates an argument list.
 func (a argumentList) clone() argumentList {
 	n := argumentList{}
+
 	for k, v := range a {
 		n[k] = v
 	}
+
 	return n
 }
 
@@ -603,9 +680,10 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	targetKube := f.GetCluster(0)
 	kubeConfPath := targetKube.KubeConfPath
 	context := targetKube.Context
+	operatorRestPort := strconv.Itoa(constants.OperatorRestPort)
+
 	t.Logf("KubeConfPath: %+v", kubeConfPath)
 	t.Logf("Context: %v", context)
-	operatorRestPort := strconv.Itoa(constants.OperatorRestPort)
 
 	// Validate args which won't produce output file
 	for _, arg := range []string{"--help", "--version"} {
@@ -665,14 +743,19 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 			execOut, err := runCbopinfoCmd(args.slice())
 			execOutStr := strings.TrimSpace(string(execOut))
+
 			t.Logf("Returned: %s\n", execOutStr)
+
 			if err != nil {
 				e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %v", arg.Arg, err))
 			}
+
 			logFileName := getLogFileNameFromExecOutput(execOutStr)
+
 			defer os.Remove(logFileName)
 
 			logFileDir := strings.Split(logFileName, ".")[0]
+
 			defer os.RemoveAll(logFileDir)
 
 			// Check command fails with missing argument value
@@ -681,7 +764,9 @@ func TestLogCollectValidateArguments(t *testing.T) {
 				args.add(arg.Arg, "")
 				execOut, err := runCbopinfoCmd(args.slice())
 				execOutStr := strings.TrimSpace(string(execOut))
+
 				t.Logf("Returned: %s\n", execOutStr)
+
 				if err == nil {
 					e2eutil.Die(t, fmt.Errorf("Command executed successfully without providing value for %s: %v", arg.Arg, err))
 				}
@@ -738,15 +823,20 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	kubeconfig, err := ioutil.TempFile("/tmp", "*")
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	defer kubeconfig.Close()
+
 	defer os.Remove(kubeconfig.Name())
+
 	if _, err := kubeconfig.Write(data); err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	if err := kubeconfig.Sync(); err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -777,7 +867,9 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 
 		execOut, err := runCbopinfoCmd(cmdArgs)
 		execOutStr := strings.TrimSpace(string(execOut))
+
 		t.Logf("Returned: %s\n", execOutStr)
+
 		if err == nil {
 			errMsgList.AppendFailure(arg.Name, fmt.Errorf("command executed successfully"))
 		}
@@ -793,6 +885,7 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 			os.Remove(logFileName)
 		}
 	}
+
 	errMsgList.CheckFailures(t)
 }
 
@@ -894,6 +987,7 @@ func TestLogCollect(t *testing.T) {
 
 		archive := cbopinfo(t, args)
 		defer os.Remove(archive)
+
 		defer removeServerLogs()
 
 		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true, cluster1.Name)
@@ -928,6 +1022,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	if err := framework.RecreateServiceAccount(targetKube, cluster.Name); err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	defer func() { _ = framework.RemoveServiceAccount(targetKube.KubeClient, targetKube.Namespace, cluster.Name) }()
 
 	// Create a kubernetes configuration file.
@@ -980,15 +1075,20 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	kubeconfig, err := ioutil.TempFile("/tmp", "*")
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	defer kubeconfig.Close()
+
 	defer os.Remove(kubeconfig.Name())
+
 	if _, err := kubeconfig.Write(data); err != nil {
 		e2eutil.Die(t, err)
 	}
+
 	if err := kubeconfig.Sync(); err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -998,10 +1098,13 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	args.add("--kubeconfig", kubeconfig.Name())
 	execOut, err := runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
+
 	t.Log(execOutStr)
+
 	if err == nil {
 		e2eutil.Die(t, fmt.Errorf("Able to read resource without valid rbac permissions"))
 	}
+
 	if !strings.Contains(execOutStr, "unable to poll CouchbaseCluster resources") {
 		e2eutil.Die(t, fmt.Errorf("Invalid error message"))
 	}
@@ -1022,12 +1125,15 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
 	}
 
 	t.Logf("Deploying operator using image '%s' and port %d", imageName, port)
+
 	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
 		return err
 	}
+
 	if err := e2eutil.WaitUntilOperatorReady(k8s.KubeClient, k8s.Namespace, constants.CouchbaseOperatorLabel); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -1043,12 +1149,14 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	clusterSize := 3
 
 	defer func() { _ = ReDeployOperator(t, targetKube, f.OpImage, 0) }()
+
 	if err := ReDeployOperator(t, targetKube, operatorImage, operatorPort); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+
 	defer e2eutil.CleanUpCluster(t, targetKube, targetKube.Namespace, f.LogDir, f.TestClusters[0], t.Name())
 
 	// Collect logs
@@ -1056,6 +1164,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 
 	archive := cbopinfo(t, args)
 	defer os.Remove(archive)
+
 	defer removeServerLogs()
 
 	files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, true, true, true)
@@ -1121,13 +1230,15 @@ func TestLogCollectInvalid(t *testing.T) {
 		archive := cbopinfo(t, args)
 		defer os.Remove(archive)
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true)
 		filtered := []string{}
+
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true)
 		for _, file := range files {
 			if !strings.Contains(file, "/deployment/") {
 				filtered = append(filtered, file)
 			}
 		}
+
 		mustVerifyArchiveContents(t, archive, filtered)
 	})
 
@@ -1169,6 +1280,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	// Collect logs when operator pod goes down in parallel
 	archive := cbopinfo(t, args)
 	defer os.Remove(archive)
+
 	defer removeServerLogs()
 
 	// Verify file list
@@ -1196,6 +1308,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{}
+
 	for i := 0; i < clusterSize; i++ {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, i)] = 1
 	}
@@ -1213,11 +1326,13 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 		switch podDownMethod {
 		case "deletePod":
 			e2eutil.MustKillPodForMember(t, targetKube, cbCluster, victim, false)
+
 			expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, clusterSize+i)] = 1
 		case "killServerProcess":
 			podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, victim)
 			e2eutil.MustExecShellInPod(t, targetKube, targetKube.Namespace, podNameToKill, "pkill beam.smp")
 		}
+
 		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
 	}
 
@@ -1225,6 +1340,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	mustVerifyPvcMappingForPods(t, targetKube, targetKube.Namespace, expectedPvcMap)
 
 	var validator eventschema.Validatable
+
 	switch podDownMethod {
 	case "deletePod":
 		validator = e2eutil.PodDownFailoverRecoverySequence()
@@ -1271,9 +1387,11 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	})
 
 	e2eutil.MustKillPodForMember(t, targetKube, cbCluster, victim, false)
+
 	if isOperatorKilledWithServerPod {
 		e2eutil.MustDeleteCouchbaseOperator(t, targetKube, targetKube.Namespace)
 	}
+
 	cbCluster = e2eutil.MustResizeCluster(t, resizedService, 1, targetKube, cbCluster, 5*time.Minute)
 
 	mustVerifyPvcMappingForPods(t, targetKube, targetKube.Namespace, map[string]int{
@@ -1435,9 +1553,11 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 
 	// Cross check number of persistent vol claims matches the defined spec.
 	expectedPvcMap := map[string]int{}
+
 	for i := 0; i < clusterSize; i++ {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
+
 	mustVerifyPvcMappingForPods(t, kubernetes, kubernetes.Namespace, expectedPvcMap)
 
 	// Kill stateless pods repeatedly waiting for recovery each time.
@@ -1450,6 +1570,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	for i := clusterSize; i < clusterSize+victims; i++ {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
+
 	mustVerifyPvcMappingForPods(t, kubernetes, kubernetes.Namespace, expectedPvcMap)
 
 	// Check the events match what we expect:
@@ -1487,6 +1608,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 
 	// Track pods we create and their expected number of persistent volumes.
 	expectedPvcMap := map[string]int{}
+
 	for i := 0; i < clusterSize; i++ {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
@@ -1511,6 +1633,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	for victim := 0; victim < victims-maxLogCount; victim++ {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, mdsGroupSize+victim)] = 0
 	}
+
 	mustVerifyPvcMappingForPods(t, kubernetes, kubernetes.Namespace, expectedPvcMap)
 
 	// Check the events match what we expect:
@@ -1593,6 +1716,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	archive := cbopinfo(t, args)
 	defer os.Remove(archive)
+
 	defer removeServerLogs()
 
 	mustVerifyServerLogs(t, targetKube, targetKube.Namespace, archive, true)
@@ -1627,10 +1751,13 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 	// We expect that after 3 minutes (1m to flag as orphaned and 1m retention period) the
 	// persistent log volume should still be present.
 	time.Sleep(3 * time.Minute)
+
 	pvcMapping := map[string]int{}
+
 	for i := 0; i < clusterSize+1; i++ {
 		pvcMapping[couchbaseutil.CreateMemberName(cluster2.Name, i)] = 1
 	}
+
 	mustVerifyPvcMappingForPods(t, kubernetes, kubernetes.Namespace, pvcMapping)
 }
 
@@ -1650,7 +1777,9 @@ func TestLogCollectListJson(t *testing.T) {
 	args.add("--collectinfo-list", "")
 	execOut, err := runCbopinfoCmd(args.slice())
 	execOutStr := strings.TrimSpace(string(execOut))
+
 	t.Logf("Returned: %s\n", execOutStr)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1659,6 +1788,7 @@ func TestLogCollectListJson(t *testing.T) {
 
 	errMsgList := failureList{}
 	testHasErrors := false
+
 	if err := verifyLogCollectListJSON(targetKube.KubeClient, targetKube.Namespace, cbCluster.Name, execOutStr, &errMsgList); err != nil {
 		t.Error(err)
 	}

@@ -183,6 +183,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	if err != nil {
 		return nil, fmt.Errorf("PodCreateTimeout improperly formatted: %v", err)
 	}
+
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
 	defer cancel()
 
@@ -193,6 +194,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	if err != nil {
 		return nil, err
 	}
+
 	if err := c.incPodIndex(); err != nil {
 		return nil, err
 	}
@@ -226,6 +228,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 		// wrong image name (pull error), PVCs taking an age to become bound etc.
 		c.logFailedMember("Member creation failed", newMember.Name)
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
+
 		return nil, err
 	}
 
@@ -240,6 +243,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	if err != nil {
 		return nil, err
 	}
+
 	if !isEnterprise {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 		return nil, fmt.Errorf("couchbase server reports community edition")
@@ -283,6 +287,7 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil
 	// TODO: 6.5.0+ probably allows HTTPS bootstrap all the time, not just
 	// when N2N is enabled...
 	url := newMember.ClientURLPlaintext()
+
 	if c.supportsNodeToNode() && c.nodeToNodeEnabled() {
 		url = newMember.ClientURL()
 	}
@@ -323,10 +328,13 @@ func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseu
 		m := couchbaseutil.NewMemberSet(member)
 		ms = c.members.Diff(m)
 	}
+
 	if err := c.client.CancelAddNode(ms, member.HostURLPlaintext()); err != nil {
 		return err
 	}
+
 	c.raiseEvent(k8sutil.FailedAddNodeEvent(member.Name, c.cluster))
+
 	return nil
 }
 
@@ -336,12 +344,14 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 	// is blocking so we need to report now or kubernetes will be out of sync
 	c.raiseEvent(k8sutil.RebalanceStartedEvent(c.cluster))
 	c.cluster.Status.SetUnbalancedCondition()
+
 	if err := c.updateCRStatus(); err != nil {
 		return err
 	}
 
 	// Perform the operation
 	nodesToRemove := append(managed.HostURLsPlaintext(), unmanaged...)
+
 	err := c.client.Rebalance(c.members, nodesToRemove, c.namespacedName())
 	if err != nil {
 		// If the rebalance was observed but failed raise an error.
@@ -357,6 +367,7 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 			return err
 		}
+
 		if ok, err := status.RebalanceSucceeded(members, managed); !ok {
 			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 			return fmt.Errorf("cluster not rebalanced as expected: %s", err)
@@ -366,20 +377,25 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 	// Error checking... perfom this a few times as there is a race between when
 	// we check and when Server reports rebalance is complete.
 	var status *couchbaseutil.ClusterStatus
+
 	retryFunc := func() error {
 		var err error
+
 		status, err = c.client.GetClusterStatus(c.members)
 		if err != nil {
 			return err
 		}
+
 		if status.NeedsRebalance {
 			return cberrors.NewRebalanceIncompleteError()
 		}
+
 		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
 	defer cancel()
+
 	if err := retryutil.RetryOnErr(ctx, time.Second, retryFunc); err != nil {
 		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 		return err
@@ -387,6 +403,7 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 
 	// Notify if we've removed some nodes (deterministically sorted)
 	sort.Strings(nodesToRemove)
+
 	for _, nodeToRemove := range nodesToRemove {
 		// TODO: this feels dirty, but as this is a mixed bag of members and
 		// un-managed nodes we have no other option for now
@@ -398,26 +415,31 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 	log.Info("Rebalance completed successfully", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
 	c.cluster.Status.SetBalancedCondition()
+
 	if err := c.updateCRStatus(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
 // gatherBuckets loads up bucket configurations from Kubernetes and marshalls them into canonical form.
 func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 	selector := labels.Everything()
+
 	if c.cluster.Spec.Buckets.Selector != nil {
 		var err error
 		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Buckets.Selector); err != nil {
 			return nil, err
 		}
 	}
+
 	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
 	couchbaseEphemeralBuckets := c.k8s.CouchbaseEphemeralBuckets.List()
 	couchbaseMemcachedBuckets := c.k8s.CouchbaseMemcachedBuckets.List()
 
 	buckets := []cbmgr.Bucket{}
+
 	for _, bucket := range couchbaseBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
@@ -441,12 +463,14 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
 		})
 	}
+
 	for _, bucket := range couchbaseEphemeralBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
 		}
 
 		name := bucket.Name
+
 		if bucket.Spec.Name != "" {
 			name = bucket.Spec.Name
 		}
@@ -463,12 +487,14 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
 		})
 	}
+
 	for _, bucket := range couchbaseMemcachedBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
 		}
 
 		name := bucket.Name
+
 		if bucket.Spec.Name != "" {
 			name = bucket.Spec.Name
 		}
@@ -505,16 +531,20 @@ func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Buck
 	// updating as necessary.
 	for _, r := range requested {
 		found := false
+
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
 				if !reflect.DeepEqual(r, a) {
 					update = append(update, r)
 					c.logUpdate(a, r)
 				}
+
 				found = true
+
 				break
 			}
 		}
+
 		if !found {
 			create = append(create, r)
 		}
@@ -524,12 +554,14 @@ func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Buck
 	// as necessary.
 	for _, a := range actual {
 		found := false
+
 		for _, r := range requested {
 			if a.BucketName == r.BucketName {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			remove = append(remove, a)
 		}
@@ -555,25 +587,31 @@ func (c *Cluster) reconcileBuckets() error {
 		if err := c.client.CreateBucket(c.readyMembers(), bucket); err != nil {
 			return err
 		}
+
 		log.Info("Bucket created", "cluster", c.namespacedName(), "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketCreateEvent(bucket.BucketName, c.cluster))
 	}
+
 	for _, bucket := range update {
 		if err := c.client.UpdateBucket(c.readyMembers(), bucket); err != nil {
 			return err
 		}
+
 		log.Info("Bucket updated", "cluster", c.namespacedName(), "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
 	}
+
 	for _, bucket := range remove {
 		if err := c.client.DeleteBucket(c.readyMembers(), bucket); err != nil {
 			return err
 		}
+
 		log.Info("Bucket deleted", "cluster", c.namespacedName(), "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketDeleteEvent(bucket.BucketName, c.cluster))
 	}
 
 	c.cluster.Status.Buckets = []couchbasev2.BucketStatus{}
+
 	for _, bucket := range requested {
 		bucketStatus := couchbasev2.BucketStatus{
 			BucketName:         bucket.BucketName,
@@ -587,8 +625,10 @@ func (c *Cluster) reconcileBuckets() error {
 			EnableIndexReplica: bucket.EnableIndexReplica,
 			CompressionMode:    string(bucket.CompressionMode),
 		}
+
 		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, bucketStatus)
 	}
+
 	return nil
 }
 
@@ -602,6 +642,7 @@ func (c *Cluster) reconcileAdminService() error {
 	}
 
 	serviceName := k8sutil.ConsoleServiceName(c.cluster.Name)
+
 	switch status {
 	case k8sutil.ReconcileStatusCreated:
 		log.Info("UI service created", "cluster", c.namespacedName(), "name", serviceName)
@@ -624,12 +665,15 @@ func (c *Cluster) reconcileExposedFeatures() error {
 	if err != nil {
 		return err
 	}
+
 	for _, service := range status.Added {
 		c.raiseEvent(k8sutil.NodeServiceCreateEvent(service, c.cluster))
 	}
+
 	for _, service := range status.Removed {
 		c.raiseEvent(k8sutil.NodeServiceDeleteEvent(service, c.cluster))
 	}
+
 	return nil
 }
 
@@ -665,6 +709,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 		},
 		FailoverServerGroup: settings.AutoFailoverServerGroup,
 	}
+
 	return c.client.SetAutoFailoverSettings(c.readyMembers(), autoFailoverSettings)
 }
 
@@ -678,6 +723,7 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 		if cs.Networking.TLS.Static != nil {
 			// Grab the operator secret
 			secretName := cs.Networking.TLS.Static.OperatorSecret
+
 			secret, found := c.k8s.Secrets.Get(secretName)
 			if !found {
 				return fmt.Errorf("unable to get operator secret %s", secretName)
@@ -693,6 +739,7 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 			if err := c.client.UploadClusterCACert(m, ca); err != nil {
 				return err
 			}
+
 			if err := c.client.ReloadNodeCert(m); err != nil {
 				return err
 			}
@@ -706,6 +753,7 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -714,9 +762,11 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 func (c *Cluster) getServerGroups() []string {
 	// Gather a set of unique server groups
 	serverGroups := map[string]interface{}{}
+
 	for _, serverGroup := range c.cluster.Spec.ServerGroups {
 		serverGroups[serverGroup] = nil
 	}
+
 	for _, serverClass := range c.cluster.Spec.Servers {
 		for _, serverGroup := range serverClass.ServerGroups {
 			serverGroups[serverGroup] = nil
@@ -725,6 +775,7 @@ func (c *Cluster) getServerGroups() []string {
 
 	// Map into a list
 	serverGroupList := []string{}
+
 	for serverGroup := range serverGroups {
 		serverGroupList = append(serverGroupList, serverGroup)
 	}
@@ -778,6 +829,7 @@ func serverGroupIndex(update *cbmgr.ServerGroupsUpdate, name string) (int, error
 			return index, nil
 		}
 	}
+
 	return -1, fmt.Errorf("server group %s undefined", name)
 }
 
@@ -806,6 +858,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	newGroups := cbmgr.ServerGroupsUpdate{
 		Groups: []cbmgr.ServerGroupUpdate{},
 	}
+
 	for _, existingGroup := range existingGroups.Groups {
 		newGroup := cbmgr.ServerGroupUpdate{
 			Name:  existingGroup.Name,
@@ -819,13 +872,14 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	// structure and also checking to see whether we need to dispatch this
 	// change to Couchbase server
 	update := false
+
 	for _, existingGroup := range existingGroups.Groups {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
 			podName := strings.Split(existingMember.HostName, ".")[0]
-			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
 
 			// Just reuse the old server group location on error, the pod is likely down
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
 			if err != nil {
 				scheduledServerGroup = existingGroup.Name
 			}
@@ -890,9 +944,9 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
 			podName := strings.Split(existingMember.HostName, ".")[0]
-			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
 
 			// Just reuse the old server group location on error, the pod is likely down
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
 			if err != nil {
 				scheduledServerGroup = existingGroup.Name
 			}
@@ -918,6 +972,7 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 // node address and node ports in the 30000 range.
 func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
 	var hostname string
+
 	if c.cluster.Spec.Networking.DNS != nil {
 		// Use the user provided DNS name.
 		hostname = k8sutil.GetDNSName(c.cluster, member.Name)
@@ -954,6 +1009,7 @@ func waitAlternateAddressReachable(addresses *cbmgr.AlternateAddressesExternal) 
 	// All exposed features contain the admin port, only TLS enabled ports
 	// are always guaranteed to exist.
 	port := 18091
+
 	if addresses.Ports != nil {
 		port = int(addresses.Ports.AdminServicePortTLS)
 	}
@@ -986,6 +1042,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 					return err
 				}
 			}
+
 			continue
 		}
 
@@ -1010,6 +1067,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -1034,6 +1092,7 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 			if existingAddresses != nil {
 				return true, err
 			}
+
 			continue
 		}
 
@@ -1051,6 +1110,7 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 		// Perform the update
 		return true, nil
 	}
+
 	return false, nil
 }
 
@@ -1069,6 +1129,7 @@ func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*
 			}
 		}
 	}
+
 	return existingAddresses, nil
 }
 
@@ -1076,20 +1137,25 @@ func (c *Cluster) reconcileClusterSettings() error {
 	if err := c.reconcileAutoFailoverSettings(); err != nil {
 		return err
 	}
+
 	if err := c.reconcileMemoryQuotaSettings(); err != nil {
 		return err
 	}
+
 	if err := c.reconcileSoftwareUpdateNotificationSettings(); err != nil {
 		return err
 	}
+
 	if err := c.reconcileIndexStorageSettings(); err != nil {
 		return err
 	}
+
 	if err := c.reconcileAutoCompactionSettings(); err != nil {
 		return err
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManageConfig)
+
 	return nil
 }
 
@@ -1125,6 +1191,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	if !failoverSettings.FailoverOnDataDiskIssues.Enabled {
 		failoverSettings.FailoverOnDataDiskIssues.TimePeriod = 0
 	}
+
 	if !specFailoverSettings.FailoverOnDataDiskIssues.Enabled {
 		specFailoverSettings.FailoverOnDataDiskIssues.TimePeriod = 0
 	}
@@ -1136,8 +1203,10 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 			log.Error(err, "Auto-failover settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Failed to update autofailover settings: `%v`", err)
 			c.cluster.Status.SetConfigRejectedCondition(message)
+
 			return err
 		}
+
 		log.Info("Auto-failover settings updated", "cluster", c.namespacedName())
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("autofailover", c.cluster))
 	}
@@ -1154,8 +1223,8 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	}
 
 	current := info.PoolsDefaults()
-
 	name := c.cluster.Name
+
 	if c.cluster.Spec.ClusterSettings.ClusterName != "" {
 		name = c.cluster.Spec.ClusterSettings.ClusterName
 	}
@@ -1175,8 +1244,10 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 			log.Error(err, "Cluster settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Unable update memory quota's [data:%v, index:%v, search:%v]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.cluster.Status.SetConfigRejectedCondition(message)
+
 			return err
 		}
+
 		log.Info("Cluster settings updated", "cluster", c.namespacedName())
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memory quota", c.cluster))
 	}
@@ -1199,8 +1270,10 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 			log.Error(err, "Software notification settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Unable update software notification settings: `%v`", err)
 			c.cluster.Status.SetConfigRejectedCondition(message)
+
 			return err
 		}
+
 		log.Info("Software notification settings updated", "cluster", c.namespacedName())
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("update notifications", c.cluster))
 	}
@@ -1222,8 +1295,10 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 			log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
 			c.cluster.Status.SetConfigRejectedCondition(message)
+
 			return err
 		}
+
 		log.Info("Index storage settings updated", "cluster", c.namespacedName())
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
 	}
@@ -1239,25 +1314,29 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 	}
 
 	databaseFragmentationThresholdPercentage := 0
+	databaseFragmentationThresholdSize := int64(0)
+	viewFragmentationThresholdPercentage := 0
+	viewFragmentationThresholdSize := int64(0)
+
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent != nil {
 		databaseFragmentationThresholdPercentage = *c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent
 	}
-	databaseFragmentationThresholdSize := int64(0)
+
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Size != nil {
 		databaseFragmentationThresholdSize = c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Size.Value()
 	}
 
-	viewFragmentationThresholdPercentage := 0
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent != nil {
 		viewFragmentationThresholdPercentage = *c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Percent
 	}
-	viewFragmentationThresholdSize := int64(0)
+
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Size != nil {
 		viewFragmentationThresholdSize = c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Size.Value()
 	}
 
 	fromHour := 0
 	fromMinute := 0
+
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.Start != "" {
 		// validated by DAC
 		parts := strings.Split(c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.Start, ":")
@@ -1267,6 +1346,7 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 
 	toHour := 0
 	toMinute := 0
+
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End != "" {
 		// validated by DAC
 		parts := strings.Split(c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End, ":")
@@ -1302,9 +1382,11 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 
 	if !reflect.DeepEqual(current, requested) {
 		log.Info("Updating auto compaction settings", "cluster", c.namespacedName())
+
 		if err := c.client.SetAutoCompactionSettings(c.readyMembers(), requested); err != nil {
 			return err
 		}
+
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("auto compaction", c.cluster))
 	}
 
@@ -1325,8 +1407,10 @@ func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
 			// Pod is not configured for volumes
 			return nil
 		}
+
 		return err
 	}
+
 	return nil
 }
 
@@ -1337,17 +1421,21 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 	dataPath := constants.DefaultDataPath
 	indexPath := constants.DefaultDataPath
 	analyticsPaths := []string{}
+
 	if mounts != nil && !mounts.LogsOnly() {
 		if mounts.DataClaim != "" {
 			dataPath = k8sutil.CouchbaseVolumeMountDataDir
 		}
+
 		if mounts.IndexClaim != "" {
 			indexPath = k8sutil.CouchbaseVolumeMountIndexDir
 		}
+
 		if len(mounts.AnalyticsClaims) > 0 {
 			analyticsPaths = mounts.GetAnalyticsVolumePaths()
 		}
 	}
+
 	return dataPath, indexPath, analyticsPaths
 }
 
@@ -1356,7 +1444,9 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 // counts of members in the various versions.
 func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 	var candidate *couchbaseutil.Member
+
 	var targetConfiguration int
+
 	var d string
 
 	// Names returns a sorted list for determinism.
@@ -1379,9 +1469,11 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		if err != nil {
 			return nil, -1, "", err
 		}
+
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
 
 		serverGroup := ""
+
 		if actual.Spec.NodeSelector != nil {
 			if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
 				serverGroup = group
@@ -1399,15 +1491,18 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		// target configuration.  Do this with reflection as the spec may contain
 		// maps (e.g. NodeSelector)
 		actualSpec := &v1.PodSpec{}
+
 		if annotation, ok := actual.Annotations[constants.PodSpecAnnotation]; ok {
 			if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
 				return nil, -1, "", err
 			}
 		}
+
 		requestedSpec := &v1.PodSpec{}
 		if err := json.Unmarshal([]byte(requested.Annotations[constants.PodSpecAnnotation]), requestedSpec); err != nil {
 			return nil, -1, "", err
 		}
+
 		if reflect.DeepEqual(actualSpec, requestedSpec) && pvcsEqual {
 			targetConfiguration++
 			continue
@@ -1418,12 +1513,15 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 			if err != nil {
 				log.Error(err, "cluster", c.namespacedName())
 			}
+
 			if !pvcsEqual {
 				d += pvcState.Diff()
 			}
+
 			candidate = member
 		}
 	}
+
 	return candidate, targetConfiguration, d, nil
 }
 
@@ -1444,6 +1542,7 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 		if status.Target != oldStatus.Target {
 			version, _ := couchbaseutil.NewVersion(status.Target)
 			oldVersion, _ := couchbaseutil.NewVersion(oldStatus.Target)
+
 			switch version.Compare(oldVersion) {
 			case 1:
 				// Upgrading
@@ -1499,6 +1598,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 	if err != nil {
 		return err
 	}
+
 	c.cluster.Status.CurrentVersion = version
 
 	if err := c.updateCRStatus(); err != nil {
@@ -1517,6 +1617,7 @@ func (c *Cluster) reconcileReadiness() error {
 			return err
 		}
 	}
+
 	return k8sutil.ReconcilePDB(c.k8s, c.cluster)
 }
 
@@ -1546,6 +1647,7 @@ func (c *Cluster) reconcileXDCR() error {
 			if !found {
 				return fmt.Errorf("unable to get remote cluster authentication secret %s", *cluster.AuthenticationSecret)
 			}
+
 			requested.Username = string(secret.Data["username"])
 			requested.Password = string(secret.Data["password"])
 		}
@@ -1556,9 +1658,11 @@ func (c *Cluster) reconcileXDCR() error {
 				if !found {
 					return fmt.Errorf("unable to get remote cluster TLS secret %s", *cluster.TLS.Secret)
 				}
+
 				if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
 					return fmt.Errorf("CA certificate is required for TLS encryption")
 				}
+
 				// No, we will never support any other type!
 				requested.SecureType = "full"
 
@@ -1570,6 +1674,7 @@ func (c *Cluster) reconcileXDCR() error {
 				if cert, ok := secret.Data[couchbasev2.RemoteClusterTLSCertificate]; ok {
 					requested.Certificate = string(cert)
 				}
+
 				if key, ok := secret.Data[couchbasev2.RemoteClusterTLSKey]; ok {
 					requested.Key = string(key)
 				}
@@ -1579,12 +1684,15 @@ func (c *Cluster) reconcileXDCR() error {
 		requestedClusters = append(requestedClusters, requested)
 
 		selector := labels.Everything()
+
 		if cluster.Replications.Selector != nil {
 			var err error
+
 			if selector, err = metav1.LabelSelectorAsSelector(cluster.Replications.Selector); err != nil {
 				return err
 			}
 		}
+
 		replications := c.k8s.CouchbaseReplications.List()
 
 		for _, replication := range replications {
@@ -1625,10 +1733,12 @@ CreateNextCluster:
 				continue CreateNextCluster
 			}
 		}
+
 		log.Info("Creating XDCR remote cluster", "cluster", c.namespacedName(), "remote", requested.Name)
 		if err := c.client.CreateRemoteCluster(c.readyMembers(), &requested); err != nil {
 			return err
 		}
+
 		c.raiseEvent(k8sutil.RemoteClusterAddedEvent(c.cluster, requested.Name))
 	}
 
@@ -1641,18 +1751,24 @@ CreateNextReplication:
 			if replicationKey(current) == replicationKey(requested) {
 				if !reflect.DeepEqual(current, requested) {
 					log.Info("Updating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(requested))
+
 					if err := c.client.UpdateReplication(c.readyMembers(), &requested); err != nil {
 						return err
 					}
+
 					c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("xdcr replication", c.cluster))
 				}
+
 				continue CreateNextReplication
 			}
 		}
+
 		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(requested))
+
 		if err := c.client.CreateReplication(c.readyMembers(), &requested); err != nil {
 			return err
 		}
+
 		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, replicationKey(requested)))
 	}
 
@@ -1666,10 +1782,13 @@ DeleteNextReplication:
 				continue DeleteNextReplication
 			}
 		}
+
 		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(current))
+
 		if err := c.client.DeleteReplication(c.readyMembers(), &current); err != nil {
 			return err
 		}
+
 		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, replicationKey(current)))
 	}
 
@@ -1683,10 +1802,13 @@ DeleteNextCluster:
 				continue DeleteNextCluster
 			}
 		}
+
 		log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", current.Name)
+
 		if err := c.client.DeleteRemoteCluster(c.readyMembers(), &current); err != nil {
 			return err
 		}
+
 		c.raiseEvent(k8sutil.RemoteClusterRemovedEvent(c.cluster, current.Name))
 	}
 
@@ -1701,10 +1823,12 @@ func (c *Cluster) reconcilePersistentStatus() error {
 	if err != nil {
 		return err
 	}
+
 	uuid, err := c.state.Get(persistence.UUID)
 	if err != nil {
 		return err
 	}
+
 	version, err := c.state.Get(persistence.Version)
 	if err != nil {
 		return err
@@ -1713,24 +1837,29 @@ func (c *Cluster) reconcilePersistentStatus() error {
 	c.cluster.Status.Phase = couchbasev2.ClusterPhase(phase)
 	c.cluster.Status.ClusterID = uuid
 	c.cluster.Status.CurrentVersion = version
+
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("failed to update cluster status", "cluster", c.namespacedName())
 	}
+
 	return nil
 }
 
 // gatherBackups returns CouchbaseBackups based on the cluster Spec selector.
 func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
 	selector := labels.Everything()
+
 	if c.cluster.Spec.Backup.Selector != nil {
 		var err error
 		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Backup.Selector); err != nil {
 			return nil, err
 		}
 	}
+
 	couchbaseBackups := c.k8s.CouchbaseBackups.List()
 
 	backups := []couchbasev2.CouchbaseBackup{}
+
 	for _, backup := range couchbaseBackups {
 		if !selector.Matches(labels.Set(backup.Labels)) {
 			continue
@@ -1745,15 +1874,18 @@ func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
 // gatherBackupRestores returns CouchbaseBackupRestores based on the cluster Spec selector.
 func (c *Cluster) gatherBackupRestores() ([]couchbasev2.CouchbaseBackupRestore, error) {
 	selector := labels.Everything()
+
 	if c.cluster.Spec.Backup.Selector != nil {
 		var err error
 		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Backup.Selector); err != nil {
 			return nil, err
 		}
 	}
+
 	couchbaseBackupRestores := c.k8s.CouchbaseBackupRestores.List()
 
 	restores := []couchbasev2.CouchbaseBackupRestore{}
+
 	for _, restore := range couchbaseBackupRestores {
 		if !selector.Matches(labels.Set(restore.Labels)) {
 			continue
@@ -1796,6 +1928,7 @@ func (c *Cluster) reconcileBackup() error {
 			existing[cronjob.Labels[constants.LabelBackup]] = true
 
 			actualSpec := &v1beta1.CronJobSpec{}
+
 			if annotation, ok := current.Annotations[constants.CronjobSpecAnnotation]; ok {
 				if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
 					return err
@@ -1806,12 +1939,15 @@ func (c *Cluster) reconcileBackup() error {
 			if err := json.Unmarshal([]byte(cronjob.Annotations[constants.CronjobSpecAnnotation]), requestedSpec); err != nil {
 				return err
 			}
+
 			if !reflect.DeepEqual(actualSpec, requestedSpec) {
 				// update
 				if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(cronjob); err != nil {
 					return err
 				}
+
 				log.Info("Backup Cronjob updated", "cbbackup", cronjob.Labels[constants.LabelBackup], "cronjob", cronjob.Name)
+
 				mutated[cronjob.Labels[constants.LabelBackup]] = true
 			}
 		} else {
@@ -1819,7 +1955,9 @@ func (c *Cluster) reconcileBackup() error {
 			if _, err = c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(cronjob); err != nil {
 				return err
 			}
+
 			log.Info("Backup Cronjob created", "cbbackup", cronjob.Labels[constants.LabelBackup], "cronjob", cronjob.Name)
+
 			mutated[cronjob.Labels[constants.LabelBackup]] = true
 		}
 	}
@@ -1833,7 +1971,9 @@ func (c *Cluster) reconcileBackup() error {
 			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(pvc); err != nil {
 				return err
 			}
+
 			log.Info("Backup PVC created", "cbbackup", pvc.Name)
+
 			mutated[pvc.Name] = true
 		}
 	}
@@ -1843,11 +1983,13 @@ func (c *Cluster) reconcileBackup() error {
 			// if a resource is updated or if a resource is left over (existing),
 			// then we create all other resources and we raise a backup updated event
 			log.Info("Backup updated", "cbbackup", backup)
+
 			c.raiseEvent(k8sutil.BackupUpdateEvent(backup, c.cluster))
 		} else {
 			// if the backup PVC and the cronjob(s) are created then we have
 			// created a backup from scratch and we class this as a backup created event
 			log.Info("Backup created", "cbbackup", backup)
+
 			c.raiseEvent(k8sutil.BackupCreateEvent(backup, c.cluster))
 		}
 	}
@@ -1886,6 +2028,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 		if err != nil {
 			return err
 		}
+
 		k8sutil.ApplyBaseAnnotations(requested)
 
 		// check if restore job already exists
@@ -1914,6 +2057,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 			}
 		} else {
 			log.Info("Restore created", "cbrestore", currentRestore.Name)
+
 			c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
 
 			// else try to create the job as it does not exist
@@ -1936,11 +2080,14 @@ Outerloop:
 				break Outerloop
 			}
 		}
+
 		// no "owner" restore, must have been deleted. cleanup
 		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(job.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
+
 		log.Info("Restore deleted", "cbrestore", job.Name)
+
 		c.raiseEvent(k8sutil.BackupRestoreDeleteEvent(job.Name, c.cluster))
 	}
 
@@ -1954,11 +2101,14 @@ func (c *Cluster) reconcileRBAC() error {
 	if err != nil {
 		return err
 	}
+
 	required, _ := couchbaseutil.NewVersion(constants.CouchbaseVersion650)
+
 	if version.GreaterEqual(required) {
 		if err := c.reconcileLDAPSettings(); err != nil {
 			return err
 		}
+
 		if err := c.reconcileRBACResources(); err != nil {
 			return err
 		}
@@ -1967,6 +2117,7 @@ func (c *Cluster) reconcileRBAC() error {
 		if c.cluster.Spec.Security.LDAP != nil {
 			log.V(1).Info("LDAP security settings are not allowed", "cluster", c.namespacedName(), "cluster_version", version, "required_version", constants.CouchbaseVersion650)
 		}
+
 		if len(c.k8s.CouchbaseGroups.List()) > 0 {
 			log.V(1).Info("RBAC is not allowed", "cluster", c.namespacedName(), "cluster_version", version, "required_version", constants.CouchbaseVersion650)
 		}
@@ -2055,6 +2206,7 @@ func (c *Cluster) reconcileSecuritySettings() error {
 		// Booleans obviously don't exist in serverland...
 		encryptionEnabledString := cbmgr.Off
 		encryptionDisabledString := cbmgr.On
+
 		if requestedEncryption {
 			encryptionEnabledString = cbmgr.On
 			encryptionDisabledString = cbmgr.Off

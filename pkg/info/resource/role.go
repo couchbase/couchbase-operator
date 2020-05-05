@@ -32,10 +32,12 @@ func (r *RoleResource) Kind() string {
 // Fetch collects all Roles as defined by the configuration.
 func (r *RoleResource) Fetch() error {
 	var err error
+
 	r.Roles, err = r.context.KubeClient.RbacV1().Roles(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -48,6 +50,7 @@ func (r *RoleResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), Role.Name, Role.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

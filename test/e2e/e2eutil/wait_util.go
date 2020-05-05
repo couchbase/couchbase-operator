@@ -98,6 +98,7 @@ func WaitForJob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, nam
 
 	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
 		listOptions := metav1.ListOptions{}
+
 		jobs, err := k8s.KubeClient.BatchV1().Jobs(couchbase.Namespace).List(listOptions)
 		if err != nil {
 			return false, err
@@ -108,9 +109,11 @@ func WaitForJob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, nam
 				if job.Status.Active == 1 {
 					return !waitForComplete, nil
 				}
+
 				if job.Status.Failed == 1 {
 					return false, fmt.Errorf("job %s failed", job.Name)
 				}
+
 				if job.Status.Succeeded == 1 {
 					return true, nil
 				}
@@ -159,6 +162,7 @@ func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, tim
 			if statusFieldValue.String() == "<*v1.Time Value>" {
 				timeValueStr := fmt.Sprintf("%s", statusFieldValue.Interface())
 				goTimeFmt := "2006-01-02 15:04:05 -0700 MST"
+
 				newTime, err := time.Parse(goTimeFmt, timeValueStr)
 				if err != nil {
 					return false, err
@@ -166,6 +170,7 @@ func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, tim
 
 				return !newTime.IsZero(), nil
 			}
+
 			// isValid checks that v has a value, returns false if it is the 0 value
 			return statusFieldValue.IsValid(), nil
 		}
@@ -177,6 +182,7 @@ func MustWaitStatusUpdate(t *testing.T, k8s *types.Cluster, backupName, statusFi
 	if err != nil {
 		Die(t, err)
 	}
+
 	return s
 }
 
@@ -189,14 +195,17 @@ func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *couchbasev2.Couchbas
 		if err != nil {
 			return false, err
 		}
+
 		for _, pod := range podList.Items {
 			if pod.Status.Phase != v1.PodRunning {
 				return false, nil
 			}
 		}
+
 		if len(podList.Items) != size {
 			return false, nil
 		}
+
 		return true, nil
 	})
 }
@@ -220,16 +229,19 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 
 		for _, b := range buckets {
 			found := false
+
 			for _, bucket := range currCluster.Status.Buckets {
 				if b == bucket.BucketName {
 					found = true
 					break
 				}
 			}
+
 			if !found {
 				return fmt.Errorf("bucket %s not present", b)
 			}
 		}
+
 		return nil
 	}
 	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
@@ -241,6 +253,7 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 	if err != nil {
 		return err
 	}
+
 	defer cleanup()
 
 	callback = func() error {
@@ -248,11 +261,13 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 		if err != nil {
 			return err
 		}
+
 		for _, node := range info.Nodes {
 			if node.Status != "healthy" || node.Membership != "active" {
 				return fmt.Errorf("node %s unhealthy, state %s:%s", node.HostName, node.Status, node.Membership)
 			}
 		}
+
 		return nil
 	}
 	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
@@ -283,6 +298,7 @@ func WaitUntilBucketNotExists(k8s *types.Cluster, couchbase *couchbasev2.Couchba
 				return false, nil
 			}
 		}
+
 		return true, nil
 	})
 }
@@ -304,8 +320,10 @@ func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *couc
 		if err != nil {
 			return false, err
 		}
+
 		return cluster.Status.Phase == couchbasev2.ClusterPhaseFailed, nil
 	})
+
 	return err
 }
 
@@ -346,12 +364,14 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 				return fmt.Errorf("healthy condition %v is %v", cond.Type, cond.Status)
 			}
 		}
+
 		return nil
 	}
 
 	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
 		return fmt.Errorf("fail to wait for cluster status to be healthy: %v", err)
 	}
+
 	return nil
 }
 
@@ -364,19 +384,23 @@ func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *cou
 func waitResourcesDeleted(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+
 	err := retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
 		list, err := kubeClient.CoreV1().Services(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
 		if err != nil {
 			return false, err
 		}
+
 		if len(list.Items) > 0 {
 			return false, nil
 		}
+
 		return true, nil
 	})
 	if err != nil {
 		return fmt.Errorf("fail to wait services deleted: %v", err)
 	}
+
 	return nil
 }
 
@@ -385,6 +409,7 @@ func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName strin
 	if err != nil {
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
+
 	return nil
 }
 
@@ -393,6 +418,7 @@ func WaitUntilPodDeleted(kubeClient kubernetes.Interface, namespace string) erro
 	if err != nil {
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
+
 	return nil
 }
 
@@ -406,26 +432,33 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.L
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+
 	err := retryutil.Retry(ctx, retryInterval, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
 		if err != nil {
 			return false, err
 		}
+
 		pods = nil
+
 		for i := range podList.Items {
 			p := &podList.Items[i]
 			filtered := false
+
 			for _, filter := range filters {
 				if filter(p) {
 					filtered = true
 				}
 			}
+
 			if !filtered {
 				pods = append(pods, p)
 			}
 		}
+
 		return len(pods) == 0, nil
 	})
+
 	return pods, err
 }
 
@@ -433,21 +466,25 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.L
 func WaitUntilOperatorReady(kubecli kubernetes.Interface, namespace, label string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+
 	err := retryutil.Retry(ctx, time.Second, func() (bool, error) {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 		if err != nil {
 			return false, err
 		}
+
 		if len(podList.Items) > 0 {
 			if k8sutil.IsPodReady(&podList.Items[0]) {
 				return true, nil
 			}
 		}
+
 		return false, nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed to wait for pods with label=(%v) to become ready: %v", label, err)
 	}
+
 	return nil
 }
 
@@ -456,15 +493,18 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.Couchb
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
 	}
+
 	watch, err := kubeClient.CoreV1().Events(cl.Namespace).Watch(opts)
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		// There is a race when you call stop, but the watcher is trying to send
 		// on the result channel, so drain any events to cause the routine to exit
 		// cleanly.
 		watch.Stop()
+
 		for {
 			if _, ok := <-watch.ResultChan(); !ok {
 				break
@@ -476,6 +516,7 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.Couchb
 
 	resultChan := watch.ResultChan()
 	timeoutChan := time.After(timeout)
+
 	for {
 		select {
 		case <-timeoutChan:
@@ -489,6 +530,7 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.Couchb
 			if crdEvent.LastTimestamp.Before(&now) {
 				continue
 			}
+
 			if EqualEvent(event, crdEvent) {
 				return nil
 			}
@@ -506,15 +548,18 @@ func WaitForBackupEvent(kubeClient kubernetes.Interface, b *couchbasev2.Couchbas
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.BackupCRDResourceKind},
 	}
+
 	watch, err := kubeClient.CoreV1().Events(b.Namespace).Watch(opts)
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		// There is a race when you call stop, but the watcher is trying to send
 		// on the result channel, so drain any events to cause the routine to exit
 		// cleanly.
 		watch.Stop()
+
 		for {
 			if _, ok := <-watch.ResultChan(); !ok {
 				break
@@ -526,6 +571,7 @@ func WaitForBackupEvent(kubeClient kubernetes.Interface, b *couchbasev2.Couchbas
 
 	resultChan := watch.ResultChan()
 	timeoutChan := time.After(timeout)
+
 	for {
 		select {
 		case <-timeoutChan:
@@ -539,6 +585,7 @@ func WaitForBackupEvent(kubeClient kubernetes.Interface, b *couchbasev2.Couchbas
 			if crdEvent.LastTimestamp.Before(&now) {
 				continue
 			}
+
 			if EqualEvent(event, crdEvent) {
 				return nil
 			}
@@ -557,6 +604,7 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 	after := time.Now()
 	timeoutChan := time.After(timeout)
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+
 	for {
 		select {
 		case <-timeoutChan:
@@ -576,6 +624,7 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 					if err != nil {
 						return err
 					}
+
 					if conditionTime.After(after) {
 						return nil
 					}
@@ -597,6 +646,7 @@ func nodeReady(node v1.Node) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -606,12 +656,14 @@ func allNodesReady(nodes []v1.Node) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
 func WaitForKubeNodesToBeReady(kubeClient kubernetes.Interface, requiredNodesInCluster, waitTimeInSec int) error {
 	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+
 	for {
 		select {
 		case <-timeOutChan:
@@ -622,6 +674,7 @@ func WaitForKubeNodesToBeReady(kubeClient kubernetes.Interface, requiredNodesInC
 			if err != nil {
 				continue
 			}
+
 			if allNodesReady(nodesList.Items) && len(nodesList.Items) == requiredNodesInCluster {
 				return nil
 			}
@@ -631,8 +684,10 @@ func WaitForKubeNodesToBeReady(kubeClient kubernetes.Interface, requiredNodesInC
 
 func WaitForPodsReadyWithLabel(t *testing.T, kubeClient kubernetes.Interface, waitTimeInSec int, label string, namespace string) error {
 	t.Logf("waiting for pods to be ready in namesapce %v with label %v", namespace, label)
+
 	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+
 	for {
 		select {
 		case <-timeOutChan:
@@ -640,18 +695,21 @@ func WaitForPodsReadyWithLabel(t *testing.T, kubeClient kubernetes.Interface, wa
 
 		case <-tickChan:
 			podReady := true
+
 			podList, _ := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
 			for _, pod := range podList.Items {
 				if pod.Status.Phase != v1.PodRunning {
 					podReady = false
 					break
 				}
+
 				for _, condition := range pod.Status.Conditions {
 					if condition.Type == "Ready" && condition.Status != v1.ConditionTrue {
 						podReady = false
 					}
 				}
 			}
+
 			if podReady {
 				t.Logf("pods with label %v ready \n", label)
 				return nil
@@ -667,34 +725,43 @@ func WaitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, lo me
 
 func waitDaemonSetsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.ListOptions, filters ...filterFuncDaemonSet) ([]*v1beta1.DaemonSet, error) {
 	var dss []*v1beta1.DaemonSet
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
+
 	err := retryutil.Retry(ctx, retryInterval, func() (bool, error) {
 		dsList, err := kubecli.ExtensionsV1beta1().DaemonSets(namespace).List(lo)
 		if err != nil {
 			return false, err
 		}
+
 		dss = nil
+
 		for i := range dsList.Items {
 			ds := &dsList.Items[i]
 			filtered := false
+
 			for _, filter := range filters {
 				if filter(ds) {
 					filtered = true
 				}
 			}
+
 			if !filtered {
 				dss = append(dss, ds)
 			}
 		}
+
 		return len(dss) == 0, nil
 	})
+
 	return dss, err
 }
 
 func WaitForExternalLoadBalancer(t *testing.T, kubeClient kubernetes.Interface, namespace string, loadBalancerServiceName string, waitTimeInSec int) error {
 	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+
 	for {
 		select {
 		case <-timeOutChan:
@@ -738,10 +805,12 @@ func MustWaitForPVC(t *testing.T, k8s *types.Cluster, name, namespace string, ti
 // as PVC reclaim is not instant.
 func WaitForPVCDeletion(ctx context.Context, k8s *types.Cluster, namespace string) error {
 	requirements := []labels.Requirement{}
+
 	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
 	if err != nil {
 		return err
 	}
+
 	requirements = append(requirements, *req)
 
 	selector := labels.NewSelector()
@@ -752,9 +821,11 @@ func WaitForPVCDeletion(ctx context.Context, k8s *types.Cluster, namespace strin
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		if len(pvcs.Items) != 0 {
 			return false, nil
 		}
+
 		return true, nil
 	})
 }
@@ -768,10 +839,12 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 
 	// Select all Couchbase PVCs in the namespace.
 	requirements := []labels.Requirement{}
+
 	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
 	if err != nil {
 		return err
 	}
+
 	requirements = append(requirements, *req)
 
 	selector := labels.NewSelector()
@@ -796,7 +869,9 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 			if len(pvc.Finalizers) == 0 {
 				continue
 			}
+
 			pvc.Finalizers = []string{}
+
 			if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(&pvc); err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
@@ -815,6 +890,7 @@ func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, namespace string, timeout t
 		if err := WaitForPVCDeletion(waitContext, k8s, namespace); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		return true, nil
 	})
 }
@@ -828,10 +904,12 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName, namespace st
 
 	// Select all Couchbase PVCs in the namespace.
 	requirements := []labels.Requirement{}
+
 	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
 	if err != nil {
 		return err
 	}
+
 	requirements = append(requirements, *req)
 
 	selector := labels.NewSelector()
@@ -845,6 +923,7 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName, namespace st
 		}
 
 		found := false
+
 		// If there are any finalizers make sure they aren't there, this causes most hangs
 		for i := range pvcs.Items {
 			pvc := pvcs.Items[i]
@@ -852,10 +931,13 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName, namespace st
 			if len(pvc.Finalizers) == 0 {
 				continue
 			}
+
 			pvc.Finalizers = []string{}
+
 			if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(&pvc); err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
+
 			if pvc.Name == pvcName {
 				found = true
 			}
@@ -876,6 +958,7 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName, namespace st
 		if err := WaitForPVCDeletion(waitContext, k8s, namespace); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		return true, nil
 	})
 }
@@ -954,6 +1037,7 @@ func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *couchbasev2.
 		}
 
 		waitReason := pod.Status.ContainerStatuses[0].State.Waiting.Reason
+
 		for _, reason := range reasons {
 			if waitReason == reason {
 				return true, nil
@@ -979,9 +1063,11 @@ func WaitForBucketDeletion(k8s *types.Cluster, namespace string, timeout time.Du
 		if err != nil {
 			return err
 		}
+
 		if len(buckets.Items) != 0 {
 			return fmt.Errorf("waiting for %v buckets to delete", len(buckets.Items))
 		}
+
 		return nil
 	}
 
@@ -997,9 +1083,11 @@ func WaitForEphemeralBucketDeletion(k8s *types.Cluster, namespace string, timeou
 		if err != nil {
 			return err
 		}
+
 		if len(buckets.Items) != 0 {
 			return fmt.Errorf("waiting for %v ephemeral buckets to delete", len(buckets.Items))
 		}
+
 		return nil
 	}
 
@@ -1015,9 +1103,11 @@ func WaitForMemcachedBucketDeletion(k8s *types.Cluster, namespace string, timeou
 		if err != nil {
 			return err
 		}
+
 		if len(buckets.Items) != 0 {
 			return fmt.Errorf("waiting for %v memcached buckets to delete", len(buckets.Items))
 		}
+
 		return nil
 	}
 
@@ -1027,14 +1117,17 @@ func WaitForMemcachedBucketDeletion(k8s *types.Cluster, namespace string, timeou
 func WaitForReplicationDeletion(k8s *types.Cluster, namespace string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
 	callback := func() error {
 		replications, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
+
 		if len(replications.Items) != 0 {
 			return fmt.Errorf("waiting for %v replications to delete", len(replications.Items))
 		}
+
 		return nil
 	}
 
@@ -1062,8 +1155,11 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		defer cleanup()
+
 		_, err = client.GetUser(user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain))
+
 		return err == nil, err
 	})
 }
@@ -1085,6 +1181,7 @@ func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.Couch
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
+
 		defer cleanup()
 
 		// we should get an error attempting to get user
@@ -1094,16 +1191,19 @@ func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.Couch
 		}
 
 		found := false
+
 		for _, user := range users {
 			if user.ID == userName {
 				found = true
 				break
 			}
 		}
+
 		if found {
 			err := fmt.Errorf("waiting for couchbase user `%s` to be deleted", userName)
 			return false, retryutil.RetryOkError(err)
 		}
+
 		return true, nil
 	}
 
@@ -1115,6 +1215,7 @@ func MustWaitForClusterUserDeletion(t *testing.T, k8s *types.Cluster, couchbase 
 	if err != nil {
 		Die(t, err)
 	}
+
 	return nil
 }
 
@@ -1129,6 +1230,7 @@ func WaitForUserDeletion(k8s *types.Cluster, namespace string, userName string, 
 		}
 
 		found := false
+
 		for _, u := range users.Items {
 			if u.Name == userName {
 				found = true
@@ -1139,6 +1241,7 @@ func WaitForUserDeletion(k8s *types.Cluster, namespace string, userName string, 
 		if found {
 			return fmt.Errorf("waiting for couchbase user `%s` to be deleted", userName)
 		}
+
 		return nil
 	}
 
@@ -1154,6 +1257,7 @@ func WaitForAllUserDeletion(k8s *types.Cluster, namespace string, timeout time.D
 		if err != nil {
 			return err
 		}
+
 		if len(users.Items) != 0 {
 			return fmt.Errorf("waiting for %v couchbase users to delete", len(users.Items))
 		}
@@ -1188,9 +1292,11 @@ func WaitForGroupDeletion(k8s *types.Cluster, namespace string, timeout time.Dur
 		if err != nil {
 			return err
 		}
+
 		if len(groups.Items) != 0 {
 			return fmt.Errorf("waiting for %v couchbase user groups to delete", len(groups.Items))
 		}
+
 		return nil
 	}
 
@@ -1206,9 +1312,11 @@ func WaitForRoleBindingDeletion(k8s *types.Cluster, namespace string, timeout ti
 		if err != nil {
 			return err
 		}
+
 		if len(bindings.Items) != 0 {
 			return fmt.Errorf("waiting for %v couchbase user role bindings to delete", len(bindings.Items))
 		}
+
 		return nil
 	}
 
@@ -1226,9 +1334,11 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 				// api reported crd deleted ok
 				return true, nil
 			}
+
 			// crd doesn't exists, but for unknown reason
 			return false, retryutil.RetryOkError(err)
 		}
+
 		// crd still exists, retry
 		return false, nil
 	})
@@ -1238,9 +1348,11 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 // populated with result of a pending cluster event.
 func WaitForPendingClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) chan error {
 	echan := make(chan error)
+
 	go func() {
 		echan <- WaitForClusterEvent(kubeClient, cl, event, timeout)
 	}()
+
 	return echan
 }
 
@@ -1260,9 +1372,11 @@ func WaitForBackupDeletion(k8s *types.Cluster, namespace string, timeout time.Du
 		if err != nil {
 			return err
 		}
+
 		if len(backups.Items) != 0 {
 			return fmt.Errorf("waiting for %v backups to delete", len(backups.Items))
 		}
+
 		return nil
 	}
 
@@ -1283,6 +1397,7 @@ func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 		listOptions := &metav1.ListOptions{
 			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 		}
+
 		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(*listOptions)
 		if err != nil {
 			return false, err
@@ -1299,6 +1414,7 @@ func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 		}
 
 		errs := []error{}
+
 		for s, b := range ready {
 			if !b {
 				errs = append(errs, fmt.Errorf("prometheus container belonging to pod %s is not ready", s))

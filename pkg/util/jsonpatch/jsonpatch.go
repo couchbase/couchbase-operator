@@ -77,11 +77,13 @@ func add(document interface{}, path string, value interface{}) (err error) {
 		if err != nil {
 			return
 		}
+
 		v.Set(reflect.ValueOf(value))
 	case reflect.Map:
 		v.SetMapIndex(reflect.ValueOf(k), reflect.ValueOf(value))
 	case reflect.Slice:
 		var index int
+
 		switch k {
 		case "-":
 			index = v.Len()
@@ -91,10 +93,12 @@ func add(document interface{}, path string, value interface{}) (err error) {
 				return
 			}
 		}
+
 		s := reflect.MakeSlice(v.Type(), 0, 0)
 		s = reflect.AppendSlice(s, v.Slice(0, index))
 		s = reflect.Append(s, reflect.ValueOf(value))
 		s = reflect.AppendSlice(s, v.Slice(index, v.Len()))
+
 		v.Set(s)
 	default:
 		err = fmt.Errorf("unexpected kind %s in add", kind)
@@ -134,18 +138,22 @@ func remove(document interface{}, path string) (err error) {
 		if err != nil {
 			return
 		}
+
 		v.Set(reflect.Zero(v.Type()))
 	case reflect.Map:
 		v.SetMapIndex(reflect.ValueOf(k), reflect.Value{})
 	case reflect.Slice:
 		var index int
+
 		index, err = strconv.Atoi(k)
 		if err != nil {
 			return
 		}
+
 		s := reflect.MakeSlice(v.Type(), 0, 0)
 		s = reflect.AppendSlice(s, v.Slice(0, index))
 		s = reflect.AppendSlice(s, v.Slice(index+1, v.Len()))
+
 		v.Set(s)
 	default:
 		err = fmt.Errorf("unexpected kind %s in remove", kind)
@@ -182,6 +190,7 @@ func replace(document interface{}, path string, value interface{}) (err error) {
 	}
 
 	v.Set(reflect.ValueOf(value))
+
 	return nil
 }
 
@@ -215,13 +224,16 @@ func test(document interface{}, path string, value interface{}) error {
 	// interface{} to nil to show the different between a nil and empty map
 	// or slice.
 	v1 := v.Interface()
+
 	switch v.Kind() {
 	case reflect.Slice, reflect.Map:
 		if v.IsNil() {
 			v1 = nil
 		}
 	}
+
 	v2 := expected.Interface()
+
 	switch expected.Kind() {
 	case reflect.Slice, reflect.Map:
 		if expected.IsNil() {
@@ -252,10 +264,12 @@ func Apply(document interface{}, patches PatchList) (err error) {
 		default:
 			err = fmt.Errorf("unsupported patch operation %s", patch.Op.String())
 		}
+
 		if err != nil {
 			return
 		}
 	}
+
 	return
 }
 

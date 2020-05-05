@@ -67,8 +67,10 @@ func TestExposedFeatureDNS(t *testing.T) {
 			fmt.Sprintf("*.%s", domain),
 		},
 	}
+
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
 	defer teardown()
+
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
@@ -113,8 +115,10 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 			fmt.Sprintf("*.%s", domain),
 		},
 	}
+
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
 	defer teardown()
+
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
@@ -166,8 +170,10 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 			fmt.Sprintf("*.%s", domain),
 		},
 	}
+
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
 	defer teardown()
+
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
@@ -212,8 +218,10 @@ func TestConsoleServiceDNS(t *testing.T) {
 			fmt.Sprintf("*.%s", domain),
 		},
 	}
+
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
 	defer teardown()
+
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
@@ -256,8 +264,10 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 			fmt.Sprintf("*.%s", domain),
 		},
 	}
+
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
 	defer teardown()
+
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
@@ -307,8 +317,10 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 			fmt.Sprintf("*.%s", domain),
 		},
 	}
+
 	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
 	defer teardown()
+
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName

@@ -32,10 +32,12 @@ func (r *secretResource) Kind() string {
 // Fetch collects all secrets as defined by the configuration.
 func (r *secretResource) Fetch() error {
 	var err error
+
 	r.secrets, err = r.context.KubeClient.CoreV1().Secrets(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
+
 	// Redact ALL secret data.  We could try and be clever and whitelist certain
 	// keys, but this is still too dangerous as we collect all secrets in a namespace
 	// which may or may not relate to a cluster.
@@ -43,12 +45,15 @@ func (r *secretResource) Fetch() error {
 		for key := range secret.Data {
 			r.secrets.Items[index].Data[key] = []byte{}
 		}
+
 		for key := range secret.StringData {
 			r.secrets.Items[index].StringData[key] = ""
 		}
+
 		// Plug a gaping hole that 'kubectl apply' creates for us
 		delete(r.secrets.Items[index].Annotations, "kubectl.kubernetes.io/last-applied-configuration")
 	}
+
 	return nil
 }
 
@@ -61,6 +66,7 @@ func (r *secretResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), secret.Name, secret.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

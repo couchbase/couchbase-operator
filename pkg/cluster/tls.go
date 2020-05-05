@@ -23,6 +23,7 @@ func tlsValid(member *couchbaseutil.Member, ca, clientCert, clientKey []byte, ce
 	if err == nil && serverChain[0].Equal(cert) {
 		return true
 	}
+
 	return false
 }
 
@@ -32,12 +33,15 @@ func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
 	if err != nil {
 		return err
 	}
+
 	if !reflect.DeepEqual(cacert, oldcacert) {
 		log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name)
+
 		if err := c.client.UploadClusterCACert(member, cacert); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -46,6 +50,7 @@ func (c *Cluster) reloadChain(member *couchbaseutil.Member) error {
 	if err := c.client.ReloadNodeCert(member); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -61,13 +66,17 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert, cli
 		if err := c.reloadChain(member); err != nil {
 			return err
 		}
+
 		if !tlsValid(member, cacert, clientCert, clientKey, cert) {
 			return fmt.Errorf("certificate chain not served")
 		}
+
 		return nil
 	}
+
 	ctx, cancel := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
 	defer cancel()
+
 	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
@@ -83,6 +92,7 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 		err = fmt.Errorf("unable to get operator secret %s", c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 		return
 	}
+
 	serverSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.ServerSecret)
 	if !found {
 		err = fmt.Errorf("unable to get server secret %s", c.cluster.Spec.Networking.TLS.Static.ServerSecret)
@@ -91,21 +101,25 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 
 	// Ensure that the secrets are correctly formatted.
 	var ok bool
+
 	ca, ok = operatorSecret.Data[tlsOperatorSecretCACert]
 	if !ok {
 		err = fmt.Errorf("operator secret missing ca.crt")
 		return
 	}
+
 	key, ok = serverSecret.Data["pkey.key"]
 	if !ok {
 		err = fmt.Errorf("server secret missing pkey.key")
 		return
 	}
+
 	chain, ok = serverSecret.Data["chain.pem"]
 	if !ok {
 		err = fmt.Errorf("server secret missing chain.pem")
 		return
 	}
+
 	return
 }
 
@@ -119,16 +133,19 @@ func (c *Cluster) getTLSClientData() (chain []byte, key []byte, err error) {
 	}
 
 	var ok bool
+
 	chain, ok = operatorSecret.Data[tlsOperatorSecretCert]
 	if !ok {
 		err = fmt.Errorf("operator secret missing " + tlsOperatorSecretCert)
 		return
 	}
+
 	key, ok = operatorSecret.Data[tlsOperatorSecretKey]
 	if !ok {
 		err = fmt.Errorf("operator secret missing " + tlsOperatorSecretKey)
 		return
 	}
+
 	return
 }
 
@@ -137,6 +154,7 @@ func (c *Cluster) getTLSClientData() (chain []byte, key []byte, err error) {
 func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key []byte, leaf *x509.Certificate) (bool, error) {
 	secureClient := member.SecureClient
 	member.SecureClient = false
+
 	defer func() {
 		member.SecureClient = secureClient
 	}()
@@ -174,6 +192,7 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 	if !found {
 		return false, nil
 	}
+
 	if _, ok := pod.Annotations[constants.PodTLSAnnotation]; !ok {
 		return false, nil
 	}
@@ -224,9 +243,11 @@ func (c *Cluster) reconcileClientAuthentication() error {
 			if err != nil {
 				return err
 			}
+
 			if !reflect.DeepEqual(currentSettings, settings) {
 				return fmt.Errorf("client TLS not reconciled")
 			}
+
 			return nil
 		}
 
@@ -260,7 +281,9 @@ func (c *Cluster) reconcileTLS() error {
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 		return err
 	}
+
 	subjectAltNames := util_x509.MandatorySANs(c.cluster.Name, c.cluster.Namespace)
+
 	if c.cluster.Spec.Networking.DNS != nil {
 		subjectAltNames = append(subjectAltNames, "*."+c.cluster.Spec.Networking.DNS.Domain)
 	}
@@ -269,10 +292,13 @@ func (c *Cluster) reconcileTLS() error {
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 
 		errStrings := []string{}
+
 		for _, err := range errs {
 			errStrings = append(errStrings, err.Error())
 		}
+
 		errString := strings.Join(errStrings, ", ")
+
 		return fmt.Errorf(errString)
 	}
 
@@ -283,7 +309,9 @@ func (c *Cluster) reconcileTLS() error {
 
 	// If client authentication is specified load and verify those certificates.
 	var clientCert []byte
+
 	var clientKey []byte
+
 	if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
 		// Load client TLS data from kubernetes and verify.
 		clientCert, clientKey, err = c.getTLSClientData()
@@ -291,14 +319,18 @@ func (c *Cluster) reconcileTLS() error {
 			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
 			return err
 		}
+
 		if errs := util_x509.Verify(cacert, clientCert, clientKey, x509.ExtKeyUsageClientAuth, nil); len(errs) != 0 {
 			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
 
 			errStrings := []string{}
+
 			for _, err := range errs {
 				errStrings = append(errStrings, err.Error())
 			}
+
 			errString := strings.Join(errStrings, ", ")
+
 			return fmt.Errorf(errString)
 		}
 
@@ -311,6 +343,7 @@ func (c *Cluster) reconcileTLS() error {
 
 	// Parse the certificate chain.
 	chainPem := util_x509.DecodePEM(chain)
+
 	cert, err := x509.ParseCertificate(chainPem[0].Bytes)
 	if err != nil {
 		return err
@@ -322,11 +355,13 @@ func (c *Cluster) reconcileTLS() error {
 
 	// Update the CA and any server certificate chains that require it.
 	changed := false
+
 	for _, member := range c.members {
 		change, err := c.reconcileMemberTLS(member, cacert, clientCert, clientKey, cert)
 		if err != nil {
 			return err
 		}
+
 		changed = changed || change
 	}
 

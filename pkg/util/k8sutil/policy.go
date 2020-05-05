@@ -49,6 +49,8 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 	if err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Delete(name, nil); err != nil {
 		return err
 	}
+
 	_, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(required)
+
 	return err
 }

@@ -32,9 +32,11 @@ func (r *namespaceResource) Kind() string {
 // Fetch collects all namespaces as defined by the configuration.
 func (r *namespaceResource) Fetch() error {
 	var err error
+
 	if r.namespace, err = r.context.KubeClient.CoreV1().Namespaces().Get(r.context.Namespace(), metav1.GetOptions{}); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -45,6 +47,7 @@ func (r *namespaceResource) Write(b backend.Backend) error {
 	}
 
 	_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), r.namespace.Name, r.namespace.Name+".yaml"), string(data))
+
 	return nil
 }
 

@@ -41,6 +41,7 @@ func (r *crdResource) Fetch() error {
 
 	// Filter out only ones defined by couchbase
 	r.crds = []v1beta1.CustomResourceDefinition{}
+
 	for _, crd := range crds.Items {
 		if strings.HasSuffix(crd.Name, ".couchbase.com") {
 			r.crds = append(r.crds, crd)
@@ -59,6 +60,7 @@ func (r *crdResource) Write(b backend.Backend) error {
 
 		_ = b.WriteFile(util.ArchivePathUnscoped(r.Kind(), crd.Name, crd.Name+".yaml"), string(data))
 	}
+
 	return nil
 }
 

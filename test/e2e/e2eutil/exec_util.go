@@ -74,6 +74,7 @@ func ExecWithOptions(k8s *types.Cluster, options ExecOptions) (string, string, e
 	}
 
 	var stdout, stderr bytes.Buffer
+
 	if err := exec.Stream(remotecommand.StreamOptions{Stdin: options.Stdin, Stdout: &stdout, Stderr: &stderr}); err != nil {
 		return "", "", err
 	}
@@ -112,6 +113,7 @@ func ExecCommandInPod(k8s *types.Cluster, namespace, name string, cmd ...string)
 	if err != nil {
 		return "", "", err
 	}
+
 	return ExecCommandInContainer(k8s, namespace, name, pod.Spec.Containers[0].Name, cmd...)
 }
 
@@ -124,6 +126,7 @@ func MustExecCommandInPod(t *testing.T, k8s *types.Cluster, namespace, name stri
 		t.Logf("stderr: %s", stderr)
 		Die(t, err)
 	}
+
 	return stdout, stderr
 }
 
@@ -141,5 +144,6 @@ func MustExecShellInPod(t *testing.T, k8s *types.Cluster, namespace, name string
 		t.Logf("stderr: %s", stderr)
 		Die(t, err)
 	}
+
 	return stdout, stderr
 }
