@@ -15,33 +15,31 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-	"github.com/couchbase/gocbmgr"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 )
 
-type serviceVerifier func(t *testing.T, ci *cbmgr.ClusterInfo, value map[string]int) bool
+type serviceVerifier func(t *testing.T, ci *couchbaseutil.ClusterInfo, value map[string]int) bool
 
 // newClient returns a new Couchbase management client (internal not go SDK).
-func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, urls []string) (*cbmgr.Couchbase, error) {
+func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, urls []string) (*couchbaseutil.Couchbase, error) {
 	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.Security.AdminSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	client := cbmgr.New(username, password)
+	client := couchbaseutil.New(username, password)
 	client.SetEndpoints(urls)
 
 	return client, nil
@@ -107,7 +105,7 @@ func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*cbmgr.Couchbase, func(), error) {
+func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*couchbaseutil.Couchbase, func(), error) {
 	// Create a port forward and get a host connection string
 	host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
 	if err != nil {
@@ -123,7 +121,7 @@ func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.Couchbase
 	return client, cleanup, nil
 }
 
-func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*cbmgr.Couchbase, func()) {
+func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*couchbaseutil.Couchbase, func()) {
 	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 	if err != nil {
 		Die(t, err)
@@ -258,7 +256,7 @@ func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 }
 
 // Get Bucket from couchbase cluster.
-func getBucket(client *cbmgr.Couchbase, bucketName string) (*cbmgr.Bucket, error) {
+func getBucket(client *couchbaseutil.Couchbase, bucketName string) (*couchbaseutil.Bucket, error) {
 	buckets, err := client.GetBuckets()
 	if err == nil {
 		for _, b := range buckets {
@@ -273,7 +271,7 @@ func getBucket(client *cbmgr.Couchbase, bucketName string) (*cbmgr.Bucket, error
 
 // Inserts Json docs into couchbase bucket.
 func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
-	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+	urlBase, cleanup, err := GetHostURL(k8s, cluster, couchbasev2.AdminService)
 	if err != nil {
 		return err
 	}
@@ -295,17 +293,28 @@ func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.Couchbase
 			return err
 		}
 
-		docData = append([]byte("value="), docData...)
+		body := "value=" + string(docData)
+		url := "http://" + urlBase + "/pools/default/buckets/" + bucketName + "/docs/" + docKey
 
-		// Get bucket Obj
-		bucketObj, err := client.GetBucket(bucketName)
+		request, err := http.NewRequest("POST", url, strings.NewReader(body))
 		if err != nil {
 			return err
 		}
 
-		// Inserts document using client
-		if err := client.InsertDoc(bucketObj, docKey, docData); err != nil {
+		request.SetBasicAuth("Administrator", "password")
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		client := http.Client{Timeout: time.Minute}
+
+		response, err := client.Do(request)
+		if err != nil {
 			return err
+		}
+
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			return fmt.Errorf("unexpected status code %v", response.Status)
 		}
 	}
 
@@ -329,7 +338,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 		return err
 	}
 
-	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
+	svcs, err := couchbaseutil.ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
 		return err
 	}
@@ -739,7 +748,7 @@ func MustVerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 	}
 }
 
-func NodeServicesVerifier(t *testing.T, ci *cbmgr.ClusterInfo, servicesMap map[string]int) bool {
+func NodeServicesVerifier(t *testing.T, ci *couchbaseutil.ClusterInfo, servicesMap map[string]int) bool {
 	clusterServices := map[string]int{
 		"Data":  0,
 		"N1QL":  0,
@@ -993,16 +1002,16 @@ func CreateBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 
 		defer cleanup()
 
-		b := &cbmgr.Bucket{
+		b := &couchbaseutil.Bucket{
 			BucketName:         bucket,
 			BucketType:         "couchbase",
 			BucketMemoryQuota:  100,
-			IoPriority:         cbmgr.IoPriorityTypeHigh,
+			IoPriority:         couchbaseutil.IoPriorityTypeHigh,
 			EvictionPolicy:     "fullEviction",
 			ConflictResolution: "seqno",
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    cbmgr.CompressionModePassive,
+			CompressionMode:    couchbaseutil.CompressionModePassive,
 		}
 
 		return client.CreateBucket(b)
@@ -1018,7 +1027,7 @@ func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 }
 
 // PatchUserInfo tries patching the user returned directly from Couchbase server.
-func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain cbmgr.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -1049,7 +1058,7 @@ func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couc
 	})
 }
 
-func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain cbmgr.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) {
+func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) {
 	if err := PatchUserInfo(t, k8s, couchbase, userName, userAuthDomain, patches, timeout); err != nil {
 		Die(t, err)
 	}
@@ -1074,7 +1083,7 @@ func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 			return false, err
 		}
 
-		if status.Result == cbmgr.LDAPStatusResultSuccess {
+		if status.Result == couchbaseutil.LDAPStatusResultSuccess {
 			return true, nil
 		} else if status.Reason != "" {
 			err = fmt.Errorf("failed to connect to LDAP server: %s", status.Reason)

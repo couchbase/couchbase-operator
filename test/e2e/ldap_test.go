@@ -5,11 +5,11 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
-	cbmgr "github.com/couchbase/gocbmgr"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -165,7 +165,7 @@ func TestLDAPUpdateRole(t *testing.T) {
 
 	// Change to bucket role user
 	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", couchbasev2.RoleBucketAdmin), time.Minute)
-	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Replace("/Roles/0/Role", string(couchbasev2.RoleBucketAdmin)), time.Minute)
+	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Replace("/Roles/0/Role", string(couchbasev2.RoleBucketAdmin)), time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

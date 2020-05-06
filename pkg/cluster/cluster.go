@@ -17,7 +17,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
-	"github.com/couchbase/gocbmgr"
 
 	"github.com/golang/groupcache/lru"
 	"github.com/prometheus/client_golang/prometheus"
@@ -665,7 +664,7 @@ func (c *Cluster) initCouchbaseClient() error {
 		}
 
 		// Add the TLS context
-		tls := &cbmgr.TLSAuth{
+		tls := &couchbaseutil.TLSAuth{
 			CACert: secret.Data[tlsOperatorSecretCACert],
 		}
 
@@ -676,7 +675,7 @@ func (c *Cluster) initCouchbaseClient() error {
 				return err
 			}
 
-			tls.ClientAuth = &cbmgr.TLSClientAuth{
+			tls.ClientAuth = &couchbaseutil.TLSClientAuth{
 				Cert: clientCert,
 				Key:  clientKey,
 			}

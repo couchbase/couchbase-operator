@@ -12,11 +12,11 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-	cbmgr "github.com/couchbase/gocbmgr"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -989,9 +989,9 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 					return fmt.Errorf("rebalance status terminated: %v", progress.Error())
 				}
 				switch status.Status {
-				case cbmgr.RebalanceStatusUnknown:
+				case couchbaseutil.RebalanceStatusUnknown:
 					return fmt.Errorf("rebalance status unknown")
-				case cbmgr.RebalanceStatusRunning:
+				case couchbaseutil.RebalanceStatusRunning:
 					if status.Progress >= threshold {
 						return nil
 					}
@@ -1158,7 +1158,7 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 
 		defer cleanup()
 
-		_, err = client.GetUser(user.Name, cbmgr.AuthDomain(user.Spec.AuthDomain))
+		_, err = client.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain))
 
 		return err == nil, err
 	})

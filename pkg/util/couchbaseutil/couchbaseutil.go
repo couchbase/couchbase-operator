@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
-	"github.com/couchbase/gocbmgr"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -70,7 +69,7 @@ type NodeStateMap map[string]NodeState
 type ClusterStatus struct {
 	// Cached /pools/default output.  From this we can derive the state of
 	// foreign nodes added by an external party to provide better dubugging.
-	info *cbmgr.ClusterInfo
+	info *ClusterInfo
 	// NodeStateMap maps a known member to it's current state.  This is an
 	// optimisation to avoid scanning the main sets below it determine the
 	// state of a member.
@@ -97,7 +96,7 @@ type ClusterStatus struct {
 // lists and maps initialized.
 func NewClusterStatus() *ClusterStatus {
 	status := &ClusterStatus{
-		info: &cbmgr.ClusterInfo{},
+		info: &ClusterInfo{},
 	}
 
 	status.Reset()
@@ -138,7 +137,7 @@ type CouchbaseClient struct {
 	// connections to target hosts for various host/port combinations.  When
 	// client parameters are changed which affect HTTP or TLS this needs to be
 	// refereshed e.g. a password is changed or the uuid is defined
-	client *cbmgr.Couchbase
+	client *Couchbase
 }
 
 // NewCouchbaseClient allocates and initializes a new couchbase API client.
@@ -151,11 +150,11 @@ func NewCouchbaseClient(ctx context.Context, clusterName, username, password str
 		username:    username,
 		password:    password,
 	}
-	c.client = cbmgr.New(username, password)
+	c.client = New(username, password)
 
 	// Make the User-Agent string more verbose about exactly who/what we are
 	// to simplify support incidents
-	userAgent := &cbmgr.UserAgent{
+	userAgent := &UserAgent{
 		Name:    version.Application,
 		Version: version.Version,
 		UUID:    revision.Revision(),
@@ -166,12 +165,12 @@ func NewCouchbaseClient(ctx context.Context, clusterName, username, password str
 }
 
 // SetTLS sets or updates the TLS configuration for a client.
-func (c *CouchbaseClient) SetTLS(tls *cbmgr.TLSAuth) {
+func (c *CouchbaseClient) SetTLS(tls *TLSAuth) {
 	c.client.SetTLS(tls)
 }
 
 // GetTLS returns the TLS configuration for the client.
-func (c *CouchbaseClient) GetTLS() *cbmgr.TLSAuth {
+func (c *CouchbaseClient) GetTLS() *TLSAuth {
 	return c.client.GetTLS()
 }
 
@@ -191,7 +190,7 @@ type nodeStatus struct {
 }
 
 // GetNode looks up node based on Couchbase hostname.
-func (cs *ClusterStatus) getNode(hostname string) (*cbmgr.NodeInfo, error) {
+func (cs *ClusterStatus) getNode(hostname string) (*NodeInfo, error) {
 	for _, node := range cs.info.Nodes {
 		if node.HostName == hostname {
 			return &node, nil
@@ -214,7 +213,7 @@ func (cs *ClusterStatus) KnownNodes() []string {
 }
 
 // getNodeState looks up node status based on Couchbase hostname.
-func getNodeState(node *cbmgr.NodeInfo) (state NodeState, err error) {
+func getNodeState(node *NodeInfo) (state NodeState, err error) {
 	// Set default return values
 	state = NodeStateInvalid
 
@@ -484,7 +483,7 @@ func CheckHealth(url string, tc *tls.Config) (bool, error) {
 func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchbasev2.ServiceList) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 
-	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
+	svcs, err := ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
 		return err
 	}
@@ -627,7 +626,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 			status.NodeStateMap[member.Name] = NodeStateUnclustered
 		}
 
-		status.IsRebalancing = (status.info.RebalanceStatus == string(cbmgr.RebalanceStatusRunning))
+		status.IsRebalancing = (status.info.RebalanceStatus == string(RebalanceStatusRunning))
 		status.NeedsRebalance = !status.info.Balanced && len(status.info.Nodes) > 1
 		return nil
 	})
@@ -647,7 +646,7 @@ func (c *CouchbaseClient) NodeInitialize(m *Member, clusterName string, dataPath
 	})
 }
 
-func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *cbmgr.PoolsDefaults,
+func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *PoolsDefaults,
 	services couchbasev2.ServiceList, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
@@ -657,7 +656,7 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string
 		return err
 	}
 
-	svcs, err := cbmgr.ServiceListFromStringArray(services.StringSlice())
+	svcs, err := ServiceListFromStringArray(services.StringSlice())
 	if err != nil {
 		return err
 	}
@@ -666,7 +665,7 @@ func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.ClusterInitialize(username, password, defaults, 8091, svcs, cbmgr.IndexStorageMode(indexStorageMode))
+		return c.client.ClusterInitialize(username, password, defaults, 8091, svcs, IndexStorageMode(indexStorageMode))
 	})
 }
 
@@ -687,7 +686,7 @@ func (c *CouchbaseClient) triggerRebalance(nodesToRemove []string) error {
 }
 
 // witnessRebalance waits until we can start streaming progress from the rebalance task.
-func (c *CouchbaseClient) witnessRebalance() (cbmgr.RebalanceProgress, *cbmgr.RebalanceStatusEntry, error) {
+func (c *CouchbaseClient) witnessRebalance() (RebalanceProgress, *RebalanceStatusEntry, error) {
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
 
@@ -730,9 +729,9 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, cluste
 	// Stream out rebalance status.
 	for {
 		switch status.Status {
-		case cbmgr.RebalanceStatusUnknown:
+		case RebalanceStatusUnknown:
 			log.Info("Rebalancing", "cluster", cluster, "progress", "unknown")
-		case cbmgr.RebalanceStatusRunning:
+		case RebalanceStatusRunning:
 			log.Info("Rebalancing", "cluster", cluster, "progress", status.Progress)
 		}
 
@@ -753,10 +752,10 @@ func (c *CouchbaseClient) StopRebalance(ms MemberSet) error {
 // Check that cluster is actively rebalancing with status 'running'.
 func (c *CouchbaseClient) IsRebalanceActive(ms MemberSet) (bool, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.CompareRebalanceStatus(cbmgr.RebalanceStatusRunning)
+	return c.client.CompareRebalanceStatus(RebalanceStatusRunning)
 }
 
-func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]cbmgr.Bucket, error) {
+func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]Bucket, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	buckets, err := c.client.GetBuckets()
@@ -765,7 +764,7 @@ func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]cbmgr.Bucket, error) {
 	}
 
 	// TODO: Standardize on value/pointer
-	res := []cbmgr.Bucket{}
+	res := []Bucket{}
 
 	for _, bucket := range buckets {
 		res = append(res, *bucket)
@@ -774,32 +773,32 @@ func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]cbmgr.Bucket, error) {
 	return res, nil
 }
 
-func (c *CouchbaseClient) CreateBucket(ms MemberSet, bucket cbmgr.Bucket) error {
+func (c *CouchbaseClient) CreateBucket(ms MemberSet, bucket Bucket) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.CreateBucket(&bucket)
 }
 
-func (c *CouchbaseClient) UpdateBucket(ms MemberSet, bucket cbmgr.Bucket) error {
+func (c *CouchbaseClient) UpdateBucket(ms MemberSet, bucket Bucket) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.EditBucket(&bucket)
 }
 
-func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucket cbmgr.Bucket) error {
+func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucket Bucket) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteBucket(bucket.BucketName)
 }
 
-func (c *CouchbaseClient) GetBucket(ms MemberSet, name string) (*cbmgr.Bucket, error) {
+func (c *CouchbaseClient) GetBucket(ms MemberSet, name string) (*Bucket, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetBucket(name)
 }
 
-func (c *CouchbaseClient) GetUser(ms MemberSet, id string, domain couchbasev2.AuthDomain) (*cbmgr.User, error) {
+func (c *CouchbaseClient) GetUser(ms MemberSet, id string, domain couchbasev2.AuthDomain) (*User, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetUser(id, cbmgr.AuthDomain(domain))
+	return c.client.GetUser(id, AuthDomain(domain))
 }
 
-func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]*cbmgr.User, error) {
+func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]*User, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	users, err := c.client.GetUsers()
@@ -810,17 +809,17 @@ func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]*cbmgr.User, error) {
 	return users, nil
 }
 
-func (c *CouchbaseClient) CreateUser(ms MemberSet, user cbmgr.User) error {
+func (c *CouchbaseClient) CreateUser(ms MemberSet, user User) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.CreateUser(&user)
 }
 
-func (c *CouchbaseClient) DeleteUser(ms MemberSet, user cbmgr.User) error {
+func (c *CouchbaseClient) DeleteUser(ms MemberSet, user User) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteUser(&user)
 }
 
-func (c *CouchbaseClient) ListGroups(ms MemberSet) ([]*cbmgr.Group, error) {
+func (c *CouchbaseClient) ListGroups(ms MemberSet) ([]*Group, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	groups, err := c.client.GetGroups()
@@ -831,17 +830,17 @@ func (c *CouchbaseClient) ListGroups(ms MemberSet) ([]*cbmgr.Group, error) {
 	return groups, nil
 }
 
-func (c *CouchbaseClient) CreateGroup(ms MemberSet, group cbmgr.Group) error {
+func (c *CouchbaseClient) CreateGroup(ms MemberSet, group Group) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.CreateGroup(&group)
 }
 
-func (c *CouchbaseClient) DeleteGroup(ms MemberSet, group cbmgr.Group) error {
+func (c *CouchbaseClient) DeleteGroup(ms MemberSet, group Group) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteGroup(&group)
 }
 
-func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.AutoFailoverSettings) error {
+func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *AutoFailoverSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
@@ -852,10 +851,10 @@ func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *cbmgr.
 	})
 }
 
-func (c *CouchbaseClient) GetAutoFailoverSettings(ms MemberSet) (*cbmgr.AutoFailoverSettings, error) {
+func (c *CouchbaseClient) GetAutoFailoverSettings(ms MemberSet) (*AutoFailoverSettings, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 
-	var settings *cbmgr.AutoFailoverSettings
+	var settings *AutoFailoverSettings
 
 	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
 	defer cancel()
@@ -866,12 +865,12 @@ func (c *CouchbaseClient) GetAutoFailoverSettings(ms MemberSet) (*cbmgr.AutoFail
 	})
 }
 
-func (c *CouchbaseClient) GetClusterInfo(ms MemberSet) (*cbmgr.ClusterInfo, error) {
+func (c *CouchbaseClient) GetClusterInfo(ms MemberSet) (*ClusterInfo, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.ClusterInfo()
 }
 
-func (c *CouchbaseClient) SetPoolsDefault(ms MemberSet, defaults *cbmgr.PoolsDefaults) error {
+func (c *CouchbaseClient) SetPoolsDefault(ms MemberSet, defaults *PoolsDefaults) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.SetPoolsDefault(defaults)
 }
@@ -910,7 +909,7 @@ func (c *CouchbaseClient) ReloadNodeCert(m *Member) error {
 
 // GetClientCertAuth/SetClientCertAuth allow reconciliation of TLS settings.  The ordering constraints
 // when using mTLS make the process very messy, so this is always done over HTTP.
-func (c *CouchbaseClient) GetClientCertAuth(ms MemberSet) (*cbmgr.ClientCertAuth, error) {
+func (c *CouchbaseClient) GetClientCertAuth(ms MemberSet) (*ClientCertAuth, error) {
 	c.client.SetEndpoints(ms.ClientURLsPlaintext())
 	return c.client.GetClientCertAuth()
 }
@@ -919,7 +918,7 @@ func (c *CouchbaseClient) CloseIdleConnections() {
 	c.client.CloseIdleConnections()
 }
 
-func (c *CouchbaseClient) SetClientCertAuth(ms MemberSet, settings *cbmgr.ClientCertAuth) error {
+func (c *CouchbaseClient) SetClientCertAuth(ms MemberSet, settings *ClientCertAuth) error {
 	c.client.SetEndpoints(ms.ClientURLsPlaintext())
 	return c.client.SetClientCertAuth(settings)
 }
@@ -934,27 +933,27 @@ func (c *CouchbaseClient) SetUpdatesEnabled(ms MemberSet, enabled bool) error {
 	return c.client.SetUpdatesEnabled(enabled)
 }
 
-func (c *CouchbaseClient) GetIndexSettings(ms MemberSet, username, password string) (*cbmgr.IndexSettings, error) {
+func (c *CouchbaseClient) GetIndexSettings(ms MemberSet, username, password string) (*IndexSettings, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetIndexSettings()
 }
 
-func (c *CouchbaseClient) SetIndexSettings(ms MemberSet, username, password, storageMode string, settings *cbmgr.IndexSettings) error {
+func (c *CouchbaseClient) SetIndexSettings(ms MemberSet, username, password, storageMode string, settings *IndexSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 
-	settings.StorageMode = cbmgr.IndexStorageMode(storageMode)
+	settings.StorageMode = IndexStorageMode(storageMode)
 
 	return c.client.SetIndexSettings(settings)
 }
 
-func (c *CouchbaseClient) GetAlternateAddressesExternal(m *Member) (*cbmgr.AlternateAddressesExternal, error) {
+func (c *CouchbaseClient) GetAlternateAddressesExternal(m *Member) (*AlternateAddressesExternal, error) {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	return c.client.GetAlternateAddressesExternal()
 }
 
-func (c *CouchbaseClient) SetAlternateAddressesExternal(m *Member, addresses *cbmgr.AlternateAddressesExternal) error {
+func (c *CouchbaseClient) SetAlternateAddressesExternal(m *Member, addresses *AlternateAddressesExternal) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
@@ -975,7 +974,7 @@ func (c *CouchbaseClient) SetRecoveryTypeDelta(ms MemberSet, hostname string) er
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeDelta)
+		return c.client.SetRecoveryType(hostname, RecoveryTypeDelta)
 	})
 }
 
@@ -986,29 +985,29 @@ func (c *CouchbaseClient) SetRecoveryTypeFull(ms MemberSet, hostname string) err
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.SetRecoveryType(hostname, cbmgr.RecoveryTypeFull)
+		return c.client.SetRecoveryType(hostname, RecoveryTypeFull)
 	})
 }
 
 // Get RecoveryType of node if it has been set.
 // The default type is 'full'.
-func (c *CouchbaseClient) GetRecoveryType(m *Member) (cbmgr.RecoveryType, error) {
+func (c *CouchbaseClient) GetRecoveryType(m *Member) (RecoveryType, error) {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	info, err := c.client.ClusterInfo()
 	if err != nil {
-		return cbmgr.RecoveryTypeFull, err
+		return RecoveryTypeFull, err
 	}
 
 	for _, node := range info.Nodes {
 		member := ms[strings.Split(node.HostName, ".")[0]]
 		if member != nil && member.Name == m.Name {
-			return cbmgr.RecoveryType(node.RecoveryType), nil
+			return RecoveryType(node.RecoveryType), nil
 		}
 	}
 
-	return cbmgr.RecoveryTypeFull, fmt.Errorf("no member exists for %s", m.Name)
+	return RecoveryTypeFull, fmt.Errorf("no member exists for %s", m.Name)
 }
 
 func (c *CouchbaseClient) IsRecoveryTypeDelta(m *Member) (bool, error) {
@@ -1017,10 +1016,10 @@ func (c *CouchbaseClient) IsRecoveryTypeDelta(m *Member) (bool, error) {
 		return false, err
 	}
 
-	return recoveryType == cbmgr.RecoveryTypeDelta, nil
+	return recoveryType == RecoveryTypeDelta, nil
 }
 
-func (c *CouchbaseClient) GetServerGroups(ms MemberSet) (*cbmgr.ServerGroups, error) {
+func (c *CouchbaseClient) GetServerGroups(ms MemberSet) (*ServerGroups, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetServerGroups()
 }
@@ -1030,97 +1029,97 @@ func (c *CouchbaseClient) CreateServerGroup(ms MemberSet, name string) error {
 	return c.client.CreateServerGroup(name)
 }
 
-func (c *CouchbaseClient) UpdateServerGroups(ms MemberSet, revision string, groups *cbmgr.ServerGroupsUpdate) error {
+func (c *CouchbaseClient) UpdateServerGroups(ms MemberSet, revision string, groups *ServerGroupsUpdate) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.UpdateServerGroups(revision, groups)
 }
 
-func (c *CouchbaseClient) GetAutoCompactionSettings(ms MemberSet) (*cbmgr.AutoCompactionSettings, error) {
+func (c *CouchbaseClient) GetAutoCompactionSettings(ms MemberSet) (*AutoCompactionSettings, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetAutoCompactionSettings()
 }
 
-func (c *CouchbaseClient) SetAutoCompactionSettings(ms MemberSet, r *cbmgr.AutoCompactionSettings) error {
+func (c *CouchbaseClient) SetAutoCompactionSettings(ms MemberSet, r *AutoCompactionSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.SetAutoCompactionSettings(r)
 }
 
-func (c *CouchbaseClient) ListRemoteClusters(ms MemberSet) (cbmgr.RemoteClusters, error) {
+func (c *CouchbaseClient) ListRemoteClusters(ms MemberSet) (RemoteClusters, error) {
 	return c.client.ListRemoteClusters()
 }
 
-func (c *CouchbaseClient) CreateRemoteCluster(ms MemberSet, r *cbmgr.RemoteCluster) error {
+func (c *CouchbaseClient) CreateRemoteCluster(ms MemberSet, r *RemoteCluster) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.CreateRemoteCluster(r)
 }
 
-func (c *CouchbaseClient) DeleteRemoteCluster(ms MemberSet, r *cbmgr.RemoteCluster) error {
+func (c *CouchbaseClient) DeleteRemoteCluster(ms MemberSet, r *RemoteCluster) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteRemoteCluster(r)
 }
 
-func (c *CouchbaseClient) ListReplications(ms MemberSet) ([]cbmgr.Replication, error) {
+func (c *CouchbaseClient) ListReplications(ms MemberSet) ([]Replication, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.ListReplications()
 }
 
-func (c *CouchbaseClient) CreateReplication(ms MemberSet, r *cbmgr.Replication) error {
+func (c *CouchbaseClient) CreateReplication(ms MemberSet, r *Replication) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.CreateReplication(r)
 }
 
-func (c *CouchbaseClient) UpdateReplication(ms MemberSet, r *cbmgr.Replication) error {
+func (c *CouchbaseClient) UpdateReplication(ms MemberSet, r *Replication) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.UpdateReplication(r)
 }
 
-func (c *CouchbaseClient) DeleteReplication(ms MemberSet, r *cbmgr.Replication) error {
+func (c *CouchbaseClient) DeleteReplication(ms MemberSet, r *Replication) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.DeleteReplication(r)
 }
 
-func (c *CouchbaseClient) SetLDAPSettings(ms MemberSet, settings *cbmgr.LDAPSettings) error {
+func (c *CouchbaseClient) SetLDAPSettings(ms MemberSet, settings *LDAPSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.SetLDAPSettings(settings)
 }
 
-func (c *CouchbaseClient) GetLDAPSettings(ms MemberSet) (*cbmgr.LDAPSettings, error) {
+func (c *CouchbaseClient) GetLDAPSettings(ms MemberSet) (*LDAPSettings, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetLDAPSettings()
 }
 
-func (c *CouchbaseClient) GetSecuritySettings(ms MemberSet) (*cbmgr.SecuritySettings, error) {
+func (c *CouchbaseClient) GetSecuritySettings(ms MemberSet) (*SecuritySettings, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetSecuritySettings()
 }
 
-func (c *CouchbaseClient) SetSecuritySettings(ms MemberSet, s *cbmgr.SecuritySettings) error {
+func (c *CouchbaseClient) SetSecuritySettings(ms MemberSet, s *SecuritySettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.SetSecuritySettings(s)
 }
 
-func (c *CouchbaseClient) GetNodeNetworkConfiguration(m *Member) (*cbmgr.NodeNetworkConfiguration, error) {
+func (c *CouchbaseClient) GetNodeNetworkConfiguration(m *Member) (*NodeNetworkConfiguration, error) {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	return c.client.GetNodeNetworkConfiguration()
 }
 
-func (c *CouchbaseClient) SetNodeNetworkConfiguration(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
+func (c *CouchbaseClient) SetNodeNetworkConfiguration(m *Member, s *NodeNetworkConfiguration) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	return c.client.SetNodeNetworkConfiguration(s)
 }
 
-func (c *CouchbaseClient) EnableExternalListener(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
+func (c *CouchbaseClient) EnableExternalListener(m *Member, s *NodeNetworkConfiguration) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 
 	return c.client.EnableExternalListener(s)
 }
 
-func (c *CouchbaseClient) DisableExternalListener(m *Member, s *cbmgr.NodeNetworkConfiguration) error {
+func (c *CouchbaseClient) DisableExternalListener(m *Member, s *NodeNetworkConfiguration) error {
 	ms := NewMemberSet(m)
 	c.client.SetEndpoints(ms.ClientURLs())
 

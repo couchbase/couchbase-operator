@@ -14,7 +14,6 @@ import (
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	"github.com/couchbase/couchbase-operator/pkg/validator/util"
-	"github.com/couchbase/gocbmgr"
 
 	"github.com/go-openapi/errors"
 
@@ -286,7 +285,7 @@ func ApplyBucketDefaults(v *types.Validator, object *unstructured.Unstructured) 
 	}
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: couchbaseutil.CompressionModePassive})
 	}
 
 	return patch
@@ -320,7 +319,7 @@ func ApplyEphemeralBucketDefaults(v *types.Validator, object *unstructured.Unstr
 	}
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: cbmgr.CompressionModePassive})
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: couchbaseutil.CompressionModePassive})
 	}
 
 	return patch

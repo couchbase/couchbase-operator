@@ -14,7 +14,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
-	"github.com/couchbase/gocbmgr"
 )
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
@@ -210,15 +209,15 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 // done over plaintext or the logic would become next to impossible to comprehend.
 func (c *Cluster) reconcileClientAuthentication() error {
 	// Reconcile client ceritifcate policy. Defaults to disable (implied by nil policy).
-	settings := &cbmgr.ClientCertAuth{
+	settings := &couchbaseutil.ClientCertAuth{
 		State:    "disable",
-		Prefixes: []cbmgr.ClientCertAuthPrefix{}, // *sigh* it must be specified and not null
+		Prefixes: []couchbaseutil.ClientCertAuthPrefix{}, // *sigh* it must be specified and not null
 	}
 
 	if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
 		settings.State = string(*c.cluster.Spec.Networking.TLS.ClientCertificatePolicy)
 		for _, path := range c.cluster.Spec.Networking.TLS.ClientCertificatePaths {
-			settings.Prefixes = append(settings.Prefixes, cbmgr.ClientCertAuthPrefix{
+			settings.Prefixes = append(settings.Prefixes, couchbaseutil.ClientCertAuthPrefix{
 				Path:      path.Path,
 				Prefix:    path.Prefix,
 				Delimiter: path.Delimiter,
@@ -303,7 +302,7 @@ func (c *Cluster) reconcileTLS() error {
 	}
 
 	// Create a new client TLS configuration.
-	tls := &cbmgr.TLSAuth{
+	tls := &couchbaseutil.TLSAuth{
 		CACert: cacert,
 	}
 
@@ -335,7 +334,7 @@ func (c *Cluster) reconcileTLS() error {
 		}
 
 		// Update the TLS client configuration.
-		tls.ClientAuth = &cbmgr.TLSClientAuth{
+		tls.ClientAuth = &couchbaseutil.TLSClientAuth{
 			Cert: clientCert,
 			Key:  clientKey,
 		}

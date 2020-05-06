@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/couchbase/gocbmgr"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -339,7 +339,7 @@ type BucketConfig struct {
 	EnableIndexReplica bool `json:"enableIndexReplica,omitempty"`
 
 	// CompressionMode is the compression mode for the bucket to run in.
-	CompressionMode cbmgr.CompressionMode `json:"compressionMode,omitempty"`
+	CompressionMode couchbaseutil.CompressionMode `json:"compressionMode,omitempty"`
 }
 
 type ServerConfig struct {

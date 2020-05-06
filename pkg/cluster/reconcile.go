@@ -21,7 +21,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
-	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -424,7 +423,7 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 }
 
 // gatherBuckets loads up bucket configurations from Kubernetes and marshalls them into canonical form.
-func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
+func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	selector := labels.Everything()
 
 	if c.cluster.Spec.Buckets.Selector != nil {
@@ -438,7 +437,7 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 	couchbaseEphemeralBuckets := c.k8s.CouchbaseEphemeralBuckets.List()
 	couchbaseMemcachedBuckets := c.k8s.CouchbaseMemcachedBuckets.List()
 
-	buckets := []cbmgr.Bucket{}
+	buckets := []couchbaseutil.Bucket{}
 
 	for _, bucket := range couchbaseBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
@@ -450,17 +449,17 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			name = bucket.Spec.Name
 		}
 
-		buckets = append(buckets, cbmgr.Bucket{
+		buckets = append(buckets, couchbaseutil.Bucket{
 			BucketName:         name,
 			BucketType:         constants.BucketTypeCouchbase,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
-			IoPriority:         cbmgr.IoPriorityType(bucket.Spec.IoPriority),
+			IoPriority:         couchbaseutil.IoPriorityType(bucket.Spec.IoPriority),
 			EvictionPolicy:     string(bucket.Spec.EvictionPolicy),
 			ConflictResolution: string(bucket.Spec.ConflictResolution),
 			EnableFlush:        bucket.Spec.EnableFlush,
 			EnableIndexReplica: bucket.Spec.EnableIndexReplica,
-			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
+			CompressionMode:    couchbaseutil.CompressionMode(bucket.Spec.CompressionMode),
 		})
 	}
 
@@ -475,16 +474,16 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			name = bucket.Spec.Name
 		}
 
-		buckets = append(buckets, cbmgr.Bucket{
+		buckets = append(buckets, couchbaseutil.Bucket{
 			BucketName:         name,
 			BucketType:         constants.BucketTypeEphemeral,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
-			IoPriority:         cbmgr.IoPriorityType(bucket.Spec.IoPriority),
+			IoPriority:         couchbaseutil.IoPriorityType(bucket.Spec.IoPriority),
 			EvictionPolicy:     string(bucket.Spec.EvictionPolicy),
 			ConflictResolution: string(bucket.Spec.ConflictResolution),
 			EnableFlush:        bucket.Spec.EnableFlush,
-			CompressionMode:    cbmgr.CompressionMode(bucket.Spec.CompressionMode),
+			CompressionMode:    couchbaseutil.CompressionMode(bucket.Spec.CompressionMode),
 		})
 	}
 
@@ -499,7 +498,7 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 			name = bucket.Spec.Name
 		}
 
-		buckets = append(buckets, cbmgr.Bucket{
+		buckets = append(buckets, couchbaseutil.Bucket{
 			BucketName:        name,
 			BucketType:        constants.BucketTypeMemcached,
 			BucketMemoryQuota: k8sutil.Megabytes(bucket.Spec.MemoryQuota),
@@ -512,7 +511,7 @@ func (c *Cluster) gatherBuckets() ([]cbmgr.Bucket, error) {
 
 // inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
 // of buckets to create, update or remove and the requested set for status updates.
-func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Bucket, error) {
+func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, error) {
 	requested, err := c.gatherBuckets()
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -523,9 +522,9 @@ func (c *Cluster) inspectBuckets() ([]cbmgr.Bucket, []cbmgr.Bucket, []cbmgr.Buck
 		return nil, nil, nil, nil, err
 	}
 
-	create := []cbmgr.Bucket{}
-	update := []cbmgr.Bucket{}
-	remove := []cbmgr.Bucket{}
+	create := []couchbaseutil.Bucket{}
+	update := []couchbaseutil.Bucket{}
+	remove := []couchbaseutil.Bucket{}
 
 	// Do an exhaustive search of requested buckets in the actual list, creating and
 	// updating as necessary.
@@ -682,7 +681,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 	log.Info("Initial pod creating", "cluster", c.namespacedName())
 	settings := c.cluster.Spec.ClusterSettings
 
-	defaults := &cbmgr.PoolsDefaults{
+	defaults := &couchbaseutil.PoolsDefaults{
 		ClusterName:          c.cluster.Name,
 		DataMemoryQuota:      k8sutil.Megabytes(settings.DataServiceMemQuota),
 		IndexMemoryQuota:     k8sutil.Megabytes(settings.IndexServiceMemQuota),
@@ -699,11 +698,11 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 	}
 
 	// enables autofailover by default
-	autoFailoverSettings := &cbmgr.AutoFailoverSettings{
+	autoFailoverSettings := &couchbaseutil.AutoFailoverSettings{
 		Enabled:  true,
 		Timeout:  k8sutil.Seconds(settings.AutoFailoverTimeout),
 		MaxCount: settings.AutoFailoverMaxCount,
-		FailoverOnDataDiskIssues: cbmgr.FailoverOnDiskFailureSettings{
+		FailoverOnDataDiskIssues: couchbaseutil.FailoverOnDiskFailureSettings{
 			Enabled:    settings.AutoFailoverOnDataDiskIssues,
 			TimePeriod: k8sutil.Seconds(settings.AutoFailoverOnDataDiskIssuesTimePeriod),
 		},
@@ -785,7 +784,7 @@ func (c *Cluster) getServerGroups() []string {
 
 // createServerGroups creates any server groups defined in the specification
 // whuch Couchbase doesn't know about.
-func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr.ServerGroups, error) {
+func (c *Cluster) createServerGroups(existingGroups *couchbaseutil.ServerGroups) (*couchbaseutil.ServerGroups, error) {
 	serverGroups := c.getServerGroups()
 
 	ctx, cancel := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
@@ -822,8 +821,8 @@ func (c *Cluster) createServerGroups(existingGroups *cbmgr.ServerGroups) (*cbmgr
 }
 
 // Given a server group update return the index of the named group
-// TODO: Move to gocbmgr as a receiver function.
-func serverGroupIndex(update *cbmgr.ServerGroupsUpdate, name string) (int, error) {
+// TODO: Move to gocouchbaseutil as a receiver function.
+func serverGroupIndex(update *couchbaseutil.ServerGroupsUpdate, name string) (int, error) {
 	for index, group := range update.Groups {
 		if group.Name == name {
 			return index, nil
@@ -855,15 +854,15 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	}
 
 	// Create a server group update
-	newGroups := cbmgr.ServerGroupsUpdate{
-		Groups: []cbmgr.ServerGroupUpdate{},
+	newGroups := couchbaseutil.ServerGroupsUpdate{
+		Groups: []couchbaseutil.ServerGroupUpdate{},
 	}
 
 	for _, existingGroup := range existingGroups.Groups {
-		newGroup := cbmgr.ServerGroupUpdate{
+		newGroup := couchbaseutil.ServerGroupUpdate{
 			Name:  existingGroup.Name,
 			URI:   existingGroup.URI,
-			Nodes: []cbmgr.ServerGroupUpdateOTPNode{},
+			Nodes: []couchbaseutil.ServerGroupUpdateOTPNode{},
 		}
 		newGroups.Groups = append(newGroups.Groups, newGroup)
 	}
@@ -902,7 +901,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 			}
 
 			// Insert the node in the correct server group
-			otpNode := cbmgr.ServerGroupUpdateOTPNode{
+			otpNode := couchbaseutil.ServerGroupUpdateOTPNode{
 				OTPNode: existingMember.OTPNode,
 			}
 			newGroups.Groups[index].Nodes = append(newGroups.Groups[index].Nodes, otpNode)
@@ -970,7 +969,7 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 // addresses should be. For public addresses we maintain the default ports, however set the
 // alternate address to the DDNS name.  For private addresses these will be an IP based on the
 // node address and node ports in the 30000 range.
-func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
+func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
 	var hostname string
 
 	if c.cluster.Spec.Networking.DNS != nil {
@@ -990,7 +989,7 @@ func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member)
 		return nil, err
 	}
 
-	addresses := &cbmgr.AlternateAddressesExternal{
+	addresses := &couchbaseutil.AlternateAddressesExternal{
 		Hostname: hostname,
 		Ports:    ports,
 	}
@@ -1002,7 +1001,7 @@ func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member)
 // This takes into account the time taken to create an external load balancer and
 // DDNS updates.  Obviously this is a best effort as different DNS servers may behave
 // differently, and what we see is not necessarily what the client sees.
-func waitAlternateAddressReachable(addresses *cbmgr.AlternateAddressesExternal) error {
+func waitAlternateAddressReachable(addresses *couchbaseutil.AlternateAddressesExternal) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
@@ -1116,7 +1115,7 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 
 // Get alternate addresses from server, when server is
 // exposed over LoadBalancer then Ports can be ignored.
-func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*cbmgr.AlternateAddressesExternal, error) {
+func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
 	existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
 	if err != nil {
 		return nil, err
@@ -1170,11 +1169,11 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 
 	// Marshal the CR spec into the same type as the existing failover settings
 	clusterSettings := c.cluster.Spec.ClusterSettings
-	specFailoverSettings := &cbmgr.AutoFailoverSettings{
+	specFailoverSettings := &couchbaseutil.AutoFailoverSettings{
 		Enabled:  true,
 		Timeout:  k8sutil.Seconds(clusterSettings.AutoFailoverTimeout),
 		MaxCount: clusterSettings.AutoFailoverMaxCount,
-		FailoverOnDataDiskIssues: cbmgr.FailoverOnDiskFailureSettings{
+		FailoverOnDataDiskIssues: couchbaseutil.FailoverOnDiskFailureSettings{
 			Enabled:    clusterSettings.AutoFailoverOnDataDiskIssues,
 			TimePeriod: k8sutil.Seconds(clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod),
 		},
@@ -1230,7 +1229,7 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	}
 
 	config := c.cluster.Spec.ClusterSettings
-	requested := &cbmgr.PoolsDefaults{
+	requested := &couchbaseutil.PoolsDefaults{
 		ClusterName:          name,
 		DataMemoryQuota:      k8sutil.Megabytes(config.DataServiceMemQuota),
 		IndexMemoryQuota:     k8sutil.Megabytes(config.IndexServiceMemQuota),
@@ -1290,7 +1289,7 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 	}
 
 	specStorageMode := c.cluster.Spec.ClusterSettings.IndexStorageSetting
-	if cbmgr.IndexStorageMode(specStorageMode) != settings.StorageMode {
+	if couchbaseutil.IndexStorageMode(specStorageMode) != settings.StorageMode {
 		if err := c.client.SetIndexSettings(c.readyMembers(), c.username, c.password, string(specStorageMode), settings); err != nil {
 			log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
@@ -1354,21 +1353,21 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 		toMinute, _ = strconv.Atoi(parts[1])
 	}
 
-	requested := &cbmgr.AutoCompactionSettings{
-		AutoCompactionSettings: cbmgr.AutoCompactionAutoCompactionSettings{
-			DatabaseFragmentationThreshold: cbmgr.AutoCompactionDatabaseFragmentationThreshold{
+	requested := &couchbaseutil.AutoCompactionSettings{
+		AutoCompactionSettings: couchbaseutil.AutoCompactionAutoCompactionSettings{
+			DatabaseFragmentationThreshold: couchbaseutil.AutoCompactionDatabaseFragmentationThreshold{
 				Percentage: databaseFragmentationThresholdPercentage,
 				Size:       databaseFragmentationThresholdSize,
 			},
-			ViewFragmentationThreshold: cbmgr.AutoCompactionViewFragmentationThreshold{
+			ViewFragmentationThreshold: couchbaseutil.AutoCompactionViewFragmentationThreshold{
 				Percentage: viewFragmentationThresholdPercentage,
 				Size:       viewFragmentationThresholdSize,
 			},
 			ParallelDBAndViewCompaction: c.cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction,
 			IndexCompactionMode:         "circular",
-			IndexCircularCompaction: cbmgr.AutoCompactionIndexCircularCompaction{
+			IndexCircularCompaction: couchbaseutil.AutoCompactionIndexCircularCompaction{
 				DaysOfWeek: "Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday",
-				Interval: cbmgr.AutoCompactionInterval{
+				Interval: couchbaseutil.AutoCompactionInterval{
 					FromHour:     fromHour,
 					FromMinute:   fromMinute,
 					ToHour:       toHour,
@@ -1622,7 +1621,7 @@ func (c *Cluster) reconcileReadiness() error {
 }
 
 // replicationKey returns a unique identifier per replication.
-func replicationKey(r cbmgr.Replication) string {
+func replicationKey(r couchbaseutil.Replication) string {
 	return fmt.Sprintf("%s/%s/%s", r.ToCluster, r.FromBucket, r.ToBucket)
 }
 
@@ -1632,11 +1631,11 @@ func (c *Cluster) reconcileXDCR() error {
 		return nil
 	}
 
-	requestedClusters := []cbmgr.RemoteCluster{}
-	requestedReplications := []cbmgr.Replication{}
+	requestedClusters := []couchbaseutil.RemoteCluster{}
+	requestedReplications := []couchbaseutil.Replication{}
 
 	for _, cluster := range c.cluster.Spec.XDCR.RemoteClusters {
-		requested := cbmgr.RemoteCluster{
+		requested := couchbaseutil.RemoteCluster{
 			Name:     cluster.Name,
 			UUID:     cluster.UUID,
 			Hostname: cluster.Hostname,
@@ -1700,7 +1699,7 @@ func (c *Cluster) reconcileXDCR() error {
 				continue
 			}
 
-			requestedReplications = append(requestedReplications, cbmgr.Replication{
+			requestedReplications = append(requestedReplications, couchbaseutil.Replication{
 				FromBucket:       replication.Spec.Bucket,
 				ToCluster:        cluster.Name,
 				ToBucket:         replication.Spec.RemoteBucket,
@@ -2163,7 +2162,7 @@ func (c *Cluster) reconcileSecuritySettings() error {
 			return nil
 		}
 
-		if (s.NodeEncryption == cbmgr.On) != requestedEncryption {
+		if (s.NodeEncryption == couchbaseutil.On) != requestedEncryption {
 			updatableMembers.Add(m)
 		}
 	}
@@ -2176,9 +2175,9 @@ func (c *Cluster) reconcileSecuritySettings() error {
 		}
 
 		// Only update if the current setting is not null (which defaults to..) or not control plane.
-		if securitySettings.ClusterEncryptionLevel != "" && securitySettings.ClusterEncryptionLevel != cbmgr.ClusterEncryptionControl {
+		if securitySettings.ClusterEncryptionLevel != "" && securitySettings.ClusterEncryptionLevel != couchbaseutil.ClusterEncryptionControl {
 			requestedSecuritySettings := *securitySettings
-			requestedSecuritySettings.ClusterEncryptionLevel = cbmgr.ClusterEncryptionControl
+			requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionControl
 
 			if err := c.client.SetSecuritySettings(c.readyMembers(), &requestedSecuritySettings); err != nil {
 				return err
@@ -2204,21 +2203,21 @@ func (c *Cluster) reconcileSecuritySettings() error {
 		}
 
 		// Booleans obviously don't exist in serverland...
-		encryptionEnabledString := cbmgr.Off
-		encryptionDisabledString := cbmgr.On
+		encryptionEnabledString := couchbaseutil.Off
+		encryptionDisabledString := couchbaseutil.On
 
 		if requestedEncryption {
-			encryptionEnabledString = cbmgr.On
-			encryptionDisabledString = cbmgr.Off
+			encryptionEnabledString = couchbaseutil.On
+			encryptionDisabledString = couchbaseutil.Off
 		}
 
-		networkSettings := &cbmgr.NodeNetworkConfiguration{
-			AddressFamily:  cbmgr.AddressFamilyIPV4,
+		networkSettings := &couchbaseutil.NodeNetworkConfiguration{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV4,
 			NodeEncryption: encryptionEnabledString,
 		}
 
-		antiNetworkSettings := &cbmgr.NodeNetworkConfiguration{
-			AddressFamily:  cbmgr.AddressFamilyIPV4,
+		antiNetworkSettings := &couchbaseutil.NodeNetworkConfiguration{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV4,
 			NodeEncryption: encryptionDisabledString,
 		}
 
@@ -2278,9 +2277,9 @@ func (c *Cluster) reconcileSecuritySettings() error {
 
 	switch *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption {
 	case couchbasev2.NodeToNodeControlPlaneOnly:
-		requestedSecuritySettings.ClusterEncryptionLevel = cbmgr.ClusterEncryptionControl
+		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionControl
 	case couchbasev2.NodeToNodeAll:
-		requestedSecuritySettings.ClusterEncryptionLevel = cbmgr.ClusterEncryptionAll
+		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionAll
 	default:
 		return fmt.Errorf("illegal cluster encryption level '%s'", *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption)
 	}

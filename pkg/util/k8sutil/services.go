@@ -12,7 +12,6 @@ import (
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/gocbmgr"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1113,7 +1112,7 @@ func WouldUpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSe
 // GetAlternateAddressExternalPorts polls the pod service for any alternate ports
 // that may have been set and returns a structure ready for submission to the
 // Couchbase API.
-func GetAlternateAddressExternalPorts(c *client.Client, namespace, name string) (*cbmgr.AlternateAddressesExternalPorts, error) {
+func GetAlternateAddressExternalPorts(c *client.Client, namespace, name string) (*couchbaseutil.AlternateAddressesExternalPorts, error) {
 	svc, found := c.Services.Get(name)
 
 	// Not created yet.
@@ -1126,7 +1125,7 @@ func GetAlternateAddressExternalPorts(c *client.Client, namespace, name string) 
 		return nil, nil
 	}
 
-	ports := &cbmgr.AlternateAddressesExternalPorts{}
+	ports := &couchbaseutil.AlternateAddressesExternalPorts{}
 
 	for _, port := range svc.Spec.Ports {
 		switch port.Name {

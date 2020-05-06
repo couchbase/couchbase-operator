@@ -7,8 +7,8 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/gocbmgr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -57,18 +57,18 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 		}
 	}
 
-	requestedGroups := make(map[string]cbmgr.Group)
+	requestedGroups := make(map[string]couchbaseutil.Group)
 
 	for _, cbGroup := range c.k8s.CouchbaseGroups.List() {
 		if selector.Matches(labels.Set(cbGroup.Labels)) {
-			group := cbmgr.Group{
+			group := couchbaseutil.Group{
 				ID:           cbGroup.Name,
 				LDAPGroupRef: cbGroup.Spec.LDAPGroupRef,
 			}
 
 			// copy roles to group
 			for _, role := range cbGroup.Spec.Roles {
-				group.Roles = append(group.Roles, cbmgr.UserRole{
+				group.Roles = append(group.Roles, couchbaseutil.UserRole{
 					Role:       string(role.Name),
 					BucketName: role.Bucket,
 				})
@@ -89,7 +89,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 	for _, e := range existingGroups {
 		if r, ok := requestedGroups[e.ID]; ok {
 			// update changed group
-			rolesMatch := reflect.DeepEqual(cbmgr.RolesToStr(r.Roles), cbmgr.RolesToStr(e.Roles))
+			rolesMatch := reflect.DeepEqual(couchbaseutil.RolesToStr(r.Roles), couchbaseutil.RolesToStr(e.Roles))
 			if !rolesMatch || r.LDAPGroupRef != e.LDAPGroupRef {
 				if err := c.createGroup(r); err != nil {
 					return existingGroupNames, err
@@ -130,7 +130,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 // reconcileUsers creates, edits, removes server users according to requested configuration.
 func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	// Map of requested users by name
-	requestedUsers := make(map[string]cbmgr.User)
+	requestedUsers := make(map[string]couchbaseutil.User)
 
 	// get rolebindings
 	couchbaseRoleBindings := c.k8s.CouchbaseRoleBindings.List()
@@ -174,10 +174,10 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 
 			// Add group to user
 			if user, ok := requestedUsers[cbUser.Name]; !ok {
-				user := cbmgr.User{
+				user := couchbaseutil.User{
 					ID:     cbUser.Name,
 					Name:   cbUser.Spec.FullName,
-					Domain: cbmgr.AuthDomain(cbUser.Spec.AuthDomain),
+					Domain: couchbaseutil.AuthDomain(cbUser.Spec.AuthDomain),
 					Groups: []string{groupName},
 				}
 
@@ -249,7 +249,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 }
 
 // create couchbase group with verification.
-func (c *Cluster) createGroup(group cbmgr.Group) error {
+func (c *Cluster) createGroup(group couchbaseutil.Group) error {
 	for _, role := range group.Roles {
 		if role.BucketName != "" && role.BucketName != "*" {
 			if _, err := c.client.GetBucket(c.readyMembers(), role.BucketName); err != nil {
@@ -292,7 +292,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 	if ldap == nil {
 		if len(apiLDAPSettings.Hosts) > 0 {
 			// Reset settings to default
-			settings := cbmgr.LDAPSettings{Encryption: cbmgr.LDAPEncryptionNone}
+			settings := couchbaseutil.LDAPSettings{Encryption: couchbaseutil.LDAPEncryptionNone}
 			return c.client.SetLDAPSettings(c.readyMembers(), &settings)
 		}
 
@@ -301,16 +301,16 @@ func (c *Cluster) reconcileLDAPSettings() error {
 	}
 
 	// Convert requested ldap spec
-	specLDAPSettings := cbmgr.LDAPSettings{
+	specLDAPSettings := couchbaseutil.LDAPSettings{
 		AuthenticationEnabled: ldap.AuthenticationEnabled,
 		AuthorizationEnabled:  ldap.AuthorizationEnabled,
 		Hosts:                 ldap.Hosts,
 		Port:                  ldap.Port,
-		Encryption:            cbmgr.LDAPEncryption(ldap.Encryption),
+		Encryption:            couchbaseutil.LDAPEncryption(ldap.Encryption),
 		EnableCertValidation:  ldap.EnableCertValidation,
 		GroupsQuery:           ldap.GroupsQuery,
 		BindDN:                ldap.BindDN,
-		UserDNMapping:         cbmgr.LDAPUserDNMapping(ldap.UserDNMapping),
+		UserDNMapping:         couchbaseutil.LDAPUserDNMapping(ldap.UserDNMapping),
 		NestedGroupsEnabled:   ldap.NestedGroupsEnabled,
 		NestedGroupsMaxDepth:  ldap.NestedGroupsMaxDepth,
 		CacheValueLifetime:    ldap.CacheValueLifetime,
