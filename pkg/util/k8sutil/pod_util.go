@@ -585,7 +585,7 @@ func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container
 		}
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
-		container.Command = append(container.Command, "--token", metricsTokenMountPath+"/token")
+		container.Args = append(container.Args, "--token", metricsTokenMountPath+"/token")
 	}
 }
 
