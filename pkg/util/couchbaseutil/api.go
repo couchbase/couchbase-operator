@@ -2,11 +2,15 @@ package couchbaseutil
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/couchbase/couchbase-operator/pkg/util/urlencoding"
 )
 
 // Certificate and key used by TLS client authentication
@@ -125,6 +129,13 @@ func (c *Couchbase) GetTLS() *TLSAuth {
 // requests.
 func (c *Couchbase) SetUserAgent(userAgent *UserAgent) {
 	c.userAgent = userAgent
+}
+
+// CloseIdleConnections forces all TCP sessions with Couchbase to terminate, as
+// it will sometime prioritize keeping a client happy rather than being in the
+// correct state.
+func (c *Couchbase) CloseIdleConnections() {
+	c.client.CloseIdleConnections()
 }
 
 // RebalanceProgressEntry is the type communicated to clients periodically
@@ -277,60 +288,124 @@ func (c *Couchbase) getXDCRTasks() (xdcrTasks []*Task, err error) {
 	return
 }
 
-func (c *Couchbase) AddNode(hostname, username, password string, services ServiceList) error {
-	return c.addNode(hostname, username, password, services)
+// getOTPNode translates the hostname (that everyone expects) into an OTP node (whatever
+// the hell that is and should not be exposed).
+func (c *Couchbase) getOTPNode(hostname string) (string, error) {
+	cluster, err := c.ClusterInfo()
+	if err != nil {
+		return "", err
+	}
+
+	for _, node := range cluster.Nodes {
+		if node.HostName == hostname {
+			return node.OTPNode, nil
+		}
+	}
+
+	return "", fmt.Errorf("unable hostname %s to translate to OTP node", hostname)
+}
+
+func (c *Couchbase) AddNode(hostname, username, password string, services fmt.Stringer) error {
+	data := url.Values{}
+	data.Set("hostname", hostname)
+	data.Set("user", username)
+	data.Set("password", password)
+	data.Set("services", services.String())
+
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
+
+	return c.doPost("/controller/addNode", []byte(data.Encode()), nil, headers)
 }
 
 func (c *Couchbase) CancelAddNode(hostname string) error {
-	cluster, err := c.getPoolsDefault()
+	otpNode, err := c.getOTPNode(hostname)
 	if err != nil {
 		return err
 	}
 
-	for _, node := range cluster.Nodes {
-		if node.HostName == hostname {
-			return c.cancelAddNode(node.OTPNode)
-		}
-	}
+	data := url.Values{}
+	data.Set("otpNode", otpNode)
 
-	return fmt.Errorf("hostname %s is not part of the cluster", hostname)
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
+
+	return c.doPost("/controller/ejectNode", []byte(data.Encode()), nil, headers)
 }
 
 func (c *Couchbase) CancelAddBackNode(hostname string) error {
-	cluster, err := c.getPoolsDefault()
+	otpNode, err := c.getOTPNode(hostname)
 	if err != nil {
 		return err
 	}
 
-	for _, node := range cluster.Nodes {
-		if node.HostName == hostname {
-			return c.cancelAddBackNode(node.OTPNode)
-		}
-	}
+	data := url.Values{}
+	data.Set("otpNode", otpNode)
 
-	return fmt.Errorf("hostname %s is not part of the cluster", hostname)
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
+
+	return c.doPost("/controller/reFailOver", []byte(data.Encode()), nil, headers)
 }
 
 func (c *Couchbase) ClusterInfo() (*ClusterInfo, error) {
-	return c.getPoolsDefault()
+	clusterInfo := &ClusterInfo{}
+
+	err := c.doGet("/pools/default", clusterInfo, c.defaultHeaders())
+	if err != nil {
+		return nil, err
+	}
+
+	return clusterInfo, nil
 }
 
 func (c *Couchbase) SetPoolsDefault(defaults *PoolsDefaults) error {
-	return c.setPoolsDefault(defaults)
-}
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
 
-func (c *Couchbase) ClusterInitialize(username, password string, defaults *PoolsDefaults, port int, services []ServiceName, mode IndexStorageMode) error {
-	if err := c.setPoolsDefault(defaults); err != nil {
-		return err
-	}
-
-	settings, err := c.getIndexSettings()
+	data, err := urlencoding.Marshal(defaults)
 	if err != nil {
 		return err
 	}
 
-	if err := c.setIndexSettings(mode, settings.Threads, settings.MemSnapInterval,
-		settings.StableSnapInterval, settings.MaxRollbackPoints, settings.LogLevel); err != nil {
+	return c.doPost("/pools/default", data, nil, headers)
+}
+
+func (c *Couchbase) setServices(services ServiceList) error {
+	data := url.Values{}
+	data.Set("services", services.String())
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/node/controller/setupServices", []byte(data.Encode()), nil, headers)
+}
+
+func (c *Couchbase) setWebSettings(username, password string, port int) error {
+	data := url.Values{}
+	data.Set("username", username)
+	data.Set("password", password)
+	data.Set("port", strconv.Itoa(port))
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/settings/web", []byte(data.Encode()), nil, headers)
+}
+
+func (c *Couchbase) ClusterInitialize(username, password string, defaults *PoolsDefaults, port int, services []ServiceName, mode IndexStorageMode) error {
+	if err := c.SetPoolsDefault(defaults); err != nil {
+		return err
+	}
+
+	settings, err := c.GetIndexSettings()
+	if err != nil {
+		return err
+	}
+
+	settings.StorageMode = mode
+
+	if err := c.SetIndexSettings(settings); err != nil {
 		return err
 	}
 
@@ -343,6 +418,28 @@ func (c *Couchbase) ClusterInitialize(username, password string, defaults *Pools
 	}
 
 	return nil
+}
+
+func (c *Couchbase) getPools() (*PoolsInfo, error) {
+	info := &PoolsInfo{}
+
+	err := c.doGet("/pools", info, c.defaultHeaders())
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+func (c *Couchbase) getTasks() ([]*Task, error) {
+	tasks := []*Task{}
+
+	err := c.doGet("/pools/default/tasks", &tasks, c.defaultHeaders())
+	if err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
 func (c *Couchbase) ClusterUUID() (string, error) {
@@ -367,6 +464,35 @@ func (c *Couchbase) IsEnterprise() (bool, error) {
 	return info.Enterprise, nil
 }
 
+func (c *Couchbase) setHostname(hostname string) error {
+	data := url.Values{}
+	data.Set("hostname", hostname)
+
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
+
+	return c.doPost("/node/controller/rename", []byte(data.Encode()), nil, headers)
+}
+
+func (c *Couchbase) setStoragePaths(dataPath, indexPath string, analyticsPaths []string) error {
+	data := url.Values{}
+	data.Set("path", dataPath)
+	data.Set("index_path", indexPath)
+
+	if len(analyticsPaths) > 0 {
+		data.Set("cbas_path", analyticsPaths[0])
+
+		for _, path := range analyticsPaths[1:] {
+			data.Add("cbas_path", path)
+		}
+	}
+
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
+
+	return c.doPost("/nodes/self/controller/settings", []byte(data.Encode()), nil, headers)
+}
+
 func (c *Couchbase) NodeInitialize(hostname, dataPath, indexPath string, analyticsPaths []string) error {
 	if err := c.setHostname(hostname); err != nil {
 		return err
@@ -380,7 +506,7 @@ func (c *Couchbase) NodeInitialize(hostname, dataPath, indexPath string, analyti
 }
 
 func (c *Couchbase) Rebalance(nodesToRemove []string) error {
-	cluster, err := c.getPoolsDefault()
+	cluster, err := c.ClusterInfo()
 	if err != nil {
 		return err
 	}
@@ -398,12 +524,14 @@ func (c *Couchbase) Rebalance(nodesToRemove []string) error {
 		}
 	}
 
-	err = c.rebalance(all, eject)
-	if err != nil {
-		return err
-	}
+	data := url.Values{}
+	data.Set("ejectedNodes", strings.Join(eject, ","))
+	data.Set("knownNodes", strings.Join(all, ","))
 
-	return nil
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
+
+	return c.doPost("/controller/rebalance", []byte(data.Encode()), nil, headers)
 }
 
 // Compare status of rebalance with an expected status.
@@ -417,11 +545,17 @@ func (c *Couchbase) CompareRebalanceStatus(expectedStatus RebalanceStatus) (bool
 }
 
 func (c *Couchbase) StopRebalance() error {
-	return c.stopRebalance()
+	data := url.Values{}
+	data.Set("allowUnsafe", "true")
+
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
+
+	return c.doPost("/controller/stopRebalance", []byte(data.Encode()), nil, headers)
 }
 
 func (c *Couchbase) Failover(nodesToRemove []string) error {
-	cluster, err := c.getPoolsDefault()
+	cluster, err := c.ClusterInfo()
 	if err != nil {
 		return err
 	}
@@ -441,19 +575,58 @@ func (c *Couchbase) Failover(nodesToRemove []string) error {
 		return fmt.Errorf("unable to find nodes to failover")
 	}
 
-	return c.failover(otpNodes)
+	data := url.Values{}
+
+	for _, otpNode := range otpNodes {
+		data.Add("otpNode", otpNode)
+	}
+
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
+
+	return c.doPost("/controller/failOver", []byte(data.Encode()), nil, headers)
 }
 
 func (c *Couchbase) CreateBucket(bucket *Bucket) error {
-	return c.createBucket(bucket)
+	params := bucket.FormEncode()
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/pools/default/buckets", params, nil, headers)
 }
 
 func (c *Couchbase) DeleteBucket(name string) error {
-	return c.deleteBucket(name)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	path := "/pools/default/buckets/" + name
+
+	return c.doDelete(path, headers)
 }
 
 func (c *Couchbase) EditBucket(bucket *Bucket) error {
-	return c.editBucket(bucket)
+	// bucket params cannot include conflict resolution field
+	// during edit.
+	bucket.ConflictResolution = ""
+
+	params := bucket.FormEncode()
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/pools/default/buckets/"+bucket.BucketName, params, nil, headers)
+}
+
+func (c *Couchbase) getBucketStatus(name string) (*BucketStatus, error) {
+	status := &BucketStatus{}
+	path := "/pools/default/buckets/" + name
+
+	if err := c.doGet(path, status, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return status, nil
 }
 
 // Determine wether bucket is ready based on status resolving
@@ -487,19 +660,29 @@ func (c *Couchbase) GetBucketStatus(name string) (*BucketStatus, error) {
 	return status, nil
 }
 
-func (c *Couchbase) GetBuckets() ([]*Bucket, error) {
-	return c.getBuckets()
-}
+func (c *Couchbase) GetBuckets() ([]Bucket, error) {
+	buckets := []Bucket{}
+	path := "/pools/default/buckets/"
 
-func (c *Couchbase) GetBucket(bucketName string) (*Bucket, error) {
-	bucketList, err := c.getBuckets()
+	err := c.doGet(path, &buckets, c.defaultHeaders())
 	if err != nil {
 		return nil, err
 	}
 
-	for _, bucket := range bucketList {
+	return buckets, nil
+}
+
+func (c *Couchbase) GetBucket(bucketName string) (*Bucket, error) {
+	bucketList, err := c.GetBuckets()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range bucketList {
+		bucket := bucketList[i]
+
 		if bucket.BucketName == bucketName {
-			return bucket, nil
+			return &bucket, nil
 		}
 	}
 
@@ -507,192 +690,613 @@ func (c *Couchbase) GetBucket(bucketName string) (*Bucket, error) {
 }
 
 func (c *Couchbase) SetAutoFailoverSettings(settings *AutoFailoverSettings) error {
-	return c.setAutoFailoverSettings(settings)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	data, err := urlencoding.Marshal(settings)
+	if err != nil {
+		return err
+	}
+
+	return c.doPost("/settings/autoFailover", data, nil, headers)
 }
 
 func (c *Couchbase) GetAutoFailoverSettings() (*AutoFailoverSettings, error) {
-	return c.getAutoFailoverSettings()
+	settings := &AutoFailoverSettings{}
+
+	if err := c.doGet("/settings/autoFailover", settings, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return settings, nil
 }
 
 func (c *Couchbase) GetIndexSettings() (*IndexSettings, error) {
-	return c.getIndexSettings()
+	settings := &IndexSettings{}
+
+	err := c.doGet("/settings/indexes", settings, c.defaultHeaders())
+	if err != nil {
+		return nil, err
+	}
+
+	return settings, nil
 }
 
 func (c *Couchbase) SetIndexSettings(settings *IndexSettings) error {
-	return c.setIndexSettings(settings.StorageMode, settings.Threads, settings.MemSnapInterval,
-		settings.StableSnapInterval, settings.MaxRollbackPoints, settings.LogLevel)
+	data := url.Values{}
+	data.Set("storageMode", string(settings.StorageMode))
+	data.Set("indexerThreads", strconv.Itoa(settings.Threads))
+	data.Set("memorySnapshotInterval", strconv.Itoa(settings.MemSnapInterval))
+	data.Set("stableSnapshotInterval", strconv.Itoa(settings.StableSnapInterval))
+	data.Set("maxRollbackPoints", strconv.Itoa(settings.MaxRollbackPoints))
+	data.Set("logLevel", string(settings.LogLevel))
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/settings/indexes", []byte(data.Encode()), nil, headers)
 }
 
-func (c *Couchbase) GetNodeInfo() (*NodeInfo, error) {
-	return c.getNodeInfo()
+func (c *Couchbase) getNodeInfo() (*NodeInfo, error) {
+	node := &NodeInfo{}
+
+	if err := c.doGet("/nodes/self", node, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return node, nil
 }
 
 func (c *Couchbase) UploadClusterCACert(pem []byte) error {
-	return c.uploadClusterCACert(pem)
+	headers := c.defaultHeaders()
+	return c.doPost("/controller/uploadClusterCA", pem, nil, headers)
 }
 
 func (c *Couchbase) ReloadNodeCert() error {
-	return c.reloadNodeCert()
+	headers := c.defaultHeaders()
+	return c.doPost("/node/controller/reloadCertificate", []byte{}, nil, headers)
 }
 
 func (c *Couchbase) GetClusterCACert() ([]byte, error) {
-	return c.getClusterCACert()
+	var cert string
+
+	err := c.doGet("/pools/default/certificate", &cert, c.defaultHeaders())
+
+	return []byte(cert), err
 }
 
 func (c *Couchbase) GetClientCertAuth() (*ClientCertAuth, error) {
-	return c.getClientCertAuth()
+	clientAuth := &ClientCertAuth{}
+	if err := c.doGet("/settings/clientCertAuth", clientAuth, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return clientAuth, nil
 }
 
 func (c *Couchbase) SetClientCertAuth(settings *ClientCertAuth) error {
-	return c.setClientCertAuth(settings)
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+
+	headers := c.defaultHeaders()
+
+	return c.doPost("/settings/clientCertAuth", data, nil, headers)
 }
 
 func (c *Couchbase) GetUpdatesEnabled() (bool, error) {
-	return c.getUpdatesEnabled()
+	settingsStats := &SettingsStats{}
+	if err := c.doGet("/settings/stats", settingsStats, c.defaultHeaders()); err != nil {
+		return false, err
+	}
+
+	return settingsStats.SendStats, nil
 }
 
 func (c *Couchbase) SetUpdatesEnabled(enabled bool) error {
-	return c.setUpdatesEnabled(enabled)
+	data := url.Values{}
+	data.Set("sendStats", BoolAsStr(enabled))
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/settings/stats", []byte(data.Encode()), nil, headers)
 }
 
 func (c *Couchbase) GetAlternateAddressesExternal() (*AlternateAddressesExternal, error) {
-	return c.getAlternateAddressesExternal()
+	nodeServices := &NodeServices{}
+	if err := c.doGet("/pools/default/nodeServices", nodeServices, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	for _, node := range nodeServices.NodesExt {
+		if !node.ThisNode {
+			continue
+		}
+
+		if node.AlternateAddresses == nil {
+			return nil, nil
+		}
+
+		return node.AlternateAddresses.External, nil
+	}
+
+	// The absence of this node is probably due to it not being balanced in yet.
+	// /pools/default/nodeServices apparently only shows nodes when the rebalance
+	// starts.  Don't raise an error.
+	return nil, nil
 }
 
 func (c *Couchbase) SetAlternateAddressesExternal(addresses *AlternateAddressesExternal) error {
-	return c.setAlternateAddressesExternal(addresses)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	data, err := urlencoding.Marshal(addresses)
+	if err != nil {
+		return err
+	}
+
+	return c.doPut("/node/controller/setupAlternateAddresses/external", data, headers)
 }
 
 func (c *Couchbase) DeleteAlternateAddressesExternal() error {
-	return c.deleteAlternateAddressesExternal()
-}
-
-func (c *Couchbase) GetLogs() ([]*LogMessage, error) {
-	return c.getLogs()
-}
-
-func (c *Couchbase) LogClientError(msg string) error {
-	return c.logClientError(msg)
+	headers := c.defaultHeaders()
+	return c.doDelete("/node/controller/setupAlternateAddresses/external", headers)
 }
 
 func (c *Couchbase) GetServerGroups() (*ServerGroups, error) {
-	return c.getServerGroups()
+	serverGroups := &ServerGroups{}
+	if err := c.doGet("/pools/default/serverGroups", serverGroups, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return serverGroups, nil
 }
 
 func (c *Couchbase) CreateServerGroup(name string) error {
-	return c.createServerGroup(name)
+	data := url.Values{}
+	data.Set("name", name)
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/pools/default/serverGroups", []byte(data.Encode()), nil, headers)
 }
 
 func (c *Couchbase) UpdateServerGroups(revision string, groups *ServerGroupsUpdate) error {
-	return c.updateServerGroups(revision, groups)
+	data, err := json.Marshal(groups)
+	if err != nil {
+		return err
+	}
+
+	uri := "/pools/default/serverGroups?rev=" + revision
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeJSON)
+
+	return c.doPut(uri, data, headers)
 }
 
 func (c *Couchbase) SetRecoveryType(hostname string, recoveryType RecoveryType) error {
-	cluster, err := c.getPoolsDefault()
+	otpNode, err := c.getOTPNode(hostname)
 	if err != nil {
 		return err
 	}
 
-	for _, node := range cluster.Nodes {
-		if node.HostName == hostname {
-			return c.setRecoveryType(node.OTPNode, recoveryType)
-		}
-	}
+	data := url.Values{}
+	data.Set("otpNode", otpNode)
+	data.Set("recoveryType", string(recoveryType))
 
-	return fmt.Errorf("hostname %s is not part of the cluster", hostname)
-}
+	headers := c.defaultHeaders()
+	headers.Set("Content-Type", ContentTypeURLEncoded)
 
-func (c *Couchbase) SetLogLevel(level string) error {
-	lvl, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
-	}
-
-	logrus.SetLevel(lvl)
-
-	return nil
+	return c.doPost("/controller/setRecoveryType", []byte(data.Encode()), nil, headers)
 }
 
 func (c *Couchbase) GetAutoCompactionSettings() (*AutoCompactionSettings, error) {
-	return c.getAutoCompactionSettings()
+	r := &AutoCompactionSettings{}
+	if err := c.doGet("/settings/autoCompaction", r, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
 func (c *Couchbase) SetAutoCompactionSettings(r *AutoCompactionSettings) error {
-	return c.setAutoCompactionSettings(r)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	data, err := urlencoding.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	return c.doPost("/controller/setAutoCompaction", data, nil, headers)
 }
 
 func (c *Couchbase) ListRemoteClusters() (RemoteClusters, error) {
-	return c.listRemoteClusters()
+	r := RemoteClusters{}
+	if err := c.doGet("/pools/default/remoteClusters", &r, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	// God only knows what this means, but lets assume we discard things
+	// that are "deleted".
+	filtered := RemoteClusters{}
+
+	for _, cluster := range r {
+		if !cluster.Deleted {
+			filtered = append(filtered, cluster)
+		}
+	}
+
+	return filtered, nil
 }
 
 func (c *Couchbase) CreateRemoteCluster(r *RemoteCluster) error {
-	return c.createRemoteCluster(r)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	data, err := urlencoding.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	return c.doPost("/pools/default/remoteClusters", data, nil, headers)
 }
 
 func (c *Couchbase) DeleteRemoteCluster(r *RemoteCluster) error {
-	return c.deleteRemoteCluster(r)
+	return c.doDelete("/pools/default/remoteClusters/"+r.Name, c.defaultHeaders())
 }
 
+// getRemoteClusterByUUID helps manage the utter horror show that is XDCR
+// replications.
+func (c *Couchbase) getRemoteClusterByUUID(uuid string) (*RemoteCluster, error) {
+	clusters, err := c.ListRemoteClusters()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cluster := range clusters {
+		if cluster.UUID == uuid {
+			return &cluster, nil
+		}
+	}
+
+	return nil, fmt.Errorf("lookupClusterForUUID: no cluster found for uuid %v", uuid)
+}
+
+// getRemoteClusterByName helps manage the utter horror show that is XDCR
+// replications.
+func (c *Couchbase) getRemoteClusterByName(name string) (*RemoteCluster, error) {
+	clusters, err := c.ListRemoteClusters()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cluster := range clusters {
+		if cluster.Name == name {
+			return &cluster, nil
+		}
+	}
+
+	return nil, fmt.Errorf("lookupUUIDForCluster: no cluster found for name %v", name)
+}
+
+// getReplicationSettings helps manage the utter horror show that is XDCR
+// replications.
+func (c *Couchbase) getReplicationSettings(uuid, from, to string) (*ReplicationSettings, error) {
+	s := &ReplicationSettings{}
+	if err := c.doGet("/settings/replications/"+url.PathEscape(uuid+"/"+from+"/"+to), s, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return s, nil
+}
+
+// ListReplications lists all replications in the cluster.  To make the Operator
+// code a million times simpler we do a lot of post processing and table joins
+// just to recover the same information used to create a replication.
 func (c *Couchbase) ListReplications() ([]Replication, error) {
-	return c.listReplications()
+	tasks, err := c.getXDCRTasks()
+	if err != nil {
+		return nil, err
+	}
+
+	replications := []Replication{}
+
+	for _, task := range tasks {
+		// Parse the target to recover lost information.
+		// Should be in the form /remoteClusters/c4c9af9ad62d8b5f665edac5ffc9c1be/buckets/default
+		if task.Target == "" {
+			return nil, fmt.Errorf("listReplications: target not populated")
+		}
+
+		parts := strings.Split(task.Target, "/")
+		if len(parts) != 5 {
+			return nil, fmt.Errorf("listReplications: target incorrectly formatted: %v", task.Target)
+		}
+
+		uuid := parts[2]
+		to := parts[4]
+
+		// Lookup the UUID to recover the cluster name.
+		cluster, err := c.getRemoteClusterByUUID(uuid)
+		if err != nil {
+			return nil, err
+		}
+
+		// Lookup the settings to recover the compression type.
+		settings, err := c.getReplicationSettings(uuid, task.Source, to)
+		if err != nil {
+			return nil, err
+		}
+
+		// By now your eyeballs will be dry from all the rolling they are doing.
+		replications = append(replications, Replication{
+			FromBucket:       task.Source,
+			ToCluster:        cluster.Name,
+			ToBucket:         to,
+			Type:             task.ReplicationType,
+			ReplicationType:  "continuous",
+			CompressionType:  settings.CompressionType,
+			FilterExpression: task.FilterExpression,
+			PauseRequested:   settings.PauseRequested,
+		})
+	}
+
+	return replications, nil
 }
 
+// CreateReplication creates an XDCR replication between clusters.
 func (c *Couchbase) CreateReplication(r *Replication) error {
-	return c.createReplication(r)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	data, err := urlencoding.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	return c.doPost("/controller/createReplication", data, nil, headers)
 }
 
+// UpdateReplication updates the parts of an XDCR replication that can be updated.
 func (c *Couchbase) UpdateReplication(r *Replication) error {
-	return c.updateReplication(r)
+	cluster, err := c.getRemoteClusterByName(r.ToCluster)
+	if err != nil {
+		return err
+	}
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	data, err := urlencoding.Marshal(r)
+	if err != nil {
+		return err
+	}
+
+	return c.doPost("/settings/replications/"+url.PathEscape(cluster.UUID+"/"+r.FromBucket+"/"+r.ToBucket), data, nil, headers)
 }
 
+// DeleteReplication deletes an existing XDCR replication between clusters.
 func (c *Couchbase) DeleteReplication(r *Replication) error {
-	return c.deleteReplication(r)
+	cluster, err := c.getRemoteClusterByName(r.ToCluster)
+	if err != nil {
+		return err
+	}
+
+	// WHAT IS THIS MADNESS?!??!?!?!?!??!
+	return c.doDelete("/controller/cancelXDCR/"+url.PathEscape(cluster.UUID+"/"+r.FromBucket+"/"+r.ToBucket), c.defaultHeaders())
 }
 
 func (c *Couchbase) GetUsers() ([]*User, error) {
-	return c.getUsers()
+	users := []*User{}
+	path := "/settings/rbac/users"
+
+	if err := c.doGet(path, &users, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
 
 func (c *Couchbase) CreateUser(user *User) error {
-	return c.createUser(user)
+	params := user.FormEncode()
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	path := strings.Join([]string{"/settings/rbac/users", string(user.Domain), user.ID}, "/")
+
+	return c.doPut(path, params, headers)
 }
 
 func (c *Couchbase) DeleteUser(user *User) error {
-	return c.deleteUser(user)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	path := strings.Join([]string{"/settings/rbac/users", string(user.Domain), user.ID}, "/")
+
+	return c.doDelete(path, headers)
 }
 
 func (c *Couchbase) GetUser(id string, domain AuthDomain) (*User, error) {
-	return c.getUser(id, domain)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	user := &User{}
+	path := strings.Join([]string{"/settings/rbac/users", string(domain), id}, "/")
+
+	if err := c.doGet(path, user, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func (c *Couchbase) GetGroups() ([]*Group, error) {
-	return c.getGroups()
+	groups := []*Group{}
+	path := "/settings/rbac/groups"
+
+	if err := c.doGet(path, &groups, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return groups, nil
 }
 
 func (c *Couchbase) CreateGroup(group *Group) error {
-	return c.createGroup(group)
+	roles := RolesToStr(group.Roles)
+
+	data := url.Values{}
+	data.Set("roles", strings.Join(roles, ","))
+	data.Set("description", group.Description)
+	data.Set("ldap_group_ref", group.LDAPGroupRef)
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	path := "/settings/rbac/groups/" + group.ID
+
+	return c.doPut(path, []byte(data.Encode()), headers)
 }
 
 func (c *Couchbase) DeleteGroup(group *Group) error {
-	return c.deleteGroup(group)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	path := "/settings/rbac/groups/" + group.ID
+
+	return c.doDelete(path, headers)
 }
 
 func (c *Couchbase) GetGroup(id string) (*Group, error) {
-	return c.getGroup(id)
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	path := "/settings/rbac/groups/" + id
+	group := &Group{}
+
+	if err := c.doGet(path, group, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return group, nil
 }
 
 func (c *Couchbase) GetLDAPSettings() (*LDAPSettings, error) {
-	return c.getLDAPSettings()
+	settings := &LDAPSettings{}
+
+	if err := c.doGet("/settings/ldap", settings, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return settings, nil
 }
 
 func (c *Couchbase) SetLDAPSettings(settings *LDAPSettings) error {
-	return c.setLDAPSettings(settings)
+	params, err := settings.FormEncode()
+	if err != nil {
+		return err
+	}
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/settings/ldap", params, nil, headers)
 }
 
 func (c *Couchbase) GetLDAPConnectivityStatus() (*LDAPStatus, error) {
-	return c.getLDAPConnectivityStatus()
+	data := url.Values{}
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeJSON)
+
+	status := &LDAPStatus{}
+
+	if err := c.doPost("/settings/ldap/validate/connectivity", []byte(data.Encode()), status, headers); err != nil {
+		return nil, err
+	}
+
+	return status, nil
 }
 
-func (c *Couchbase) CloseIdleConnections() {
-	c.client.CloseIdleConnections()
+func (c *Couchbase) GetSecuritySettings() (*SecuritySettings, error) {
+	s := &SecuritySettings{}
+
+	if err := c.doGet("/settings/security", s, c.defaultHeaders()); err != nil {
+		return nil, err
+	}
+
+	return s, nil
+}
+
+func (c *Couchbase) SetSecuritySettings(s *SecuritySettings) error {
+	data, err := urlencoding.Marshal(s)
+	if err != nil {
+		return err
+	}
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/settings/security", data, nil, headers)
+}
+
+func (c *Couchbase) GetNodeNetworkConfiguration() (*NodeNetworkConfiguration, error) {
+	// And yet again, the CRUD is completely ignored!
+	node, err := c.getNodeInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	onOrOff := Off
+
+	if node.NodeEncryption {
+		onOrOff = On
+	}
+
+	s := &NodeNetworkConfiguration{
+		NodeEncryption: onOrOff,
+	}
+
+	return s, nil
+}
+
+func (c *Couchbase) SetNodeNetworkConfiguration(s *NodeNetworkConfiguration) error {
+	data, err := urlencoding.Marshal(s)
+	if err != nil {
+		return err
+	}
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/node/controller/setupNetConfig", data, nil, headers)
+}
+
+func (c *Couchbase) EnableExternalListener(s *NodeNetworkConfiguration) error {
+	data, err := urlencoding.Marshal(s)
+	if err != nil {
+		return err
+	}
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/node/controller/enableExternalListener", data, nil, headers)
+}
+
+func (c *Couchbase) DisableExternalListener(s *NodeNetworkConfiguration) error {
+	data, err := urlencoding.Marshal(s)
+	if err != nil {
+		return err
+	}
+
+	headers := c.defaultHeaders()
+	headers.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doPost("/node/controller/disableExternalListener", data, nil, headers)
 }

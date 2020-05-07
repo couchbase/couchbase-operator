@@ -1282,17 +1282,19 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 
 // Compare cluster index settings with spec, reconcile if necessary.
 func (c *Cluster) reconcileIndexStorageSettings() error {
-	settings, err := c.client.GetIndexSettings(c.readyMembers(), c.username, c.password)
+	settings, err := c.client.GetIndexSettings(c.readyMembers())
 	if err != nil {
 		log.Error(err, "Index storage settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
 
-	specStorageMode := c.cluster.Spec.ClusterSettings.IndexStorageSetting
-	if couchbaseutil.IndexStorageMode(specStorageMode) != settings.StorageMode {
-		if err := c.client.SetIndexSettings(c.readyMembers(), c.username, c.password, string(specStorageMode), settings); err != nil {
+	storageMode := couchbaseutil.IndexStorageMode(c.cluster.Spec.ClusterSettings.IndexStorageSetting)
+	if storageMode != settings.StorageMode {
+		settings.StorageMode = storageMode
+
+		if err := c.client.SetIndexSettings(c.readyMembers(), settings); err != nil {
 			log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
-			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", specStorageMode, err.Error())
+			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", storageMode, err.Error())
 			c.cluster.Status.SetConfigRejectedCondition(message)
 
 			return err

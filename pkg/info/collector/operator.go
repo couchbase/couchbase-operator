@@ -2,7 +2,6 @@ package collector
 
 import (
 	"fmt"
-	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"io/ioutil"
 	"net/http"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/k8s"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 
 	corev1 "k8s.io/api/core/v1"

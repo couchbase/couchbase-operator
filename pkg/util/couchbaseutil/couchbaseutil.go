@@ -757,20 +757,7 @@ func (c *CouchbaseClient) IsRebalanceActive(ms MemberSet) (bool, error) {
 
 func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]Bucket, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
-
-	buckets, err := c.client.GetBuckets()
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Standardize on value/pointer
-	res := []Bucket{}
-
-	for _, bucket := range buckets {
-		res = append(res, *bucket)
-	}
-
-	return res, nil
+	return c.client.GetBuckets()
 }
 
 func (c *CouchbaseClient) CreateBucket(ms MemberSet, bucket Bucket) error {
@@ -800,13 +787,7 @@ func (c *CouchbaseClient) GetUser(ms MemberSet, id string, domain couchbasev2.Au
 
 func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]*User, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
-
-	users, err := c.client.GetUsers()
-	if err != nil {
-		return nil, err
-	}
-
-	return users, nil
+	return c.client.GetUsers()
 }
 
 func (c *CouchbaseClient) CreateUser(ms MemberSet, user User) error {
@@ -821,13 +802,7 @@ func (c *CouchbaseClient) DeleteUser(ms MemberSet, user User) error {
 
 func (c *CouchbaseClient) ListGroups(ms MemberSet) ([]*Group, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
-
-	groups, err := c.client.GetGroups()
-	if err != nil {
-		return nil, err
-	}
-
-	return groups, nil
+	return c.client.GetGroups()
 }
 
 func (c *CouchbaseClient) CreateGroup(ms MemberSet, group Group) error {
@@ -933,16 +908,13 @@ func (c *CouchbaseClient) SetUpdatesEnabled(ms MemberSet, enabled bool) error {
 	return c.client.SetUpdatesEnabled(enabled)
 }
 
-func (c *CouchbaseClient) GetIndexSettings(ms MemberSet, username, password string) (*IndexSettings, error) {
+func (c *CouchbaseClient) GetIndexSettings(ms MemberSet) (*IndexSettings, error) {
 	c.client.SetEndpoints(ms.ClientURLs())
 	return c.client.GetIndexSettings()
 }
 
-func (c *CouchbaseClient) SetIndexSettings(ms MemberSet, username, password, storageMode string, settings *IndexSettings) error {
+func (c *CouchbaseClient) SetIndexSettings(ms MemberSet, settings *IndexSettings) error {
 	c.client.SetEndpoints(ms.ClientURLs())
-
-	settings.StorageMode = IndexStorageMode(storageMode)
-
 	return c.client.SetIndexSettings(settings)
 }
 

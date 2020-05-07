@@ -259,9 +259,11 @@ func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 func getBucket(client *couchbaseutil.Couchbase, bucketName string) (*couchbaseutil.Bucket, error) {
 	buckets, err := client.GetBuckets()
 	if err == nil {
-		for _, b := range buckets {
-			if b.BucketName == bucketName {
-				return b, nil
+		for i := range buckets {
+			bucket := buckets[i]
+
+			if bucket.BucketName == bucketName {
+				return &bucket, nil
 			}
 		}
 	}

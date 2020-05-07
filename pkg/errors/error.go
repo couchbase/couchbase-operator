@@ -1,7 +1,7 @@
 package errors
 
 import (
-	E "errors"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	ErrClusterCreating       = E.New("existing cluster failed during prior initialization, state unknown")
-	ErrUnknownCreatePod      = E.New("unknown error occurred creating pod")
-	ErrResourceLabelMismatch = E.New("resource does not match label selection")
+	ErrClusterCreating       = errors.New("existing cluster failed during prior initialization, state unknown")
+	ErrUnknownCreatePod      = errors.New("unknown error occurred creating pod")
+	ErrResourceLabelMismatch = errors.New("resource does not match label selection")
 )
 
 type rebalanceNotObservedError struct{}
