@@ -32,7 +32,6 @@ linters:
   - goconst # repeated things that should be constants
   - prealloc # constant sized arrays can be preallocated
   - nakedret # using naked returns in complicated functions
-  - goimports # almost certainly gocbmgr's (cbmgr) fault
 
 linters-settings:
   # Code duplication filter catches a lot of duplication in test

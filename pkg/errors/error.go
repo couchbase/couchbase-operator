@@ -7,7 +7,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (

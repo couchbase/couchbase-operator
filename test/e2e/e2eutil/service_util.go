@@ -1,11 +1,13 @@
 package e2eutil
 
 import (
+	"testing"
+
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"testing"
 )
 
 func CreateService(kubeClient kubernetes.Interface, namespace string, service *v1.Service) (*v1.Service, error) {

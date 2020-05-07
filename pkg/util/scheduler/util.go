@@ -6,7 +6,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/client"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // serverList is a list of servers in a server group

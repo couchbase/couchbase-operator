@@ -3,13 +3,13 @@ package client
 import (
 	"context"
 	"fmt"
-	"k8s.io/api/batch/v1beta1"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	couchbaseclientv2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -725,7 +725,7 @@ type CronJobCache struct {
 
 // newJobCache creates a new synchronized cache for Job resources.
 func newCronJobCache(ctx context.Context, client kubernetes.Interface, namespace string, selector fmt.Stringer) (*CronJobCache, error) {
-	resourceCache, err := newResourceCache(ctx, client.BatchV1beta1().RESTClient(), &v1beta1.CronJob{}, selector, "cronjobs", namespace)
+	resourceCache, err := newResourceCache(ctx, client.BatchV1beta1().RESTClient(), &batchv1beta1.CronJob{}, selector, "cronjobs", namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -737,7 +737,7 @@ func newCronJobCache(ctx context.Context, client kubernetes.Interface, namespace
 }
 
 // get returns the requested job based on name.
-func (c *CronJobCache) Get(name string) (*v1beta1.CronJob, bool) {
+func (c *CronJobCache) Get(name string) (*batchv1beta1.CronJob, bool) {
 	key := c.namespace + "/" + name
 
 	// Cannot error
@@ -746,14 +746,14 @@ func (c *CronJobCache) Get(name string) (*v1beta1.CronJob, bool) {
 		return nil, exists
 	}
 
-	return obj.(*v1beta1.CronJob), true
+	return obj.(*batchv1beta1.CronJob), true
 }
 
 // list returns all jobs.
-func (c *CronJobCache) List() (resources []*v1beta1.CronJob) {
+func (c *CronJobCache) List() (resources []*batchv1beta1.CronJob) {
 	objs := c.resourceCache.informer.GetStore().List()
 	for _, obj := range objs {
-		resources = append(resources, obj.(*v1beta1.CronJob))
+		resources = append(resources, obj.(*batchv1beta1.CronJob))
 	}
 
 	return

@@ -10,7 +10,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 )

@@ -3,7 +3,6 @@ package e2eutil
 import (
 	"context"
 	"fmt"
-	"github.com/go-openapi/errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,6 +16,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+
+	"github.com/go-openapi/errors"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"

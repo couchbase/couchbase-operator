@@ -6,7 +6,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )

@@ -1,8 +1,9 @@
 package k8sutil
 
 import (
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"testing"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
 func TestKubernetesVersion(t *testing.T) {

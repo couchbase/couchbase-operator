@@ -2,10 +2,12 @@ package cluster
 
 import (
 	"fmt"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {

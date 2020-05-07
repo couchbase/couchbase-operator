@@ -9,7 +9,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // eventCollector represents a collection of events
