@@ -498,7 +498,7 @@ From there you can access the logs and backup data directly.
 The following is an example file that creates such a Kubernetes job.
 The job creates a pod and mounts the PVC on the path `/data` as the backup and restore pods themselves would.
 
-[source,yaml]
+[source,yaml,subs="attributes,verbatim"]
 ----
 kind: Job
 apiVersion: batch/v1
