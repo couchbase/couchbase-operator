@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"crypto/x509"
-	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -103,13 +102,6 @@ func validateTLS(kubeclient kubernetes.Interface, cluster *couchbasev1.Couchbase
 
 func main() {
 	printVersion := false
-	flag.BoolVar(&printVersion, "v", false, "Displays the version and exits")
-	flag.Parse()
-
-	if printVersion {
-		fmt.Println("cbopconv", version.VersionWithBuildNumber())
-		os.Exit(0)
-	}
 
 	// Parse the command line arguments.
 	config := Configuration{
@@ -117,9 +109,17 @@ func main() {
 	}
 	flagSet := pflag.NewFlagSet("cbopconv", pflag.ExitOnError)
 	config.ConfigFlags.AddFlags(flagSet)
+
+	flagSet.BoolVar(&printVersion, "version", false, "Displays the version and exits")
+
 	if err := flagSet.Parse(os.Args[1:]); err != nil {
 		fmt.Println("failed to parse arguments:", err)
 		os.Exit(1)
+	}
+
+	if printVersion {
+		fmt.Println("cbopconv", version.VersionWithBuildNumber())
+		os.Exit(0)
 	}
 
 	// Register our data types.
