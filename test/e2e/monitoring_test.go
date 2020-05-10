@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -166,7 +167,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 
 	// deleting monitoring secret
 	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(monitoringAuthSecret, nil); err != nil {
-		e2eutil.Die(t, err)
+		fmt.Println("Warning: Unable to delete monitoring secret: ", err)
 	}
 
 	// Create the cluster.
