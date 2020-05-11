@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
 	"github.com/golang/groupcache/lru"
@@ -79,6 +80,7 @@ type Cluster struct {
 	members      couchbaseutil.MemberSet
 	username     string
 	password     string
+	api          *couchbaseutil.Client
 	client       *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
 	ctx          context.Context                // Context used to cancel long running operations
 	cancel       context.CancelFunc             // Closure on the context to indicate cancellation
@@ -252,7 +254,7 @@ func (c *Cluster) setup() error {
 	// Once the cluster is guaranteed to exist, extract the UUID and inject
 	// it into the client.  Connections from now on will be aborted if the
 	// UUID reported on the persistent connection differs
-	c.client.SetUUID(c.cluster.Status.ClusterID)
+	c.api.SetUUID(c.cluster.Status.ClusterID)
 
 	return nil
 }
@@ -314,8 +316,27 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	uuid, err := c.client.ClusterUUID(m)
-	if err != nil {
+	// This takes a while to get set, yawn...
+	var uuid string
+
+	callback := func() error {
+		info := &couchbaseutil.PoolsInfo{}
+		if err := couchbaseutil.GetPools(info).On(c.api, m); err != nil {
+			return err
+		}
+
+		uuid = info.GetUUID()
+		if uuid == "" {
+			return fmt.Errorf("cluster UUID not set")
+		}
+
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(c.ctx, time.Minute)
+	defer cancel()
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
 		return err
 	}
 
@@ -647,7 +668,9 @@ func (c *Cluster) setupAuth(authSecret string) error {
 func (c *Cluster) initCouchbaseClient() error {
 	log.Info("Couchbase client starting", "cluster", c.namespacedName())
 
-	c.client = couchbaseutil.NewCouchbaseClient(c.ctx, c.cluster.Name, c.username, c.password)
+	c.api = couchbaseutil.New(c.ctx, c.namespacedName(), c.username, c.password)
+
+	c.client = couchbaseutil.NewCouchbaseClient(c.ctx, c.api)
 
 	if c.isSecureClient() {
 		// Grab the operator secret
@@ -681,7 +704,7 @@ func (c *Cluster) initCouchbaseClient() error {
 			}
 		}
 
-		c.client.SetTLS(tls)
+		c.api.SetTLS(tls)
 	}
 
 	return nil

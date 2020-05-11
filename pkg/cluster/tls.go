@@ -28,15 +28,15 @@ func tlsValid(member *couchbaseutil.Member, ca, clientCert, clientKey []byte, ce
 
 // reloadCA insecurely reloads the cluster CA certificate.
 func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
-	oldcacert, err := c.client.GetClusterCACert(member)
-	if err != nil {
+	oldcacert := []byte{}
+	if err := couchbaseutil.GetClusterCACert(oldcacert).On(c.api, member); err != nil {
 		return err
 	}
 
 	if !reflect.DeepEqual(cacert, oldcacert) {
 		log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name)
 
-		if err := c.client.UploadClusterCACert(member, cacert); err != nil {
+		if err := couchbaseutil.SetClusterCACert(cacert).On(c.api, member); err != nil {
 			return err
 		}
 	}
@@ -46,11 +46,7 @@ func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
 
 // reloadChain does an insecure reload of the TLS certificates and keys.
 func (c *Cluster) reloadChain(member *couchbaseutil.Member) error {
-	if err := c.client.ReloadNodeCert(member); err != nil {
-		return err
-	}
-
-	return nil
+	return couchbaseutil.ReloadNodeCert().On(c.api, member)
 }
 
 // reloadChainAndVerify reloads the certificate chain for a member when necessary,
@@ -73,7 +69,7 @@ func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert, cli
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
+	ctx, cancel := context.WithTimeout(c.ctx, extendedRetryPeriod)
 	defer cancel()
 
 	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
@@ -172,7 +168,7 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 	// when mandatory mTLS is enabled. If however we are disabling mTLS entirely but
 	// not rotating, then we need to use the existing client cert or the check will
 	// fail.
-	if tls := c.client.GetTLS(); cert == nil && tls != nil && tls.ClientAuth != nil {
+	if tls := c.api.GetTLS(); cert == nil && tls != nil && tls.ClientAuth != nil {
 		cert = tls.ClientAuth.Cert
 		key = tls.ClientAuth.Key
 	}
@@ -225,21 +221,24 @@ func (c *Cluster) reconcileClientAuthentication() error {
 		}
 	}
 
-	existingSettings, err := c.client.GetClientCertAuth(c.members)
-	if err != nil {
+	// GetClientCertAuth/SetClientCertAuth allow reconciliation of TLS settings.
+	// The ordering constraints when using mTLS make the process very messy, so
+	// this is always done over HTTP.
+	existingSettings := &couchbaseutil.ClientCertAuth{}
+	if err := couchbaseutil.GetClientCertAuth(existingSettings).InPlaintext().On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
 	if !reflect.DeepEqual(existingSettings, settings) {
-		if err := c.client.SetClientCertAuth(c.members, settings); err != nil {
+		if err := couchbaseutil.SetClientCertAuth(settings).InPlaintext().On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
 		// These settings are ACCEPTED and take some time to apply, so wait until they are
 		// live, lest we get non-determinism.
 		callback := func() error {
-			currentSettings, err := c.client.GetClientCertAuth(c.members)
-			if err != nil {
+			currentSettings := &couchbaseutil.ClientCertAuth{}
+			if err := couchbaseutil.GetClientCertAuth(currentSettings).InPlaintext().On(c.api, c.readyMembers()); err != nil {
 				return err
 			}
 
@@ -372,8 +371,8 @@ func (c *Cluster) reconcileTLS() error {
 	// Update the client if necessary.  This must be done after member reconciliation as
 	// we need a reference to the old TLS client certs using this process.  They are not
 	// interrogated when no longer required as per the client code above.
-	if !reflect.DeepEqual(tls, c.client.GetTLS()) {
-		c.client.SetTLS(tls)
+	if !reflect.DeepEqual(tls, c.api.GetTLS()) {
+		c.api.SetTLS(tls)
 		log.Info("Reloading TLS client configuration")
 		c.raiseEvent(k8sutil.ClientTLSUpdatedEvent(c.cluster))
 	}

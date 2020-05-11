@@ -2,6 +2,8 @@ package version
 
 import (
 	"fmt"
+
+	"github.com/couchbase/couchbase-operator/pkg/revision"
 )
 
 const (
@@ -38,4 +40,12 @@ func WithRevisionRedHat() string {
 // commit) is being used.
 func WithBuildNumber() string {
 	return fmt.Sprintf("%s (build %s)", WithRevision(), BuildNumber)
+}
+
+// UserAgent is a valid user agent string as defined by the HTTP specification
+// https://tools.ietf.org/html/rfc1945#section-10.15, this is used to identify
+// what unique version of the Operator has been interacting with Couchbase
+// server.
+func UserAgent() string {
+	return fmt.Sprintf("%s/%s (commit/%s; build/%s)", Application, Version, revision.Revision(), BuildNumber)
 }

@@ -258,8 +258,8 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 	defer cleanup()
 
 	callback = func() error {
-		info, err := client.ClusterInfo()
-		if err != nil {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
 			return err
 		}
 
@@ -978,25 +978,33 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 		}
 		defer cleanup()
 
-		progress := client.NewRebalanceProgress()
-		defer progress.Cancel()
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case status, ok := <-progress.Status():
-				if !ok {
-					return fmt.Errorf("rebalance status terminated: %v", progress.Error())
+			case <-ticker.C:
+				tasks := &couchbaseutil.TaskList{}
+				if err := couchbaseutil.ListTasks(tasks).On(client.client, client.host); err != nil {
+					return err
 				}
-				switch status.Status {
-				case couchbaseutil.RebalanceStatusUnknown:
-					return fmt.Errorf("rebalance status unknown")
-				case couchbaseutil.RebalanceStatusRunning:
-					if status.Progress >= threshold {
-						return nil
-					}
+
+				task, err := tasks.GetTask(couchbaseutil.TaskTypeRebalance)
+				if err != nil {
+					return err
 				}
+
+				if task.Status != "running" {
+					return fmt.Errorf("rebalance status %s", task.Status)
+				}
+
+				if task.Progress < threshold {
+					return fmt.Errorf("rebalance %.2f%% waiting for %.2f%%", task.Progress, threshold)
+				}
+
+				return nil
 			}
 		}
 	})
@@ -1159,7 +1167,7 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 
 		defer cleanup()
 
-		_, err = client.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain))
+		err = couchbaseutil.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), nil).On(client.client, client.host)
 
 		return err == nil, err
 	})
@@ -1186,14 +1194,14 @@ func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.Couch
 		defer cleanup()
 
 		// we should get an error attempting to get user
-		users, err := client.GetUsers()
-		if err != nil {
+		users := &couchbaseutil.UserList{}
+		if err := couchbaseutil.ListUsers(users).On(client.client, client.host); err != nil {
 			return true, err
 		}
 
 		found := false
 
-		for _, user := range users {
+		for _, user := range *users {
 			if user.ID == userName {
 				found = true
 				break

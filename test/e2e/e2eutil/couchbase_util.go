@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
@@ -32,15 +33,22 @@ import (
 
 type serviceVerifier func(t *testing.T, ci *couchbaseutil.ClusterInfo, value map[string]int) bool
 
+type CouchbaseClient struct {
+	client *couchbaseutil.Client
+	host   string
+}
+
 // newClient returns a new Couchbase management client (internal not go SDK).
-func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, urls []string) (*couchbaseutil.Couchbase, error) {
+func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, host string) (*CouchbaseClient, error) {
 	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.Security.AdminSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	client := couchbaseutil.New(username, password)
-	client.SetEndpoints(urls)
+	client := &CouchbaseClient{
+		client: couchbaseutil.New(context.Background(), "", username, password),
+		host:   host,
+	}
 
 	return client, nil
 }
@@ -105,7 +113,7 @@ func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*couchbaseutil.Couchbase, func(), error) {
+func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*CouchbaseClient, func(), error) {
 	// Create a port forward and get a host connection string
 	host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
 	if err != nil {
@@ -113,7 +121,7 @@ func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.Couchbase
 	}
 
 	// Return a client proxying through the port forwarder.
-	client, err := newClient(k8s.KubeClient, cluster, []string{"http://" + host})
+	client, err := newClient(k8s.KubeClient, cluster, "http://"+host)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,7 +129,7 @@ func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.Couchbase
 	return client, cleanup, nil
 }
 
-func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*couchbaseutil.Couchbase, func()) {
+func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*CouchbaseClient, func()) {
 	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 	if err != nil {
 		Die(t, err)
@@ -241,7 +249,7 @@ func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 			return true, nil
 		}
 
-		if err := client.EditBucket(&after); err != nil {
+		if err := couchbaseutil.UpdateBucket(&after).On(client.client, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -256,19 +264,18 @@ func MustPatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 }
 
 // Get Bucket from couchbase cluster.
-func getBucket(client *couchbaseutil.Couchbase, bucketName string) (*couchbaseutil.Bucket, error) {
-	buckets, err := client.GetBuckets()
-	if err == nil {
-		for i := range buckets {
-			bucket := buckets[i]
-
-			if bucket.BucketName == bucketName {
-				return &bucket, nil
-			}
-		}
+func getBucket(client *CouchbaseClient, bucketName string) (*couchbaseutil.Bucket, error) {
+	buckets := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&buckets).On(client.client, client.host); err != nil {
+		return nil, err
 	}
 
-	return nil, NewErrGetClusterBucket(bucketName)
+	bucket, err := buckets.Get(bucketName)
+	if err != nil {
+		return nil, err
+	}
+
+	return bucket, nil
 }
 
 // Inserts Json docs into couchbase bucket.
@@ -356,7 +363,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		defer cleanup()
 
-		if err := client.AddNode(member.ClientURLPlaintext(), username, password, svcs); err != nil {
+		if err := couchbaseutil.AddNode(member.ClientURLPlaintext(), username, password, svcs).RetryFor(time.Minute).On(client.client, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -374,7 +381,18 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		defer cleanup()
 
-		if err := client.Rebalance([]string{}); err != nil {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		known := make([]string, len(info.Nodes))
+
+		for i, node := range info.Nodes {
+			known[i] = node.OTPNode
+		}
+
+		if err := couchbaseutil.Rebalance(known, []string{}).On(client.client, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -392,8 +410,8 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		defer cleanup()
 
-		info, err := client.ClusterInfo()
-		if err != nil {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -417,10 +435,28 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
 	defer cleanup()
 
+	info := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+		return err
+	}
+
+	known := make([]string, len(info.Nodes))
+
+	for i, node := range info.Nodes {
+		known[i] = node.OTPNode
+	}
+
 	member := MemberFromSpecProps(couchbase.Name, couchbase.Namespace, "", index)
 
-	err := client.Rebalance([]string{member.HostURL()})
-	if err != nil {
+	eject := []string{}
+
+	for _, node := range info.Nodes {
+		if node.HostName == member.HostURL() {
+			eject = append(eject, node.OTPNode)
+		}
+	}
+
+	if err := couchbaseutil.Rebalance(known, eject).On(client.client, client.host); err != nil {
 		return err
 	}
 
@@ -441,8 +477,8 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 
 		defer cleanup()
 
-		info, err := client.ClusterInfo()
-		if err != nil {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -497,7 +533,27 @@ func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 			hostnames = append(hostnames, member.HostURLPlaintext())
 		}
 
-		if err := client.Failover(hostnames); err != nil {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		data := url.Values{}
+
+		for _, node := range info.Nodes {
+			for _, hostname := range hostnames {
+				if node.HostName == hostname {
+					data.Add("otpNode", node.OTPNode)
+				}
+			}
+		}
+
+		request := &couchbaseutil.Request{
+			Path: "/controller/failOver",
+			Body: []byte(data.Encode()),
+		}
+
+		if err := client.client.Post(request, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -529,8 +585,8 @@ func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *couchbasev2.
 
 		defer cleanup()
 
-		clusterInfo, err := client.ClusterInfo()
-		if err != nil {
+		clusterInfo := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(clusterInfo).On(client.client, client.host); err != nil {
 			return err
 		}
 
@@ -566,11 +622,12 @@ func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 
 		defer cleanup()
 
-		unhealthy := []string{}
-		clusterInfo, err := client.ClusterInfo()
-		if err != nil {
+		clusterInfo := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(clusterInfo).On(client.client, client.host); err != nil {
 			return err
 		}
+
+		unhealthy := []string{}
 
 		for _, node := range clusterInfo.Nodes {
 			if node.Status == "unhealthy" {
@@ -605,8 +662,8 @@ func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 
 		defer cleanup()
 
-		info, err := client.ClusterInfo()
-		if err != nil {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
 			return false, err
 		}
 
@@ -636,8 +693,8 @@ func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 
 		defer cleanup()
 
-		info, err := client.GetAutoFailoverSettings()
-		if err != nil {
+		info := &couchbaseutil.AutoFailoverSettings{}
+		if err := couchbaseutil.GetAutoFailoverSettings(info).On(client.client, client.host); err != nil {
 			return false, err
 		}
 
@@ -667,8 +724,8 @@ func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 
 		defer cleanup()
 
-		info, err := client.GetIndexSettings()
-		if err != nil {
+		info := &couchbaseutil.IndexSettings{}
+		if err := couchbaseutil.GetIndexSettings(info).On(client.client, client.host); err != nil {
 			return false, err
 		}
 
@@ -698,8 +755,8 @@ func PatchAutoCompactionSettings(k8s *types.Cluster, couchbase *couchbasev2.Couc
 
 		defer cleanup()
 
-		info, err := client.GetAutoCompactionSettings()
-		if err != nil {
+		info := &couchbaseutil.AutoCompactionSettings{}
+		if err := couchbaseutil.GetAutoCompactionSettings(info).On(client.client, client.host); err != nil {
 			return false, err
 		}
 
@@ -729,8 +786,8 @@ func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 
 		defer cleanup()
 
-		info, err := client.ClusterInfo()
-		if err != nil {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -966,8 +1023,14 @@ func GetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 
 		defer cleanup()
 
-		info, err := client.GetBucketStatus(bucket)
-		if err != nil {
+		info := &couchbaseutil.BucketStatus{}
+
+		request := &couchbaseutil.Request{
+			Path:   "/pools/default/buckets/" + bucket,
+			Result: info,
+		}
+
+		if err := client.client.Get(request, client.host); err != nil {
 			return err
 		}
 
@@ -1016,7 +1079,7 @@ func CreateBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 			CompressionMode:    couchbaseutil.CompressionModePassive,
 		}
 
-		return client.CreateBucket(b)
+		return couchbaseutil.CreateBucket(b).On(client.client, client.host)
 	}
 
 	return retryutil.RetryOnErr(ctx, 10*time.Second, callback)
@@ -1041,13 +1104,13 @@ func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couc
 
 		defer cleanup()
 
-		actual, err := client.GetUser(userName, userAuthDomain)
-		if err != nil {
+		actual := &couchbaseutil.User{}
+		if err := couchbaseutil.GetUser(userName, userAuthDomain, actual).On(client.client, client.host); err != nil {
 			return false, err
 		}
 
-		expected, err := client.GetUser(userName, userAuthDomain)
-		if err != nil {
+		expected := &couchbaseutil.User{}
+		if err := couchbaseutil.GetUser(userName, userAuthDomain, expected).On(client.client, client.host); err != nil {
 			return false, err
 		}
 
@@ -1080,8 +1143,8 @@ func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 
 		defer cleanup()
 
-		status, err := client.GetLDAPConnectivityStatus()
-		if err != nil {
+		status := &couchbaseutil.LDAPStatus{}
+		if err := couchbaseutil.GetLDAPConnectivityStatus(status).On(client.client, client.host); err != nil {
 			return false, err
 		}
 
@@ -1113,13 +1176,13 @@ func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled
 
 		defer cleanup()
 
-		clusterInfo, err := client.ClusterInfo()
-		if err != nil {
+		clusterInfo := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(clusterInfo).On(client.client, client.host); err != nil {
 			return err
 		}
 
-		securityInfo, err := client.GetSecuritySettings()
-		if err != nil {
+		securityInfo := &couchbaseutil.SecuritySettings{}
+		if err := couchbaseutil.GetSecuritySettings(securityInfo).On(client.client, client.host); err != nil {
 			return err
 		}
 

@@ -114,6 +114,19 @@ type ClusterInfo struct {
 	Balanced               bool       `json:"balanced"`
 }
 
+// GetNode returns the named node.
+func (c *ClusterInfo) GetNode(hostname string) (*NodeInfo, error) {
+	for i := range c.Nodes {
+		node := &c.Nodes[i]
+
+		if node.HostName == hostname {
+			return node, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unable to lookup node %s", hostname)
+}
+
 // PoolsDefaults returns a struct which could be used with the /pools/default API.
 func (c *ClusterInfo) PoolsDefaults() *PoolsDefaults {
 	return &PoolsDefaults{
@@ -127,12 +140,12 @@ func (c *ClusterInfo) PoolsDefaults() *PoolsDefaults {
 }
 
 type IndexSettings struct {
-	StorageMode        IndexStorageMode `json:"storageMode"`
-	Threads            int              `json:"indexerThreads"`
-	MemSnapInterval    int              `json:"memorySnapshotInterval"`
-	StableSnapInterval int              `json:"stableSnapshotInterval"`
-	MaxRollbackPoints  int              `json:"maxRollbackPoints"`
-	LogLevel           IndexLogLevel    `json:"logLevel"`
+	StorageMode        IndexStorageMode `url:"storageMode" json:"storageMode"`
+	Threads            int              `url:"indexerThreads" json:"indexerThreads"`
+	MemSnapInterval    int              `url:"memorySnapshotInterval" json:"memorySnapshotInterval"`
+	StableSnapInterval int              `url:"stableSnapshotInterval" json:"stableSnapshotInterval"`
+	MaxRollbackPoints  int              `url:"maxRollbackPoints" json:"maxRollbackPoints"`
+	LogLevel           IndexLogLevel    `url:"logLevel" json:"logLevel"`
 }
 
 type FailoverOnDiskFailureSettings struct {
@@ -208,7 +221,7 @@ type NodeInfo struct {
 	ThisNode           bool                 `json:"thisNode"`
 	Uptime             string               `json:"uptime"`
 	Membership         string               `json:"clusterMembership"`
-	RecoveryType       string               `json:"recoveryType"`
+	RecoveryType       RecoveryType         `json:"recoveryType"`
 	Status             string               `json:"status"`
 	OTPNode            string               `json:"otpNode"`
 	HostName           string               `json:"hostname"`
@@ -226,16 +239,38 @@ type StorageInfo struct {
 }
 
 type PoolsInfo struct {
-	Enterprise bool        `json:"isEnterprise"`
-	UUID       interface{} `json:"uuid"`
+	// Enterprise determines whether this is an EE build.
+	Enterprise bool `json:"isEnterprise"`
+
+	// UUID, in true server style, is either a string, or initially
+	// an array.
+	UUID interface{} `json:"uuid"`
 }
+
+// GetUUID abstracts away the polymorphic nature of the UUID field,
+// returning an empty string if something goes wrong.
+func (p PoolsInfo) GetUUID() string {
+	uuid, ok := p.UUID.(string)
+	if !ok {
+		return ""
+	}
+
+	return uuid
+}
+
+type TaskType string
+
+const (
+	TaskTypeRebalance TaskType = "rebalance"
+	TaskTypeXDCR      TaskType = "xdcr"
+)
 
 // Task is a base object to describe the very unfriendly polymorphic
 // task struct.
 type Task struct {
 	// Common attributes.
-	Type   string `json:"type"`
-	Status string `json:"status"`
+	Type   TaskType `json:"type"`
+	Status string   `json:"status"`
 
 	// Rebalance attributes.
 	Progress float64 `json:"progress"`
@@ -247,6 +282,46 @@ type Task struct {
 	Target           string `json:"target"`
 	ReplicationType  string `url:"replicationType"`
 	FilterExpression string `url:"filterExpression"`
+}
+
+type TaskList []Task
+
+// GetTask expects to find at most one task of the specified type.
+// If more than one is found it's considered an error and you have
+// probably introduced a bug.
+func (t TaskList) GetTask(taskType TaskType) (*Task, error) {
+	var task *Task
+
+	for i := range t {
+		temp := &t[i]
+
+		if temp.Type == taskType {
+			if task != nil {
+				return nil, fmt.Errorf("found more than one task of type %v", taskType)
+			}
+
+			task = temp
+		}
+	}
+
+	if task == nil {
+		return nil, fmt.Errorf("no task of type %v found", taskType)
+	}
+
+	return task, nil
+}
+
+// FilterType returns all tasks of the specified type.
+func (t TaskList) FilterType(taskType TaskType) *TaskList {
+	out := TaskList{}
+
+	for _, task := range t {
+		if task.Type == taskType {
+			out = append(out, task)
+		}
+	}
+
+	return &out
 }
 
 // PoolsDefaults is the data that may be posted via the /pools/default API
@@ -289,6 +364,20 @@ type Bucket struct {
 	EnableIndexReplica bool            `json:"enableIndexReplica"`
 	BucketPassword     string          `json:"password"`
 	CompressionMode    CompressionMode `json:"compressionMode"`
+}
+
+type BucketList []Bucket
+
+func (b BucketList) Get(name string) (*Bucket, error) {
+	for i := range b {
+		bucket := b[i]
+
+		if bucket.BucketName == name {
+			return &bucket, nil
+		}
+	}
+
+	return nil, fmt.Errorf("bucket %s not found", name)
 }
 
 type BucketBasicStats struct {
@@ -342,12 +431,16 @@ type User struct {
 	Groups   []string   `json:"groups"`
 }
 
+type UserList []User
+
 type Group struct {
 	ID           string     `json:"id"`
 	Roles        []UserRole `json:"roles"`
 	Description  string     `json:"description"`
 	LDAPGroupRef string     `json:"ldap_group_ref"`
 }
+
+type GroupList []Group
 
 type LDAPEncryption string
 
@@ -520,7 +613,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	return nil
 }
 
-func (b *Bucket) FormEncode() []byte {
+func (b *Bucket) FormEncode(update bool) []byte {
 	data := url.Values{}
 	data.Set("name", b.BucketName)
 	data.Set("bucketType", b.BucketType)
@@ -546,7 +639,7 @@ func (b *Bucket) FormEncode() []byte {
 		data.Set("threadsNumber", strconv.Itoa(int(IoPriorityThreadCountHigh)))
 	}
 
-	if b.ConflictResolution != "" {
+	if !update && b.ConflictResolution != "" {
 		data.Set("conflictResolutionType", b.ConflictResolution)
 	}
 
@@ -560,7 +653,7 @@ func (b *Bucket) FormEncode() []byte {
 // SettingsStats is the data structure returned by /settings/stats
 type SettingsStats struct {
 	// SendStats actually indicates whether to perform software update checks
-	SendStats bool `json:"sendStats"`
+	SendStats bool `json:"sendStats" url:"sendStats"`
 }
 
 // ServerGroup is a map from name to a list of nodes
@@ -748,6 +841,8 @@ type Replication struct {
 	FilterExpression string `url:"filterExpression,omitempty"`
 	PauseRequested   bool   `url:"pauseRequested"`
 }
+
+type ReplicationList []Replication
 
 // ReplicationSettings describes an XDCR replication settings as returned by
 //   GET /settings/replications/<remote UUID>/<local bucket>/<remote bucket>
@@ -940,4 +1035,21 @@ type NodeNetworkConfiguration struct {
 
 	// NodeEncryption is whether encyryption is enabled for a node.
 	NodeEncryption OnOrOff `json:"nodeEncryption" url:"nodeEncryption"`
+}
+
+// Client certificate authentication prefixes, used to extract the user name
+// All fields must be specified, so no "omitempty" tags.
+type ClientCertAuthPrefix struct {
+	Path      string `json:"path"`
+	Prefix    string `json:"prefix"`
+	Delimiter string `json:"delimiter"`
+}
+
+// Client certificate authentication settings
+// All fields must be specified, so no "omitempty" tags.
+type ClientCertAuth struct {
+	// Must be 'disable', 'enable', 'mandatory'
+	State string `json:"state"`
+	// Maximum of 10
+	Prefixes []ClientCertAuthPrefix `json:"prefixes"`
 }

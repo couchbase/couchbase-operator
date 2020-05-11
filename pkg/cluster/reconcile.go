@@ -27,6 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+const (
+	// extendedRetryPeriod is an extended amount of time to wait for slow
+	// API operations to report success.
+	extendedRetryPeriod = 3 * time.Minute
+)
+
 func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
 	defer log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
@@ -138,6 +144,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 
 	c.cluster.Status.Size = c.members.Size()
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
+	c.cluster.Status.SetBalancedCondition()
 	c.cluster.Status.SetReadyCondition()
 
 	return nil
@@ -234,16 +241,16 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	// The new node will not be part of the cluster yet  so the API calls will fail
 	// when checking the UUID, temporarily disable these checks while installing
 	// TLS configuration
-	c.client.SetUUID("")
-	defer c.client.SetUUID(c.cluster.Status.ClusterID)
+	c.api.SetUUID("")
+	defer c.api.SetUUID(c.cluster.Status.ClusterID)
 
 	// Check the pod is EE
-	isEnterprise, err := c.client.IsEnterprise(newMember)
-	if err != nil {
+	info := &couchbaseutil.PoolsInfo{}
+	if err := couchbaseutil.GetPools(info).On(c.api, newMember); err != nil {
 		return nil, err
 	}
 
-	if !isEnterprise {
+	if !info.Enterprise {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
 		return nil, fmt.Errorf("couchbase server reports community edition")
 	}
@@ -254,9 +261,16 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 		return nil, err
 	}
 
-	// Initialize node paths
+	// Set the hostname.  Sometimes this returns a 500 so needs a retry, I'm guessing
+	// although the server is running and returns cluster information it's not configured
+	// enough to allow host name changes.
+	if err := couchbaseutil.SetHostname(newMember.Addr()).RetryFor(time.Minute).On(c.api, newMember); err != nil {
+		return nil, err
+	}
+
+	// Initialize storage paths.
 	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
-	if err := c.client.NodeInitialize(newMember, c.cluster.Name, dataPath, indexPath, analyticsPaths); err != nil {
+	if err := couchbaseutil.SetStoragePaths(dataPath, indexPath, analyticsPaths).On(c.api, newMember); err != nil {
 		return nil, err
 	}
 
@@ -274,9 +288,6 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 
 // Creates and adds a new Couchbase cluster member.
 func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil.Member, error) {
-	// Save the existing members now, these will be the set we use to add the new node via
-	ms := c.members.Copy()
-
 	// Create the new member
 	newMember, err := c.createMember(serverSpec)
 	if err != nil {
@@ -293,7 +304,12 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil
 
 	// Add to the cluster. Note we have to use the plain text url as
 	// /controller/addNode will not work with a https reference
-	if err := c.client.AddNode(ms, url, serverSpec.Services); err != nil {
+	services, err := couchbaseutil.ServiceListFromStringArray(serverSpec.Services.StringSlice())
+	if err != nil {
+		return newMember, err
+	}
+
+	if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
 		return newMember, err
 	}
 
@@ -322,13 +338,13 @@ func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 }
 
 // Cancel a node addition.
-func (c *Cluster) cancelAddMember(ms couchbaseutil.MemberSet, member *couchbaseutil.Member) error {
-	if ms == nil {
-		m := couchbaseutil.NewMemberSet(member)
-		ms = c.members.Diff(m)
+func (c *Cluster) cancelAddMember(member *couchbaseutil.Member) error {
+	otpNode, err := c.client.GetOTPNode(c.readyMembers(), member.HostURLPlaintext())
+	if err != nil {
+		return err
 	}
 
-	if err := c.client.CancelAddNode(ms, member.HostURLPlaintext()); err != nil {
+	if err := couchbaseutil.CancelAddNode(otpNode).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
@@ -517,8 +533,8 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		return nil, nil, nil, nil, err
 	}
 
-	actual, err := c.client.ListBuckets(c.readyMembers())
-	if err != nil {
+	actual := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&actual).On(c.api, c.readyMembers()); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -582,8 +598,10 @@ func (c *Cluster) reconcileBuckets() error {
 		return err
 	}
 
-	for _, bucket := range create {
-		if err := c.client.CreateBucket(c.readyMembers(), bucket); err != nil {
+	for i := range create {
+		bucket := &create[i]
+
+		if err := couchbaseutil.CreateBucket(bucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -591,8 +609,10 @@ func (c *Cluster) reconcileBuckets() error {
 		c.raiseEvent(k8sutil.BucketCreateEvent(bucket.BucketName, c.cluster))
 	}
 
-	for _, bucket := range update {
-		if err := c.client.UpdateBucket(c.readyMembers(), bucket); err != nil {
+	for i := range update {
+		bucket := &update[i]
+
+		if err := couchbaseutil.UpdateBucket(bucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -601,7 +621,7 @@ func (c *Cluster) reconcileBuckets() error {
 	}
 
 	for _, bucket := range remove {
-		if err := c.client.DeleteBucket(c.readyMembers(), bucket); err != nil {
+		if err := couchbaseutil.DeleteBucket(bucket.BucketName).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -690,10 +710,35 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 		AnalyticsMemoryQuota: k8sutil.Megabytes(settings.AnalyticsServiceMemQuota),
 	}
 
-	// set default volume paths and allow for override of via spec
-	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
-	if err := c.client.InitializeCluster(m, c.username, c.password, defaults,
-		serverSpec.Services, dataPath, indexPath, analyticsPaths, string(settings.IndexStorageSetting)); err != nil {
+	// Set the cluster name and memory quotas.
+	if err := couchbaseutil.SetPoolsDefault(defaults).On(c.api, m); err != nil {
+		return err
+	}
+
+	// Set index settings.
+	indexSettings := &couchbaseutil.IndexSettings{}
+	if err := couchbaseutil.GetIndexSettings(indexSettings).On(c.api, m); err != nil {
+		return err
+	}
+
+	indexSettings.StorageMode = couchbaseutil.IndexStorageMode(settings.IndexStorageSetting)
+
+	if err := couchbaseutil.SetIndexSettings(indexSettings).On(c.api, m); err != nil {
+		return err
+	}
+
+	// Setup the services running on this node.
+	services, err := couchbaseutil.ServiceListFromStringArray(serverSpec.Services.StringSlice())
+	if err != nil {
+		return err
+	}
+
+	if err := couchbaseutil.SetServices(services).On(c.api, m); err != nil {
+		return err
+	}
+
+	// Setup the "web UI", which really means set the username and password.
+	if err := couchbaseutil.SetWebSettings(c.username, c.password, 8091).On(c.api, m); err != nil {
 		return err
 	}
 
@@ -709,7 +754,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 		FailoverServerGroup: settings.AutoFailoverServerGroup,
 	}
 
-	return c.client.SetAutoFailoverSettings(c.readyMembers(), autoFailoverSettings)
+	return couchbaseutil.SetAutoFailoverSettings(autoFailoverSettings).On(c.api, m)
 }
 
 // Initialize a member with TLS certificates.
@@ -735,11 +780,11 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 			}
 
 			// Update Couchbase's TLS configuration
-			if err := c.client.UploadClusterCACert(m, ca); err != nil {
+			if err := couchbaseutil.SetClusterCACert(ca).On(c.api, m); err != nil {
 				return err
 			}
 
-			if err := c.client.ReloadNodeCert(m); err != nil {
+			if err := couchbaseutil.ReloadNodeCert().On(c.api, m); err != nil {
 				return err
 			}
 
@@ -784,10 +829,10 @@ func (c *Cluster) getServerGroups() []string {
 
 // createServerGroups creates any server groups defined in the specification
 // whuch Couchbase doesn't know about.
-func (c *Cluster) createServerGroups(existingGroups *couchbaseutil.ServerGroups) (*couchbaseutil.ServerGroups, error) {
+func (c *Cluster) createServerGroups(existingGroups *couchbaseutil.ServerGroups) error {
 	serverGroups := c.getServerGroups()
 
-	ctx, cancel := context.WithTimeout(c.ctx, couchbaseutil.ExtendedRetryPeriod)
+	ctx, cancel := context.WithTimeout(c.ctx, extendedRetryPeriod)
 	defer cancel()
 
 	// Create any that do not exist
@@ -798,26 +843,30 @@ func (c *Cluster) createServerGroups(existingGroups *couchbaseutil.ServerGroups)
 			continue
 		}
 
-		if err := c.client.CreateServerGroup(c.members, serverGroup); err != nil {
-			return nil, err
+		if err := couchbaseutil.CreateServerGroup(serverGroup).On(c.api, c.readyMembers()); err != nil {
+			return err
 		}
 
 		// 409s have been seen due to this not being updated quick enough, ensure the
 		// new server group exists before continuing
-		err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
-			var err error
-			existingGroups, err = c.client.GetServerGroups(c.members)
-			if err != nil {
-				return false, err
+		callback := func() error {
+			if err := couchbaseutil.ListServerGroups(existingGroups).On(c.api, c.readyMembers()); err != nil {
+				return err
 			}
-			return existingGroups.GetServerGroup(serverGroup) != nil, nil
-		})
-		if err != nil {
-			return nil, err
+
+			if existingGroups.GetServerGroup(serverGroup) == nil {
+				return fmt.Errorf("server group %s not found", serverGroup)
+			}
+
+			return nil
+		}
+
+		if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
+			return err
 		}
 	}
 
-	return existingGroups, nil
+	return nil
 }
 
 // Given a server group update return the index of the named group
@@ -842,14 +891,13 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	}
 
 	// Poll the server for existing information
-	existingGroups, err := c.client.GetServerGroups(c.members)
-	if err != nil {
+	existingGroups := &couchbaseutil.ServerGroups{}
+	if err := couchbaseutil.ListServerGroups(existingGroups).On(c.api, c.readyMembers()); err != nil {
 		return false, err
 	}
 
 	// Create any server groups which need defining
-	existingGroups, err = c.createServerGroups(existingGroups)
-	if err != nil {
+	if err := c.createServerGroups(existingGroups); err != nil {
 		return false, err
 	}
 
@@ -913,7 +961,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 		return false, nil
 	}
 
-	return true, c.client.UpdateServerGroups(c.members, existingGroups.GetRevision(), &newGroups)
+	return true, couchbaseutil.UpdateServerGroups(existingGroups.GetRevision(), &newGroups).On(c.api, c.readyMembers())
 }
 
 // TEMPORARY HACK
@@ -925,14 +973,13 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 	}
 
 	// Poll the server for existing information
-	existingGroups, err := c.client.GetServerGroups(c.members)
-	if err != nil {
+	existingGroups := &couchbaseutil.ServerGroups{}
+	if err := couchbaseutil.ListServerGroups(existingGroups).On(c.api, c.readyMembers()); err != nil {
 		return false, err
 	}
 
 	// Create any server groups which need defining
-	existingGroups, err = c.createServerGroups(existingGroups)
-	if err != nil {
+	if err := c.createServerGroups(existingGroups); err != nil {
 		return false, err
 	}
 
@@ -1037,7 +1084,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		// then remove the configuration.
 		if !c.cluster.Spec.HasExposedFeatures() {
 			if existingAddresses != nil {
-				if err := c.client.DeleteAlternateAddressesExternal(member); err != nil {
+				if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
 					return err
 				}
 			}
@@ -1062,7 +1109,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		}
 
 		// Perform the update
-		if err := c.client.SetAlternateAddressesExternal(member, addresses); err != nil {
+		if err := couchbaseutil.SetAlternateAddressesExternal(addresses).On(c.api, member); err != nil {
 			return err
 		}
 	}
@@ -1116,16 +1163,19 @@ func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
 // Get alternate addresses from server, when server is
 // exposed over LoadBalancer then Ports can be ignored.
 func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
-	existingAddresses, err := c.client.GetAlternateAddressesExternal(member)
-	if err != nil {
+	existingAddresses := &couchbaseutil.AlternateAddressesExternal{}
+	if err := c.getAlternateAddressesExternalInto(member, existingAddresses); err != nil {
 		return nil, err
 	}
+
+	if existingAddresses.Hostname == "" {
+		return nil, nil
+	}
+
 	// Remove Ports if member features are exposed with a loadbalancer
 	if svc, found := c.k8s.Services.Get(member.Name); found {
 		if svc.Spec.Type == v1.ServiceTypeLoadBalancer {
-			if existingAddresses != nil {
-				existingAddresses.Ports = nil
-			}
+			existingAddresses.Ports = nil
 		}
 	}
 
@@ -1161,8 +1211,8 @@ func (c *Cluster) reconcileClusterSettings() error {
 // ensure autofailover timeout matches spec setting.
 func (c *Cluster) reconcileAutoFailoverSettings() error {
 	// Get the existing settings
-	failoverSettings, err := c.client.GetAutoFailoverSettings(c.readyMembers())
-	if err != nil {
+	failoverSettings := &couchbaseutil.AutoFailoverSettings{}
+	if err := couchbaseutil.GetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
 		log.Error(err, "Auto-failover settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
@@ -1197,8 +1247,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 
 	// Check to see if we need to reconcile
 	if !reflect.DeepEqual(failoverSettings, specFailoverSettings) {
-		err = c.client.SetAutoFailoverSettings(c.readyMembers(), specFailoverSettings)
-		if err != nil {
+		if err := couchbaseutil.SetAutoFailoverSettings(specFailoverSettings).On(c.api, c.readyMembers()); err != nil {
 			log.Error(err, "Auto-failover settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Failed to update autofailover settings: `%v`", err)
 			c.cluster.Status.SetConfigRejectedCondition(message)
@@ -1215,9 +1264,8 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 
 // ensure memory quota's matche spec setting.
 func (c *Cluster) reconcileMemoryQuotaSettings() error {
-	info, err := c.client.GetClusterInfo(c.readyMembers())
-	if err != nil {
-		log.Error(err, "Cluster settings collection failed", "cluster", c.namespacedName())
+	info := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(info).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
@@ -1239,7 +1287,7 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	}
 
 	if !reflect.DeepEqual(current, requested) {
-		if err := c.client.SetPoolsDefault(c.readyMembers(), requested); err != nil {
+		if err := couchbaseutil.SetPoolsDefault(requested).On(c.api, c.readyMembers()); err != nil {
 			log.Error(err, "Cluster settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Unable update memory quota's [data:%v, index:%v, search:%v]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.cluster.Status.SetConfigRejectedCondition(message)
@@ -1257,33 +1305,40 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 // reconcileSoftwareUpdateNotificationSettings looks to see if the UI displays software
 // update notifications, and updates if different from the cluster specification.
 func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
-	actual, err := c.client.GetUpdatesEnabled(c.readyMembers())
-	if err != nil {
+	// Read
+	actual := &couchbaseutil.SettingsStats{}
+	if err := couchbaseutil.GetSettingsStats(actual).On(c.api, c.readyMembers()); err != nil {
 		log.Error(err, "Software notification settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
 
-	requested := c.cluster.Spec.SoftwareUpdateNotifications
-	if actual != requested {
-		if err := c.client.SetUpdatesEnabled(c.readyMembers(), requested); err != nil {
-			log.Error(err, "Software notification settings update failed", "cluster", c.namespacedName())
-			message := fmt.Sprintf("Unable update software notification settings: `%v`", err)
-			c.cluster.Status.SetConfigRejectedCondition(message)
+	// Modify
+	requested := *actual
+	requested.SendStats = c.cluster.Spec.SoftwareUpdateNotifications
 
-			return err
-		}
-
-		log.Info("Software notification settings updated", "cluster", c.namespacedName())
-		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("update notifications", c.cluster))
+	// Write
+	if reflect.DeepEqual(actual, &requested) {
+		return nil
 	}
+
+	if err := couchbaseutil.SetSettingsStats(&requested).On(c.api, c.readyMembers()); err != nil {
+		log.Error(err, "Software notification settings update failed", "cluster", c.namespacedName())
+		message := fmt.Sprintf("Unable update software notification settings: `%v`", err)
+		c.cluster.Status.SetConfigRejectedCondition(message)
+
+		return err
+	}
+
+	log.Info("Software notification settings updated", "cluster", c.namespacedName())
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("update notifications", c.cluster))
 
 	return nil
 }
 
 // Compare cluster index settings with spec, reconcile if necessary.
 func (c *Cluster) reconcileIndexStorageSettings() error {
-	settings, err := c.client.GetIndexSettings(c.readyMembers())
-	if err != nil {
+	settings := &couchbaseutil.IndexSettings{}
+	if err := couchbaseutil.GetIndexSettings(settings).On(c.api, c.readyMembers()); err != nil {
 		log.Error(err, "Index storage settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
@@ -1292,7 +1347,7 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 	if storageMode != settings.StorageMode {
 		settings.StorageMode = storageMode
 
-		if err := c.client.SetIndexSettings(c.readyMembers(), settings); err != nil {
+		if err := couchbaseutil.SetIndexSettings(settings).On(c.api, c.readyMembers()); err != nil {
 			log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", storageMode, err.Error())
 			c.cluster.Status.SetConfigRejectedCondition(message)
@@ -1309,11 +1364,13 @@ func (c *Cluster) reconcileIndexStorageSettings() error {
 
 // reconcileAutoCompactionSettings sets up disk defragmentation.
 func (c *Cluster) reconcileAutoCompactionSettings() error {
-	current, err := c.client.GetAutoCompactionSettings(c.readyMembers())
-	if err != nil {
+	// Read
+	current := &couchbaseutil.AutoCompactionSettings{}
+	if err := couchbaseutil.GetAutoCompactionSettings(current).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
+	// Modify
 	databaseFragmentationThresholdPercentage := 0
 	databaseFragmentationThresholdSize := int64(0)
 	viewFragmentationThresholdPercentage := 0
@@ -1381,15 +1438,18 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 		PurgeInterval: c.cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Hours() / 24.0,
 	}
 
-	if !reflect.DeepEqual(current, requested) {
-		log.Info("Updating auto compaction settings", "cluster", c.namespacedName())
-
-		if err := c.client.SetAutoCompactionSettings(c.readyMembers(), requested); err != nil {
-			return err
-		}
-
-		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("auto compaction", c.cluster))
+	// Write
+	if reflect.DeepEqual(current, requested) {
+		return nil
 	}
+
+	log.Info("Updating auto compaction settings", "cluster", c.namespacedName())
+
+	if err := couchbaseutil.SetAutoCompactionSettings(requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("auto compaction", c.cluster))
 
 	return nil
 }
@@ -1627,6 +1687,95 @@ func replicationKey(r couchbaseutil.Replication) string {
 	return fmt.Sprintf("%s/%s/%s", r.ToCluster, r.FromBucket, r.ToBucket)
 }
 
+func (c *Cluster) listReplications(r *couchbaseutil.ReplicationList) error {
+	tasks := &couchbaseutil.TaskList{}
+	if err := couchbaseutil.ListTasks(tasks).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	tasks = tasks.FilterType(couchbaseutil.TaskTypeXDCR)
+
+	replications := make([]couchbaseutil.Replication, len(*tasks))
+
+	for _, task := range *tasks {
+		// Parse the target to recover lost information.
+		// Should be in the form /remoteClusters/c4c9af9ad62d8b5f665edac5ffc9c1be/buckets/default
+		if task.Target == "" {
+			return fmt.Errorf("listReplications: target not populated")
+		}
+
+		parts := strings.Split(task.Target, "/")
+		if len(parts) != 5 {
+			return fmt.Errorf("listReplications: target incorrectly formatted: %v", task.Target)
+		}
+
+		uuid := parts[2]
+		to := parts[4]
+
+		// Lookup the UUID to recover the cluster name.
+		cluster, err := c.getRemoteClusterByUUID(uuid)
+		if err != nil {
+			return err
+		}
+
+		// Lookup the settings to recover the compression type.
+		settings := &couchbaseutil.ReplicationSettings{}
+		if err := couchbaseutil.GetReplicationSettings(settings, uuid, task.Source, to).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		// By now your eyeballs will be dry from all the rolling they are doing.
+		replications = append(replications, couchbaseutil.Replication{
+			FromBucket:       task.Source,
+			ToCluster:        cluster.Name,
+			ToBucket:         to,
+			Type:             task.ReplicationType,
+			ReplicationType:  "continuous",
+			CompressionType:  settings.CompressionType,
+			FilterExpression: task.FilterExpression,
+			PauseRequested:   settings.PauseRequested,
+		})
+	}
+
+	*r = replications
+
+	return nil
+}
+
+// getRemoteClusterByName helps manage the utter horror show that is XDCR
+// replications.
+func (c *Cluster) getRemoteClusterByName(name string) (*couchbaseutil.RemoteCluster, error) {
+	clusters := &couchbaseutil.RemoteClusters{}
+	if err := couchbaseutil.ListRemoteClusters(clusters).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	for _, cluster := range *clusters {
+		if cluster.Name == name {
+			return &cluster, nil
+		}
+	}
+
+	return nil, fmt.Errorf("lookupUUIDForCluster: no cluster found for name %v", name)
+}
+
+// getRemoteClusterByUUID helps manage the utter horror show that is XDCR
+// replications.
+func (c *Cluster) getRemoteClusterByUUID(uuid string) (*couchbaseutil.RemoteCluster, error) {
+	clusters := &couchbaseutil.RemoteClusters{}
+	if err := couchbaseutil.ListRemoteClusters(clusters).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	for _, cluster := range *clusters {
+		if cluster.UUID == uuid {
+			return &cluster, nil
+		}
+	}
+
+	return nil, fmt.Errorf("lookupClusterForUUID: no cluster found for uuid %v", uuid)
+}
+
 // reconcileXDCR creates and deletes XDCR connections dynamically.
 func (c *Cluster) reconcileXDCR() error {
 	if !c.cluster.Spec.XDCR.Managed {
@@ -1714,13 +1863,13 @@ func (c *Cluster) reconcileXDCR() error {
 		}
 	}
 
-	currentClusters, err := c.client.ListRemoteClusters(c.readyMembers())
-	if err != nil {
+	currentClusters := &couchbaseutil.RemoteClusters{}
+	if err := couchbaseutil.ListRemoteClusters(currentClusters).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
-	currentReplications, err := c.client.ListReplications(c.readyMembers())
-	if err != nil {
+	currentReplications := &couchbaseutil.ReplicationList{}
+	if err := c.listReplications(currentReplications); err != nil {
 		return err
 	}
 
@@ -1729,14 +1878,14 @@ CreateNextCluster:
 	for requestedIndex := range requestedClusters {
 		requested := requestedClusters[requestedIndex]
 
-		for _, current := range currentClusters {
+		for _, current := range *currentClusters {
 			if current.Name == requested.Name {
 				continue CreateNextCluster
 			}
 		}
 
 		log.Info("Creating XDCR remote cluster", "cluster", c.namespacedName(), "remote", requested.Name)
-		if err := c.client.CreateRemoteCluster(c.readyMembers(), &requested); err != nil {
+		if err := couchbaseutil.CreateRemoteCluster(&requested).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -1748,12 +1897,17 @@ CreateNextReplication:
 	for requestedIndex := range requestedReplications {
 		requested := requestedReplications[requestedIndex]
 
-		for _, current := range currentReplications {
+		for _, current := range *currentReplications {
 			if replicationKey(current) == replicationKey(requested) {
 				if !reflect.DeepEqual(current, requested) {
 					log.Info("Updating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(requested))
 
-					if err := c.client.UpdateReplication(c.readyMembers(), &requested); err != nil {
+					cluster, err := c.getRemoteClusterByName(requested.ToCluster)
+					if err != nil {
+						return err
+					}
+
+					if err := couchbaseutil.UpdateReplication(&requested, cluster.UUID, requested.FromBucket, requested.ToBucket).On(c.api, c.readyMembers()); err != nil {
 						return err
 					}
 
@@ -1766,7 +1920,7 @@ CreateNextReplication:
 
 		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(requested))
 
-		if err := c.client.CreateReplication(c.readyMembers(), &requested); err != nil {
+		if err := couchbaseutil.CreateReplication(&requested).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -1775,8 +1929,8 @@ CreateNextReplication:
 
 	// Delete any orphaned replications...
 DeleteNextReplication:
-	for currentIndex := range currentReplications {
-		current := currentReplications[currentIndex]
+	for _, currentReplication := range *currentReplications {
+		current := currentReplication
 
 		for _, requested := range requestedReplications {
 			if replicationKey(current) == replicationKey(requested) {
@@ -1786,7 +1940,12 @@ DeleteNextReplication:
 
 		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(current))
 
-		if err := c.client.DeleteReplication(c.readyMembers(), &current); err != nil {
+		cluster, err := c.getRemoteClusterByName(current.ToCluster)
+		if err != nil {
+			return err
+		}
+
+		if err := couchbaseutil.DeleteReplication(&current, cluster.UUID, current.FromBucket, current.ToBucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -1795,8 +1954,8 @@ DeleteNextReplication:
 
 	// Delete any orphaned clusters...
 DeleteNextCluster:
-	for currentIndex := range currentClusters {
-		current := currentClusters[currentIndex]
+	for _, currentCluster := range *currentClusters {
+		current := currentCluster
 
 		for _, requested := range requestedClusters {
 			if current.Name == requested.Name {
@@ -1806,7 +1965,7 @@ DeleteNextCluster:
 
 		log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", current.Name)
 
-		if err := c.client.DeleteRemoteCluster(c.readyMembers(), &current); err != nil {
+		if err := couchbaseutil.DeleteRemoteCluster(&current).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -2157,8 +2316,8 @@ func (c *Cluster) reconcileSecuritySettings() error {
 	updatableMembers := couchbaseutil.NewMemberSet()
 
 	for _, m := range c.members {
-		s, err := c.client.GetNodeNetworkConfiguration(m)
-		if err != nil {
+		s := &couchbaseutil.NodeNetworkConfiguration{}
+		if err := c.getNodeNetworkConfiguration(m, s); err != nil {
 			// As the message says, this is "fine"
 			log.Info("failed to get node network configuration", "cluster", c.namespacedName(), "pod", m.Name, "error", err)
 			return nil
@@ -2171,8 +2330,8 @@ func (c *Cluster) reconcileSecuritySettings() error {
 
 	// If we are disabling encryption then we need to set the mode to control plane only first...
 	if !requestedEncryption {
-		securitySettings, err := c.client.GetSecuritySettings(c.readyMembers())
-		if err != nil {
+		securitySettings := &couchbaseutil.SecuritySettings{}
+		if err := couchbaseutil.GetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -2181,7 +2340,7 @@ func (c *Cluster) reconcileSecuritySettings() error {
 			requestedSecuritySettings := *securitySettings
 			requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionControl
 
-			if err := c.client.SetSecuritySettings(c.readyMembers(), &requestedSecuritySettings); err != nil {
+			if err := couchbaseutil.SetSecuritySettings(&requestedSecuritySettings).On(c.api, c.readyMembers()); err != nil {
 				return err
 			}
 
@@ -2193,14 +2352,14 @@ func (c *Cluster) reconcileSecuritySettings() error {
 	if !updatableMembers.Empty() {
 		// For some reasons you need to disable failover because server is
 		// incapable of doing this itself...
-		failoverSettings, err := c.client.GetAutoFailoverSettings(c.readyMembers())
-		if err != nil {
+		failoverSettings := &couchbaseutil.AutoFailoverSettings{}
+		if err := couchbaseutil.GetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
 		failoverSettings.Enabled = false
 
-		if err := c.client.SetAutoFailoverSettings(c.readyMembers(), failoverSettings); err != nil {
+		if err := couchbaseutil.SetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -2225,14 +2384,14 @@ func (c *Cluster) reconcileSecuritySettings() error {
 
 		// Update one API per node...
 		for _, m := range updatableMembers {
-			if err := c.client.EnableExternalListener(m, networkSettings); err != nil {
+			if err := couchbaseutil.EnableExternalListener(networkSettings).On(c.api, m); err != nil {
 				return err
 			}
 		}
 
 		// Update another API per node, with exactly the same configuration...
 		for _, m := range updatableMembers {
-			if err := c.client.SetNodeNetworkConfiguration(m, networkSettings); err != nil {
+			if err := couchbaseutil.SetNodeNetworkConfiguration(networkSettings).On(c.api, m); err != nil {
 				return err
 			}
 		}
@@ -2247,7 +2406,7 @@ func (c *Cluster) reconcileSecuritySettings() error {
 			m := updatableMembers[i]
 
 			callback := func() error {
-				return c.client.DisableExternalListener(m, antiNetworkSettings)
+				return couchbaseutil.DisableExternalListener(antiNetworkSettings).On(c.api, m)
 			}
 
 			if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
@@ -2258,7 +2417,7 @@ func (c *Cluster) reconcileSecuritySettings() error {
 		// Reenable auto failover
 		failoverSettings.Enabled = true
 
-		if err := c.client.SetAutoFailoverSettings(c.readyMembers(), failoverSettings); err != nil {
+		if err := couchbaseutil.SetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -2270,8 +2429,8 @@ func (c *Cluster) reconcileSecuritySettings() error {
 		return nil
 	}
 
-	securitySettings, err := c.client.GetSecuritySettings(c.readyMembers())
-	if err != nil {
+	securitySettings := &couchbaseutil.SecuritySettings{}
+	if err := couchbaseutil.GetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
@@ -2291,11 +2450,58 @@ func (c *Cluster) reconcileSecuritySettings() error {
 		return nil
 	}
 
-	if err := c.client.SetSecuritySettings(c.readyMembers(), &requestedSecuritySettings); err != nil {
+	if err := couchbaseutil.SetSecuritySettings(&requestedSecuritySettings).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
 	c.raiseEvent(k8sutil.SecuritySettingsUpdatedEvent(c.cluster, k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified))
+
+	return nil
+}
+
+// getAlternateAddressesExternal gets the alternate addresses for this node.
+// It is *NOT* an error condition for this not to exist, which is an indication
+// that the client code is not clever enough to handle the snafu.
+func (c *Cluster) getAlternateAddressesExternalInto(m *couchbaseutil.Member, alternateAddresses *couchbaseutil.AlternateAddressesExternal) error {
+	nodeServices := &couchbaseutil.NodeServices{}
+	if err := couchbaseutil.GetNodeServices(nodeServices).On(c.api, m); err != nil {
+		return err
+	}
+
+	for _, node := range nodeServices.NodesExt {
+		if !node.ThisNode {
+			continue
+		}
+
+		if node.AlternateAddresses != nil {
+			*alternateAddresses = *node.AlternateAddresses.External
+		}
+
+		return nil
+	}
+
+	// The absence of this node is probably due to it not being balanced in yet.
+	// /pools/default/nodeServices apparently only shows nodes when the rebalance
+	// starts.  Don't raise an error.
+	return nil
+}
+
+// getNodeNetworkConfiguration gets the network configuration settings for a node.
+func (c *Cluster) getNodeNetworkConfiguration(m *couchbaseutil.Member, s *couchbaseutil.NodeNetworkConfiguration) error {
+	node := &couchbaseutil.NodeInfo{}
+	if err := couchbaseutil.GetNodesSelf(node).On(c.api, m); err != nil {
+		return err
+	}
+
+	onOrOff := couchbaseutil.Off
+
+	if node.NodeEncryption {
+		onOrOff = couchbaseutil.On
+	}
+
+	*s = couchbaseutil.NodeNetworkConfiguration{
+		NodeEncryption: onOrOff,
+	}
 
 	return nil
 }

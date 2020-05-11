@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -14,15 +13,16 @@ import (
 	"net/http"
 	"reflect"
 	"time"
+
+	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
 const (
 	ContentTypeURLEncoded string = "application/x-www-form-urlencoded"
 	ContentTypeJSON       string = "application/json"
 
-	HeaderAuthorization string = "Authorization"
-	HeaderContentType   string = "Content-Type"
-	HeaderUserAgent     string = "User-Agent"
+	HeaderContentType string = "Content-Type"
+	HeaderUserAgent   string = "User-Agent"
 
 	tcpConnectTimeout = 5 * time.Second
 )
@@ -32,7 +32,7 @@ const (
 // allowing further HTTP requests.
 //
 // Here be dragons!  You have been warned...
-func (c *Couchbase) makeClient() {
+func (c *Client) makeClient() {
 	// uuidCheck is a closure which binds basic HTTP authorization and cluster
 	// UUID to the configuration.  It is responsible for doing a HTTP GET from
 	// a new network connection and verifying that the UUID matches what we
@@ -195,16 +195,53 @@ func (c *Couchbase) makeClient() {
 }
 
 // doRequest is the generic request handler for all client calls.
-func (c *Couchbase) doRequest(request *http.Request, result interface{}) error {
+// Always ensure the body is initialized by NewRequest, rather than being
+// tempted to do it here.  I made the mistake of just setting Body and that
+// resulted in the client using chunked encoding.  Everything works fine,
+// with the exception of XDCR, so use the library!
+func (c Client) doRequest(request *http.Request, requestBody []byte, result interface{}) error {
 	// Do the request recording the time taken.
 	start := time.Now()
 
+	// All requests send the username and password.
+	request.SetBasicAuth(c.username, c.password)
+
+	// Rrequest logging.  Careful here, higher levels of verbosity generate a huge
+	// amount more log traffic. All requests have the following common attributes.
+	logLabels := []interface{}{
+		"cluster", c.cluster,
+		"method", request.Method,
+		"url", request.URL.String(),
+	}
+
+	if log.V(2).Enabled() {
+		// Contains admin password.
+		logLabels = append(logLabels, "headers", request.Header)
+
+		// May contain passwords.
+		if requestBody != nil {
+			logLabels = append(logLabels, "request", string(requestBody))
+		}
+	}
+
+	// Logs are always emitted regardless of status.  Context is added to the log labels
+	// depending on the path taken.
+	defer func() {
+		delta := time.Since(start)
+
+		logLabels = append(logLabels, "time_ms", float64(delta.Nanoseconds())/1000000.0)
+
+		log.V(1).Info("http", logLabels...)
+	}()
+
+	// Do the request.
 	response, err := c.client.Do(request)
 	if err != nil {
+		logLabels = append(logLabels, "error", err)
 		return err
 	}
 
-	delta := time.Since(start)
+	logLabels = append(logLabels, "status", response.Status)
 
 	// Read the body so we can display it for really verbose debugging.
 	defer response.Body.Close()
@@ -214,17 +251,11 @@ func (c *Couchbase) doRequest(request *http.Request, result interface{}) error {
 		return err
 	}
 
-	// Log the request.  Careful here, higher levels of verbosity generate a huge
-	// amount more log traffic.
-	log.V(1).Info("http",
-		"method", request.Method,
-		"url", request.URL.String(),
-		"status", response.Status,
-		"time_ms", float64(delta.Nanoseconds())/1000000.0,
-	)
-	log.V(2).Info("http",
-		"response body", string(body),
-	)
+	if log.V(2).Enabled() {
+		if string(body) != "" {
+			logLabels = append(logLabels, "response", string(body))
+		}
+	}
 
 	// Anything outside of a 2XX we regard as an error.
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
@@ -243,12 +274,12 @@ func (c *Couchbase) doRequest(request *http.Request, result interface{}) error {
 			return err
 		}
 	case "text/plain":
-		s, ok := result.(*string)
+		s, ok := result.([]byte)
 		if !ok {
 			return fmt.Errorf("unexpected type decode for text/plain")
 		}
 
-		*s = string(body)
+		copy(s, body)
 	default:
 		return fmt.Errorf("unexpected content type %s", contentType)
 	}
@@ -256,112 +287,90 @@ func (c *Couchbase) doRequest(request *http.Request, result interface{}) error {
 	return nil
 }
 
-func (c *Couchbase) doGet(path string, result interface{}, headers http.Header) error {
-	errs := []error{}
-
-	for _, endpoint := range c.endpoints {
-		req, err := http.NewRequest("GET", endpoint+path, nil)
-		if err != nil {
-			return ClientError{"request creation", err}
-		}
-
-		req.Header = headers
-
-		if err := c.doRequest(req, result); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		return nil
+func (c *Client) Get(r *Request, host string) error {
+	req, err := http.NewRequest("GET", host+r.Path, nil)
+	if err != nil {
+		return ClientError{"request creation", err}
 	}
 
-	return BulkError{errs}
+	req.Header = defaultHeaders()
+
+	return c.doRequest(req, nil, r.Result)
 }
 
-func (c *Couchbase) doPost(path string, data []byte, result interface{}, headers http.Header) error {
-	errs := []error{}
-
-	for _, endpoint := range c.endpoints {
-		log.V(2).Info("http", "request body", string(data))
-
-		req, err := http.NewRequest("POST", endpoint+path, bytes.NewBuffer(data))
-		if err != nil {
-			return ClientError{"request creation", err}
-		}
-
-		req.Header = headers
-		if err := c.doRequest(req, result); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		return nil
+func (c *Client) Post(r *Request, host string) error {
+	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
+	if err != nil {
+		return ClientError{"request creation", err}
 	}
 
-	return BulkError{errs}
+	req.Header = defaultHeaders()
+	req.Header.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doRequest(req, r.Body, r.Result)
 }
 
-func (c *Couchbase) doPut(path string, data []byte, headers http.Header) error {
-	errs := []error{}
-
-	for _, endpoint := range c.endpoints {
-		req, err := http.NewRequest("PUT", endpoint+path, bytes.NewBuffer(data))
-		if err != nil {
-			return ClientError{"request creation", err}
-		}
-
-		req.Header = headers
-
-		if err := c.doRequest(req, nil); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		return nil
+func (c *Client) PostJSON(r *Request, host string) error {
+	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
+	if err != nil {
+		return ClientError{"request creation", err}
 	}
 
-	return BulkError{errs}
+	req.Header = defaultHeaders()
+	req.Header.Set(HeaderContentType, ContentTypeJSON)
+
+	return c.doRequest(req, r.Body, r.Result)
 }
 
-func (c *Couchbase) doDelete(path string, headers http.Header) error {
-	errs := []error{}
-
-	for _, endpoint := range c.endpoints {
-		req, err := http.NewRequest("DELETE", endpoint+path, nil)
-		if err != nil {
-			return ClientError{"request creation", err}
-		}
-
-		req.Header = headers
-
-		if err := c.doRequest(req, nil); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		return nil
+func (c *Client) PostNoContentType(r *Request, host string) error {
+	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
+	if err != nil {
+		return ClientError{"request creation", err}
 	}
 
-	return BulkError{errs}
+	req.Header = defaultHeaders()
+
+	return c.doRequest(req, r.Body, r.Result)
 }
 
-func (c *Couchbase) defaultHeaders() http.Header {
-	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(c.username+":"+c.password))
+func (c *Client) Put(r *Request, host string) error {
+	req, err := http.NewRequest("PUT", host+r.Path, bytes.NewReader(r.Body))
+	if err != nil {
+		return ClientError{"request creation", err}
+	}
 
+	req.Header = defaultHeaders()
+	req.Header.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doRequest(req, r.Body, nil)
+}
+
+func (c *Client) PutJSON(r *Request, host string) error {
+	req, err := http.NewRequest("PUT", host+r.Path, bytes.NewReader(r.Body))
+	if err != nil {
+		return ClientError{"request creation", err}
+	}
+
+	req.Header = defaultHeaders()
+	req.Header.Set(HeaderContentType, ContentTypeJSON)
+
+	return c.doRequest(req, r.Body, nil)
+}
+
+func (c *Client) Delete(r *Request, host string) error {
+	req, err := http.NewRequest("DELETE", host+r.Path, nil)
+	if err != nil {
+		return ClientError{"request creation", err}
+	}
+
+	req.Header = defaultHeaders()
+
+	return c.doRequest(req, nil, nil)
+}
+
+func defaultHeaders() http.Header {
 	headers := http.Header{}
-	headers.Set(HeaderAuthorization, auth)
-
-	userAgent := "couchbase-operator"
-
-	if c.userAgent != nil {
-		userAgent = c.userAgent.Name + "/" + c.userAgent.Version
-
-		if c.userAgent.UUID != "" {
-			userAgent += " (" + c.userAgent.UUID + ")"
-		}
-	}
-
-	headers.Set(HeaderUserAgent, userAgent)
+	headers.Set(HeaderUserAgent, version.UserAgent())
 	headers.Set("Accept-Encoding", "application/json, text/plain, */*")
 
 	return headers

@@ -14,6 +14,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -113,9 +114,15 @@ func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbase
 		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
 		defer cleanup()
 
-		info, err := client.GetBucketStatus(bucket)
-		if err != nil {
-			return false, retryutil.RetryOkError(err)
+		info := &couchbaseutil.BucketStatus{}
+
+		request := &couchbaseutil.Request{
+			Path:   "/pools/default/buckets/" + bucket,
+			Result: info,
+		}
+
+		if err := client.client.Get(request, client.host); err != nil {
+			return false, err
 		}
 
 		if info.BasicStats.ItemCount != items {
@@ -142,8 +149,14 @@ func VerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *co
 		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
 		defer cleanup()
 
-		info, err := client.GetBucketStatus(bucket)
-		if err != nil {
+		info := &couchbaseutil.BucketStatus{}
+
+		request := &couchbaseutil.Request{
+			Path:   "/pools/default/buckets/" + bucket,
+			Result: info,
+		}
+
+		if err := client.client.Get(request, client.host); err != nil {
 			return err
 		}
 

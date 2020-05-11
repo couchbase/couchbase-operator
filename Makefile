@@ -160,7 +160,7 @@ lint: $(GENERATED_FILES)
 # well, but it is quite possible in future that the canonical Dockerfile will
 # need to be moved to a separate repo in which case the "docker build" command
 # can't be here anyway.
-container: binaries crd
+container: $(OPERATOR_BINARY) $(ADMISSION_BINARY) crd
 	docker build -f Dockerfile -t couchbase/couchbase-operator:v1 .
 	docker build -f Dockerfile.admission -t couchbase/couchbase-operator-admission:v1 .
 

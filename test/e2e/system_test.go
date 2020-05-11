@@ -381,12 +381,6 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	// create connection to couchbase nodes
 	t.Logf("creating couchbase client")
 
-	client1, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase1)
-	defer cleanup()
-
-	client2, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase2)
-	defer cleanup()
-
 	// pause the operator for the test duration
 	t.Logf("Pausing operator...")
 
@@ -398,20 +392,6 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
 
 	t.Logf("grabbing bucket info")
-
-	bucketInfo1, err := client1.GetBuckets()
-	if err != nil {
-		t.Fatalf("failed to get bucket info %v", err)
-	}
-
-	t.Logf("bucket info: %v", bucketInfo1)
-
-	bucketInfo2, err := client2.GetBuckets()
-	if err != nil {
-		t.Fatalf("failed to get bucket info %v", err)
-	}
-
-	t.Logf("bucket info: %v", bucketInfo2)
 
 	t.Logf("populating scope")
 
@@ -429,9 +409,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		testScope.nodes2 = append(testScope.nodes2, couchbaseutil.CreateMemberName(testCouchbase2.Name, i)+suffix2)
 	}
 
-	for _, b := range bucketInfo1 {
-		testScope.buckets = append(testScope.buckets, b.BucketName)
-	}
+	testScope.buckets = bucketNames
 
 	t.Logf("scope: %v", testScope)
 

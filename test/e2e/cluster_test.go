@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -364,20 +363,6 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-
-	// check that actual cluster size is only 2 nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
-	info, err := client.ClusterInfo()
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	numNodes := len(info.Nodes)
-	if numNodes != 2 {
-		e2eutil.Die(t, fmt.Errorf("expected 2 nodes, found: %d", numNodes))
-	}
 
 	// Check the events match what we expect:
 	// * Cluster created

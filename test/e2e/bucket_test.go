@@ -92,19 +92,10 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
-	// create connection to couchbase nodes
-	client, cleanup := e2eutil.MustCreateAdminConsoleClient(t, targetKube, testCouchbase)
-	defer cleanup()
-
 	for i, bucket := range buckets {
 		e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, bucket)
 		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, names[:i+1], 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-		currentBuckets, err := client.GetBuckets()
-		if err != nil && len(currentBuckets) != i+1 {
-			e2eutil.Die(t, fmt.Errorf("failed to see all buckets from client"))
-		}
 	}
 
 	for _, bucket := range buckets {
@@ -116,11 +107,6 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	currentBuckets, err := client.GetBuckets()
-	if err != nil && len(currentBuckets) != 0 {
-		e2eutil.Die(t, fmt.Errorf("failed to see no buckets from client"))
-	}
 
 	// Check the events match what we expect:
 	// * Cluster created

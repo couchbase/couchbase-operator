@@ -15,6 +15,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
 	"github.com/spf13/pflag"
 
 	"go.uber.org/zap"
@@ -67,10 +69,24 @@ func (l *logLevel) Set(s string) error {
 			return err
 		}
 
-		l.level = zapcore.Level(i)
+		l.level = zapcore.Level(-i)
 	}
 
 	return nil
+}
+
+// newLogger creates a zap logger.
+func newLogger(l zapcore.Level) logr.Logger {
+	encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+
+	level := zap.NewAtomicLevelAt(l)
+
+	stacktraceLevel := zap.NewAtomicLevelAt(zap.ErrorLevel)
+
+	// Note that we don't use the controller-runtime version, that adds a
+	// sampler by default that causes a panic when we use debug levels lower
+	// than -1 (e.g. log.V(1))
+	return zapr.NewLogger(zap.New(zapcore.NewCore(&zapf.KubeAwareEncoder{Encoder: encoder}, os.Stderr, level)).WithOptions(zap.AddStacktrace(stacktraceLevel)))
 }
 
 var log = logf.Log.WithName("main")
@@ -89,9 +105,7 @@ func main() {
 	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
 	pflag.Parse()
 
-	atomicLevel := zap.NewAtomicLevelAt(level.level)
-
-	logf.SetLogger(zapf.New(zapf.Level(&atomicLevel)))
+	logf.SetLogger(newLogger(level.level))
 
 	// Some 3rd party libraries try to write to a file on error, which it cannot do
 	// when using scratch containers, so route those errors to standard error.  Not

@@ -175,16 +175,6 @@ func (ms MemberSet) ClientURLs() []string {
 	return endpoints
 }
 
-func (ms MemberSet) ClientURLsPlaintext() []string {
-	endpoints := make([]string, 0, len(ms))
-
-	for _, m := range ms {
-		endpoints = append(endpoints, m.ClientURLPlaintext())
-	}
-
-	return endpoints
-}
-
 func (ms MemberSet) HostURLs() []string {
 	endpoints := make([]string, 0, len(ms))
 

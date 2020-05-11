@@ -266,15 +266,15 @@ func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
 			log.Error(err, "Rebalance status collection failed", "cluster", c.namespacedName())
 		} else if !running {
 			// stop rebalance
-			err := c.client.StopRebalance(c.readyMembers())
-			if err != nil {
+			if err := couchbaseutil.StopRebalance().On(c.api, c.readyMembers()); err != nil {
 				log.Error(err, "Rebalance cancellation failed", "cluster", c.namespacedName())
-			} else {
-				log.Info("Rebalance cancelled", "cluster", c.namespacedName())
-				r.transitionState(ReconcileDownNodes)
-
-				return nil
+				return err
 			}
+
+			log.Info("Rebalance cancelled", "cluster", c.namespacedName())
+			r.transitionState(ReconcileDownNodes)
+
+			return nil
 		}
 
 		return fmt.Errorf("skipping reconcile loop because the cluster is currently rebalancing")
@@ -414,7 +414,7 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 			return fmt.Errorf("recovering pending add node %s", m.ClientURL())
 		}
 
-		err := c.cancelAddMember(r.knownNodes, m)
+		err := c.cancelAddMember(m)
 		if err != nil {
 			return fmt.Errorf("unable to remove a failed pending add node: %s", err.Error())
 		}
@@ -458,27 +458,24 @@ func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 				}
 			}
 
-			var err error
+			otpNode, err := c.client.GetOTPNode(r.couchbase.ActiveNodes, m.HostURLPlaintext())
+			if err != nil {
+				return err
+			}
+
+			recoveryType := couchbaseutil.RecoveryTypeFull
 
 			if deltaRecovery {
-				log.Info("Marking pod for delta recovery", "cluster", c.namespacedName(), "name", m.Name)
-
-				err = c.client.SetRecoveryTypeDelta(r.couchbase.ActiveNodes, m.HostURLPlaintext())
-			} else {
-				log.Info("Marking pod for full recovery", "cluster", c.namespacedName(), "name", m.Name)
-
-				err = c.client.SetRecoveryTypeFull(r.couchbase.ActiveNodes, m.HostURLPlaintext())
+				recoveryType = couchbaseutil.RecoveryTypeDelta
 			}
 
-			if err != nil {
-				log.Error(err, "Recovery type update failed", "cluster", c.namespacedName(), "name", m.Name)
+			log.Info("Setting recovery type", "cluster", c.namespacedName(), "name", m.Name, "type", recoveryType)
 
-				r.ejectNodes.Add(m)
-
-				break
-			} else {
-				r.couchbase.NeedsRebalance = true
+			if err := couchbaseutil.SetRecoveryType(otpNode, recoveryType).On(c.api, c.readyMembers()); err != nil {
+				return err
 			}
+
+			r.couchbase.NeedsRebalance = true
 		} else {
 			log.Info("Add back pod not in the specification, deleting", "cluster", c.namespacedName(), "name", m.Name, "class", m.ServerConfig)
 
@@ -765,14 +762,19 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 			deltaNodes := couchbaseutil.NewMemberSet()
 
 			for _, m := range addNodes {
-				isDelta, err := c.client.IsRecoveryTypeDelta(m)
-				if err != nil {
+				info := &couchbaseutil.ClusterInfo{}
+				if err := couchbaseutil.GetPoolsDefault(info).On(c.api, c.readyMembers()); err != nil {
 					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name)
-
 					return err
 				}
 
-				if isDelta {
+				node, err := info.GetNode(m.HostURL())
+				if err != nil {
+					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name)
+					return err
+				}
+
+				if node.RecoveryType == couchbaseutil.RecoveryTypeDelta {
 					deltaNodes.Add(m)
 				}
 			}
@@ -781,7 +783,12 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 				log.Info("Pod add-back failed, forcing full recovery")
 
 				for _, m := range deltaNodes {
-					if err := c.client.SetRecoveryTypeFull(r.couchbase.ActiveNodes, m.HostURLPlaintext()); err != nil {
+					otpNode, err := c.client.GetOTPNode(r.couchbase.ActiveNodes, m.HostURLPlaintext())
+					if err != nil {
+						return err
+					}
+
+					if err := couchbaseutil.SetRecoveryType(otpNode, couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 						log.Error(err, "Pod add-back, recovery type update failed", "cluster", c.namespacedName(), "name", m.Name)
 
 						c.raiseEvent(k8sutil.FailedAddBackNodeEvent(m.Name, c.cluster))

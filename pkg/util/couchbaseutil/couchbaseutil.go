@@ -2,17 +2,12 @@ package couchbaseutil
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
-	"github.com/couchbase/couchbase-operator/pkg/revision"
-	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -33,14 +28,6 @@ const (
 	NodeStateAddBack
 	NodeStateUnclustered
 	NodeStateInvalid
-
-	// DefaultRetryPeriod is the default amount of time to wait for an API
-	// operation to report success.
-	DefaultRetryPeriod = 30 * time.Second
-
-	// ExtendedRetryPeriod is an extended amount of time to wait for slow
-	// API operations to report success.
-	ExtendedRetryPeriod = 3 * time.Minute
 )
 
 // String converts a node state into a string representation.
@@ -120,64 +107,6 @@ func (cs *ClusterStatus) Reset() {
 	cs.UnmanagedNodes = []string{}
 	cs.IsRebalancing = false
 	cs.NeedsRebalance = false
-}
-
-// CouchbaseClient encapsulates Couchbase API operations.
-type CouchbaseClient struct {
-	// ctx is used to asynchronously cancel blocking or long operations.
-	ctx context.Context
-	// clusterName is used in logging to add context if multiple clusters are
-	// defined
-	clusterName string
-	// username is used in HTTP basic authorization
-	username string
-	// password is used in HTTP basic authorization
-	password string
-	// client is ostensibly an http.Client.  It contains a pool of persistent
-	// connections to target hosts for various host/port combinations.  When
-	// client parameters are changed which affect HTTP or TLS this needs to be
-	// refereshed e.g. a password is changed or the uuid is defined
-	client *Couchbase
-}
-
-// NewCouchbaseClient allocates and initializes a new couchbase API client.
-// Connections are persistent so we only expect to create a single client
-// per cluster.
-func NewCouchbaseClient(ctx context.Context, clusterName, username, password string) *CouchbaseClient {
-	c := &CouchbaseClient{
-		ctx:         ctx,
-		clusterName: clusterName,
-		username:    username,
-		password:    password,
-	}
-	c.client = New(username, password)
-
-	// Make the User-Agent string more verbose about exactly who/what we are
-	// to simplify support incidents
-	userAgent := &UserAgent{
-		Name:    version.Application,
-		Version: version.Version,
-		UUID:    revision.Revision(),
-	}
-	c.client.SetUserAgent(userAgent)
-
-	return c
-}
-
-// SetTLS sets or updates the TLS configuration for a client.
-func (c *CouchbaseClient) SetTLS(tls *TLSAuth) {
-	c.client.SetTLS(tls)
-}
-
-// GetTLS returns the TLS configuration for the client.
-func (c *CouchbaseClient) GetTLS() *TLSAuth {
-	return c.client.GetTLS()
-}
-
-// SetUUID sets or updates the cluster UUID to be checked by new persistent
-// connections being dialed.
-func (c *CouchbaseClient) SetUUID(uuid string) {
-	c.client.SetUUID(uuid)
 }
 
 // nodeStatus is an intermediate data structured used to log node status information.
@@ -474,87 +403,23 @@ func (nsm NodeStateMap) AllActive() bool {
 	return true
 }
 
-// check the health of a particular Couchbase node.
-func CheckHealth(url string, tc *tls.Config) (bool, error) {
-	// TODO: check the health of a particular Couchbase node.
-	return true, nil
+// CouchbaseClient encapsulates Couchbase API operations.
+type CouchbaseClient struct {
+	// ctx is used to asynchronously cancel blocking or long operations.
+	ctx context.Context
+
+	// api provides API calls
+	api *Client
 }
 
-func (c *CouchbaseClient) AddNode(ms MemberSet, hostname string, services couchbasev2.ServiceList) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	svcs, err := ServiceListFromStringArray(services.StringSlice())
-	if err != nil {
-		return err
+// NewCouchbaseClient allocates and initializes a new couchbase API client.
+// Connections are persistent so we only expect to create a single client
+// per cluster.
+func NewCouchbaseClient(ctx context.Context, api *Client) *CouchbaseClient {
+	return &CouchbaseClient{
+		ctx: ctx,
+		api: api,
 	}
-
-	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.AddNode(hostname, c.username, c.password, svcs)
-	})
-}
-
-func (c *CouchbaseClient) CancelAddNode(ms MemberSet, hostname string) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.CancelAddNode(hostname)
-	})
-}
-
-func (c *CouchbaseClient) CancelAddBackNode(ms MemberSet, hostname string) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.CancelAddBackNode(hostname)
-	})
-}
-
-func (c *CouchbaseClient) ClusterUUID(m *Member) (string, error) {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	var err error
-
-	var uuid string
-
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		uuid, err = c.client.ClusterUUID()
-		return err
-	})
-
-	return uuid, err
-}
-
-// IsEnterprise returns whether the member is Couchbase Enterprise Edition or not.
-func (c *CouchbaseClient) IsEnterprise(m *Member) (bool, error) {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	var err error
-
-	var isEnterprise bool
-
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		isEnterprise, err = c.client.IsEnterprise()
-		return err
-	})
-
-	return isEnterprise, err
 }
 
 func (c *CouchbaseClient) GetClusterStatus(ms MemberSet) (*ClusterStatus, error) {
@@ -567,127 +432,236 @@ func (c *CouchbaseClient) GetClusterStatus(ms MemberSet) (*ClusterStatus, error)
 }
 
 func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatus) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
 	status.Reset()
 
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
+	cluster := &ClusterInfo{}
+	if err := GetPoolsDefault(cluster).On(c.api, ms); err != nil {
+		return err
+	}
 
-	err := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		// Get the cluster information from Couchbase server
-		var err error
+	status.info = cluster
 
-		status.info, err = c.client.ClusterInfo()
+	// Cache the managed nodes in the status
+	status.managedNodes.Append(ms)
+
+	// Collect the node known to Couchbase server as we iterate through the cluster map
+	knownNodes := NewMemberSet()
+
+	// Iterate over all of the nodes known to Couchbase server
+	for i := range status.info.Nodes {
+		node := status.info.Nodes[i]
+
+		// The node name should be in the form cb-pod.cb-cluster.namespace.svc:8091.
+		// By extracting the first field we can derive the pod name.  If it is not
+		// know to the operator we flag it as unmanaged.
+		member := ms[strings.Split(node.HostName, ".")[0]]
+		if member == nil {
+			status.UnmanagedNodes = append(status.UnmanagedNodes, node.HostName)
+			continue
+		}
+
+		// Add to the list of nodes known to Couchbase
+		knownNodes.Add(member)
+
+		// Attempt to get the internal state of the node from the cluster info
+		state, err := getNodeState(&node)
 		if err != nil {
 			return err
 		}
 
-		// Cache the managed nodes in the status
-		status.managedNodes.Append(ms)
+		// Map the member to its state
+		status.NodeStateMap[member.Name] = state
 
-		// Collect the node known to Couchbase server as we iterate through the cluster map
-		knownNodes := NewMemberSet()
-
-		// Iterate over all of the nodes known to Couchbase server
-		for i := range status.info.Nodes {
-			node := status.info.Nodes[i]
-
-			// The node name should be in the form cb-pod.cb-cluster.namespace.svc:8091.
-			// By extracting the first field we can derive the pod name.  If it is not
-			// know to the operator we flag it as unmanaged.
-			member := ms[strings.Split(node.HostName, ".")[0]]
-			if member == nil {
-				status.UnmanagedNodes = append(status.UnmanagedNodes, node.HostName)
-				continue
-			}
-
-			// Add to the list of nodes known to Couchbase
-			knownNodes.Add(member)
-
-			// Attempt to get the internal state of the node from the cluster info
-			state, err := getNodeState(&node)
-			if err != nil {
-				return err
-			}
-
-			// Map the member to its state
-			status.NodeStateMap[member.Name] = state
-
-			// Add the member to the relevant state based set
-			if err := status.addMemberToStateSet(state, member); err != nil {
-				return err
-			}
+		// Add the member to the relevant state based set
+		if err := status.addMemberToStateSet(state, member); err != nil {
+			return err
 		}
-
-		// Any managed nodes not known to the cluster are unclustered (have been ejected).
-		status.UnclusteredNodes = ms.Diff(knownNodes)
-		for _, member := range status.UnclusteredNodes {
-			status.NodeStateMap[member.Name] = NodeStateUnclustered
-		}
-
-		status.IsRebalancing = (status.info.RebalanceStatus == string(RebalanceStatusRunning))
-		status.NeedsRebalance = !status.info.Balanced && len(status.info.Nodes) > 1
-		return nil
-	})
-
-	return err
-}
-
-func (c *CouchbaseClient) NodeInitialize(m *Member, clusterName string, dataPath string, indexPath string, analyticsPaths []string) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.NodeInitialize(m.Addr(), dataPath, indexPath, analyticsPaths)
-	})
-}
-
-func (c *CouchbaseClient) InitializeCluster(m *Member, username, password string, defaults *PoolsDefaults,
-	services couchbasev2.ServiceList, dataPath string, indexPath string, analyticsPaths []string, indexStorageMode string) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	err := c.NodeInitialize(m, defaults.ClusterName, dataPath, indexPath, analyticsPaths)
-	if err != nil {
-		return err
 	}
 
-	svcs, err := ServiceListFromStringArray(services.StringSlice())
-	if err != nil {
-		return err
+	// Any managed nodes not known to the cluster are unclustered (have been ejected).
+	status.UnclusteredNodes = ms.Diff(knownNodes)
+	for _, member := range status.UnclusteredNodes {
+		status.NodeStateMap[member.Name] = NodeStateUnclustered
 	}
 
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.ClusterInitialize(username, password, defaults, 8091, svcs, IndexStorageMode(indexStorageMode))
-	})
-}
-
-// triggerRebalance triggers a rebalance.
-func (c *CouchbaseClient) triggerRebalance(nodesToRemove []string) error {
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	callback := func() error {
-		return c.client.Rebalance(nodesToRemove)
-	}
-
-	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
-		return err
-	}
+	status.IsRebalancing = (status.info.RebalanceStatus == string(RebalanceStatusRunning))
+	status.NeedsRebalance = !status.info.Balanced && len(status.info.Nodes) > 1
 
 	return nil
 }
 
+// getOTPNode attempts to translate the real host name into the weird name
+// that should never be exposed to a public API.
+func getOTPNode(info *ClusterInfo, hostname string) (string, error) {
+	for _, node := range info.Nodes {
+		if node.HostName == hostname {
+			return node.OTPNode, nil
+		}
+	}
+
+	return "", fmt.Errorf("unable to translate hostname %s to OTP node", hostname)
+}
+
+// GetOTPNode translates a single hostname into an OTP node name.
+func (c *CouchbaseClient) GetOTPNode(members MemberSet, hostname string) (string, error) {
+	info := &ClusterInfo{}
+	if err := GetPoolsDefault(info).On(c.api, members); err != nil {
+		return "", err
+	}
+
+	return getOTPNode(info, hostname)
+}
+
+// GetOTPNodes translates a set of hostnames into an OTP node list.
+func (c *CouchbaseClient) GetOTPNodes(members MemberSet, hostnames []string) ([]string, error) {
+	info := &ClusterInfo{}
+	if err := GetPoolsDefault(info).On(c.api, members); err != nil {
+		return nil, err
+	}
+
+	out := make([]string, len(hostnames))
+
+	for i, hostname := range hostnames {
+		otpNode, err := getOTPNode(info, hostname)
+		if err != nil {
+			return nil, err
+		}
+
+		out[i] = otpNode
+	}
+
+	return out, nil
+}
+
+// RebalanceProgressEntry is the type communicated to clients periodically
+// over a channel.
+type RebalanceStatusEntry struct {
+	// Status is the status of a rebalance.
+	Status RebalanceStatus
+	// Progress is how far the rebalance has progressed, only valid when
+	// the status is RebalanceStatusRunning.
+	Progress float64
+}
+
+// RebalanceProgress is a type used to monitor rebalance status.
+type RebalanceProgress interface {
+	// Status is a channel that is periodically updated with the rebalance
+	// status and progress.  This channel is closed once the rebalance task
+	// is no longer running or an error was detected.
+	Status() <-chan *RebalanceStatusEntry
+	// Error is used to check the error status when the Status channel has
+	// been closed.
+	Error() error
+	// Cancel allows the client to stop the go routine before a rebalance has
+	// completed.
+	Cancel()
+}
+
+// rebalanceProgressImpl implements the RebalanceProgress interface.
+type rebalanceProgressImpl struct {
+	// statusChan is the main channel for communicating status to the client.
+	statusChan chan *RebalanceStatusEntry
+	// err is used to return any error encountered
+	err error
+	// context is a context used to cancel the rebalance progress
+	context context.Context
+	// cancel is used to cancel the rebalance progress
+	cancel context.CancelFunc
+}
+
+// NewRebalanceProgress creates a new RebalanceProgress object and starts a go routine to
+// periodically poll for updates.
+func (c *CouchbaseClient) NewRebalanceProgress(ms MemberSet) RebalanceProgress {
+	progress := &rebalanceProgressImpl{
+		statusChan: make(chan *RebalanceStatusEntry),
+	}
+
+	progress.context, progress.cancel = context.WithCancel(context.Background())
+
+	go func() {
+	RoutineRunloop:
+		for {
+			tasks := &TaskList{}
+			if err := ListTasks(tasks).On(c.api, ms); err != nil {
+				progress.err = err
+
+				close(progress.statusChan)
+
+				break RoutineRunloop
+			}
+
+			task, err := tasks.GetTask(TaskTypeRebalance)
+			if err != nil {
+				progress.err = err
+
+				close(progress.statusChan)
+
+				break RoutineRunloop
+			}
+
+			status := getRebalanceStatus(task)
+
+			// If the task is no longer running then terminate the routine.
+			if status == RebalanceStatusNotRunning {
+				close(progress.statusChan)
+
+				break RoutineRunloop
+			}
+
+			// Otherwise return the status to the client
+			progress.statusChan <- &RebalanceStatusEntry{
+				Status:   status,
+				Progress: task.Progress,
+			}
+
+			// Wait for a period of time or for the client to close the
+			// progress.  Do this in the loop tail to maintain compatibility
+			// with the old code.
+			select {
+			case <-time.After(4 * time.Second):
+			case <-progress.context.Done():
+				break RoutineRunloop
+			}
+		}
+	}()
+
+	return progress
+}
+
+// Status returns the RebalanceProgress status channel.
+func (r *rebalanceProgressImpl) Status() <-chan *RebalanceStatusEntry {
+	return r.statusChan
+}
+
+// Error returns the RebalanceProgress error channel.
+func (r *rebalanceProgressImpl) Error() error {
+	return r.err
+}
+
+// Cancel terminates the RebalanceProgress routine.
+func (r *rebalanceProgressImpl) Cancel() {
+	r.cancel()
+}
+
+// getRebalanceStatus transforms a task status into our simplified rebalance status.
+func getRebalanceStatus(task *Task) RebalanceStatus {
+	// We treat stale or timed out tasks as unknown, no status
+	// is treated as not running.
+	status := RebalanceStatus(task.Status)
+
+	switch {
+	case task.Stale || task.Timeout:
+		status = RebalanceStatusUnknown
+	case status == RebalanceStatusNone:
+		status = RebalanceStatusNotRunning
+	}
+
+	return status
+}
+
 // witnessRebalance waits until we can start streaming progress from the rebalance task.
-func (c *CouchbaseClient) witnessRebalance() (RebalanceProgress, *RebalanceStatusEntry, error) {
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
+func (c *CouchbaseClient) witnessRebalance(ms MemberSet) (RebalanceProgress, *RebalanceStatusEntry, error) {
+	ctx, cancel := context.WithTimeout(c.ctx, time.Minute)
 	defer cancel()
 
 	tick := time.NewTicker(time.Second)
@@ -695,7 +669,7 @@ func (c *CouchbaseClient) witnessRebalance() (RebalanceProgress, *RebalanceStatu
 
 WitnessLoop:
 	for {
-		progress := c.client.NewRebalanceProgress()
+		progress := c.NewRebalanceProgress(ms)
 		status, ok := <-progress.Status()
 		if ok {
 			return progress, status, nil
@@ -712,16 +686,39 @@ WitnessLoop:
 }
 
 func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, cluster string) error {
-	c.client.SetEndpoints(ms.ClientURLs())
+	// The rebalance API is crap, rather than accepting a list of host names to eject
+	// it requires a list of nodes that it already knows about as well.  On top of that
+	// the names need translating into erlang rather than the hostnames that all the
+	// clients and uses know and use.
+	info := &ClusterInfo{}
+	if err := GetPoolsDefault(info).On(c.api, ms); err != nil {
+		return err
+	}
 
-	// Start the rebalance.
-	if err := c.triggerRebalance(nodesToRemove); err != nil {
+	known := make([]string, len(info.Nodes))
+
+	for i, node := range info.Nodes {
+		known[i] = node.OTPNode
+	}
+
+	eject := make([]string, len(nodesToRemove))
+
+	for i, hostname := range nodesToRemove {
+		otpNode, err := getOTPNode(info, hostname)
+		if err != nil {
+			return err
+		}
+
+		eject[i] = otpNode
+	}
+
+	if err := Rebalance(known, eject).On(c.api, ms); err != nil {
 		return err
 	}
 
 	// Ensure we see the rebalance happen, if we don't do this then we can delete
 	// pods prematurely.
-	progress, status, err := c.witnessRebalance()
+	progress, status, err := c.witnessRebalance(ms)
 	if err != nil {
 		return err
 	}
@@ -744,356 +741,21 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, cluste
 	}
 }
 
-func (c *CouchbaseClient) StopRebalance(ms MemberSet) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.StopRebalance()
-}
-
 // Check that cluster is actively rebalancing with status 'running'.
 func (c *CouchbaseClient) IsRebalanceActive(ms MemberSet) (bool, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.CompareRebalanceStatus(RebalanceStatusRunning)
-}
-
-func (c *CouchbaseClient) ListBuckets(ms MemberSet) ([]Bucket, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetBuckets()
-}
-
-func (c *CouchbaseClient) CreateBucket(ms MemberSet, bucket Bucket) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.CreateBucket(&bucket)
-}
-
-func (c *CouchbaseClient) UpdateBucket(ms MemberSet, bucket Bucket) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.EditBucket(&bucket)
-}
-
-func (c *CouchbaseClient) DeleteBucket(ms MemberSet, bucket Bucket) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.DeleteBucket(bucket.BucketName)
-}
-
-func (c *CouchbaseClient) GetBucket(ms MemberSet, name string) (*Bucket, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetBucket(name)
-}
-
-func (c *CouchbaseClient) GetUser(ms MemberSet, id string, domain couchbasev2.AuthDomain) (*User, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetUser(id, AuthDomain(domain))
-}
-
-func (c *CouchbaseClient) ListUsers(ms MemberSet) ([]*User, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetUsers()
-}
-
-func (c *CouchbaseClient) CreateUser(ms MemberSet, user User) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.CreateUser(&user)
-}
-
-func (c *CouchbaseClient) DeleteUser(ms MemberSet, user User) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.DeleteUser(&user)
-}
-
-func (c *CouchbaseClient) ListGroups(ms MemberSet) ([]*Group, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetGroups()
-}
-
-func (c *CouchbaseClient) CreateGroup(ms MemberSet, group Group) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.CreateGroup(&group)
-}
-
-func (c *CouchbaseClient) DeleteGroup(ms MemberSet, group Group) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.DeleteGroup(&group)
-}
-
-func (c *CouchbaseClient) SetAutoFailoverSettings(ms MemberSet, settings *AutoFailoverSettings) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.SetAutoFailoverSettings(settings)
-	})
-}
-
-func (c *CouchbaseClient) GetAutoFailoverSettings(ms MemberSet) (*AutoFailoverSettings, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	var settings *AutoFailoverSettings
-
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	return settings, retryutil.RetryOnErr(ctx, 5*time.Second, func() (e error) {
-		settings, e = c.client.GetAutoFailoverSettings()
-		return e
-	})
-}
-
-func (c *CouchbaseClient) GetClusterInfo(ms MemberSet) (*ClusterInfo, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.ClusterInfo()
-}
-
-func (c *CouchbaseClient) SetPoolsDefault(ms MemberSet, defaults *PoolsDefaults) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetPoolsDefault(defaults)
-}
-
-func (c *CouchbaseClient) UploadClusterCACert(m *Member, pem []byte) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.UploadClusterCACert(pem)
-	})
-}
-
-func (c *CouchbaseClient) GetClusterCACert(m *Member) ([]byte, error) {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	return c.client.GetClusterCACert()
-}
-
-func (c *CouchbaseClient) ReloadNodeCert(m *Member) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	// This may take ages if the CA was previously updated.
-	ctx, cancel := context.WithTimeout(c.ctx, ExtendedRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.ReloadNodeCert()
-	})
-}
-
-// GetClientCertAuth/SetClientCertAuth allow reconciliation of TLS settings.  The ordering constraints
-// when using mTLS make the process very messy, so this is always done over HTTP.
-func (c *CouchbaseClient) GetClientCertAuth(ms MemberSet) (*ClientCertAuth, error) {
-	c.client.SetEndpoints(ms.ClientURLsPlaintext())
-	return c.client.GetClientCertAuth()
-}
-
-func (c *CouchbaseClient) CloseIdleConnections() {
-	c.client.CloseIdleConnections()
-}
-
-func (c *CouchbaseClient) SetClientCertAuth(ms MemberSet, settings *ClientCertAuth) error {
-	c.client.SetEndpoints(ms.ClientURLsPlaintext())
-	return c.client.SetClientCertAuth(settings)
-}
-
-func (c *CouchbaseClient) GetUpdatesEnabled(ms MemberSet) (bool, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetUpdatesEnabled()
-}
-
-func (c *CouchbaseClient) SetUpdatesEnabled(ms MemberSet, enabled bool) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetUpdatesEnabled(enabled)
-}
-
-func (c *CouchbaseClient) GetIndexSettings(ms MemberSet) (*IndexSettings, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetIndexSettings()
-}
-
-func (c *CouchbaseClient) SetIndexSettings(ms MemberSet, settings *IndexSettings) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetIndexSettings(settings)
-}
-
-func (c *CouchbaseClient) GetAlternateAddressesExternal(m *Member) (*AlternateAddressesExternal, error) {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	return c.client.GetAlternateAddressesExternal()
-}
-
-func (c *CouchbaseClient) SetAlternateAddressesExternal(m *Member, addresses *AlternateAddressesExternal) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	return c.client.SetAlternateAddressesExternal(addresses)
-}
-
-func (c *CouchbaseClient) DeleteAlternateAddressesExternal(m *Member) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	return c.client.DeleteAlternateAddressesExternal()
-}
-
-func (c *CouchbaseClient) SetRecoveryTypeDelta(ms MemberSet, hostname string) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.SetRecoveryType(hostname, RecoveryTypeDelta)
-	})
-}
-
-func (c *CouchbaseClient) SetRecoveryTypeFull(ms MemberSet, hostname string) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	ctx, cancel := context.WithTimeout(c.ctx, DefaultRetryPeriod)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		return c.client.SetRecoveryType(hostname, RecoveryTypeFull)
-	})
-}
-
-// Get RecoveryType of node if it has been set.
-// The default type is 'full'.
-func (c *CouchbaseClient) GetRecoveryType(m *Member) (RecoveryType, error) {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	info, err := c.client.ClusterInfo()
-	if err != nil {
-		return RecoveryTypeFull, err
+	tasks := &TaskList{}
+	if err := ListTasks(tasks).On(c.api, ms); err != nil {
+		return false, err
 	}
 
-	for _, node := range info.Nodes {
-		member := ms[strings.Split(node.HostName, ".")[0]]
-		if member != nil && member.Name == m.Name {
-			return RecoveryType(node.RecoveryType), nil
-		}
-	}
-
-	return RecoveryTypeFull, fmt.Errorf("no member exists for %s", m.Name)
-}
-
-func (c *CouchbaseClient) IsRecoveryTypeDelta(m *Member) (bool, error) {
-	recoveryType, err := c.GetRecoveryType(m)
+	task, err := tasks.GetTask(TaskTypeRebalance)
 	if err != nil {
 		return false, err
 	}
 
-	return recoveryType == RecoveryTypeDelta, nil
+	return getRebalanceStatus(task) == RebalanceStatusRunning, nil
 }
 
-func (c *CouchbaseClient) GetServerGroups(ms MemberSet) (*ServerGroups, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetServerGroups()
-}
-
-func (c *CouchbaseClient) CreateServerGroup(ms MemberSet, name string) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.CreateServerGroup(name)
-}
-
-func (c *CouchbaseClient) UpdateServerGroups(ms MemberSet, revision string, groups *ServerGroupsUpdate) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.UpdateServerGroups(revision, groups)
-}
-
-func (c *CouchbaseClient) GetAutoCompactionSettings(ms MemberSet) (*AutoCompactionSettings, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetAutoCompactionSettings()
-}
-
-func (c *CouchbaseClient) SetAutoCompactionSettings(ms MemberSet, r *AutoCompactionSettings) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetAutoCompactionSettings(r)
-}
-
-func (c *CouchbaseClient) ListRemoteClusters(ms MemberSet) (RemoteClusters, error) {
-	return c.client.ListRemoteClusters()
-}
-
-func (c *CouchbaseClient) CreateRemoteCluster(ms MemberSet, r *RemoteCluster) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.CreateRemoteCluster(r)
-}
-
-func (c *CouchbaseClient) DeleteRemoteCluster(ms MemberSet, r *RemoteCluster) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.DeleteRemoteCluster(r)
-}
-
-func (c *CouchbaseClient) ListReplications(ms MemberSet) ([]Replication, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.ListReplications()
-}
-
-func (c *CouchbaseClient) CreateReplication(ms MemberSet, r *Replication) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.CreateReplication(r)
-}
-
-func (c *CouchbaseClient) UpdateReplication(ms MemberSet, r *Replication) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.UpdateReplication(r)
-}
-
-func (c *CouchbaseClient) DeleteReplication(ms MemberSet, r *Replication) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.DeleteReplication(r)
-}
-
-func (c *CouchbaseClient) SetLDAPSettings(ms MemberSet, settings *LDAPSettings) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetLDAPSettings(settings)
-}
-
-func (c *CouchbaseClient) GetLDAPSettings(ms MemberSet) (*LDAPSettings, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetLDAPSettings()
-}
-
-func (c *CouchbaseClient) GetSecuritySettings(ms MemberSet) (*SecuritySettings, error) {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.GetSecuritySettings()
-}
-
-func (c *CouchbaseClient) SetSecuritySettings(ms MemberSet, s *SecuritySettings) error {
-	c.client.SetEndpoints(ms.ClientURLs())
-	return c.client.SetSecuritySettings(s)
-}
-
-func (c *CouchbaseClient) GetNodeNetworkConfiguration(m *Member) (*NodeNetworkConfiguration, error) {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	return c.client.GetNodeNetworkConfiguration()
-}
-
-func (c *CouchbaseClient) SetNodeNetworkConfiguration(m *Member, s *NodeNetworkConfiguration) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	return c.client.SetNodeNetworkConfiguration(s)
-}
-
-func (c *CouchbaseClient) EnableExternalListener(m *Member, s *NodeNetworkConfiguration) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	return c.client.EnableExternalListener(s)
-}
-
-func (c *CouchbaseClient) DisableExternalListener(m *Member, s *NodeNetworkConfiguration) error {
-	ms := NewMemberSet(m)
-	c.client.SetEndpoints(ms.ClientURLs())
-
-	return c.client.DisableExternalListener(s)
+func (c *CouchbaseClient) CloseIdleConnections() {
+	c.api.CloseIdleConnections()
 }

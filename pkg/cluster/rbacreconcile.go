@@ -81,12 +81,14 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 	// reconcile with existing groups
 	existingGroupNames := []string{}
 
-	existingGroups, err := c.client.ListGroups(c.readyMembers())
-	if err != nil {
+	existingGroups := &couchbaseutil.GroupList{}
+	if err := couchbaseutil.ListGroups(existingGroups).On(c.api, c.readyMembers()); err != nil {
 		return existingGroupNames, err
 	}
 
-	for _, e := range existingGroups {
+	for _, group := range *existingGroups {
+		e := group
+
 		if r, ok := requestedGroups[e.ID]; ok {
 			// update changed group
 			rolesMatch := reflect.DeepEqual(couchbaseutil.RolesToStr(r.Roles), couchbaseutil.RolesToStr(e.Roles))
@@ -100,7 +102,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			}
 		} else {
 			// delete unrequested group
-			if err := c.client.DeleteGroup(c.readyMembers(), *e); err != nil {
+			if err := couchbaseutil.DeleteGroup(&e).On(c.api, c.readyMembers()); err != nil {
 				return existingGroupNames, err
 			}
 
@@ -201,19 +203,21 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	}
 
 	// reconcile with existing users
-	existingUsers, err := c.client.ListUsers(c.readyMembers())
-	if err != nil {
+	existingUsers := &couchbaseutil.UserList{}
+	if err := couchbaseutil.ListUsers(existingUsers).On(c.api, c.readyMembers()); err != nil {
 		return nil, nil
 	}
 
 	existingUserNames := []string{}
 
-	for _, e := range existingUsers {
+	for _, user := range *existingUsers {
+		e := user
+
 		if r, ok := requestedUsers[e.ID]; ok {
 			// requested user exists
 			// update user if group bindings change
 			if !reflect.DeepEqual(r.Groups, e.Groups) || !reflect.DeepEqual(r.Name, e.Name) {
-				if err := c.client.CreateUser(c.readyMembers(), r); err != nil {
+				if err := couchbaseutil.CreateUser(&r).On(c.api, c.readyMembers()); err != nil {
 					return existingUserNames, err
 				}
 
@@ -222,7 +226,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			}
 		} else {
 			// delete unrequested user
-			if err := c.client.DeleteUser(c.readyMembers(), *e); err != nil {
+			if err := couchbaseutil.DeleteUser(&e).On(c.api, c.readyMembers()); err != nil {
 				return existingUserNames, err
 			}
 
@@ -234,9 +238,11 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	}
 
 	// create requested groups that do not exist
-	for _, r := range requestedUsers {
+	for i := range requestedUsers {
+		r := requestedUsers[i]
+
 		if _, found := couchbasev2.HasItem(r.ID, existingUserNames); !found {
-			if err := c.client.CreateUser(c.readyMembers(), r); err != nil {
+			if err := couchbaseutil.CreateUser(&r).On(c.api, c.readyMembers()); err != nil {
 				return existingUserNames, err
 			}
 
@@ -252,13 +258,18 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 func (c *Cluster) createGroup(group couchbaseutil.Group) error {
 	for _, role := range group.Roles {
 		if role.BucketName != "" && role.BucketName != "*" {
-			if _, err := c.client.GetBucket(c.readyMembers(), role.BucketName); err != nil {
+			buckets := couchbaseutil.BucketList{}
+			if err := couchbaseutil.ListBuckets(&buckets).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
+
+			if _, err := buckets.Get(role.BucketName); err != nil {
 				return fmt.Errorf("group `%s` with role `%s` references a bucket which does not exist: %s", group.ID, role.Role, role.BucketName)
 			}
 		}
 	}
 
-	return c.client.CreateGroup(c.readyMembers(), group)
+	return couchbaseutil.CreateGroup(&group).On(c.api, c.readyMembers())
 }
 
 // Get auth password to be set for user.
@@ -283,8 +294,8 @@ func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
 // reconcileLDAPSettings synchronizes couchbase ldap settings with requested settings.
 func (c *Cluster) reconcileLDAPSettings() error {
 	// Get current ldap cluster spec
-	apiLDAPSettings, err := c.client.GetLDAPSettings(c.readyMembers())
-	if err != nil {
+	apiLDAPSettings := &couchbaseutil.LDAPSettings{}
+	if err := couchbaseutil.GetLDAPSettings(apiLDAPSettings).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
@@ -293,7 +304,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		if len(apiLDAPSettings.Hosts) > 0 {
 			// Reset settings to default
 			settings := couchbaseutil.LDAPSettings{Encryption: couchbaseutil.LDAPEncryptionNone}
-			return c.client.SetLDAPSettings(c.readyMembers(), &settings)
+			return couchbaseutil.SetLDAPSettings(&settings).On(c.api, c.readyMembers())
 		}
 
 		// nothing to reconcile
@@ -352,7 +363,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		}
 
 		// Update ldap settings according requested spec
-		return c.client.SetLDAPSettings(c.readyMembers(), &specLDAPSettings)
+		return couchbaseutil.SetLDAPSettings(&specLDAPSettings).On(c.api, c.readyMembers())
 	}
 
 	return nil
