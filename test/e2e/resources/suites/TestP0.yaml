@@ -237,7 +237,7 @@ tcGroups:
     - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToFullNodeToNode
     - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificate
     - name: TestCreateClusterWithTLSAndFullNodeToNode
-    - name: TestCreateClusterWithTLSAndFaullNodeToNodeThenScale
+    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenScale
     - name: TestCreateClusterWithTLSAndFullNodeToNodeThenKillPod
     - name: TestCreateClusterWithTLSThenEnableFullNodeToNode
     - name: TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode

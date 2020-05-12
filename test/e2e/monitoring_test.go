@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -164,6 +165,11 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
+	// deleting monitoring secret
+	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(monitoringAuthSecret, nil); err != nil {
+		fmt.Println("Warning: Unable to delete monitoring secret: ", err)
+	}
+
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
@@ -201,11 +207,6 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustCheckPrometheusWithAuthSecret(t, targetKube, testCouchbase, token)
-
-	// deleting monitoring secret
-	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(monitoringAuthSecret, nil); err != nil {
-		e2eutil.Die(t, err)
-	}
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{

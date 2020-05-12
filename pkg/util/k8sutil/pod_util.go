@@ -84,9 +84,12 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 			if _, err = createPersistentVolumeClaim(client, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
 				return nil, err
 			}
+		}
 
-			// If we are creating a default mount, then also create an init container to
-			// copy Couchbase's etc directory onto the PVC.
+		// If we are creating a default mount, then also create an init container to
+		// copy Couchbase's etc directory onto the PVC.  Do this always to avoid surprises
+		// the init command is idempotent.
+		for _, pvc := range pvcState.pvcs {
 			if pvc.Annotations[constants.AnnotationVolumeMountPath] == couchbaseVolumeDefaultConfigDir {
 				initContainer := couchbaseInitContainer(cluster.Spec.CouchbaseImage(), pvc.Name, config)
 				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
@@ -574,7 +577,7 @@ func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container
 		}
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
-		container.Command = append(container.Command, "--token", metricsTokenMountPath+"/token")
+		container.Args = append(container.Args, "--token", metricsTokenMountPath+"/token")
 	}
 }
 
@@ -801,7 +804,7 @@ func couchbaseContainer(image string, config *couchbasev2.ServerConfig) v1.Conta
 func couchbaseInitContainer(image, claimName string, config couchbasev2.ServerConfig) v1.Container {
 	initContainer := couchbaseContainer(image, &config)
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
-	initContainer.Args = []string{"cp", "-a", "/opt/couchbase/etc", "/mnt/"}
+	initContainer.Args = []string{"bash", "-c", "if [[ ! -e /mnt/etc ]]; then cp -a /opt/couchbase/etc /mnt/; fi"}
 	initContainer.VolumeMounts = []v1.VolumeMount{
 		{Name: claimName,
 			MountPath: "/mnt"},

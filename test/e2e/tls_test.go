@@ -1066,6 +1066,14 @@ func skipN2NCheck(t *testing.T) {
 	}
 }
 
+func getEncryptionLevel(encryptionType couchbasev2.NodeToNodeEncryptionType) string {
+	if encryptionType == "ControlPlaneOnly" {
+		return "control"
+	}
+
+	return "all"
+}
+
 // testCreateClusterWithTLSAndNodeToNode creates a cluster with N2N initially enabled.
 func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
 	skipN2NCheck(t)
@@ -1092,8 +1100,11 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
+	//get the encyptionLevel
+	encryptionLevel := getEncryptionLevel(encryptionType)
+
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1140,10 +1151,13 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
+	//get the encyptionLevel
+	encryptionLevel := getEncryptionLevel(encryptionType)
+
 	// Check the state is as we expect, then scale, and repeat the check.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 	testCouchbase = e2eutil.MustResizeCluster(t, 0, clusterSize+scaleUp, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1192,12 +1206,15 @@ func testCreateClusterWithTLSAndNodeToNodeThenKillPod(t *testing.T, encryptionTy
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
+	//get the encyptionLevel
+	encryptionLevel := getEncryptionLevel(encryptionType)
+
 	// Check the state is as we expect, kill a pod, let it recover and recheck N2N.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1235,10 +1252,13 @@ func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType c
 	defer teardown()
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, targetKube.Namespace, clusterSize, ctx)
 
+	//get the encyptionLevel
+	encryptionLevel := getEncryptionLevel(encryptionType)
+
 	// Enable N2N encryption and check the state is as we expect.
 	patchset := jsonpatch.NewPatchSet().Add("/Spec/Networking/TLS/NodeToNodeEncryption", &encryptionType)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1291,11 +1311,14 @@ func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, en
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
+	//get the encyptionLevel
+	encryptionLevel := getEncryptionLevel(encryptionType)
+
 	// Disable N2N then check state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 	patchset := jsonpatch.NewPatchSet().Remove("/Spec/Networking/TLS/NodeToNodeEncryption")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
-	e2eutil.MustCheckN2NDisabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NDisabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1348,8 +1371,11 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
+	//get the encyptionLevel
+	encryptionLevel := getEncryptionLevel(encryptionType)
+
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 	patchset := jsonpatch.NewPatchSet().Replace("/Spec/Networking/TLS/NodeToNodeEncryption", &newEncryptionType)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 	// TODO: race, check cluster state.
@@ -1398,7 +1424,10 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
 
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, time.Minute)
+	//get the encyptionLevel
+	encryptionLevel := getEncryptionLevel(encryptionType)
+
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 	e2eutil.MustRotateServerCertificate(t, ctx, []string{})
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSUpdatedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, targetKube, targetKube.Namespace, ctx)
