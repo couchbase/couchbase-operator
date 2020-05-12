@@ -13,14 +13,6 @@ import (
 )
 
 const (
-	// dnsService is where the DNS service is expected to run.
-	dnsNamespace = "kube-system"
-
-	// dnsService is the name of the DNS service and endpoints.
-	// This seems to hold for those using both kube-dns and coredns,
-	// most likely for backwards compatibility.
-	dnsService = "kube-dns"
-
 	// resourceName is the common name for resources we will create.
 	// TODO: We could generate these names to prevent collisions in
 	// the event of some failure.
@@ -40,6 +32,11 @@ const (
 `
 )
 
+var dnsServices = map[string]string{
+	"kube-system":   "kube-dns",
+	"openshift-dns": "dns-default",
+}
+
 // getSearchDomains returns a set of valid search domains for a local cluster
 // using an intermediate forwarding proxy.
 func getSearchDomains(local *types.Cluster) []string {
@@ -50,13 +47,27 @@ func getSearchDomains(local *types.Cluster) []string {
 	}
 }
 
+func findDNSService(k8s *types.Cluster) (string, string, error) {
+	for namespace, service := range dnsServices {
+		if _, err := k8s.KubeClient.CoreV1().Services(namespace).Get(service, metav1.GetOptions{}); err == nil {
+			return namespace, service, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("dns service not found")
+}
+
 // provisionCoreDNS creates a CoreDNS instance that forwards requests to the remote
 // namespace to the remote cluster's authoratative DNS server, and everything else
 // to the local cluster's authoratative DNS server.  It returns the DNS service and
 // a cleanup callback.
 func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), error) {
+	namespace, service, err := findDNSService(remote)
+	if err != nil {
+		return nil, nil, err
+	}
 	// Get a remote DNS endpoint.
-	endpoints, err := remote.KubeClient.CoreV1().Endpoints(dnsNamespace).Get(dnsService, metav1.GetOptions{})
+	endpoints, err := remote.KubeClient.CoreV1().Endpoints(namespace).Get(service, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,7 +83,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 	}
 
 	// Get the local DNS endpoint.
-	localDNSService, err := local.KubeClient.CoreV1().Services(dnsNamespace).Get(dnsService, metav1.GetOptions{})
+	localDNSService, err := local.KubeClient.CoreV1().Services(namespace).Get(service, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -91,7 +102,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 		},
 	}
 	_ = local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
-	if _, err = local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Create(configMap); err != nil {
+	if _, err := local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Create(configMap); err != nil {
 		return nil, nil, err
 	}
 
@@ -158,7 +169,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 		return nil, nil, err
 	}
 
-	service := &corev1.Service{
+	coreService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: resourceName,
 		},
@@ -183,7 +194,8 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 		},
 	}
 	_ = local.KubeClient.CoreV1().Services(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
-	if service, err = local.KubeClient.CoreV1().Services(local.Namespace).Create(service); err != nil {
+	svc, err := local.KubeClient.CoreV1().Services(local.Namespace).Create(coreService)
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -192,7 +204,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 		_ = local.KubeClient.AppsV1().Deployments(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
 		_ = local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
 	}
-	return service, cleanup, nil
+	return svc, cleanup, nil
 }
 
 // MustProvisionCoreDNS reates a CoreDNS instance that forwards requests to the remote
