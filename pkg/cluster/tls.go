@@ -349,7 +349,7 @@ func (c *Cluster) reconcileTLS() error {
 
 	// Quiesce persistent connections, NS server doesn't quite work if some are
 	// still open.
-	c.client.CloseIdleConnections()
+	c.api.CloseIdleConnections()
 
 	// Update the CA and any server certificate chains that require it.
 	changed := false

@@ -103,15 +103,15 @@ const (
 )
 
 type ClusterInfo struct {
-	SearchMemoryQuotaMB    int64      `json:"ftsMemoryQuota"`
-	IndexMemoryQuotaMB     int64      `json:"indexMemoryQuota"`
-	DataMemoryQuotaMB      int64      `json:"memoryQuota"`
-	EventingMemoryQuotaMB  int64      `json:"eventingMemoryQuota"`
-	AnalyticsMemoryQuotaMB int64      `json:"cbasMemoryQuota"`
-	Nodes                  []NodeInfo `json:"nodes"`
-	RebalanceStatus        string     `json:"rebalanceStatus"`
-	ClusterName            string     `json:"clusterName"`
-	Balanced               bool       `json:"balanced"`
+	SearchMemoryQuotaMB    int64           `json:"ftsMemoryQuota"`
+	IndexMemoryQuotaMB     int64           `json:"indexMemoryQuota"`
+	DataMemoryQuotaMB      int64           `json:"memoryQuota"`
+	EventingMemoryQuotaMB  int64           `json:"eventingMemoryQuota"`
+	AnalyticsMemoryQuotaMB int64           `json:"cbasMemoryQuota"`
+	Nodes                  []NodeInfo      `json:"nodes"`
+	RebalanceStatus        RebalanceStatus `json:"rebalanceStatus"`
+	ClusterName            string          `json:"clusterName"`
+	Balanced               bool            `json:"balanced"`
 }
 
 // GetNode returns the named node.
@@ -229,6 +229,7 @@ type NodeInfo struct {
 	AvailableStorage   AvailableStorageInfo `json:"storage"`
 	AlternateAddresses *AlternateAddresses  `json:"alternateAddresses,omitempty"`
 	NodeEncryption     bool                 `json:"nodeEncryption"`
+	Version            string               `json:"version"`
 }
 
 type AvailableStorageInfo map[AvailableStorageType][]StorageInfo

@@ -73,26 +73,85 @@ type Config struct {
 	PodCreateTimeout string
 }
 
+// Cluster is the core internal data type representing a Couchbase cluster.
 type Cluster struct {
-	config       Config
-	k8s          *client.Client
-	cluster      *couchbasev2.CouchbaseCluster
-	members      couchbaseutil.MemberSet
-	username     string
-	password     string
-	api          *couchbaseutil.Client
-	client       *couchbaseutil.CouchbaseClient // Client to communicate with the Couchbase admin port
-	ctx          context.Context                // Context used to cancel long running operations
-	cancel       context.CancelFunc             // Closure on the context to indicate cancellation
-	lastEvent    time.Time                      // When we raised the last event (see raiseEvent)
-	scheduler    scheduler.Scheduler            // Pod placement scheduler
-	forceUpdate  bool                           // Members are cached so we can trust dead ephemeral pods are ours, this allows us to force a refresh
-	eventCache   *lru.Cache                     // Used to store events for aggregation
-	state        persistence.PersistentStorage  // Used to store persistent cluster state
-	recoveryTime map[string]time.Time           // Used to determine when to manually recover nodes
+	// config is the configuration passed in from the command line.
+	config Config
+
+	// k8s is a Kubernetes interface layer.  All resource types managed by
+	// this client use caching to improve performance and remove load from
+	// the Kubernetes API servers.
+	k8s *client.Client
+
+	// cluster is the current couchbase cluster resource from Kubernetes.
+	// This is ephemeral and is updated with each iteration of the runloop.
+	cluster *couchbasev2.CouchbaseCluster
+
+	// members is the set of all members we curretly recognize.
+	members couchbaseutil.MemberSet
+
+	// callableMembers is the subset of members that we can attempt to call
+	// with the API. The CallAPI functions will iterate over this set in
+	// an attempt to avoid transient errors.
+	callableMembers couchbaseutil.MemberSet
+
+	// username is the administrative username that the operator is using
+	// to communicate with the cluster.  This should be persisted in the
+	// cluster config map to enable rotation across restarts.
+	username string
+
+	// password is the administrative users's password the the operator
+	// is using to communicate with the cluster. This should be persisted
+	// in the cluster config map to enable rotation across restarts.
+	password string
+
+	// api is client used to communicate with Couchbase server.
+	api *couchbaseutil.Client
+
+	// ctx is a golang context used to cancel long running or iterative
+	// operations.  It is closed when the cluster is deleted to clean up
+	// go routines and avoid excessive error messages in the log stream.
+	// As the runloop is synchronously driven now, this serves little
+	// purpose, consider deleting it...
+	ctx context.Context
+
+	// cancel is the function that causes the ctx to close.
+	cancel context.CancelFunc
+
+	// lastEvent records when the last event was raised.  Although based
+	// on time, which has sub-second accuracy, when marshalled into JSON
+	// and sent to the API, times are reduced to a second granularity.
+	// This means that events can alias, and that ordering--critical to
+	// the test framework--becomes non-deterministic.  We track the last
+	// event time and delay subsequent events until the next whole second.
+	lastEvent time.Time
+
+	// scheduler is the interface that control distribution of pods across
+	// available nodes on the platform.
+	scheduler scheduler.Scheduler
+
+	// eventCache is responsible for caching certain events that repeat
+	// often, and can be agreggated by incrementing their counts.  Unlike
+	// the cache implemented by the Kubernetes client library, this one
+	// does not rate-limit and discard events, which would cause non-
+	// determinism in testing.
+	eventCache *lru.Cache
+
+	// state is the persistent storage associated with the cluster.  This
+	// should be used judiciously, and where possible state observed from
+	// either Kubernetes or Couchbase server.
+	state persistence.PersistentStorage
+
+	// recoveryTime is a threshold for automatic recovery of a pod backed
+	// by a persistent volume.  When the current time passes this threshold
+	// then we attempt manual recovery by recreating the pod.
+	recoveryTime map[string]time.Time
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.
+// controller-runtime is actually just using the raw NamespacedName in its logs
+// these days, maintaining the structured JSON, so perhaps we should do the same
+// and adjust tooling to match.
 func (c *Cluster) namespacedName() string {
 	return types.NamespacedName{Namespace: c.cluster.Namespace, Name: c.cluster.Name}.String()
 }
@@ -101,10 +160,12 @@ func (c *Cluster) namespacedName() string {
 // creation or recovery after an Operator restart.
 func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
-		config:       config,
-		cluster:      cl,
-		eventCache:   lru.New(1024),
-		recoveryTime: map[string]time.Time{},
+		config:          config,
+		cluster:         cl,
+		eventCache:      lru.New(1024),
+		recoveryTime:    map[string]time.Time{},
+		members:         couchbaseutil.MemberSet{},
+		callableMembers: couchbaseutil.MemberSet{},
 	}
 
 	// Cancel is used to abort the go routine when the operator is deleted
@@ -392,21 +453,16 @@ func (c *Cluster) runReconcile() {
 		return
 	}
 
-	// When cluster is being restored or reconcile error has occurred then
-	// then the memberset can be updated from the status of running pods and
-	// persistent volumes.
-	if c.forceUpdate || c.members.Empty() {
-		c.forceUpdate = false
+	// Members are updated each iteration by performing a union of Kubernetes resources
+	// we discover, and any hosts that Couchbase knows about, if we can actually talk
+	// to it.  By performing no caching the behaviour of the systems is identical during
+	// runtime and after a restart.
+	if err := c.updateMembers(); err != nil {
+		log.Error(err, "Failed to update members", "cluster", c.namespacedName())
+		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
+		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 
-		if err := c.updateMembers(podsToMemberSet(running)); err != nil {
-			log.Error(err, "Failed to update members", "cluster", c.namespacedName())
-			reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
-			reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
-
-			c.forceUpdate = true
-
-			return
-		}
+		return
 	}
 
 	// Finally reconcile state according to the specification.
@@ -554,7 +610,7 @@ func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
 
 func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
 	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
-	if config != nil {
+	if config == nil {
 		return false
 	}
 
@@ -616,36 +672,53 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod) {
 	return running, pending
 }
 
-func (c *Cluster) updateMemberStatus() error {
-	// The first member will get here when the pod is brought up, however calls
-	// to get the cluster status will fail as it hasn't been initialized yet, so
-	// instead just return an empty status
-	var info *couchbaseutil.ClusterStatus
+func (c *Cluster) updateMemberStatus(firstMember bool) error {
+	// Hack, NS server doesn't start to work properly until the full initialization
+	// sequence is performed, so a call to /pools/default will not work :sadpanda:
+	// We need to avoid this code path in order to avoid this hack.
+	if firstMember {
+		c.updateMemberStatusWithClusterInfo(c.members, nil)
+		return nil
+	}
 
-	if c.cluster.Status.ClusterID == "" {
-		info = couchbaseutil.NewClusterStatus()
-	} else {
-		var err error
+	status, err := c.GetStatus()
+	if err != nil {
+		return err
+	}
 
-		if info, err = c.client.GetClusterStatus(c.members); err != nil {
-			return err
+	ready := couchbaseutil.MemberSet{}
+
+	for name, member := range c.members {
+		state, ok := status.NodeStates[name]
+		if !ok {
+			continue
+		}
+
+		if state == NodeStateActive {
+			ready.Add(member)
 		}
 	}
 
-	return c.updateMemberStatusWithClusterInfo(info)
+	unready := c.members.Diff(ready)
+
+	c.updateMemberStatusWithClusterInfo(ready, unready)
+
+	return nil
 }
 
 // use cluster info to set ready members from active nodes
 // and all remaining nodes as unready.
-func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) error {
+func (c *Cluster) updateMemberStatusWithClusterInfo(ready, unready couchbaseutil.MemberSet) {
 	if c.cluster.Status.Members == nil {
 		c.cluster.Status.Members = &couchbasev2.MembersStatus{}
 	}
 
-	c.cluster.Status.Members.SetReady(cs.ActiveNodes.Names())
-	c.cluster.Status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
+	c.cluster.Status.Members.SetReady(ready.Names())
+	c.cluster.Status.Members.SetUnready(unready.Names())
 
-	return c.updateCRStatus()
+	if err := c.updateCRStatus(); err != nil {
+		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
+	}
 }
 
 // Use username and password from secret store.
@@ -675,8 +748,6 @@ func (c *Cluster) initCouchbaseClient() error {
 	log.Info("Couchbase client starting", "cluster", c.namespacedName())
 
 	c.api = couchbaseutil.New(c.ctx, c.namespacedName(), c.username, c.password)
-
-	c.client = couchbaseutil.NewCouchbaseClient(c.ctx, c.api)
 
 	if c.isSecureClient() {
 		// Grab the operator secret
@@ -730,20 +801,24 @@ func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
 
 // Adds a new member to our cluster object and updates the cluster status.
 func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) error {
+	firstMember := c.members.Empty()
+
 	c.members.Add(member)
+	c.callableMembers.Add(member)
 
 	c.cluster.Status.Size = c.members.Size()
 
-	return c.updateMemberStatus()
+	return c.updateMemberStatus(firstMember)
 }
 
 // Removes a member from our cluster object and updates the cluster status.
 func (c *Cluster) clusterRemoveMember(name string) error {
 	c.members.Remove(name)
+	c.callableMembers.Remove(name)
 
 	c.cluster.Status.Size = c.members.Size()
 
-	return c.updateMemberStatus()
+	return c.updateMemberStatus(false)
 }
 
 // Raises an event.  While time.Time has nanosecond accuracy, this is lost when
@@ -809,45 +884,14 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 // clients should use ready members that are available to service requests
 // according to status readiness.  Otherwise, fallback to cluster members.
 func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
-	members := couchbaseutil.MemberSet{}
-	readyNodes := c.cluster.Status.Members.Ready
-
-	// Get running pods to ensure ready nodes exists
-	running, _ := c.pollPods()
-	podMembers := podsToMemberSet(running)
-
-	for _, node := range readyNodes {
-		if m, ok := c.members[node]; ok {
-			if _, ok := podMembers[node]; ok {
-				members.Add(m)
-			}
-		}
-	}
-
-	if members.Empty() && c.members != nil {
-		err := c.updateMembers(podMembers)
-		if err != nil {
-			log.Error(err, "Member update failed", "cluster", c.namespacedName())
-		}
-
-		members = c.members
-	}
-
-	return members
+	// This used to cross reference with pod liveness.  Why?
+	// Performance improvment?  UX?
+	return c.callableMembers
 }
 
 // Check if volume only has log volumes mounted.
 func (c *Cluster) memberHasLogVolumes(name string) bool {
-	if m, ok := c.members[name]; ok {
-		config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
-		if config != nil {
-			if mounts := config.GetVolumeMounts(); mounts != nil {
-				return mounts.LogsOnly()
-			}
-		}
-	}
-
-	return false
+	return k8sutil.MemberHasLogVolumes(c.k8s, name)
 }
 
 // getPodIndex returns the current pod naming index.
@@ -890,7 +934,7 @@ func (c *Cluster) decPodIndex() error {
 	return c.setPodIndex(podIndex - 1)
 }
 
-func (c *Cluster) logStatus(status *couchbaseutil.ClusterStatus) {
+func (c *Cluster) logStatus(status *MemberState) {
 	status.LogStatus(c.namespacedName())
 	c.scheduler.LogStatus(c.namespacedName())
 }

@@ -1332,7 +1332,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 			e2eutil.MustExecShellInPod(t, targetKube, podNameToKill, "pkill beam.smp")
 		}
 
-		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 10*time.Minute)
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator

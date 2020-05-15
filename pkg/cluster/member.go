@@ -1,8 +1,6 @@
 package cluster
 
 import (
-	"fmt"
-
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -10,47 +8,60 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-func (c *Cluster) updateMembers(known couchbaseutil.MemberSet) error {
-	// If we have no known members, default to an empty status
-	status := couchbaseutil.NewClusterStatus()
+// updateMembers is the canonical source of truth for all membership information.
+// It looks at Kubernetes for pods and pvcs (this is ostensibly free).
+func (c *Cluster) updateMembers() error {
+	// Get all pods these are running and ready for attempted API access.
+	runningPods, _ := c.pollPods()
+	runningMembers := podsToMemberSet(runningPods)
 
-	if !known.Empty() {
-		var err error
-		if status, err = c.client.GetClusterStatus(known); err != nil {
+	// All pods are members as are persistent volume claims.
+	members := couchbaseutil.MemberSet{}
+	members.Append(runningMembers)
+	members.Append(c.pvcMembers())
+
+	// The ready set is nodes that are in the active state.
+	ready := couchbaseutil.MemberSet{}
+
+	// The callable set is nodes that can be called with the Couchbase API.
+	callable := couchbaseutil.MemberSet{}
+
+	if !runningMembers.Empty() {
+		// Try to find a Couchbase node that responds.
+		status, err := c.GetStatusUnsafe(runningMembers)
+		if err != nil {
 			return err
 		}
-	}
 
-	// Establish initial members from running cluster Pods
-	members := known
+		// Add any nodes that Couchbase knows about that we do not.
+		// We will just kick them out anyway.
+		members.Append(status.UnknownMembers)
 
-	// Collect additional members from available Persistent Volumes
-	members.Append(c.getManagedPersistedMembers(status.KnownNodes()))
+		for name, member := range runningMembers {
+			state, ok := status.NodeStates[name]
+			if !ok {
+				continue
+			}
 
-	// Return error in the case where cluster knows about nodes
-	// that aren't identifed as members since these are either:
-	//  1. A foreign node
-	//  2. A node with both deleted Pod and Volume
-	//  2. An ephemeral node with deleted Pod.
-	//
-	// In any of these cases nodes cannot be recovered and should
-	// be manually failed over before we allow reconcile since
-	// there's no way to determine if this node is managed by the operator.
-	for _, node := range status.KnownNodes() {
-		if !members.Contains(node) {
-			return fmt.Errorf("cluster contains node `%s` which cannot be managed. Failover/Rebalance is recommended", node)
+			if state == NodeStateActive {
+				ready.Add(member)
+			}
+
+			if state.Callable() {
+				callable.Add(member)
+			}
 		}
 	}
 
-	if members.Empty() {
-		return fmt.Errorf("cluster does not have any Pods that are running or recoverable")
-	}
+	// The unready set is the boolean difference of all nodes with the ready set.
+	unready := members.Diff(ready)
 
+	// Update the cluster status
+	c.updateMemberStatusWithClusterInfo(ready, unready)
+
+	// Update the main cluster configuration
 	c.members = members
-
-	if err := c.updateMemberStatusWithClusterInfo(status); err != nil {
-		return err
-	}
+	c.callableMembers = callable
 
 	return nil
 }
@@ -77,7 +88,7 @@ func (c *Cluster) newMember(id int, serverSpecName, image string) (*couchbaseuti
 func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
 
-	pvcMembers, err := k8sutil.PVCToMemberset(c.k8s, c.cluster.Namespace, c.isSecureClient())
+	pvcMembers, err := k8sutil.PVCToMemberset(c.k8s, c.cluster.Name, c.cluster.Namespace, c.isSecureClient())
 	if err != nil {
 		log.Error(err, "Member discovery failed", "cluster", c.namespacedName())
 	} else {
@@ -85,30 +96,6 @@ func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 	}
 
 	return members
-}
-
-// getManagedPersistedMembers gets list of members associated with
-// persisted volumes that are actually managed by active cluster.
-func (c *Cluster) getManagedPersistedMembers(knownNodes []string) couchbaseutil.MemberSet {
-	managedMembers := couchbaseutil.MemberSet{}
-	pvcMembers := c.pvcMembers()
-
-	// When knownNodes are empty then we'll only rely on
-	// members that can be retrieved from persisted volumes
-	if len(knownNodes) == 0 {
-		return pvcMembers
-	}
-
-	if !pvcMembers.Empty() {
-		// Only include persisted members that are part of knownNodes
-		for _, node := range knownNodes {
-			if m, ok := pvcMembers[node]; ok {
-				managedMembers.Add(m)
-			}
-		}
-	}
-
-	return managedMembers
 }
 
 func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {

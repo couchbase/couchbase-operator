@@ -2,11 +2,14 @@ package cluster
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 // ReconcileState is an enumeration used to define the current
@@ -27,7 +30,6 @@ const (
 	ReconcileServerConfigs
 	ReconcileUpgradeNode
 	ReconcileRemoveNodes
-	ReconcileRemoveUnmanaged
 	ReconcileAddNodes
 	ReconcileServerGroups
 	ReconcileNodeServices
@@ -71,7 +73,6 @@ var (
 		ReconcileServerConfigs:    handleUnknownServerConfigs,
 		ReconcileUpgradeNode:      handleUpgradeNode,
 		ReconcileRemoveNodes:      handleRemoveNode,
-		ReconcileRemoveUnmanaged:  handleUnmanagedNodes,
 		ReconcileAddNodes:         handleAddNode,
 		ReconcileServerGroups:     handleServerGroups,
 		ReconcileNodeServices:     handleNodeServices,
@@ -81,14 +82,163 @@ var (
 	}
 )
 
+// This is a temporary measure to maintain the interface.  This is all smell code
+// and will probably get killed off fairly soon.
+type MemberState struct {
+	NodeStateMap     NodeStateMap
+	managedNodes     couchbaseutil.MemberSet
+	ActiveNodes      couchbaseutil.MemberSet
+	PendingAddNodes  couchbaseutil.MemberSet
+	AddBackNodes     couchbaseutil.MemberSet
+	FailedAddNodes   couchbaseutil.MemberSet
+	WarmupNodes      couchbaseutil.MemberSet
+	DownNodes        couchbaseutil.MemberSet
+	FailedNodes      couchbaseutil.MemberSet
+	UnclusteredNodes couchbaseutil.MemberSet
+	IsRebalancing    bool
+	NeedsRebalance   bool
+}
+
+func (m *MemberState) ClusterHealthy() bool {
+	// All nodes must be active.
+	badMembers := couchbaseutil.NewMemberSet()
+	badMembers.Append(m.PendingAddNodes)
+	badMembers.Append(m.AddBackNodes)
+	badMembers.Append(m.FailedAddNodes)
+	badMembers.Append(m.WarmupNodes)
+	badMembers.Append(m.DownNodes)
+	badMembers.Append(m.FailedNodes)
+	badMembers.Append(m.UnclusteredNodes)
+
+	if !badMembers.Empty() {
+		return false
+	}
+
+	// Must be balanced and not rebalancing.
+	return !m.IsRebalancing && !m.NeedsRebalance
+}
+
+// nodeStatus is an intermediate data structured used to log node status information.
+type nodeStatus struct {
+	name    string
+	version string
+	class   string
+	managed bool
+	state   string
+}
+
+func (m *MemberState) LogStatus(cluster string) {
+	// A cluster is either balanced or not
+	balance := "balanced"
+	if m.NeedsRebalance {
+		balance = "unbalanced"
+	}
+
+	log.Info("Cluster status", "cluster", cluster, "balance", balance, "rebalancing", m.IsRebalancing)
+
+	// Sort the names so it's easier to grok
+	names := []string{}
+
+	for name := range m.managedNodes {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	// Collect all the node statuses, as we process check the string lengths for
+	// pretty tabulation
+	statuses := []nodeStatus{}
+
+	for _, name := range names {
+		// All members are managed
+		// And they will exist in one state
+		state := m.NodeStateMap[name]
+
+		// Buffer up the status entry
+		class := m.managedNodes[name].ServerConfig
+		version := m.managedNodes[name].Version
+
+		status := nodeStatus{
+			name:    name,
+			version: version,
+			class:   class,
+			managed: true,
+			state:   string(state),
+		}
+		statuses = append(statuses, status)
+	}
+
+	for _, status := range statuses {
+		log.Info("Node status", "cluster", cluster, "name", status.name, "version", status.version, "class", status.class, "managed", status.managed, "status", status.state)
+	}
+}
+
 type ReconcileMachine struct {
 	runningPods   couchbaseutil.MemberSet
 	knownNodes    couchbaseutil.MemberSet
 	ejectNodes    couchbaseutil.MemberSet
 	unknownNodes  couchbaseutil.MemberSet
-	couchbase     *couchbaseutil.ClusterStatus
+	couchbase     *MemberState
 	state         ReconcileState
 	removeVolumes map[string]bool // map of nodes with volumes to remove if deleted
+}
+
+func (c *Cluster) newReconcileMachine(pods []*v1.Pod) (*ReconcileMachine, error) {
+	status, err := c.GetStatus()
+	if err != nil {
+		return nil, err
+	}
+
+	state := &MemberState{
+		NodeStateMap:     status.NodeStates,
+		managedNodes:     c.members,
+		ActiveNodes:      couchbaseutil.NewMemberSet(),
+		PendingAddNodes:  couchbaseutil.NewMemberSet(),
+		AddBackNodes:     couchbaseutil.NewMemberSet(),
+		FailedAddNodes:   couchbaseutil.NewMemberSet(),
+		WarmupNodes:      couchbaseutil.NewMemberSet(),
+		DownNodes:        couchbaseutil.NewMemberSet(),
+		FailedNodes:      couchbaseutil.NewMemberSet(),
+		UnclusteredNodes: couchbaseutil.NewMemberSet(),
+		IsRebalancing:    status.Balancing,
+		NeedsRebalance:   !status.Balanced,
+	}
+
+	for name, nodeState := range status.NodeStates {
+		switch nodeState {
+		case NodeStateActive:
+			state.ActiveNodes.Add(c.members[name])
+		case NodeStatePendingAdd:
+			state.PendingAddNodes.Add(c.members[name])
+		case NodeStateFailedAdd:
+			state.FailedAddNodes.Add(c.members[name])
+		case NodeStateWarmup:
+			state.WarmupNodes.Add(c.members[name])
+		case NodeStateDown:
+			state.DownNodes.Add(c.members[name])
+		case NodeStateFailed:
+			state.FailedNodes.Add(c.members[name])
+		case NodeStateAddBack:
+			state.AddBackNodes.Add(c.members[name])
+		}
+	}
+
+	for name, member := range c.members {
+		if _, ok := status.NodeStates[name]; !ok {
+			state.UnclusteredNodes.Add(member)
+		}
+	}
+
+	fsm := &ReconcileMachine{
+		runningPods:   podsToMemberSet(pods),
+		knownNodes:    couchbaseutil.NewMemberSet(),
+		ejectNodes:    couchbaseutil.NewMemberSet(),
+		couchbase:     state,
+		state:         ReconcileInit,
+		removeVolumes: make(map[string]bool),
+	}
+
+	return fsm, nil
 }
 
 func (r *ReconcileMachine) transitionState(to ReconcileState) {
@@ -261,7 +411,7 @@ func handleWarmupNodes(r *ReconcileMachine, c *Cluster) error {
 func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.IsRebalancing {
 		// If rebalance isn't actually active then we should stop it
-		running, err := c.client.IsRebalanceActive(c.readyMembers())
+		running, err := c.IsRebalanceActive(c.readyMembers())
 		if err != nil {
 			log.Error(err, "Rebalance status collection failed", "cluster", c.namespacedName())
 		} else if !running {
@@ -591,16 +741,6 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 		r.couchbase.NeedsRebalance = true
 	}
 
-	r.transitionState(ReconcileRemoveUnmanaged)
-
-	return nil
-}
-
-func handleUnmanagedNodes(r *ReconcileMachine, c *Cluster) error {
-	if len(r.couchbase.UnmanagedNodes) > 0 {
-		r.couchbase.NeedsRebalance = true
-	}
-
 	r.transitionState(ReconcileAddNodes)
 
 	return nil
@@ -747,11 +887,7 @@ func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
 func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.NeedsRebalance {
 		// Eject nodes that we want to discard.
-		eject := make(couchbaseutil.OTPNodeList, len(r.ejectNodes))
-		copy(eject, r.ejectNodes.OTPNodes())
-
-		// Eject nodes that we don't think are managed by us.
-		eject = append(eject, r.couchbase.UnmanagedNodes.OTPNodes()...)
+		eject := r.ejectNodes.OTPNodes()
 
 		if err := c.rebalance(r.knownNodes, eject); err != nil {
 			// If rebalance error occurred due to a node that could not be delta

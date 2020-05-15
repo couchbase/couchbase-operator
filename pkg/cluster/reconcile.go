@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -73,40 +72,21 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		}
 	}
 
-	// Update the status and ready list before doing anything.
-	status, err := c.client.GetClusterStatus(c.members)
-	if err != nil {
-		log.Error(err, "Cluster state collection failed, skipping", "cluster", c.namespacedName())
-		return err
-	}
-
-	if err := c.updateMemberStatusWithClusterInfo(status); err != nil {
-		return err
-	}
-
-	state := &ReconcileMachine{
-		runningPods:   podsToMemberSet(pods),
-		knownNodes:    couchbaseutil.NewMemberSet(),
-		ejectNodes:    couchbaseutil.NewMemberSet(),
-		couchbase:     status,
-		state:         ReconcileInit,
-		removeVolumes: make(map[string]bool),
-	}
-
 	if err := c.reconcileClusterSettings(); err != nil {
 		return err
 	}
 
-	if err := c.reconcileMembers(state); err != nil {
+	fsm, err := c.newReconcileMachine(pods)
+	if err != nil {
+		return err
+	}
+
+	if err := c.reconcileMembers(fsm); err != nil {
 		return err
 	}
 
 	// Update the status and ready list to reflect any new members added.
-	if status, err = c.client.GetClusterStatus(c.members); err != nil {
-		return err
-	}
-
-	if err := c.updateMemberStatusWithClusterInfo(status); err != nil {
+	if err := c.updateMembers(); err != nil {
 		return err
 	}
 
@@ -244,7 +224,8 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	c.api.SetUUID("")
 	defer c.api.SetUUID(c.cluster.Status.ClusterID)
 
-	// Check the pod is EE
+	// Check the pod is EE.  DNS should be working (as checked by the wait above), but
+	// it has been observed that this may still need a retry.
 	info := &couchbaseutil.PoolsInfo{}
 	if err := couchbaseutil.GetPools(info).RetryFor(time.Minute).On(c.api, newMember); err != nil {
 		return nil, err
@@ -344,90 +325,6 @@ func (c *Cluster) cancelAddMember(member *couchbaseutil.Member) error {
 	}
 
 	c.raiseEvent(k8sutil.FailedAddNodeEvent(member.Name, c.cluster))
-
-	return nil
-}
-
-// Rebalance nodes in the cluster.
-func (c *Cluster) rebalance(members couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList) error {
-	// Notify that we are starting a rebalance, the actual client operation
-	// is blocking so we need to report now or kubernetes will be out of sync
-	c.raiseEvent(k8sutil.RebalanceStartedEvent(c.cluster))
-	c.cluster.Status.SetUnbalancedCondition()
-
-	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
-
-	// Perform the operation
-	err := c.client.Rebalance(c.members, eject, c.namespacedName())
-	if err != nil {
-		// If the rebalance was observed but failed, raise an error.
-		if err != cberrors.RebalanceNotObservedError {
-			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-			return err
-		}
-
-		// If the rebalance wasn't observed check to see it what we intended to
-		// happen happened without being seen. Magic as we like to call it.
-		status, err := c.client.GetClusterStatus(c.members)
-		if err != nil {
-			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-			return err
-		}
-
-		if ok, err := status.RebalanceSucceeded(members /*, managed*/); !ok {
-			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-			return fmt.Errorf("cluster not rebalanced as expected: %s", err)
-		}
-	}
-
-	// Error checking... perfom this a few times as there is a race between when
-	// we check and when Server reports rebalance is complete.
-	var status *couchbaseutil.ClusterStatus
-
-	retryFunc := func() error {
-		var err error
-
-		status, err = c.client.GetClusterStatus(c.members)
-		if err != nil {
-			return err
-		}
-
-		if status.NeedsRebalance {
-			return cberrors.NewRebalanceIncompleteError()
-		}
-
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
-	defer cancel()
-
-	if err := retryutil.RetryOnErr(ctx, time.Second, retryFunc); err != nil {
-		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-		return err
-	}
-
-	// Notify if we've removed some nodes (deterministically sorted)
-	ejectedOTPNodeStringSlice := eject.StringSlice()
-	sort.Strings(ejectedOTPNodeStringSlice)
-
-	for _, otpNode := range ejectedOTPNodeStringSlice {
-		// TODO: this feels dirty!!
-		hostname := strings.Split(otpNode, "@")[1]
-		memberName := strings.Split(hostname, ".")[0]
-		c.raiseEvent(k8sutil.MemberRemoveEvent(memberName, c.cluster))
-	}
-
-	// Report the cluster is balanced
-	log.Info("Rebalance completed successfully", "cluster", c.namespacedName())
-	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
-	c.cluster.Status.SetBalancedCondition()
-
-	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -736,7 +633,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 		return err
 	}
 
-	// enables autofailover by default
+	// Enable autofailover by default.
 	autoFailoverSettings := &couchbaseutil.AutoFailoverSettings{
 		Enabled:  true,
 		Timeout:  k8sutil.Seconds(settings.AutoFailoverTimeout),

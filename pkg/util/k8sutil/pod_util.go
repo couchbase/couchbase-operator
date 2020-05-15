@@ -424,6 +424,24 @@ func listMemberPVCS(client *client.Client, memberName string) (pvcs []*v1.Persis
 	return
 }
 
+// MemberHasLogVolumes gets volumes for the named members and returns true
+// if it has a log-only volume.
+func MemberHasLogVolumes(client *client.Client, name string) bool {
+	for _, pvc := range listMemberPVCS(client, name) {
+		if pvc.Annotations == nil {
+			return false
+		}
+
+		for key, value := range pvc.Annotations {
+			if key == constants.AnnotationVolumeMountPath && value == CouchbaseVolumeMountLogsDir {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // Names of persistent volume claims are combinations of
 // Member name, mount type, and mount index.
 // ie...: cb-example-0000-default-00, pvc-data-cb-example-0000-01-index.
@@ -1009,7 +1027,7 @@ func findMemberPVC(client *client.Client, memberName, path string) (*v1.Persiste
 }
 
 // Recreate list of members from persistent volumes.
-func PVCToMemberset(client *client.Client, namespace string, secure bool) (couchbaseutil.MemberSet, error) {
+func PVCToMemberset(client *client.Client, cluster, namespace string, secure bool) (couchbaseutil.MemberSet, error) {
 	ms := couchbaseutil.MemberSet{}
 
 	for _, pvc := range client.PersistentVolumeClaims.List() {
@@ -1029,6 +1047,7 @@ func PVCToMemberset(client *client.Client, namespace string, secure bool) (couch
 		}
 
 		m := couchbaseutil.Member{
+			ClusterName:  cluster,
 			Namespace:    namespace,
 			SecureClient: secure,
 		}

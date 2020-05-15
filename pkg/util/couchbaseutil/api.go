@@ -12,7 +12,11 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/urlencoding"
+
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var log = logf.Log.WithName("api")
 
 // Certificate and key used by TLS client authentication
 type TLSClientAuth struct {
