@@ -307,6 +307,10 @@ var (
 		"TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode":               TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode,
 		"TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode":  TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode,
 		"TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate":         TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate,
+
+		// Lights-out Recovery
+		"TestLightsOutEphemeral":  TestLightsOutEphemeral,
+		"TestLightsOutPersistent": TestLightsOutPersistent,
 	}
 )
 

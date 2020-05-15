@@ -1604,3 +1604,22 @@ func CleanTestResources(k8s *types.Cluster) error {
 
 	return nil
 }
+
+// MustTerminateAllPods kills pods by causing the root process to shutdown.  This results in
+// the same state as if cluster was powered off and back on again.
+func MustTerminateAllPods(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
+	selector := labels.SelectorFromSet(labels.Set(k8sutil.LabelsForCluster(cluster)))
+
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		Die(t, err)
+	}
+
+	for _, pod := range pods.Items {
+		// Pew pew pew!
+		// "If runsvdir receives a TERM signal, it exits with 0 immediately."
+		if _, _, err := ExecShellInPod(kubernetes, pod.Name, "kill -TERM 1"); err != nil {
+			t.Logf("command may have failed, but that may be because the pod died: %v", err)
+		}
+	}
+}

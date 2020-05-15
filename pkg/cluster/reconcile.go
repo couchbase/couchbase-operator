@@ -32,17 +32,34 @@ const (
 	extendedRetryPeriod = 3 * time.Minute
 )
 
-func (c *Cluster) reconcile(pods []*v1.Pod) error {
+func (c *Cluster) reconcile() error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
 	defer log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
 
-	// Persistent data may need to be reflected in the status.
-	if err := c.reconcilePersistentStatus(); err != nil {
+	if err := c.reconcileCompletedPods(); err != nil {
 		return err
 	}
 
 	// Establish DNS for cluster communication.
 	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster); err != nil {
+		return err
+	}
+
+	// Setup the UI so we can monitor cluster creation.  This is legacy behaviour, but
+	// makes for a good demo...
+	if err := c.reconcileAdminService(); err != nil {
+		return err
+	}
+
+	// Create/recreate the cluster.
+	if c.members.Empty() {
+		if err := c.create(); err != nil {
+			return err
+		}
+	}
+
+	// Persistent data may need to be reflected in the status.
+	if err := c.reconcilePersistentStatus(); err != nil {
 		return err
 	}
 
@@ -65,7 +82,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
-	if len(pods) == 0 {
+	if len(c.k8s.Pods.List()) == 0 {
 		err := c.recoverClusterDown()
 		if err != nil {
 			return err
@@ -76,7 +93,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 		return err
 	}
 
-	fsm, err := c.newReconcileMachine(pods)
+	fsm, err := c.newReconcileMachine()
 	if err != nil {
 		return err
 	}
@@ -229,8 +246,8 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	// The new node will not be part of the cluster yet  so the API calls will fail
 	// when checking the UUID, temporarily disable these checks while installing
 	// TLS configuration
-	c.api.SetUUID("")
-	defer c.api.SetUUID(c.cluster.Status.ClusterID)
+	//c.api.SetUUID("")
+	//defer c.api.SetUUID(c.cluster.Status.ClusterID)
 
 	// Check the pod is EE.  DNS should be working (as checked by the wait above), but
 	// it has been observed that this may still need a retry.
@@ -1868,11 +1885,6 @@ DeleteNextCluster:
 // dependant cluster status, in case someone or something thought it wise to
 // delete it!
 func (c *Cluster) reconcilePersistentStatus() error {
-	phase, err := c.state.Get(persistence.Phase)
-	if err != nil {
-		return err
-	}
-
 	uuid, err := c.state.Get(persistence.UUID)
 	if err != nil {
 		return err
@@ -1883,7 +1895,6 @@ func (c *Cluster) reconcilePersistentStatus() error {
 		return err
 	}
 
-	c.cluster.Status.Phase = couchbasev2.ClusterPhase(phase)
 	c.cluster.Status.ClusterID = uuid
 	c.cluster.Status.CurrentVersion = version
 
@@ -2390,6 +2401,29 @@ func (c *Cluster) getNodeNetworkConfiguration(m *couchbaseutil.Member, s *couchb
 
 	*s = couchbaseutil.NodeNetworkConfiguration{
 		NodeEncryption: onOrOff,
+	}
+
+	return nil
+}
+
+// reconcileCompletedPods looks for pods in the completed state.  This occurs after kubelet
+// comes backup after a lights-out and the pod restart policy denies reuse of the pod from
+// disk.  Which does beg the question, should we allow this?
+func (c *Cluster) reconcileCompletedPods() error {
+	for _, pod := range c.k8s.Pods.List() {
+		// Succeeded and failed means the pod has terminated, kill it!
+		// Things to note: members are only considered so if they are Running or
+		// Pending, so we need to do no book keeping.  Also persistent recovery
+		// will fail unless we delete the pods.
+		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+			continue
+		}
+
+		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
+
+		log.Info("Deleted terminated pod", "cluster", c.namespacedName(), "name", pod.Name)
 	}
 
 	return nil

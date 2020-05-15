@@ -16,10 +16,8 @@ import (
 type PersistentKind string
 
 const (
-	// Phase is the phase of operation for a cluster e.g. provisioning, running, failed.
-	Phase PersistentKind = "phase"
-
 	// PodIndex the current index to allocate pod names from.
+	// In theory we can start to use generated names now...
 	PodIndex PersistentKind = "podIndex"
 
 	// UUID is the UUID of the cluster under management.
@@ -40,6 +38,8 @@ type PersistentStorage interface {
 	Update(PersistentKind, string) error
 	// Get a value.
 	Get(PersistentKind) (string, error)
+	// Clear clears persistent storage (e.g. ephemeral disaster recovery)
+	Clear() error
 }
 
 // KeyError is returned when a key does/doesn't exist when it should't/should.
@@ -106,6 +106,12 @@ func New(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (
 	}, nil
 }
 
+func (p *persistentStorageImpl) Clear() error {
+	p.configMap.Data = map[string]string{}
+
+	return p.flush()
+}
+
 // flush flushes the config map to etcd to persist changes.
 func (p *persistentStorageImpl) flush() error {
 	// Note: if there is a CAS collision then some evil 3rd party actor shouldn't have
@@ -115,6 +121,10 @@ func (p *persistentStorageImpl) flush() error {
 	configMap, err := p.client.CoreV1().ConfigMaps(p.configMap.Namespace).Update(p.configMap)
 	if err != nil {
 		return err
+	}
+
+	if configMap.Data == nil {
+		configMap.Data = map[string]string{}
 	}
 
 	p.configMap = configMap

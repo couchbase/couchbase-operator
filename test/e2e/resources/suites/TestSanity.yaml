@@ -14,6 +14,9 @@ testcases:
 # RecoveryTests
 - TestRecoveryAfterOnePodFailureNoBucket
 
+# Lights-out recovery
+- TestLightsOutEphemeral
+
 # PodTests
 - TestAntiAffinityOn
 - TestPodResourcesBasic

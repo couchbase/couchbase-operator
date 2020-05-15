@@ -31,6 +31,9 @@ testcases:
 - TestRecoveryAfterOnePodFailureBucketTwoReplica
 - TestRecoveryAfterTwoPodFailureBucketTwoReplica
 
+# Lights-out recovery
+- TestLightsOutPersistent
+
 # Anti-Affinity Tests
 - TestAntiAffinityOff
 - TestAntiAffinityOnCannotBePlaced

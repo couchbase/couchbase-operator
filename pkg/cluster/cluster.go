@@ -184,14 +184,6 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 		return nil, err
 	}
 
-	if err := c.state.Insert(persistence.Phase, string(couchbasev2.ClusterPhaseNone)); err != nil && !persistence.IsKeyError(err) {
-		return nil, err
-	}
-
-	if err := c.state.Insert(persistence.PodIndex, "0"); err != nil && !persistence.IsKeyError(err) {
-		return nil, err
-	}
-
 	log.Info("Watching new cluster", "cluster", c.namespacedName())
 
 	// Initialize the scheduler for the initial pod
@@ -203,19 +195,16 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	// Spawn the janitor process which monitors persistent log volumes.
 	go newJanitor(c).run()
 
-	if err := c.setup(); err != nil {
-		log.Error(err, "Cluster setup failed", "cluster", c.namespacedName())
-
-		c.cluster.Status.SetReason(err.Error())
-
-		if err := c.updatePhase(couchbasev2.ClusterPhaseFailed); err != nil {
-			return nil, err
-		}
-
+	if err := c.setupAuth(c.cluster.Spec.Security.AdminSecret); err != nil {
 		return nil, err
 	}
 
-	if err := c.updatePhase(couchbasev2.ClusterPhaseRunning); err != nil {
+	if err := c.initCouchbaseClient(); err != nil {
+		return nil, err
+	}
+
+	// Perform any necessary upgrades to the cluster and kubernetes resources.
+	if err := c.operatorUpgrade(); err != nil {
 		return nil, err
 	}
 
@@ -234,106 +223,6 @@ func (c *Cluster) Delete() {
 	c.k8s.Shutdown()
 }
 
-func (c *Cluster) setup() error {
-	phase, err := c.state.Get(persistence.Phase)
-	if err != nil {
-		return err
-	}
-
-	c.cluster.Status.SetPhase(couchbasev2.ClusterPhase(phase))
-
-	if err := c.updateCRStatus(); err != nil {
-		log.Info("warning failed to update cluster status", "cluster", c.namespacedName())
-	}
-
-	var shouldCreateCluster bool
-
-	switch couchbasev2.ClusterPhase(phase) {
-	case couchbasev2.ClusterPhaseNone:
-		shouldCreateCluster = true
-	case couchbasev2.ClusterPhaseCreating:
-		return cberrors.ErrClusterCreating
-	case couchbasev2.ClusterPhaseRunning:
-		shouldCreateCluster = false
-	default:
-		return fmt.Errorf("unexpected cluster phase: %s", phase)
-	}
-
-	if err := c.setupAuth(c.cluster.Spec.Security.AdminSecret); err != nil {
-		return err
-	}
-
-	if err := c.initCouchbaseClient(); err != nil {
-		return err
-	}
-
-	// Establish DNS for cluster communication.
-	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster); err != nil {
-		return err
-	}
-
-	// Setup the UI so we can monitor cluster creation
-	if err := c.reconcileAdminService(); err != nil {
-		return err
-	}
-
-	if shouldCreateCluster {
-		if err := c.create(); err != nil {
-			return err
-		}
-	} else {
-		log.Info("Cluster already exists, the operator will now manage it", "cluster", c.namespacedName())
-
-		// Reload dynamic persistent storage.
-		if err := c.reconcilePersistentStatus(); err != nil {
-			return err
-		}
-
-		// TLS may have updated across the restart, so the client CA is valid
-		// but the rest of the cluster is uncontactable.  For this we need a
-		// set of members to iterate over, however the normal updateMembers()
-		// tries to contact Couchbase server to verify membership, that will
-		// fail as TLS invalid.  We need to just take what we are given before
-		// making any calls to Couchbase server.
-		running, _ := c.pollPods()
-		c.members = podsToMemberSet(running)
-
-		if err := c.reconcileTLS(); err != nil {
-			return err
-		}
-
-		// Let the normal security machanisms kick in.
-		c.members = nil
-
-		// Perform any necessary upgrades to the cluster and kubernetes resources.
-		if err := c.operatorUpgrade(); err != nil {
-			return err
-		}
-	}
-
-	// Once the cluster is guaranteed to exist, extract the UUID and inject
-	// it into the client.  Connections from now on will be aborted if the
-	// UUID reported on the persistent connection differs
-	c.api.SetUUID(c.cluster.Status.ClusterID)
-
-	return nil
-}
-
-// updatePhase updates the cluster phase in both persistent state and the status.
-func (c *Cluster) updatePhase(phase couchbasev2.ClusterPhase) error {
-	if err := c.state.Update(persistence.Phase, string(phase)); err != nil {
-		return err
-	}
-
-	c.cluster.Status.SetPhase(phase)
-
-	if err := c.updateCRStatus(); err != nil {
-		log.Info("warning failed to update cluster status", "cluster", c.namespacedName())
-	}
-
-	return nil
-}
-
 func (c *Cluster) create() error {
 	log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.namespacedName())
 
@@ -342,15 +231,21 @@ func (c *Cluster) create() error {
 		return err
 	}
 
+	// Clear the persistent state for a new cluster, it may be doing DR and we need
+	// to go off the spec, not what is in memory.
+	if err := c.state.Clear(); err != nil {
+		return err
+	}
+
+	if err := c.state.Insert(persistence.PodIndex, "0"); err != nil {
+		return err
+	}
+
 	if err := c.state.Insert(persistence.Version, version); err != nil {
 		return err
 	}
 
 	c.cluster.Status.CurrentVersion = version
-
-	if err := c.updatePhase(couchbasev2.ClusterPhaseCreating); err != nil {
-		return err
-	}
 
 	if len(c.cluster.Spec.Servers) == 0 {
 		return fmt.Errorf("cluster create: no server specification defined")
@@ -401,6 +296,10 @@ func (c *Cluster) create() error {
 	}
 
 	if err := c.state.Insert(persistence.UUID, uuid); err != nil {
+		return err
+	}
+
+	if err := c.updateMembers(); err != nil {
 		return err
 	}
 
@@ -465,7 +364,7 @@ func (c *Cluster) runReconcile() {
 	}
 
 	// Finally reconcile state according to the specification.
-	if err := c.reconcile(running); err != nil {
+	if err := c.reconcile(); err != nil {
 		log.Error(err, "Reconciliation failed", "cluster", c.namespacedName())
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
 		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()

@@ -8,8 +8,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-
-	v1 "k8s.io/api/core/v1"
 )
 
 // ReconcileState is an enumeration used to define the current
@@ -184,7 +182,7 @@ type ReconcileMachine struct {
 	removeVolumes map[string]bool // map of nodes with volumes to remove if deleted
 }
 
-func (c *Cluster) newReconcileMachine(pods []*v1.Pod) (*ReconcileMachine, error) {
+func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 	status, err := c.GetStatus()
 	if err != nil {
 		return nil, err
@@ -231,7 +229,7 @@ func (c *Cluster) newReconcileMachine(pods []*v1.Pod) (*ReconcileMachine, error)
 	}
 
 	fsm := &ReconcileMachine{
-		runningPods:   podsToMemberSet(pods),
+		runningPods:   podsToMemberSet(c.k8s.Pods.List()),
 		knownNodes:    couchbaseutil.NewMemberSet(),
 		newNodes:      couchbaseutil.NewMemberSet(),
 		ejectNodes:    couchbaseutil.NewMemberSet(),
