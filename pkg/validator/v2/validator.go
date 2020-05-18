@@ -144,7 +144,13 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 				continue
 			}
 
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: fmt.Sprintf("/spec/servers/%d/pod/spec/containers", index), Value: emptyArray})
+			if _, found, _ := unstructured.NestedFieldNoCopy(obj, "pod", "spec"); !found {
+				continue
+			}
+
+			if v, found, _ := unstructured.NestedFieldNoCopy(obj, "pod", "spec", "containers"); !found || v == nil {
+				patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: fmt.Sprintf("/spec/servers/%d/pod/spec/containers", index), Value: emptyArray})
+			}
 		}
 	}
 
