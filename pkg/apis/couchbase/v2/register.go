@@ -6,41 +6,39 @@ import (
 )
 
 const (
-	ClusterCRDResourceKind            = "CouchbaseCluster"
-	ClusterCRDResourcePlural          = "couchbaseclusters"
-	BackupCRDResourceKind             = "CouchbaseBackup"
-	BackupCRDResourcePlural           = "couchbasebackups"
-	BackupRestoreCRDResourceKind      = "CouchbaseBackupRestore"
-	BackupRestoreCRDResourcePlural    = "couchbasebackuprestores"
-	BackupCRDResourceShortName        = "cbbackup"
-	BackupRestoreCRDResourceShortName = "cbrestore"
-	BucketCRDResourceKind             = "CouchbaseBucket"
-	BucketCRDResourcePlural           = "couchbasebuckets"
-	EphemeralBucketCRDResourceKind    = "CouchbaseEphemeralBucket"
-	EphemeralBucketCRDResourcePlural  = "couchbaseephemeralbuckets"
-	MemcachedBucketCRDResourceKind    = "CouchbaseMemcachedBucket"
-	MemcachedBucketCRDResourcePlural  = "couchbasememcachedbuckets"
-	ReplicationCRDResourceKind        = "CouchbaseReplication"
-	ReplicationCRDResourcePlural      = "couchbasereplications"
-	UserCRDResourceKind               = "CouchbaseUser"
-	UserCRDResourcePlural             = "couchbaseusers"
-	GroupCRDResourceKind              = "CouchbaseGroup"
-	GroupCRDResourcePlural            = "couchbasegroups"
-	RoleBindingCRDResourceKind        = "CouchbaseRoleBinding"
-	RoleBindingCRDResourcePlural      = "couchbaserolebindings"
-	GroupVersion                      = "v2"
-	GroupName                         = "couchbase.com"
-	Group                             = GroupName + "/" + GroupVersion
-	ClusterCRDName                    = ClusterCRDResourcePlural + "." + GroupName
-	BackupCRDName                     = BackupCRDResourcePlural + "." + GroupName
-	BackupRestoreCRDName              = BackupRestoreCRDResourcePlural + "." + GroupName
-	BucketCRDName                     = BucketCRDResourcePlural + "." + GroupName
-	EphemeralBucketCRDName            = EphemeralBucketCRDResourcePlural + "." + GroupName
-	MemcachedBucketCRDName            = MemcachedBucketCRDResourcePlural + "." + GroupName
-	ReplicationCRDName                = ReplicationCRDResourcePlural + "." + GroupName
-	UserCRDName                       = UserCRDResourcePlural + "." + GroupName
-	GroupCRDName                      = GroupCRDResourcePlural + "." + GroupName
-	RoleBindingCRDName                = RoleBindingCRDResourcePlural + "." + GroupName
+	ClusterCRDResourceKind           = "CouchbaseCluster"
+	ClusterCRDResourcePlural         = "couchbaseclusters"
+	BackupCRDResourceKind            = "CouchbaseBackup"
+	BackupCRDResourcePlural          = "couchbasebackups"
+	BackupRestoreCRDResourceKind     = "CouchbaseBackupRestore"
+	BackupRestoreCRDResourcePlural   = "couchbasebackuprestores"
+	BucketCRDResourceKind            = "CouchbaseBucket"
+	BucketCRDResourcePlural          = "couchbasebuckets"
+	EphemeralBucketCRDResourceKind   = "CouchbaseEphemeralBucket"
+	EphemeralBucketCRDResourcePlural = "couchbaseephemeralbuckets"
+	MemcachedBucketCRDResourceKind   = "CouchbaseMemcachedBucket"
+	MemcachedBucketCRDResourcePlural = "couchbasememcachedbuckets"
+	ReplicationCRDResourceKind       = "CouchbaseReplication"
+	ReplicationCRDResourcePlural     = "couchbasereplications"
+	UserCRDResourceKind              = "CouchbaseUser"
+	UserCRDResourcePlural            = "couchbaseusers"
+	GroupCRDResourceKind             = "CouchbaseGroup"
+	GroupCRDResourcePlural           = "couchbasegroups"
+	RoleBindingCRDResourceKind       = "CouchbaseRoleBinding"
+	RoleBindingCRDResourcePlural     = "couchbaserolebindings"
+	GroupVersion                     = "v2"
+	GroupName                        = "couchbase.com"
+	Group                            = GroupName + "/" + GroupVersion
+	ClusterCRDName                   = ClusterCRDResourcePlural + "." + GroupName
+	BackupCRDName                    = BackupCRDResourcePlural + "." + GroupName
+	BackupRestoreCRDName             = BackupRestoreCRDResourcePlural + "." + GroupName
+	BucketCRDName                    = BucketCRDResourcePlural + "." + GroupName
+	EphemeralBucketCRDName           = EphemeralBucketCRDResourcePlural + "." + GroupName
+	MemcachedBucketCRDName           = MemcachedBucketCRDResourcePlural + "." + GroupName
+	ReplicationCRDName               = ReplicationCRDResourcePlural + "." + GroupName
+	UserCRDName                      = UserCRDResourcePlural + "." + GroupName
+	GroupCRDName                     = GroupCRDResourcePlural + "." + GroupName
+	RoleBindingCRDName               = RoleBindingCRDResourcePlural + "." + GroupName
 )
 
 var (

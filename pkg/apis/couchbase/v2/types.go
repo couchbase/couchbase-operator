@@ -77,6 +77,7 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:shortName=cbbackup
 // +kubebuilder:printcolumn:name="strategy",type="string",JSONPath=".spec.strategy"
 // +kubebuilder:printcolumn:name="volume size",type="string",JSONPath=".spec.size"
 // +kubebuilder:printcolumn:name="capacity used",type="string",JSONPath=".status.capacityUsed"
@@ -193,6 +194,7 @@ type BackupStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:shortName=cbrestore
 // +kubebuilder:printcolumn:name="capacity used",type="string",JSONPath=".status.capacityUsed"
 // +kubebuilder:printcolumn:name="last run",type="string",JSONPath=".status.lastRun"
 // +kubebuilder:printcolumn:name="last success",type="string",JSONPath=".status.lastSuccess"
@@ -588,6 +590,7 @@ type CouchbaseClusterList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:shortName=cbc
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".status.currentVersion"
 // +kubebuilder:printcolumn:name="size",type="string",JSONPath=".status.size"
 // +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.phase"
