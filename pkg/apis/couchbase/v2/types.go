@@ -1246,7 +1246,7 @@ type ClusterStatus struct {
 	// Size is the current size of the cluster
 	Size int `json:"size,omitempty"`
 	// Members are the couchbase members in the cluster
-	Members MembersStatus `json:"members,omitempty"`
+	Members *MembersStatus `json:"members,omitempty"`
 	// CurrentVersion is the current cluster version
 	CurrentVersion string `json:"currentVersion,omitempty"`
 

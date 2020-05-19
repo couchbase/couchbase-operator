@@ -475,9 +475,22 @@ func (cs *ClusterStatus) GetCondition(t ClusterConditionType) *ClusterCondition 
 }
 
 func (cs *ClusterStatus) setClusterCondition(c *ClusterCondition) {
-	for index := range cs.Conditions {
-		if cs.Conditions[index].Type == c.Type {
-			cs.Conditions[index] = *c
+	for index, condition := range cs.Conditions {
+		if condition.Type == c.Type {
+			// Only update the transition time on an status edge trigger.
+			if condition.Status != c.Status {
+				cs.Conditions[index].Status = c.Status
+				cs.Conditions[index].LastTransitionTime = c.LastTransitionTime
+				cs.Conditions[index].LastUpdateTime = c.LastUpdateTime
+			}
+
+			// If the message or reason have changed, then update the update time only
+			if condition.Message != c.Message || condition.Reason != c.Reason {
+				cs.Conditions[index].Message = c.Message
+				cs.Conditions[index].Reason = c.Reason
+				cs.Conditions[index].LastUpdateTime = c.LastUpdateTime
+			}
+
 			return
 		}
 	}

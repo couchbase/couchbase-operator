@@ -457,6 +457,8 @@ func (c *Cluster) updateCRStatus() error {
 		return nil
 	}
 
+	c.logUpdate(cluster.Status, c.cluster.Status)
+
 	// Copy the updated status to our cluster object and try update it
 	cluster.Status = c.cluster.Status
 
@@ -636,6 +638,10 @@ func (c *Cluster) updateMemberStatus() error {
 // use cluster info to set ready members from active nodes
 // and all remaining nodes as unready.
 func (c *Cluster) updateMemberStatusWithClusterInfo(cs *couchbaseutil.ClusterStatus) error {
+	if c.cluster.Status.Members == nil {
+		c.cluster.Status.Members = &couchbasev2.MembersStatus{}
+	}
+
 	c.cluster.Status.Members.SetReady(cs.ActiveNodes.Names())
 	c.cluster.Status.Members.SetUnready(c.members.Diff(cs.ActiveNodes).Names())
 
