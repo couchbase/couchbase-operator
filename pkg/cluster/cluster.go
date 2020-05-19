@@ -532,7 +532,7 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 
 // wait with context.
 func (c *Cluster) waitForCreatePod(ctx context.Context, member *couchbaseutil.Member) error {
-	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name, member.HostURL()); err != nil {
+	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name, member.GetHostPort()); err != nil {
 		return err
 	}
 
@@ -571,7 +571,7 @@ func (c *Cluster) recoverClusterDown() error {
 		m := c.members[name]
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
-				return fmt.Errorf("node %s could not be recovered: %s", m.ClientURL(), err.Error())
+				return fmt.Errorf("node %s could not be recovered: %s", m.Name, err.Error())
 			}
 
 			log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name)

@@ -310,6 +310,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	member := &couchbaseutil.Member{
 		Name:         foreignNodeName,
 		Namespace:    targetKube.Namespace,
+		ClusterName:  testCouchbase.Name,
 		ServerConfig: testCouchbase.Spec.Servers[0].Name,
 	}
 

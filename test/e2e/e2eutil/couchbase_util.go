@@ -363,7 +363,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		defer cleanup()
 
-		if err := couchbaseutil.AddNode(member.ClientURLPlaintext(), username, password, svcs).RetryFor(time.Minute).On(client.client, client.host); err != nil {
+		if err := couchbaseutil.AddNode(member.GetHostURLPlaintext(), username, password, svcs).On(client.client, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -386,13 +386,13 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 			return false, retryutil.RetryOkError(err)
 		}
 
-		known := make([]string, len(info.Nodes))
+		known := make(couchbaseutil.OTPNodeList, len(info.Nodes))
 
 		for i, node := range info.Nodes {
 			known[i] = node.OTPNode
 		}
 
-		if err := couchbaseutil.Rebalance(known, []string{}).On(client.client, client.host); err != nil {
+		if err := couchbaseutil.Rebalance(known, nil).On(client.client, client.host); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -440,7 +440,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 		return err
 	}
 
-	known := make([]string, len(info.Nodes))
+	known := make(couchbaseutil.OTPNodeList, len(info.Nodes))
 
 	for i, node := range info.Nodes {
 		known[i] = node.OTPNode
@@ -448,12 +448,8 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 
 	member := MemberFromSpecProps(couchbase.Name, couchbase.Namespace, "", index)
 
-	eject := []string{}
-
-	for _, node := range info.Nodes {
-		if node.HostName == member.HostURL() {
-			eject = append(eject, node.OTPNode)
-		}
+	eject := couchbaseutil.OTPNodeList{
+		member.GetOTPNode(),
 	}
 
 	if err := couchbaseutil.Rebalance(known, eject).On(client.client, client.host); err != nil {
@@ -523,29 +519,15 @@ func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 
 		defer cleanup()
 
-		hostnames := []string{}
+		data := url.Values{}
 
 		for _, index := range indexes {
 			member := couchbaseutil.Member{
 				Name:      couchbaseutil.CreateMemberName(couchbase.Name, index),
 				Namespace: couchbase.Namespace,
 			}
-			hostnames = append(hostnames, member.HostURLPlaintext())
-		}
 
-		info := &couchbaseutil.ClusterInfo{}
-		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-
-		data := url.Values{}
-
-		for _, node := range info.Nodes {
-			for _, hostname := range hostnames {
-				if node.HostName == hostname {
-					data.Add("otpNode", node.OTPNode)
-				}
-			}
+			data.Add("otpNode", string(member.GetOTPNode()))
 		}
 
 		request := &couchbaseutil.Request{
@@ -627,7 +609,7 @@ func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 			return err
 		}
 
-		unhealthy := []string{}
+		unhealthy := couchbaseutil.HostNameList{}
 
 		for _, node := range clusterInfo.Nodes {
 			if node.Status == "unhealthy" {

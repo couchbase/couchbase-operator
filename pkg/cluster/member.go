@@ -64,6 +64,7 @@ func (c *Cluster) newMember(id int, serverSpecName, image string) (*couchbaseuti
 	name := couchbaseutil.CreateMemberName(c.cluster.Name, id)
 	member := &couchbaseutil.Member{
 		Name:         name,
+		ClusterName:  c.cluster.Name,
 		Namespace:    c.cluster.Namespace,
 		ServerConfig: serverSpecName,
 		SecureClient: false,
@@ -114,9 +115,14 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
 
 	for _, pod := range pods {
-		config := ""
-
 		labels := pod.GetLabels()
+
+		cluster := ""
+		if val, ok := labels[constants.LabelCluster]; ok {
+			cluster = val
+		}
+
+		config := ""
 		if val, ok := labels[constants.LabelNodeConf]; ok {
 			config = val
 		}
@@ -130,6 +136,7 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 
 		m := &couchbaseutil.Member{
 			Name:         pod.Name,
+			ClusterName:  cluster,
 			Namespace:    pod.Namespace,
 			ServerConfig: config,
 			SecureClient: secure,

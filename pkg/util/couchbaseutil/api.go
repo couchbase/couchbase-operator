@@ -153,7 +153,7 @@ func NewRequestError(err error) *Request {
 
 // InPlaintext forces the API requests to be in plaintext.
 func (r *Request) InPlaintext() *Request {
-	r.Host = (*Member).ClientURLPlaintext
+	r.Host = (*Member).GetHostURLPlaintext
 	return r
 }
 
@@ -175,7 +175,7 @@ func (r *Request) On(client *Client, target interface{}) error {
 
 	// Set a default address resolution function if none is specified.
 	if r.Host == nil {
-		r.Host = (*Member).ClientURL
+		r.Host = (*Member).GetHostURL
 	}
 
 	// Translate the specified targets into a list of hosts.
@@ -245,9 +245,9 @@ func AddNode(hostname, username, password string, services fmt.Stringer) *Reques
 
 // CancelAddNode stops Client server from from attempting to add a node to
 // the cluster.
-func CancelAddNode(otpNode string) *Request {
+func CancelAddNode(otpNode OTPNode) *Request {
 	data := url.Values{}
-	data.Set("otpNode", otpNode)
+	data.Set("otpNode", string(otpNode))
 
 	return NewRequest((*Client).Post, "/controller/ejectNode", []byte(data.Encode()), nil)
 }
@@ -321,10 +321,10 @@ func SetStoragePaths(dataPath, indexPath string, analyticsPaths []string) *Reque
 }
 
 // Rebalance starts a rebalance on a node.
-func Rebalance(known, eject []string) *Request {
+func Rebalance(known, eject OTPNodeList) *Request {
 	data := url.Values{}
-	data.Set("ejectedNodes", strings.Join(eject, ","))
-	data.Set("knownNodes", strings.Join(known, ","))
+	data.Set("ejectedNodes", strings.Join(eject.StringSlice(), ","))
+	data.Set("knownNodes", strings.Join(known.StringSlice(), ","))
 
 	return NewRequest((*Client).Post, "/controller/rebalance", []byte(data.Encode()), nil)
 }
@@ -485,9 +485,9 @@ func UpdateServerGroups(revision string, groups *ServerGroupsUpdate) *Request {
 }
 
 // SetRecoveryType sets the recovery type for a specific node.
-func SetRecoveryType(otpNode string, recoveryType RecoveryType) *Request {
+func SetRecoveryType(otpNode OTPNode, recoveryType RecoveryType) *Request {
 	data := url.Values{}
-	data.Set("otpNode", otpNode)
+	data.Set("otpNode", string(otpNode))
 	data.Set("recoveryType", string(recoveryType))
 
 	return NewRequest((*Client).Post, "/controller/setRecoveryType", []byte(data.Encode()), nil)

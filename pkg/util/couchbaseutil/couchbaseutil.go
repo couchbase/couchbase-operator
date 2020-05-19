@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -66,15 +65,15 @@ type ClusterStatus struct {
 	// set.
 	managedNodes MemberSet
 
-	ActiveNodes      MemberSet // status=healthy,   clusterMembership=active
-	PendingAddNodes  MemberSet // status=healthy,   clusterMembership=inactiveAdded
-	AddBackNodes     MemberSet // status=healthy,   clusterMembership=inactiveFailed
-	FailedAddNodes   MemberSet // status=unhealthy, clusterMembership=inactiveAdded
-	WarmupNodes      MemberSet // status=warmup,    clusterMembership=inactiveAdded
-	DownNodes        MemberSet // status=unhealthy, clusterMembership=active
-	FailedNodes      MemberSet // status=unhealthy, clusterMembership=inactiveFailed
-	UnclusteredNodes MemberSet // Managed by Kubernetes, but not part of the cluster
-	UnmanagedNodes   []string  // Not managed by Kubernetes
+	ActiveNodes      MemberSet    // status=healthy,   clusterMembership=active
+	PendingAddNodes  MemberSet    // status=healthy,   clusterMembership=inactiveAdded
+	AddBackNodes     MemberSet    // status=healthy,   clusterMembership=inactiveFailed
+	FailedAddNodes   MemberSet    // status=unhealthy, clusterMembership=inactiveAdded
+	WarmupNodes      MemberSet    // status=warmup,    clusterMembership=inactiveAdded
+	DownNodes        MemberSet    // status=unhealthy, clusterMembership=active
+	FailedNodes      MemberSet    // status=unhealthy, clusterMembership=inactiveFailed
+	UnclusteredNodes MemberSet    // Managed by Kubernetes, but not part of the cluster
+	UnmanagedNodes   HostNameList // Not managed by Kubernetes
 	IsRebalancing    bool
 	NeedsRebalance   bool
 }
@@ -104,7 +103,7 @@ func (cs *ClusterStatus) Reset() {
 	cs.DownNodes = NewMemberSet()
 	cs.FailedNodes = NewMemberSet()
 	cs.UnclusteredNodes = NewMemberSet()
-	cs.UnmanagedNodes = []string{}
+	cs.UnmanagedNodes = HostNameList{}
 	cs.IsRebalancing = false
 	cs.NeedsRebalance = false
 }
@@ -119,7 +118,7 @@ type nodeStatus struct {
 }
 
 // GetNode looks up node based on Couchbase hostname.
-func (cs *ClusterStatus) getNode(hostname string) (*NodeInfo, error) {
+func (cs *ClusterStatus) getNode(hostname HostName) (*NodeInfo, error) {
 	for _, node := range cs.info.Nodes {
 		if node.HostName == hostname {
 			return &node, nil
@@ -134,8 +133,7 @@ func (cs *ClusterStatus) KnownNodes() []string {
 	knownNodes := []string{}
 
 	for _, node := range cs.info.Nodes {
-		memberName := strings.Split(node.HostName, ".")[0]
-		knownNodes = append(knownNodes, memberName)
+		knownNodes = append(knownNodes, node.HostName.GetMemberName())
 	}
 
 	return knownNodes
@@ -261,9 +259,6 @@ func (cs *ClusterStatus) logClusterNodeStatus(cluster string) {
 		}
 	}
 
-	// Sort the names so it's easier to grok
-	sort.Strings(cs.UnmanagedNodes)
-
 	for _, name := range cs.UnmanagedNodes {
 		// Ignore the error, if we've added the unmanaged node it has to exist in the node info.
 		node, _ := cs.getNode(name)
@@ -274,7 +269,7 @@ func (cs *ClusterStatus) logClusterNodeStatus(cluster string) {
 
 		// Buffer up the status entry
 		status := nodeStatus{
-			name:    name,
+			name:    string(name),
 			version: "unknown",
 			class:   "unknown",
 			managed: false,
@@ -349,21 +344,12 @@ func (cs *ClusterStatus) ContainsNode(name string) bool {
 
 // RebalanceSucceeded looks at the state and determines whether what we inteded to happen
 // actually happened in light of Server not behaving sensibly.
-func (cs *ClusterStatus) RebalanceSucceeded(members, ejected MemberSet) (bool, error) {
+func (cs *ClusterStatus) RebalanceSucceeded(members MemberSet) (bool, error) {
 	// For all managed nodes, we expect them to either be active (after being balanced in)
 	// or unclustered after being ejected.
 	for name := range cs.managedNodes {
-		switch state := cs.NodeStateMap[name]; state {
-		case NodeStateActive:
-			if _, ok := members[name]; !ok {
-				return false, fmt.Errorf("unexpected member %s active", name)
-			}
-		case NodeStateUnclustered:
-			if _, ok := ejected[name]; !ok {
-				return false, fmt.Errorf("unexpected member %s ejected", name)
-			}
-		default:
-			return false, fmt.Errorf("unexpected state %s for member %s", state.String(), name)
+		if state, ok := cs.NodeStateMap[name]; !ok || state != NodeStateActive {
+			return false, fmt.Errorf("node %s not found or not active", name)
 		}
 	}
 
@@ -454,7 +440,7 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 		// The node name should be in the form cb-pod.cb-cluster.namespace.svc:8091.
 		// By extracting the first field we can derive the pod name.  If it is not
 		// know to the operator we flag it as unmanaged.
-		member := ms[strings.Split(node.HostName, ".")[0]]
+		member := ms[node.HostName.GetMemberName()]
 		if member == nil {
 			status.UnmanagedNodes = append(status.UnmanagedNodes, node.HostName)
 			continue
@@ -488,49 +474,6 @@ func (c *CouchbaseClient) UpdateClusterStatus(ms MemberSet, status *ClusterStatu
 	status.NeedsRebalance = !status.info.Balanced && len(status.info.Nodes) > 1
 
 	return nil
-}
-
-// getOTPNode attempts to translate the real host name into the weird name
-// that should never be exposed to a public API.
-func getOTPNode(info *ClusterInfo, hostname string) (string, error) {
-	for _, node := range info.Nodes {
-		if node.HostName == hostname {
-			return node.OTPNode, nil
-		}
-	}
-
-	return "", fmt.Errorf("unable to translate hostname %s to OTP node", hostname)
-}
-
-// GetOTPNode translates a single hostname into an OTP node name.
-func (c *CouchbaseClient) GetOTPNode(members MemberSet, hostname string) (string, error) {
-	info := &ClusterInfo{}
-	if err := GetPoolsDefault(info).On(c.api, members); err != nil {
-		return "", err
-	}
-
-	return getOTPNode(info, hostname)
-}
-
-// GetOTPNodes translates a set of hostnames into an OTP node list.
-func (c *CouchbaseClient) GetOTPNodes(members MemberSet, hostnames []string) ([]string, error) {
-	info := &ClusterInfo{}
-	if err := GetPoolsDefault(info).On(c.api, members); err != nil {
-		return nil, err
-	}
-
-	out := make([]string, len(hostnames))
-
-	for i, hostname := range hostnames {
-		otpNode, err := getOTPNode(info, hostname)
-		if err != nil {
-			return nil, err
-		}
-
-		out[i] = otpNode
-	}
-
-	return out, nil
 }
 
 // RebalanceProgressEntry is the type communicated to clients periodically
@@ -685,7 +628,7 @@ WitnessLoop:
 	return nil, nil, errors.RebalanceNotObservedError
 }
 
-func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, cluster string) error {
+func (c *CouchbaseClient) Rebalance(ms MemberSet, eject OTPNodeList, cluster string) error {
 	// The rebalance API is crap, rather than accepting a list of host names to eject
 	// it requires a list of nodes that it already knows about as well.  On top of that
 	// the names need translating into erlang rather than the hostnames that all the
@@ -695,21 +638,10 @@ func (c *CouchbaseClient) Rebalance(ms MemberSet, nodesToRemove []string, cluste
 		return err
 	}
 
-	known := make([]string, len(info.Nodes))
+	known := make(OTPNodeList, len(info.Nodes))
 
 	for i, node := range info.Nodes {
 		known[i] = node.OTPNode
-	}
-
-	eject := make([]string, len(nodesToRemove))
-
-	for i, hostname := range nodesToRemove {
-		otpNode, err := getOTPNode(info, hostname)
-		if err != nil {
-			return err
-		}
-
-		eject[i] = otpNode
 	}
 
 	if err := Rebalance(known, eject).On(c.api, ms); err != nil {

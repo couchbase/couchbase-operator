@@ -288,7 +288,7 @@ func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
 func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.DownNodes.Size() > 0 {
 		// Ensure the cluster is visibly unhealthy before triggering any events
-		c.cluster.Status.SetUnavailableCondition(r.couchbase.DownNodes.ClientURLs())
+		c.cluster.Status.SetUnavailableCondition(r.couchbase.DownNodes.Names())
 
 		if err := c.updateCRStatus(); err != nil {
 			return err
@@ -411,7 +411,7 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 
-			return fmt.Errorf("recovering pending add node %s", m.ClientURL())
+			return fmt.Errorf("recovering pending add node %s", m.Name)
 		}
 
 		err := c.cancelAddMember(m)
@@ -458,11 +458,6 @@ func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 				}
 			}
 
-			otpNode, err := c.client.GetOTPNode(r.couchbase.ActiveNodes, m.HostURLPlaintext())
-			if err != nil {
-				return err
-			}
-
 			recoveryType := couchbaseutil.RecoveryTypeFull
 
 			if deltaRecovery {
@@ -471,7 +466,7 @@ func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 
 			log.Info("Setting recovery type", "cluster", c.namespacedName(), "name", m.Name, "type", recoveryType)
 
-			if err := couchbaseutil.SetRecoveryType(otpNode, recoveryType).On(c.api, c.readyMembers()); err != nil {
+			if err := couchbaseutil.SetRecoveryType(m.GetOTPNode(), recoveryType).On(c.api, c.readyMembers()); err != nil {
 				return err
 			}
 
@@ -511,7 +506,7 @@ func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
 
-			return fmt.Errorf("recovering node %s", m.ClientURL())
+			return fmt.Errorf("recovering node %s", m.Name)
 		}
 
 		log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", m.Name)
@@ -751,7 +746,14 @@ func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
 
 func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.NeedsRebalance {
-		if err := c.rebalance(r.knownNodes, r.ejectNodes, r.couchbase.UnmanagedNodes); err != nil {
+		// Eject nodes that we want to discard.
+		eject := make(couchbaseutil.OTPNodeList, len(r.ejectNodes))
+		copy(eject, r.ejectNodes.OTPNodes())
+
+		// Eject nodes that we don't think are managed by us.
+		eject = append(eject, r.couchbase.UnmanagedNodes.OTPNodes()...)
+
+		if err := c.rebalance(r.knownNodes, eject); err != nil {
 			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be set to a full recovery type.  The state
 			// will have changed from add-back to pending-add, so we won't loop
@@ -768,7 +770,7 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 					return err
 				}
 
-				node, err := info.GetNode(m.HostURL())
+				node, err := info.GetNode(m.GetHostName())
 				if err != nil {
 					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name)
 					return err
@@ -783,12 +785,7 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 				log.Info("Pod add-back failed, forcing full recovery")
 
 				for _, m := range deltaNodes {
-					otpNode, err := c.client.GetOTPNode(r.couchbase.ActiveNodes, m.HostURLPlaintext())
-					if err != nil {
-						return err
-					}
-
-					if err := couchbaseutil.SetRecoveryType(otpNode, couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+					if err := couchbaseutil.SetRecoveryType(m.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 						log.Error(err, "Pod add-back, recovery type update failed", "cluster", c.namespacedName(), "name", m.Name)
 
 						c.raiseEvent(k8sutil.FailedAddBackNodeEvent(m.Name, c.cluster))

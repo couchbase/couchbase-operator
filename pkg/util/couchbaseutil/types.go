@@ -115,7 +115,7 @@ type ClusterInfo struct {
 }
 
 // GetNode returns the named node.
-func (c *ClusterInfo) GetNode(hostname string) (*NodeInfo, error) {
+func (c *ClusterInfo) GetNode(hostname HostName) (*NodeInfo, error) {
 	for i := range c.Nodes {
 		node := &c.Nodes[i]
 
@@ -223,8 +223,8 @@ type NodeInfo struct {
 	Membership         string               `json:"clusterMembership"`
 	RecoveryType       RecoveryType         `json:"recoveryType"`
 	Status             string               `json:"status"`
-	OTPNode            string               `json:"otpNode"`
-	HostName           string               `json:"hostname"`
+	OTPNode            OTPNode              `json:"otpNode"`
+	HostName           HostName             `json:"hostname"`
 	Services           []string             `json:"services"`
 	AvailableStorage   AvailableStorageInfo `json:"storage"`
 	AlternateAddresses *AlternateAddresses  `json:"alternateAddresses,omitempty"`
@@ -693,7 +693,7 @@ func (groups ServerGroups) GetServerGroup(name string) *ServerGroup {
 
 // ServerGroupUpdateOTPNode defines a single node is OTP notation
 type ServerGroupUpdateOTPNode struct {
-	OTPNode string `json:"otpNode"`
+	OTPNode OTPNode `json:"otpNode"`
 }
 
 // ServerGroupUpdate defines a server group and its nodes

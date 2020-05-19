@@ -18,7 +18,7 @@ import (
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
 func tlsValid(member *couchbaseutil.Member, ca, clientCert, clientKey []byte, cert *x509.Certificate) bool {
-	serverChain, err := netutil.GetTLSState(member.HostURLTLS(), ca, clientCert, clientKey)
+	serverChain, err := netutil.GetTLSState(member.GetHostPortTLS(), ca, clientCert, clientKey)
 	if err == nil && serverChain[0].Equal(cert) {
 		return true
 	}
@@ -159,7 +159,7 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 	ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
 	defer cancel()
 
-	if err := netutil.WaitForHostPort(ctx, member.HostURL()); err != nil {
+	if err := netutil.WaitForHostPort(ctx, member.GetHostPort()); err != nil {
 		return false, nil
 	}
 

@@ -264,7 +264,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	// Set the hostname.  Sometimes this returns a 500 so needs a retry, I'm guessing
 	// although the server is running and returns cluster information it's not configured
 	// enough to allow host name changes.
-	if err := couchbaseutil.SetHostname(newMember.Addr()).RetryFor(time.Minute).On(c.api, newMember); err != nil {
+	if err := couchbaseutil.SetHostname(newMember.GetDNSName()).RetryFor(time.Minute).On(c.api, newMember); err != nil {
 		return nil, err
 	}
 
@@ -296,10 +296,10 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil
 
 	// TODO: 6.5.0+ probably allows HTTPS bootstrap all the time, not just
 	// when N2N is enabled...
-	url := newMember.ClientURLPlaintext()
+	url := newMember.GetHostURLPlaintext()
 
 	if c.supportsNodeToNode() && c.nodeToNodeEnabled() {
-		url = newMember.ClientURL()
+		url = newMember.GetHostURL()
 	}
 
 	// Add to the cluster. Note we have to use the plain text url as
@@ -339,12 +339,7 @@ func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 
 // Cancel a node addition.
 func (c *Cluster) cancelAddMember(member *couchbaseutil.Member) error {
-	otpNode, err := c.client.GetOTPNode(c.readyMembers(), member.HostURLPlaintext())
-	if err != nil {
-		return err
-	}
-
-	if err := couchbaseutil.CancelAddNode(otpNode).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
+	if err := couchbaseutil.CancelAddNode(member.GetOTPNode()).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
@@ -354,7 +349,7 @@ func (c *Cluster) cancelAddMember(member *couchbaseutil.Member) error {
 }
 
 // Rebalance nodes in the cluster.
-func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged []string) error {
+func (c *Cluster) rebalance(members couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList) error {
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
 	c.raiseEvent(k8sutil.RebalanceStartedEvent(c.cluster))
@@ -365,11 +360,9 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 	}
 
 	// Perform the operation
-	nodesToRemove := append(managed.HostURLsPlaintext(), unmanaged...)
-
-	err := c.client.Rebalance(c.members, nodesToRemove, c.namespacedName())
+	err := c.client.Rebalance(c.members, eject, c.namespacedName())
 	if err != nil {
-		// If the rebalance was observed but failed raise an error.
+		// If the rebalance was observed but failed, raise an error.
 		if err != cberrors.RebalanceNotObservedError {
 			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 			return err
@@ -383,7 +376,7 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 			return err
 		}
 
-		if ok, err := status.RebalanceSucceeded(members, managed); !ok {
+		if ok, err := status.RebalanceSucceeded(members /*, managed*/); !ok {
 			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 			return fmt.Errorf("cluster not rebalanced as expected: %s", err)
 		}
@@ -417,12 +410,13 @@ func (c *Cluster) rebalance(members, managed couchbaseutil.MemberSet, unmanaged 
 	}
 
 	// Notify if we've removed some nodes (deterministically sorted)
-	sort.Strings(nodesToRemove)
+	ejectedOTPNodeStringSlice := eject.StringSlice()
+	sort.Strings(ejectedOTPNodeStringSlice)
 
-	for _, nodeToRemove := range nodesToRemove {
-		// TODO: this feels dirty, but as this is a mixed bag of members and
-		// un-managed nodes we have no other option for now
-		memberName := strings.Split(nodeToRemove, ".")[0]
+	for _, otpNode := range ejectedOTPNodeStringSlice {
+		// TODO: this feels dirty!!
+		hostname := strings.Split(otpNode, "@")[1]
+		memberName := strings.Split(hostname, ".")[0]
 		c.raiseEvent(k8sutil.MemberRemoveEvent(memberName, c.cluster))
 	}
 
@@ -792,7 +786,7 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 			m.SecureClient = true
 
 			// Wait for the port to come backup with the correct certificate chain
-			if err := netutil.WaitForHostPortTLS(ctx, m.HostURL(), ca); err != nil {
+			if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), ca); err != nil {
 				return err
 			}
 		}
@@ -923,7 +917,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	for _, existingGroup := range existingGroups.Groups {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
-			podName := strings.Split(existingMember.HostName, ".")[0]
+			podName := existingMember.HostName.GetMemberName()
 
 			// Just reuse the old server group location on error, the pod is likely down
 			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
@@ -989,7 +983,7 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 	for _, existingGroup := range existingGroups.Groups {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
-			podName := strings.Split(existingMember.HostName, ".")[0]
+			podName := existingMember.HostName.GetMemberName()
 
 			// Just reuse the old server group location on error, the pod is likely down
 			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)

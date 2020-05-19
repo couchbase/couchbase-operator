@@ -11,16 +11,140 @@ const (
 	adminPortTLS = 18091
 )
 
-type Member struct {
-	Name         string
-	Namespace    string
-	ServerConfig string
-	SecureClient bool
-	Version      string
+// A host name is Couchbase's idea of a host name, this is the DNS name and a port.
+type HostName string
+
+// GetMemberName extracts the Operator member/pod name from the Couchbase host name.
+func (hostName HostName) GetMemberName() string {
+	return strings.Split(string(hostName), ".")[0]
 }
 
+// GetOTPNode extracts the Couchbase OTP node names from the Couchbase host name.
+func (hostName HostName) GetOTPNode() OTPNode {
+	dnsName := strings.Split(string(hostName), ":")[0]
+	return OTPNode(fmt.Sprintf("ns_1@%s", dnsName))
+}
+
+// HostNameList is a list of Couchbase host names.
+type HostNameList []HostName
+
+// OTPNodes translates between a Couchbase host name and an OTP node name.
+// Used primarily for the shit show that is rebalance.
+func (hostNames HostNameList) OTPNodes() OTPNodeList {
+	otpNodes := make(OTPNodeList, len(hostNames))
+
+	for i, hostName := range hostNames {
+		otpNodes[i] = hostName.GetOTPNode()
+	}
+
+	return otpNodes
+}
+
+// An OTP node is a relic of exposing erlang via public APIs.
+type OTPNode string
+
+// OTPNodeList is a list of OTP nodes.
+type OTPNodeList []OTPNode
+
+// StringSlice converts from a list of OTP nodes to a slice of strings.  This should
+// only be used the the API.
+func (otpNodes OTPNodeList) StringSlice() []string {
+	out := make([]string, len(otpNodes))
+
+	for i, otpNode := range otpNodes {
+		out[i] = string(otpNode)
+	}
+
+	return out
+}
+
+// Member is the core internal representation of a Couchbase server node.
+type Member struct {
+	// Name is the pod name of a member.
+	Name string
+
+	// Cluster name is the Couchbase cluster a member belongs to.
+	ClusterName string
+
+	// Namespace is the namespace the Couchbase cluster resides in.
+	Namespace string
+
+	// ServerConfig is the server class (spec.servers.name) the member belongs to.
+	ServerConfig string
+
+	// SecureClient defines whether this member will be communicated with over
+	// plain text or TLS.
+	SecureClient bool
+
+	// Version is the Couchbase server version this member is using.
+	Version string
+}
+
+// GetDNSName returns the member's DNS name.  The host name is generated for an endpoint
+// associated with a cluster-wide headless service.
+func (m Member) GetDNSName() string {
+	return fmt.Sprintf("%s.%s.%s.svc", m.Name, m.ClusterName, m.Namespace)
+}
+
+// GetHostPort returns the member's host and port.  The port is dynamic based on the TLS
+// configuration, if TLS is enabled, we will use the TLS admin port.
+func (m Member) GetHostPort() string {
+	return fmt.Sprintf("%s:%d", m.GetDNSName(), m.clientPort())
+}
+
+// GetHostPortTLS is used to force the use of TLS, in particular for probing the TLS
+// state before upgrading client connections.
+func (m Member) GetHostPortTLS() string {
+	return fmt.Sprintf("%s:18091", m.GetDNSName())
+}
+
+// GetHostURL return the member's host URL (without a path).  The scheme and port are
+// based on the TLS configuration, if TLS is enabled, we will use HTTPS and the TLS admin
+// port.  This is how the Operator will communicate with Couchbase server.
+func (m Member) GetHostURL() string {
+	return fmt.Sprintf("%s://%s", m.clientScheme(), m.GetHostPort())
+}
+
+// GetHostURLPlaintext is for use when we need to force the use of HTTP, typically
+// during TLS reconciliation where the TLS state would usually prohibit this.
+func (m Member) GetHostURLPlaintext() string {
+	return fmt.Sprintf("http://%s:8091", m.GetDNSName())
+}
+
+// GetHostName returns what Couchbase calls a host name; a combination of DNS and port.
+func (m Member) GetHostName() HostName {
+	return HostName(m.GetHostPort())
+}
+
+// GetOTPNode is an anachronism and is used to operator the Couchbase cluster even though
+// nothing on the client ever refers to nodes this way!  While this can be mapped from a
+// /pools/default, it's quicker and less error prone to just to procedurally generate it.
+func (m Member) GetOTPNode() OTPNode {
+	return OTPNode(fmt.Sprintf("ns_1@%s", m.GetDNSName()))
+}
+
+// clientScheme returns the URL scheme for a member dependant upon the TLS mode.
+func (m Member) clientScheme() string {
+	if m.SecureClient {
+		return "https"
+	}
+
+	return "http"
+}
+
+// clientPort returns the admin port dependant on the member TLS mode.
+func (m Member) clientPort() int {
+	if m.SecureClient {
+		return adminPortTLS
+	}
+
+	return adminPort
+}
+
+// MemberSet is a mapping from member/pod name to the member.
 type MemberSet map[string]*Member
 
+// NewMemberSet creates a new member set from the list of members.
 func NewMemberSet(ms ...*Member) MemberSet {
 	res := MemberSet{}
 
@@ -31,58 +155,13 @@ func NewMemberSet(ms ...*Member) MemberSet {
 	return res
 }
 
-func (m *Member) Addr() string {
-	return fmt.Sprintf("%s.%s.%s.svc", m.Name, clusterNameFromMemberName(m.Name), m.Namespace)
-}
-
-// ClientURL is the client URL for this member.
-func (m *Member) ClientURL() string {
-	return fmt.Sprintf("%s://%s:%d", m.clientScheme(), m.Addr(), m.clientPort())
-}
-
-func (m *Member) HostURL() string {
-	return fmt.Sprintf("%s:%d", m.Addr(), m.clientPort())
-}
-
-// Be **very** careful using these functions.
-// NS server isn't able to handle /controller/addNode with a HTTPS/TLS node. As
-// an unfortunate result when adding or removing nodes from the cluster we must
-// force the use of HTTP.
-// Regular client operations should use the functions above which dynamically
-// adjust depending on the current node state.
-func (m *Member) ClientURLPlaintext() string {
-	return fmt.Sprintf("http://%s:%d", m.Addr(), adminPort)
-}
-
-func (m *Member) HostURLPlaintext() string {
-	return fmt.Sprintf("%s:%d", m.Addr(), adminPort)
-}
-
-func (m *Member) HostURLTLS() string {
-	return fmt.Sprintf("%s:%d", m.Addr(), adminPortTLS)
-}
-
-func (m *Member) clientScheme() string {
-	if m.SecureClient {
-		return "https"
-	}
-
-	return "http"
-}
-
-func (m *Member) clientPort() int {
-	if m.SecureClient {
-		return adminPortTLS
-	}
-
-	return adminPort
-}
-
+// Contains returns whether a named member is part of the set.
 func (ms MemberSet) Contains(name string) bool {
 	_, ok := ms[name]
 	return ok
 }
 
+// Copy clones a member set into a new map.
 func (ms MemberSet) Copy() MemberSet {
 	clone := MemberSet{}
 
@@ -93,7 +172,8 @@ func (ms MemberSet) Copy() MemberSet {
 	return clone
 }
 
-// the set of all members of s1 that are not members of s2.
+// Diff returns the set of all members of the receiver that are not members of the
+// specified member set.
 func (ms MemberSet) Diff(other MemberSet) MemberSet {
 	diff := MemberSet{}
 
@@ -106,6 +186,8 @@ func (ms MemberSet) Diff(other MemberSet) MemberSet {
 	return diff
 }
 
+// Equal returns whether each member set contains the same members.  It is only a
+// shallow compare, so member fields are not compared.
 func (ms MemberSet) Equal(other MemberSet) bool {
 	for n := range ms {
 		if _, ok := other[n]; !ok {
@@ -116,36 +198,27 @@ func (ms MemberSet) Equal(other MemberSet) bool {
 	return true
 }
 
-func (ms MemberSet) IsEqual(other MemberSet) bool {
-	if ms.Size() != other.Size() {
-		return false
-	}
-
-	for n := range ms {
-		if _, ok := other[n]; !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
+// Size returns the member set size.
 func (ms MemberSet) Size() int {
 	return len(ms)
 }
 
+// Emptry returns whether the member set is empty.
 func (ms MemberSet) Empty() bool {
 	return len(ms) == 0
 }
 
+// Add adds a new member to the member set.
 func (ms MemberSet) Add(m *Member) {
 	ms[m.Name] = m
 }
 
+// Remove removes the named member from the member set.
 func (ms MemberSet) Remove(name string) {
 	delete(ms, name)
 }
 
+// Append adds the specified member set to the receiver.
 func (ms MemberSet) Append(other MemberSet) {
 	for _, m := range other {
 		ms.Add(m)
@@ -165,38 +238,18 @@ func (ms MemberSet) Names() []string {
 	return names
 }
 
-func (ms MemberSet) ClientURLs() []string {
-	endpoints := make([]string, 0, len(ms))
+// OTPNodes returns the list of OTP nodes for a member set.
+func (ms MemberSet) OTPNodes() OTPNodeList {
+	otpNodes := make(OTPNodeList, 0, len(ms))
 
-	for _, m := range ms {
-		endpoints = append(endpoints, m.ClientURL())
+	for _, member := range ms {
+		otpNodes = append(otpNodes, member.GetOTPNode())
 	}
 
-	return endpoints
+	return otpNodes
 }
 
-func (ms MemberSet) HostURLs() []string {
-	endpoints := make([]string, 0, len(ms))
-
-	for _, m := range ms {
-		endpoints = append(endpoints, m.HostURL())
-	}
-
-	return endpoints
-}
-
-// See the documentation for HostURLPlaintext as to the intended use of
-// this method.
-func (ms MemberSet) HostURLsPlaintext() []string {
-	endpoints := make([]string, 0, len(ms))
-
-	for _, m := range ms {
-		endpoints = append(endpoints, m.HostURLPlaintext())
-	}
-
-	return endpoints
-}
-
+// GroupByServerConfig filters members based on their server class.
 func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
 	rv := NewMemberSet()
 
@@ -209,63 +262,8 @@ func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
 	return rv
 }
 
-func (ms MemberSet) PickOne() *Member {
-	for _, m := range ms {
-		return m
-	}
-
-	panic("empty")
-}
-
-// retrieve the member with lowest index.
-func (ms MemberSet) First(clusterName string, max int) *Member {
-	for i := 0; i < max; i++ {
-		name := CreateMemberName(clusterName, i)
-
-		m := ms[name]
-		if m != nil {
-			return m
-		}
-	}
-
-	panic("empty")
-}
-
-func (ms MemberSet) Highest() *Member {
-	if ms.Empty() {
-		return nil
-	}
-
-	rv := ms.PickOne()
-
-	for _, m := range ms {
-		if strings.Compare(m.Name, rv.Name) > 0 {
-			rv = m
-		}
-	}
-
-	return rv
-}
-
+// CreateMemberName is a helper function that defines a member name based on
+// cluster and numerical index.
 func CreateMemberName(clusterName string, member int) string {
 	return fmt.Sprintf("%s-%04d", clusterName, member)
-}
-
-func clusterNameFromMemberName(mn string) string {
-	i := strings.LastIndex(mn, "-")
-	if i == -1 {
-		panic(fmt.Sprintf("unexpected member name: %s", mn))
-	}
-
-	return mn[:i]
-}
-
-func (ms MemberSet) String() string {
-	var mstring []string
-
-	for m := range ms {
-		mstring = append(mstring, m)
-	}
-
-	return strings.Join(mstring, ",")
 }
