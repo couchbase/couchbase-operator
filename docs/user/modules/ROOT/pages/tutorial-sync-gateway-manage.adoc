@@ -86,7 +86,7 @@ $ curl -X POST \
 
 
 ==== Monitor the status of the log collection
-Use the xref:sync-gateway::admin-test-api.adoc[GET _sgcollect_info] REST endpoint to monitor the status of the log collection.
+Use the xref:sync-gateway::admin-rest-api.adoc[GET _sgcollect_info] REST endpoint to monitor the status of the log collection.
 This is an example of the command.
 Wait until the status reported back is not `running`
 
