@@ -1,4 +1,5 @@
 = Public Cloud Prerequisites
+:page-aliases: cloud-intro
 
 [abstract]
 Vendor specific tasks to perform before installing the Operator.

@@ -1,4 +1,5 @@
 = Configure Automated Backup and Restore
+:page-aliases: backup-and-restore
 include::partial$constants.adoc[]
 
 [abstract]

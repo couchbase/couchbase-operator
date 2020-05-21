@@ -1,5 +1,5 @@
 = Persistent Volumes
-:page-aliases: persistent-volumes-guide
+:page-aliases: persistent-volumes-guide, persistent-volumes-zoning-guide-legacy, persistent-volumes-zoning-guide
 
 [abstract]
 The Operator fully supports Couchbase Clusters running with persistent storage.
