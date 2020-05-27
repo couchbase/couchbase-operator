@@ -332,12 +332,10 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 
 	// Create the first cluster.
-	ctx1, teardown1, err := e2eutil.InitClusterTLS(targetKube, &e2eutil.TLSOpts{})
+	ctx1, err := e2eutil.InitClusterTLS(targetKube, &e2eutil.TLSOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	defer teardown1()
 
 	testCouchbase1 := clusterTemplate.DeepCopy()
 	testCouchbase1.Name = ctx1.ClusterName
@@ -351,12 +349,10 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	testCouchbase1 = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase1)
 
 	// Create the second cluster.
-	ctx2, teardown2, err := e2eutil.InitClusterTLS(targetKube, &e2eutil.TLSOpts{})
+	ctx2, err := e2eutil.InitClusterTLS(targetKube, &e2eutil.TLSOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	defer teardown2()
 
 	testCouchbase2 := clusterTemplate.DeepCopy()
 	testCouchbase2.Name = ctx2.ClusterName

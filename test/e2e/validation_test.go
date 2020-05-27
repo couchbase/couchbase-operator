@@ -338,7 +338,7 @@ func runValidationTest(t *testing.T, targetKube *types.Cluster, testDefs []testD
 						AltNames:    util_x509.MandatorySANs(object.GetName(), targetKube.Namespace),
 					}
 					tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
-					ctx, _ = e2eutil.MustInitClusterTLS(t, targetKube, tlsOpts)
+					ctx = e2eutil.MustInitClusterTLS(t, targetKube, tlsOpts)
 
 					tlsCache[object.GetName()] = ctx
 				}

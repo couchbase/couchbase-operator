@@ -27,6 +27,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // randomSuffix generates a 5 character random suffix to be appended to
@@ -116,6 +118,7 @@ func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *
 // performing garbage collection.
 func NewClusterBasic(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
+
 	return newClusterFromSpec(t, k8s, clusterSpec)
 }
 
@@ -378,10 +381,13 @@ func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, size int, ct
 func NewBucket(k8s *types.Cluster, bucket runtime.Object) (runtime.Object, error) {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
+		ApplyGarbageCollectedObjectLabels(t)
 		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Create(t)
 	case *couchbasev2.CouchbaseEphemeralBucket:
+		ApplyGarbageCollectedObjectLabels(t)
 		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).Create(t)
 	case *couchbasev2.CouchbaseMemcachedBucket:
+		ApplyGarbageCollectedObjectLabels(t)
 		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).Create(t)
 	default:
 		return nil, fmt.Errorf("unsupported bucket type")
@@ -398,6 +404,7 @@ func MustNewBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object) runt
 }
 
 func NewBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseBackup, error) {
+	ApplyGarbageCollectedObjectLabels(backup)
 	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Create(backup)
 }
 
@@ -411,6 +418,7 @@ func MustNewBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.Couchba
 }
 
 func NewBackupRestore(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackupRestore) (*couchbasev2.CouchbaseBackupRestore, error) {
+	ApplyGarbageCollectedObjectLabels(backup)
 	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(k8s.Namespace).Create(backup)
 }
 
@@ -740,88 +748,11 @@ func DeleteCbCluster(t *testing.T, k8s *types.Cluster, cbCluster *couchbasev2.Co
 }
 
 func CleanK8sCluster(k8s *types.Cluster) {
-	if err := k8s.KubeClient.BatchV1().Jobs(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete jobs: ", err)
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaseclusters: ", err)
-	}
-
-	if err := WaitUntilPodDeleted(k8s); err != nil {
-		fmt.Println("Warning: Unable to delete pods:", err)
-	}
-
 	// Ensure all existing PVCs are deleted before continuing.  In the cloud these may take a
 	// while to fully disappear, and may bleed through into other tests, especially ones that
 	// cover supportability.
 	if err := DeleteAndWaitForPVCDeletion(k8s, 5*time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete PVCs:", err)
-	}
-
-	// Should be garbage collected
-	services, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-	if err == nil {
-		for _, service := range services.Items {
-			_ = k8s.KubeClient.CoreV1().Services(k8s.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
-		}
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasebuckets: ", err)
-	} else if err := WaitForBucketDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasebuckets: ", err)
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaseephemeralbuckets: ", err)
-	} else if err := WaitForEphemeralBucketDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaseephemeralbuckets: ", err)
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
-	} else if err := WaitForMemcachedBucketDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasereplications: ", err)
-	} else if err := WaitForReplicationDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasereplications: ", err)
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
-	} else if err := WaitForAllUserDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasegroups: ", err)
-	} else if err := WaitForGroupDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasegroups: ", err)
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)
-	} else if err := WaitForRoleBindingDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)
-	}
-
-	// remove any left over jobs and pods related to backup before deleting the Backup CRDs
-	CleanupBackup(k8s)
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
-	} else if err := WaitForBucketDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
-	}
-
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasebackuprestores: ", err)
-	} else if err := WaitForBucketDeletion(k8s, time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete couchbasebackuprestores: ", err)
 	}
 }
 
@@ -1503,6 +1434,8 @@ func GenerateWorkload(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 		},
 	}
 
+	ApplyGarbageCollectedObjectLabels(pod)
+
 	if _, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Create(pod); err != nil {
 		return nil, err
 	}
@@ -1585,4 +1518,84 @@ func CleanupBackup(k8s *types.Cluster) {
 			}
 		}
 	}
+}
+
+func ApplyGarbageCollectedObjectLabels(resource metav1.Object) {
+	labels := resource.GetLabels()
+
+	if labels == nil {
+		labels = map[string]string{}
+	}
+
+	labels["owner"] = "couchbaseqe"
+	resource.SetLabels(labels)
+}
+
+func CleanTestResources(k8s *types.Cluster) error {
+	// Add any types we want to clean up here...
+	objects := []runtime.Object{
+		//&admissionregistrationv1beta1.MutatingWebhookConfiguration{},
+		//&admissionregistrationv1beta1.ValidatingWebhookConfiguration{},
+		//&apiextensionsv1beta1.CustomResourceDefinition{},
+		&appsv1.Deployment{},
+		&batchv1.Job{},
+		// &batchv1beta1.CronJob{},
+		&couchbasev2.CouchbaseBucket{},
+		&couchbasev2.CouchbaseEphemeralBucket{},
+		&couchbasev2.CouchbaseMemcachedBucket{},
+		&couchbasev2.CouchbaseReplication{},
+		&couchbasev2.CouchbaseGroup{},
+		&couchbasev2.CouchbaseUser{},
+		&couchbasev2.CouchbaseBackup{},
+		&couchbasev2.CouchbaseCluster{},
+		&couchbasev2.CouchbaseRoleBinding{},
+		&couchbasev2.CouchbaseBackupRestore{},
+		&v1.ConfigMap{},
+		&v1.Endpoints{},
+		&v1.Namespace{},
+		&v1.PersistentVolumeClaim{},
+		&v1.Pod{},
+		&v1.Secret{},
+		&v1.Service{},
+		&v1.ServiceAccount{},
+		//&rbacv1.ClusterRole{},
+		//&rbacv1.ClusterRoleBinding{},
+		//&rbacv1.Role{},
+		//&rbacv1.RoleBinding{},
+	}
+
+	for _, object := range objects {
+		// Use the scheme to translate from object type into API kind metadata...
+		gvks, unversioned, err := scheme.Scheme.ObjectKinds(object)
+		if err != nil {
+			return err
+		}
+
+		if unversioned {
+			return fmt.Errorf("unknown what to do")
+		}
+
+		if len(gvks) != 1 {
+			return fmt.Errorf("too many gvks")
+		}
+
+		gvk := gvks[0]
+
+		// Use the rest mapper to go from the group/version/kind into api parameters...
+		mapping, err := k8s.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		// Delete the resources...
+		if err := k8s.DynamicClient.Resource(mapping.Resource).Namespace(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: "owner=couchbaseqe"}); err != nil {
+			if err.Error() == "the server could not find the requested resource" {
+				return nil
+			}
+
+			return err
+		}
+	}
+
+	return nil
 }

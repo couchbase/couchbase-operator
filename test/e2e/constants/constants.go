@@ -110,3 +110,8 @@ const (
 	LDAPDomain        = "openldap"
 	LDAPLabelSelector = "openldap.couchbase.com"
 )
+
+//test secrets Label
+const (
+	TestLabelSelector = "couchbaseqe"
+)

@@ -13,6 +13,7 @@ import (
 
 // NewLDAPServer creates a new LDAP server.
 func NewLDAPServer(k8s *types.Cluster, pod *v1.Pod) (*v1.Pod, error) {
+	ApplyGarbageCollectedObjectLabels(pod)
 	return k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Create(pod)
 }
 
@@ -28,6 +29,7 @@ func MustNewLDAPServer(t *testing.T, k8s *types.Cluster, pod *v1.Pod) *v1.Pod {
 
 // NewLDAPService creates headless service for accessing LDAP server.
 func NewLDAPService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error) {
+	ApplyGarbageCollectedObjectLabels(service)
 	return k8s.KubeClient.CoreV1().Services(k8s.Namespace).Create(service)
 }
 

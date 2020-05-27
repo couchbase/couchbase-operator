@@ -115,8 +115,7 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 	// When ready, establish the XDCR connection and verify correct replication...
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 
-	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
-	defer cleanup()
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
@@ -197,8 +196,7 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 
-	cleanup := e2eutil.MustEstablishXDCRReplication(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication, tls)
-	defer cleanup()
+	e2eutil.MustEstablishXDCRReplication(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication, tls)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
@@ -237,8 +235,7 @@ func TestXdcrCreateClusterLocal(t *testing.T) {
 func TestXdcrCreateClusterLocalTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, nil)
 }
@@ -247,8 +244,7 @@ func TestXdcrCreateClusterLocalTLS(t *testing.T) {
 func TestXdcrCreateClusterLocalMutualTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, &policy)
@@ -258,8 +254,7 @@ func TestXdcrCreateClusterLocalMutualTLS(t *testing.T) {
 func TestXdcrCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, &policy)
@@ -284,8 +279,7 @@ func TestXdcrCreateClusterRemoteTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, nil)
 }
@@ -298,8 +292,7 @@ func TestXdcrCreateClusterRemoteMutualTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, &policy)
@@ -313,8 +306,7 @@ func TestXdcrCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, &policy)
@@ -341,8 +333,7 @@ func TestXdcrCreateCluster(t *testing.T) {
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 
-	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
-	defer cleanup()
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
@@ -390,8 +381,7 @@ func TestXDCRPauseReplication(t *testing.T) {
 	// pause.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 
-	replication, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
-	defer cleanup()
+	replication = e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, time.Minute)
@@ -451,8 +441,7 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	// When healthy verify the documents have been replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 
-	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
-	defer cleanup()
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
@@ -507,8 +496,7 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 	// and ensure they are (eventually - after 5 whole minutes) replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 
-	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
-	defer cleanup()
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
@@ -562,8 +550,7 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 	// replicated when the connection is reestablished.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 
-	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
-	defer cleanup()
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, 10*time.Minute)
@@ -671,8 +658,7 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(e2espec.DefaultBucket.Name, e2espec.DefaultBucket.Name)
 
-	replication, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
-	defer cleanup()
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, e2espec.DefaultBucket.Name, 10)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, e2espec.DefaultBucket.Name, 10, time.Minute)
@@ -750,8 +736,7 @@ func TestXDCRFilterExp(t *testing.T) {
 		replication.Spec.FilterExpression = `^doc.*$`
 	}
 
-	_, cleanup := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
-	defer cleanup()
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	// MustPopulateBucket inserts documents with DocId following the template: "random%d"
 	// which won't be matched by the filter and will not get replicated.

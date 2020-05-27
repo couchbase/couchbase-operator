@@ -26,6 +26,8 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 
 	cl.Namespace = k8s.Namespace
 
+	ApplyGarbageCollectedObjectLabels(cl)
+
 	res, err := k8sutil.CreateCouchbaseCluster(k8s.CRClient, cl)
 	if err != nil {
 		return res, err

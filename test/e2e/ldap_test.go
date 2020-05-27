@@ -39,7 +39,7 @@ func setupLDAP(t *testing.T, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 	tlsOpts := &e2eutil.TLSOpts{
 		AltNames: e2espec.LDAPAltNames(k8s.Namespace),
 	}
-	ctx, _ := e2eutil.MustInitLDAPTLS(t, k8s, tlsOpts)
+	ctx := e2eutil.MustInitLDAPTLS(t, k8s, tlsOpts)
 
 	pod := e2espec.NewLDAPServerTLS(k8s.Namespace, ctx.LDAPSecretName)
 	_ = e2eutil.MustNewLDAPServer(t, k8s, pod)

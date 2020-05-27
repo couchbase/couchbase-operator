@@ -614,8 +614,7 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	numOfDocs := 200
 
 	// Create the cluster.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	defer teardown()
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
 	imageName := getBackupImage(f)
 	testCouchbase := e2espec.NewBackupCluster(clusterSize, imageName)
@@ -670,8 +669,7 @@ func TestFullOnlyOverTLS(t *testing.T) {
 	numOfDocs := 200
 
 	// Create the cluster.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	defer teardown()
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
 	imageName := getBackupImage(f)
 	testCouchbase := e2espec.NewBackupCluster(clusterSize, imageName)

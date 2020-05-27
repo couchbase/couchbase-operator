@@ -144,6 +144,10 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 		k8s := f.ClusterSpec[clusterName]
 		_ = e2eutil.CleanLDAPResources(k8s)
 		e2eutil.DeleteSyncGateway(cluster)
+
+		if err := e2eutil.CleanTestResources(k8s); err != nil {
+			fmt.Println("Warning: Test resources not cleaned")
+		}
 	}
 
 	// Run the test, catch and report any goroutine leaks or operator crashes
@@ -172,7 +176,12 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 	// Cleanup the namespace.
 	if !f.SkipTeardown {
 		for i, cluster := range f.ClusterSpec {
+			k8s := f.ClusterSpec[i]
 			e2eutil.CleanUpCluster(t, cluster, f.LogDir, i, name)
+
+			if err := e2eutil.CleanTestResources(k8s); err != nil {
+				fmt.Println("Warning: Test resources not cleaned")
+			}
 		}
 	}
 

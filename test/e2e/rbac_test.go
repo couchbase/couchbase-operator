@@ -280,8 +280,7 @@ func TestRBACWithLDAPAuth(t *testing.T) {
 		AltNames: e2espec.LDAPAltNames(targetKube.Namespace),
 	}
 
-	ctx, teardown := e2eutil.MustInitLDAPTLS(t, targetKube, tlsOpts)
-	defer teardown()
+	ctx := e2eutil.MustInitLDAPTLS(t, targetKube, tlsOpts)
 
 	pod := e2espec.NewLDAPServerTLS(targetKube.Namespace, ctx.LDAPSecretName)
 	_ = e2eutil.MustNewLDAPServer(t, targetKube, pod)

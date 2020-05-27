@@ -413,12 +413,13 @@ const (
 )
 
 func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, certPEM, keyPEM []byte) *corev1.Secret {
-	return &corev1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      secretName,
 			Labels: map[string]string{
 				"group": constants.LDAPLabelSelector,
+				"name":  constants.TestLabelSelector,
 			},
 		},
 		Data: map[string][]byte{
@@ -427,10 +428,14 @@ func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, 
 			operatorTLSSecretKey:   keyPEM,
 		},
 	}
+
+	ApplyGarbageCollectedObjectLabels(secret)
+
+	return secret
 }
 
 func CreateClusterSecretData(namespace, secretName string, certPEM, keyPEM []byte) *corev1.Secret {
-	return &corev1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      secretName,
@@ -440,6 +445,10 @@ func CreateClusterSecretData(namespace, secretName string, certPEM, keyPEM []byt
 			clusterTLSSecretKey:   keyPEM,
 		},
 	}
+
+	ApplyGarbageCollectedObjectLabels(secret)
+
+	return secret
 }
 
 const (
@@ -510,7 +519,7 @@ func (ctx *TLSContext) Close(k8s *types.Cluster) {
 
 // InitClusterTLS accepts a key type (only RSA works for now) and returns a context
 // containing all the certificates, and a tear down function to be deferred.
-func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
+func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err error) {
 	// Create the context
 	ctx = &TLSContext{
 		Client:    k8s.KubeClient,
@@ -587,8 +596,8 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardow
 	ctx.ClientCert = operatorCert
 
 	ctx.OperatorSecretName = "operator-secret-tls-" + RandomSuffix()
-
 	operatorSecretData := CreateOperatorSecretData(k8s.Namespace, ctx.OperatorSecretName, ctx.CA.Certificate, operatorCert, operatorKey)
+
 	if _, err = CreateSecret(k8s, operatorSecretData); err != nil {
 		return
 	}
@@ -608,29 +617,24 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardow
 	}
 
 	ctx.ClusterSecretName = "cluster-secret-tls-" + RandomSuffix()
-
 	clusterSecretData := CreateClusterSecretData(k8s.Namespace, ctx.ClusterSecretName, clusterCert, clusterKey)
+
 	if _, err = CreateSecret(k8s, clusterSecretData); err != nil {
 		_ = DeleteSecret(k8s, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 		return
-	}
-
-	teardown = func() {
-		_ = DeleteSecret(k8s, ctx.ClusterSecretName, &metav1.DeleteOptions{})
-		_ = DeleteSecret(k8s, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 	}
 
 	return
 }
 
 // MustInitClusterTLS does the same as InitClusterTLS, dying on failure.
-func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func()) {
-	ctx, teardown, err := InitClusterTLS(k8s, opts)
+func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext) {
+	ctx, err := InitClusterTLS(k8s, opts)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return ctx, teardown
+	return ctx
 }
 
 // MustRotateServerCertificate generates a new server certificate and updates the existing secret.
@@ -1072,7 +1076,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, podName string, ctx *TLSCo
 
 // InitLDAPTLS accepts a key type (only RSA works for now) and returns a context
 // containing all the certificates, and a tear down function to be deferred.
-func InitLDAPTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
+func InitLDAPTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err error) {
 	// Create the context
 	ctx = &TLSContext{
 		Client:    k8s.KubeClient,
@@ -1138,19 +1142,15 @@ func InitLDAPTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown f
 		return
 	}
 
-	teardown = func() {
-		_ = DeleteSecret(k8s, ctx.LDAPSecretName, &metav1.DeleteOptions{})
-	}
-
 	return
 }
 
 // MustInitLDAPTLS does the same as InitLDAPTLS, dying on failure.
-func MustInitLDAPTLS(t *testing.T, k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func()) {
-	ctx, teardown, err := InitLDAPTLS(k8s, opts)
+func MustInitLDAPTLS(t *testing.T, k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext) {
+	ctx, err := InitLDAPTLS(k8s, opts)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return ctx, teardown
+	return ctx
 }

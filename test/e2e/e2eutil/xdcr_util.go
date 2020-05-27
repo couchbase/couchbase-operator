@@ -314,7 +314,7 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 
 // EstablishXDCRReplicationGeneric creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (replicationSpec *couchbasev2.CouchbaseReplication, cleanup func(), err error) {
+func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (replicationSpec *couchbasev2.CouchbaseReplication, err error) {
 	// Create the remote cluster secret.
 	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
 	secret := &corev1.Secret{
@@ -324,20 +324,13 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 		Data: dstK8s.DefaultSecret.Data,
 	}
 
+	ApplyGarbageCollectedObjectLabels(secret)
+
 	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
 		return
 	}
 
-	// Define the cleanup to remove the secret and automatically perform cleanup on error so the client doesn't need to worry.
-	cleanup = func() {
-		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
-	}
-
-	defer func() {
-		if err != nil {
-			cleanup()
-		}
-	}()
+	ApplyGarbageCollectedObjectLabels(replication)
 
 	if replicationSpec, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
 		return
@@ -381,7 +374,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 
 // EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, tls *TLSContext) (cleanup func(), err error) {
+func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, tls *TLSContext) (err error) {
 	// Create the remote cluster secret.
 	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
 	secret := &corev1.Secret{
@@ -391,13 +384,10 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 		Data: dstK8s.DefaultSecret.Data,
 	}
 
+	ApplyGarbageCollectedObjectLabels(secret)
+
 	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
 		return
-	}
-
-	// Define the cleanup to remove the secret and automatically perform cleanup on error so the client doesn't need to worry.
-	cleanup = func() {
-		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
 	}
 
 	// Define the TLS secret if we are using it.
@@ -422,12 +412,10 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 		if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
 			return
 		}
-
-		cleanup = func() {
-			_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
-			_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(tlsSecret, metav1.NewDeleteOptions(0))
-		}
 	}
+
+	ApplyGarbageCollectedObjectLabels(secret)
+	ApplyGarbageCollectedObjectLabels(replication)
 
 	if _, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
 		return
@@ -497,22 +485,20 @@ func DeleteXDCRReplication(k8s *types.Cluster, source *couchbasev2.CouchbaseClus
 	})
 }
 
-func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (*couchbasev2.CouchbaseReplication, func()) {
-	replication, cleanup, err := EstablishXDCRReplicationGeneric(srcK8s, dstK8s, source, target, replication)
+func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) *couchbasev2.CouchbaseReplication {
+	replication, err := EstablishXDCRReplicationGeneric(srcK8s, dstK8s, source, target, replication)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return replication, cleanup
+	return replication
 }
 
-func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, ctx *TLSContext) func() {
-	cleanup, err := EstablishXDCRReplication(srcK8s, dstK8s, source, target, replication, ctx)
+func MustEstablishXDCRReplication(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, ctx *TLSContext) {
+	err := EstablishXDCRReplication(srcK8s, dstK8s, source, target, replication, ctx)
 	if err != nil {
 		Die(t, err)
 	}
-
-	return cleanup
 }
 
 func MustDeleteXDCRReplication(t *testing.T, k8s *types.Cluster, source *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) {

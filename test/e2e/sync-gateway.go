@@ -63,8 +63,7 @@ func TestSyncGatewayCreateLocal(t *testing.T) {
 func TestSyncGatewayCreateLocalTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
 	testSyncGatewayCreate(t, k8s1, k8s1, nil, tls, nil)
 }
@@ -73,8 +72,7 @@ func TestSyncGatewayCreateLocalTLS(t *testing.T) {
 func TestSyncGatewayCreateLocalMutualTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
 	testSyncGatewayCreate(t, k8s1, k8s1, nil, tls, &policy)
@@ -84,8 +82,7 @@ func TestSyncGatewayCreateLocalMutualTLS(t *testing.T) {
 func TestSyncGatewayCreateLocalMandatoryMutualTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	testSyncGatewayCreate(t, k8s1, k8s1, nil, tls, &policy)
@@ -110,8 +107,7 @@ func TestSyncGatewayCreateRemoteTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
 	testSyncGatewayCreate(t, k8s1, k8s2, dns, tls, nil)
 }
@@ -124,8 +120,7 @@ func TestSyncGatewayCreateRemoteMutualTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
 	testSyncGatewayCreate(t, k8s1, k8s2, dns, tls, &policy)
@@ -139,8 +134,7 @@ func TestSyncGatewayCreateRemoteMandatoryMutualTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
-	defer teardown()
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	testSyncGatewayCreate(t, k8s1, k8s2, dns, tls, &policy)
@@ -171,6 +165,7 @@ func TestSyncGatewayRBAC(t *testing.T) {
 			constants.AuthSecretPasswordKey: []byte(password),
 		},
 	}
+	e2eutil.ApplyGarbageCollectedObjectLabels(secret)
 
 	user := &couchbasev2.CouchbaseUser{
 		ObjectMeta: metav1.ObjectMeta{
@@ -181,7 +176,6 @@ func TestSyncGatewayRBAC(t *testing.T) {
 			AuthSecret: secretName,
 		},
 	}
-
 	group := &couchbasev2.CouchbaseGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: resourceName,
@@ -195,7 +189,6 @@ func TestSyncGatewayRBAC(t *testing.T) {
 			},
 		},
 	}
-
 	binding := &couchbasev2.CouchbaseRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: resourceName,
@@ -213,7 +206,6 @@ func TestSyncGatewayRBAC(t *testing.T) {
 			},
 		},
 	}
-
 	// Create the RBAC primitives and Couchbase cluster.
 	e2eutil.MustCreateSecret(t, k8s1, secret)
 

@@ -16,6 +16,7 @@ import (
 
 // NewUser creates a new couchbase user.
 func NewUser(k8s *types.Cluster, user *couchbasev2.CouchbaseUser) (*couchbasev2.CouchbaseUser, error) {
+	ApplyGarbageCollectedObjectLabels(user)
 	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).Create(user)
 }
 
@@ -40,6 +41,7 @@ func MustDeleteUser(t *testing.T, k8s *types.Cluster, user *couchbasev2.Couchbas
 
 // NewRole creates a new couchbase group.
 func NewGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) (*couchbasev2.CouchbaseGroup, error) {
+	ApplyGarbageCollectedObjectLabels(group)
 	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).Create(group)
 }
 
@@ -64,6 +66,7 @@ func MustDeleteGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.Couchb
 
 // NewRoleBinding creates a new couchbase role binding.
 func NewRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) (*couchbasev2.CouchbaseRoleBinding, error) {
+	ApplyGarbageCollectedObjectLabels(binding)
 	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).Create(binding)
 }
 

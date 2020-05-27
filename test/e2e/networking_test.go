@@ -68,8 +68,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
-	defer teardown()
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
@@ -116,8 +115,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
-	defer teardown()
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
@@ -171,8 +169,7 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
-	defer teardown()
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
@@ -219,8 +216,7 @@ func TestConsoleServiceDNS(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
-	defer teardown()
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
@@ -265,8 +261,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
-	defer teardown()
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
@@ -318,8 +313,7 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
-	defer teardown()
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)

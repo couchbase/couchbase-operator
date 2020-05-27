@@ -27,7 +27,7 @@ import (
 func createPersistentVolumeClaimSpec(storageClass *string, pvcName string, resourceQtyVal int64) corev1.PersistentVolumeClaim {
 	resourceQuantity := apiresource.NewQuantity(resourceQtyVal*1024*1024*1024, apiresource.BinarySI)
 
-	return corev1.PersistentVolumeClaim{
+	pvc := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pvcName,
 		},
@@ -40,6 +40,10 @@ func createPersistentVolumeClaimSpec(storageClass *string, pvcName string, resou
 			},
 		},
 	}
+
+	e2eutil.ApplyGarbageCollectedObjectLabels(&pvc)
+
+	return pvc
 }
 
 // Verifies actual PVC wrt to server pods matches the expected PVC mapping given by user.

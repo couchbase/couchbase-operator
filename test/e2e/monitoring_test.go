@@ -187,6 +187,8 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 		},
 	}
 
+	e2eutil.ApplyGarbageCollectedObjectLabels(secret)
+
 	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(secret); err != nil {
 		e2eutil.Die(t, err)
 	}

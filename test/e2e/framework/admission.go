@@ -71,6 +71,8 @@ func createAdmissionController(k8s *types.Cluster) error {
 	}
 
 	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, pullSecret, "-v", "1")
+	e2eutil.ApplyGarbageCollectedObjectLabels(&deployment.Spec.Template.ObjectMeta)
+
 	if _, err := client.AppsV1().Deployments(admissionNamespace).Create(deployment); err != nil {
 		return err
 	}
