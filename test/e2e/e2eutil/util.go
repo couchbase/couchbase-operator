@@ -25,7 +25,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -66,9 +65,9 @@ func RandomSuffix() string {
 
 // newClusterFromSpec creates a cluster and waits for various ready conditions.
 // Performs retries and garbage collection in the event of transient failure.
-func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+func newClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	// Create the cluster.
-	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	cluster, err := CreateCluster(t, k8s, clusterSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +84,8 @@ func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clus
 	return updatedCluster, nil
 }
 
-func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
-	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
+func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
+	cluster, err := newClusterFromSpec(t, k8s, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -94,9 +93,9 @@ func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, 
 	return cluster
 }
 
-func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	// Create the cluster
-	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	cluster, err := CreateCluster(t, k8s, clusterSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +103,8 @@ func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string,
 	return cluster, nil
 }
 
-func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewClusterFromSpecAsync(t, k8s, namespace, clusterSpec)
+func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewClusterFromSpecAsync(t, k8s, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -115,13 +114,13 @@ func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace str
 
 // NewClusterBasic creates a basic cluster, retrying if an error is encountered and
 // performing garbage collection.
-func NewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+func NewClusterBasic(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
+	return newClusterFromSpec(t, k8s, clusterSpec)
 }
 
-func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewClusterBasic(t, k8s, namespace, size)
+func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewClusterBasic(t, k8s, size)
 	if err != nil {
 		Die(t, err)
 	}
@@ -130,7 +129,7 @@ func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, siz
 }
 
 // NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered.
-func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
+func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -140,11 +139,11 @@ func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size
 		},
 	}
 
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
+	return newClusterFromSpec(t, k8s, clusterSpec)
 }
 
-func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewTLSClusterBasic(t, k8s, namespace, size, ctx)
+func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewTLSClusterBasic(t, k8s, size, ctx)
 	if err != nil {
 		Die(t, err)
 	}
@@ -153,7 +152,7 @@ func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, 
 }
 
 // NewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered.
-func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
+func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -169,11 +168,11 @@ func NewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string
 		},
 	}
 
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
+	return newClusterFromSpec(t, k8s, clusterSpec)
 }
 
-func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewMutualTLSClusterBasic(t, k8s, namespace, size, ctx, policy)
+func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewMutualTLSClusterBasic(t, k8s, size, ctx, policy)
 	if err != nil {
 		Die(t, err)
 	}
@@ -182,7 +181,7 @@ func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace st
 }
 
 // NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously.
-func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
+func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Name = ctx.ClusterName
 	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -192,18 +191,18 @@ func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string
 		},
 	}
 
-	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	return CreateCluster(t, k8s, clusterSpec)
 }
 
 // MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification.
-func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) {
-	if _, err := NewTLSClusterBasicNoWait(t, k8s, namespace, size, ctx); err == nil {
+func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) {
+	if _, err := NewTLSClusterBasicNoWait(t, k8s, size, ctx); err == nil {
 		Die(t, fmt.Errorf("cluster created unexpectedly"))
 	}
 }
 
 // NewXDCRrClusterGeneric creates a cluster for use with generic, IP-based networking (DEPRECATED).
-func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicXdcrCluster(size)
 	clusterSpec.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
 		ExposeAdminConsole: true,
@@ -212,7 +211,7 @@ func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, s
 		},
 	}
 
-	cluster, err := newClusterFromSpec(t, k8s, namespace, clusterSpec)
+	cluster, err := newClusterFromSpec(t, k8s, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -222,8 +221,8 @@ func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, s
 	return cluster, err
 }
 
-func MustNewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewXDCRClusterGeneric(t, k8s, namespace, size)
+func MustNewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewXDCRClusterGeneric(t, k8s, size)
 	if err != nil {
 		Die(t, err)
 	}
@@ -275,7 +274,7 @@ func NewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service,
 		}
 	}
 
-	cluster, err := newClusterFromSpec(t, k8s, k8s.Namespace, clusterSpec)
+	cluster, err := newClusterFromSpec(t, k8s, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -294,20 +293,20 @@ func MustNewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Serv
 	return cluster
 }
 
-func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
-	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	return CreateCluster(t, k8s, clusterSpec)
 }
 
 // NewStatefulCluster creates a cluster with persistent block storage, retrying if an
 // error is encountered and performing garbage collection.
-func NewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+func NewStatefulCluster(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewStatefulCluster(size)
-	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
+	return newClusterFromSpec(t, k8s, clusterSpec)
 }
 
-func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewStatefulCluster(t, k8s, namespace, size)
+func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewStatefulCluster(t, k8s, size)
 	if err != nil {
 		Die(t, err)
 	}
@@ -318,15 +317,15 @@ func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, namespace string, 
 // NewSupportableCluster creates a cluster with two MDS groups of 'size'.  The first is
 // a stateful group with data and index enabled.  The second is a stateless group with
 // query enabled.
-func NewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
+func NewSupportableCluster(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
 	spec := e2espec.NewSupportableCluster(size)
-	return newClusterFromSpec(t, k8s, namespace, spec)
+	return newClusterFromSpec(t, k8s, spec)
 }
 
 // MustNewSupportableCluster creates a supportable cluster as described by NewSupportableCluster
 // but dies on error.
-func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace string, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewSupportableCluster(t, k8s, namespace, size)
+func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewSupportableCluster(t, k8s, size)
 	if err != nil {
 		Die(t, err)
 	}
@@ -334,13 +333,13 @@ func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, namespace strin
 	return cluster
 }
 
-func NewBackupCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, imageName string) (*couchbasev2.CouchbaseCluster, error) {
+func NewBackupCluster(t *testing.T, k8s *types.Cluster, size int, imageName string) (*couchbasev2.CouchbaseCluster, error) {
 	spec := e2espec.NewBackupCluster(size, imageName)
-	return newClusterFromSpec(t, k8s, namespace, spec)
+	return newClusterFromSpec(t, k8s, spec)
 }
 
-func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, imageName string) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewBackupCluster(t, k8s, namespace, size, imageName)
+func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, size int, imageName string) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewBackupCluster(t, k8s, size, imageName)
 	if err != nil {
 		Die(t, err)
 	}
@@ -351,7 +350,7 @@ func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, namespace string, si
 // NewSupportableTLSCluster creates a cluster with two MDS groups of 'size'.  The first is
 // a stateful group with data and index enabled.  The second is a stateless group with
 // query enabled.
-func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
+func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	cluster := e2espec.NewClusterCRD("", e2espec.NewSupportableClusterSpec(size))
 	cluster.Name = ctx.ClusterName
 	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -361,13 +360,13 @@ func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string
 		},
 	}
 
-	return newClusterFromSpec(t, k8s, namespace, cluster)
+	return newClusterFromSpec(t, k8s, cluster)
 }
 
 // MustNewSupportableTLSCluster creates a supportable cluster as described by NewSupportableTLSCluster
 // but dies on error.
-func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace string, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewSupportableTLSCluster(t, k8s, namespace, size, ctx)
+func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewSupportableTLSCluster(t, k8s, size, ctx)
 	if err != nil {
 		Die(t, err)
 	}
@@ -376,21 +375,21 @@ func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace st
 }
 
 // NewBucket creates a bucket.
-func NewBucket(k8s *types.Cluster, namespace string, bucket runtime.Object) (runtime.Object, error) {
+func NewBucket(k8s *types.Cluster, bucket runtime.Object) (runtime.Object, error) {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(namespace).Create(t)
+		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Create(t)
 	case *couchbasev2.CouchbaseEphemeralBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).Create(t)
+		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).Create(t)
 	case *couchbasev2.CouchbaseMemcachedBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).Create(t)
+		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).Create(t)
 	default:
 		return nil, fmt.Errorf("unsupported bucket type")
 	}
 }
 
-func MustNewBucket(t *testing.T, k8s *types.Cluster, namespace string, bucket runtime.Object) runtime.Object {
-	object, err := NewBucket(k8s, namespace, bucket)
+func MustNewBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object) runtime.Object {
+	object, err := NewBucket(k8s, bucket)
 	if err != nil {
 		Die(t, err)
 	}
@@ -398,12 +397,12 @@ func MustNewBucket(t *testing.T, k8s *types.Cluster, namespace string, bucket ru
 	return object
 }
 
-func NewBackup(k8s *types.Cluster, namespace string, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseBackup, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).Create(backup)
+func NewBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseBackup, error) {
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Create(backup)
 }
 
-func MustNewBackup(t *testing.T, k8s *types.Cluster, namespace string, backup *couchbasev2.CouchbaseBackup) *couchbasev2.CouchbaseBackup {
-	object, err := NewBackup(k8s, namespace, backup)
+func MustNewBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) *couchbasev2.CouchbaseBackup {
+	object, err := NewBackup(k8s, backup)
 	if err != nil {
 		Die(t, err)
 	}
@@ -411,12 +410,12 @@ func MustNewBackup(t *testing.T, k8s *types.Cluster, namespace string, backup *c
 	return object
 }
 
-func NewBackupRestore(k8s *types.Cluster, namespace string, backup *couchbasev2.CouchbaseBackupRestore) (*couchbasev2.CouchbaseBackupRestore, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(namespace).Create(backup)
+func NewBackupRestore(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackupRestore) (*couchbasev2.CouchbaseBackupRestore, error) {
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(k8s.Namespace).Create(backup)
 }
 
-func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, namespace string, restore *couchbasev2.CouchbaseBackupRestore) *couchbasev2.CouchbaseBackupRestore {
-	object, err := NewBackupRestore(k8s, namespace, restore)
+func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) *couchbasev2.CouchbaseBackupRestore {
+	object, err := NewBackupRestore(k8s, restore)
 	if err != nil {
 		Die(t, err)
 	}
@@ -444,21 +443,21 @@ func MustDeleteBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbas
 	}
 }
 
-func DeleteBucket(k8s *types.Cluster, namespace string, bucket runtime.Object) error {
+func DeleteBucket(k8s *types.Cluster, bucket runtime.Object) error {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
+		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
 	case *couchbasev2.CouchbaseEphemeralBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
+		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
 	case *couchbasev2.CouchbaseMemcachedBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
+		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
 	default:
 		return fmt.Errorf("unsupported bucket type")
 	}
 }
 
-func MustDeleteBucket(t *testing.T, k8s *types.Cluster, namespace string, bucket runtime.Object) {
-	if err := DeleteBucket(k8s, namespace, bucket); err != nil {
+func MustDeleteBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object) {
+	if err := DeleteBucket(k8s, bucket); err != nil {
 		Die(t, err)
 	}
 }
@@ -690,13 +689,13 @@ func MustPatchReplication(t *testing.T, k8s *types.Cluster, replication *couchba
 	return replication
 }
 
-func DestroyCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cluster *couchbasev2.CouchbaseCluster) {
-	if err := DeleteCluster(t, crClient, kubeClient, cluster); err != nil {
+func DestroyCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
+	if err := DeleteCluster(t, k8s, cluster); err != nil {
 		Die(t, err)
 	}
 }
 
-func CleanUpCluster(t *testing.T, k8s *types.Cluster, namespace, logDir, kubeName, testName string) {
+func CleanUpCluster(t *testing.T, k8s *types.Cluster, logDir, kubeName, testName string) {
 	// Creates dir for kubename
 	logDir = filepath.Join(logDir, kubeName)
 
@@ -706,23 +705,23 @@ func CleanUpCluster(t *testing.T, k8s *types.Cluster, namespace, logDir, kubeNam
 	}
 
 	// Pulls operator pod logs
-	if err := WriteLogs(k8s.KubeClient, namespace, logDir, testName); err != nil {
+	if err := WriteLogs(k8s, logDir, testName); err != nil {
 		t.Logf("Error: %v", err)
 	}
 
-	CleanK8sCluster(k8s, namespace)
+	CleanK8sCluster(k8s)
 }
 
-func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient versioned.Interface, namespace string, cbCluster *couchbasev2.CouchbaseCluster) {
+func DeleteCbCluster(t *testing.T, k8s *types.Cluster, cbCluster *couchbasev2.CouchbaseCluster) {
 	t.Logf("Attempting to delete: [%v]", cbCluster.Name)
 
-	if err := k8sutil.DeleteCouchbaseCluster(crClient, cbCluster); err != nil {
+	if err := k8sutil.DeleteCouchbaseCluster(k8s.CRClient, cbCluster); err != nil {
 		t.Logf("Error: %v", err)
 	} else {
 		t.Logf("Successfully deleted: [%v]", cbCluster.Name)
 	}
 
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
 	if err != nil {
 		t.Logf("Error: Failed to get pods %v", err)
 	}
@@ -735,93 +734,93 @@ func DeleteCbCluster(t *testing.T, kubeClient kubernetes.Interface, crClient ver
 
 	t.Logf("Killing pods: %v", killPods)
 
-	if err := KillMembers(kubeClient, namespace, cbCluster.Name, killPods...); err != nil {
+	if err := KillMembers(k8s.KubeClient, k8s.Namespace, cbCluster.Name, killPods...); err != nil {
 		t.Logf("Failed to kill members: %v", err)
 	}
 }
 
-func CleanK8sCluster(k8s *types.Cluster, namespace string) {
-	if err := k8s.KubeClient.BatchV1().Jobs(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+func CleanK8sCluster(k8s *types.Cluster) {
+	if err := k8s.KubeClient.BatchV1().Jobs(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete jobs: ", err)
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseclusters: ", err)
 	}
 
-	if err := WaitUntilPodDeleted(k8s.KubeClient, namespace); err != nil {
+	if err := WaitUntilPodDeleted(k8s); err != nil {
 		fmt.Println("Warning: Unable to delete pods:", err)
 	}
 
 	// Ensure all existing PVCs are deleted before continuing.  In the cloud these may take a
 	// while to fully disappear, and may bleed through into other tests, especially ones that
 	// cover supportability.
-	if err := DeleteAndWaitForPVCDeletion(k8s, namespace, 5*time.Minute); err != nil {
+	if err := DeleteAndWaitForPVCDeletion(k8s, 5*time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete PVCs:", err)
 	}
 
 	// Should be garbage collected
-	services, err := k8s.KubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	services, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err == nil {
 		for _, service := range services.Items {
-			_ = k8s.KubeClient.CoreV1().Services(namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+			_ = k8s.KubeClient.CoreV1().Services(k8s.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
 		}
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebuckets: ", err)
-	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForBucketDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebuckets: ", err)
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseephemeralbuckets: ", err)
-	} else if err := WaitForEphemeralBucketDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForEphemeralBucketDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseephemeralbuckets: ", err)
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
-	} else if err := WaitForMemcachedBucketDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForMemcachedBucketDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasememcachedbuckets: ", err)
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasereplications: ", err)
-	} else if err := WaitForReplicationDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForReplicationDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasereplications: ", err)
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
-	} else if err := WaitForAllUserDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForAllUserDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaseusers: ", err)
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasegroups: ", err)
-	} else if err := WaitForGroupDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForGroupDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasegroups: ", err)
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)
-	} else if err := WaitForRoleBindingDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForRoleBindingDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbaserolebindings: ", err)
 	}
 
 	// remove any left over jobs and pods related to backup before deleting the Backup CRDs
-	CleanupBackup(k8s, namespace)
+	CleanupBackup(k8s)
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
-	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForBucketDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebackups: ", err)
 	}
 
-	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+	if err := k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebackuprestores: ", err)
-	} else if err := WaitForBucketDeletion(k8s, namespace, time.Minute); err != nil {
+	} else if err := WaitForBucketDeletion(k8s, time.Minute); err != nil {
 		fmt.Println("Warning: Unable to delete couchbasebackuprestores: ", err)
 	}
 }
@@ -851,16 +850,16 @@ func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name strin
 	return nil
 }
 
-func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, clusterName string, memberID int) error {
+func RemovePersistentVolumesOfPod(k8s *types.Cluster, clusterName string, memberID int) error {
 	podMemberName := couchbaseutil.CreateMemberName(clusterName, memberID)
 
-	pvcList, err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + podMemberName})
+	pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + podMemberName})
 	if err != nil {
 		return fmt.Errorf("unable to fetch persistent volume list for pod %s: %v", podMemberName, err)
 	}
 
 	for _, pvc := range pvcList.Items {
-		if err := kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, &metav1.DeleteOptions{}); err != nil {
+		if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Delete(pvc.Name, &metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("failed to delete persistent volume claim %s: %v", pvc.Name, err)
 		}
 	}
@@ -868,17 +867,17 @@ func RemovePersistentVolumesOfPod(kubeClient kubernetes.Interface, namespace, cl
 	return nil
 }
 
-func WriteLogs(kubeClient kubernetes.Interface, namespace, logDir, testName string) error {
+func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 	options := metav1.ListOptions{LabelSelector: constants.CouchbaseOperatorLabel}
 
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(options)
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(options)
 	if err != nil {
 		return err
 	}
 
 	for _, pod := range pods.Items {
 		logOpts := &v1.PodLogOptions{}
-		req := kubeClient.CoreV1().Pods(namespace).GetLogs(pod.Name, logOpts)
+		req := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).GetLogs(pod.Name, logOpts)
 
 		data, err := req.DoRaw()
 		if err != nil {
@@ -1024,35 +1023,35 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m *co
 	return nil, NewErrServerConfigNotFound(m.ServerConfig)
 }
 
-func deleteCouchbaseOperator(kubeCli kubernetes.Interface, namespace string) error {
-	name, err := GetOperatorName(kubeCli, namespace)
+func deleteCouchbaseOperator(k8s *types.Cluster) error {
+	name, err := GetOperatorName(k8s)
 	if err != nil {
 		return err
 	}
 
-	return kubeCli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
+	return k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(name, metav1.NewDeleteOptions(0))
 }
 
-func MustDeleteCouchbaseOperator(t *testing.T, k8s *types.Cluster, namespace string) {
-	if err := deleteCouchbaseOperator(k8s.KubeClient, namespace); err != nil {
+func MustDeleteCouchbaseOperator(t *testing.T, k8s *types.Cluster) {
+	if err := deleteCouchbaseOperator(k8s); err != nil {
 		Die(t, err)
 	}
 }
 
-func KillOperatorAndWaitForRecovery(k8s *types.Cluster, namespace string) error {
-	if err := deleteCouchbaseOperator(k8s.KubeClient, namespace); err != nil {
+func KillOperatorAndWaitForRecovery(k8s *types.Cluster) error {
+	if err := deleteCouchbaseOperator(k8s); err != nil {
 		return fmt.Errorf("failed to kill couchbase operator: %v", err)
 	}
 
-	if err := WaitUntilOperatorReady(k8s.KubeClient, namespace, constants.CouchbaseOperatorLabel); err != nil {
+	if err := WaitUntilOperatorReady(k8s, constants.CouchbaseOperatorLabel); err != nil {
 		return fmt.Errorf("failed to recover couchbase operator: %v", err)
 	}
 
 	return nil
 }
 
-func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster, namespace string) {
-	if err := KillOperatorAndWaitForRecovery(k8s, namespace); err != nil {
+func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster) {
+	if err := KillOperatorAndWaitForRecovery(k8s); err != nil {
 		Die(t, err)
 	}
 }
@@ -1061,13 +1060,13 @@ func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster, namesp
 // once all the dependant pods are cleaned up.  This allows us to explicitly make alterations
 // while the operator is not running and see what happens on a restart without introducing race
 // conditions.
-func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, namespace string, deployment *appsv1.Deployment, timeout time.Duration) {
-	if err := k8s.KubeClient.AppsV1().Deployments(namespace).Delete(deployment.Name, metav1.NewDeleteOptions(0)); err != nil {
+func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment *appsv1.Deployment, timeout time.Duration) {
+	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deployment.Name, metav1.NewDeleteOptions(0)); err != nil {
 		Die(t, err)
 	}
 
 	callback := func() error {
-		_, err := k8s.KubeClient.AppsV1().Deployments(namespace).Get(deployment.Name, metav1.GetOptions{})
+		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -1089,13 +1088,13 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, namespace st
 
 // MustCreateOperatorDeployment is the partner of MustDeleteOperatorDeployment which is used to
 // restart the operator synchronously, potentially after modifying resources.
-func MustCreateOperatorDeployment(t *testing.T, k8s *types.Cluster, namespace string, deployment *appsv1.Deployment) {
-	if _, err := k8s.KubeClient.AppsV1().Deployments(namespace).Create(deployment); err != nil {
+func MustCreateOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment *appsv1.Deployment) {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
 		Die(t, err)
 	}
 }
 
-func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, error) {
+func GetOperatorName(k8s *types.Cluster) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -1106,7 +1105,7 @@ func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, er
 	outerErr := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		var err error
 
-		pods, err = kubeCli.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pods, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -1134,8 +1133,8 @@ func GetOperatorName(kubeCli kubernetes.Interface, namespace string) (string, er
 	return operatorPods[0], nil
 }
 
-func MustGetOperatorName(t *testing.T, k8s *types.Cluster, namespace string) string {
-	name, err := GetOperatorName(k8s.KubeClient, namespace)
+func MustGetOperatorName(t *testing.T, k8s *types.Cluster) string {
+	name, err := GetOperatorName(k8s)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1143,7 +1142,7 @@ func MustGetOperatorName(t *testing.T, k8s *types.Cluster, namespace string) str
 	return name
 }
 
-func GetNodeNames(kubeCli kubernetes.Interface, namespace string) (string, error) {
+func GetNodeNames(kubeCli kubernetes.Interface) (string, error) {
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("name", "couchbase-operator")))
 
 	pods, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
@@ -1294,20 +1293,20 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 // Construct expected name for the PersistentVolumeClaim which belongs to member
 // where 'index' specifies the Nth claim generated from the specs template.
 // Only specs with multiple VolumeMounts should return volumes with index > 0.
-func GetMemberPVC(kubeCli kubernetes.Interface, namespace, memberName string, index int, mountName couchbasev2.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
+func GetMemberPVC(k8s *types.Cluster, memberName string, index int, mountName couchbasev2.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
 	name := k8sutil.NameForPersistentVolumeClaim(memberName, index, mountName)
-	return kubeCli.CoreV1().PersistentVolumeClaims(namespace).Get(name, metav1.GetOptions{})
+	return k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(name, metav1.GetOptions{})
 }
 
-func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx *TLSContext) error {
-	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + ctx.ClusterName})
+func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, ctx *TLSContext) error {
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + ctx.ClusterName})
 	if err != nil {
 		return fmt.Errorf("unable to get couchbase pods: %v", err)
 	}
 
 	// TLS handshake with pods
 	for _, pod := range pods.Items {
-		if err := tlsCheckForPod(t, k8s, namespace, pod.GetName(), ctx); err != nil {
+		if err := tlsCheckForPod(t, k8s, pod.GetName(), ctx); err != nil {
 			return fmt.Errorf("TLS verification failed: %v", err)
 		}
 	}
@@ -1315,28 +1314,28 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, namespace string, ctx 
 	return nil
 }
 
-func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, ctx *TLSContext) {
-	if err := TLSCheckForCluster(t, k8s, namespace, ctx); err != nil {
+func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, ctx *TLSContext) {
+	if err := TLSCheckForCluster(t, k8s, ctx); err != nil {
 		Die(t, err)
 	}
 }
 
-func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, namespace string) error {
+func DeletePodsWithLabel(t *testing.T, k8s *types.Cluster, label string) error {
 	t.Logf("deleting pods with label: %v", label)
 
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
 
 	for _, pod := range pods.Items {
-		err := deletePod(t, kubeClient, pod.Name, namespace)
+		err := deletePod(t, k8s, pod.Name)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = WaitPodsDeleted(kubeClient, namespace, metav1.ListOptions{LabelSelector: label})
+	_, err = WaitPodsDeleted(k8s.KubeClient, k8s.Namespace, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
@@ -1344,14 +1343,14 @@ func DeletePodsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, n
 	return nil
 }
 
-func deletePod(t *testing.T, kubeClient kubernetes.Interface, podName, namespace string) error {
+func deletePod(t *testing.T, k8s *types.Cluster, podName string) error {
 	t.Logf("deleting pod: %v", podName)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
-		if err := kubeClient.CoreV1().Pods(namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
+		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -1361,22 +1360,22 @@ func deletePod(t *testing.T, kubeClient kubernetes.Interface, podName, namespace
 	return err
 }
 
-func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, label, namespace string) error {
+func DeleteDaemonSetsWithLabel(t *testing.T, k8s *types.Cluster, label string) error {
 	t.Logf("deleting pods with label: %v", label)
 
-	dsList, err := kubeClient.ExtensionsV1beta1().DaemonSets(namespace).List(metav1.ListOptions{LabelSelector: label})
+	dsList, err := k8s.KubeClient.ExtensionsV1beta1().DaemonSets(k8s.Namespace).List(metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
 
 	for _, ds := range dsList.Items {
-		err := DeleteDaemonSet(t, kubeClient, ds.Name, namespace)
+		err := DeleteDaemonSet(t, k8s, ds.Name)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = WaitDaemonSetsDeleted(kubeClient, namespace, metav1.ListOptions{LabelSelector: label})
+	_, err = WaitDaemonSetsDeleted(k8s, metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
@@ -1384,10 +1383,10 @@ func DeleteDaemonSetsWithLabel(t *testing.T, kubeClient kubernetes.Interface, la
 	return nil
 }
 
-func DeleteDaemonSet(t *testing.T, kubeClient kubernetes.Interface, dsName, namespace string) error {
+func DeleteDaemonSet(t *testing.T, k8s *types.Cluster, dsName string) error {
 	t.Logf("deleting daemonset: %v", dsName)
 
-	err := kubeClient.ExtensionsV1beta1().DaemonSets(namespace).Delete(dsName, metav1.NewDeleteOptions(0))
+	err := k8s.KubeClient.ExtensionsV1beta1().DaemonSets(k8s.Namespace).Delete(dsName, metav1.NewDeleteOptions(0))
 	if err != nil {
 		return err
 	}
@@ -1433,13 +1432,13 @@ func Die(t *testing.T, err error) {
 
 // MustKillCouchbaseService kills the couchbase service depending on the platform type
 // TODO: Find a generic way of doing this on OpenShift.
-func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, namespace, member, kubernetesType string) {
+func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, member, kubernetesType string) {
 	if kubernetesType == "kubernetes" {
-		MustExecShellInPod(t, k8s, namespace, member, "mv /etc/service/couchbase-server /tmp/")
+		MustExecShellInPod(t, k8s, member, "mv /etc/service/couchbase-server /tmp/")
 		return
 	}
 
-	if err := deletePod(t, k8s.KubeClient, member, namespace); err != nil {
+	if err := deletePod(t, k8s, member); err != nil {
 		Die(t, err)
 	}
 }
@@ -1456,7 +1455,7 @@ func MustDeletePodServices(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 
 	for _, service := range services.Items {
 		if _, ok := service.Spec.Selector[operator_constants.LabelNode]; ok {
-			if err := DeleteService(k8s.KubeClient, service.Namespace, service.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err := DeleteService(k8s, service.Name, metav1.NewDeleteOptions(0)); err != nil {
 				Die(t, err)
 			}
 		}
@@ -1562,8 +1561,8 @@ func MustGetUUID(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	return uuid
 }
 
-func CleanupBackup(k8s *types.Cluster, namespace string) {
-	backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).List(metav1.ListOptions{})
+func CleanupBackup(k8s *types.Cluster) {
+	backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		fmt.Println("Warning: Unable to list couchbasebackups: ", err)
 	}
@@ -1571,17 +1570,17 @@ func CleanupBackup(k8s *types.Cluster, namespace string) {
 	for _, backup := range backups.Items {
 		listOptions := metav1.ListOptions{LabelSelector: operator_constants.LabelBackup + "=" + backup.Name}
 
-		if err := k8s.KubeClient.BatchV1().Jobs(namespace).DeleteCollection(metav1.NewDeleteOptions(0), listOptions); err != nil {
+		if err := k8s.KubeClient.BatchV1().Jobs(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), listOptions); err != nil {
 			fmt.Println("Warning: Unable to delete backup jobs: ", err)
 		}
 
-		pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(listOptions)
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(listOptions)
 		if err != nil {
 			fmt.Println("Warning: Unable to list backup pods: ", err)
 		}
 
 		for _, pod := range pods.Items {
-			if err := k8s.KubeClient.CoreV1().Pods(namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
 				fmt.Println("Warning: Unable to delete backup pods: ", err)
 			}
 		}

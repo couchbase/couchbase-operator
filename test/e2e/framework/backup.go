@@ -2,13 +2,13 @@ package framework
 
 import (
 	"github.com/couchbase/couchbase-operator/pkg/config"
-	"k8s.io/client-go/kubernetes"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 )
 
-func CreateBackupRole(client kubernetes.Interface, namespace string) error {
+func CreateBackupRole(k8s *types.Cluster) error {
 	backupRole := config.GetBackupRole(config.BackupResourceName)
 
-	_, err := client.RbacV1().Roles(namespace).Create(backupRole)
+	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(backupRole)
 	if err != nil {
 		return err
 	}
@@ -16,10 +16,10 @@ func CreateBackupRole(client kubernetes.Interface, namespace string) error {
 	return nil
 }
 
-func CreateBackupServiceAccount(client kubernetes.Interface, namespace string) error {
+func CreateBackupServiceAccount(k8s *types.Cluster) error {
 	backupServiceAccount := config.GetBackupServiceAccount(config.BackupResourceName)
 
-	_, err := client.CoreV1().ServiceAccounts(namespace).Create(backupServiceAccount)
+	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(backupServiceAccount)
 	if err != nil {
 		return err
 	}
@@ -27,10 +27,10 @@ func CreateBackupServiceAccount(client kubernetes.Interface, namespace string) e
 	return nil
 }
 
-func CreateBackupRoleBinding(client kubernetes.Interface, namespace string) error {
-	backupRoleBinding := config.GetBackupRoleBinding(config.BackupResourceName, namespace)
+func CreateBackupRoleBinding(k8s *types.Cluster) error {
+	backupRoleBinding := config.GetBackupRoleBinding(config.BackupResourceName, k8s.Namespace)
 
-	_, err := client.RbacV1().RoleBindings(namespace).Create(backupRoleBinding)
+	_, err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Create(backupRoleBinding)
 	if err != nil {
 		return err
 	}

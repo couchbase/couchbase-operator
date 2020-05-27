@@ -41,7 +41,7 @@ func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	clusterSize := 3
 
 	// Create the cluster in the target cluster.
-	e2eutil.MustNewBucket(t, kubernetes2, kubernetes2.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, kubernetes2, e2espec.DefaultBucket)
 	cluster := e2eutil.MustNewXDCRCluster(t, kubernetes2, clusterSize, nil, tls, policy)
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes2, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -63,7 +63,7 @@ func TestSyncGatewayCreateLocal(t *testing.T) {
 func TestSyncGatewayCreateLocalTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, k8s1.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	testSyncGatewayCreate(t, k8s1, k8s1, nil, tls, nil)
@@ -73,7 +73,7 @@ func TestSyncGatewayCreateLocalTLS(t *testing.T) {
 func TestSyncGatewayCreateLocalMutualTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, k8s1.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
@@ -84,7 +84,7 @@ func TestSyncGatewayCreateLocalMutualTLS(t *testing.T) {
 func TestSyncGatewayCreateLocalMandatoryMutualTLS(t *testing.T) {
 	k8s1 := framework.Global.GetCluster(0)
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, k8s1.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
@@ -110,7 +110,7 @@ func TestSyncGatewayCreateRemoteTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	testSyncGatewayCreate(t, k8s1, k8s2, dns, tls, nil)
@@ -124,7 +124,7 @@ func TestSyncGatewayCreateRemoteMutualTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
@@ -139,7 +139,7 @@ func TestSyncGatewayCreateRemoteMandatoryMutualTLS(t *testing.T) {
 	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 	defer cleanup()
 
-	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, k8s2.Namespace, &e2eutil.TLSOpts{})
+	tls, teardown := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
@@ -215,18 +215,18 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	}
 
 	// Create the RBAC primitives and Couchbase cluster.
-	e2eutil.MustCreateSecret(t, k8s1, k8s1.Namespace, secret)
+	e2eutil.MustCreateSecret(t, k8s1, secret)
 
 	defer func() {
-		_ = e2eutil.DeleteSecret(k8s1.KubeClient, k8s1.Namespace, secretName, nil)
+		_ = e2eutil.DeleteSecret(k8s1, secretName, nil)
 	}()
 
-	e2eutil.MustNewUser(t, k8s1, k8s1.Namespace, user)
-	e2eutil.MustNewGroup(t, k8s1, k8s1.Namespace, group)
-	e2eutil.MustNewRoleBinding(t, k8s1, k8s1.Namespace, binding)
-	e2eutil.MustNewBucket(t, k8s1, k8s1.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewUser(t, k8s1, user)
+	e2eutil.MustNewGroup(t, k8s1, group)
+	e2eutil.MustNewRoleBinding(t, k8s1, binding)
+	e2eutil.MustNewBucket(t, k8s1, e2espec.DefaultBucket)
 
-	cluster := e2eutil.MustNewClusterBasic(t, k8s1, k8s1.Namespace, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, k8s1, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, k8s1, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.

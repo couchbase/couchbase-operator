@@ -18,35 +18,35 @@ import (
 )
 
 // mustCreateBoundUser creates user bound to cluster and bucket admin roles.
-func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseGroup, *couchbasev2.CouchbaseRoleBinding) {
-	user := e2eutil.MustNewUser(t, k8s, namespace, e2espec.NewDefaultLDAPUser())
-	group := e2eutil.MustNewGroup(t, k8s, namespace, e2espec.NewClusterAdminGroup())
+func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseGroup, *couchbasev2.CouchbaseRoleBinding) {
+	user := e2eutil.MustNewUser(t, k8s, e2espec.NewDefaultLDAPUser())
+	group := e2eutil.MustNewGroup(t, k8s, e2espec.NewClusterAdminGroup())
 	bindSpec := e2espec.NewRoleBinding(e2e_constants.RoleBindingName, []string{user.Name}, group.Name)
-	binding := e2eutil.MustNewRoleBinding(t, k8s, namespace, bindSpec)
+	binding := e2eutil.MustNewRoleBinding(t, k8s, bindSpec)
 
 	return user, group, binding
 }
 
-func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.CouchbaseCluster {
+func setupLDAP(t *testing.T, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 	// Static configuration.
 	clusterSize := 1
 
 	// Start LDAP service
 	service := e2espec.NewLDAPService()
-	_ = e2eutil.MustNewLDAPService(t, k8s.KubeClient, namespace, service)
+	_ = e2eutil.MustNewLDAPService(t, k8s, service)
 
 	// Start the LDAP server
 	tlsOpts := &e2eutil.TLSOpts{
-		AltNames: e2espec.LDAPAltNames(namespace),
+		AltNames: e2espec.LDAPAltNames(k8s.Namespace),
 	}
-	ctx, _ := e2eutil.MustInitLDAPTLS(t, k8s, namespace, tlsOpts)
+	ctx, _ := e2eutil.MustInitLDAPTLS(t, k8s, tlsOpts)
 
-	pod := e2espec.NewLDAPServerTLS(namespace, ctx.LDAPSecretName)
-	_ = e2eutil.MustNewLDAPServer(t, k8s.KubeClient, namespace, pod)
+	pod := e2espec.NewLDAPServerTLS(k8s.Namespace, ctx.LDAPSecretName)
+	_ = e2eutil.MustNewLDAPServer(t, k8s, pod)
 
 	// Create a cluster with LDAP Auth
-	testCouchbase := e2espec.NewLDAPClusterBasic(namespace, clusterSize, ctx.LDAPSecretName, k8s.DefaultSecret.Name)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, k8s, namespace, testCouchbase)
+	testCouchbase := e2espec.NewLDAPClusterBasic(k8s.Namespace, clusterSize, ctx.LDAPSecretName, k8s.DefaultSecret.Name)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, k8s, testCouchbase)
 	e2eutil.MustWaitClusterStatusHealthy(t, k8s, testCouchbase, 5*time.Minute)
 
 	// Verify Connectivity
@@ -62,10 +62,10 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 	// Static configuration.
 	clusterSize := 1
 
-	testCouchbase := setupLDAP(t, targetKube, targetKube.Namespace)
+	testCouchbase := setupLDAP(t, targetKube)
 
 	//Create LDAP User with Cluster admin privileges
-	user, _, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
+	user, _, _ := mustCreateLDAPBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, 4*time.Minute)
 
 	// Validation
@@ -84,7 +84,7 @@ func TestLDAPCDeleteUser(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
-	testCouchbase := setupLDAP(t, targetKube, targetKube.Namespace)
+	testCouchbase := setupLDAP(t, targetKube)
 	timeout := 2 * time.Minute
 
 	// Expect user delete event eventually to occur
@@ -92,11 +92,11 @@ func TestLDAPCDeleteUser(t *testing.T) {
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
-	user, _, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
+	user, _, _ := mustCreateLDAPBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Delete user deletion
-	e2eutil.MustDeleteUser(t, targetKube, targetKube.Namespace, user)
+	e2eutil.MustDeleteUser(t, targetKube, user)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
 	// Ensure user delete event emitted
@@ -119,7 +119,7 @@ func TestLDAPDeleteRole(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
-	testCouchbase := setupLDAP(t, targetKube, targetKube.Namespace)
+	testCouchbase := setupLDAP(t, targetKube)
 	timeout := 2 * time.Minute
 
 	// Expect user delete event to occur
@@ -127,11 +127,11 @@ func TestLDAPDeleteRole(t *testing.T) {
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
-	user, group, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
+	user, group, _ := mustCreateLDAPBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Delete group and wait for user deletion from cluster
-	e2eutil.MustDeleteGroup(t, targetKube, targetKube.Namespace, group)
+	e2eutil.MustDeleteGroup(t, targetKube, group)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
 	// Ensure user delete event emitted
@@ -157,10 +157,10 @@ func TestLDAPUpdateRole(t *testing.T) {
 
 	// Cluster
 	clusterSize := 1
-	testCouchbase := setupLDAP(t, targetKube, targetKube.Namespace)
+	testCouchbase := setupLDAP(t, targetKube)
 
 	// User
-	user, group, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
+	user, group, _ := mustCreateLDAPBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Change to bucket role user
@@ -192,16 +192,16 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 
 	// Cluster
 	clusterSize := 1
-	testCouchbase := setupLDAP(t, targetKube, targetKube.Namespace)
+	testCouchbase := setupLDAP(t, targetKube)
 
 	// User
-	user, _, binding := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
+	user, _, binding := mustCreateLDAPBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Create another user
 	customUser := e2espec.NewDefaultLDAPUser()
 	customUser.Name = "alt-user"
-	customUser = e2eutil.MustNewUser(t, targetKube, targetKube.Namespace, customUser)
+	customUser = e2eutil.MustNewUser(t, targetKube, customUser)
 
 	// Expect user delete event eventually occur
 	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
@@ -247,18 +247,18 @@ func TestLDAPDeleteBinding(t *testing.T) {
 
 	// Create Cluster
 	clusterSize := 1
-	testCouchbase := setupLDAP(t, targetKube, targetKube.Namespace)
+	testCouchbase := setupLDAP(t, targetKube)
 
 	// Expect user delete event to eventually occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
 	// Create User
-	user, _, binding := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
+	user, _, binding := mustCreateLDAPBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Delete binding and wait for user deletion from cluster
-	e2eutil.MustDeleteRoleBinding(t, targetKube, targetKube.Namespace, binding)
+	e2eutil.MustDeleteRoleBinding(t, targetKube, binding)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
 	// Ensure user delete event emitted

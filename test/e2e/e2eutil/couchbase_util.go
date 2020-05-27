@@ -446,7 +446,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 		known[i] = node.OTPNode
 	}
 
-	member := MemberFromSpecProps(couchbase.Name, couchbase.Namespace, "", index)
+	member := MemberFromSpecProps(couchbase, "", index)
 
 	eject := couchbaseutil.OTPNodeList{
 		member.GetOTPNode(),
@@ -498,10 +498,10 @@ func MustEjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 	}
 }
 
-func MemberFromSpecProps(name, namespace, serverConfig string, memberIndex int) *couchbaseutil.Member {
+func MemberFromSpecProps(couchbase *couchbasev2.CouchbaseCluster, serverConfig string, memberIndex int) *couchbaseutil.Member {
 	return &couchbaseutil.Member{
-		Name:         couchbaseutil.CreateMemberName(name, memberIndex),
-		Namespace:    namespace,
+		Name:         couchbaseutil.CreateMemberName(couchbase.Name, memberIndex),
+		Namespace:    couchbase.Namespace,
 		ServerConfig: serverConfig,
 		SecureClient: false,
 	}

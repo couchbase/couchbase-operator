@@ -161,7 +161,7 @@ func getOperatorRestartCounts() map[string]int {
 	for _, cluster := range f.TestClusters {
 		k8s := f.ClusterSpec[cluster]
 
-		restarts, err := f.GetOperatorRestartCount(k8s.KubeClient, k8s.Namespace)
+		restarts, err := f.GetOperatorRestartCount(k8s)
 		if err != nil {
 			fmt.Println("WARN: unable to get restart counts on cluster", cluster, ":", err)
 		}
@@ -198,7 +198,7 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 	// Do any pre-test clean up actions
 	for clusterName, cluster := range f.ClusterSpec {
 		k8s := f.ClusterSpec[clusterName]
-		_ = e2eutil.CleanLDAPResources(k8s.KubeClient, k8s.Namespace)
+		_ = e2eutil.CleanLDAPResources(k8s)
 		e2eutil.DeleteSyncGateway(cluster)
 	}
 
@@ -221,7 +221,7 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 	// Cleanup the namespace.
 	if !f.SkipTeardown {
 		for clusterName, cluster := range f.ClusterSpec {
-			e2eutil.CleanUpCluster(t, cluster, cluster.Namespace, f.LogDir, clusterName, name)
+			e2eutil.CleanUpCluster(t, cluster, f.LogDir, clusterName, name)
 		}
 	}
 

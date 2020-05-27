@@ -505,11 +505,11 @@ func (ctx *TLSContext) clusterSANs() []string {
 
 // InitClusterTLS accepts a key type (only RSA works for now) and returns a context
 // containing all the certificates, and a tear down function to be deferred.
-func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
+func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
 	// Create the context
 	ctx = &TLSContext{
-		Client:    client,
-		Namespace: namespace,
+		Client:    k8s.KubeClient,
+		Namespace: k8s.Namespace,
 	}
 
 	// Generate an explicit cluster name to use
@@ -583,8 +583,8 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 
 	ctx.OperatorSecretName = "operator-secret-tls-" + RandomSuffix()
 
-	operatorSecretData := CreateOperatorSecretData(namespace, ctx.OperatorSecretName, ctx.CA.Certificate, operatorCert, operatorKey)
-	if _, err = CreateSecret(client, namespace, operatorSecretData); err != nil {
+	operatorSecretData := CreateOperatorSecretData(k8s.Namespace, ctx.OperatorSecretName, ctx.CA.Certificate, operatorCert, operatorKey)
+	if _, err = CreateSecret(k8s, operatorSecretData); err != nil {
 		return
 	}
 
@@ -594,7 +594,7 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
-		_ = DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+		_ = DeleteSecret(k8s, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 		return
 	}
 
@@ -604,23 +604,23 @@ func InitClusterTLS(client kubernetes.Interface, namespace string, opts *TLSOpts
 
 	ctx.ClusterSecretName = "cluster-secret-tls-" + RandomSuffix()
 
-	clusterSecretData := CreateClusterSecretData(namespace, ctx.ClusterSecretName, clusterCert, clusterKey)
-	if _, err = CreateSecret(client, namespace, clusterSecretData); err != nil {
-		_ = DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+	clusterSecretData := CreateClusterSecretData(k8s.Namespace, ctx.ClusterSecretName, clusterCert, clusterKey)
+	if _, err = CreateSecret(k8s, clusterSecretData); err != nil {
+		_ = DeleteSecret(k8s, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 		return
 	}
 
 	teardown = func() {
-		_ = DeleteSecret(client, namespace, ctx.ClusterSecretName, &metav1.DeleteOptions{})
-		_ = DeleteSecret(client, namespace, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+		_ = DeleteSecret(k8s, ctx.ClusterSecretName, &metav1.DeleteOptions{})
+		_ = DeleteSecret(k8s, ctx.OperatorSecretName, &metav1.DeleteOptions{})
 	}
 
 	return
 }
 
 // MustInitClusterTLS does the same as InitClusterTLS, dying on failure.
-func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func()) {
-	ctx, teardown, err := InitClusterTLS(k8s.KubeClient, namespace, opts)
+func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func()) {
+	ctx, teardown, err := InitClusterTLS(k8s, opts)
 	if err != nil {
 		Die(t, err)
 	}
@@ -964,7 +964,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 
 // tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
 // using TlsCheckForCluster which is safer.
-func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string, ctx *TLSContext) error {
+func tlsCheckForPod(t *testing.T, k8s *types.Cluster, podName string, ctx *TLSContext) error {
 	// Allocate a free port to use
 	sport, err := getFreePort()
 	if err != nil {
@@ -975,7 +975,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 	pf := portforward.PortForwarder{
 		Config:    k8s.Config,
 		Client:    k8s.KubeClient,
-		Namespace: namespace,
+		Namespace: k8s.Namespace,
 		Pod:       podName,
 		Port:      sport + ":18091",
 	}
@@ -1067,11 +1067,11 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, namespace, podName string,
 
 // InitLDAPTLS accepts a key type (only RSA works for now) and returns a context
 // containing all the certificates, and a tear down function to be deferred.
-func InitLDAPTLS(client kubernetes.Interface, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
+func InitLDAPTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {
 	// Create the context
 	ctx = &TLSContext{
-		Client:    client,
-		Namespace: namespace,
+		Client:    k8s.KubeClient,
+		Namespace: k8s.Namespace,
 	}
 
 	// Generate alt names.
@@ -1128,21 +1128,21 @@ func InitLDAPTLS(client kubernetes.Interface, namespace string, opts *TLSOpts) (
 
 	ctx.LDAPSecretName = "ldap-secret-tls-" + RandomSuffix()
 
-	ldapSecretData := CreateOperatorSecretData(namespace, ctx.LDAPSecretName, ctx.CA.Certificate, ldapCert, ldapKey)
-	if _, err = CreateSecret(client, namespace, ldapSecretData); err != nil {
+	ldapSecretData := CreateOperatorSecretData(k8s.Namespace, ctx.LDAPSecretName, ctx.CA.Certificate, ldapCert, ldapKey)
+	if _, err = CreateSecret(k8s, ldapSecretData); err != nil {
 		return
 	}
 
 	teardown = func() {
-		_ = DeleteSecret(client, namespace, ctx.LDAPSecretName, &metav1.DeleteOptions{})
+		_ = DeleteSecret(k8s, ctx.LDAPSecretName, &metav1.DeleteOptions{})
 	}
 
 	return
 }
 
 // MustInitLDAPTLS does the same as InitLDAPTLS, dying on failure.
-func MustInitLDAPTLS(t *testing.T, k8s *types.Cluster, namespace string, opts *TLSOpts) (ctx *TLSContext, teardown func()) {
-	ctx, teardown, err := InitLDAPTLS(k8s.KubeClient, namespace, opts)
+func MustInitLDAPTLS(t *testing.T, k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func()) {
+	ctx, teardown, err := InitLDAPTLS(k8s, opts)
 	if err != nil {
 		Die(t, err)
 	}

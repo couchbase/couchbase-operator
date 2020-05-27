@@ -7,20 +7,20 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
-func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	// This is the only place where all cluster creations converge due to code sprawl.
 	// So regardless of whether the CRD was hand crafted, or a cookie cutter we are
 	// guaranteed to apply the correct pod policy mutations here before every creation.
 	e2espec.ApplyImagePullSecret(cl)
 
-	cl.Namespace = namespace
+	cl.Namespace = k8s.Namespace
 
-	res, err := k8sutil.CreateCouchbaseCluster(crClient, cl)
+	res, err := k8sutil.CreateCouchbaseCluster(k8s.CRClient, cl)
 	if err != nil {
 		return res, err
 	}
@@ -30,15 +30,15 @@ func CreateCluster(t *testing.T, crClient versioned.Interface, namespace string,
 	return res, nil
 }
 
-func DeleteCluster(t *testing.T, crClient versioned.Interface, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster) error {
+func DeleteCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) error {
 	t.Logf("deleting couchbase cluster: %v", cl.Name)
 
-	err := k8sutil.DeleteCouchbaseCluster(crClient, cl)
+	err := k8sutil.DeleteCouchbaseCluster(k8s.CRClient, cl)
 	if err != nil {
 		return err
 	}
 
-	return waitResourcesDeleted(kubeClient, cl)
+	return waitResourcesDeleted(k8s.KubeClient, cl)
 }
 
 func getClusterCRD(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {

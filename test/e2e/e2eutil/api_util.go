@@ -15,13 +15,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func GetCouchbaseCluster(crClient versioned.Interface, name, namespace string) (*couchbasev2.CouchbaseCluster, error) {
-	return crClient.CouchbaseV2().CouchbaseClusters(namespace).Get(name, metav1.GetOptions{})
+func GetCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 }
 
 // Gets events for a CouchbaseCluster and returns them sorted by time (oldest to newest).
-func GetCouchbaseEvents(kubeCli kubernetes.Interface, name, namespace string) (EventList, error) {
-	list, err := kubeCli.CoreV1().Events(namespace).List(metav1.ListOptions{FieldSelector: "involvedObject.name=" + name})
+func GetCouchbaseEvents(kubeCli kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (EventList, error) {
+	list, err := kubeCli.CoreV1().Events(couchbase.Namespace).List(metav1.ListOptions{FieldSelector: "involvedObject.name=" + couchbase.Name})
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +63,8 @@ func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnsch
 }
 
 // GetNodeForPod returns a reference to the node a pod runs on.
-func GetNodeForPod(k8s *types.Cluster, namespace, name string) (*v1.Node, error) {
-	pod, err := k8s.KubeClient.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+func GetNodeForPod(k8s *types.Cluster, name string) (*v1.Node, error) {
+	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +83,8 @@ func GetNodeForPod(k8s *types.Cluster, namespace, name string) (*v1.Node, error)
 	return nil, fmt.Errorf("node for pod not found")
 }
 
-func MustGetNodeForPod(t *testing.T, k8s *types.Cluster, namespace, name string) *v1.Node {
-	node, err := GetNodeForPod(k8s, namespace, name)
+func MustGetNodeForPod(t *testing.T, k8s *types.Cluster, name string) *v1.Node {
+	node, err := GetNodeForPod(k8s, name)
 	if err != nil {
 		Die(t, err)
 	}
@@ -93,8 +93,8 @@ func MustGetNodeForPod(t *testing.T, k8s *types.Cluster, namespace, name string)
 }
 
 // MustGetAvailabiltyZoneForPod returns the availability zone a pod runs on.
-func MustGetAvailabiltyZoneForPod(t *testing.T, k8s *types.Cluster, namespace, name string) string {
-	node := MustGetNodeForPod(t, k8s, namespace, name)
+func MustGetAvailabiltyZoneForPod(t *testing.T, k8s *types.Cluster, name string) string {
+	node := MustGetNodeForPod(t, k8s, name)
 
 	availaibiltyZone, ok := node.Labels[constants.FailureDomainZoneLabel]
 	if !ok {

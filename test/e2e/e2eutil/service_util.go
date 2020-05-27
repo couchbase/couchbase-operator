@@ -7,11 +7,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
-func CreateService(kubeClient kubernetes.Interface, namespace string, service *v1.Service) (*v1.Service, error) {
-	service, err := kubeClient.CoreV1().Services(namespace).Create(service)
+func CreateService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error) {
+	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Create(service)
 	if err != nil {
 		return nil, err
 	}
@@ -19,8 +18,8 @@ func CreateService(kubeClient kubernetes.Interface, namespace string, service *v
 	return service, nil
 }
 
-func UpdateService(kubeClient kubernetes.Interface, namespace string, service *v1.Service) (*v1.Service, error) {
-	service, err := kubeClient.CoreV1().Services(namespace).Update(service)
+func UpdateService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error) {
+	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Update(service)
 	if err != nil {
 		return nil, err
 	}
@@ -28,12 +27,12 @@ func UpdateService(kubeClient kubernetes.Interface, namespace string, service *v
 	return service, nil
 }
 
-func DeleteService(kubeClient kubernetes.Interface, namespace string, serviceName string, options *metav1.DeleteOptions) error {
-	return kubeClient.CoreV1().Services(namespace).Delete(serviceName, options)
+func DeleteService(k8s *types.Cluster, serviceName string, options *metav1.DeleteOptions) error {
+	return k8s.KubeClient.CoreV1().Services(k8s.Namespace).Delete(serviceName, options)
 }
 
-func GetService(kubeClient kubernetes.Interface, namespace string, serviceName string) (*v1.Service, error) {
-	service, err := kubeClient.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
+func GetService(k8s *types.Cluster, serviceName string) (*v1.Service, error) {
+	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Get(serviceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +40,8 @@ func GetService(kubeClient kubernetes.Interface, namespace string, serviceName s
 	return service, nil
 }
 
-func GetServices(kubeClient kubernetes.Interface, namespace string) ([]v1.Service, error) {
-	serviceList, err := kubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{})
+func GetServices(k8s *types.Cluster) ([]v1.Service, error) {
+	serviceList, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +49,8 @@ func GetServices(kubeClient kubernetes.Interface, namespace string) ([]v1.Servic
 	return serviceList.Items, nil
 }
 
-func GetEventingIPAndPort(k8s *types.Cluster, namespace, pod string) (string, string, func(), error) {
-	port, cleanup, err := forwardPort(k8s, namespace, pod, "8096")
+func GetEventingIPAndPort(k8s *types.Cluster, pod string) (string, string, func(), error) {
+	port, cleanup, err := forwardPort(k8s, k8s.Namespace, pod, "8096")
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -60,8 +59,8 @@ func GetEventingIPAndPort(k8s *types.Cluster, namespace, pod string) (string, st
 	return "127.0.0.1", port, cleanup, nil
 }
 
-func MustGetEventingIPAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
-	host, port, cleanup, err := GetEventingIPAndPort(k8s, namespace, pod)
+func MustGetEventingIPAndPort(t *testing.T, k8s *types.Cluster, pod string) (string, string, func()) {
+	host, port, cleanup, err := GetEventingIPAndPort(k8s, pod)
 	if err != nil {
 		Die(t, err)
 	}
@@ -69,8 +68,8 @@ func MustGetEventingIPAndPort(t *testing.T, k8s *types.Cluster, namespace, pod s
 	return host, port, cleanup
 }
 
-func GetAnalyticsIPAndPort(k8s *types.Cluster, namespace, pod string) (string, string, func(), error) {
-	port, cleanup, err := forwardPort(k8s, namespace, pod, "8095")
+func GetAnalyticsIPAndPort(k8s *types.Cluster, pod string) (string, string, func(), error) {
+	port, cleanup, err := forwardPort(k8s, k8s.Namespace, pod, "8095")
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -79,8 +78,8 @@ func GetAnalyticsIPAndPort(k8s *types.Cluster, namespace, pod string) (string, s
 	return "127.0.0.1", port, cleanup, nil
 }
 
-func MustGetAnalyticsIPAndPort(t *testing.T, k8s *types.Cluster, namespace, pod string) (string, string, func()) {
-	host, port, cleanup, err := GetAnalyticsIPAndPort(k8s, namespace, pod)
+func MustGetAnalyticsIPAndPort(t *testing.T, k8s *types.Cluster, pod string) (string, string, func()) {
+	host, port, cleanup, err := GetAnalyticsIPAndPort(k8s, pod)
 	if err != nil {
 		Die(t, err)
 	}

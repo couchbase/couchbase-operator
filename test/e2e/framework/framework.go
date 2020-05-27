@@ -267,7 +267,7 @@ func cleanUpNamespace() (err error) {
 
 		// Remove secrets
 		if k8s.DefaultSecret != nil {
-			if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, k8s.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := e2eutil.DeleteSecret(k8s, k8s.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
 				if !k8sutil.IsKubernetesResourceNotFoundError(err) {
 					return fmt.Errorf("unable to delete the default secret: %v", err)
 				}
@@ -275,12 +275,12 @@ func cleanUpNamespace() (err error) {
 		}
 
 		// Clean-up Deployments and pods
-		if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
+		if err := DeleteOperatorCompletely(k8s, Global.Deployment.Name); err != nil {
 			return err
 		}
 
 		// Blow away any couchbase cluster resources (and friends)
-		e2eutil.CleanK8sCluster(k8s, k8s.Namespace)
+		e2eutil.CleanK8sCluster(k8s)
 	}
 
 	// TODO: check all deleted and wait
@@ -328,7 +328,7 @@ func createKubeClusterObject(c KubeConfData) (*types.Cluster, error) {
 }
 
 func (f *Framework) CreateSecretInKubeCluster(k8s *types.Cluster) error {
-	secret, err := e2eutil.CreateSecret(k8s.KubeClient, k8s.Namespace, e2espec.NewDefaultSecret(k8s.Namespace))
+	secret, err := e2eutil.CreateSecret(k8s, e2espec.NewDefaultSecret(k8s.Namespace))
 	if err != nil {
 		err = fmt.Errorf("failed to create default couchbase secret: %v", err)
 		return err
@@ -424,11 +424,11 @@ func (l initializedClusterList) isClusterInitialized(host string) bool {
 }
 
 // check that the namespace for this host is already initialized.
-func (l initializedClusterList) isClusterNamespaceInitialized(host, namespace string) bool {
+func (l initializedClusterList) isClusterNamespaceInitialized(k8s *types.Cluster) bool {
 	for _, cluster := range l {
-		if cluster.host == host {
+		if cluster.host == k8s.Config.Host {
 			for _, ns := range cluster.namespaces {
-				if ns == namespace {
+				if ns == k8s.Namespace {
 					return true
 				}
 			}
@@ -439,24 +439,24 @@ func (l initializedClusterList) isClusterNamespaceInitialized(host, namespace st
 }
 
 // add initializedCluster to the initializedClusterList.
-func (l initializedClusterList) initializeClusterNamespace(host, namespace string) (initializedClusterList, error) {
+func (l initializedClusterList) initializeClusterNamespace(k8s *types.Cluster) (initializedClusterList, error) {
 	for _, cluster := range l {
-		if cluster.host == host {
+		if cluster.host == k8s.Config.Host {
 			for _, ns := range cluster.namespaces {
-				if ns == namespace {
+				if ns == k8s.Namespace {
 					return nil, fmt.Errorf("requested namespace already exists on the requested host")
 				}
 			}
 
-			cluster.namespaces = append(cluster.namespaces, namespace)
+			cluster.namespaces = append(cluster.namespaces, k8s.Namespace)
 
 			return l, nil
 		}
 	}
 
 	return append(l, initializedCluster{
-		host:       host,
-		namespaces: []string{namespace},
+		host:       k8s.Config.Host,
+		namespaces: []string{k8s.Namespace},
 	}), nil
 }
 
@@ -481,7 +481,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		}
 
 		// Creating required namespaces and cluster roles before deploying the operator
-		if err := createK8SNamespace(k8s.KubeClient, k8s.Namespace); err != nil {
+		if err := createK8SNamespace(k8s); err != nil {
 			return err
 		}
 
@@ -508,16 +508,16 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		}
 	}
 
-	if f.initializedClusters.isClusterNamespaceInitialized(k8s.Config.Host, k8s.Namespace) {
+	if f.initializedClusters.isClusterNamespaceInitialized(k8s) {
 		return nil
 	}
 
 	// Creating required namespaces and cluster roles before deploying the operator
-	if err := createK8SNamespace(k8s.KubeClient, k8s.Namespace); err != nil {
+	if err := createK8SNamespace(k8s); err != nil {
 		return err
 	}
 
-	e2eutil.CleanK8sCluster(k8s, k8s.Namespace)
+	e2eutil.CleanK8sCluster(k8s)
 
 	logrus.Info("Deleting orphaned pods")
 
@@ -572,7 +572,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	// deleting secrets
 	logrus.Info("Deleting secrets")
 
-	if err := e2eutil.DeleteSecret(k8s.KubeClient, k8s.Namespace, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
+	if err := e2eutil.DeleteSecret(k8s, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
 		logrus.Infof("Secret deleted: %v", "basic-test-secret")
 	}
 
@@ -585,7 +585,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	// delete and create operator
 	logrus.Infof("Cleaning up namespace %s before deployment in %s", k8s.Namespace, k8s.Name)
 
-	if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
+	if err := DeleteOperatorCompletely(k8s, Global.Deployment.Name); err != nil {
 		return fmt.Errorf("failed to delete operator: %v", err)
 	}
 
@@ -597,7 +597,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 	logrus.Info("Couchbase operator created successfully")
 
-	f.initializedClusters, err = f.initializedClusters.initializeClusterNamespace(k8s.Config.Host, k8s.Namespace)
+	f.initializedClusters, err = f.initializedClusters.initializeClusterNamespace(k8s)
 	if err != nil {
 		return err
 	}
@@ -612,11 +612,11 @@ func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
 		return err
 	}
 
-	return e2eutil.WaitUntilOperatorReady(k8s.KubeClient, k8s.Namespace, constants.CouchbaseOperatorLabel)
+	return e2eutil.WaitUntilOperatorReady(k8s, constants.CouchbaseOperatorLabel)
 }
 
-func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, namespace string) (int32, error) {
-	operatorPodName, err := e2eutil.GetOperatorName(kubeClient, namespace)
+func (f *Framework) GetOperatorRestartCount(k8s *types.Cluster) (int32, error) {
+	operatorPodName, err := e2eutil.GetOperatorName(k8s)
 	if err != nil {
 		return 0, err
 	}
@@ -627,7 +627,7 @@ func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, nam
 	var operatorPod *v1.Pod
 
 	err = retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
-		operatorPod, err = kubeClient.CoreV1().Pods(namespace).Get(operatorPodName, metav1.GetOptions{})
+		operatorPod, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(operatorPodName, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -641,8 +641,8 @@ func (f *Framework) GetOperatorRestartCount(kubeClient kubernetes.Interface, nam
 	return operatorPod.Status.ContainerStatuses[0].RestartCount, nil
 }
 
-func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, namespace string) error {
-	if err := deleteOperator(kubeClient, deploymentName, namespace); err != nil {
+func DeleteOperatorCompletely(k8s *types.Cluster, deploymentName string) error {
+	if err := deleteOperator(k8s, deploymentName); err != nil {
 		return err
 	}
 
@@ -652,7 +652,7 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, n
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
 	return retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
-		_, err := kubeClient.AppsV1().Deployments(namespace).Get(deploymentName, metav1.GetOptions{})
+		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deploymentName, metav1.GetOptions{})
 		if err == nil {
 			return false, err
 		}
@@ -665,13 +665,13 @@ func DeleteOperatorCompletely(kubeClient kubernetes.Interface, deploymentName, n
 	})
 }
 
-func deleteOperator(kubeClient kubernetes.Interface, deploymentName, namespace string) error {
+func deleteOperator(k8s *types.Cluster, deploymentName string) error {
 	deletePropagation := metav1.DeletePropagationForeground
 
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation
 
-	if err := kubeClient.AppsV1().Deployments(namespace).Delete(deploymentName, deleteOpts); err != nil {
+	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deploymentName, deleteOpts); err != nil {
 		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}

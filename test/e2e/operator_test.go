@@ -25,7 +25,7 @@ func TestPauseOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// Pause the operator, kill a pod, ensure nothing comes back from the dead, then reenable the operator.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
@@ -62,10 +62,10 @@ func TestKillOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// Kill the operator, wait for recovery and make sure nothing bad happened to the cluster.
-	e2eutil.MustKillOperatorAndWaitForRecovery(t, targetKube, targetKube.Namespace)
+	e2eutil.MustKillOperatorAndWaitForRecovery(t, targetKube)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Check the events match what we expect:
@@ -87,8 +87,8 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// When the cluster is ready, pause the operator, and await aknowledgement.  Manually update the bucket, then kill
@@ -96,7 +96,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/ControlPaused", true), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
-	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, targetKube.Namespace)
+	e2eutil.MustDeleteCouchbaseOperator(t, targetKube)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.BucketEditEvent(e2espec.DefaultBucket.Name, testCouchbase), time.Minute)
 

@@ -64,8 +64,8 @@ func TestFullIncremental(t *testing.T) {
 
 	// Create a normal cluster.
 	imageName := getBackupImage(f)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -74,7 +74,7 @@ func TestFullIncremental(t *testing.T) {
 
 	// Create a Backup object.
 	backup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
-	backup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, backup)
+	backup = e2eutil.MustNewBackup(t, targetKube, backup)
 	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
 
 	// Expect the full backup to complete, followed by the the incremental.
@@ -106,8 +106,8 @@ func TestFullOnly(t *testing.T) {
 
 	// Create a normal cluster.
 	imageName := getBackupImage(f)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -116,7 +116,7 @@ func TestFullOnly(t *testing.T) {
 
 	// Create a Backup object.
 	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
-	backup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, backup)
+	backup = e2eutil.MustNewBackup(t, targetKube, backup)
 	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
 
 	// Expect the full backup to complete.
@@ -158,9 +158,9 @@ func TestFailedBackupBehaviour(t *testing.T) {
 		testCouchbase.Spec.Backup.Image = imageName
 	}
 
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -169,7 +169,7 @@ func TestFailedBackupBehaviour(t *testing.T) {
 
 	// create this backup to run every 2 minutes so we can test the backup still runs successfully after a failure.
 	fullBackup := createTestBackup(v2.FullOnly, "*/2 * * * *", "")
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
@@ -221,8 +221,8 @@ func TestBackupPVCReconcile(t *testing.T) {
 	// Create cluster.
 	numOfDocs := 200
 	imageName := getBackupImage(f)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -231,7 +231,7 @@ func TestBackupPVCReconcile(t *testing.T) {
 
 	// Create a Backup object.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "")
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, time.Minute)
@@ -248,12 +248,12 @@ func TestBackupPVCReconcile(t *testing.T) {
 	}
 
 	// DELET the PVC!!
-	if err := e2eutil.DeleteAndWaitForPVCDeletionSingle(targetKube, pvc.Name, targetKube.Namespace, 5*time.Minute); err != nil {
+	if err := e2eutil.DeleteAndWaitForPVCDeletionSingle(targetKube, pvc.Name, 5*time.Minute); err != nil {
 		e2eutil.Die(t, err)
 	}
 
 	// check pvc is recreated and exists
-	e2eutil.MustWaitForPVC(t, targetKube, fullBackup.Name, targetKube.Namespace, 5*time.Minute)
+	e2eutil.MustWaitForPVC(t, targetKube, fullBackup.Name, 5*time.Minute)
 
 	// Expect backup to complete
 	//e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
@@ -291,8 +291,8 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	// Create a normal cluster.
 	numOfDocs := 200
 	imageName := getBackupImage(f)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -301,7 +301,7 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 
 	// create initial backup
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
@@ -313,11 +313,11 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	// DELET THIS
 	e2eutil.MustDeleteBackup(t, targetKube, fullBackup)
 	// wait for backup to be deleted
-	e2eutil.MustWaitForBackupDeletion(t, targetKube, targetKube.Namespace, 2*time.Minute)
+	e2eutil.MustWaitForBackupDeletion(t, targetKube, 2*time.Minute)
 
 	// create new backup
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
-	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
 
 	// wait for backups to complete
@@ -361,8 +361,8 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	// Create a normal cluster.
 	numOfDocs := 200
 	imageName := getBackupImage(f)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -371,7 +371,7 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 
 	// create initial backup
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
-	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
@@ -385,11 +385,11 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	// DELET THIS
 	e2eutil.MustDeleteBackup(t, targetKube, fullIncrementalBackup)
 	// wait for backup to be deleted
-	e2eutil.MustWaitForBackupDeletion(t, targetKube, targetKube.Namespace, 2*time.Minute)
+	e2eutil.MustWaitForBackupDeletion(t, targetKube, 2*time.Minute)
 
 	// create new backup
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
 
 	// wait for backup to complete
@@ -425,8 +425,8 @@ func TestBackupAndRestore(t *testing.T) {
 
 	numOfDocs := 2000
 	imageName := getBackupImage(f)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -435,7 +435,7 @@ func TestBackupAndRestore(t *testing.T) {
 
 	// Create a Backup object.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "")
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
@@ -463,16 +463,16 @@ func TestBackupAndRestore(t *testing.T) {
 	}
 
 	// delete bucket
-	e2eutil.MustDeleteBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustDeleteBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 2*time.Minute)
 
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 5*time.Minute)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, targetKube.Namespace, restore)
+	e2eutil.MustNewBackupRestore(t, targetKube, restore)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, time.Minute)
@@ -508,8 +508,8 @@ func TestUpdateBackupStatus(t *testing.T) {
 
 	numOfDocs := 200
 	imageName := getBackupImage(f)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -518,7 +518,7 @@ func TestUpdateBackupStatus(t *testing.T) {
 
 	// Create a Backup object.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
@@ -560,8 +560,8 @@ func TestMultipleBackups(t *testing.T) {
 	// Create a normal cluster.
 	numOfDocs := 200
 	imageName := getBackupImage(f)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, targetKube.Namespace, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -570,11 +570,11 @@ func TestMultipleBackups(t *testing.T) {
 
 	// Create Backup object 1.
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
-	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// Create Backup object 2.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "")
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backups
 	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
@@ -614,7 +614,7 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	numOfDocs := 200
 
 	// Create the cluster.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, &e2eutil.TLSOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	imageName := getBackupImage(f)
@@ -626,9 +626,9 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -637,7 +637,7 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 
 	// Create a Backup object.
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
-	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullIncrementalBackup)
+	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
@@ -670,7 +670,7 @@ func TestFullOnlyOverTLS(t *testing.T) {
 	numOfDocs := 200
 
 	// Create the cluster.
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, &e2eutil.TLSOpts{})
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 	defer teardown()
 
 	imageName := getBackupImage(f)
@@ -682,9 +682,9 @@ func TestFullOnlyOverTLS(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
 
 	// insert docs to backup
@@ -693,7 +693,7 @@ func TestFullOnlyOverTLS(t *testing.T) {
 
 	// Create a Backup object.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, targetKube.Namespace, fullBackup)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)

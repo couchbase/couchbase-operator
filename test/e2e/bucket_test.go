@@ -90,16 +90,16 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	for i, bucket := range buckets {
-		e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, bucket)
+		e2eutil.MustNewBucket(t, targetKube, bucket)
 		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, names[:i+1], 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	}
 
 	for _, bucket := range buckets {
-		e2eutil.MustDeleteBucket(t, targetKube, targetKube.Namespace, bucket)
+		e2eutil.MustDeleteBucket(t, targetKube, bucket)
 	}
 
 	for _, name := range names {
@@ -128,17 +128,17 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 
 	buckets := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucket := range buckets {
 		name := e2eutil.MustGetBucketName(t, bucket)
-		e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, bucket)
+		e2eutil.MustNewBucket(t, targetKube, bucket)
 		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{name}, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-		e2eutil.MustDeleteBucket(t, targetKube, targetKube.Namespace, bucket)
+		e2eutil.MustDeleteBucket(t, targetKube, bucket)
 		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, name, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	}
@@ -173,8 +173,8 @@ func TestEditBucket(t *testing.T) {
 	disabled := false
 
 	// Create the cluster.
-	bucket := e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, e2espec.DefaultBucket)
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, kubernetes.Namespace, constants.Size1)
+	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Create a direct connection to a couchbase node.
@@ -236,8 +236,8 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	bucketName := "default"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, constants.Size1)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, constants.Size1)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
@@ -273,12 +273,12 @@ func TestBucketUnmanaged(t *testing.T) {
 	clusterSize := 3
 
 	// Create a bucket.
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 
 	// Create a cluster with buckets unmanaged.
 	couchbase := e2espec.NewBasicCluster(clusterSize)
 	couchbase.Spec.Buckets.Managed = false
-	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, couchbase)
+	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
 
 	// Ensure the bucket doesn't get created.
 	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{e2espec.DefaultBucket.Name}, time.Minute); err == nil {
@@ -309,18 +309,18 @@ func TestBucketSelection(t *testing.T) {
 	}
 
 	// Create a default bucket and a labelled bucket.
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	bucket := e2espec.DefaultBucket.DeepCopy()
 	bucket.Name = bucketName
 	bucket.Labels = labels
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, bucket)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	// Create a cluster that selects only labelled buckets.
 	couchbase := e2espec.NewBasicCluster(clusterSize)
 	couchbase.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
-	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, couchbase)
+	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
 
 	// Ensure the unlabelled bucket doesn't get created.
 	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{e2espec.DefaultBucket.Name}, time.Minute); err == nil {
@@ -352,10 +352,10 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	foreignBucketName := "foreign"
 
 	// Create the cluster
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 10)
 
@@ -403,8 +403,8 @@ func TestBucketWithExplicitName(t *testing.T) {
 	// Create the cluster.
 	bucketTyped := e2espec.DefaultBucket.DeepCopy()
 	bucketTyped.Spec.Name = bucketName
-	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, bucketTyped)
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, kubernetes.Namespace, constants.Size1)
+	e2eutil.MustNewBucket(t, kubernetes, bucketTyped)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucketName}, time.Minute)
 
 	// Check the events match what we expect:
@@ -442,13 +442,13 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketTyped1.Labels = labels1
 	bucketTyped1.Spec.Name = bucketName
 
-	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, bucketTyped1)
+	e2eutil.MustNewBucket(t, kubernetes, bucketTyped1)
 
 	cluster1 := e2espec.NewBasicCluster(clusterSize)
 	cluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels1,
 	}
-	cluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, kubernetes.Namespace, cluster1)
+	cluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster1)
 
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster1, []string{bucketName}, time.Minute)
 
@@ -459,13 +459,13 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketTyped2.Labels = labels2
 	bucketTyped2.Spec.Name = bucketName
 
-	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, bucketTyped2)
+	e2eutil.MustNewBucket(t, kubernetes, bucketTyped2)
 
 	cluster2 := e2espec.NewBasicCluster(clusterSize)
 	cluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels2,
 	}
-	cluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, kubernetes.Namespace, cluster2)
+	cluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster2)
 
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster2, []string{bucketName}, time.Minute)
 

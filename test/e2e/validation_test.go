@@ -292,7 +292,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 	targetKube := f.ClusterSpec[kubeName]
 
 	// Stop the operator, we don't actually need it to validate the API and the tests will take forever.
-	_ = framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, targetKube.Namespace)
+	_ = framework.DeleteOperatorCompletely(targetKube, f.Deployment.Name)
 
 	defer func() { _ = f.SetupCouchbaseOperator(targetKube) }()
 
@@ -336,7 +336,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 					AltNames:    util_x509.MandatorySANs(object.GetName(), targetKube.Namespace),
 				}
 				tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
-				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOpts)
+				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOpts)
 				defer teardown()
 
 				if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "static", "serverSecret"); err != nil {
@@ -444,7 +444,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 
 	// Removing deployment if any
 	if !f.SkipTeardown {
-		e2eutil.CleanUpCluster(t, targetKube, targetKube.Namespace, f.LogDir, kubeName, t.Name())
+		e2eutil.CleanUpCluster(t, targetKube, f.LogDir, kubeName, t.Name())
 	}
 }
 

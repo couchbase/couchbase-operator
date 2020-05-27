@@ -88,10 +88,10 @@ func ExecWithOptions(k8s *types.Cluster, options ExecOptions) (string, string, e
 
 // ExecCommandInContainerWithFullOutput executes a command in the
 // specified container and return stdout, stderr and error.
-func ExecCommandInContainerWithFullOutput(k8s *types.Cluster, namespace, podName, containerName string, cmd ...string) (string, string, error) {
+func ExecCommandInContainerWithFullOutput(k8s *types.Cluster, podName, containerName string, cmd ...string) (string, string, error) {
 	return ExecWithOptions(k8s, ExecOptions{
 		Command:       cmd,
-		Namespace:     namespace,
+		Namespace:     k8s.Namespace,
 		PodName:       podName,
 		ContainerName: containerName,
 
@@ -103,23 +103,23 @@ func ExecCommandInContainerWithFullOutput(k8s *types.Cluster, namespace, podName
 }
 
 // ExecCommandInContainer executes a command in the specified container.
-func ExecCommandInContainer(k8s *types.Cluster, namespace, podName, containerName string, cmd ...string) (string, string, error) {
-	return ExecCommandInContainerWithFullOutput(k8s, namespace, podName, containerName, cmd...)
+func ExecCommandInContainer(k8s *types.Cluster, podName, containerName string, cmd ...string) (string, string, error) {
+	return ExecCommandInContainerWithFullOutput(k8s, podName, containerName, cmd...)
 }
 
 // ExecCommandInPod executes a command in the specified pod, selecting the first container.
-func ExecCommandInPod(k8s *types.Cluster, namespace, name string, cmd ...string) (string, string, error) {
-	pod, err := k8s.KubeClient.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
+func ExecCommandInPod(k8s *types.Cluster, name string, cmd ...string) (string, string, error) {
+	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
 
-	return ExecCommandInContainer(k8s, namespace, name, pod.Spec.Containers[0].Name, cmd...)
+	return ExecCommandInContainer(k8s, name, pod.Spec.Containers[0].Name, cmd...)
 }
 
 // MustExecCommandInPod behaves like ExecCommandInPod, dying on error.
-func MustExecCommandInPod(t *testing.T, k8s *types.Cluster, namespace, name string, cmd ...string) (string, string) {
-	stdout, stderr, err := ExecCommandInPod(k8s, namespace, name, cmd...)
+func MustExecCommandInPod(t *testing.T, k8s *types.Cluster, name string, cmd ...string) (string, string) {
+	stdout, stderr, err := ExecCommandInPod(k8s, name, cmd...)
 	if err != nil {
 		t.Logf("Command: %s", strings.Join(cmd, ""))
 		t.Logf("stdout: %s", stdout)
@@ -131,13 +131,13 @@ func MustExecCommandInPod(t *testing.T, k8s *types.Cluster, namespace, name stri
 }
 
 // ExecShellInPod executes a command in the specified pod, selecting the first container.  The command is run via the default shell.
-func ExecShellInPod(k8s *types.Cluster, namespace, name string, cmd string) (string, string, error) {
-	return ExecCommandInPod(k8s, namespace, name, "/bin/sh", "-c", cmd)
+func ExecShellInPod(k8s *types.Cluster, name string, cmd string) (string, string, error) {
+	return ExecCommandInPod(k8s, name, "/bin/sh", "-c", cmd)
 }
 
 // MustExecShellInPod behaves like ExecShellInPod, dying on error.
-func MustExecShellInPod(t *testing.T, k8s *types.Cluster, namespace, name string, cmd string) (string, string) {
-	stdout, stderr, err := ExecShellInPod(k8s, namespace, name, cmd)
+func MustExecShellInPod(t *testing.T, k8s *types.Cluster, name string, cmd string) (string, string) {
+	stdout, stderr, err := ExecShellInPod(k8s, name, cmd)
 	if err != nil {
 		t.Logf("Command: %s", cmd)
 		t.Logf("stdout: %s", stdout)

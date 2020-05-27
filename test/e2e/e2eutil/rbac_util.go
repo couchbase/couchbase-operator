@@ -15,12 +15,12 @@ import (
 )
 
 // NewUser creates a new couchbase user.
-func NewUser(k8s *types.Cluster, namespace string, user *couchbasev2.CouchbaseUser) (*couchbasev2.CouchbaseUser, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(namespace).Create(user)
+func NewUser(k8s *types.Cluster, user *couchbasev2.CouchbaseUser) (*couchbasev2.CouchbaseUser, error) {
+	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).Create(user)
 }
 
-func MustNewUser(t *testing.T, k8s *types.Cluster, namespace string, user *couchbasev2.CouchbaseUser) *couchbasev2.CouchbaseUser {
-	newUser, err := NewUser(k8s, namespace, user)
+func MustNewUser(t *testing.T, k8s *types.Cluster, user *couchbasev2.CouchbaseUser) *couchbasev2.CouchbaseUser {
+	newUser, err := NewUser(k8s, user)
 	if err != nil {
 		Die(t, err)
 	}
@@ -28,23 +28,23 @@ func MustNewUser(t *testing.T, k8s *types.Cluster, namespace string, user *couch
 	return newUser
 }
 
-func DeleteUser(k8s *types.Cluster, namespace string, user *couchbasev2.CouchbaseUser) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(namespace).Delete(user.Name, metav1.NewDeleteOptions(0))
+func DeleteUser(k8s *types.Cluster, user *couchbasev2.CouchbaseUser) error {
+	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).Delete(user.Name, metav1.NewDeleteOptions(0))
 }
 
-func MustDeleteUser(t *testing.T, k8s *types.Cluster, namespace string, user *couchbasev2.CouchbaseUser) {
-	if err := DeleteUser(k8s, namespace, user); err != nil {
+func MustDeleteUser(t *testing.T, k8s *types.Cluster, user *couchbasev2.CouchbaseUser) {
+	if err := DeleteUser(k8s, user); err != nil {
 		Die(t, err)
 	}
 }
 
 // NewRole creates a new couchbase group.
-func NewGroup(k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) (*couchbasev2.CouchbaseGroup, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).Create(group)
+func NewGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) (*couchbasev2.CouchbaseGroup, error) {
+	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).Create(group)
 }
 
-func MustNewGroup(t *testing.T, k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) *couchbasev2.CouchbaseGroup {
-	newGroup, err := NewGroup(k8s, namespace, group)
+func MustNewGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) *couchbasev2.CouchbaseGroup {
+	newGroup, err := NewGroup(k8s, group)
 	if err != nil {
 		Die(t, err)
 	}
@@ -52,23 +52,23 @@ func MustNewGroup(t *testing.T, k8s *types.Cluster, namespace string, group *cou
 	return newGroup
 }
 
-func DeleteGroup(k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(namespace).Delete(group.Name, metav1.NewDeleteOptions(0))
+func DeleteGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) error {
+	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).Delete(group.Name, metav1.NewDeleteOptions(0))
 }
 
-func MustDeleteGroup(t *testing.T, k8s *types.Cluster, namespace string, group *couchbasev2.CouchbaseGroup) {
-	if err := DeleteGroup(k8s, namespace, group); err != nil {
+func MustDeleteGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) {
+	if err := DeleteGroup(k8s, group); err != nil {
 		Die(t, err)
 	}
 }
 
 // NewRoleBinding creates a new couchbase role binding.
-func NewRoleBinding(k8s *types.Cluster, namespace string, binding *couchbasev2.CouchbaseRoleBinding) (*couchbasev2.CouchbaseRoleBinding, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(namespace).Create(binding)
+func NewRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) (*couchbasev2.CouchbaseRoleBinding, error) {
+	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).Create(binding)
 }
 
-func MustNewRoleBinding(t *testing.T, k8s *types.Cluster, namespace string, binding *couchbasev2.CouchbaseRoleBinding) *couchbasev2.CouchbaseRoleBinding {
-	newBinding, err := NewRoleBinding(k8s, namespace, binding)
+func MustNewRoleBinding(t *testing.T, k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) *couchbasev2.CouchbaseRoleBinding {
+	newBinding, err := NewRoleBinding(k8s, binding)
 	if err != nil {
 		Die(t, err)
 	}
@@ -76,12 +76,12 @@ func MustNewRoleBinding(t *testing.T, k8s *types.Cluster, namespace string, bind
 	return newBinding
 }
 
-func DeleteRoleBinding(k8s *types.Cluster, namespace string, binding *couchbasev2.CouchbaseRoleBinding) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(namespace).Delete(binding.Name, metav1.NewDeleteOptions(0))
+func DeleteRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) error {
+	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).Delete(binding.Name, metav1.NewDeleteOptions(0))
 }
 
-func MustDeleteRoleBinding(t *testing.T, k8s *types.Cluster, namespace string, binding *couchbasev2.CouchbaseRoleBinding) {
-	if err := DeleteRoleBinding(k8s, namespace, binding); err != nil {
+func MustDeleteRoleBinding(t *testing.T, k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) {
+	if err := DeleteRoleBinding(k8s, binding); err != nil {
 		Die(t, err)
 	}
 }

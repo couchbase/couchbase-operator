@@ -307,7 +307,7 @@ var (
 )
 
 func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, events []eventschema.Validatable) {
-	clusterEvents, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, couchbase.Name, couchbase.Namespace)
+	clusterEvents, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, couchbase)
 	if err != nil {
 		t.Error(err)
 		return

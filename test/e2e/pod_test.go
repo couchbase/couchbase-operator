@@ -36,7 +36,7 @@ func TestPodResourcesBasic(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse(memLimit),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -67,7 +67,7 @@ func TestNegPodResourcesBasic(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse(memLimit),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
 
 	// Expect the cluster to enter a failed state
 	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 15*time.Minute)
@@ -97,7 +97,7 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// When the cluster is ready, scale up, the node shouldn't be scheduled.
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, targetKube, testCouchbase)
@@ -130,7 +130,7 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
 
 	// Expect the cluster to enter a failed state
 	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 15*time.Minute)
@@ -147,7 +147,7 @@ func TestAntiAffinityOn(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.AntiAffinity = true
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -168,7 +168,7 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.AntiAffinity = true
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
 
 	// Wait for a healthy status.
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 2*f.PodCreateTimeout)
@@ -193,7 +193,7 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.AntiAffinity = true
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// When ready scale beyond the limits and wait for a failed creation.
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, targetKube, testCouchbase)
@@ -217,7 +217,7 @@ func TestAntiAffinityOff(t *testing.T) {
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// Wait for a healthy status.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)

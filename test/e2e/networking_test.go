@@ -35,12 +35,12 @@ func TestExposedFeatureIP(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that all nodes advertise an IP based alternate address.
 	e2eutil.MustCheckForIPAlternateAddresses(t, targetKube, testCouchbase, time.Minute)
@@ -68,10 +68,10 @@ func TestExposedFeatureDNS(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 	defer teardown()
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
@@ -87,7 +87,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that all nodes advertise a DNS based alternate address.
 	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, domain, time.Minute)
@@ -116,10 +116,10 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 	defer teardown()
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
@@ -135,7 +135,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that all nodes advertise a DNS based alternate address, and it changes when updated.
 	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, domain, time.Minute)
@@ -171,10 +171,10 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 	defer teardown()
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
@@ -190,7 +190,7 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that changing the node port type is reflected in the services.
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
@@ -219,10 +219,10 @@ func TestConsoleServiceDNS(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 	defer teardown()
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
@@ -239,7 +239,7 @@ func TestConsoleServiceDNS(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify console service advertises a DNS based address.
 	e2eutil.MustCheckForDNSAdminAnnotation(t, targetKube, testCouchbase, domain, time.Minute)
@@ -265,10 +265,10 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 	defer teardown()
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
@@ -285,7 +285,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that all nodes advertise a DNS based alternate address, and it changes when updated.
 	e2eutil.MustCheckForDNSAdminAnnotation(t, targetKube, testCouchbase, domain, time.Minute)
@@ -318,10 +318,10 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 		},
 	}
 
-	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, targetKube.Namespace, tlsOptions)
+	ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 	defer teardown()
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
@@ -338,7 +338,7 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that changing the node port type is reflected in the services.
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
@@ -366,7 +366,7 @@ func TestExposedFeatureTrafficPolicyCluster(t *testing.T) {
 	}
 	policy := corev1.ServiceExternalTrafficPolicyTypeCluster
 	testCouchbase.Spec.Networking.ExposedFeatureTrafficPolicy = &policy
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Check the events match what we expect:
 	// * Cluster created

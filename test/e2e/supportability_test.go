@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/client-go/kubernetes"
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 
 	"github.com/ghodss/yaml"
@@ -231,14 +230,14 @@ func getLabelSelector(all bool, clusters []string) (string, error) {
 }
 
 // mustVerifyServerLogs looks for pods that exist and should have associated server logs.
-func mustVerifyServerLogs(t *testing.T, k8s *types.Cluster, namespace, archive string, redacted bool, clusters ...string) {
+func mustVerifyServerLogs(t *testing.T, k8s *types.Cluster, archive string, redacted bool, clusters ...string) {
 	// Grab the required pods.
 	selector, err := getLabelSelector(false, clusters)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -256,7 +255,7 @@ func mustVerifyServerLogs(t *testing.T, k8s *types.Cluster, namespace, archive s
 	errs := []error{}
 NextPod:
 	for _, pod := range pods.Items {
-		expected := archiveName(namespace, pod.Name, timestamp, redacted) + ".zip"
+		expected := archiveName(k8s.Namespace, pod.Name, timestamp, redacted) + ".zip"
 		for _, file := range files {
 			if file.Name() == expected {
 				if redacted {
@@ -295,8 +294,8 @@ func verifyLogRedaction(archive string) error {
 	return fmt.Errorf("file %s not redacted", archive)
 }
 
-func verifyLogCollectListJSON(kubeClient kubernetes.Interface, namespace, cbClusterName, collectInfoListJSON string, errMsgList *failureList) error {
-	pods, err := kubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
+func verifyLogCollectListJSON(k8s *types.Cluster, cbClusterName, collectInfoListJSON string, errMsgList *failureList) error {
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
 	if err != nil {
 		return err
 	}
@@ -731,7 +730,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	}
 
 	// Deploy cb server for cbopinfo validation
-	e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, constants.Size1)
+	e2eutil.MustNewClusterBasic(t, targetKube, constants.Size1)
 
 	for i := range validArgumentList {
 		arg := validArgumentList[i]
@@ -900,10 +899,10 @@ func TestLogCollect(t *testing.T) {
 	cluster2Size := constants.Size1
 	cluster3Size := constants.Size1
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	cluster1 := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, cluster1Size)
-	cluster2 := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, cluster2Size)
-	cluster3 := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, cluster3Size)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	cluster1 := e2eutil.MustNewClusterBasic(t, targetKube, cluster1Size)
+	cluster2 := e2eutil.MustNewClusterBasic(t, targetKube, cluster2Size)
+	cluster3 := e2eutil.MustNewClusterBasic(t, targetKube, cluster3Size)
 
 	commonArgs := argumentList{}
 	commonArgs.addClusterDefaults(targetKube)
@@ -992,7 +991,7 @@ func TestLogCollect(t *testing.T) {
 
 		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true, cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
-		mustVerifyServerLogs(t, targetKube, targetKube.Namespace, archive, false, cluster1.Name)
+		mustVerifyServerLogs(t, targetKube, archive, false, cluster1.Name)
 	})
 
 	t.Run("TestLogCollectAll", func(t *testing.T) {
@@ -1016,14 +1015,14 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, constants.Size1)
+	cluster := e2eutil.MustNewClusterBasic(t, targetKube, constants.Size1)
 
 	// Create a service account with no permissions.
 	if err := framework.RecreateServiceAccount(targetKube, cluster.Name); err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	defer func() { _ = framework.RemoveServiceAccount(targetKube.KubeClient, targetKube.Namespace, cluster.Name) }()
+	defer func() { _ = framework.RemoveServiceAccount(targetKube, cluster.Name) }()
 
 	// Create a kubernetes configuration file.
 	sa, err := targetKube.KubeClient.CoreV1().ServiceAccounts(targetKube.Namespace).Get(cluster.Name, metav1.GetOptions{})
@@ -1114,7 +1113,7 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
 	f := framework.Global
 
 	// Delete existing Deployment
-	if err := framework.DeleteOperatorCompletely(k8s.KubeClient, f.Deployment.Name, k8s.Namespace); err != nil {
+	if err := framework.DeleteOperatorCompletely(k8s, f.Deployment.Name); err != nil {
 		return err
 	}
 
@@ -1130,7 +1129,7 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
 		return err
 	}
 
-	if err := e2eutil.WaitUntilOperatorReady(k8s.KubeClient, k8s.Namespace, constants.CouchbaseOperatorLabel); err != nil {
+	if err := e2eutil.WaitUntilOperatorReady(k8s, constants.CouchbaseOperatorLabel); err != nil {
 		return err
 	}
 
@@ -1155,9 +1154,9 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	}
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
-	defer e2eutil.CleanUpCluster(t, targetKube, targetKube.Namespace, f.LogDir, f.TestClusters[0], t.Name())
+	defer e2eutil.CleanUpCluster(t, targetKube, f.LogDir, f.TestClusters[0], t.Name())
 
 	// Collect logs
 	args.add(cbCluster.Name, "")
@@ -1169,7 +1168,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 
 	files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, true, true, true)
 	mustVerifyArchiveContents(t, archive, files)
-	mustVerifyServerLogs(t, targetKube, targetKube.Namespace, archive, false)
+	mustVerifyServerLogs(t, targetKube, archive, false)
 }
 
 // Collect cbopinfo using '--operator-image' and '--operator-rest-port'
@@ -1218,7 +1217,7 @@ func TestLogCollectInvalid(t *testing.T) {
 	//cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
-	e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// Collect logs with invalid operator-image-name
 	t.Run("TestLogCollectInvalidOperatorImage", func(t *testing.T) {
@@ -1265,7 +1264,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create Couchbase cluster
-	e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	args := argumentList{}
 	args.addClusterDefaults(targetKube)
@@ -1275,7 +1274,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	args.add("--collectinfo-collect", "all")
 	args.add("--all", "")
 
-	e2eutil.MustDeleteCouchbaseOperator(t, targetKube, targetKube.Namespace)
+	e2eutil.MustDeleteCouchbaseOperator(t, targetKube)
 
 	// Collect logs when operator pod goes down in parallel
 	archive := cbopinfo(t, args)
@@ -1286,7 +1285,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	// Verify file list
 	files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, true, true, true)
 	mustVerifyArchiveContents(t, archive, files)
-	mustVerifyServerLogs(t, targetKube, targetKube.Namespace, archive, false)
+	mustVerifyServerLogs(t, targetKube, archive, false)
 }
 
 /**************************************
@@ -1302,8 +1301,8 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	clusterSize := mdsGroupSize * 2
 	victims := []int{2, 3}
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, mdsGroupSize)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, cbCluster, []string{e2espec.DefaultBucketTwoReplicas.Name}, time.Minute)
 
 	// To cross check number of persistent vol claims matches the defined spec
@@ -1314,13 +1313,13 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	mustVerifyPvcMappingForPods(t, targetKube, targetKube.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, targetKube, expectedPvcMap)
 
 	// Kill PV log enabled pods and verify the logs are persisted after pod deletion
 	for i, victim := range victims {
 		// Kills operator pod in async way
 		if isOperatorKilledWithServerPod {
-			e2eutil.MustDeleteCouchbaseOperator(t, targetKube, targetKube.Namespace)
+			e2eutil.MustDeleteCouchbaseOperator(t, targetKube)
 		}
 
 		switch podDownMethod {
@@ -1330,14 +1329,14 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 			expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, clusterSize+i)] = 1
 		case "killServerProcess":
 			podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, victim)
-			e2eutil.MustExecShellInPod(t, targetKube, targetKube.Namespace, podNameToKill, "pkill beam.smp")
+			e2eutil.MustExecShellInPod(t, targetKube, podNameToKill, "pkill beam.smp")
 		}
 
 		e2eutil.MustWaitForClusterEvent(t, targetKube, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 5*time.Minute)
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
-	mustVerifyPvcMappingForPods(t, targetKube, targetKube.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, targetKube, expectedPvcMap)
 
 	var validator eventschema.Validatable
 
@@ -1373,11 +1372,11 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	victim := 3
 
 	// Create the cluster (3 stateful nodes, 3 stateless nodes)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, targetKube.Namespace, mdsGroupSize)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, mdsGroupSize)
 
 	// When ready, ensure the persistent volumes are allocated as expected.
-	mustVerifyPvcMappingForPods(t, targetKube, targetKube.Namespace, map[string]int{
+	mustVerifyPvcMappingForPods(t, targetKube, map[string]int{
 		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
@@ -1389,12 +1388,12 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	e2eutil.MustKillPodForMember(t, targetKube, cbCluster, victim, false)
 
 	if isOperatorKilledWithServerPod {
-		e2eutil.MustDeleteCouchbaseOperator(t, targetKube, targetKube.Namespace)
+		e2eutil.MustDeleteCouchbaseOperator(t, targetKube)
 	}
 
 	cbCluster = e2eutil.MustResizeCluster(t, resizedService, 1, targetKube, cbCluster, 5*time.Minute)
 
-	mustVerifyPvcMappingForPods(t, targetKube, targetKube.Namespace, map[string]int{
+	mustVerifyPvcMappingForPods(t, targetKube, map[string]int{
 		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
@@ -1477,14 +1476,14 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	scaledService := 1
 
 	// Create the cluster (3 stateful and 3 stateless)
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
 	cbCluster := e2espec.NewSupportableCluster(mdsGroupSize)
 	cbCluster.Spec.Logging.LogRetentionCount = 3
-	cbCluster = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, cbCluster)
+	cbCluster = e2eutil.MustNewClusterFromSpec(t, targetKube, cbCluster)
 
 	// When ready, ensure the currect volumes are in place, then scale up and down.
 	// Expect only volumes to exist for live pods on completion.
-	mustVerifyPvcMappingForPods(t, targetKube, targetKube.Namespace, map[string]int{
+	mustVerifyPvcMappingForPods(t, targetKube, map[string]int{
 		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
@@ -1497,7 +1496,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 4, targetKube, cbCluster, 5*time.Minute)
 	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 1, targetKube, cbCluster, 5*time.Minute)
 
-	mustVerifyPvcMappingForPods(t, targetKube, targetKube.Namespace, map[string]int{
+	mustVerifyPvcMappingForPods(t, targetKube, map[string]int{
 		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
 		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
@@ -1547,8 +1546,8 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	victims := 6
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, e2espec.DefaultBucket)
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, kubernetes.Namespace, mdsGroupSize)
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket)
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Cross check number of persistent vol claims matches the defined spec.
@@ -1558,7 +1557,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
 
-	mustVerifyPvcMappingForPods(t, kubernetes, kubernetes.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
 
 	// Kill stateless pods repeatedly waiting for recovery each time.
 	for victim := mdsGroupSize; victim < mdsGroupSize+victims; victim++ {
@@ -1571,7 +1570,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, i)] = 1
 	}
 
-	mustVerifyPvcMappingForPods(t, kubernetes, kubernetes.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1599,11 +1598,11 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	maxLogCount := 2
 
 	// Create the cluster
-	e2eutil.MustNewBucket(t, kubernetes, kubernetes.Namespace, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket)
 	cluster := e2espec.NewSupportableCluster(mdsGroupSize)
 	cluster.Spec.Logging.LogRetentionTime = "15m"
 	cluster.Spec.Logging.LogRetentionCount = maxLogCount
-	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, kubernetes.Namespace, cluster)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
 	// Track pods we create and their expected number of persistent volumes.
@@ -1634,7 +1633,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cluster.Name, mdsGroupSize+victim)] = 0
 	}
 
-	mustVerifyPvcMappingForPods(t, kubernetes, kubernetes.Namespace, expectedPvcMap)
+	mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1657,8 +1656,8 @@ func TestLogRedactionVerify(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Create Couchbase cluster
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
-	e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, constants.Size3)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewClusterBasic(t, targetKube, constants.Size3)
 
 	// Collect logs
 	args := argumentList{}
@@ -1673,7 +1672,7 @@ func TestLogRedactionVerify(t *testing.T) {
 	defer os.Remove(archive)
 	defer removeServerLogs()
 
-	mustVerifyServerLogs(t, targetKube, targetKube.Namespace, archive, true)
+	mustVerifyServerLogs(t, targetKube, archive, true)
 }
 
 func TestLogRedactionWithPvVerify(t *testing.T) {
@@ -1687,7 +1686,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	clusterSize := constants.Size3
 	pvcName := "couchbase"
 
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
 	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
 	cbCluster := e2espec.NewBasicCluster(clusterSize)
 	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
@@ -1703,7 +1702,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	cbCluster.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		pvcTemplate,
 	}
-	e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, cbCluster)
+	e2eutil.MustNewClusterFromSpec(t, targetKube, cbCluster)
 
 	// Collect logs
 	args := argumentList{}
@@ -1719,7 +1718,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	defer removeServerLogs()
 
-	mustVerifyServerLogs(t, targetKube, targetKube.Namespace, archive, true)
+	mustVerifyServerLogs(t, targetKube, archive, true)
 }
 
 // TestLogRetentionMultiCluster ensures that one cluster's retention settings do not affect anothers
@@ -1734,8 +1733,8 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create two clusters.
-	cluster1 := e2eutil.MustNewSupportableCluster(t, kubernetes, kubernetes.Namespace, mdsGroupSize)
-	cluster2 := e2eutil.MustNewSupportableCluster(t, kubernetes, kubernetes.Namespace, mdsGroupSize)
+	cluster1 := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
+	cluster2 := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
 
 	// Ensure cluster 1 is healthy and update the retention period to be 1m.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, 2*time.Minute)
@@ -1758,7 +1757,7 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 		pvcMapping[couchbaseutil.CreateMemberName(cluster2.Name, i)] = 1
 	}
 
-	mustVerifyPvcMappingForPods(t, kubernetes, kubernetes.Namespace, pvcMapping)
+	mustVerifyPvcMappingForPods(t, kubernetes, pvcMapping)
 }
 
 func TestLogCollectListJson(t *testing.T) {
@@ -1766,8 +1765,8 @@ func TestLogCollectListJson(t *testing.T) {
 	targetKube := f.GetCluster(0)
 
 	// Create Couchbase cluster
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucketTwoReplicas)
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, constants.Size3)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, constants.Size3)
 
 	// Collect logs
 	args := argumentList{}
@@ -1789,7 +1788,7 @@ func TestLogCollectListJson(t *testing.T) {
 	errMsgList := failureList{}
 	testHasErrors := false
 
-	if err := verifyLogCollectListJSON(targetKube.KubeClient, targetKube.Namespace, cbCluster.Name, execOutStr, &errMsgList); err != nil {
+	if err := verifyLogCollectListJSON(targetKube, cbCluster.Name, execOutStr, &errMsgList); err != nil {
 		t.Error(err)
 	}
 

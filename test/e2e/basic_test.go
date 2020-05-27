@@ -23,7 +23,7 @@ func TestCreateCluster(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -46,8 +46,8 @@ func TestCreateBucketCluster(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// Check the events match what we expect:
 	// * Cluster created

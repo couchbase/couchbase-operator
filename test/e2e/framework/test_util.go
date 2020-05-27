@@ -162,26 +162,26 @@ func getSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	return
 }
 
-func createK8SNamespace(kubeClient kubernetes.Interface, namespaceName string) error {
-	namespaceList, err := kubeClient.CoreV1().Namespaces().List(metav1.ListOptions{})
+func createK8SNamespace(k8s *types.Cluster) error {
+	namespaceList, err := k8s.KubeClient.CoreV1().Namespaces().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	// Return if namespace already exists
 	for _, temNs := range namespaceList.Items {
-		if temNs.GetName() == namespaceName {
+		if temNs.GetName() == k8s.Namespace {
 			return nil
 		}
 	}
 
 	nsLabel := map[string]string{
-		"name": namespaceName,
+		"name": k8s.Namespace,
 	}
 
-	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName, Labels: nsLabel}}
+	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: k8s.Namespace, Labels: nsLabel}}
 
-	_, err = kubeClient.CoreV1().Namespaces().Create(nsSpec)
+	_, err = k8s.KubeClient.CoreV1().Namespaces().Create(nsSpec)
 
 	return err
 }
@@ -194,19 +194,19 @@ func removeRole(k8s *types.Cluster, roleName string) error {
 	return nil
 }
 
-func RemoveServiceAccount(kubeClient kubernetes.Interface, namespace, serviceAccountName string) error {
-	svcAccList, err := kubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
+func RemoveServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
+	svcAccList, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	for _, svcAcc := range svcAccList.Items {
 		if svcAcc.GetName() == serviceAccountName {
-			if err := kubeClient.CoreV1().ServiceAccounts(namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{}); err != nil {
+			if err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{}); err != nil {
 				return err
 			}
 
-			if err := waitForServiceAccountDeleted(kubeClient, serviceAccountName, namespace, 30); err != nil {
+			if err := waitForServiceAccountDeleted(k8s, serviceAccountName, 30); err != nil {
 				return err
 			}
 		}
@@ -272,7 +272,7 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 		return nil
 	}
 
-	if err := CreateBackupRole(k8s.KubeClient, k8s.Namespace); err != nil {
+	if err := CreateBackupRole(k8s); err != nil {
 		return err
 	}
 
@@ -285,7 +285,7 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 }
 
 func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
-	if err := RemoveServiceAccount(k8s.KubeClient, k8s.Namespace, serviceAccountName); err != nil {
+	if err := RemoveServiceAccount(k8s, serviceAccountName); err != nil {
 		return err
 	}
 
@@ -293,11 +293,11 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 		return nil
 	}
 
-	if err := RemoveServiceAccount(k8s.KubeClient, k8s.Namespace, config.BackupResourceName); err != nil {
+	if err := RemoveServiceAccount(k8s, config.BackupResourceName); err != nil {
 		return err
 	}
 
-	if err := CreateBackupServiceAccount(k8s.KubeClient, k8s.Namespace); err != nil {
+	if err := CreateBackupServiceAccount(k8s); err != nil {
 		return err
 	}
 
@@ -311,15 +311,15 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 }
 
 func recreateRoleBindings(k8s *types.Cluster) error {
-	if err := removeRoleBinding(k8s.KubeClient, k8s.Namespace, config.OperatorResourceName); err != nil {
+	if err := removeRoleBinding(k8s, config.OperatorResourceName); err != nil {
 		return err
 	}
 
-	if err := removeRoleBinding(k8s.KubeClient, k8s.Namespace, config.BackupResourceName); err != nil {
+	if err := removeRoleBinding(k8s, config.BackupResourceName); err != nil {
 		return err
 	}
 
-	if err := CreateBackupRoleBinding(k8s.KubeClient, k8s.Namespace); err != nil {
+	if err := CreateBackupRoleBinding(k8s); err != nil {
 		return err
 	}
 
@@ -330,15 +330,15 @@ func recreateRoleBindings(k8s *types.Cluster) error {
 	return err
 }
 
-func removeRoleBinding(kubeClient kubernetes.Interface, namespace, roleBindingName string) error {
-	if err := kubeClient.RbacV1().RoleBindings(namespace).Delete(roleBindingName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+func removeRoleBinding(k8s *types.Cluster, roleBindingName string) error {
+	if err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Delete(roleBindingName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
 	return nil
 }
 
-func waitForServiceAccountDeleted(kubeClient kubernetes.Interface, serviceAccountName string, namespace string, waitTimeInSec int) error {
+func waitForServiceAccountDeleted(k8s *types.Cluster, serviceAccountName string, waitTimeInSec int) error {
 	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
 	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
 
@@ -348,7 +348,7 @@ func waitForServiceAccountDeleted(kubeClient kubernetes.Interface, serviceAccoun
 			return fmt.Errorf("timed out waiting for service account %s to be deleted", serviceAccountName)
 
 		case <-tickChan:
-			svcAccList, err := kubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
+			svcAccList, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).List(metav1.ListOptions{})
 			if err != nil {
 				return err
 			}

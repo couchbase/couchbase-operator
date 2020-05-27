@@ -12,12 +12,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func CreateSecret(kubeClient kubernetes.Interface, namespace string, secretSpec *v1.Secret) (*v1.Secret, error) {
-	return kubeClient.CoreV1().Secrets(namespace).Create(secretSpec)
+func CreateSecret(k8s *types.Cluster, secretSpec *v1.Secret) (*v1.Secret, error) {
+	return k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(secretSpec)
 }
 
-func MustCreateSecret(t *testing.T, k8s *types.Cluster, namespace string, secret *v1.Secret) *v1.Secret {
-	secret, err := CreateSecret(k8s.KubeClient, namespace, secret)
+func MustCreateSecret(t *testing.T, k8s *types.Cluster, secret *v1.Secret) *v1.Secret {
+	secret, err := CreateSecret(k8s, secret)
 	if err != nil {
 		Die(t, err)
 	}
@@ -25,22 +25,22 @@ func MustCreateSecret(t *testing.T, k8s *types.Cluster, namespace string, secret
 	return secret
 }
 
-func MustRecreateSecret(t *testing.T, k8s *types.Cluster, namespace string, secret *v1.Secret) *v1.Secret {
+func MustRecreateSecret(t *testing.T, k8s *types.Cluster, secret *v1.Secret) *v1.Secret {
 	secret.ObjectMeta = metav1.ObjectMeta{
 		Name:        secret.Name,
 		Labels:      secret.Labels,
 		Annotations: secret.Annotations,
 	}
 
-	return MustCreateSecret(t, k8s, namespace, secret)
+	return MustCreateSecret(t, k8s, secret)
 }
 
-func DeleteSecret(kubeClient kubernetes.Interface, namespace string, secretName string, options *metav1.DeleteOptions) error {
-	return kubeClient.CoreV1().Secrets(namespace).Delete(secretName, options)
+func DeleteSecret(k8s *types.Cluster, secretName string, options *metav1.DeleteOptions) error {
+	return k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(secretName, options)
 }
 
-func MustDeleteSecret(t *testing.T, k8s *types.Cluster, namespace string, secretName string) {
-	if err := DeleteSecret(k8s.KubeClient, namespace, secretName, nil); err != nil {
+func MustDeleteSecret(t *testing.T, k8s *types.Cluster, secretName string) {
+	if err := DeleteSecret(k8s, secretName, nil); err != nil {
 		Die(t, err)
 	}
 }
@@ -49,8 +49,8 @@ func GetSecret(kubeClient kubernetes.Interface, namespace string, secretName str
 	return kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 }
 
-func MustGetSecret(t *testing.T, k8s *types.Cluster, namespace string, secretName string) *v1.Secret {
-	secret, err := GetSecret(k8s.KubeClient, namespace, secretName)
+func MustGetSecret(t *testing.T, k8s *types.Cluster, secretName string) *v1.Secret {
+	secret, err := GetSecret(k8s.KubeClient, k8s.Namespace, secretName)
 	if err != nil {
 		Die(t, err)
 	}
