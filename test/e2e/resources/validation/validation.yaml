@@ -245,7 +245,7 @@ spec:
     remoteClusters:
       - name: starsky
         uuid: 246bb8fb53a75e37819cb50b98ac3b65
-        hostname: starsky-and-hutch.tv:8091
+        hostname: couchbases://starsky-and-hutch.tv:8091?network=nbc
         authenticationSecret: POPULATED_BY_TEST
         tls:
           secret: xdcr-tls-secret

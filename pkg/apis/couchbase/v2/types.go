@@ -1123,7 +1123,7 @@ type RemoteCluster struct {
 	UUID string `json:"uuid,omitempty"`
 
 	// Hostname is the connection string to use to connect the remote cluster.
-	// +kubebuilder:validation:Pattern="^[0-9a-zA-Z\\-\\.]+(:\\d+)?$"
+	// +kubebuilder:validation:Pattern="^((couchbase|couchbases|http|https)://)?[0-9a-zA-Z\\-\\.]+(:\\d+)?(\\?network=[^&]+)?$"
 	Hostname string `json:"hostname,omitempty"`
 
 	// AuthenticationSecret is a secret used to authenticate when establishing a

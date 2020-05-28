@@ -75,7 +75,7 @@ spec:
     remoteClusters:
     - name: remote-cluster # <.>
       uuid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
-      hostname: my-remote-cluster.my-remote-namespace # <.>
+      hostname: couchbases://my-remote-cluster.my-remote-namespace # <.>
       authenticationSecret: my-xdcr-secret # <.>
       tls:
         secret: my-xdcr-tls-secret # <.>
@@ -101,7 +101,7 @@ spec:
 <.> The `uuid` has been collected by interrogating the xref:reference-couchbasecluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery.
-The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing[SDK configuration how-to], *without* the scheme.
+The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing[SDK configuration how-to].
 
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
 
@@ -197,7 +197,7 @@ spec:
     remoteClusters:
     - name: remote-cluster # <.>
       uuid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
-      hostname: console.my-remote-cluster.example.com:18091 # <.>
+      hostname: couchbases://console.my-remote-cluster.example.com?network=external # <.>
       authenticationSecret: my-xdcr-secret # <.>
       tls:
         secret: my-xdcr-tls-secret # <.>
@@ -212,7 +212,7 @@ spec:
 <.> The `uuid` has been collected by interrogating the xref:reference-couchbasecluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use is the remote cluster's console service to provide stable naming and service discovery.
-The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[SDK configuration how-to], *without* the scheme.
+The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addressing-with-external-dns[SDK configuration how-to].
 
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
 
@@ -287,7 +287,7 @@ spec:
     remoteClusters:
     - name: remote-cluster # <.>
       uuid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
-      hostname: 10.16.5.87:30584 # <.>
+      hostname: http://10.16.5.87:30584?network=external # <.>
       authenticationSecret: my-xdcr-secret # <.>
       replications: # <.>
         selector:
@@ -300,7 +300,7 @@ spec:
 <.> The `uuid` has been collected by interrogating the xref:reference-couchbasecluster-status.adoc#status-clusterid[`status.clusterId`] field on the remote cluster.
 
 <.> The correct hostname to use.
-The hostname is calculated as per the xref:howto-client-sdks.adoc#ip-based-addressing[SDK configuration how-to], *without* the scheme.
+The hostname is calculated as per the xref:howto-client-sdks.adoc#ip-based-addressing[SDK configuration how-to].
 
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
 

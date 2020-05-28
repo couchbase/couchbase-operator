@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
@@ -1738,10 +1739,34 @@ func (c *Cluster) reconcileXDCR() error {
 	requestedReplications := []couchbaseutil.Replication{}
 
 	for _, cluster := range c.cluster.Spec.XDCR.RemoteClusters {
+		// We act as a translation layer here, treating XDCR as just another client
+		connectionString, err := url.Parse(cluster.Hostname)
+		if err != nil {
+			return err
+		}
+
+		// Default to host:port
+		hostname := connectionString.Host
+
+		// When using http chances are you are using node port networking
+		// so will have to specify a port, couchbase means round-robin DNS
+		// or SRV, and XDCR will default to 8091.
+		// With https and couchbases we need to provide a default of 18091
+		// because XDCR has no way of autoconfiguring.  These two modes
+		// translate to public addressing, DNS based round-robin and SRV
+		// (the port is stripped for the latter).
+		switch connectionString.Scheme {
+		case "https", "couchbases":
+			if connectionString.Port() == "" {
+				hostname += ":18091"
+			}
+		}
+
 		requested := couchbaseutil.RemoteCluster{
 			Name:     cluster.Name,
 			UUID:     cluster.UUID,
-			Hostname: cluster.Hostname,
+			Hostname: hostname,
+			Network:  connectionString.Query().Get("network"),
 		}
 
 		if cluster.AuthenticationSecret != nil {
