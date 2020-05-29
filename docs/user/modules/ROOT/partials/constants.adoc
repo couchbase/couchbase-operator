@@ -7,7 +7,7 @@
 :couchbase-version-upgrade-from: 6.0.0
 :couchbase-version-redhat: 6.5.0-2
 :couchbase-version-redhat-upgrade-from: 6.0.0-1
-:prometheus-version: 1.0.1
+:prometheus-version: 1.0.2
 :prometheus-version-redhat: 1.0.0
 :tutorial-gke-version: 1.14.10-gke.27
 :backup-archive: /data/backups
