@@ -67,15 +67,68 @@ func Init() error {
 }
 
 func readYamlData() (err error) {
+	// Provide some sane defaults.
+	params := TestRunParam{
+		KubeConfig: []KubeConfData{
+			{
+				ClusterName: "BasicCluster",
+			},
+			{
+				ClusterName: "NewCluster1",
+			},
+		},
+		ServiceAccountName: "couchbase-operator",
+	}
+
+	var platform string
+
+	flag.StringVar(&params.KubeType, "platform-type", "kubernetes", "Either kubernetes or openshift")
+	flag.StringVar(&platform, "platform-vendor", "", "Either aws, gce or azure")
+	flag.StringVar(&params.OperatorImage, "operator-image", "couchbase/couchbase-operator:v1", "Docker image to use for the operator")
+	flag.StringVar(&params.AdmissionControllerImage, "admission-image", "couchbase/couchbase-operator-admission:v1", "Docker image to use for the admission controller")
+	flag.StringVar(&params.SyncGatewayImage, "mobile-image", "ouchbase/sync-gateway:2.7.0-enterprise", "Docker image to use for couchbase mobile")
+	flag.StringVar(&params.CouchbaseServerImage, "server-image", "couchbase/server:6.5.0", "Docker image to use for couchbase server")
+	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade", "couchbase/server:6.5.1", "Docker image to use for couchbase server upgrades")
+	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.0", "Docker image to use for the couchbase exporter")
+	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.2", "Docker image to use for couchbase exporter upgrades")
+	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:6.5.0", "Docker image to use for couchbase backup")
+	flag.StringVar(&params.SuiteToRun, "suite", "", "Test suite to run")
+	flag.StringVar(&params.StorageClassName, "storage-class", "default", "Storage class to use")
+	flag.StringVar(&params.KubeConfig[0].ClusterConfig, "kubeconfig1", "~/.kube/config", "Kubernetes configuration file for the first cluster")
+	flag.StringVar(&params.KubeConfig[0].Context, "context1", "", "Kubernetes context for the first cluster")
+	flag.StringVar(&params.KubeConfig[0].Namespace, "namespace1", "default", "Kubernetes namespace for the first cluster")
+	flag.StringVar(&params.KubeConfig[1].ClusterConfig, "kubeconfig2", "~/.kube/config", "Kubernetes configuration file for the second cluster")
+	flag.StringVar(&params.KubeConfig[1].Context, "context2", "", "Kubernetes context for the second cluster")
+	flag.StringVar(&params.KubeConfig[1].Namespace, "namespace2", "remote", "Kubernetes namespace for the second cluster")
+	flag.StringVar(&params.DockerServer, "docker-server", "https://index.docker.io/v1/", "Docker server to authenticate against")
+	flag.StringVar(&params.DockerUsername, "docker-username", "", "Docker registry user name")
+	flag.StringVar(&params.DockerPassword, "docker-password", "", "Docker registry user password")
+	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
+
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
 
 	flag.Parse()
 
-	logrus.Info("Using test_config file ", *testConfigFilePath)
+	// Use either the CLI parameters, or the YAML file.  I suspect the YAML
+	// method will suffer a quick death...
+	if params.SuiteToRun != "" {
+		params.Platform = couchbasev2.PlatformType(platform)
 
-	runtimeParams, err = readRuntimeConfig(*testConfigFilePath)
-	if err != nil {
-		return err
+		// Heretical use of global variables alert.
+		runtimeParams = params
+	} else {
+		logrus.Info("Using test_config file ", *testConfigFilePath)
+
+		runtimeParams, err = readRuntimeConfig(*testConfigFilePath)
+		if err != nil {
+			return err
+		}
+	}
+
+	for index, config := range runtimeParams.KubeConfig {
+		if strings.HasPrefix(config.ClusterConfig, "~/") {
+			runtimeParams.KubeConfig[index].ClusterConfig = strings.Replace(config.ClusterConfig, "~", os.Getenv("HOME"), 1)
+		}
 	}
 
 	suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
@@ -171,12 +224,10 @@ func Setup(t *testing.T) (err error) {
 	// Initialize Global from runtime info
 	Global = &Framework{
 		KubeType:                      runtimeParams.KubeType,
-		KubeVersion:                   runtimeParams.KubeVersion,
 		OpImage:                       runtimeParams.OperatorImage,
 		SkipTeardown:                  runtimeParams.SkipTearDown,
 		CollectLogs:                   runtimeParams.CollectLogsOnFailure,
 		SuiteYmlData:                  suiteData,
-		ClusterConfFile:               runtimeParams.ClusterConfFile,
 		ClusterSpec:                   types.ClusterMap{},
 		CouchbaseServerImage:          runtimeParams.CouchbaseServerImage,
 		CouchbaseServerImageUpgrade:   runtimeParams.CouchbaseServerImageUpgrade,

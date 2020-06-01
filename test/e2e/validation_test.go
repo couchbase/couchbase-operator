@@ -19,6 +19,7 @@ import (
 	"github.com/ghodss/yaml"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -207,7 +208,7 @@ func updateResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		res, err := client.Resource(*groupVersion).Namespace(object.GetNamespace()).Update(object, metav1.UpdateOptions{})
+		res, err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Update(object, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -245,7 +246,15 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		if err := client.Resource(*groupVersion).Namespace(object.GetNamespace()).Delete(object.GetName(), metav1.NewDeleteOptions(0)); err != nil {
+		if _, err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Get(object.GetName(), metav1.GetOptions{}); err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+
+			return err
+		}
+
+		if err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Delete(object.GetName(), metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
@@ -295,6 +304,16 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 	_ = framework.DeleteOperatorCompletely(targetKube, f.Deployment.Name)
 
 	defer func() { _ = f.SetupCouchbaseOperator(targetKube) }()
+
+	// Clean up resources that may have been left behind by a job that was interrupted.
+	objects, err := loadResources("./resources/validation/validation.yaml")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if err := deleteResources(targetKube, objects); err != nil {
+		e2eutil.Die(t, err)
+	}
 
 	for i := range testDefs {
 		test := testDefs[i]

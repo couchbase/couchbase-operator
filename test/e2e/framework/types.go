@@ -76,12 +76,9 @@ type TestRunParam struct {
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`
-	ClusterConfFile    string `yaml:"cluster-config"`
 
-	KubeVersion string         `yaml:"kube-version"`
-	KubeConfig  []KubeConfData `yaml:"kube-config"`
+	KubeConfig []KubeConfData `yaml:"kube-config"`
 
-	ForceKubeCreation    bool `yaml:"forceKubeCreation"`
 	SkipTearDown         bool `yaml:"skip-tear-down"`
 	CollectLogsOnFailure bool `yaml:"collectLogsOnFailure"`
 

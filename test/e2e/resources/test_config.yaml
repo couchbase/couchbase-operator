@@ -13,10 +13,7 @@ admission-controller-image: couchbase/couchbase-operator-admission:v1
 # Cluster namespace to run the tests
 namespace: default
 
-# cluster config file path
-cluster-config: resources/cluster_conf.yaml
-
-# List of Cluster KUBECONFIG to be used during tests, if not cluster will be formed using cluster-config data
+# List of Cluster KUBECONFIG to be used during tests.
 kube-config:
   #- name: Cluster1
   #  namespace: default
@@ -42,9 +39,6 @@ couchbase-server-image-upgrade: couchbase/server:enterprise-6.0.0
 
 # Cluster type kubernetes | openshift
 kube-type: kubernetes
-
-# KUBE version to install
-kube-version: 1.10.5-0
 
 # Storage class defined in cluster to use for PV cases
 StorageClassName: standard

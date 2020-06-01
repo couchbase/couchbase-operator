@@ -5,10 +5,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -136,12 +134,6 @@ func readRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err erro
 		return
 	}
 
-	for i, kubeConf := range runTimeConfig.KubeConfig {
-		if strings.HasPrefix(kubeConf.ClusterConfig, "~/") {
-			runTimeConfig.KubeConfig[i].ClusterConfig = strings.Replace(kubeConf.ClusterConfig, "~", os.Getenv("HOME"), 1)
-		}
-	}
-
 	return
 }
 
@@ -225,40 +217,33 @@ func recreateDockerAuthSecret(kubeClient kubernetes.Interface, namespace string)
 	}
 
 	// If specified create the authentication secret
-	if runtimeParams.DockerServer != "" {
-		// Check all the necessary bits are there
-		if runtimeParams.DockerUsername == "" {
-			return fmt.Errorf("docker username must be specified with docker server")
-		}
-
-		if runtimeParams.DockerPassword == "" {
-			return fmt.Errorf("docker password must be specified with docker server")
-		}
-
-		// auth string is simply "username:password" base64 encoded
-		auth := runtimeParams.DockerUsername + ":" + runtimeParams.DockerPassword
-		auth = base64.StdEncoding.EncodeToString([]byte(auth))
-
-		// authentication data is encoded as per "~/.docker/config.json", and created by "docker login"
-		data := `{"auths":{"` + runtimeParams.DockerServer + `":{"auth":"` + auth + `"}}}`
-
-		// create the new secret
-		secret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: dockerPullSecretName,
-			},
-			Type: v1.SecretTypeDockerConfigJson,
-			Data: map[string][]byte{
-				".dockerconfigjson": []byte(data),
-			},
-		}
-		if _, err := kubeClient.CoreV1().Secrets(namespace).Create(secret); err != nil {
-			return err
-		}
-
-		// Register with the cluster creation module that we have a pull secret.
-		e2espec.SetImagePullSecret(dockerPullSecretName)
+	if runtimeParams.DockerServer == "" || runtimeParams.DockerUsername == "" || runtimeParams.DockerPassword == "" {
+		return nil
 	}
+
+	// auth string is simply "username:password" base64 encoded
+	auth := runtimeParams.DockerUsername + ":" + runtimeParams.DockerPassword
+	auth = base64.StdEncoding.EncodeToString([]byte(auth))
+
+	// authentication data is encoded as per "~/.docker/config.json", and created by "docker login"
+	data := `{"auths":{"` + runtimeParams.DockerServer + `":{"auth":"` + auth + `"}}}`
+
+	// create the new secret
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: dockerPullSecretName,
+		},
+		Type: v1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			".dockerconfigjson": []byte(data),
+		},
+	}
+	if _, err := kubeClient.CoreV1().Secrets(namespace).Create(secret); err != nil {
+		return err
+	}
+
+	// Register with the cluster creation module that we have a pull secret.
+	e2espec.SetImagePullSecret(dockerPullSecretName)
 
 	return nil
 }

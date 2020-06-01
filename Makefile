@@ -18,6 +18,10 @@ version = $(if $(VERSION),$(VERSION),2.0.0)
 productVersion = $(version)-$(bldNum)
 testname = $(E2E_TEST)
 
+# This allows the container tags to be explicitly set.
+DOCKER_USER = couchbase
+DOCKER_TAG = v1
+
 # Set this to, for example beta1, for a beta release.
 # This will affect the "-v" version strings and docker images.
 # This is analogous to revisions in DEB and RPM archives.
@@ -40,7 +44,7 @@ CONTAINER_GOENV = $(GOENV) GOOS=linux GOARCH=amd64
 # that a binary came from.
 LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(version) -X github.com/couchbase/couchbase-operator/pkg/version.Revision=$(revision) -X github.com/couchbase/couchbase-operator/pkg/version.RevisionRedHat=$(revisionRedHat) -X github.com/couchbase/couchbase-operator/pkg/version.BuildNumber=$(bldNum) -X github.com/couchbase/couchbase-operator/pkg/revision.gitRevision=$(GIT_REVISION)"
 
-.PHONY: all generated binaries crd build-test lint container dist test test-indv
+.PHONY: all generated binaries crd build-test lint container container-public dist test test-indv
 
 all: binaries crd
 
@@ -168,8 +172,15 @@ lint: $(GENERATED_FILES)
 # need to be moved to a separate repo in which case the "docker build" command
 # can't be here anyway.
 container: $(OPERATOR_BINARY) $(ADMISSION_BINARY) crd
-	docker build -f Dockerfile -t couchbase/couchbase-operator:v1 .
-	docker build -f Dockerfile.admission -t couchbase/couchbase-operator-admission:v1 .
+	docker build -f Dockerfile -t ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG} .
+	docker build -f Dockerfile.admission -t ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG} .
+
+# This target pushes the containers to a public repository.
+# A typical one liner to deploy to the cloud would be:
+# 	make container-public -e DOCKER_USER=couchbase DOCKER_TAG=2.0.0
+container-public: container
+	docker push ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG}
+	docker push ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG}
 
 # NOTE: This target is only for local development. While we use this Dockerfile
 # (for now), the actual "docker build" command is located in the Jenkins job

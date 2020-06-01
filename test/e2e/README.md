@@ -20,7 +20,6 @@ The test configuration is defined in `./resources/test_config.yaml`. The default
 ```
 operator-image: couchbase/couchbase-operator:v1
 namespace: default
-cluster-config: resources/cluster_conf.yaml
 kube-config:
   - name: BasicCluster
     config: /root/.kube/config
@@ -28,7 +27,6 @@ duration: 7
 skip-tear-down: false
 suite: TestCustom
 kube-type: kubernetes
-kube-version: 1.10.5-0
 serviceAccountName: default
  ```
 
@@ -37,8 +35,6 @@ The following are descriptions of the field in `test_config.yaml`:
 `operator-image`: the name of the autonomous operator docker image to test. If you built the image locally and are using Minikube or Minishift, you do not need to modify this field.
 
 `namespace`: the namespace in the kubernetes cluster in which the test will be run. The testing framework will set up all required permissions (clusterrole, clusterrolebinding, and serviceaccount) in this namespace 
-
-`cluster-config`: this file defines different clusters used for regression and system testing. If the user is running test on Minikube or Minishift, this field can be ignored.
 
 `kube-config`: the kubeconfig to use for testing. The kubeconfig will be associated with a cluster name. Each test requires a specific cluster name to run. The required cluster name is specified both in the test code and the test suite descriptor yamls. For basic testing on Minikube or Minishift, the default cluster name should be used, but the config should point to the Minikube or Minishift kubeconfig. If this `kube-config` is ommited or commented out, the testing framework will provision the require cluster using the set of VMs listed in `./resources/cluster_conf.yaml`.
 
@@ -49,8 +45,6 @@ The following are descriptions of the field in `test_config.yaml`:
 `suite`: the test suite descriptor file to run. The default test suite descriptor can be modified for custom testing, like running/debugging single tests.
 
 `kube-type`: the kubernetes cluster type (kubernetes or openshift) to provision if no kubeconfig is provided to the framework.
-
-`kube-version`: the version to install of the select `kube-type` if no kubeconfig is provided.
 
 `serviceAccountName`: the name of the serviceaccount to create for the Autonomous Operator.
 

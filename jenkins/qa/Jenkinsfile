@@ -1,0 +1,177 @@
+/*  One pipeline to rule them all...
+    Reegardless of the platform all run the same, the test framework accepts
+    configuration for two clusters, and it runs the tests against them.  This
+    should not be run by itself as it provides no locking around the use of
+    configuration.
+*/
+pipeline {
+  agent {
+    label 'k8'
+  }
+
+  options {
+    timestamps()
+  }
+
+  parameters {
+    string(name: 'refspec', defaultValue: 'refs/heads/master')
+    string(name: 'server_image', defaultValue: 'couchbase/server:6.5.0')
+    string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.5.1')
+    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:6.5.0')
+    string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.0')
+    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.2')
+    string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.7.0-enterprise')
+    string(name: 'platform', defaultValue: 'kubernetes')
+    string(name: 'storage_class', defaultValue: 'default')
+    string(name: 'kubeconfig1', defaultValue: '~/.kube/config')
+    string(name: 'kubeconfig2', defaultValue: '~/.kube/config')
+    booleanParam(name: 'validation', defaultValue: true)
+    booleanParam(name: 'sanity', defaultValue: true)
+    booleanParam(name: 'p0', defaultValue: true)
+    booleanParam(name: 'p1', defaultValue: true)
+    booleanParam(name: 'custom', defaultValue: false)
+  }
+
+  environment {
+    GOVERSION = '1.13.3'
+    GOROOT = "${env.WORKSPACE}/go"
+    PATH = "${env.WORKSPACE}/go/bin:$PATH"
+    DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
+    LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
+  }
+
+  stages {
+    stage('Go Install') {
+      steps {
+        sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
+      }
+    }
+
+    stage('Post Checkout') {
+      steps {
+        sh 'make touch-generated'
+      }
+    }
+
+    stage('Build') {
+      steps {
+        sh 'make'
+      }
+    }
+
+    stage('Build Docker') {
+      steps {
+        sh "docker login -u ${env.DOCKER_CREDENTIALS_USR} -p ${env.DOCKER_CREDENTIALS_PSW}"
+        sh "make container-public -e DOCKER_USER=${env.DOCKER_CREDENTIALS_USR} DOCKER_TAG=`git rev-parse FETCH_HEAD`"
+      }
+    }
+
+    /* All of these test stages are exactly the same.  With a matrix build
+       iterating over a list of suites, you only need to define it once.
+       Appears to need the declarative pipeline plugin version >= 1.5.
+    */
+    stage('Test Validation') {
+      when {
+        expression {
+          params.validation
+        }
+      }
+      steps {
+        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
+        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCRDValidation -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+      }
+      post {
+        always {
+            junit "test/e2e/*.xml"
+        }
+        failure {
+          /* Is there any reason we shouln't be using native artifacts? */
+          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/validation.tar.gz -C test/e2e/logs ."
+        }
+      }
+    }
+
+    stage('Test Sanity') {
+      when {
+        expression {
+          params.sanity
+        }
+      }
+      steps {
+        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
+        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestSanity -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+      }
+      post {
+        always {
+            junit "test/e2e/*.xml"
+        }
+        failure {
+          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/sanity.tar.gz -C test/e2e/logs ."
+        }
+      }
+    }
+
+    stage('Test P0') {
+      when {
+        expression {
+          params.p0
+        }
+      }
+      steps {
+        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
+        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP0 -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+      }
+      post {
+        always {
+            junit "test/e2e/*.xml"
+        }
+        failure {
+          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/p0.tar.gz -C test/e2e/logs ."
+        }
+      }
+    }
+
+    stage('Test P1') {
+      when {
+        expression {
+          params.p1
+        }
+      }
+      steps {
+        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
+        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP1 -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+      }
+      post {
+        always {
+            junit "test/e2e/*.xml"
+        }
+        failure {
+          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/p1.tar.gz -C test/e2e/logs ."
+        }
+      }
+    }
+
+    stage('Test Custom') {
+      when {
+        expression {
+          params.custom
+        }
+      }
+      steps {
+        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
+        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCustom -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+      }
+      post {
+        failure {
+          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/custom.tar.gz -C test/e2e/logs ."
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}

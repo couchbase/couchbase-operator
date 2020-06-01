@@ -1,0 +1,59 @@
+/* EKS pipeline is a specialization of the core pipeline.
+   It hard codes any platform specifc configuration and provides locking
+   around the configuration - tests cannot use the same cluster at the
+   same time without interfing with one another.
+*/
+pipeline {
+  agent {
+    label 'k8'
+  }
+
+  options {
+    /* Block concurrent runs using the same Kubernetes clusters */
+    disableConcurrentBuilds()
+
+    /* Don't bother checking out source */
+    skipDefaultCheckout()
+  }
+
+  parameters {
+    string(name: 'refspec', defaultValue: 'refs/heads/master')
+    string(name: 'server_image', defaultValue: 'couchbase/server:6.5.0')
+    string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.5.1')
+    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:6.5.0')
+    string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.0')
+    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.2')
+    string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.7.0-enterprise')
+    booleanParam(name: 'validation', defaultValue: true)
+    booleanParam(name: 'sanity', defaultValue: true)
+    booleanParam(name: 'p0', defaultValue: true)
+    booleanParam(name: 'p1', defaultValue: true)
+    booleanParam(name: 'custom', defaultValue: false)
+  }
+
+  stages {
+    stage('Run') {
+      steps {
+        build job: 'simon-test', wait: true, parameters: [
+          string(name: 'refspec', value: params.refspec),
+          string(name: 'server_image', value: params.server_image),
+          string(name: 'server_image_upgrade', value: params.server_image_upgrade),
+          string(name: 'backup_image', value: params.backup_image),
+          string(name: 'exporter_image', value: params.exporter_image),
+          string(name: 'exporter_image_upgrade', value: params.exporter_image_upgrade),
+          string(name: 'mobile_image', value: params.mobile_image),
+          string(name: 'platform', value: 'aws'),
+          string(name: 'storage_class', value: 'gp2'),
+          /* these should be credentials, not files */
+          string(name: 'kubeconfig1', value: '~/.kube/config_eks_2.x_BasicCluster'),
+          string(name: 'kubeconfig2', value: '~/.kube/config_eks_2.x_NewCluster1'),
+          booleanParam(name: 'validation', value: params.validation),
+          booleanParam(name: 'sanity', value: params.sanity),
+          booleanParam(name: 'p0', value: params.p0),
+          booleanParam(name: 'p1', value: params.p1),
+          booleanParam(name: 'custom', value: params.custom),
+        ]
+      }
+    }
+  }
+}
