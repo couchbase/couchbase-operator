@@ -649,7 +649,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateTLSClientCertificatePathRequired",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/networking/tls/clientCertificatePaths/0/path")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths.path in body is required`},
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths.path`},
 		},
 		{
 			name:           "TestValidateTLSClientCertificateNoPaths",
@@ -897,7 +897,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateBackupRestoreMissingBackupField",
 			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Remove("/spec/backup")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.backup in body is required`},
+			expectedErrors: []string{`spec.backup`},
 		},
 		{
 			name:           "TestValidateBackupRestoreStartPositiveInteger",
