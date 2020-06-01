@@ -300,6 +300,8 @@ func NewBasicCluster(size int) *couchbasev2.CouchbaseCluster {
 		spec.Platform = platform
 	}
 
+	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
+
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
@@ -328,6 +330,8 @@ func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
 	if platform != "" {
 		spec.Platform = platform
 	}
+
+	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
 
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
@@ -392,7 +396,7 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 	// The defaults are too aggressive.  When killing a pod during a rebalance the operator
 	// may hang for ~30 seconds due to network retries. During this period we may or may not
 	// observe a failover leading to non-determinism.
-	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(120)
+	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
 
 	if platform != "" {
 		spec.Platform = platform
