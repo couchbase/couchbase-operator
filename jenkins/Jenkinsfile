@@ -1,0 +1,58 @@
+pipeline {
+  agent {
+    label 'ubuntu-1604 && master'
+  }
+
+  environment {
+    GOVERSION = '1.13.3'
+    GOROOT = "${env.WORKSPACE}/go"
+    PATH = "${env.WORKSPACE}/go/bin:${PATH}"
+    BUILD_DIR = 'github.com/couchbase/couchbase-operator'
+  }
+
+  options {
+    checkoutToSubdirectory('github.com/couchbase/couchbase-operator')
+  }
+
+  stages {
+    stage('Go Install') {
+      steps {
+        sh "wget -q -O- https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz | tar xz"
+      }
+    }
+    stage('Go Lint') {
+      steps {
+        dir("${BUILD_DIR}") {
+          sh "make lint"
+        }
+      }
+    }
+    stage('Build All') {
+      steps {
+        dir("${BUILD_DIR}") {
+          sh "make"
+        }
+      }
+    }
+    stage('Build Test') {
+      steps {
+        dir("${BUILD_DIR}") {
+          sh "make build-test"
+        }
+      }
+    }
+    stage('Unit Test') {
+      steps {
+        dir("${BUILD_DIR}") {
+          sh "make test-unit"
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}
