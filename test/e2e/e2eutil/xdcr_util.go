@@ -383,12 +383,6 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 		_ = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Delete(xdcrSecret, metav1.NewDeleteOptions(0))
 	}
 
-	defer func() {
-		if err != nil {
-			cleanup()
-		}
-	}()
-
 	// Define the TLS secret if we are using it.
 	tlsSecret := ""
 

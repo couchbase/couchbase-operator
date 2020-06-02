@@ -34,8 +34,8 @@ const (
 	defaultServiceMemQuota                        = "256Mi"
 	defaultAnalyticsServiceMemQuota               = "1Gi"
 	defaultFSGroup                                = 1000
-	defaultMetricsImage                           = "couchbase/exporter:1.0.0"
-	redhatMetricsImage                            = "registry.connect.redhat.com/couchbase/exporter:1.0.0-2"
+	defaultMetricsImage                           = "couchbase/exporter:1.0.2"
+	redhatMetricsImage                            = "registry.connect.redhat.com/couchbase/exporter:1.0.2-1"
 	defaultBackupImage                            = "couchbase/operator-backup:6.5.0"
 	redhatBackupImage                             = "registry.connect.redhat.com/couchbase/operator-backup:6.5.0-5"
 	defaultBackupServiceAccount                   = "couchbase-backup"

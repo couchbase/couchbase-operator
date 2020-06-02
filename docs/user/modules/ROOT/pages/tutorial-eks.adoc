@@ -8,30 +8,31 @@ include::partial$tutorial.adoc[]
 
 This guide is meant to supplement the regular Amazon EKS https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html[setup documentation^], and provides recommendations up to setting up worker nodes.
 
-== Prerequisites
-
-In addition to the standard EKS https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-prereqs[prerequisites^], you must also do the following:
-
-* Install `aws-iam-authenticator` when you install `kubectl`.
-* Install the latest version of the AWS CLI.
-
 == Create the Cluster and Configure kubectl
 
-Create the EKS cluster(s) according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-create-cluster[documentation^].
+Create the EKS cluster(s) according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-create-cluster[documentation^], with either `eksctl` or via the AWS Management Console.
 Actual cluster creation in EKS can take some time (around 10-15 minutes per cluster).
 
-When configuring `kubectl`, pay particular attention to the following command:
+=== Configure `kubectl`
+
+[INFO]
+====
+The following section applies only to when using the AWS Management Console method in the Amazon EKS setup documentation.
+====
+When configuring `kubectl` via the https://docs.aws.amazon.com/eks/latest/userguide/getting-started-console.html[AWS Management Console^], pay particular attention to the following command:
 
 [source,console]
 ----
-$ aws eks update-kubeconfig --name clusterName
+$ aws eks --region region-code update-kubeconfig --name cluster_name
 ----
 
 This command is vital as it sets the relevant Amazon Resource Name (ARN) variables in `~/.kube/config`.
 Optionally, you can add `--region regionName` to specify a cluster in a region that is different than the default.
 (Your default region should have been specified when you first setup the AWS CLI through `aws configure` command.)
 
-View the config at `~/.kube/config` to ensure that all variables look correct:
+=== Validate `kubectl` Configuration
+
+Once you have followed the setup instructions for either method, view the config at `~/.kube/config` to ensure that all variables look correct:
 
 [source,console]
 ----
@@ -105,19 +106,6 @@ To switch between Kubernetes contexts, use `kubectl config use-context <context-
 ----
 $ kubectl config use-context arn:aws:eks:eu-west-1:705067739613:cluster/test1
 ----
-
-[#worker-nodes]
-== Set up Worker Nodes
-
-Launch and configure the worker nodes according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-launch-workers[documentation^].
-Note that it's important to wait for your EKS cluster status to show as ACTIVE before launching worker nodes.
-If you launch your worker nodes before the cluster is active, the worker nodes will fail to register with the cluster and you'll have to relaunch them.
-
-To enable worker nodes to join your cluster, select the CloudFormation stack for your worker nodes, go to the Resources tab and then click on the link in the Physical ID column for Logical ID *NodeInstanceRole*.
-This should then take you to an IAM Management page with the Role ARN displayed.
-Copy this value and replace the _<ARN of instance role (not instance profile)>_ portion of the `aws-auth-cm.yaml` file.
-
-Now it's important to apply the `aws-auth-cm.yaml` file so that the worker nodes can be discovered by the control plane, otherwise the process will hang as there are no nodes to deploy onto.
 
 == Configuring for XDCR
 

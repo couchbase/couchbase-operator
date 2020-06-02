@@ -1,5 +1,5 @@
 = Install the Operator on Kubernetes
-:page-aliases: install-admission-controller
+:page-aliases: install-admission-controller, list-and-describe
 
 [abstract]
 This guide walks through the recommended procedure for installing the Couchbase Autonomous Operator on an open source Kubernetes cluster that has _RBAC enabled_.

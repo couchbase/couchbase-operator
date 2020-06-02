@@ -20,6 +20,7 @@ metadata:
   labels:
     cluster: my-cluster
 spec:
+  name: Non_DNS_name
   memoryQuota: 100Mi
   enableFlush: false
 ----
@@ -83,9 +84,23 @@ The following are parameters that may be set on the bucket:
 [source,yaml]
 ----
 spec:
+  name: Non_DNS_name
   memoryQuota: 100Mi
   enableFlush: false
 ----
+
+=== spec.name
+
+This field allows the name of a bucket to be overridden.
+By default, the bucket name will be that specified as the resource name in `metadata.name`.
+This has limitations in that the metadata name is limited to the character set defined by a DNS label.
+Couchbase Server allows characters outside of the DNS label character set.
+By specifying this field you may use any character that Couchbase Server supports.
+You may also use this field to allow multiple buckets in the same namespace -- whose resource names differ as they must be unique -- to have the same actual bucket name in Couchbase.
+
+____
+_Field rules_: This field is optional and must be a string containing the characters `a-zA-Z0-9-_%.`.
+____
 
 === spec.memoryQuota
 

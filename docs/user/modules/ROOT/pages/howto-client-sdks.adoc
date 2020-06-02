@@ -7,7 +7,7 @@ Connecting a Couchbase SDK to an Operator managed Couchbase cluster.
 Couchbase Server requires clients in order to do productive work.
 The operator is only concerned with cluster life cycle and high availability.
 
-Configuration and use of a client SDK is available in xref:server::sdk/overview.adoc[language specific documentation].
+Configuration and use of a client SDK is available in xref:server:sdk:overview.adoc[language specific documentation].
 All client SDKs share a common connection string format; used by the SDK to connect to the Couchbase cluster and discover nodes.
 This how-to documents how to calculate the required connection string based on your chosen xref:concept-couchbase-networking.adoc[network architecture].
 

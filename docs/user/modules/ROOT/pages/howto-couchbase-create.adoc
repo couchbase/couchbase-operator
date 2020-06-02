@@ -1,5 +1,5 @@
 = Create a Couchbase Deployment
-:page-aliases: deploying-couchbase
+:page-aliases: deploying-couchbase, demo
 include::partial$constants.adoc[]
 :tabs:
 

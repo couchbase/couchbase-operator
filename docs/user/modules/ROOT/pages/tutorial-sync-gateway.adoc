@@ -165,7 +165,25 @@ $ kubectl create -f sgw-config.yaml
 If not using client certificate authentication, secure the system further by using a limited role to access Couchbase Server.
 In doing so, the scope of operations that can be performed in the event the Sync Gateway configuration is compromised is limited.
 The RBAC user corresponding to Sync Gateway can be manually configured as specified in link:https://docs.couchbase.com/sync-gateway/2.7/getting-started.html#creating-an-rbac-user[Getting Started Guide].
-The steps discussed below is the preferred option for creatig sync gateway user and binding it to a specified role.
+
+Alternatively, you can take advantage of the xref:concept-user-rbac.adoc[Couchbase user RBAC management] capability introduced with Autonomous Operator 2.0.
+With this method, the Autonomous Operator takes care of creating the relevant Sync Gateway user and binding it to a specified role.
+ 
+==== Enabling RBAC Management
+
+RBAC security management on the Couchbase Server cluster defaults to `false`.
+This is the relevant snippet that would need to be added or modified in your xref:reference-couchbasecluster.adoc[CouchbaseCluster] configuration:
+
+[source,yaml]
+----
+security:
+  adminSecret: cb-example-auth
+  rbac:
+    managed: true
+----
+
+NOTE: Enabling RBAC management by the Autonomous Operator will remove any RBAC users that were manually created on the cluster.
+Therefore, you will need to specify the relevant users and role bindings for those RBAC users if you want to continue using those identities after enabling RBAC management.
 
 ==== Creating a Sync Gateway RBAC User
 
@@ -370,6 +388,9 @@ Now, let's look at the xref:tutorial-sync-gateway-clients.adoc[connectivity to C
 Template files are provided in the Operator binary distribution :
 
 ** `sync-gateway.yaml` : Sample Deployment Controller for Sync Gateway using RBAC for server connectivity
+This template creates a sync gateway RBAC user per procedures outlined in <<Configuring RBAC User for Sync Gateway>> section. 
+However, the `couchbase-custer.yaml` template that is packaged has RBAC management set to false by default.
+So before you deploy the sync gateway cluster using the `sync-gateway.yaml` template, you must enable RBAC management on the server cluster as specified in the <<Enabling RBAC Management>> section. 
 
 These files are provided as *evaluation examples* -- they should be modified to suit production deployments.
 
