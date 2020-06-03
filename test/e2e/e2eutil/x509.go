@@ -503,6 +503,11 @@ func (ctx *TLSContext) clusterSANs() []string {
 	return util_x509.MandatorySANs(ctx.ClusterName, ctx.Namespace)
 }
 
+func (ctx *TLSContext) Close(k8s *types.Cluster) {
+	_ = DeleteSecret(k8s, ctx.ClusterSecretName, &metav1.DeleteOptions{})
+	_ = DeleteSecret(k8s, ctx.OperatorSecretName, &metav1.DeleteOptions{})
+}
+
 // InitClusterTLS accepts a key type (only RSA works for now) and returns a context
 // containing all the certificates, and a tear down function to be deferred.
 func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, teardown func(), err error) {

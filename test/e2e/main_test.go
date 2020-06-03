@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"testing"
 
@@ -13,6 +15,10 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	go func() {
+		_ = http.ListenAndServe("localhost:6060", nil)
+	}()
+
 	// Perform any static initialization
 	if err := framework.Init(); err != nil {
 		logrus.Error(err)

@@ -315,6 +315,16 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 		e2eutil.Die(t, err)
 	}
 
+	// This is slow (entropy and modular exponetiation) so cache where possible,
+	// this will make tests 4x faster!
+	tlsCache := map[string]*e2eutil.TLSContext{}
+
+	defer func() {
+		for _, ctx := range tlsCache {
+			ctx.Close(targetKube)
+		}
+	}()
+
 	for i := range testDefs {
 		test := testDefs[i]
 
@@ -350,13 +360,17 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 				}
 
 				// Do dynamic TLS configuration.
-				tlsOpts := &e2eutil.TLSOpts{
-					ClusterName: object.GetName(),
-					AltNames:    util_x509.MandatorySANs(object.GetName(), targetKube.Namespace),
+				ctx, ok := tlsCache[object.GetName()]
+				if !ok {
+					tlsOpts := &e2eutil.TLSOpts{
+						ClusterName: object.GetName(),
+						AltNames:    util_x509.MandatorySANs(object.GetName(), targetKube.Namespace),
+					}
+					tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
+					ctx, _ = e2eutil.MustInitClusterTLS(t, targetKube, tlsOpts)
+
+					tlsCache[object.GetName()] = ctx
 				}
-				tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
-				ctx, teardown := e2eutil.MustInitClusterTLS(t, targetKube, tlsOpts)
-				defer teardown()
 
 				if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "static", "serverSecret"); err != nil {
 					e2eutil.Die(t, err)

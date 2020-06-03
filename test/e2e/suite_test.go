@@ -70,7 +70,7 @@ func goroutineLeakCheck(expected int) {
 	defer cancel()
 
 	callback := func() (bool, error) {
-		return runtime.NumGoroutine() == expected, nil
+		return runtime.NumGoroutine() <= expected, nil
 	}
 
 	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
