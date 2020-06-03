@@ -1098,6 +1098,16 @@ func FlagPodReady(client *client.Client, name string) error {
 	if !found {
 		return fmt.Errorf("pod %s not found", name)
 	}
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == constants.CouchbaseContainerName {
+			if status.Ready {
+				return nil
+			}
+
+			break
+		}
+	}
+
 	if err := exec(client.KubeClient, pod, []string{"touch", readinessFile}); err != nil {
 		return err
 	}
