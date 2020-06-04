@@ -48,7 +48,7 @@ func DumpAdmissionYAML(conf *Config) error {
 	key, cert, _ := req.Generate(ca)
 
 	// Create resources.
-	if err := DumpYAML(conf, "admission-service-account", GetAdmissionServiceAccount()); err != nil {
+	if err := DumpYAML(conf, "admission-service-account", GetAdmissionServiceAccount(conf.Namespace)); err != nil {
 		return err
 	}
 	if err := DumpYAML(conf, "admission-cluster-role", GetAdmissionClusterRole()); err != nil {
@@ -57,13 +57,13 @@ func DumpAdmissionYAML(conf *Config) error {
 	if err := DumpYAML(conf, "admission-cluster-role-binding", GetAdmissionClusterRoleBinding(conf.Namespace)); err != nil {
 		return err
 	}
-	if err := DumpYAML(conf, "admission-secret", GetAdmissionSecret(key, cert)); err != nil {
+	if err := DumpYAML(conf, "admission-secret", GetAdmissionSecret(conf.Namespace, key, cert)); err != nil {
 		return err
 	}
-	if err := DumpYAML(conf, "admission-deployment", GetAdmissionDeployment(conf.AdmissionImage, conf.ImagePullSecret)); err != nil {
+	if err := DumpYAML(conf, "admission-deployment", GetAdmissionDeployment(conf.Namespace, conf.AdmissionImage, conf.ImagePullSecret)); err != nil {
 		return err
 	}
-	if err := DumpYAML(conf, "admission-service", GetAdmissionService()); err != nil {
+	if err := DumpYAML(conf, "admission-service", GetAdmissionService(conf.Namespace)); err != nil {
 		return err
 	}
 	if err := DumpYAML(conf, "admission-mutating-webhook", GetAdmissionMutatingWebhook(conf.Namespace, ca.Certificate)); err != nil {
@@ -134,14 +134,15 @@ func GetAdmissionClusterRole() *rbacv1.ClusterRole {
 }
 
 // GetAdmissionServiceAccount get the service account to run as.
-func GetAdmissionServiceAccount() *corev1.ServiceAccount {
+func GetAdmissionServiceAccount(namespace string) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "ServiceAccount",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: AdmissionResourceName,
+			Name:      AdmissionResourceName,
+			Namespace: namespace,
 		},
 	}
 }
@@ -172,14 +173,15 @@ func GetAdmissionClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding
 }
 
 // GetAdmissionSecret generates the TLS secret providing server certificates.
-func GetAdmissionSecret(key, cert []byte) *corev1.Secret {
+func GetAdmissionSecret(namespace string, key, cert []byte) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Secret",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: AdmissionResourceName,
+			Name:      AdmissionResourceName,
+			Namespace: namespace,
 		},
 		Data: map[string][]byte{
 			"tls-cert-file":        cert,
@@ -189,7 +191,7 @@ func GetAdmissionSecret(key, cert []byte) *corev1.Secret {
 }
 
 // GetAdmissionDeployment returns the canonical deployment for the admission controller.
-func GetAdmissionDeployment(image, imagePullSecret string, extraArgs ...string) *appsv1.Deployment {
+func GetAdmissionDeployment(namespace, image, imagePullSecret string, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -197,7 +199,8 @@ func GetAdmissionDeployment(image, imagePullSecret string, extraArgs ...string) 
 			Kind:       "Deployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: AdmissionResourceName,
+			Name:      AdmissionResourceName,
+			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -267,14 +270,15 @@ func GetAdmissionDeployment(image, imagePullSecret string, extraArgs ...string) 
 }
 
 // GetAdmissionService returns a cluster service definition for the admission controller.
-func GetAdmissionService() *corev1.Service {
+func GetAdmissionService(namespace string) *corev1.Service {
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Service",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: AdmissionResourceName,
+			Name:      AdmissionResourceName,
+			Namespace: namespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{

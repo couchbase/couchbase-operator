@@ -50,14 +50,14 @@ Alternatively, you may wish to install just the DAC in the `camelot` namespace:
 
 [source,console]
 ----
-$ bin/cbopcfg --no-operator --namespace camelot | kubectl create -n camelot -f -
+$ bin/cbopcfg --no-operator --namespace camelot | kubectl create -f -
 ----
 
 And then install just the Operator into the `asgard` namespace:
 
 [source,console]
 ----
-$ bin/cbopcfg --no-admission --namespace asgard | kubectl create -n asgard -f -
+$ bin/cbopcfg --no-admission --namespace asgard | kubectl create -f -
 ----
 
 For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
