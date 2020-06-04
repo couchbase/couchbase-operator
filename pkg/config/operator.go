@@ -311,6 +311,15 @@ func GetOperatorDeployment(namespace, image, imagePullSecret string, podCreateTi
 									ContainerPort: 8383,
 								},
 							},
+							ReadinessProbe: &corev1.Probe{
+								Handler: corev1.Handler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path:   "/readyz",
+										Port:   intstr.FromString("http"),
+										Scheme: corev1.URISchemeHTTP,
+									},
+								},
+							},
 						},
 					},
 				},

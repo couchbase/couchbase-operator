@@ -109,6 +109,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Report as ready when we have the lock and done initialization.
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
 	go func() { _ = http.ListenAndServe(listenAddr, nil) }()
 
 	chaos.Start(context.Background(), mgr, namespace, chaosLevel)

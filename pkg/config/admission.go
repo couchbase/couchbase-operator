@@ -236,6 +236,15 @@ func GetAdmissionDeployment(namespace, image, imagePullSecret string, extraArgs 
 									ContainerPort: 8443,
 								},
 							},
+							ReadinessProbe: &corev1.Probe{
+								Handler: corev1.Handler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path:   "/readyz",
+										Port:   intstr.FromString("https"),
+										Scheme: corev1.URISchemeHTTPS,
+									},
+								},
+							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      AdmissionResourceName,
