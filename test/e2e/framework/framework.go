@@ -486,6 +486,16 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 	e2eutil.CleanK8sCluster(k8s, k8s.Namespace)
 
+	// Clean up any state locls that may prevent the framework working
+	// across operator versions.
+	logrus.Info("Cleaning stale locks...")
+
+	if err := k8s.KubeClient.CoreV1().ConfigMaps(k8s.Namespace).Delete("couchbase-operator", metav1.NewDeleteOptions(0)); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+
 	logrus.Info("Deleting orphaned pods")
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
