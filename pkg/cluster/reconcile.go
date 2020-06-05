@@ -246,7 +246,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 
 	// Check the pod is EE
 	info := &couchbaseutil.PoolsInfo{}
-	if err := couchbaseutil.GetPools(info).On(c.api, newMember); err != nil {
+	if err := couchbaseutil.GetPools(info).RetryFor(time.Minute).On(c.api, newMember); err != nil {
 		return nil, err
 	}
 
@@ -748,7 +748,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 		FailoverServerGroup: settings.AutoFailoverServerGroup,
 	}
 
-	return couchbaseutil.SetAutoFailoverSettings(autoFailoverSettings).On(c.api, m)
+	return couchbaseutil.SetAutoFailoverSettings(autoFailoverSettings).RetryFor(time.Minute).On(c.api, m)
 }
 
 // Initialize a member with TLS certificates.
