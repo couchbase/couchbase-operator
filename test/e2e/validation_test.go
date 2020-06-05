@@ -20,13 +20,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/restmapper"
 )
 
 var (
@@ -37,6 +33,18 @@ var (
 // Resources are stored in a list in order to maintain ordering.  Do not try to use a map
 // or things will happen in a random order.
 type resourceList [][]byte
+
+func (in resourceList) DeepCopy() [][]byte {
+	out := make([][]byte, len(in))
+
+	for i := range in {
+		out[i] = make([]byte, len(in[i]))
+
+		copy(out[i], in[i])
+	}
+
+	return out
+}
 
 // We validate operations on multiple objects concurrently, so need a way to discriminate
 // which patches to pply to which resources.  At present we key on name, so resources must
@@ -119,32 +127,13 @@ func getResourceMeta(resource []byte) (string, string, error) {
 	return object.GetNamespace(), object.GetName(), nil
 }
 
-var (
-	// restMapper is cached because the calls to create it are very expensive.
-	restMapper meta.RESTMapper
-)
-
 // getResource takes raw JSON and returns the resource type (used by the raw API),
 // the API version and the Kind (POST and PUT methods actually strip this from
 // the status response so we have to replopulate it).
 func getResource(k8s *types.Cluster, object *unstructured.Unstructured) (*schema.GroupVersionResource, error) {
-	if restMapper == nil {
-		discoveryClient, err := discovery.NewDiscoveryClientForConfig(k8s.Config)
-		if err != nil {
-			return nil, err
-		}
-
-		groupresources, err := restmapper.GetAPIGroupResources(discoveryClient)
-		if err != nil {
-			return nil, err
-		}
-
-		restMapper = restmapper.NewDiscoveryRESTMapper(groupresources)
-	}
-
 	gvk := object.GroupVersionKind()
 
-	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	mapping, err := k8s.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -165,12 +154,7 @@ func createResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		client, err := dynamic.NewForConfig(k8s.Config)
-		if err != nil {
-			return err
-		}
-
-		res, err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Create(object, metav1.CreateOptions{})
+		res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Create(object, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -203,12 +187,7 @@ func updateResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		client, err := dynamic.NewForConfig(k8s.Config)
-		if err != nil {
-			return err
-		}
-
-		res, err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Update(object, metav1.UpdateOptions{})
+		res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Update(object, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -241,12 +220,7 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		client, err := dynamic.NewForConfig(k8s.Config)
-		if err != nil {
-			return err
-		}
-
-		if _, err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Get(object.GetName(), metav1.GetOptions{}); err != nil {
+		if _, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Get(object.GetName(), metav1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
 				continue
 			}
@@ -254,7 +228,7 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		if err := client.Resource(*groupVersion).Namespace(k8s.Namespace).Delete(object.GetName(), metav1.NewDeleteOptions(0)); err != nil {
+		if err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Delete(object.GetName(), metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
@@ -306,12 +280,12 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 	defer func() { _ = f.SetupCouchbaseOperator(targetKube) }()
 
 	// Clean up resources that may have been left behind by a job that was interrupted.
-	objects, err := loadResources("./resources/validation/validation.yaml")
+	objectsPristine, err := loadResources("./resources/validation/validation.yaml")
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	if err := deleteResources(targetKube, objects); err != nil {
+	if err := deleteResources(targetKube, objectsPristine); err != nil {
 		e2eutil.Die(t, err)
 	}
 
@@ -331,10 +305,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 		// Run each test case defined as a separate test so we have a way
 		// of running them individually.
 		t.Run(test.name, func(t *testing.T) {
-			objects, err := loadResources("./resources/validation/validation.yaml")
-			if err != nil {
-				e2eutil.Die(t, err)
-			}
+			objects := objectsPristine.DeepCopy()
 
 			// Delete anything we created.
 			defer func() {

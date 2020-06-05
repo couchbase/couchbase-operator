@@ -35,8 +35,11 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -367,14 +370,33 @@ func createKubeClusterObject(c KubeConfData) (*types.Cluster, error) {
 		return nil, err
 	}
 
+	// Clients are rate limited to 5 queries per-second by default, override the
+	// defaults or whatever the provider has specified :D
+	config.QPS = 1000
+	config.Burst = 1000
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	groupresources, err := restmapper.GetAPIGroupResources(discoveryClient)
+	if err != nil {
+		return nil, err
+	}
+
+	restMapper := restmapper.NewDiscoveryRESTMapper(groupresources)
+
 	return &types.Cluster{
-		Config:       config,
-		CRClient:     client.MustNew(config),
-		KubeClient:   kubernetes.NewForConfigOrDie(config),
-		KubeConfPath: c.ClusterConfig,
-		Context:      c.Context,
-		Namespace:    c.Namespace,
-		Name:         c.ClusterName,
+		Config:        config,
+		CRClient:      client.MustNew(config),
+		KubeClient:    kubernetes.NewForConfigOrDie(config),
+		DynamicClient: dynamic.NewForConfigOrDie(config),
+		RESTMapper:    restMapper,
+		KubeConfPath:  c.ClusterConfig,
+		Context:       c.Context,
+		Namespace:     c.Namespace,
+		Name:          c.ClusterName,
 	}, nil
 }
 

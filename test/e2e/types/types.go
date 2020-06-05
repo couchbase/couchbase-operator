@@ -7,6 +7,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -15,6 +17,10 @@ import (
 type Cluster struct {
 	// KubeClient is a Kubernetes client for the cluster.
 	KubeClient kubernetes.Interface
+	// DynamicClient is an untyped client.
+	DynamicClient dynamic.Interface
+	// RESTMapper maps from an object to API paths.
+	RESTMapper meta.RESTMapper
 	// CRClient is a Kubernetes client for CouchbaseCluster resources.
 	CRClient versioned.Interface
 	// DefaultSecret is the secret to use defining admin credentials.
