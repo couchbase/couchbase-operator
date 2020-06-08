@@ -90,6 +90,12 @@ GENERATED_FILES = pkg/apis/couchbase/v1/zz_generated.deepcopy.go \
 # Build target to generate source.
 generated: $(GENERATED_FILES)
 
+# Timestamps aren't preserved by a git checkout, so the ordering is random as far
+# as we're concerned.  This 'fixes' generated target timestamps after checkout to
+# inhibit rebuilds.
+touch-generated: ${GENERATED_FILES}
+	touch $?
+
 # Build the V1 deep copy functions when the API source changes.
 pkg/apis/couchbase/v1/zz_generated.deepcopy.go: $(APISRC_V1)
 	go run k8s.io/code-generator/cmd/deepcopy-gen --input-dirs $(API_PACKAGE_V1) -O zz_generated.deepcopy --bounding-dirs $(API_PACKAGE_BASE) $(CODEGEN_ARGS)
