@@ -93,8 +93,8 @@ generated: $(GENERATED_FILES)
 # Timestamps aren't preserved by a git checkout, so the ordering is random as far
 # as we're concerned.  This 'fixes' generated target timestamps after checkout to
 # inhibit rebuilds.
-touch-generated: ${GENERATED_FILES}
-	touch $?
+touch-generated:
+	touch ${GENERATED_FILES}
 
 # Build the V1 deep copy functions when the API source changes.
 pkg/apis/couchbase/v1/zz_generated.deepcopy.go: $(APISRC_V1)
