@@ -4,20 +4,13 @@
 .idea
 
 *~
-*.deepcopy.go
 *.sw[a-z]
 
 /build/
 /dist/
-/vendor/
-/pkg/generated/
 /test/e2e/logs/
 /test/e2e/resources/*.yaml
 /test/e2e/resources/suites/TestCustom.yaml
-/test/e2e/resources/ansible/*Cluster*
-/test/e2e/resources/ansible/generic/*.retry
-/test/e2e/resources/ansible/kubernetes/*.retry
-/test/e2e/resources/validation/temp.yaml
 example/crd.yaml
 test/e2e/results.xml
 test/e2e/*.zip

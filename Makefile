@@ -1,5 +1,4 @@
 PREFIX ?= $(shell pwd)
-GOPATH = $(shell echo $${PWD%/src/*})
 SOURCE = $(shell find . -name *.go -type f)
 OPERATOR_BINARY = build/bin/couchbase-operator
 ADMISSION_BINARY = build/bin/couchbase-operator-admission
@@ -152,7 +151,7 @@ build-test: $(GENERATED_FILES) $(SOURCE)
 
 # Lint target to test source code compliance.
 lint: $(GENERATED_FILES) 
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint run
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint run ./pkg/... ./cmd/... ./test/...
 
 # NOTE: This target is only for local development. While we use this Dockerfile
 # (for now), the actual "docker build" command is located in the Jenkins job

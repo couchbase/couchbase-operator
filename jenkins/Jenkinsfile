@@ -7,11 +7,6 @@ pipeline {
     GOVERSION = '1.13.3'
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:${PATH}"
-    BUILD_DIR = 'github.com/couchbase/couchbase-operator'
-  }
-
-  options {
-    checkoutToSubdirectory('github.com/couchbase/couchbase-operator')
   }
 
   stages {
@@ -22,30 +17,22 @@ pipeline {
     }
     stage('Go Lint') {
       steps {
-        dir("${BUILD_DIR}") {
-          sh "make lint"
-        }
+        sh "make lint"
       }
     }
     stage('Build All') {
       steps {
-        dir("${BUILD_DIR}") {
-          sh "make"
-        }
+        sh "make"
       }
     }
     stage('Build Test') {
       steps {
-        dir("${BUILD_DIR}") {
-          sh "make build-test"
-        }
+        sh "make build-test"
       }
     }
     stage('Unit Test') {
       steps {
-        dir("${BUILD_DIR}") {
-          sh "make test-unit"
-        }
+        sh "make test-unit"
       }
     }
   }
