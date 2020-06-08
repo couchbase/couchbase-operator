@@ -6,6 +6,8 @@ CBOPCFG_BINARY = build/bin/cbopcfg
 CBOPINFO_BINARY = build/bin/cbopinfo
 CBOPCONV_BINARY = build/bin/cbopconv
 ARTIFACTS = build/artifacts
+OPERATOR_ARTIFACTS = $(ARTIFACTS)/couchbase-operator
+ADMISSION_ARTIFACTS = $(ARTIFACTS)/couchbase-admission-controller
 
 kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
 operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
@@ -156,7 +158,7 @@ build-test: $(GENERATED_FILES) $(SOURCE)
 	go test -c $(PACKAGE_BASE)/test/e2e
 
 # Lint target to test source code compliance.
-lint: $(GENERATED_FILES) 
+lint: $(GENERATED_FILES)
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint run ./pkg/... ./cmd/... ./test/...
 
 # NOTE: This target is only for local development. While we use this Dockerfile
@@ -210,23 +212,23 @@ artifacts: tools crd
 
 image-artifacts: binaries
 	# Create a subdirectory for the operator docker build
-	mkdir -p $(ARTIFACTS)/operator/docs
-	mkdir -p $(ARTIFACTS)/operator/build/bin
-	cp docs/License.txt $(ARTIFACTS)/operator/docs/License.txt
-	cp docs/README.txt $(ARTIFACTS)/operator/docs/README.txt
-	cp $(OPERATOR_BINARY) $(ARTIFACTS)/operator/$(OPERATOR_BINARY)
-	cp Dockerfile $(ARTIFACTS)/operator/Dockerfile
-	cp Dockerfile.rhel $(ARTIFACTS)/operator/Dockerfile.rhel
+	mkdir -p $(OPERATOR_ARTIFACTS)/docs
+	mkdir -p $(OPERATOR_ARTIFACTS)/build/bin
+	cp docs/License.txt $(OPERATOR_ARTIFACTS)/docs/License.txt
+	cp docs/README.txt $(OPERATOR_ARTIFACTS)/docs/README.txt
+	cp $(OPERATOR_BINARY) $(OPERATOR_ARTIFACTS)/$(OPERATOR_BINARY)
+	cp Dockerfile $(OPERATOR_ARTIFACTS)/Dockerfile
+	cp Dockerfile.rhel $(OPERATOR_ARTIFACTS)/Dockerfile.rhel
 	# Create a subdirectory for the admission controller docker build
-	mkdir -p $(ARTIFACTS)/admission/docs
-	mkdir -p $(ARTIFACTS)/admission/build/bin
-	cp docs/License.txt $(ARTIFACTS)/admission/docs/License.txt
-	cp docs/README.txt $(ARTIFACTS)/admission/docs/README.txt
-	cp $(ADMISSION_BINARY) $(ARTIFACTS)/admission/$(ADMISSION_BINARY)
-	cp Dockerfile.admission $(ARTIFACTS)/admission/Dockerfile
-	cp Dockerfile.admission-rhel $(ARTIFACTS)/admission/Dockerfile.rhel
+	mkdir -p $(ADMISSION_ARTIFACTS)/docs
+	mkdir -p $(ADMISSION_ARTIFACTS)/build/bin
+	cp docs/License.txt $(ADMISSION_ARTIFACTS)/docs/License.txt
+	cp docs/README.txt $(ADMISSION_ARTIFACTS)/docs/README.txt
+	cp $(ADMISSION_BINARY) $(ADMISSION_ARTIFACTS)/$(ADMISSION_BINARY)
+	cp Dockerfile.admission $(ADMISSION_ARTIFACTS)/Dockerfile
+	cp Dockerfile.admission-rhel $(ADMISSION_ARTIFACTS)/Dockerfile.rhel
 	# Create the archive
-	tar -C $(ARTIFACTS) -czf build/couchbase-autonomous-operator-image_$(productVersion).tgz .
+	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(productVersion).tgz .
 	rm -rf $(ARTIFACTS)
 
 # This target (and only this target) is invoked by the production build job.
@@ -234,7 +236,7 @@ image-artifacts: binaries
 dist: artifacts image-artifacts
 	rm -rf dist
 	mkdir dist
-	cp build/couchbase-autonomous-operator-image_*.tgz dist
+	cp build/couchbase-operator-image_*.tgz dist
 	cp build/couchbase-autonomous-operator-*.tar.gz dist
 	cp build/couchbase-autonomous-operator-*.zip dist
 
