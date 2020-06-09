@@ -106,7 +106,7 @@ pipeline {
       post {
         always {
           junit 'test/e2e/*.xml'
-          sh 'tar czf validation.tar.gz -C test/e2e/logs .'
+          sh 'tar czf validation.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
           archiveArtifacts artifacts: 'validation.tar.gz', fingerprint: true
         }
       }
@@ -132,7 +132,7 @@ pipeline {
       post {
         always {
           junit 'test/e2e/*.xml'
-          sh 'tar czf sanity.tar.gz -C test/e2e/logs .'
+          sh 'tar czf sanity.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
           archiveArtifacts artifacts: 'sanity.tar.gz', fingerprint: true
         }
       }
@@ -158,7 +158,7 @@ pipeline {
       post {
         always {
           junit 'test/e2e/*.xml'
-          sh 'tar czf p0.tar.gz -C test/e2e/logs .'
+          sh 'tar czf p0.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
           archiveArtifacts artifacts: 'p0.tar.gz', fingerprint: true
         }
       }
@@ -184,7 +184,7 @@ pipeline {
       post {
         always {
           junit 'test/e2e/*.xml'
-          sh 'tar czf p1.tar.gz -C test/e2e/logs .'
+          sh 'tar czf p1.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
           archiveArtifacts artifacts: 'p1.tar.gz', fingerprint: true
         }
       }
@@ -209,7 +209,7 @@ pipeline {
       }
       post {
         always {
-          sh 'tar czf custom.tar.gz -C test/e2e/logs .'
+          sh 'tar czf custom.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
           archiveArtifacts artifacts: 'custom.tar.gz', fingerprint: true
         }
       }
