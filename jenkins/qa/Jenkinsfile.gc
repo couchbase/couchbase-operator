@@ -1,9 +1,10 @@
-/* This job is run periodically to clean up images left around
-   by the main pipeline.  72h is the default retention time which
-   is more than enough.  There is still a race in that you could
-   retry a run, using the same tag and it gets deleted.  We should
-   perhaps use a unique tag per run instead.
-*/
+/**
+ * This job is run periodically to clean up images left around
+ * by the main pipeline.  72h is the default retention time which
+ * is more than enough.  There is still a race in that you could
+ * retry a run, using the same tag and it gets deleted.  We should
+ * perhaps use a unique tag per run instead.
+ */
 pipeline {
   agent {
     label 'k8'
@@ -14,19 +15,34 @@ pipeline {
   }
 
   environment {
+    GOVERSION = '1.13.3'
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     THRESHOLD = '72h'
   }
 
+  triggers {
+    cron('0 0 * * *')
+  }
+
   stages {
-    stage('Clean Operator Images') {
-      sh "go run github.com/spjmurray/hub-scrub/cmd/hub-scrub -u ${env.DOCKER_CREDENTIALS_USR} -p ${env.DOCKER_CREDENTIALS_PSW} -i couchbase-operator -t ${env.THRESHOLD}"
+    stage('Go Install') {
+      steps {
+        sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
+      }
     }
 
-    state('Clean Admission Controller Images') {
-      sh "go run github.com/spjmurray/hub-scrub/cmd/hub-scrub -u ${env.DOCKER_CREDENTIALS_USR} -p ${env.DOCKER_CREDENTIALS_PSW} -i couchbase-operator-admission -t ${env.THRESHOLD}"
+    stage('Clean Operator Images') {
+      steps {
+        sh "go run github.com/spjmurray/hub-scrub/cmd/hub-scrub -u ${env.DOCKER_CREDENTIALS_USR} -p ${env.DOCKER_CREDENTIALS_PSW} -i couchbase-operator -t ${env.THRESHOLD}"
+      }
+    }
+
+    stage('Clean Admission Controller Images') {
+      steps {
+        sh "go run github.com/spjmurray/hub-scrub/cmd/hub-scrub -u ${env.DOCKER_CREDENTIALS_USR} -p ${env.DOCKER_CREDENTIALS_PSW} -i couchbase-operator-admission -t ${env.THRESHOLD}"
+      }
     }
   }
 
