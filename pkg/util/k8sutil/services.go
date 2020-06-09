@@ -310,7 +310,7 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 				ports = append(ports, getPeerServicePort(i))
 			}
 		default:
-			return nil, fmt.Errorf("%w: illegal port rule: %v", errors.ErrInternalError, rule)
+			return nil, fmt.Errorf("%w: illegal port rule: %v", errors.NewStackTracedError(errors.ErrInternalError), rule)
 		}
 	}
 
@@ -747,7 +747,7 @@ func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (
 	for _, featureSet := range featureSet {
 		featureSetPorts, ok := exposedfeatureSets[featureSet]
 		if !ok {
-			return nil, fmt.Errorf("%w: feature set %s undefined", errors.ErrInternalError, featureSet)
+			return nil, fmt.Errorf("%w: feature set %s undefined", errors.NewStackTracedError(errors.ErrInternalError), featureSet)
 		}
 
 		for _, featureSetPort := range featureSetPorts {
@@ -835,7 +835,7 @@ func filterConfiguredPorts(ports []v1.ServicePort, services couchbasev2.ServiceL
 func memberServices(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member) (couchbasev2.ServiceList, error) {
 	class := cluster.Spec.GetServerConfigByName(member.Config())
 	if class == nil {
-		return nil, fmt.Errorf("%w: sever class %s missing for member %s", errors.ErrResourceAttributeRequired, member.Config(), member.Name())
+		return nil, fmt.Errorf("%w: sever class %s missing for member %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), member.Config(), member.Name())
 	}
 
 	// Append the admin service, this is not explicitly enabled
@@ -986,7 +986,7 @@ func GetAlternateAddressExternalPorts(c *client.Client, namespace, name string) 
 		case dataServicePortNameTLS:
 			ports.DataServicePortTLS = port.NodePort
 		default:
-			return nil, fmt.Errorf("%w: unexpected port name %s", errors.ErrInternalError, port.Name)
+			return nil, fmt.Errorf("%w: unexpected port name %s", errors.NewStackTracedError(errors.ErrInternalError), port.Name)
 		}
 	}
 

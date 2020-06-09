@@ -187,7 +187,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 		// within the spec before we can add it to the pod
 		required := cluster.Spec.GetVolumeClaimTemplate(claimName)
 		if required == nil {
-			return nil, fmt.Errorf("%w: claim (%s) does not map to any claimTemplates", errors.ErrResourceAttributeRequired, claimName)
+			return nil, fmt.Errorf("%w: claim (%s) does not map to any claimTemplates", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), claimName)
 		}
 
 		// Label and Annotate so that volumes
@@ -300,7 +300,7 @@ func getPathsToPersist(mounts *couchbasev2.VolumeMounts) (map[couchbasev2.Volume
 		// When logsClaim is specified no other mounts are allowed.
 		// Return error if validation didn't prevent this from occurring.
 		if defaultClaim != "" || hasSecondaryMounts {
-			return mountPaths, fmt.Errorf("%w: other mounts cannot be used in with `logs` mount", errors.ErrConfigurationInvalid)
+			return mountPaths, fmt.Errorf("%w: other mounts cannot be used in with `logs` mount", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 		}
 
 		mountPaths[couchbasev2.LogsVolumeMount] = logsClaim
@@ -326,7 +326,7 @@ func getPathsToPersist(mounts *couchbasev2.VolumeMounts) (map[couchbasev2.Volume
 		}
 	} else if hasSecondaryMounts {
 		// Reutrn error if other mount paths are specified without default volume
-		return mountPaths, fmt.Errorf("%w: other mounts cannot be used in without `default` mount", errors.ErrConfigurationInvalid)
+		return mountPaths, fmt.Errorf("%w: other mounts cannot be used in without `default` mount", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 	}
 
 	return mountPaths, nil
@@ -419,7 +419,7 @@ func deletePodVolumes(client *client.Client, memberName string) error {
 				return nil
 			}
 
-			return fmt.Errorf("%w: pvc %s not deleted", errors.ErrResourceExists, name)
+			return fmt.Errorf("%w: pvc %s not deleted", errors.NewStackTracedError(errors.ErrResourceExists), name)
 		}
 
 		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
@@ -968,7 +968,7 @@ func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("%w: unable to locate couchbase container", errors.ErrResourceAttributeRequired)
+	return nil, fmt.Errorf("%w: unable to locate couchbase container", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 }
 
 // Adds any necessary pod prerequisites before enabling TLS.
@@ -1038,13 +1038,13 @@ func findMemberPVC(client *client.Client, memberName, path string) (*v1.Persiste
 				case v1.ClaimBound:
 					return pvc, nil
 				default:
-					return nil, fmt.Errorf("%w: volume %s for %s is %s, expected Bound", errors.ErrKubernetesError, path, memberName, phase)
+					return nil, fmt.Errorf("%w: volume %s for %s is %s, expected Bound", errors.NewStackTracedError(errors.ErrKubernetesError), path, memberName, phase)
 				}
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("%w: volume %s for %s missing", errors.ErrResourceRequired, path, memberName)
+	return nil, fmt.Errorf("%w: volume %s for %s missing", errors.NewStackTracedError(errors.ErrResourceRequired), path, memberName)
 }
 
 // Recreate list of members from persistent volumes.
@@ -1105,13 +1105,13 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, podName string) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
-		return errors.ErrNoVolumeMounts
+		return errors.NewStackTracedError(errors.ErrNoVolumeMounts)
 	}
 
 	// default volume claim is required for recovery
 	defaultClaim := mounts.DefaultClaim
 	if defaultClaim == "" {
-		return fmt.Errorf("%w: no claim defined for default volume", errors.ErrResourceAttributeRequired)
+		return fmt.Errorf("%w: no claim defined for default volume", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	// all volume mounts must be healthy
@@ -1148,7 +1148,7 @@ func IsLogPVC(pvc *v1.PersistentVolumeClaim) bool {
 func FlagPodReady(client *client.Client, name string) error {
 	pod, found := client.Pods.Get(name)
 	if !found {
-		return fmt.Errorf("%w: pod %s not found", errors.ErrResourceRequired, name)
+		return fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
 	}
 
 	for _, condition := range pod.Status.Conditions {

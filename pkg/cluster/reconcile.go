@@ -271,7 +271,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 
 	if !info.Enterprise {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
-		return nil, fmt.Errorf("%w: couchbase server reports community edition", errors.ErrConfigurationInvalid)
+		return nil, fmt.Errorf("%w: couchbase server reports community edition", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 	}
 
 	// Enable TLS if requested
@@ -744,13 +744,13 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m couchbaseutil.Member, cs 
 
 			secret, found := c.k8s.Secrets.Get(secretName)
 			if !found {
-				return fmt.Errorf("%w: unable to get operator secret %s", errors.ErrResourceRequired, secretName)
+				return fmt.Errorf("%w: unable to get operator secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), secretName)
 			}
 
 			// Extract the CA's PEM data
 			ca, ok := secret.Data[tlsOperatorSecretCACert]
 			if !ok {
-				return fmt.Errorf("%w: unable to find %s in operator secret", errors.ErrResourceAttributeRequired, tlsOperatorSecretCACert)
+				return fmt.Errorf("%w: unable to find %s in operator secret", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), tlsOperatorSecretCACert)
 			}
 
 			// Update Couchbase's TLS configuration
@@ -826,7 +826,7 @@ func (c *Cluster) createServerGroups(existingGroups *couchbaseutil.ServerGroups)
 			}
 
 			if existingGroups.GetServerGroup(serverGroup) == nil {
-				return fmt.Errorf("%w: server group %s not found", errors.ErrCouchbaseServerError, serverGroup)
+				return fmt.Errorf("%w: server group %s not found", errors.NewStackTracedError(errors.ErrCouchbaseServerError), serverGroup)
 			}
 
 			return nil
@@ -849,7 +849,7 @@ func serverGroupIndex(update *couchbaseutil.ServerGroupsUpdate, name string) (in
 		}
 	}
 
-	return -1, fmt.Errorf("%w: server group %s undefined", errors.ErrInternalError, name)
+	return -1, fmt.Errorf("%w: server group %s undefined", errors.NewStackTracedError(errors.ErrInternalError), name)
 }
 
 // reconcileServerGroups looks at the cluster specification, if we have enabled
@@ -904,7 +904,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 
 			// TODO: should we flag this as a warning and leave it where it is?
 			if scheduledServerGroup == "" {
-				return false, fmt.Errorf("%w: server group unset for pod %s", errors.ErrCouchbaseServerError, podName)
+				return false, fmt.Errorf("%w: server group unset for pod %s", errors.NewStackTracedError(errors.ErrCouchbaseServerError), podName)
 			}
 
 			// If the node is in the wrong server group schedule an update
@@ -970,7 +970,7 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 
 			// TODO: should we flag this as a warning and leave it where it is?
 			if scheduledServerGroup == "" {
-				return false, fmt.Errorf("%w: server group unset for pod %s", errors.ErrCouchbaseServerError, podName)
+				return false, fmt.Errorf("%w: server group unset for pod %s", errors.NewStackTracedError(errors.ErrCouchbaseServerError), podName)
 			}
 
 			// If the node is in the wrong server group schedule an update
@@ -1623,12 +1623,12 @@ func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
 		// Parse the target to recover lost information.
 		// Should be in the form /remoteClusters/c4c9af9ad62d8b5f665edac5ffc9c1be/buckets/default
 		if task.Target == "" {
-			return nil, fmt.Errorf("listReplications: target not populated: %w", errors.ErrCouchbaseServerError)
+			return nil, fmt.Errorf("listReplications: target not populated: %w", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 		}
 
 		parts := strings.Split(task.Target, "/")
 		if len(parts) != 5 {
-			return nil, fmt.Errorf("listReplications: target incorrectly formatted: %v: %w", task.Target, errors.ErrCouchbaseServerError)
+			return nil, fmt.Errorf("listReplications: target incorrectly formatted: %v: %w", task.Target, errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 		}
 
 		uuid := parts[2]
@@ -1676,7 +1676,7 @@ func (c *Cluster) getRemoteClusterByName(name string) (*couchbaseutil.RemoteClus
 		}
 	}
 
-	return nil, fmt.Errorf("lookupUUIDForCluster: no cluster found for name %v: %w", name, errors.ErrCouchbaseServerError)
+	return nil, fmt.Errorf("lookupUUIDForCluster: no cluster found for name %v: %w", name, errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 }
 
 // getRemoteClusterByUUID helps manage the utter horror show that is XDCR
@@ -1693,7 +1693,7 @@ func (c *Cluster) getRemoteClusterByUUID(uuid string) (*couchbaseutil.RemoteClus
 		}
 	}
 
-	return nil, fmt.Errorf("lookupClusterForUUID: no cluster found for uuid %v: %w", uuid, errors.ErrCouchbaseServerError)
+	return nil, fmt.Errorf("lookupClusterForUUID: no cluster found for uuid %v: %w", uuid, errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 }
 
 // reconcileXDCR creates and deletes XDCR connections dynamically.
@@ -1715,7 +1715,7 @@ func (c *Cluster) reconcileXDCR() error {
 		if cluster.AuthenticationSecret != nil {
 			secret, found := c.k8s.Secrets.Get(*cluster.AuthenticationSecret)
 			if !found {
-				return fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.ErrResourceRequired, *cluster.AuthenticationSecret)
+				return fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *cluster.AuthenticationSecret)
 			}
 
 			requested.Username = string(secret.Data["username"])
@@ -1726,11 +1726,11 @@ func (c *Cluster) reconcileXDCR() error {
 			if cluster.TLS.Secret != nil {
 				secret, found := c.k8s.Secrets.Get(*cluster.TLS.Secret)
 				if !found {
-					return fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.ErrResourceRequired, *cluster.TLS.Secret)
+					return fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *cluster.TLS.Secret)
 				}
 
 				if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
-					return fmt.Errorf("%w: CA certificate is required for TLS encryption", errors.ErrResourceAttributeRequired)
+					return fmt.Errorf("%w: CA certificate is required for TLS encryption", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 				}
 
 				// No, we will never support any other type!
@@ -2117,7 +2117,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 
 				// compare the specs
 				if updatedRestore.Annotations[constants.CronjobSpecAnnotation] != requested.Annotations[constants.CronjobSpecAnnotation] {
-					return fmt.Errorf("%w: inconsistency between requested job and actual job", errors.ErrInternalError)
+					return fmt.Errorf("%w: inconsistency between requested job and actual job", errors.NewStackTracedError(errors.ErrInternalError))
 				}
 
 				log.Info("restore job updated", "cbrestore", currentRestore.Name, "updated job", requested.Name)
@@ -2356,7 +2356,7 @@ func (c *Cluster) reconcileSecuritySettings() error {
 	case couchbasev2.NodeToNodeAll:
 		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionAll
 	default:
-		return fmt.Errorf("%w: illegal cluster encryption level '%s'", errors.ErrConfigurationInvalid, *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption)
+		return fmt.Errorf("%w: illegal cluster encryption level '%s'", errors.NewStackTracedError(errors.ErrConfigurationInvalid), *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption)
 	}
 
 	// Nothing has changed, ignore.
@@ -2450,12 +2450,12 @@ func (c *Cluster) reconcileCompletedPods() error {
 func (c *Cluster) reconcileAdminPassword() error {
 	secret, found := c.k8s.Secrets.Get(c.cluster.Spec.Security.AdminSecret)
 	if !found {
-		return fmt.Errorf("%w: unable to get admin secret %s", errors.ErrResourceRequired, c.cluster.Spec.Security.AdminSecret)
+		return fmt.Errorf("%w: unable to get admin secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Security.AdminSecret)
 	}
 
 	passwordRaw, ok := secret.Data[constants.AuthSecretPasswordKey]
 	if !ok {
-		return fmt.Errorf("%w: secret missing password", errors.ErrResourceAttributeRequired)
+		return fmt.Errorf("%w: secret missing password", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	password := string(passwordRaw)

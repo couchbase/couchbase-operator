@@ -54,7 +54,7 @@ type reconcileFuncMap map[ReconcileState]reconcileFunc
 func (r reconcileFuncMap) lookup(state ReconcileState) (reconcileFunc, error) {
 	f, ok := r[state]
 	if !ok {
-		return nil, fmt.Errorf("%w: invalid reconcile state", errors.ErrInternalError)
+		return nil, fmt.Errorf("%w: invalid reconcile state", errors.NewStackTracedError(errors.ErrInternalError))
 	}
 
 	return f, nil
@@ -417,7 +417,7 @@ func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
 			return nil
 		}
 
-		return fmt.Errorf("%w: cluster is currently rebalancing", ErrReconcileInhibited)
+		return fmt.Errorf("%w: cluster is currently rebalancing", errors.NewStackTracedError(ErrReconcileInhibited))
 	}
 
 	r.transitionState(ReconcileDownNodes)
@@ -459,7 +459,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 		// Ephemeral clusters are handled either automatically by server or
 		// manually by the user.
 		if !c.isPodRecoverable(m) && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritzeDataIntegrity {
-			return fmt.Errorf("%w: pod down, waiting for auto-failover on cluster: %s, pod: %s", ErrReconcileInhibited, c.namespacedName(), m.Name())
+			return fmt.Errorf("%w: pod down, waiting for auto-failover on cluster: %s, pod: %s", errors.NewStackTracedError(ErrReconcileInhibited), c.namespacedName(), m.Name())
 		}
 
 		// If we've not seen this node down yet, then take note of when we should
@@ -504,7 +504,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 	// We are still waiting for failovers to occur, don't allow the rest of the reconcile to
 	// happen.
 	if pendingFailovers != 0 {
-		return fmt.Errorf("%w: waiting for pod failover", ErrReconcileInhibited)
+		return fmt.Errorf("%w: waiting for pod failover", errors.NewStackTracedError(ErrReconcileInhibited))
 	}
 
 	// By this point we know:
@@ -586,7 +586,7 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 
-			return fmt.Errorf("%w: recovering pending add node %s", ErrReconcileInhibited, name)
+			return fmt.Errorf("%w: recovering pending add node %s", errors.NewStackTracedError(ErrReconcileInhibited), name)
 		}
 
 		err := c.cancelAddMember(m)
@@ -683,7 +683,7 @@ func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 
-			return fmt.Errorf("%w: recovering node %s", ErrReconcileInhibited, name)
+			return fmt.Errorf("%w: recovering node %s", errors.NewStackTracedError(ErrReconcileInhibited), name)
 		}
 
 		log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", name)
@@ -847,7 +847,7 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 	// Grab the server class.
 	class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 	if class == nil {
-		return fmt.Errorf("upgrade unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.ErrResourceAttributeRequired)
+		return fmt.Errorf("upgrade unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	// Add the new member.
@@ -952,7 +952,7 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 					}
 				}
 
-				return fmt.Errorf("%w: rebalance failed, forcing full recovery", ErrReconcileInhibited)
+				return fmt.Errorf("%w: rebalance failed, forcing full recovery", errors.NewStackTracedError(ErrReconcileInhibited))
 			}
 
 			return fmt.Errorf("failed to rebalance: %w", err)

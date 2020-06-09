@@ -130,7 +130,7 @@ func (j *janitor) updateDetachedAnnotation(pvc *corev1.PersistentVolumeClaim) er
 	// Extract the pod name from the PVC.
 	podName, ok := pvc.Labels[constants.LabelNode]
 	if !ok {
-		return fmt.Errorf("pvc '%s' missing label '%s': %w", pvc.Name, constants.LabelNode, errors.ErrResourceAttributeRequired)
+		return fmt.Errorf("pvc '%s' missing label '%s': %w", pvc.Name, constants.LabelNode, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	// Look up the pod and calculate whether the PVC is attached.

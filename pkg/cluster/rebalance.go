@@ -178,7 +178,7 @@ WitnessLoop:
 		}
 	}
 
-	return nil, nil, errors.ErrRebalanceIncomplete
+	return nil, nil, errors.NewStackTracedError(errors.ErrRebalanceIncomplete)
 }
 
 func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList) error {
@@ -283,25 +283,25 @@ func (c *Cluster) verifyRebalance(members couchbaseutil.MemberSet) error {
 
 		// Cluster reports as balanced.
 		if !status.Balanced {
-			return errors.ErrRebalanceIncomplete
+			return errors.NewStackTracedError(errors.ErrRebalanceIncomplete)
 		}
 
 		// All Operator members should be active Couchbase nodes.
 		for name := range members {
 			state, ok := status.NodeStates[name]
 			if !ok {
-				return fmt.Errorf("%w: node %s not found in cluster", errors.ErrRebalanceIncomplete, name)
+				return fmt.Errorf("%w: node %s not found in cluster", errors.NewStackTracedError(errors.ErrRebalanceIncomplete), name)
 			}
 
 			if state != NodeStateActive {
-				return fmt.Errorf("%w: node %s state %v, expected Active", errors.ErrRebalanceIncomplete, name, state)
+				return fmt.Errorf("%w: node %s state %v, expected Active", errors.NewStackTracedError(errors.ErrRebalanceIncomplete), name, state)
 			}
 		}
 
 		// All Couchbase nodes should be Operator members.
 		for name := range status.NodeStates {
 			if _, ok := members[name]; !ok {
-				return fmt.Errorf("%w: node %s unexpectedly clustered", errors.ErrRebalanceIncomplete, name)
+				return fmt.Errorf("%w: node %s unexpectedly clustered", errors.NewStackTracedError(errors.ErrRebalanceIncomplete), name)
 			}
 		}
 

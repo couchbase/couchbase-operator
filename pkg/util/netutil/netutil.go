@@ -48,7 +48,7 @@ func WaitForHostPortTLS(ctx context.Context, hostport string, cacert []byte) err
 		RootCAs: x509.NewCertPool(),
 	}
 	if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(cacert); !ok {
-		return errors.ErrCertificateInvalid
+		return errors.NewStackTracedError(errors.ErrCertificateInvalid)
 	}
 
 	// Setup a ticker to retry every second
@@ -84,7 +84,7 @@ func GetTLSState(hostport string, cacert, clientCert, clientKey []byte) ([]*x509
 		RootCAs: x509.NewCertPool(),
 	}
 	if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(cacert); !ok {
-		return nil, errors.ErrCertificateInvalid
+		return nil, errors.NewStackTracedError(errors.ErrCertificateInvalid)
 	}
 
 	if clientCert != nil {

@@ -253,12 +253,12 @@ func (c *Cluster) create() error {
 	c.cluster.Status.CurrentVersion = version
 
 	if len(c.cluster.Spec.Servers) == 0 {
-		return fmt.Errorf("cluster create: no server specification defined: %w", errors.ErrResourceAttributeRequired)
+		return fmt.Errorf("cluster create: no server specification defined: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	idx := c.indexOfServerConfigWithService(couchbasev2.DataService)
 	if idx == -1 {
-		return fmt.Errorf("%w: cluster create: at least one server specification must contain the data service", errors.ErrConfigurationInvalid)
+		return fmt.Errorf("%w: cluster create: at least one server specification must contain the data service", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 	}
 
 	c.members = couchbaseutil.NewMemberSet()
@@ -290,7 +290,7 @@ func (c *Cluster) create() error {
 
 		uuid = info.GetUUID()
 		if uuid == "" {
-			return fmt.Errorf("cluster UUID not set: %w", errors.ErrCouchbaseServerError)
+			return fmt.Errorf("cluster UUID not set: %w", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 		}
 
 		return nil
@@ -482,7 +482,7 @@ func (c *Cluster) removePod(name string, removeVolumes bool) error {
 func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	config := c.cluster.Spec.GetServerConfigByName(m.Config())
 	if config == nil {
-		return fmt.Errorf("%w: config %s for pod does not exist", errors.ErrResourceAttributeRequired, m.Config())
+		return fmt.Errorf("%w: config %s for pod does not exist", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), m.Config())
 	}
 
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
@@ -649,12 +649,12 @@ func (c *Cluster) updateMemberStatusWithClusterInfo(ready, unready couchbaseutil
 func (c *Cluster) setupAuth() error {
 	secret, found := c.k8s.Secrets.Get(c.cluster.Spec.Security.AdminSecret)
 	if !found {
-		return fmt.Errorf("unable to get admin secret %s: %w", c.cluster.Spec.Security.AdminSecret, errors.ErrResourceRequired)
+		return fmt.Errorf("%w: unable to get admin secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Security.AdminSecret)
 	}
 
 	username, ok := secret.Data[constants.AuthSecretUsernameKey]
 	if !ok {
-		return fmt.Errorf("%w: admin secret missing %s", errors.ErrResourceAttributeRequired, constants.AuthSecretUsernameKey)
+		return fmt.Errorf("%w: admin secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.AuthSecretUsernameKey)
 	}
 
 	// The stored password trumps everything, because it's not infeasible
@@ -669,7 +669,7 @@ func (c *Cluster) setupAuth() error {
 
 		passwordRaw, ok := secret.Data[constants.AuthSecretPasswordKey]
 		if !ok {
-			return fmt.Errorf("%w: admin secret missing %s", errors.ErrResourceAttributeRequired, constants.AuthSecretPasswordKey)
+			return fmt.Errorf("%w: admin secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.AuthSecretPasswordKey)
 		}
 
 		password = string(passwordRaw)
@@ -692,12 +692,12 @@ func (c *Cluster) initCouchbaseClient() error {
 
 		secret, found := c.k8s.Secrets.Get(secretName)
 		if !found {
-			return fmt.Errorf("unable to get operator secret %s: %w", secretName, errors.ErrResourceRequired)
+			return fmt.Errorf("unable to get operator secret %s: %w", secretName, errors.NewStackTracedError(errors.ErrResourceRequired))
 		}
 
 		// Extract the data
 		if _, ok := secret.Data[tlsOperatorSecretCACert]; !ok {
-			return fmt.Errorf("unable to find %s in operator secret: %w", tlsOperatorSecretCACert, errors.ErrResourceAttributeRequired)
+			return fmt.Errorf("unable to find %s in operator secret: %w", tlsOperatorSecretCACert, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
 		// Add the TLS context

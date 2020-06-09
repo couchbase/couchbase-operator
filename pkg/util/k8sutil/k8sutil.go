@@ -48,7 +48,7 @@ func CouchbaseVersion(image string) (string, error) {
 
 	lenParts := len(parts)
 	if lenParts < 2 {
-		return "", fmt.Errorf("%w: invalid image string %s", errors.ErrInvalidVersion, image)
+		return "", fmt.Errorf("%w: invalid image string %s", errors.NewStackTracedError(errors.ErrInvalidVersion), image)
 	}
 
 	version := parts[lenParts-1]
@@ -120,11 +120,11 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 func GetHostIP(client *client.Client, name string) (string, error) {
 	pod, found := client.Pods.Get(name)
 	if !found {
-		return "", fmt.Errorf("%w: pod %s not found", errors.ErrResourceRequired, name)
+		return "", fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
 	}
 
 	if pod.Status.HostIP == "" {
-		return "", fmt.Errorf("%w: host IP unset, pod not scheduled", errors.ErrResourceAttributeRequired)
+		return "", fmt.Errorf("%w: host IP unset, pod not scheduled", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	return pod.Status.HostIP, nil
@@ -133,11 +133,11 @@ func GetHostIP(client *client.Client, name string) (string, error) {
 func GetServerGroup(client *client.Client, name string) (string, error) {
 	pod, found := client.Pods.Get(name)
 	if !found {
-		return "", fmt.Errorf("%w: pod %s not found", errors.ErrResourceRequired, name)
+		return "", fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
 	}
 
 	if pod.Spec.NodeSelector == nil {
-		return "", fmt.Errorf("%w: pod %s has no node selector", errors.ErrResourceAttributeRequired, name)
+		return "", fmt.Errorf("%w: pod %s has no node selector", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), name)
 	}
 
 	serverGroup := pod.Spec.NodeSelector[constants.ServerGroupLabel]
@@ -256,7 +256,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 		}
 
 		if pod.Status.Phase != v1.PodRunning {
-			return fmt.Errorf("%w: pod phase %v not Running as expected", errors.ErrKubernetesError, pod.Status.Phase)
+			return fmt.Errorf("%w: pod phase %v not Running as expected", errors.NewStackTracedError(errors.ErrKubernetesError), pod.Status.Phase)
 		}
 
 		return nil
@@ -315,7 +315,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 			switch ev.Type {
 			// check if any error occurred creating pod
 			case watch.Error:
-				return fmt.Errorf("%w: unexpected error deleting pod %v: %v", errors.ErrKubernetesError, podName, status.Reason)
+				return fmt.Errorf("%w: unexpected error deleting pod %v: %v", errors.NewStackTracedError(errors.ErrKubernetesError), podName, status.Reason)
 			case watch.Deleted:
 				return nil
 			}
@@ -338,7 +338,7 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 	if versionMajor == "" || versionMinor == "" {
 		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}")
 		if !rx.MatchString(gitVersion) {
-			err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.ErrInternalError)
+			err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.NewStackTracedError(errors.ErrInternalError))
 			return constants.KubernetesVersionUnknown, err
 		}
 
@@ -351,19 +351,19 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 	rx := regexp.MustCompile("^[0-9]{1,2}")
 	// simply require that version starts with a number to be valid
 	if !rx.MatchString(versionMajor) || !rx.MatchString(versionMinor) {
-		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.ErrInternalError)
+		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.NewStackTracedError(errors.ErrInternalError))
 		return constants.KubernetesVersionUnknown, err
 	}
 
 	major, err := strconv.Atoi(rx.FindString(versionMajor))
 	if err != nil {
-		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.ErrInternalError)
+		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.NewStackTracedError(errors.ErrInternalError))
 		return constants.KubernetesVersionUnknown, err
 	}
 
 	minor, err := strconv.Atoi(rx.FindString(versionMinor))
 	if err != nil {
-		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.ErrInternalError)
+		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.NewStackTracedError(errors.ErrInternalError))
 		return constants.KubernetesVersionUnknown, err
 	}
 

@@ -75,7 +75,7 @@ func getNodeState(node *couchbaseutil.NodeInfo) (NodeState, error) {
 		}
 	}
 
-	return "", fmt.Errorf("%w: unknown node state: status=%s membership=%s", errors.ErrInternalError, node.Status, node.Membership)
+	return "", fmt.Errorf("%w: unknown node state: status=%s membership=%s", errors.NewStackTracedError(errors.ErrInternalError), node.Status, node.Membership)
 }
 
 // Status is a curated view of the Couchbase cluster state.

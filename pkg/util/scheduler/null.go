@@ -34,7 +34,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 	for _, pod := range podGetter.Get() {
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
-			return nil, fmt.Errorf("%s: pod %s does not have server class label: %w", stripeErrorHeader, pod.Name, errors.ErrResourceAttributeRequired)
+			return nil, fmt.Errorf("%s: pod %s does not have server class label: %w", stripeErrorHeader, pod.Name, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
 		// Class deleted, ignore the pod
@@ -51,7 +51,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 // Create does nothing.
 func (sched *nullSchedulerImpl) Create(class, name, group string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: pod %s server class '%s' undefined: %w", stripeErrorHeader, name, class, errors.ErrResourceAttributeRequired)
+		return "", fmt.Errorf("%s: pod %s server class '%s' undefined: %w", stripeErrorHeader, name, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	sched.serverClasses[class].push(name)
@@ -63,7 +63,7 @@ func (sched *nullSchedulerImpl) Create(class, name, group string) (string, error
 func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 	// Select the victim server group based on population
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: server group map missing server class '%s': %w", stripeErrorHeader, class, errors.ErrResourceAttributeRequired)
+		return "", fmt.Errorf("%s: server group map missing server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	sched.serverClasses[class].sort()

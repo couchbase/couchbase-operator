@@ -25,7 +25,7 @@ type Version struct {
 // Initialise the version struct.  Prefix and semver are lazilly initialised.
 func NewVersion(version string) (*Version, error) {
 	if version == "" {
-		return nil, fmt.Errorf("%w: null version", errors.ErrInvalidVersion)
+		return nil, fmt.Errorf("%w: null version", errors.NewStackTracedError(errors.ErrInvalidVersion))
 	}
 
 	// lookup version associated with sha256 digest
@@ -40,7 +40,7 @@ func NewVersion(version string) (*Version, error) {
 
 	matches := re.FindStringSubmatch(version)
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: malformed version '%s'", errors.ErrInvalidVersion, version)
+		return nil, fmt.Errorf("%w: malformed version '%s'", errors.NewStackTracedError(errors.ErrInvalidVersion), version)
 	}
 
 	prefix := matches[1]
@@ -162,7 +162,7 @@ func VerifyVersion(version string) error {
 
 	minVersion, _ := NewVersion(constants.CouchbaseVersionMin)
 	if v.Compare(minVersion) == -1 {
-		return fmt.Errorf("%w: version %s is unsupported, requires at least %s", errors.ErrInvalidVersion, version, minVersion)
+		return fmt.Errorf("%w: version %s is unsupported, requires at least %s", errors.NewStackTracedError(errors.ErrInvalidVersion), version, minVersion)
 	}
 
 	return nil

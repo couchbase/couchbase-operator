@@ -64,7 +64,7 @@ func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cacert, clie
 		}
 
 		if !tlsValid(member, cacert, clientCert, clientKey, cert) {
-			return fmt.Errorf("%w: certificate chain not served", errors.ErrCouchbaseServerError)
+			return fmt.Errorf("%w: certificate chain not served", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 		}
 
 		return nil
@@ -85,13 +85,13 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 	// Load the TLS data from kubernetes.
 	operatorSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 	if !found {
-		err = fmt.Errorf("%w: unable to get operator secret %s", errors.ErrResourceRequired, c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
+		err = fmt.Errorf("%w: unable to get operator secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 		return
 	}
 
 	serverSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.ServerSecret)
 	if !found {
-		err = fmt.Errorf("%w: unable to get server secret %s", errors.ErrResourceRequired, c.cluster.Spec.Networking.TLS.Static.ServerSecret)
+		err = fmt.Errorf("%w: unable to get server secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.Static.ServerSecret)
 		return
 	}
 
@@ -100,19 +100,19 @@ func (c *Cluster) getTLSData() (ca []byte, chain []byte, key []byte, err error) 
 
 	ca, ok = operatorSecret.Data[tlsOperatorSecretCACert]
 	if !ok {
-		err = fmt.Errorf("%w: operator secret missing ca.crt", errors.ErrResourceAttributeRequired)
+		err = fmt.Errorf("%w: operator secret missing ca.crt", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		return
 	}
 
 	key, ok = serverSecret.Data["pkey.key"]
 	if !ok {
-		err = fmt.Errorf("%w: server secret missing pkey.key", errors.ErrResourceAttributeRequired)
+		err = fmt.Errorf("%w: server secret missing pkey.key", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		return
 	}
 
 	chain, ok = serverSecret.Data["chain.pem"]
 	if !ok {
-		err = fmt.Errorf("%w: server secret missing chain.pem", errors.ErrResourceAttributeRequired)
+		err = fmt.Errorf("%w: server secret missing chain.pem", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		return
 	}
 
@@ -124,7 +124,7 @@ func (c *Cluster) getTLSClientData() (chain []byte, key []byte, err error) {
 	// Load the TLS data from kubernetes.
 	operatorSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 	if !found {
-		err = fmt.Errorf("%w: unable to get operator secret %s", errors.ErrResourceRequired, c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
+		err = fmt.Errorf("%w: unable to get operator secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 		return
 	}
 
@@ -132,13 +132,13 @@ func (c *Cluster) getTLSClientData() (chain []byte, key []byte, err error) {
 
 	chain, ok = operatorSecret.Data[tlsOperatorSecretCert]
 	if !ok {
-		err = fmt.Errorf("%w: operator secret missing %s", errors.ErrResourceAttributeRequired, tlsOperatorSecretCert)
+		err = fmt.Errorf("%w: operator secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), tlsOperatorSecretCert)
 		return
 	}
 
 	key, ok = operatorSecret.Data[tlsOperatorSecretKey]
 	if !ok {
-		err = fmt.Errorf("%w: operator secret missing %s", errors.ErrResourceAttributeRequired, tlsOperatorSecretKey)
+		err = fmt.Errorf("%w: operator secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), tlsOperatorSecretKey)
 		return
 	}
 
@@ -237,7 +237,7 @@ func (c *Cluster) reconcileClientAuthentication(members couchbaseutil.MemberSet)
 			}
 
 			if !reflect.DeepEqual(currentSettings, settings) {
-				return fmt.Errorf("%w: client TLS not reconciled", errors.ErrCouchbaseServerError)
+				return fmt.Errorf("%w: client TLS not reconciled", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 			}
 
 			return nil
@@ -296,7 +296,7 @@ func (c *Cluster) reconcileTLS(members couchbaseutil.MemberSet) error {
 
 		errString := strings.Join(errStrings, ", ")
 
-		return fmt.Errorf("%w: %s", errors.ErrTLSInvalid, errString)
+		return fmt.Errorf("%w: %s", errors.NewStackTracedError(errors.ErrTLSInvalid), errString)
 	}
 
 	// Create a new client TLS configuration.
@@ -328,7 +328,7 @@ func (c *Cluster) reconcileTLS(members couchbaseutil.MemberSet) error {
 
 			errString := strings.Join(errStrings, ", ")
 
-			return fmt.Errorf("%w: %s", errors.ErrTLSInvalid, errString)
+			return fmt.Errorf("%w: %s", errors.NewStackTracedError(errors.ErrTLSInvalid), errString)
 		}
 
 		// Update the TLS client configuration.

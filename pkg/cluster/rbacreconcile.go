@@ -264,7 +264,7 @@ func (c *Cluster) createGroup(group couchbaseutil.Group) error {
 			}
 
 			if _, err := buckets.Get(role.BucketName); err != nil {
-				return fmt.Errorf("%w: group `%s` with role `%s` references a bucket which does not exist: %s", errors.ErrResourceRequired, group.ID, role.Role, role.BucketName)
+				return fmt.Errorf("%w: group `%s` with role `%s` references a bucket which does not exist: %s", errors.NewStackTracedError(errors.ErrResourceRequired), group.ID, role.Role, role.BucketName)
 			}
 		}
 	}
@@ -278,14 +278,14 @@ func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
 
 	secret, found := c.k8s.Secrets.Get(authSecret)
 	if !found {
-		return password, fmt.Errorf("%w: unable to find secret %s", errors.ErrResourceRequired, authSecret)
+		return password, fmt.Errorf("%w: unable to find secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), authSecret)
 	}
 
 	data := secret.Data
 	if dataPassword, ok := data[constants.AuthSecretPasswordKey]; ok {
 		password = string(dataPassword)
 	} else {
-		return password, fmt.Errorf("%w: rbac secret missing key %s", errors.ErrResourceAttributeRequired, constants.AuthSecretPasswordKey)
+		return password, fmt.Errorf("%w: rbac secret missing key %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.AuthSecretPasswordKey)
 	}
 
 	return password, nil
@@ -333,12 +333,12 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		if tlsSecretName != "" {
 			tlsSecret, found := c.k8s.Secrets.Get(tlsSecretName)
 			if !found {
-				return fmt.Errorf("%w: unable to get ldap tls secret `%s`", errors.ErrResourceRequired, tlsSecretName)
+				return fmt.Errorf("%w: unable to get ldap tls secret `%s`", errors.NewStackTracedError(errors.ErrResourceRequired), tlsSecretName)
 			}
 
 			ca, ok := tlsSecret.Data[constants.LDAPSecretCACert]
 			if !ok {
-				return fmt.Errorf("%w: unable to find %s in tls ldap secret", errors.ErrResourceAttributeRequired, constants.LDAPSecretCACert)
+				return fmt.Errorf("%w: unable to find %s in tls ldap secret", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.LDAPSecretCACert)
 			}
 
 			specLDAPSettings.CACert = string(ca)
@@ -351,12 +351,12 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		if bindSecretName != "" {
 			bindSecret, found := c.k8s.Secrets.Get(bindSecretName)
 			if !found {
-				return fmt.Errorf("%w: unable to get ldap bind secret `%s`", errors.ErrResourceRequired, bindSecretName)
+				return fmt.Errorf("%w: unable to get ldap bind secret `%s`", errors.NewStackTracedError(errors.ErrResourceRequired), bindSecretName)
 			}
 
 			password, ok := bindSecret.Data[constants.LDAPSecretPassword]
 			if !ok {
-				return fmt.Errorf("%w: unable to find %s in ldap bind secret", errors.ErrResourceAttributeRequired, constants.LDAPSecretPassword)
+				return fmt.Errorf("%w: unable to find %s in ldap bind secret", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.LDAPSecretPassword)
 			}
 
 			specLDAPSettings.BindPass = string(password)

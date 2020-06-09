@@ -48,10 +48,10 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 	switch {
 	case len(caPem) < 1:
-		errs = append(errs, fmt.Errorf("%w: CA contains no PEM blocks", errors.ErrCertificateInvalid))
+		errs = append(errs, fmt.Errorf("%w: CA contains no PEM blocks", errors.NewStackTracedError(errors.ErrCertificateInvalid)))
 		return
 	case len(caPem) > 1:
-		errs = append(errs, fmt.Errorf("%w: CA contains %d PEM blocks, expected 1", errors.ErrCertificateInvalid, len(caPem)))
+		errs = append(errs, fmt.Errorf("%w: CA contains %d PEM blocks, expected 1", errors.NewStackTracedError(errors.ErrCertificateInvalid), len(caPem)))
 		return
 	}
 
@@ -64,7 +64,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 	// Decode chain
 	chainPem := DecodePEM(chainData)
 	if len(chainPem) == 0 {
-		errs = append(errs, fmt.Errorf("%w: chain contains no PEM blocks", errors.ErrCertificateInvalid))
+		errs = append(errs, fmt.Errorf("%w: chain contains no PEM blocks", errors.NewStackTracedError(errors.ErrCertificateInvalid)))
 		return
 	}
 
@@ -119,17 +119,17 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 	switch {
 	case len(keyPem) < 1:
-		errs = append(errs, fmt.Errorf("%w: private key contains no PEM blocks", errors.ErrPrivateKeyInvalid))
+		errs = append(errs, fmt.Errorf("%w: private key contains no PEM blocks", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid)))
 		return
 	case len(keyPem) > 1:
-		errs = append(errs, fmt.Errorf("%w: private key contains %d PEM blocks, expected 1", errors.ErrPrivateKeyInvalid, len(keyPem)))
+		errs = append(errs, fmt.Errorf("%w: private key contains %d PEM blocks, expected 1", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid), len(keyPem)))
 		return
 	}
 
 	if extKeyUsage == x509.ExtKeyUsageServerAuth {
 		if _, err := x509.ParsePKCS1PrivateKey(keyPem[0].Bytes); err != nil {
 			// This is an annoying bug with NS server not supporting PKCS8 *sigh*
-			errs = append(errs, fmt.Errorf("%w: private key not formatted as PKCS1", errors.ErrPrivateKeyInvalid))
+			errs = append(errs, fmt.Errorf("%w: private key not formatted as PKCS1", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid)))
 		}
 	}
 
