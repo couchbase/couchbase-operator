@@ -1,9 +1,10 @@
-/*  One pipeline to rule them all...
-    Reegardless of the platform all run the same, the test framework accepts
-    configuration for two clusters, and it runs the tests against them.  This
-    should not be run by itself as it provides no locking around the use of
-    configuration.
-*/
+/**
+ * One pipeline to rule them all...
+ * Reegardless of the platform all run the same, the test framework accepts
+ * configuration for two clusters, and it runs the tests against them.  This
+ * should not be run by itself as it provides no locking around the use of
+ * configuration.
+ */
 pipeline {
   agent {
     label 'k8'
@@ -11,6 +12,16 @@ pipeline {
 
   options {
     timestamps()
+
+    // Don't use all the disk, these servers aren't monitored with Nagios or anything.
+    buildDiscarder(
+      logRotator(
+        artifactDaysToKeepStr: '7',
+        artifactNumToKeepStr: '10',
+        daysToKeepStr: '7',
+        numToKeepStr: '10',
+      )
+    )
   }
 
   parameters {
@@ -66,10 +77,10 @@ pipeline {
       }
     }
 
-    /* All of these test stages are exactly the same.  With a matrix build
-       iterating over a list of suites, you only need to define it once.
-       Appears to need the declarative pipeline plugin version >= 1.5.
-    */
+    // All of these test stages are exactly the same.  With a matrix build
+    // iterating over a list of suites, you only need to define it once.
+    // Appears to need the declarative pipeline plugin version >= 1.5.
+
     stage('Test Validation') {
       when {
         expression {
@@ -78,15 +89,25 @@ pipeline {
       }
       steps {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCRDValidation -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+
+        // Newer versions can use the warnError closure, which can flag
+        // individual stages as broken, not the whole build.  That said
+        // none of this would be necessary if tests were stable...
+
+        script {
+          try {
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCRDValidation -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+        }
       }
       post {
         always {
-            junit "test/e2e/*.xml"
-        }
-        failure {
-          /* Is there any reason we shouln't be using native artifacts? */
-          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/validation.tar.gz -C test/e2e/logs ."
+          junit 'test/e2e/*.xml'
+          sh 'tar czf validation.tar.gz -C test/e2e/logs .'
+          archiveArtifacts artifacts: 'validation.tar.gz', fingerprint: true
         }
       }
     }
@@ -99,14 +120,20 @@ pipeline {
       }
       steps {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestSanity -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+        script {
+          try {
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestSanity -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+        }
       }
       post {
         always {
-            junit "test/e2e/*.xml"
-        }
-        failure {
-          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/sanity.tar.gz -C test/e2e/logs ."
+          junit 'test/e2e/*.xml'
+          sh 'tar czf sanity.tar.gz -C test/e2e/logs .'
+          archiveArtifacts artifacts: 'sanity.tar.gz', fingerprint: true
         }
       }
     }
@@ -119,14 +146,20 @@ pipeline {
       }
       steps {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP0 -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+        script {
+          try {
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP0 -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+        }
       }
       post {
         always {
-            junit "test/e2e/*.xml"
-        }
-        failure {
-          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/p0.tar.gz -C test/e2e/logs ."
+          junit 'test/e2e/*.xml'
+          sh 'tar czf p0.tar.gz -C test/e2e/logs .'
+          archiveArtifacts artifacts: 'p0.tar.gz', fingerprint: true
         }
       }
     }
@@ -139,14 +172,20 @@ pipeline {
       }
       steps {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP1 -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+        script {
+          try {
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP1 -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+        }
       }
       post {
         always {
-            junit "test/e2e/*.xml"
-        }
-        failure {
-          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/p1.tar.gz -C test/e2e/logs ."
+          junit 'test/e2e/*.xml'
+          sh 'tar czf p1.tar.gz -C test/e2e/logs .'
+          archiveArtifacts artifacts: 'p1.tar.gz', fingerprint: true
         }
       }
     }
@@ -159,11 +198,19 @@ pipeline {
       }
       steps {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCustom -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+        script {
+          try {
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCustom -storage-class ${params.storage_class} -kubeconfig1 ${params.kubeconfig1} -kubeconfig2 ${params.kubeconfig2} -docker-username ${env.DOCKER_CREDENTIALS_USR} -docker-password ${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+        }
       }
       post {
-        failure {
-          sh "mkdir -p ${env.LOG_DIR} && tar czf ${env.LOG_DIR}/custom.tar.gz -C test/e2e/logs ."
+        always {
+          sh 'tar czf custom.tar.gz -C test/e2e/logs .'
+          archiveArtifacts artifacts: 'custom.tar.gz', fingerprint: true
         }
       }
     }
