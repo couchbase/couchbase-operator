@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -11,7 +12,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
-	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -204,7 +205,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("PodCreateTimeout improperly formatted: %v", err)
+		return nil, fmt.Errorf("PodCreateTimeout improperly formatted: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
@@ -241,7 +242,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 
 	if err := c.createPod(ctx, newMember, serverSpec); err != nil {
 		c.logFailedMember("Member creation failed", newMember.Name())
-		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name(), err)
+		return nil, fmt.Errorf("fail to create member's pod (%s): %w", newMember.Name(), err)
 	}
 
 	// Synchronize on pod creation and service availability
@@ -270,7 +271,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 
 	if !info.Enterprise {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
-		return nil, fmt.Errorf("couchbase server reports community edition")
+		return nil, fmt.Errorf("%w: couchbase server reports community edition", errors.ErrConfigurationInvalid)
 	}
 
 	// Enable TLS if requested
@@ -631,7 +632,7 @@ func (c *Cluster) reconcilePodServices() error {
 			_, ok := c.k8s.Services.Get(member.Name())
 
 			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, member); err != nil {
-				if cberrors.IsErrUnknownServerClass(err) {
+				if goerrors.Is(err, errors.ErrResourceAttributeRequired) {
 					log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
 					continue
 				}
@@ -743,13 +744,13 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m couchbaseutil.Member, cs 
 
 			secret, found := c.k8s.Secrets.Get(secretName)
 			if !found {
-				return fmt.Errorf("unable to get operator secret %s", secretName)
+				return fmt.Errorf("%w: unable to get operator secret %s", errors.ErrResourceRequired, secretName)
 			}
 
 			// Extract the CA's PEM data
 			ca, ok := secret.Data[tlsOperatorSecretCACert]
 			if !ok {
-				return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretCACert)
+				return fmt.Errorf("%w: unable to find %s in operator secret", errors.ErrResourceAttributeRequired, tlsOperatorSecretCACert)
 			}
 
 			// Update Couchbase's TLS configuration
@@ -825,7 +826,7 @@ func (c *Cluster) createServerGroups(existingGroups *couchbaseutil.ServerGroups)
 			}
 
 			if existingGroups.GetServerGroup(serverGroup) == nil {
-				return fmt.Errorf("server group %s not found", serverGroup)
+				return fmt.Errorf("%w: server group %s not found", errors.ErrCouchbaseServerError, serverGroup)
 			}
 
 			return nil
@@ -848,7 +849,7 @@ func serverGroupIndex(update *couchbaseutil.ServerGroupsUpdate, name string) (in
 		}
 	}
 
-	return -1, fmt.Errorf("server group %s undefined", name)
+	return -1, fmt.Errorf("%w: server group %s undefined", errors.ErrInternalError, name)
 }
 
 // reconcileServerGroups looks at the cluster specification, if we have enabled
@@ -903,7 +904,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 
 			// TODO: should we flag this as a warning and leave it where it is?
 			if scheduledServerGroup == "" {
-				return false, fmt.Errorf("server group unset for pod %s", podName)
+				return false, fmt.Errorf("%w: server group unset for pod %s", errors.ErrCouchbaseServerError, podName)
 			}
 
 			// If the node is in the wrong server group schedule an update
@@ -915,7 +916,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 			index, err := serverGroupIndex(&newGroups, scheduledServerGroup)
 			if err != nil {
 				// You have done something stupid like change the pod label
-				return false, fmt.Errorf("server group %s for pod %s undefined", scheduledServerGroup, podName)
+				return false, fmt.Errorf("server group %s for pod %s undefined: %w", scheduledServerGroup, podName, err)
 			}
 
 			// Insert the node in the correct server group
@@ -969,7 +970,7 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 
 			// TODO: should we flag this as a warning and leave it where it is?
 			if scheduledServerGroup == "" {
-				return false, fmt.Errorf("server group unset for pod %s", podName)
+				return false, fmt.Errorf("%w: server group unset for pod %s", errors.ErrCouchbaseServerError, podName)
 			}
 
 			// If the node is in the wrong server group schedule an update
@@ -1391,7 +1392,7 @@ func (c *Cluster) verifyMemberVolumes(m couchbaseutil.Member) error {
 
 	err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name())
 	if err != nil {
-		if _, ok := err.(cberrors.ErrNoVolumeMounts); ok {
+		if goerrors.Is(err, errors.ErrNoVolumeMounts) {
 			// Pod is not configured for volumes
 			return nil
 		}
@@ -1630,12 +1631,12 @@ func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
 		// Parse the target to recover lost information.
 		// Should be in the form /remoteClusters/c4c9af9ad62d8b5f665edac5ffc9c1be/buckets/default
 		if task.Target == "" {
-			return nil, fmt.Errorf("listReplications: target not populated")
+			return nil, fmt.Errorf("listReplications: target not populated: %w", errors.ErrCouchbaseServerError)
 		}
 
 		parts := strings.Split(task.Target, "/")
 		if len(parts) != 5 {
-			return nil, fmt.Errorf("listReplications: target incorrectly formatted: %v", task.Target)
+			return nil, fmt.Errorf("listReplications: target incorrectly formatted: %v: %w", task.Target, errors.ErrCouchbaseServerError)
 		}
 
 		uuid := parts[2]
@@ -1683,7 +1684,7 @@ func (c *Cluster) getRemoteClusterByName(name string) (*couchbaseutil.RemoteClus
 		}
 	}
 
-	return nil, fmt.Errorf("lookupUUIDForCluster: no cluster found for name %v", name)
+	return nil, fmt.Errorf("lookupUUIDForCluster: no cluster found for name %v: %w", name, errors.ErrCouchbaseServerError)
 }
 
 // getRemoteClusterByUUID helps manage the utter horror show that is XDCR
@@ -1700,7 +1701,7 @@ func (c *Cluster) getRemoteClusterByUUID(uuid string) (*couchbaseutil.RemoteClus
 		}
 	}
 
-	return nil, fmt.Errorf("lookupClusterForUUID: no cluster found for uuid %v", uuid)
+	return nil, fmt.Errorf("lookupClusterForUUID: no cluster found for uuid %v: %w", uuid, errors.ErrCouchbaseServerError)
 }
 
 // reconcileXDCR creates and deletes XDCR connections dynamically.
@@ -1722,7 +1723,7 @@ func (c *Cluster) reconcileXDCR() error {
 		if cluster.AuthenticationSecret != nil {
 			secret, found := c.k8s.Secrets.Get(*cluster.AuthenticationSecret)
 			if !found {
-				return fmt.Errorf("unable to get remote cluster authentication secret %s", *cluster.AuthenticationSecret)
+				return fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.ErrResourceRequired, *cluster.AuthenticationSecret)
 			}
 
 			requested.Username = string(secret.Data["username"])
@@ -1733,11 +1734,11 @@ func (c *Cluster) reconcileXDCR() error {
 			if cluster.TLS.Secret != nil {
 				secret, found := c.k8s.Secrets.Get(*cluster.TLS.Secret)
 				if !found {
-					return fmt.Errorf("unable to get remote cluster TLS secret %s", *cluster.TLS.Secret)
+					return fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.ErrResourceRequired, *cluster.TLS.Secret)
 				}
 
 				if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
-					return fmt.Errorf("CA certificate is required for TLS encryption")
+					return fmt.Errorf("%w: CA certificate is required for TLS encryption", errors.ErrResourceAttributeRequired)
 				}
 
 				// No, we will never support any other type!
@@ -2124,7 +2125,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 
 				// compare the specs
 				if updatedRestore.Annotations[constants.CronjobSpecAnnotation] != requested.Annotations[constants.CronjobSpecAnnotation] {
-					return fmt.Errorf("inconsistency between requested job and actual job")
+					return fmt.Errorf("%w: inconsistency between requested job and actual job", errors.ErrInternalError)
 				}
 
 				log.Info("restore job updated", "cbrestore", currentRestore.Name, "updated job", requested.Name)
@@ -2363,7 +2364,7 @@ func (c *Cluster) reconcileSecuritySettings() error {
 	case couchbasev2.NodeToNodeAll:
 		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionAll
 	default:
-		return fmt.Errorf("illegal cluster encryption level '%s'", *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption)
+		return fmt.Errorf("%w: illegal cluster encryption level '%s'", errors.ErrConfigurationInvalid, *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption)
 	}
 
 	// Nothing has changed, ignore.
@@ -2457,12 +2458,12 @@ func (c *Cluster) reconcileCompletedPods() error {
 func (c *Cluster) reconcileAdminPassword() error {
 	secret, found := c.k8s.Secrets.Get(c.cluster.Spec.Security.AdminSecret)
 	if !found {
-		return fmt.Errorf("unable to get admin secret %s", c.cluster.Spec.Security.AdminSecret)
+		return fmt.Errorf("%w: unable to get admin secret %s", errors.ErrResourceRequired, c.cluster.Spec.Security.AdminSecret)
 	}
 
 	passwordRaw, ok := secret.Data[constants.AuthSecretPasswordKey]
 	if !ok {
-		return fmt.Errorf("secret missing password")
+		return fmt.Errorf("%w: secret missing password", errors.ErrResourceAttributeRequired)
 	}
 
 	password := string(passwordRaw)

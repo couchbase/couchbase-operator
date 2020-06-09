@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-// ExecOptions passed to ExecWithOptions
+// ExecOptions passed to ExecWithOptions.
 type ExecOptions struct {
 	// Command is the command and argurments to run.
 	Command []string

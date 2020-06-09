@@ -11,7 +11,7 @@ var log = logf.Log.WithName("scheduler")
 
 // Scheduler is an abstraction for something that is able to inspect the cluster
 // and make intelligent decisions about which server groups to add pods to or
-// remove them from in a deterministic fashion
+// remove them from in a deterministic fashion.
 type Scheduler interface {
 	// Create examines the cluster state and cluster specification in order to
 	// schedule the creation of a new pod.  The pod parameter is mutated to

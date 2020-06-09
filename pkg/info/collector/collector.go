@@ -9,7 +9,7 @@ import (
 // Collectors are similar to resources in that they abstract the collection
 // and formatting of resources, however they target specific instances.  For
 // example this is used to collect events associated with a specific cluster
-// instance
+// instance.
 type Collector interface {
 	// Kind returns the Kubernetes kind of the resource
 	Kind() string

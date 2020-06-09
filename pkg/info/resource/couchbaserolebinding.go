@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// couchbaseRoleBindingResource represents a collection of couchbase clusters
+// couchbaseRoleBindingResource represents a collection of couchbase clusters.
 type couchbaseRoleBindingResource struct {
 	context *context.Context
 	// couchbaseRoleBindings is the raw output from listing couchbaseRoleBindings

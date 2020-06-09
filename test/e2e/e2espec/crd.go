@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// bucket settings
+// bucket settings.
 var (
 	DefaultBucket = &couchbasev2.CouchbaseBucket{
 		ObjectMeta: metav1.ObjectMeta{

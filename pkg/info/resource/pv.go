@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// persistentVolumeResource represents a collection of persistentVolumes
+// persistentVolumeResource represents a collection of persistentVolumes.
 type persistentVolumeResource struct {
 	context *context.Context
 	// persistentVolumes is the raw output from listing persistentVolumes

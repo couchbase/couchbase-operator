@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -11,7 +12,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
-	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -252,12 +253,12 @@ func (c *Cluster) create() error {
 	c.cluster.Status.CurrentVersion = version
 
 	if len(c.cluster.Spec.Servers) == 0 {
-		return fmt.Errorf("cluster create: no server specification defined")
+		return fmt.Errorf("cluster create: no server specification defined: %w", errors.ErrResourceAttributeRequired)
 	}
 
 	idx := c.indexOfServerConfigWithService(couchbasev2.DataService)
 	if idx == -1 {
-		return fmt.Errorf("cluster create: at least one server specification must contain the `data` service")
+		return fmt.Errorf("%w: cluster create: at least one server specification must contain the data service", errors.ErrConfigurationInvalid)
 	}
 
 	c.members = couchbaseutil.NewMemberSet()
@@ -289,7 +290,7 @@ func (c *Cluster) create() error {
 
 		uuid = info.GetUUID()
 		if uuid == "" {
-			return fmt.Errorf("cluster UUID not set")
+			return fmt.Errorf("cluster UUID not set: %w", errors.ErrCouchbaseServerError)
 		}
 
 		return nil
@@ -382,7 +383,14 @@ func (c *Cluster) runReconcile() {
 
 	// Finally reconcile state according to the specification.
 	if err := c.reconcile(); err != nil {
-		log.Error(err, "Reconciliation failed", "cluster", c.namespacedName())
+		var stackTracedError *errors.StackTracedError
+
+		if goerrors.As(err, &stackTracedError) {
+			log.Info("Reconciliation failed", "cluster", c.namespacedName(), "error", err.Error(), "stack", stackTracedError.GetStack())
+		} else {
+			log.Error(err, "Reconciliation failed", "cluster", c.namespacedName())
+		}
+
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
 		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 
@@ -474,7 +482,7 @@ func (c *Cluster) removePod(name string, removeVolumes bool) error {
 func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	config := c.cluster.Spec.GetServerConfigByName(m.Config())
 	if config == nil {
-		return fmt.Errorf("config for pod does not exist: %s", m.Config())
+		return fmt.Errorf("%w: config %s for pod does not exist", errors.ErrResourceAttributeRequired, m.Config())
 	}
 
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
@@ -490,7 +498,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
-		return fmt.Errorf("PodCreateTimeout improperly formatted: %v", err)
+		return fmt.Errorf("PodCreateTimeout improperly formatted: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
@@ -545,7 +553,7 @@ func (c *Cluster) recoverClusterDown() error {
 		m := c.members[name]
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
-				return fmt.Errorf("node %s could not be recovered: %s", m.Name(), err.Error())
+				return fmt.Errorf("node %s could not be recovered: %w", m.Name(), err)
 			}
 
 			log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name())
@@ -641,14 +649,12 @@ func (c *Cluster) updateMemberStatusWithClusterInfo(ready, unready couchbaseutil
 func (c *Cluster) setupAuth() error {
 	secret, found := c.k8s.Secrets.Get(c.cluster.Spec.Security.AdminSecret)
 	if !found {
-		return fmt.Errorf("unable to get admin secret %s", c.cluster.Spec.Security.AdminSecret)
+		return fmt.Errorf("unable to get admin secret %s: %w", c.cluster.Spec.Security.AdminSecret, errors.ErrResourceRequired)
 	}
 
-	data := secret.Data
-	if username, ok := data[constants.AuthSecretUsernameKey]; ok {
-		c.username = string(username)
-	} else {
-		return cberrors.ErrSecretMissingUsername{Reason: c.cluster.Spec.Security.AdminSecret}
+	username, ok := secret.Data[constants.AuthSecretUsernameKey]
+	if !ok {
+		return fmt.Errorf("%w: admin secret missing %s", errors.ErrResourceAttributeRequired, constants.AuthSecretUsernameKey)
 	}
 
 	// The stored password trumps everything, because it's not infeasible
@@ -661,14 +667,15 @@ func (c *Cluster) setupAuth() error {
 			return err
 		}
 
-		passwordRaw, ok := data[constants.AuthSecretPasswordKey]
+		passwordRaw, ok := secret.Data[constants.AuthSecretPasswordKey]
 		if !ok {
-			return fmt.Errorf("mssing passsword")
+			return fmt.Errorf("%w: admin secret missing %s", errors.ErrResourceAttributeRequired, constants.AuthSecretPasswordKey)
 		}
 
 		password = string(passwordRaw)
 	}
 
+	c.username = string(username)
 	c.password = password
 
 	return nil
@@ -685,12 +692,12 @@ func (c *Cluster) initCouchbaseClient() error {
 
 		secret, found := c.k8s.Secrets.Get(secretName)
 		if !found {
-			return fmt.Errorf("unable to get operator secret %s", secretName)
+			return fmt.Errorf("unable to get operator secret %s: %w", secretName, errors.ErrResourceRequired)
 		}
 
 		// Extract the data
 		if _, ok := secret.Data[tlsOperatorSecretCACert]; !ok {
-			return fmt.Errorf("unable to find %s in operator secret", tlsOperatorSecretCACert)
+			return fmt.Errorf("unable to find %s in operator secret: %w", tlsOperatorSecretCACert, errors.ErrResourceAttributeRequired)
 		}
 
 		// Add the TLS context

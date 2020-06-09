@@ -14,7 +14,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
-	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
@@ -48,7 +48,7 @@ func CouchbaseVersion(image string) (string, error) {
 
 	lenParts := len(parts)
 	if lenParts < 2 {
-		return "", fmt.Errorf("invalid image string: %s", image)
+		return "", fmt.Errorf("%w: invalid image string %s", errors.ErrInvalidVersion, image)
 	}
 
 	version := parts[lenParts-1]
@@ -120,11 +120,11 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 func GetHostIP(client *client.Client, name string) (string, error) {
 	pod, found := client.Pods.Get(name)
 	if !found {
-		return "", fmt.Errorf("pod %s not found", name)
+		return "", fmt.Errorf("%w: pod %s not found", errors.ErrResourceRequired, name)
 	}
 
 	if pod.Status.HostIP == "" {
-		return "", fmt.Errorf("host IP unset, pod not scheduled")
+		return "", fmt.Errorf("%w: host IP unset, pod not scheduled", errors.ErrResourceAttributeRequired)
 	}
 
 	return pod.Status.HostIP, nil
@@ -133,11 +133,11 @@ func GetHostIP(client *client.Client, name string) (string, error) {
 func GetServerGroup(client *client.Client, name string) (string, error) {
 	pod, found := client.Pods.Get(name)
 	if !found {
-		return "", fmt.Errorf("pod %s not found", name)
+		return "", fmt.Errorf("%w: pod %s not found", errors.ErrResourceRequired, name)
 	}
 
 	if pod.Spec.NodeSelector == nil {
-		return "", fmt.Errorf("pod %s has no node selector", name)
+		return "", fmt.Errorf("%w: pod %s has no node selector", errors.ErrResourceAttributeRequired, name)
 	}
 
 	serverGroup := pod.Spec.NodeSelector[constants.ServerGroupLabel]
@@ -256,7 +256,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 		}
 
 		if pod.Status.Phase != v1.PodRunning {
-			return cberrors.ErrCreatingPod{Reason: pod.Status.Reason}
+			return fmt.Errorf("%w: pod phase %v not Running as expected", errors.ErrKubernetesError, pod.Status.Phase)
 		}
 
 		return nil
@@ -298,16 +298,15 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 
 	events := watcher.ResultChan()
 
-	done := false
-	for !done {
+	for {
 		select {
 		// Handle timeout and cancellation events
 		case <-ctx.Done():
-			return fmt.Errorf("%v: Pod Deletion error - error deleting pod %v", ctx.Err(), podName)
+			return fmt.Errorf("%w: Pod Deletion error - error deleting pod %v", ctx.Err(), podName)
 		// Process K8S events for our chosen pod
 		case ev := <-events:
 			if ev.Object == nil {
-				continue
+				break
 			}
 
 			obj := ev.Object.(*v1.Pod)
@@ -316,16 +315,12 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 			switch ev.Type {
 			// check if any error occurred creating pod
 			case watch.Error:
-				return cberrors.ErrDeletingPod{Reason: status.Reason}
+				return fmt.Errorf("%w: unexpected error deleting pod %v: %v", errors.ErrKubernetesError, podName, status.Reason)
 			case watch.Deleted:
 				return nil
-			default:
-				continue
 			}
 		}
 	}
-
-	return fmt.Errorf("failed to wait for pod to delete: %s", podName)
 }
 
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
@@ -343,7 +338,7 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 	if versionMajor == "" || versionMinor == "" {
 		rx := regexp.MustCompile("^v[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}")
 		if !rx.MatchString(gitVersion) {
-			err := fmt.Errorf("unable to get version from Kubernetes API response")
+			err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.ErrInternalError)
 			return constants.KubernetesVersionUnknown, err
 		}
 
@@ -356,19 +351,19 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 	rx := regexp.MustCompile("^[0-9]{1,2}")
 	// simply require that version starts with a number to be valid
 	if !rx.MatchString(versionMajor) || !rx.MatchString(versionMinor) {
-		err := fmt.Errorf("unable to get version from Kubernetes API response")
+		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.ErrInternalError)
 		return constants.KubernetesVersionUnknown, err
 	}
 
 	major, err := strconv.Atoi(rx.FindString(versionMajor))
 	if err != nil {
-		err := fmt.Errorf("unable to get version from Kubernetes API response")
+		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.ErrInternalError)
 		return constants.KubernetesVersionUnknown, err
 	}
 
 	minor, err := strconv.Atoi(rx.FindString(versionMinor))
 	if err != nil {
-		err := fmt.Errorf("unable to get version from Kubernetes API response")
+		err := fmt.Errorf("%w: unable to get version from Kubernetes API response", errors.ErrInternalError)
 		return constants.KubernetesVersionUnknown, err
 	}
 

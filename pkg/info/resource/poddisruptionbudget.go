@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// podDisruptionBudgetResource represents a collection of pod disruption budgets
+// podDisruptionBudgetResource represents a collection of pod disruption budgets.
 type podDisruptionBudgetResource struct {
 	context *context.Context
 	// pdbs is the raw output from listing pod disruption budgets

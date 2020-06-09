@@ -13,7 +13,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// logCollector represents a collection of logs
+// logCollector represents a collection of logs.
 type logCollector struct {
 	context *context.Context
 	// logs is the raw output from listing logs

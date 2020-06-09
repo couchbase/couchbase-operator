@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// secretResource represents a collection of secrets
+// secretResource represents a collection of secrets.
 type secretResource struct {
 	context *context.Context
 	// secrets is the raw output from listing secrets

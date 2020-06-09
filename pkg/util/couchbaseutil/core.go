@@ -27,6 +27,10 @@ const (
 	tcpConnectTimeout = 5 * time.Second
 )
 
+var ErrCertificateError = fmt.Errorf("certificate error")
+var ErrStatusError = fmt.Errorf("unexpected status code")
+var ErrUUIDError = fmt.Errorf("cluster UUID error")
+
 // newClient creates a new HTTP client which offers connection persistence and
 // also checks that the UUID of a host is what we expect when dialing before
 // allowing further HTTP requests.
@@ -46,7 +50,7 @@ func (c *Client) makeClient() {
 		// Construct a HTTP request
 		req, err := http.NewRequest("GET", "/pools", nil)
 		if err != nil {
-			return fmt.Errorf("uuid check: %s", err.Error())
+			return fmt.Errorf("uuid check: %w", err)
 		}
 
 		req.URL.Host = addr
@@ -55,17 +59,17 @@ func (c *Client) makeClient() {
 
 		// Perform the transaction
 		if err = req.Write(conn); err != nil {
-			return fmt.Errorf("uuid check: %s", err.Error())
+			return fmt.Errorf("uuid check: %w", err)
 		}
 
 		resp, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
-			return fmt.Errorf("uuid check: %s", err.Error())
+			return fmt.Errorf("uuid check: %w", err)
 		}
 
 		// Check the status code was 2XX
 		if resp.StatusCode/100 != 2 {
-			return fmt.Errorf("uuid check: unexpected status code '%s' from %s", resp.Status, addr)
+			return fmt.Errorf("%w: uuid check: unexpected status code '%s' from %s", ErrStatusError, resp.Status, addr)
 		}
 
 		defer resp.Body.Close()
@@ -73,7 +77,7 @@ func (c *Client) makeClient() {
 		// Read the body
 		buffer, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("uuid check: %s", err.Error())
+			return fmt.Errorf("uuid check: %w", err)
 		}
 
 		// Parse the JSON body into our anonymous struct, we only care about the UUID
@@ -82,7 +86,7 @@ func (c *Client) makeClient() {
 		}
 
 		if err = json.Unmarshal(buffer, &body); err != nil {
-			return fmt.Errorf("uuid check: json error '%s' from %s", err.Error(), addr)
+			return fmt.Errorf("uuid check: json error '%w' from %s", err, addr)
 		}
 
 		// UUID is a string if set or an empty array otherwise :/
@@ -92,14 +96,14 @@ func (c *Client) makeClient() {
 		case string:
 			uuid = t
 		case []interface{}:
-			return fmt.Errorf("uuid is unset")
+			return fmt.Errorf("%w: uuid is unset", ErrUUIDError)
 		default:
-			return fmt.Errorf("uuid is unexpected type: %s", reflect.TypeOf(t))
+			return fmt.Errorf("%w: uuid is unexpected type: %s", ErrUUIDError, reflect.TypeOf(t))
 		}
 
 		// Finally check the UUID is as we expect.  Will be empty if no body was found
 		if uuid != c.uuid {
-			return fmt.Errorf("uuid check: wanted %s got %s from %s", c.uuid, uuid, addr)
+			return fmt.Errorf("%w: uuid check: wanted %s got %s from %s", ErrUUIDError, c.uuid, uuid, addr)
 		}
 
 		return nil
@@ -146,7 +150,7 @@ func (c *Client) makeClient() {
 
 			// At the very least we need a CA certificate to attain trust in the remote end
 			if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(c.tls.CACert); !ok {
-				return nil, fmt.Errorf("failed to append CA certificate")
+				return nil, fmt.Errorf("%w: failed to append CA certificate", ErrCertificateError)
 			}
 
 			// If the remote end needs to trust us too we add a client certificate and key pair
@@ -259,7 +263,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 
 	// Anything outside of a 2XX we regard as an error.
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("request failed %v %v %v: %v", request.Method, request.URL.String(), response.Status, string(body))
+		return fmt.Errorf("%w: request failed %v %v %v: %v", ErrStatusError, request.Method, request.URL.String(), response.Status, string(body))
 	}
 
 	// Don't care about the returned data, just report success.
@@ -276,12 +280,12 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	case "text/plain":
 		s, ok := result.(*[]byte)
 		if !ok {
-			return fmt.Errorf("unexpected type decode for text/plain")
+			return fmt.Errorf("%w: unexpected type decode for text/plain", ErrTypeError)
 		}
 
 		copy(*s, body)
 	default:
-		return fmt.Errorf("unexpected content type %s", contentType)
+		return fmt.Errorf("%w: unexpected content type %s", ErrTypeError, contentType)
 	}
 
 	return nil
@@ -290,7 +294,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 func (c *Client) Get(r *Request, host string) error {
 	req, err := http.NewRequest("GET", host+r.Path, nil)
 	if err != nil {
-		return ClientError{"request creation", err}
+		return err
 	}
 
 	req.Header = defaultHeaders()
@@ -301,7 +305,7 @@ func (c *Client) Get(r *Request, host string) error {
 func (c *Client) Post(r *Request, host string) error {
 	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return ClientError{"request creation", err}
+		return err
 	}
 
 	req.Header = defaultHeaders()
@@ -313,7 +317,7 @@ func (c *Client) Post(r *Request, host string) error {
 func (c *Client) PostJSON(r *Request, host string) error {
 	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return ClientError{"request creation", err}
+		return err
 	}
 
 	req.Header = defaultHeaders()
@@ -325,7 +329,7 @@ func (c *Client) PostJSON(r *Request, host string) error {
 func (c *Client) PostNoContentType(r *Request, host string) error {
 	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return ClientError{"request creation", err}
+		return err
 	}
 
 	req.Header = defaultHeaders()
@@ -336,7 +340,7 @@ func (c *Client) PostNoContentType(r *Request, host string) error {
 func (c *Client) Put(r *Request, host string) error {
 	req, err := http.NewRequest("PUT", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return ClientError{"request creation", err}
+		return err
 	}
 
 	req.Header = defaultHeaders()
@@ -348,7 +352,7 @@ func (c *Client) Put(r *Request, host string) error {
 func (c *Client) PutJSON(r *Request, host string) error {
 	req, err := http.NewRequest("PUT", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return ClientError{"request creation", err}
+		return err
 	}
 
 	req.Header = defaultHeaders()
@@ -360,7 +364,7 @@ func (c *Client) PutJSON(r *Request, host string) error {
 func (c *Client) Delete(r *Request, host string) error {
 	req, err := http.NewRequest("DELETE", host+r.Path, nil)
 	if err != nil {
-		return ClientError{"request creation", err}
+		return err
 	}
 
 	req.Header = defaultHeaders()

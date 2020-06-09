@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RoleBindingResource represents a collection of RoleBindings
+// RoleBindingResource represents a collection of RoleBindings.
 type RoleBindingResource struct {
 	context *context.Context
 	// RoleBindings is the raw output from listing RoleBindings

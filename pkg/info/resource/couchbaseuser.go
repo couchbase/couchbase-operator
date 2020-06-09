@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// couchbaseUserResource represents a collection of couchbase clusters
+// couchbaseUserResource represents a collection of couchbase clusters.
 type couchbaseUserResource struct {
 	context *context.Context
 	// couchbaseUsers is the raw output from listing couchbaseUsers

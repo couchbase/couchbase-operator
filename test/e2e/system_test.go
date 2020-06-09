@@ -20,14 +20,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// a test consists of a name, duration of test to run, and a list of operations to run
+// a test consists of a name, duration of test to run, and a list of operations to run.
 type sysTestDef struct {
 	name     string
 	duration time.Duration
 	ops      []operation
 }
 
-// an operation  is a docker image run as a kubernetes job that executes a command
+// an operation  is a docker image run as a kubernetes job that executes a command.
 type operation struct {
 	name     string
 	image    string
@@ -39,7 +39,7 @@ type operation struct {
 }
 
 // scope will be used to hold information about the cluster configuration.
-// this information will be injected into generic commands
+// this information will be injected into generic commands.
 type scope struct {
 	nodes1  []string
 	nodes2  []string

@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	v1 "k8s.io/api/core/v1"
 )
@@ -30,7 +31,7 @@ func getServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couch
 	if len(serverGroups) == 0 {
 		serverGroups = cluster.Spec.ServerGroups
 		if len(serverGroups) == 0 {
-			return nil, fmt.Errorf("%s: no server groups defined for server config '%s'", stripeErrorHeader, class.Name)
+			return nil, fmt.Errorf("%s: no server groups defined for server config '%s': %w", stripeErrorHeader, class.Name, errors.ErrResourceAttributeRequired)
 		}
 	}
 
@@ -70,7 +71,7 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
-			return nil, fmt.Errorf("%s: pod %s does not have server class label", stripeErrorHeader, pod.Name)
+			return nil, fmt.Errorf("%s: pod %s does not have server class label: %w", stripeErrorHeader, pod.Name, errors.ErrResourceAttributeRequired)
 		}
 
 		// Class deleted, ignore the pod
@@ -80,11 +81,11 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 
 		group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
 		if !ok {
-			return nil, fmt.Errorf("%s: pod %s does not have server group selector", stripeErrorHeader, pod.Name)
+			return nil, fmt.Errorf("%s: pod %s does not have server group selector: %w", stripeErrorHeader, pod.Name, errors.ErrResourceAttributeRequired)
 		}
 
 		if _, ok := sched.serverClasses[class][group]; !ok {
-			return nil, fmt.Errorf("%s: pod %s server group '%s' undefined", stripeErrorHeader, pod.Name, group)
+			return nil, fmt.Errorf("%s: pod %s server group '%s' undefined: %w", stripeErrorHeader, pod.Name, group, errors.ErrResourceAttributeRequired)
 		}
 
 		sched.serverClasses[class][group].push(pod.Name)
@@ -101,7 +102,7 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 // before labelling the pod with this server group as a label selector.
 func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: pod %s server class '%s' undefined", stripeErrorHeader, name, class)
+		return "", fmt.Errorf("%s: pod %s server class '%s' undefined: %w", stripeErrorHeader, name, class, errors.ErrResourceAttributeRequired)
 	}
 
 	if group == "" {
@@ -116,7 +117,7 @@ func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, err
 func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 	// Select the victim server group based on population
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: server group map missing server class '%s'", stripeErrorHeader, class)
+		return "", fmt.Errorf("%s: server group map missing server class '%s': %w", stripeErrorHeader, class, errors.ErrResourceAttributeRequired)
 	}
 
 	serverGroup := sched.serverClasses[class].largestGroup()
@@ -124,7 +125,7 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 	// Select the victim server deterministically based on alphabetical order
 	server, err := sched.serverClasses[class][serverGroup].pop()
 	if err != nil {
-		return "", fmt.Errorf("%s: server group '%s' in class '%s' empty", stripeErrorHeader, serverGroup, class)
+		return "", fmt.Errorf("%s: server group '%s' in class '%s' empty: %w", stripeErrorHeader, serverGroup, class, errors.ErrResourceAttributeRequired)
 	}
 
 	return server, nil
@@ -138,7 +139,7 @@ func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
 		}
 	}
 
-	return fmt.Errorf("%s: server '%s' does not exist in class '%s'", stripeErrorHeader, name, class)
+	return fmt.Errorf("%s: server '%s' does not exist in class '%s': %w", stripeErrorHeader, name, class, errors.ErrResourceAttributeRequired)
 }
 
 // LogStatus writes formatted state for debugging.

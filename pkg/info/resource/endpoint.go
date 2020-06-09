@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// endpointResource represents a collection of endpoints
+// endpointResource represents a collection of endpoints.
 type endpointResource struct {
 	context *context.Context
 	// endpoints is the raw output from listing endpoints

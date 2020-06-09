@@ -8,7 +8,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 )
 
-// Main framework structure
+// Main framework structure.
 type Framework struct {
 	// CbopinfoPath is the absolute path to the cbopinfo binary
 	CbopinfoPath                  string
@@ -86,7 +86,7 @@ type RegistryConfig struct {
 	Password string `json:"password"`
 }
 
-// Struct to read and store test_config yaml passed by the user during testing
+// Struct to read and store test_config yaml passed by the user during testing.
 type TestRunParam struct {
 	KubeType                      string `yaml:"kube-type"`
 	OperatorImage                 string `yaml:"operator-image"`
@@ -129,13 +129,13 @@ type TestRunParam struct {
  Following types are used for testing framework
 ************************************************/
 
-// TestFunc defines the test function type
+// TestFunc defines the test function type.
 type TestFunc func(*testing.T)
 
-// Map to store Testcase name to their respective Function objects
+// Map to store Testcase name to their respective Function objects.
 type FuncMap map[string]TestFunc
 
-// To decode test-suite yaml file
+// To decode test-suite yaml file.
 type SuiteData struct {
 	Timeout  string   `yaml:"timeout"`
 	TestCase []string `yaml:"testcases"`

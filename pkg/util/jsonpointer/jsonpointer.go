@@ -16,6 +16,8 @@ import (
 	"strings"
 )
 
+var ErrInvalidPointer = fmt.Errorf("invalid json pointer token")
+
 // unescape translates escape characters back into their native form.
 func unescape(token string) string {
 	replacer := strings.NewReplacer("~1", "/", "~0", "~")
@@ -27,7 +29,7 @@ func LookupValue(v reflect.Value, k string) (value reflect.Value, err error) {
 	// Reflection will panic, so be sure to catch and return an error.
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("invalid token %s: %v", k, r)
+			err = fmt.Errorf("invalid token %s: %v: %w", k, r, ErrInvalidPointer)
 		}
 	}()
 
@@ -57,13 +59,13 @@ func LookupValue(v reflect.Value, k string) (value reflect.Value, err error) {
 		var i int
 
 		if i, err = strconv.Atoi(k); err != nil {
-			err = fmt.Errorf("malformed array index %s", k)
+			err = fmt.Errorf("malformed array index %s: %w", k, ErrInvalidPointer)
 			return
 		}
 
 		value = value.Index(i)
 	default:
-		err = fmt.Errorf("unexpected kind %s in lookup", kind)
+		err = fmt.Errorf("unexpected kind %s in lookup: %w", kind, ErrInvalidPointer)
 	}
 
 	return
@@ -77,14 +79,14 @@ func LookupPath(object interface{}, pointer string) (value reflect.Value, key st
 	// Reflection will panic, so be sure to catch and return an error.
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("invalid pointer %s: %v", pointer, r)
+			err = fmt.Errorf("invalid pointer %s: %v: %w", pointer, r, ErrInvalidPointer)
 		}
 	}()
 
 	// Ensure the pointer is correctly specified.
 	re := regexp.MustCompile(`^(/[\w\d~-]*)+$`)
 	if !re.MatchString(pointer) {
-		err = fmt.Errorf("malformed pointer %s", pointer)
+		err = fmt.Errorf("malformed pointer %s: %w", pointer, ErrInvalidPointer)
 		return
 	}
 

@@ -11,7 +11,7 @@ import (
 )
 
 // Reference contains data so other modules can extract data associated
-// with discovered associated with resource instances
+// with discovered associated with resource instances.
 type Reference interface {
 	// Kind is the Kubernetes kind of a resource
 	Kind() string
@@ -34,7 +34,7 @@ type Resource interface {
 	References() []Reference
 }
 
-// Initializer is a function signature used to get resource handlers
+// Initializer is a function signature used to get resource handlers.
 type Initializer func(*context.Context) Resource
 
 // getResourceSelector returns a label selector which will scope the resources we

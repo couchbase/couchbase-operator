@@ -51,3 +51,23 @@ issues:
   - text: always receives
     linters:
     - unparam
+  # Test is exempt from proper error handling.
+  # Validation and tools are exempt for now...
+  - path: test/.*
+    linters:
+    - goerr113
+  - path: cmd/.*
+    linters:
+    - goerr113
+  - path: pkg/admission/.*
+    linters:
+    - goerr113
+  - path: pkg/config/.*
+    linters:
+    - goerr113
+  - path: pkg/info/.*
+    linters:
+    - goerr113
+  - path: pkg/validator/.*
+    linters:
+    - goerr113

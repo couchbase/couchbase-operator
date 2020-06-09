@@ -18,7 +18,10 @@ import (
 
 var log = logf.Log.WithName("api")
 
-// Certificate and key used by TLS client authentication
+var ErrTypeError = fmt.Errorf("unsupported type")
+var ErrMemberError = fmt.Errorf("member error")
+
+// Certificate and key used by TLS client authentication.
 type TLSClientAuth struct {
 	// PEM encoded certificate
 	Cert []byte
@@ -27,7 +30,7 @@ type TLSClientAuth struct {
 	Key []byte
 }
 
-// TLS Authentication parameters
+// TLS Authentication parameters.
 type TLSAuth struct {
 	// PEM encoded CA certificate
 	CACert []byte
@@ -37,7 +40,7 @@ type TLSAuth struct {
 }
 
 // Client is a structure which encapsulates HTTP API access to a
-// Client cluster
+// Client cluster.
 type Client struct {
 	// username is used in basic HTTP authorization
 	username string
@@ -199,12 +202,12 @@ func (r *Request) On(client *Client, target interface{}) error {
 	case string:
 		hosts = append(hosts, t)
 	default:
-		return fmt.Errorf("unknown target type: %v", t)
+		return fmt.Errorf("%w: unknown target type %v", ErrTypeError, t)
 	}
 
 	// Generate a closure to iterate over the hosts trying the call.
 	callMembers := func(c *Client, r *Request) error {
-		lastError := fmt.Errorf("no members specified")
+		lastError := ErrMemberError
 
 		for _, host := range hosts {
 			if err := r.method(c, r, host); err != nil {

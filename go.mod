@@ -16,7 +16,7 @@ require (
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9
-	github.com/golangci/golangci-lint v1.25.1 // indirect
+	github.com/golangci/golangci-lint v1.27.0 // indirect
 	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/uuid v1.1.1
@@ -27,6 +27,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.5.1
 	github.com/robfig/cron/v3 v3.0.0
+	github.com/securego/gosec v0.0.0-20200316084457-7da9f46445fd // indirect
 	github.com/sirupsen/logrus v1.5.0
 	github.com/spf13/pflag v1.0.5
 	go.uber.org/zap v1.14.1

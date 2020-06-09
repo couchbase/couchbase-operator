@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// deploymentResource represents a collection of deployments
+// deploymentResource represents a collection of deployments.
 type deploymentResource struct {
 	context *context.Context
 	// deployments is the raw output from listing deployments

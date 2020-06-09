@@ -1,6 +1,6 @@
 package e2eutil
 
-// error handling for util methods
+// error handling for util methods.
 import (
 	"fmt"
 )

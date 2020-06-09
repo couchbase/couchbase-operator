@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RoleResource represents a collection of Roles
+// RoleResource represents a collection of Roles.
 type RoleResource struct {
 	context *context.Context
 	// Roles is the raw output from listing Roles

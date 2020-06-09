@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// namespaceResource represents a collection of namespaces
+// namespaceResource represents a collection of namespaces.
 type namespaceResource struct {
 	context *context.Context
 	// namespaces is the raw output from listing namespaces

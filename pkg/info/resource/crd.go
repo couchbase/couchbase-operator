@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// crdResource represents a collection of crds
+// crdResource represents a collection of crds.
 type crdResource struct {
 	context *context.Context
 	// crds is the raw output from listing crds

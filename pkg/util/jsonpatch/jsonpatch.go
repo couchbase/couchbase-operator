@@ -17,6 +17,10 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpointer"
 )
 
+var ErrException = fmt.Errorf("caught an exception")
+var ErrTypeError = fmt.Errorf("unsupported type")
+var ErrOperationInvalid = fmt.Errorf("invalid operation type")
+
 // Operation defines valid operation types.
 type Operation string
 
@@ -52,14 +56,14 @@ func add(document interface{}, path string, value interface{}) (err error) {
 	// Catch reflection errors
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("failed to add %s: %v", path, r)
+			err = fmt.Errorf("%w: failed to add %s: %v", ErrException, path, r)
 		}
 	}()
 
 	// Get a reference to the object to add to
 	v, k, err := jsonpointer.LookupPath(document, path)
 	if err != nil {
-		err = fmt.Errorf("failed to lookup %s in add: %v", path, err)
+		err = fmt.Errorf("failed to lookup %s in add: %w", path, err)
 		return
 	}
 
@@ -101,7 +105,7 @@ func add(document interface{}, path string, value interface{}) (err error) {
 
 		v.Set(s)
 	default:
-		err = fmt.Errorf("unexpected kind %s in add", kind)
+		err = fmt.Errorf("%w: unexpected kind %s in add", ErrTypeError, kind)
 		return
 	}
 
@@ -113,14 +117,14 @@ func remove(document interface{}, path string) (err error) {
 	// Catch reflection errors
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("failed to remove %s: %v", path, r)
+			err = fmt.Errorf("%w: failed to remove %s: %v", ErrException, path, r)
 		}
 	}()
 
 	// Get a reference to the object to delete from
 	v, k, err := jsonpointer.LookupPath(document, path)
 	if err != nil {
-		err = fmt.Errorf("failed to lookup %s in remove: %v", path, err)
+		err = fmt.Errorf("failed to lookup %s in remove: %w", path, err)
 		return
 	}
 
@@ -156,7 +160,7 @@ func remove(document interface{}, path string) (err error) {
 
 		v.Set(s)
 	default:
-		err = fmt.Errorf("unexpected kind %s in remove", kind)
+		err = fmt.Errorf("%w: unexpected kind %s in remove", ErrTypeError, kind)
 		return
 	}
 
@@ -168,14 +172,14 @@ func replace(document interface{}, path string, value interface{}) (err error) {
 	// Catch reflection errors
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("failed to replace %s: %v", path, r)
+			err = fmt.Errorf("%w: failed to replace %s: %v", ErrException, path, r)
 		}
 	}()
 
 	// Get a reference to the object to update
 	v, k, err := jsonpointer.LookupPath(document, path)
 	if err != nil {
-		err = fmt.Errorf("failed to lookup %s in replace: %v", path, err)
+		err = fmt.Errorf("failed to lookup %s in replace: %w", path, err)
 		return
 	}
 
@@ -199,7 +203,7 @@ func test(document interface{}, path string, value interface{}) error {
 	// Get a reference to the object to update
 	v, k, err := jsonpointer.LookupPath(document, path)
 	if err != nil {
-		return fmt.Errorf("failed to lookup %s in test: %v", path, err)
+		return fmt.Errorf("%w: failed to lookup %s in test: %v", ErrException, path, err)
 	}
 
 	// Dereference pointer types
@@ -242,7 +246,7 @@ func test(document interface{}, path string, value interface{}) error {
 	}
 
 	if !reflect.DeepEqual(v.Interface(), value) {
-		return fmt.Errorf(`values for "%s" do not match: actual %v %v, required %v %v`, path, v1, v.Type().String(), v2, expected.Type().String())
+		return fmt.Errorf(`%w: values for "%s" do not match: actual %v %v, required %v %v`, ErrTypeError, path, v1, v.Type().String(), v2, expected.Type().String())
 	}
 
 	return nil
@@ -262,7 +266,7 @@ func Apply(document interface{}, patches PatchList) (err error) {
 		case Test:
 			err = test(document, patch.Path, patch.Value)
 		default:
-			err = fmt.Errorf("unsupported patch operation %s", patch.Op.String())
+			err = fmt.Errorf("%w: %s", ErrOperationInvalid, patch.Op.String())
 		}
 
 		if err != nil {

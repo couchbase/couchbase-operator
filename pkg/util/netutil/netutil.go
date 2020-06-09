@@ -6,9 +6,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"net"
 	"time"
+
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
 // Wait for a TCP port to become available
@@ -33,7 +34,7 @@ func WaitForHostPort(ctx context.Context, hostport string) error {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			return fmt.Errorf("%v: Connection error - %v", ctx.Err(), err)
+			return err
 		}
 	}
 }
@@ -47,7 +48,7 @@ func WaitForHostPortTLS(ctx context.Context, hostport string, cacert []byte) err
 		RootCAs: x509.NewCertPool(),
 	}
 	if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(cacert); !ok {
-		return fmt.Errorf("failed to append CA certificate")
+		return errors.ErrCertificateInvalid
 	}
 
 	// Setup a ticker to retry every second
@@ -70,7 +71,7 @@ func WaitForHostPortTLS(ctx context.Context, hostport string, cacert []byte) err
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			return fmt.Errorf("%v: TLS Configuration error - %v", ctx.Err(), err)
+			return err
 		}
 	}
 }
@@ -83,7 +84,7 @@ func GetTLSState(hostport string, cacert, clientCert, clientKey []byte) ([]*x509
 		RootCAs: x509.NewCertPool(),
 	}
 	if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(cacert); !ok {
-		return nil, fmt.Errorf("failed to append CA certificate")
+		return nil, errors.ErrCertificateInvalid
 	}
 
 	if clientCert != nil {

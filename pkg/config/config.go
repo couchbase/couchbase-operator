@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// Config contains command line configuration
+// Config contains command line configuration.
 type Config struct {
 	// Namespace is the namespace to target, relevant for services and TLS.
 	Namespace string

@@ -12,19 +12,12 @@ const (
 	CommunityEditionImage = "couchbase/server:community-6.0.4"
 )
 
-// These values can be updated from e2espec/crd.go
+// These values can be updated from e2espec/crd.go.
 var (
 	CouchbaseServerImage = "couchbase/server:enterprise-6.0.4"
 )
 
-// Const Ansible setting string
-var (
-	CbAppSelectorMap = map[string]string{
-		"app": "couchbase",
-	}
-)
-
-// Couchbase cluster
+// Couchbase cluster.
 var (
 	ClusterNamePrefix          = "test-couchbase-"
 	CouchbaseLabel             = util_const.LabelApp + "=" + util_const.App
@@ -32,7 +25,7 @@ var (
 	CouchbaseServerClusterKey  = "couchbase_cluster"
 	CouchbaseServerPodLabelStr = CouchbaseLabel + "," + CouchbaseServerClusterKey + "="
 
-	// List of Couchbase-cluster services
+	// List of Couchbase-cluster services.
 	StatefulCbServiceList = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 		couchbasev2.IndexService,
@@ -45,7 +38,7 @@ var (
 	}
 )
 
-// Secret name in kube used for testing
+// Secret name in kube used for testing.
 var (
 	KubeTestSecretName = "basic-test-secret"
 	SecretUsernameKey  = util_const.AuthSecretUsernameKey
@@ -54,13 +47,13 @@ var (
 	CbClusterPassword  = "password"
 )
 
-// Labels for K8S nodes
+// Labels for K8S nodes.
 var (
 	NodeRoleMasterLabel    = "node-role.kubernetes.io/master"
 	FailureDomainZoneLabel = util_const.ServerGroupLabel
 )
 
-// Operator constants
+// Operator constants.
 const (
 	OperatorRestPort = 8080
 
@@ -68,7 +61,7 @@ const (
 	CbClusterRestPort int32 = 8091
 )
 
-// different size naming
+// different size naming.
 const (
 	Size1 = 1
 	Size2 = 2
@@ -77,17 +70,17 @@ const (
 	Size5 = 5
 )
 
-//DefaultBucket naming
+//DefaultBucket naming.
 const (
 	DefaultBucket = "default"
 )
 
-//DefaultReplication naming
+//DefaultReplication naming.
 const (
 	DefaultReplication = "test-replication"
 )
 
-// CRD Object naming
+// CRD Object naming.
 const (
 	CouchbaseUserName     = "admin"
 	CouchbaseLDAPUserName = "ldap-admin"
@@ -105,13 +98,13 @@ const (
 	CouchbaseSubjectGroupKind = "CouchbaseGroup"
 )
 
-//ldap naming
+//ldap naming.
 const (
 	LDAPDomain        = "openldap"
 	LDAPLabelSelector = "openldap.couchbase.com"
 )
 
-//test secrets Label
+//test secrets Label.
 const (
 	TestLabelSelector = "couchbaseqe"
 )

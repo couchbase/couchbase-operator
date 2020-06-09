@@ -33,7 +33,7 @@ func Retry(ctx context.Context, interval time.Duration, f func() (bool, error)) 
 		select {
 		case <-tick.C:
 		case <-ctx.Done():
-			return fmt.Errorf("%v: %v", ctx.Err(), err)
+			return fmt.Errorf("%v: %w", ctx.Err(), err)
 		}
 	}
 }

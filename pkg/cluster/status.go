@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 )
 
@@ -74,7 +75,7 @@ func getNodeState(node *couchbaseutil.NodeInfo) (NodeState, error) {
 		}
 	}
 
-	return "", fmt.Errorf("unknown node state: status=%s membership=%s", node.Status, node.Membership)
+	return "", fmt.Errorf("%w: unknown node state: status=%s membership=%s", errors.ErrInternalError, node.Status, node.Membership)
 }
 
 // Status is a curated view of the Couchbase cluster state.

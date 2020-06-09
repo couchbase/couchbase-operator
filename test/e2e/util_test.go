@@ -15,7 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 )
 
-// Variable to store random suffix for couchbase-server name & tls certificates
+// Variable to store random suffix for couchbase-server name & tls certificates.
 var (
 	TestFuncMap = framework.FuncMap{
 		"TestCreateCluster":                                   TestCreateCluster,

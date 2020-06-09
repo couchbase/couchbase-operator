@@ -70,7 +70,7 @@ func Init() error {
 }
 
 // ClusterConfigValue allows multiple cluster configurations to be passed on the command line
-// e.g. --cluster ~/.kube/conf,,default --cluster ~/kubeconfig,,remote
+// e.g. --cluster ~/.kube/conf,,default --cluster ~/kubeconfig,,remote.
 type ClusterConfigValue struct {
 	values []ClusterConfig
 }

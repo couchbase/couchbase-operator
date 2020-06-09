@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// configMapResource represents a collection of configMaps
+// configMapResource represents a collection of configMaps.
 type configMapResource struct {
 	context *context.Context
 	// configMaps is the raw output from listing configMaps

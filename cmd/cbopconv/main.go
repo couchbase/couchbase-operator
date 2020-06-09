@@ -35,7 +35,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 )
 
-// Configuration holds command line parameters
+// Configuration holds command line parameters.
 type Configuration struct {
 	// ConfigFlags is a generic set of Kubernetes client flags
 	ConfigFlags *genericclioptions.ConfigFlags

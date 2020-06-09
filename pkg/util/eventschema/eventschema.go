@@ -37,7 +37,7 @@ type Validator struct {
 func (c *Validator) Validate(out io.Writer) error {
 	err := c.Schema.Validate(c)
 	if err == nil && c.index < len(c.Events) {
-		err = newUnderflowError()
+		err = ErrUnderflow
 	}
 
 	if err != nil {
@@ -105,19 +105,19 @@ type Event struct {
 // is ignored if the zero value.
 func (e Event) Validate(c *Validator) error {
 	if c.index >= len(c.Events) {
-		return newOverflowError()
+		return ErrOverflow
 	}
 
 	if e.Reason != c.Events[c.index].Reason {
-		return newReasonMismatchError(e.Reason, c.Events[c.index].Reason)
+		return fmt.Errorf("%w: expected %s, got %s", ErrReasonMismatch, e.Reason, c.Events[c.index].Reason)
 	}
 
 	if e.Message != "" && e.Message != c.Events[c.index].Message {
-		return newMessageMismatchError(e.Reason, c.Events[c.index].Reason)
+		return fmt.Errorf("%w: expected %s, got %s", ErrMessageMismatch, e.Reason, c.Events[c.index].Reason)
 	}
 
 	if e.FuzzyMessage != "" && !regexp.MustCompile(e.FuzzyMessage).MatchString(c.Events[c.index].Message) {
-		return newFuzzyMessageMismatchError(e.Reason, c.Events[c.index].Reason)
+		return fmt.Errorf("%w: expected %s, got %s", ErrFuzzyMessageMismatch, e.Reason, c.Events[c.index].Reason)
 	}
 
 	c.index++
@@ -195,7 +195,7 @@ func (e Set) Validate(c *Validator) error {
 		}
 
 		if !matched {
-			return newSetMismatchError()
+			return ErrSetMismatch
 		}
 	}
 
@@ -226,7 +226,7 @@ func (e AnyOf) Validate(c *Validator) error {
 		c.index = index
 	}
 
-	return newAnyOfError()
+	return ErrAnyOf
 }
 
 // Optional represents a validator that may happen.  This is useful for situations
@@ -272,7 +272,7 @@ func (e RepeatAtLeast) Validate(c *Validator) error {
 	}
 
 	if times < e.Times {
-		return fmt.Errorf("failed to validate at least %d times", e.Times)
+		return fmt.Errorf("%w: failed to validate at least %d times", ErrRepeatAtLeast, e.Times)
 	}
 
 	return nil

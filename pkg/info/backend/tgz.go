@@ -11,7 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 )
 
-// tgzBackend realizes the Backend interface for a gzipped tape archive
+// tgzBackend realizes the Backend interface for a gzipped tape archive.
 type tgzBackend struct {
 	// buffer is used to accumulate TAR data
 	buffer bytes.Buffer

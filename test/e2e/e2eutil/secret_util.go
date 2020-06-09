@@ -1,9 +1,9 @@
 package e2eutil
 
 import (
+	"fmt"
 	"testing"
 
-	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
@@ -72,12 +72,12 @@ func GetClusterAuth(kubeClient kubernetes.Interface, namespace string, secretNam
 
 	username, ok := secret.Data[constants.AuthSecretUsernameKey]
 	if !ok {
-		return "", "", cberrors.ErrSecretMissingUsername{Reason: secretName}
+		return "", "", fmt.Errorf("admin secret missing username")
 	}
 
 	password, ok := secret.Data[constants.AuthSecretPasswordKey]
 	if !ok {
-		return "", "", cberrors.ErrSecretMissingPassword{Reason: secretName}
+		return "", "", fmt.Errorf("admin secret missing password")
 	}
 
 	return string(username), string(password), nil

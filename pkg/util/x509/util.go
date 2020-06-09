@@ -16,6 +16,8 @@ import (
 	"math/big"
 	"reflect"
 	"time"
+
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
 // KeyType defines the supported types of private key that can be used with
@@ -47,7 +49,7 @@ const (
 )
 
 // KeyPairRequest contains the necessary configuration to generate
-// a private key and signed public key pair by a CA
+// a private key and signed public key pair by a CA.
 type KeyPairRequest struct {
 	// keyType is the type of private key to generate.
 	KeyType KeyType
@@ -107,7 +109,7 @@ func GeneratePrivateKey(keyType KeyType) (crypto.PrivateKey, error) {
 	case KeyTypeEllipticP521:
 		return ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	default:
-		return nil, fmt.Errorf("unhandled key type")
+		return nil, errors.ErrPrivateKeyInvalid
 	}
 }
 
@@ -145,7 +147,7 @@ func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 			}
 		default:
 			info := reflect.TypeOf(t)
-			return nil, fmt.Errorf("unsupported key type %v", info.Name())
+			return nil, fmt.Errorf("%w: %v", errors.ErrPrivateKeyInvalid, info.Name())
 		}
 	}
 
@@ -188,7 +190,7 @@ func CreateCertificateRequest(req *x509.CertificateRequest, key crypto.PrivateKe
 func ParseCertificate(data []byte) (*x509.Certificate, error) {
 	pem, _ := pem.Decode(data)
 	if pem == nil {
-		return nil, fmt.Errorf("unable to parse PEM certificate")
+		return nil, errors.ErrCertificateInvalid
 	}
 
 	return x509.ParseCertificate(pem.Bytes)
@@ -210,7 +212,7 @@ type CertificateAuthority struct {
 func NewCertificateAuthority(keyType KeyType, commonName string, certValidFrom, certValidTo time.Time, caCertType CertType) (*CertificateAuthority, error) {
 	key, err := GeneratePrivateKey(keyType)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate CA key: %v", err)
+		return nil, fmt.Errorf("unable to generate CA key: %w", err)
 	}
 
 	ca := &CertificateAuthority{
@@ -225,17 +227,17 @@ func NewCertificateAuthority(keyType KeyType, commonName string, certValidFrom, 
 
 	req, err = CreateCertificateRequest(req, key)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate CA req: %v", err)
+		return nil, fmt.Errorf("unable to generate CA req: %w", err)
 	}
 
 	pem, err := ca.SignCertificateRequest(req, caCertType, certValidFrom, certValidTo)
 	if err != nil {
-		return nil, fmt.Errorf("unable to sign CA cert: %v", err)
+		return nil, fmt.Errorf("unable to sign CA cert: %w", err)
 	}
 
 	cert, err := ParseCertificate(pem)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse CA cert: %v", err)
+		return nil, fmt.Errorf("unable to parse CA cert: %w", err)
 	}
 
 	ca.certificate = cert
@@ -248,7 +250,7 @@ func NewCertificateAuthority(keyType KeyType, commonName string, certValidFrom, 
 func (ca *CertificateAuthority) NewIntermediateCertificateAuthority(keyType KeyType, commonName string, certValidFrom, certValidTo time.Time, caCertType CertType) (*CertificateAuthority, error) {
 	key, err := GeneratePrivateKey(keyType)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate CA key: %v", err)
+		return nil, fmt.Errorf("unable to generate CA key: %w", err)
 	}
 
 	intermediate := &CertificateAuthority{
@@ -263,17 +265,17 @@ func (ca *CertificateAuthority) NewIntermediateCertificateAuthority(keyType KeyT
 
 	req, err = CreateCertificateRequest(req, key)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate CA req: %v", err)
+		return nil, fmt.Errorf("unable to generate CA req: %w", err)
 	}
 
 	pem, err := ca.SignCertificateRequest(req, caCertType, certValidFrom, certValidTo)
 	if err != nil {
-		return nil, fmt.Errorf("unable to sign CA cert: %v", err)
+		return nil, fmt.Errorf("unable to sign CA cert: %w", err)
 	}
 
 	cert, err := ParseCertificate(pem)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse CA cert: %v", err)
+		return nil, fmt.Errorf("unable to parse CA cert: %w", err)
 	}
 
 	intermediate.certificate = cert
@@ -308,7 +310,7 @@ func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 	case *ecdsa.PublicKey:
 		subjectPublicKey = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 	default:
-		return nil, fmt.Errorf("invalid public key type")
+		return nil, errors.ErrPublicKeyInvalid
 	}
 
 	if err != nil {
@@ -358,7 +360,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 		cert.IsCA = true
 		cert.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageCRLSign
 	default:
-		return nil, fmt.Errorf("invalid certificate type")
+		return nil, errors.ErrCertificateInvalid
 	}
 
 	// If the CA certificate is nil we just want to self sign

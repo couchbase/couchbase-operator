@@ -88,7 +88,7 @@ func scaleDownXDCRCluster(t *testing.T, k8s *types.Cluster, couchbase *couchbase
 	return e2eutil.ClusterScaleDownSequence(couchbase.Spec.TotalSize() - size)
 }
 
-// xdcrCluster defines the cluster to operate on (source or target)
+// xdcrCluster defines the cluster to operate on (source or target).
 type xdcrCluster int
 
 const (
@@ -96,7 +96,7 @@ const (
 	xdcrClusterTarget xdcrCluster = iota
 )
 
-// xdcrOperation defines the operation to perform on the cluster (eject, delete or scale down nodes)
+// xdcrOperation defines the operation to perform on the cluster (eject, delete or scale down nodes).
 type xdcrOperation int
 
 const (

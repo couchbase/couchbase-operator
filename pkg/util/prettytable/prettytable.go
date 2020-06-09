@@ -23,7 +23,7 @@ type Table struct {
 	widths []int
 }
 
-// Style allows custom styling of a table
+// Style allows custom styling of a table.
 type Style struct {
 	HeaderHorizontal rune
 	HeaderVertical   rune

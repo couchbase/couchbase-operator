@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// nodeResource represents a collection of nodes
+// nodeResource represents a collection of nodes.
 type nodeResource struct {
 	context *context.Context
 	// nodes is the raw output from listing nodes

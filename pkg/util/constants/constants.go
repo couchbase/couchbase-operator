@@ -36,7 +36,7 @@ var (
 	CronjobSpecAnnotation = "cronjob.couchbase.com/spec"
 )
 
-// Label types added to pods
+// Label types added to pods.
 const (
 	App = "couchbase"
 

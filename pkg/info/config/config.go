@@ -18,7 +18,7 @@ const (
 flags:`
 )
 
-// Configuration holds command line parameters
+// Configuration holds command line parameters.
 type Configuration struct {
 	// ConfigFlags is a generic set of Kubernetes client flags
 	ConfigFlags *genericclioptions.ConfigFlags

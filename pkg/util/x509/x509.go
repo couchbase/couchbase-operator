@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
 // MandatorySANs returns the list of SANs that all server certificates must implement.
@@ -40,29 +42,29 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 }
 
 // Verify checks the given chain and CA are valid to be installed.
-func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string) (errors []error) {
+func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string) (errs []error) {
 	// Decode CA certificate
 	caPem := DecodePEM(caData)
 
 	switch {
 	case len(caPem) < 1:
-		errors = append(errors, fmt.Errorf("CA contains no PEM blocks"))
+		errs = append(errs, fmt.Errorf("%w: CA contains no PEM blocks", errors.ErrCertificateInvalid))
 		return
 	case len(caPem) > 1:
-		errors = append(errors, fmt.Errorf("CA contains %d PEM blocks, expected 1", len(caPem)))
+		errs = append(errs, fmt.Errorf("%w: CA contains %d PEM blocks, expected 1", errors.ErrCertificateInvalid, len(caPem)))
 		return
 	}
 
 	ca, err := x509.ParseCertificate(caPem[0].Bytes)
 	if err != nil {
-		errors = append(errors, fmt.Errorf("CA failed to decode: %v", err))
+		errs = append(errs, fmt.Errorf("CA failed to decode: %w", err))
 		return
 	}
 
 	// Decode chain
 	chainPem := DecodePEM(chainData)
 	if len(chainPem) == 0 {
-		errors = append(errors, fmt.Errorf("chain contains no PEM blocks"))
+		errs = append(errs, fmt.Errorf("%w: chain contains no PEM blocks", errors.ErrCertificateInvalid))
 		return
 	}
 
@@ -71,7 +73,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 	for _, block := range chainPem {
 		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
-			errors = append(errors, fmt.Errorf("chain failed to decode: %v", err))
+			errs = append(errs, fmt.Errorf("chain failed to decode: %w", err))
 			return
 		}
 
@@ -96,7 +98,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 	// Verify the certificate validates on its own (valid for both server and client)
 	if _, err := cert.Verify(verifyOptions); err != nil {
-		errors = append(errors, fmt.Errorf("certificate cannot be verified: %v", err))
+		errs = append(errs, fmt.Errorf("certificate cannot be verified: %w", err))
 	}
 
 	// Verify the certificate validates for each supplied zone (valid for server only)
@@ -108,7 +110,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 		verifyOptions.DNSName = hostname
 		if _, err := cert.Verify(verifyOptions); err != nil {
-			errors = append(errors, fmt.Errorf("certificate cannot be verified for zone: %v", err))
+			errs = append(errs, fmt.Errorf("certificate cannot be verified for zone: %w", err))
 		}
 	}
 
@@ -117,17 +119,17 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 	switch {
 	case len(keyPem) < 1:
-		errors = append(errors, fmt.Errorf("private key contains no PEM blocks"))
+		errs = append(errs, fmt.Errorf("%w: private key contains no PEM blocks", errors.ErrPrivateKeyInvalid))
 		return
 	case len(keyPem) > 1:
-		errors = append(errors, fmt.Errorf("private key contains %d PEM blocks, expected 1", len(keyPem)))
+		errs = append(errs, fmt.Errorf("%w: private key contains %d PEM blocks, expected 1", errors.ErrPrivateKeyInvalid, len(keyPem)))
 		return
 	}
 
 	if extKeyUsage == x509.ExtKeyUsageServerAuth {
 		if _, err := x509.ParsePKCS1PrivateKey(keyPem[0].Bytes); err != nil {
 			// This is an annoying bug with NS server not supporting PKCS8 *sigh*
-			errors = append(errors, fmt.Errorf("private key not formatted as PKCS1"))
+			errs = append(errs, fmt.Errorf("%w: private key not formatted as PKCS1", errors.ErrPrivateKeyInvalid))
 		}
 	}
 

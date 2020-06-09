@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
@@ -81,7 +82,7 @@ func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod,
 
 		// Select just one instance
 		if len(pods.Items) == 0 {
-			return nil, fmt.Errorf("no pods delected for Deployment %s", resource.Name())
+			return nil, fmt.Errorf("%w: no pods delected for Deployment %s", errors.ErrResourceRequired, resource.Name())
 		}
 
 		return &pods.Items[0], nil
@@ -94,7 +95,7 @@ func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod,
 func GetDeployments(context *context.Context) (*appsv1.DeploymentList, error) {
 	deployments, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to poll Deployment resources: %v", err)
+		return nil, fmt.Errorf("%w: unable to poll Deployment resources", err)
 	}
 
 	return deployments, nil
@@ -122,7 +123,7 @@ func GetOperatorDeployment(context *context.Context) (*appsv1.Deployment, error)
 func GetCouchbaseClusters(context *context.Context) (*couchbasev2.CouchbaseClusterList, error) {
 	clusters, err := context.CouchbaseClient.CouchbaseV2().CouchbaseClusters(context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to poll CouchbaseCluster resources: %v", err)
+		return nil, fmt.Errorf("%w: unable to poll CouchbaseCluster resources", err)
 	}
 
 	return clusters, nil

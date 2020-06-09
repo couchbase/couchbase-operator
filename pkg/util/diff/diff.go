@@ -3,8 +3,6 @@
 package diff
 
 import (
-	"fmt"
-
 	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
 )
@@ -14,12 +12,12 @@ import (
 func Diff(old, new interface{}) (string, error) {
 	oldBytes, err := yaml.Marshal(old)
 	if err != nil {
-		return "", fmt.Errorf("diff: %v", err)
+		return "", err
 	}
 
 	newBytes, err := yaml.Marshal(new)
 	if err != nil {
-		return "", fmt.Errorf("diff: %v", err)
+		return "", err
 	}
 
 	return cmp.Diff(string(oldBytes), string(newBytes)), nil

@@ -69,7 +69,7 @@ func EventReasonAdminPasswordChangedEvent(cl *couchbasev2.CouchbaseCluster) *v1.
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonAdminPasswordChanged
-	event.Message = fmt.Sprintf("The cluster admin password was changed")
+	event.Message = "The cluster admin password was changed"
 
 	return event
 }
@@ -132,7 +132,7 @@ func RebalanceStartedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRebalanceStarted
-	event.Message = fmt.Sprintf("A rebalance has been started to balance data across the cluster")
+	event.Message = "A rebalance has been started to balance data across the cluster"
 
 	return event
 }
@@ -141,7 +141,7 @@ func RebalanceIncompleteEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRebalanceIncomplete
-	event.Message = fmt.Sprintf("A rebalance is incomplete")
+	event.Message = "A rebalance is incomplete"
 
 	return event
 }
@@ -150,7 +150,7 @@ func RebalanceCompletedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRebalanceCompleted
-	event.Message = fmt.Sprintf("A rebalance has completed")
+	event.Message = "A rebalance has completed"
 
 	return event
 }

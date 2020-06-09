@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
@@ -12,7 +13,7 @@ const (
 )
 
 // nullSchedulerImpl does no scheduling except enforcing ordering of
-// server deletion
+// server deletion.
 type nullSchedulerImpl struct {
 	// A plain list of servers per server class
 	serverClasses map[string]*serverList
@@ -33,7 +34,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 	for _, pod := range podGetter.Get() {
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
-			return nil, fmt.Errorf("%s: pod %s does not have server class label", stripeErrorHeader, pod.Name)
+			return nil, fmt.Errorf("%s: pod %s does not have server class label: %w", stripeErrorHeader, pod.Name, errors.ErrResourceAttributeRequired)
 		}
 
 		// Class deleted, ignore the pod
@@ -50,7 +51,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 // Create does nothing.
 func (sched *nullSchedulerImpl) Create(class, name, group string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: pod %s server class '%s' undefined", stripeErrorHeader, name, class)
+		return "", fmt.Errorf("%s: pod %s server class '%s' undefined: %w", stripeErrorHeader, name, class, errors.ErrResourceAttributeRequired)
 	}
 
 	sched.serverClasses[class].push(name)
@@ -62,14 +63,14 @@ func (sched *nullSchedulerImpl) Create(class, name, group string) (string, error
 func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 	// Select the victim server group based on population
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: server group map missing server class '%s'", stripeErrorHeader, class)
+		return "", fmt.Errorf("%s: server group map missing server class '%s': %w", stripeErrorHeader, class, errors.ErrResourceAttributeRequired)
 	}
 
 	sched.serverClasses[class].sort()
 
 	server, err := sched.serverClasses[class].pop()
 	if err != nil {
-		return "", fmt.Errorf("%s: %v", nullErrorHeader, err)
+		return "", fmt.Errorf("%s: %w", nullErrorHeader, err)
 	}
 
 	return server, nil

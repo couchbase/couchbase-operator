@@ -1,6 +1,6 @@
 package framework
 
-// Variables local to this package
+// Variables local to this package.
 var runtimeParams TestRunParam
 var suiteData SuiteData
 var SuiteName string

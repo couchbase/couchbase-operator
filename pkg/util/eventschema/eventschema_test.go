@@ -1,8 +1,8 @@
 package eventschema
 
 import (
+	"errors"
 	"io/ioutil"
-	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -25,7 +25,7 @@ func mustNotValidate(t *testing.T, events []corev1.Event, schema Validatable, ex
 		t.Fatal(err)
 	}
 
-	if reflect.TypeOf(err) != reflect.TypeOf(expectedErr) {
+	if !errors.Is(err, expectedErr) {
 		t.Fatal(err)
 	}
 }
@@ -63,7 +63,7 @@ func TestValidateEventMismatchReason(t *testing.T) {
 		{Reason: "mickey", Message: "mouse"},
 	}
 	schema := Event{Reason: "minnie", Message: "mouse"}
-	mustNotValidate(t, events, schema, &ReasonMismatchError{})
+	mustNotValidate(t, events, schema, ErrReasonMismatch)
 }
 
 // TestValidateEventMismatchMessage tests mismatched messages fail.
@@ -72,7 +72,7 @@ func TestValidateEventMismatchMessage(t *testing.T) {
 		{Reason: "mickey", Message: "mouse"},
 	}
 	schema := Event{Reason: "mickey", Message: "duck"}
-	mustNotValidate(t, events, schema, &MessageMismatchError{})
+	mustNotValidate(t, events, schema, ErrMessageMismatch)
 }
 
 // TestValidateEventMismatchFuzzyMessage tests mismatched messages fail.
@@ -81,7 +81,7 @@ func TestValidateEventMismatchFuzzyMessage(t *testing.T) {
 		{Reason: "mickey", Message: "is a duck, he is married to daisy"},
 	}
 	schema := Event{Reason: "mickey", FuzzyMessage: "mouse"}
-	mustNotValidate(t, events, schema, &FuzzyMessageMismatchError{})
+	mustNotValidate(t, events, schema, ErrFuzzyMessageMismatch)
 }
 
 // TestUnderflow tests we raise an underflow if many few events are present.
@@ -90,14 +90,14 @@ func TestUnderflow(t *testing.T) {
 		{Reason: "mickey", Message: "mouse"},
 	}
 	schema := Sequence{}
-	mustNotValidate(t, events, schema, &UnderflowError{})
+	mustNotValidate(t, events, schema, ErrUnderflow)
 }
 
 // TestOverflow tests we raise an overflow if too few events are present.
 func TestOverflow(t *testing.T) {
 	events := []corev1.Event{}
 	schema := Event{Reason: "mickey", FuzzyMessage: "mouse"}
-	mustNotValidate(t, events, schema, &OverflowError{})
+	mustNotValidate(t, events, schema, ErrOverflow)
 }
 
 // TestRepeat tests repeated events match.
@@ -117,7 +117,7 @@ func TestRepeatMismatch(t *testing.T) {
 		{Reason: "donald"},
 	}
 	schema := Repeat{Times: 2, Validator: Event{Reason: "mickey"}}
-	mustNotValidate(t, events, schema, &ReasonMismatchError{})
+	mustNotValidate(t, events, schema, ErrReasonMismatch)
 }
 
 // TestSequence tests sequences of events match.
@@ -147,7 +147,7 @@ func TestSequenceMismatch(t *testing.T) {
 			Event{Reason: "mickey"},
 		},
 	}
-	mustNotValidate(t, events, schema, &ReasonMismatchError{})
+	mustNotValidate(t, events, schema, ErrReasonMismatch)
 }
 
 // TestSet tests sets of events match.
@@ -177,7 +177,7 @@ func TestSetMissmatch(t *testing.T) {
 			Event{Reason: "mickey"},
 		},
 	}
-	mustNotValidate(t, events, schema, &SetMismatchError{})
+	mustNotValidate(t, events, schema, ErrSetMismatch)
 }
 
 // TestAnyOf tests whether an event matches any allowed validator.
@@ -205,7 +205,7 @@ func TestAnyOfMismatch(t *testing.T) {
 			Event{Reason: "donald"},
 		},
 	}
-	mustNotValidate(t, events, schema, &AnyOfError{})
+	mustNotValidate(t, events, schema, ErrAnyOf)
 }
 
 // TestOptionalMatch tests that events validate with an optional validator on match.

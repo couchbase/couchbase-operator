@@ -5,11 +5,12 @@ import (
 	"sort"
 
 	"github.com/couchbase/couchbase-operator/pkg/client"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 )
 
-// serverList is a list of servers in a server group
+// serverList is a list of servers in a server group.
 type serverList struct {
 	servers []string
 }
@@ -27,7 +28,7 @@ func (s *serverList) sort() {
 // pop alphabetically sorts a server list, removes and returns the tail item.
 func (s *serverList) pop() (string, error) {
 	if len(s.servers) == 0 {
-		return "", fmt.Errorf("pop from empty server list")
+		return "", fmt.Errorf("%w: pop from empty server list", errors.ErrInternalError)
 	}
 
 	item := len(s.servers) - 1
@@ -46,10 +47,10 @@ func (s *serverList) del(name string) error {
 		}
 	}
 
-	return fmt.Errorf("del of non-existent server from server list")
+	return fmt.Errorf("%w: del of non-existent server from server list", errors.ErrInternalError)
 }
 
-// serverGroups maps server group names to a list of servers
+// serverGroups maps server group names to a list of servers.
 type serverGroups map[string]*serverList
 
 // sizes returns a list of the size of each server group.
@@ -94,7 +95,7 @@ func (s serverGroups) maxSize() int {
 	return max
 }
 
-// filterPredicate is used to filter server groups based typically on a closure
+// filterPredicate is used to filter server groups based typically on a closure.
 type filterPredicate func(*serverList) bool
 
 // filterGroupsOnSize returns an alphabetically sorted list of server group names
@@ -149,16 +150,16 @@ func (s serverGroups) largestGroup() string {
 	return groups[len(groups)-1]
 }
 
-// serverClassGroupMap maps server classes to their server groups of pods
+// serverClassGroupMap maps server classes to their server groups of pods.
 type serverClassGroupMap map[string]serverGroups
 
 // PodGetter is an abstraction around the Kubernetes API for the purpose of
-// testability
+// testability.
 type PodGetter interface {
 	Get() []*v1.Pod
 }
 
-// k8sPodGetter gets pods related to the specified cluster via a specified client
+// k8sPodGetter gets pods related to the specified cluster via a specified client.
 type k8sPodGetter struct {
 	// client is a client for accessing Kubernetes
 	client *client.Client
@@ -176,7 +177,7 @@ func (g *k8sPodGetter) Get() []*v1.Pod {
 	return g.client.Pods.List()
 }
 
-// nullPodGetter returns no pods, used for testing
+// nullPodGetter returns no pods, used for testing.
 type nullPodGetter struct {
 }
 

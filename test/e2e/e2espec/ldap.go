@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LDAP Settings
+// LDAP Settings.
 var (
 	// pod
 	openLDAPImage     = "osixia/openldap:1.2.4"

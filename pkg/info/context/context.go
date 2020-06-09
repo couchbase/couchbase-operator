@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// Context is a container which holds things needed across the application
+// Context is a container which holds things needed across the application.
 type Context struct {
 	// Config holds immutable configuration data loaded at startup
 	Config config.Configuration

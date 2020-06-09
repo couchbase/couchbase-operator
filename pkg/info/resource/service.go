@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// serviceResource represents a collection of services
+// serviceResource represents a collection of services.
 type serviceResource struct {
 	context *context.Context
 	// services is the raw output from listing services

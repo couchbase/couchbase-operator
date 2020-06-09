@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+var ErrInvalidResourceName = fmt.Errorf("unsupported resource name")
+var ErrMissingResource = fmt.Errorf("requested resource not found")
+var ErrDuplicatedResource = fmt.Errorf("requested resource duplicated")
+
 type RebalanceStatus string
 
 const (
@@ -78,7 +82,7 @@ func ServiceListFromStringArray(arr []string) (ServiceList, error) {
 		case "cbas", "analytics":
 			list = append(list, AnalyticsService)
 		default:
-			return list, fmt.Errorf("invalid service name: %s", svc)
+			return list, fmt.Errorf("%w: invalid service name: %s", ErrInvalidResourceName, svc)
 		}
 	}
 
@@ -124,7 +128,7 @@ func (c *ClusterInfo) GetNode(hostname HostName) (*NodeInfo, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unable to lookup node %s", hostname)
+	return nil, fmt.Errorf("%w: unable to lookup node %s", ErrMissingResource, hostname)
 }
 
 // PoolsDefaults returns a struct which could be used with the /pools/default API.
@@ -212,7 +216,7 @@ type NodeService struct {
 	AlternateAddresses *AlternateAddresses `json:"alternateAddresses,omitempty"`
 }
 
-// NodeServices is returned by the /pools/default/nodeServices API
+// NodeServices is returned by the /pools/default/nodeServices API.
 type NodeServices struct {
 	NodesExt []NodeService `json:"nodesExt"`
 }
@@ -298,7 +302,7 @@ func (t TaskList) GetTask(taskType TaskType) (*Task, error) {
 
 		if temp.Type == taskType {
 			if task != nil {
-				return nil, fmt.Errorf("found more than one task of type %v", taskType)
+				return nil, fmt.Errorf("%w: found more than one task of type %v", ErrDuplicatedResource, taskType)
 			}
 
 			task = temp
@@ -306,7 +310,7 @@ func (t TaskList) GetTask(taskType TaskType) (*Task, error) {
 	}
 
 	if task == nil {
-		return nil, fmt.Errorf("no task of type %v found", taskType)
+		return nil, fmt.Errorf("%w: no task of type %v found", ErrMissingResource, taskType)
 	}
 
 	return task, nil
@@ -325,7 +329,7 @@ func (t TaskList) FilterType(taskType TaskType) *TaskList {
 	return &out
 }
 
-// PoolsDefaults is the data that may be posted via the /pools/default API
+// PoolsDefaults is the data that may be posted via the /pools/default API.
 type PoolsDefaults struct {
 	ClusterName          string `url:"clusterName,omitempty"`
 	DataMemoryQuota      int64  `url:"memoryQuota,omitempty"`
@@ -378,7 +382,7 @@ func (b BucketList) Get(name string) (*Bucket, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("bucket %s not found", name)
+	return nil, fmt.Errorf("%w: bucket %s not found", ErrMissingResource, name)
 }
 
 type BucketBasicStats struct {
@@ -651,13 +655,13 @@ func (b *Bucket) FormEncode(update bool) []byte {
 	return []byte(data.Encode())
 }
 
-// SettingsStats is the data structure returned by /settings/stats
+// SettingsStats is the data structure returned by /settings/stats.
 type SettingsStats struct {
 	// SendStats actually indicates whether to perform software update checks
 	SendStats bool `json:"sendStats" url:"sendStats"`
 }
 
-// ServerGroup is a map from name to a list of nodes
+// ServerGroup is a map from name to a list of nodes.
 type ServerGroup struct {
 	// Name is the human readable server group name
 	Name string `json:"name"`
@@ -667,7 +671,7 @@ type ServerGroup struct {
 	URI string `json:"uri"`
 }
 
-// ServerGroups is returned by /nodes/default/serverGroups
+// ServerGroups is returned by /nodes/default/serverGroups.
 type ServerGroups struct {
 	// Groups is a list of ServerGroup objects
 	Groups []ServerGroup `json:"groups"`
@@ -692,12 +696,12 @@ func (groups ServerGroups) GetServerGroup(name string) *ServerGroup {
 	return nil
 }
 
-// ServerGroupUpdateOTPNode defines a single node is OTP notation
+// ServerGroupUpdateOTPNode defines a single node is OTP notation.
 type ServerGroupUpdateOTPNode struct {
 	OTPNode OTPNode `json:"otpNode"`
 }
 
-// ServerGroupUpdate defines a server group and its nodes
+// ServerGroupUpdate defines a server group and its nodes.
 type ServerGroupUpdate struct {
 	// Name is the group name and must match the existing one
 	Name string `json:"name,omitempty"`
@@ -707,7 +711,7 @@ type ServerGroupUpdate struct {
 	Nodes []ServerGroupUpdateOTPNode `json:"nodes"`
 }
 
-// ServerGroupsUpdate is used to move nodes between server groups
+// ServerGroupsUpdate is used to move nodes between server groups.
 type ServerGroupsUpdate struct {
 	Groups []ServerGroupUpdate `json:"groups"`
 }
@@ -809,8 +813,7 @@ type AutoCompactionSettings struct {
 	PurgeInterval          float64                              `json:"purgeInterval" url:"purgeInterval"`
 }
 
-// RemoteClusters is returned by
-//   GET /pools/default/remoteClusters
+// RemoteClusters is returned by /pools/default/remoteClusters.
 type RemoteClusters []RemoteCluster
 
 // RemoteCluster describes an XDCR remote cluster.
@@ -830,8 +833,7 @@ type RemoteCluster struct {
 	Key         string `json:"-" url:"clientKey,omitempty"`
 }
 
-// Replication describes an XDCR replication as set with
-//   POST /controller/createReplication
+// Replication describes an XDCR replication as set with /controller/createReplication.
 type Replication struct {
 	FromBucket       string `url:"fromBucket"`
 	ToCluster        string `url:"toCluster"`
@@ -846,7 +848,7 @@ type Replication struct {
 type ReplicationList []Replication
 
 // ReplicationSettings describes an XDCR replication settings as returned by
-//   GET /settings/replications/<remote UUID>/<local bucket>/<remote bucket>
+//   GET /settings/replications/<remote UUID>/<local bucket>/<remote bucket>.
 type ReplicationSettings struct {
 	CompressionType string `json:"compressionType" url:"compressionType,omitempty"`
 	PauseRequested  bool   `json:"pauseRequested" url:"pauseRequested"`

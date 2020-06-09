@@ -88,7 +88,7 @@ func supportsMultipleVolumeClaims(t *testing.T, cluster *types.Cluster) bool {
 		lazyBoundStorageClass(t, cluster)
 }
 
-// compoundError is a group of errors
+// compoundError is a group of errors.
 type compoundError struct {
 	errs []error
 }
@@ -634,7 +634,7 @@ func getLogFileNameFromExecOutput(outputStr string) string {
 	return outputStrArr[len(outputStrArr)-1]
 }
 
-// Struct to define cbopinfo command args
+// Struct to define cbopinfo command args.
 type cbopinfoArg struct {
 	Name        string
 	Arg         string

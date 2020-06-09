@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var ErrTypeUnsupported = fmt.Errorf("unsupported urlencoding type")
+
 // isEmptyValue checks for an unset value in the context of 'omitempty' being set.
 func isEmptyValue(v reflect.Value) bool {
 	switch v.Kind() {
@@ -56,10 +58,10 @@ func encode(v reflect.Value) (string, error) {
 		return "[" + strings.Join(items, ",") + "]", nil
 	}
 
-	return "", fmt.Errorf("unsupported type %v %v", v, v.Type())
+	return "", fmt.Errorf("unsupported type %v %v: %w", v, v.Type(), ErrTypeUnsupported)
 }
 
-// options is an array of options
+// options is an array of options.
 type tagOptions []string
 
 // parseTag splits up an options string into a field name and list of options.
@@ -146,7 +148,7 @@ func marshal(m interface{}, data *url.Values) error {
 					return err
 				}
 			default:
-				return fmt.Errorf("unhandled type %v for field %s", fv.Kind(), st.Name)
+				return fmt.Errorf("unhandled type %v for field %s: %w", fv.Kind(), st.Name, ErrTypeUnsupported)
 			}
 
 			continue
@@ -160,7 +162,7 @@ func marshal(m interface{}, data *url.Values) error {
 		// Finally encode the struct value
 		encoded, err := encode(fv)
 		if err != nil {
-			return fmt.Errorf("urlencode: %v", err)
+			return err
 		}
 
 		data.Set(name, encoded)

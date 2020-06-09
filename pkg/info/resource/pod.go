@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// podResource represents a collection of pods
+// podResource represents a collection of pods.
 type podResource struct {
 	context *context.Context
 	// pods is the raw output from listing pods

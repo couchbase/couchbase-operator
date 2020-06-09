@@ -20,7 +20,7 @@ const (
 )
 
 // CollectInfoResult is used to communicate execution info
-// back from go routines
+// back from go routines.
 type CollectInfoResult struct {
 	// pod is the pod the result relates to
 	Pod *v1.Pod
@@ -66,7 +66,7 @@ func CollectInfo(context *context.Context, pod *v1.Pod) (result *CollectInfoResu
 	// Create an executor running over HTTP2
 	exec, err := remotecommand.NewSPDYExecutor(context.KubeConfig, "POST", req.URL())
 	if err != nil {
-		result.Err = fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+		result.Err = fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 		return
 	}
 
@@ -75,7 +75,7 @@ func CollectInfo(context *context.Context, pod *v1.Pod) (result *CollectInfoResu
 	stdout := &bytes.Buffer{}
 
 	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
-		result.Err = fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+		result.Err = fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 		return
 	}
 
@@ -101,14 +101,14 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 	// Create an executor running over HTTP2
 	exec, err := remotecommand.NewSPDYExecutor(context.KubeConfig, "POST", req.URL())
 	if err != nil {
-		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+		return fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 	}
 
 	// Finally run the copy command
 	stdout := &bytes.Buffer{}
 
 	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
-		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+		return fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 	}
 
 	tarReader := tar.NewReader(stdout)
@@ -120,7 +120,7 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 		}
 
 		if err != nil {
-			return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+			return fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 		}
 
 		if err := ioutil.WriteFile(filepath.Base(header.Name), stdout.Bytes(), 0600); err != nil {
@@ -148,14 +148,14 @@ func CleanLogs(context *context.Context, pod *v1.Pod) error {
 	// Create an executor running over HTTP2
 	exec, err := remotecommand.NewSPDYExecutor(context.KubeConfig, "POST", req.URL())
 	if err != nil {
-		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+		return fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 	}
 
 	// Finally run the delete command
 	stdout := &bytes.Buffer{}
 
 	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
-		return fmt.Errorf("log collection on %s failed: %v", pod.Name, err)
+		return fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 	}
 
 	return nil

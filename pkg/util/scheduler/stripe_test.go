@@ -131,7 +131,7 @@ var (
 )
 
 // testPodGetter replaces the standard Kubernetes API driven method
-// of listing pods and simply returns what we have given it
+// of listing pods and simply returns what we have given it.
 type testPodGetter struct {
 	pods []*v1.Pod
 }

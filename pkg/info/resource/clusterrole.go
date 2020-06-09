@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// clusterRoleResource represents a collection of clusterRoles
+// clusterRoleResource represents a collection of clusterRoles.
 type clusterRoleResource struct {
 	context *context.Context
 	// clusterRoles is the raw output from listing clusterRoles

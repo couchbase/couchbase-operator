@@ -12,7 +12,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// eventCollector represents a collection of events
+// eventCollector represents a collection of events.
 type eventCollector struct {
 	context *context.Context
 	// events is the raw output from listing events

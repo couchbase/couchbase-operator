@@ -11,7 +11,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
-	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -187,7 +187,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 		// within the spec before we can add it to the pod
 		required := cluster.Spec.GetVolumeClaimTemplate(claimName)
 		if required == nil {
-			return nil, fmt.Errorf("claim (%s) does not map to any claimTemplates", claimName)
+			return nil, fmt.Errorf("%w: claim (%s) does not map to any claimTemplates", errors.ErrResourceAttributeRequired, claimName)
 		}
 
 		// Label and Annotate so that volumes
@@ -300,7 +300,7 @@ func getPathsToPersist(mounts *couchbasev2.VolumeMounts) (map[couchbasev2.Volume
 		// When logsClaim is specified no other mounts are allowed.
 		// Return error if validation didn't prevent this from occurring.
 		if defaultClaim != "" || hasSecondaryMounts {
-			return mountPaths, fmt.Errorf("other mounts cannot be used in with `logs` mount")
+			return mountPaths, fmt.Errorf("%w: other mounts cannot be used in with `logs` mount", errors.ErrConfigurationInvalid)
 		}
 
 		mountPaths[couchbasev2.LogsVolumeMount] = logsClaim
@@ -326,7 +326,7 @@ func getPathsToPersist(mounts *couchbasev2.VolumeMounts) (map[couchbasev2.Volume
 		}
 	} else if hasSecondaryMounts {
 		// Reutrn error if other mount paths are specified without default volume
-		return mountPaths, fmt.Errorf("other mounts cannot be used in without `default` mount")
+		return mountPaths, fmt.Errorf("%w: other mounts cannot be used in without `default` mount", errors.ErrConfigurationInvalid)
 	}
 
 	return mountPaths, nil
@@ -382,20 +382,14 @@ func podVolumeSpecForClaim(claimName string) v1.Volume {
 // Delete pod and any associated persisted volumes
 // when removeVolumes is 'true'.
 func DeleteCouchbasePod(client *client.Client, namespace, name string, opts *metav1.DeleteOptions, removeVolumes bool) error {
-	var errs []string
-
 	if err := DeletePod(client, namespace, name, opts); err != nil {
-		errs = append(errs, err.Error())
+		return err
 	}
 
 	if removeVolumes {
 		if err := deletePodVolumes(client, name); err != nil {
-			errs = append(errs, err.Error())
+			return err
 		}
-	}
-
-	if len(errs) > 0 {
-		return fmt.Errorf(strings.Join(errs, ","))
 	}
 
 	return nil
@@ -425,7 +419,7 @@ func deletePodVolumes(client *client.Client, memberName string) error {
 				return nil
 			}
 
-			return fmt.Errorf("PVC still visible")
+			return fmt.Errorf("%w: pvc %s not deleted", errors.ErrResourceExists, name)
 		}
 
 		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
@@ -967,7 +961,7 @@ func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unable to locate couchbase container")
+	return nil, fmt.Errorf("%w: unable to locate couchbase container", errors.ErrResourceAttributeRequired)
 }
 
 // Adds any necessary pod prerequisites before enabling TLS.
@@ -1036,18 +1030,14 @@ func findMemberPVC(client *client.Client, memberName, path string) (*v1.Persiste
 				switch phase {
 				case v1.ClaimBound:
 					return pvc, nil
-				case v1.ClaimPending:
-					return nil, cberrors.ErrVolumeClaimPending{Path: path, Phase: phase}
-				case v1.ClaimLost:
-					return nil, cberrors.ErrVolumeClaimLost{Path: path, Phase: phase}
 				default:
-					return nil, cberrors.ErrVolumeClaimUnknownPhase{Path: path, Phase: phase}
+					return nil, fmt.Errorf("%w: volume %s for %s is %s, expected Bound", errors.ErrKubernetesError, path, memberName, phase)
 				}
 			}
 		}
 	}
 
-	return nil, cberrors.ErrVolumeClaimMissing{Path: path}
+	return nil, fmt.Errorf("%w: volume %s for %s missing", errors.ErrResourceRequired, path, memberName)
 }
 
 // Recreate list of members from persistent volumes.
@@ -1108,13 +1098,13 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, podName string) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
-		return cberrors.ErrNoVolumeMounts{}
+		return errors.ErrNoVolumeMounts
 	}
 
 	// default volume claim is required for recovery
 	defaultClaim := mounts.DefaultClaim
 	if defaultClaim == "" {
-		return fmt.Errorf("no claim defined for default volume")
+		return fmt.Errorf("%w: no claim defined for default volume", errors.ErrResourceAttributeRequired)
 	}
 
 	// all volume mounts must be healthy
@@ -1151,7 +1141,7 @@ func IsLogPVC(pvc *v1.PersistentVolumeClaim) bool {
 func FlagPodReady(client *client.Client, name string) error {
 	pod, found := client.Pods.Get(name)
 	if !found {
-		return fmt.Errorf("pod %s not found", name)
+		return fmt.Errorf("%w: pod %s not found", errors.ErrResourceRequired, name)
 	}
 
 	for _, condition := range pod.Status.Conditions {

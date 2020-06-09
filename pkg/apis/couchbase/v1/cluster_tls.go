@@ -1,8 +1,9 @@
+// nolint
 package v1
 
 import "errors"
 
-// TLSPolicy defines the TLS policy of an couchbase cluster
+// TLSPolicy defines the TLS policy of an couchbase cluster.
 type TLSPolicy struct {
 	// StaticTLS enables user to generate static x509 certificates and keys,
 	// put them into Kubernetes secrets, and specify them into here.

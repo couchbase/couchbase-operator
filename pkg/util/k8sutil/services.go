@@ -9,7 +9,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
-	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -297,7 +297,7 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 				})
 			}
 		default:
-			return nil, fmt.Errorf("illegal port rule: %v", rule)
+			return nil, fmt.Errorf("%w: illegal port rule: %v", errors.ErrInternalError, rule)
 		}
 	}
 
@@ -698,7 +698,7 @@ func GetExposedServiceName(nodeName string) string {
 	return nodeName
 }
 
-// exposedfeatureSets is a mapping from feature name to a list of host ports to expose
+// exposedfeatureSets is a mapping from feature name to a list of host ports to expose.
 var exposedfeatureSets = map[couchbasev2.ExposedFeature][]couchbasev2.Service{
 	couchbasev2.FeatureAdmin: {
 		couchbasev2.AdminService,
@@ -734,7 +734,7 @@ func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (
 	for _, featureSet := range featureSet {
 		featureSetPorts, ok := exposedfeatureSets[featureSet]
 		if !ok {
-			return nil, fmt.Errorf("feature set %s undefined", featureSet)
+			return nil, fmt.Errorf("%w: feature set %s undefined", errors.ErrInternalError, featureSet)
 		}
 
 		for _, featureSetPort := range featureSetPorts {
@@ -822,7 +822,7 @@ func filterConfiguredPorts(ports []v1.ServicePort, services couchbasev2.ServiceL
 func memberServices(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member) (couchbasev2.ServiceList, error) {
 	class := cluster.Spec.GetServerConfigByName(member.Config())
 	if class == nil {
-		return nil, cberrors.NewErrUnknownServerClass(member.Config())
+		return nil, fmt.Errorf("%w: sever class %s missing for member %s", errors.ErrResourceAttributeRequired, member.Config(), member.Name())
 	}
 
 	// Append the admin service, this is not explicitly enabled
@@ -830,7 +830,7 @@ func memberServices(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.
 }
 
 // UpdateExposedFeatureStatus is used to communicate to clients which services have been
-// added or created by UpdateExposedFeatureStatus
+// added or created by UpdateExposedFeatureStatus.
 type UpdateExposedFeatureStatus struct {
 	Added   couchbasev2.ServiceList
 	Removed couchbasev2.ServiceList
@@ -973,7 +973,7 @@ func GetAlternateAddressExternalPorts(c *client.Client, namespace, name string) 
 		case dataServicePortNameTLS:
 			ports.DataServicePortTLS = port.NodePort
 		default:
-			return nil, fmt.Errorf("unexpected port name %s", port.Name)
+			return nil, fmt.Errorf("%w: unexpected port name %s", errors.ErrInternalError, port.Name)
 		}
 	}
 

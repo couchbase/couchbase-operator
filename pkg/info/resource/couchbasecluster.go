@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// couchbaseClusterResource represents a collection of couchbase clusters
+// couchbaseClusterResource represents a collection of couchbase clusters.
 type couchbaseClusterResource struct {
 	context *context.Context
 	// pods is the raw output from listing couchbaseClusters

@@ -61,7 +61,7 @@ const (
 )
 
 // KeyPairRequest contains the necessary configuration to generate
-// a private key and signed public key pair by a CA
+// a private key and signed public key pair by a CA.
 type KeyPairRequest struct {
 	keyType  KeyType
 	certType CertType
@@ -188,7 +188,7 @@ func ParseCertificate(data []byte) (*x509.Certificate, error) {
 }
 
 // CertificateAuthority represents a certificate authority with public
-// and private key pair
+// and private key pair.
 type CertificateAuthority struct {
 	// Private certificate used to sign CSRs
 	certificate *x509.Certificate

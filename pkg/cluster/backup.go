@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -69,7 +70,7 @@ func getBackupContainerForTLS(podSpec corev1.PodSpec, containerName string) (*co
 		}
 	}
 
-	return nil, fmt.Errorf("unable to locate backup container")
+	return nil, fmt.Errorf("unable to locate backup container: %w", errors.ErrResourceRequired)
 }
 
 // Adds any necessary pod prerequisites before enabling TLS.
@@ -82,7 +83,7 @@ func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) err
 			// Ensure the schema is correct
 			// TODO: does this make sense not to be a pointer?
 			if len(cs.Networking.TLS.Static.OperatorSecret) == 0 {
-				return fmt.Errorf("static tls operator secret required")
+				return fmt.Errorf("static tls operator secret required: %w", errors.ErrResourceRequired)
 			}
 
 			//Add the TLS secret volume to the podSpec
@@ -371,7 +372,7 @@ func (c *Cluster) getBackupRepo(restore *couchbasev2.CouchbaseBackupRestore) err
 	backups := c.k8s.CouchbaseBackups.List()
 
 	if len(backups) == 0 {
-		return fmt.Errorf("no CouchbaseBackups exist currently")
+		return fmt.Errorf("no CouchbaseBackups exist currently: %w", errors.ErrResourceRequired)
 	}
 
 	for _, backup := range backups {
@@ -386,7 +387,7 @@ func (c *Cluster) getBackupRepo(restore *couchbasev2.CouchbaseBackupRestore) err
 	}
 
 	if !backupFound {
-		return fmt.Errorf("no corresponding CouchbaseBackup Repo found")
+		return fmt.Errorf("no corresponding CouchbaseBackup Repo found: %w", errors.ErrResourceRequired)
 	}
 
 	return nil

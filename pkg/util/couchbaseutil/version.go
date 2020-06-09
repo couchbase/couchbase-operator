@@ -8,11 +8,11 @@ import (
 	"regexp"
 	"strconv"
 
-	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
-// A Couchbase version.  This type is immutable
+// A Couchbase version.  This type is immutable.
 type Version struct {
 	// Full name e.g. "enterprise-5.5.0"
 	version string
@@ -25,7 +25,7 @@ type Version struct {
 // Initialise the version struct.  Prefix and semver are lazilly initialised.
 func NewVersion(version string) (*Version, error) {
 	if version == "" {
-		return nil, fmt.Errorf("null version")
+		return nil, fmt.Errorf("%w: null version", errors.ErrInvalidVersion)
 	}
 
 	// lookup version associated with sha256 digest
@@ -44,7 +44,7 @@ func NewVersion(version string) (*Version, error) {
 
 	matches := re.FindStringSubmatch(version)
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("malformed version '%s'", version)
+		return nil, fmt.Errorf("%w: malformed version '%s'", errors.ErrInvalidVersion, version)
 	}
 
 	prefix := matches[1]
@@ -87,7 +87,7 @@ func GetSHA256Version(version string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("unknown version digest: %s", version)
+	return "", fmt.Errorf("%w: unknown version digest: %s", errors.ErrInvalidVersion, version)
 }
 
 // Return the full version string.
@@ -164,7 +164,7 @@ func VerifyVersion(version string) error {
 
 	minVersion, _ := NewVersion(constants.CouchbaseVersionMin)
 	if v.Compare(minVersion) == -1 {
-		return cberrors.ErrUnsupportedVersion{Version: version}
+		return fmt.Errorf("%w: version %s is unsupported, requires at least %s", errors.ErrInvalidVersion, version, minVersion)
 	}
 
 	return nil

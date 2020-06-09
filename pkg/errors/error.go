@@ -3,253 +3,127 @@ package errors
 import (
 	"errors"
 	"fmt"
-	"reflect"
-
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-
-	v1 "k8s.io/api/core/v1"
+	"runtime"
+	"strings"
 )
 
+// As of go 1.13, errors are now beginning to be standardized.
+// Read https://blog.golang.org/go1.13-errors for a good introduction.
+// Basic errors should be directly comparable as the errors below i.e.
+// Specializations should wrap base errors (either use fmt.Errorf("%w..."))
+// or implement Unwrap().
+//
+// Why is this cool?  Well each frame in the call stack can wrap the error
+// with more and more context until the point it is reported, but it retains
+// the ability to ask "were you originally due to error type X?" or "was the
+// error X at any point?".
+
+// Generic TLS related errors.
 var (
-	ErrClusterCreating       = errors.New("existing cluster failed during prior initialization, state unknown")
-	ErrUnknownCreatePod      = errors.New("unknown error occurred creating pod")
-	ErrResourceLabelMismatch = errors.New("resource does not match label selection")
+	// ErrCertificateInvalid is raised when a certificate is invalid for any reason.
+	ErrCertificateInvalid = errors.New("certificate error")
+
+	// ErrPublicKeyInvalid is raised when a public key is malformed or not supported.
+	ErrPublicKeyInvalid = errors.New("public key invalid")
+
+	// ErrPrivateKeyInvalid is raised when a private key is malformed or not supported.
+	ErrPrivateKeyInvalid = errors.New("private key invalid")
+
+	// ErrTLSInvalid is raised when a TLS error occurs e.g. client/server certs don't
+	// validate.
+	ErrTLSInvalid = errors.New("TLS invalid")
 )
 
-type rebalanceNotObservedError struct{}
+// Generic Kubernetes errors.
+var (
+	// ErrResourceRequired is raised when an expected resource is not found.
+	ErrResourceRequired = errors.New("required resource missing")
 
-func (e rebalanceNotObservedError) Error() string {
-	return "rebalance task not observed as running"
+	// ErrResourceExists is raised when a resource exists and it shouldn't.
+	ErrResourceExists = errors.New("resource unexpectedly exists")
+
+	// ErrResourceAttributeRequired is raised when any data associated with a resource
+	// is not found e.g. labels, annotations or specification attributes.
+	ErrResourceAttributeRequired = errors.New("required resource attribute missing")
+
+	// ErrKubernetesError is raised when not handled by one of the resource errors e.g.
+	// some validation steps fail.
+	ErrKubernetesError = errors.New("unexpected kubernetes error")
+)
+
+// Couchbase server specific errors.
+var (
+	// ErrCouchbaseServerError is raised when couchbase doesn't behave in the way that
+	// we expect, either by explicitly throwing an error or not doing something aynchronously.
+	ErrCouchbaseServerError = errors.New("unexpected couchbase server error")
+
+	// ErrInvalidVersion is raised when we detect a semantic version formatting error
+	// or an attempt to use an incompatible version etc.
+	ErrInvalidVersion = fmt.Errorf("version error")
+
+	// ErrRebalanceIncomplete is raised when we think the rebalance failed or did not
+	// even occur and thus we should avoid deleting anything yet.
+	ErrRebalanceIncomplete = errors.New("unexpected rebalance error")
+
+	// ErrNoVolumeMounts is raised when a pod has no volume mounts specified.
+	ErrNoVolumeMounts = errors.New("pod has no persistent storage")
+)
+
+// Operator specifc errors.
+var (
+	// ErrInternalError is something that should never get raised.
+	ErrInternalError = errors.New("unexpected internal error")
+
+	// ErrConfigurationInvalid is raised when we detect that configuration constraints
+	// have been violated.  This is indicative that the user has either ignored the DAC
+	// or that there is some functionality missing from the DAC.
+	ErrConfigurationInvalid = errors.New("user configuration error")
+)
+
+// StackTracedError allows an error to be wrapped up at the source and store the stack
+// trace of where it occurred, useful for determining the context in which the error
+// occurred when errors are propagated up the stack without being wrapped further.
+type StackTracedError struct {
+	// err is the cached base error.
+	err error
+
+	// stack is the stack trace where the error was created.
+	stack string
 }
 
-var RebalanceNotObservedError error = rebalanceNotObservedError{}
+func NewStackTracedError(err error) error {
+	// Collect upto 64 program counters.
+	pcs := make([]uintptr, 64)
 
-type ErrSecretMissingUsername struct {
-	Reason string
-}
+	// Get the callers that led to here, skipping this stack frame and the call's.
+	runtime.Callers(2, pcs)
 
-type ErrSecretMissingPassword struct {
-	Reason string
-}
+	// Yes, you may be thinking that runtime/debug.Stack is easier, and while it
+	// is we have no control over formatting.  We could even eventually just
+	// keep this as a map (JSON object) and have logify format it correctly...
+	frames := runtime.CallersFrames(pcs)
 
-type ErrCreatingPod struct {
-	Reason string
-}
+	stack := []string{}
 
-type ErrDeletingPod struct {
-	Reason string
-}
+	for frame, more := frames.Next(); more; frame, more = frames.Next() {
+		stack = append(stack, frame.Function)
+		stack = append(stack, fmt.Sprintf("\t%s:%d", frame.File, frame.Line))
+	}
 
-type ErrRunningPod struct {
-	Reason string
-}
-
-type ErrInvalidBucketParamChange struct {
-	Bucket string
-	Param  string
-	From   interface{}
-	To     interface{}
-}
-
-type ErrPodUnschedulable struct {
-	Reason string
-}
-
-type ErrUnsupportedVersion struct {
-	Version string
-}
-
-type ErrCreatingPersistentVolumeClaim struct {
-	Reason string
-}
-
-type ErrCreatingPersistentVolume struct {
-	Reason string
-}
-
-// Errors for volume health checking
-type ErrNoVolumeMounts struct{}
-
-type ErrVolumeClaimPending struct {
-	Path  string
-	Phase v1.PersistentVolumeClaimPhase
-}
-
-type ErrVolumeClaimLost struct {
-	Path  string
-	Phase v1.PersistentVolumeClaimPhase
-}
-
-type ErrVolumeClaimUnknownPhase struct {
-	Path  string
-	Phase v1.PersistentVolumeClaimPhase
-}
-
-type ErrVolumeClaimMissing struct {
-	Path string
-}
-
-type ErrVolumeUnexpectedPhase struct {
-	Path  string
-	Phase v1.PersistentVolumePhase
-}
-
-type ErrVolumeMissingGroup struct {
-	VolumeName string
-}
-
-func NewErrVolumeMissingGroup(name string) error {
-	return &ErrVolumeMissingGroup{
-		VolumeName: name,
+	return &StackTracedError{
+		err:   err,
+		stack: strings.Join(stack, "\n"),
 	}
 }
 
-func (e ErrVolumeMissingGroup) Error() string {
-	return fmt.Sprintf("volume `%s` is not labeled with a server group", e.VolumeName)
+func (e *StackTracedError) Error() string {
+	return e.err.Error()
 }
 
-func IsErrVolumeMissingGroup(err error) bool {
-	_, ok := err.(*ErrVolumeMissingGroup)
-	return ok
+func (e *StackTracedError) Unwrap() error {
+	return e.err
 }
 
-// ErrUnknownMember is used when mapping a pod to a member and the
-// member is unknown
-type ErrUnknownMember struct {
-	member string
-}
-
-// Error returns an error string.
-func (e ErrUnknownMember) Error() string {
-	return fmt.Sprintf("member is unknown: %s", e.member)
-}
-
-// NewErrUnknownMember creates a new unknown member error.
-func NewErrUnknownMember(member string) error {
-	return &ErrUnknownMember{member: member}
-}
-
-// IsErrUnknownMember returns whether the error is an unknown member.
-func IsErrUnknownMember(err error) bool {
-	_, ok := err.(*ErrUnknownMember)
-	return ok
-}
-
-// RebalanceIncompleteError is used when a rebalance operation did not
-// complete successfully and the cluster is unbalanced
-type rebalanceIncompleteError struct{}
-
-func (e rebalanceIncompleteError) Error() string {
-	return "rebalance did not complete, cluster is unbalanced"
-}
-
-func NewRebalanceIncompleteError() error {
-	return &rebalanceIncompleteError{}
-}
-
-func IsRebalanceIncompleteError(err error) bool {
-	_, ok := err.(*rebalanceIncompleteError)
-	return ok
-}
-
-// ErrUnknownServerClass is used when mapping a class name to a server
-// configuration and the configuration does not exist
-type ErrUnknownServerClass struct {
-	serverClass string
-}
-
-// Error returns an error string.
-func (e ErrUnknownServerClass) Error() string {
-	return fmt.Sprintf("server class is unknown: %s", e.serverClass)
-}
-
-// NewErrUnknownServerClass returns a new new missing.
-func NewErrUnknownServerClass(serverClass string) error {
-	return &ErrUnknownServerClass{serverClass: serverClass}
-}
-
-// IsErrUnknownServerClass returns whether the error is an unknown server class.
-func IsErrUnknownServerClass(err error) bool {
-	_, ok := err.(*ErrUnknownServerClass)
-	return ok
-}
-
-func (e ErrSecretMissingUsername) Error() string {
-	return fmt.Sprintf("secret is missing username key: %s", e.Reason)
-}
-
-func (e ErrSecretMissingPassword) Error() string {
-	return fmt.Sprintf("secret is missing password key: %s", e.Reason)
-}
-
-func (e ErrCreatingPod) Error() string {
-	return fmt.Sprintf("failed to create pod: %s", e.Reason)
-}
-
-func (e ErrDeletingPod) Error() string {
-	return fmt.Sprintf("failed to delete pod: %s", e.Reason)
-}
-
-func (e ErrRunningPod) Error() string {
-	return fmt.Sprintf("failed to run pod: %s", e.Reason)
-}
-
-func (e ErrInvalidBucketParamChange) Error() string {
-	fromStr := "unset"
-	toStr := "unset"
-
-	if hasValue(e.From) {
-		fromStr = reflect.Indirect(reflect.ValueOf(e.From)).String()
-	}
-
-	if hasValue(e.To) {
-		toStr = reflect.Indirect(reflect.ValueOf(e.To)).String()
-	}
-
-	return fmt.Sprintf("cannot change (%s) bucket param='%s' from '%s' to '%s'",
-		e.Bucket, e.Param, fromStr, toStr)
-}
-
-func (e ErrPodUnschedulable) Error() string {
-	return fmt.Sprintf("unable to schedule pod: %s", e.Reason)
-}
-
-func (e ErrUnsupportedVersion) Error() string {
-	return fmt.Sprintf("version not supported: %s, min version: %s", e.Version, constants.CouchbaseVersionMin)
-}
-
-func (e ErrCreatingPersistentVolumeClaim) Error() string {
-	return fmt.Sprintf("failed to create persistent volume claim: %s", e.Reason)
-}
-
-func (e ErrCreatingPersistentVolume) Error() string {
-	return fmt.Sprintf("failed to create persistent volume: %s", e.Reason)
-}
-
-func (e ErrNoVolumeMounts) Error() string {
-	return fmt.Sprintf("No volume mounts defined")
-}
-
-func (e ErrVolumeClaimLost) Error() string {
-	return fmt.Sprintf("PersistentVolumeClaim for path %s has lost it's underlying PersistentVolume, Phase=`%s`", e.Path, e.Phase)
-}
-
-func (e ErrVolumeClaimPending) Error() string {
-	return fmt.Sprintf("PersistentVolumeClaim for path %s is not yet bound to an underlying PersistentVolume, Phase=`%s`", e.Path, e.Phase)
-}
-
-func (e ErrVolumeClaimUnknownPhase) Error() string {
-	return fmt.Sprintf("PersistentVolumeClaim for path %s is in an unknown phase `%s`", e.Path, e.Phase)
-}
-
-func (e ErrVolumeClaimMissing) Error() string {
-	return fmt.Sprintf("Missing PersistentVolumeClaim for path %s", e.Path)
-}
-
-func (e ErrVolumeUnexpectedPhase) Error() string {
-	return fmt.Sprintf("PersistentVolume for path %s is in an unexpected Phase: `%s`, expected `Bound`", e.Path, e.Phase)
-}
-
-func hasValue(v interface{}) bool {
-	return reflect.ValueOf(v) != reflect.Zero(reflect.TypeOf(v))
+func (e *StackTracedError) GetStack() string {
+	return e.stack
 }

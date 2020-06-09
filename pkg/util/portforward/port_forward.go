@@ -22,7 +22,7 @@ var (
 	handlers []func(error)
 )
 
-// PortForwarder forwards a pod port to localhost in the background
+// PortForwarder forwards a pod port to localhost in the background.
 type PortForwarder struct {
 	Config    *rest.Config
 	Client    kubernetes.Interface

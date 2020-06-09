@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -129,7 +130,7 @@ func (j *janitor) updateDetachedAnnotation(pvc *corev1.PersistentVolumeClaim) er
 	// Extract the pod name from the PVC.
 	podName, ok := pvc.Labels[constants.LabelNode]
 	if !ok {
-		return fmt.Errorf("pvc '%s' missing label '%s'", pvc.Name, constants.LabelNode)
+		return fmt.Errorf("pvc '%s' missing label '%s': %w", pvc.Name, constants.LabelNode, errors.ErrResourceAttributeRequired)
 	}
 
 	// Look up the pod and calculate whether the PVC is attached.
@@ -194,7 +195,7 @@ func (j *janitor) deleteTimedOutVolumes() error {
 
 	logRetentionTime, err := time.ParseDuration(j.cluster.cluster.Spec.Logging.LogRetentionTime)
 	if err != nil {
-		return fmt.Errorf("logRetentionTime improperly formatted: %v", err)
+		return fmt.Errorf("logRetentionTime improperly formatted: %w", err)
 	}
 
 	if logRetentionTime == 0 {
