@@ -69,22 +69,74 @@ func Init() error {
 	return nil
 }
 
+// ClusterConfigValue allows multiple cluster configurations to be passed on the command line
+// e.g. --cluster BasicCluster,~/.kube/conf,,default --cluster NewCluster1,~/kubeconfig,,remote
+type ClusterConfigValue struct {
+	values []ClusterConfig
+}
+
+func (v *ClusterConfigValue) Set(value string) error {
+	fields := strings.Split(value, ",")
+	if len(fields) != 4 {
+		return fmt.Errorf("invalid cluster config value, expected NAME,FILE,CONTEXT,NAMESPACE")
+	}
+
+	config := ClusterConfig{
+		Name:      fields[0],
+		Config:    fields[1],
+		Context:   fields[2],
+		Namespace: fields[3],
+	}
+
+	v.values = append(v.values, config)
+
+	return nil
+}
+
+func (v *ClusterConfigValue) String() string {
+	return ""
+}
+
+// RegistryConfigValue allows multiple container image registries to be passed on the command line
+// e.g. --registry https://index.docker.io/v1/,organization,password
+type RegistryConfigValue struct {
+	values []RegistryConfig
+}
+
+func (v *RegistryConfigValue) Set(value string) error {
+	fields := strings.Split(value, ",")
+	if len(fields) != 3 {
+		return fmt.Errorf("invalid cluster config value, expected SERVER,USERNAME,PASSWORD")
+	}
+
+	config := RegistryConfig{
+		Server:   fields[0],
+		Username: fields[1],
+		Password: fields[2],
+	}
+
+	v.values = append(v.values, config)
+
+	return nil
+}
+
+func (v *RegistryConfigValue) String() string {
+	return ""
+}
+
 func readYamlData() (err error) {
 	// Provide some sane defaults.
 	params := TestRunParam{
-		KubeConfig: []KubeConfData{
-			{
-				ClusterName: "BasicCluster",
-			},
-			{
-				ClusterName: "NewCluster1",
-			},
-		},
 		ServiceAccountName: "couchbase-operator",
 	}
 
 	var platform string
 
+	var clusters ClusterConfigValue
+
+	var registries RegistryConfigValue
+
+	// CLI based configuration (CI/computer friendly)
 	flag.StringVar(&params.KubeType, "platform-type", "kubernetes", "Either kubernetes or openshift")
 	flag.StringVar(&platform, "platform-vendor", "", "Either aws, gce or azure")
 	flag.StringVar(&params.OperatorImage, "operator-image", "couchbase/couchbase-operator:v1", "Docker image to use for the operator")
@@ -97,20 +149,17 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:6.5.0", "Docker image to use for couchbase backup")
 	flag.StringVar(&params.SuiteToRun, "suite", "", "Test suite to run")
 	flag.StringVar(&params.StorageClassName, "storage-class", "default", "Storage class to use")
-	flag.StringVar(&params.KubeConfig[0].ClusterConfig, "kubeconfig1", "~/.kube/config", "Kubernetes configuration file for the first cluster")
-	flag.StringVar(&params.KubeConfig[0].Context, "context1", "", "Kubernetes context for the first cluster")
-	flag.StringVar(&params.KubeConfig[0].Namespace, "namespace1", "default", "Kubernetes namespace for the first cluster")
-	flag.StringVar(&params.KubeConfig[1].ClusterConfig, "kubeconfig2", "~/.kube/config", "Kubernetes configuration file for the second cluster")
-	flag.StringVar(&params.KubeConfig[1].Context, "context2", "", "Kubernetes context for the second cluster")
-	flag.StringVar(&params.KubeConfig[1].Namespace, "namespace2", "remote", "Kubernetes namespace for the second cluster")
-	flag.StringVar(&params.DockerServer, "docker-server", "https://index.docker.io/v1/", "Docker server to authenticate against")
-	flag.StringVar(&params.DockerUsername, "docker-username", "", "Docker registry user name")
-	flag.StringVar(&params.DockerPassword, "docker-password", "", "Docker registry user password")
 	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
+	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. NAME,FILE,CONTEXT,NAMESPACE")
+	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
 
+	// File based configuration (meat-space friendly)
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
 
 	flag.Parse()
+
+	params.ClusterConfigs = clusters.values
+	params.RegistryConfigs = registries.values
 
 	// Use either the CLI parameters, or the YAML file.  I suspect the YAML
 	// method will suffer a quick death...
@@ -128,9 +177,9 @@ func readYamlData() (err error) {
 		}
 	}
 
-	for index, config := range runtimeParams.KubeConfig {
-		if strings.HasPrefix(config.ClusterConfig, "~/") {
-			runtimeParams.KubeConfig[index].ClusterConfig = strings.Replace(config.ClusterConfig, "~", os.Getenv("HOME"), 1)
+	for index, config := range runtimeParams.ClusterConfigs {
+		if strings.HasPrefix(config.Config, "~/") {
+			runtimeParams.ClusterConfigs[index].Config = strings.Replace(config.Config, "~", os.Getenv("HOME"), 1)
 		}
 	}
 
@@ -203,8 +252,16 @@ func startTimeoutTimer() {
 	}()
 }
 
-func CreateDeploymentObject(operatorImage string, operatorPort int, podCreateTimeout fmt.Stringer) (deployment *appsv1.Deployment, err error) {
-	deployment = config.GetOperatorDeployment("", operatorImage, dockerPullSecretName, podCreateTimeout, "--zap-level", "debug")
+func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPort int, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
+	// This just picks the first, so ordering is important unless we sort out
+	// cbopcfg...
+	var pullSecret string
+
+	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil {
+		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
+	}
+
+	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, podCreateTimeout, "--zap-level", "debug")
 
 	// Manually set the HTTP port.
 	if operatorPort != 0 {
@@ -212,7 +269,7 @@ func CreateDeploymentObject(operatorImage string, operatorPort int, podCreateTim
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
 	}
 
-	return
+	return deployment
 }
 
 // Setup setups a test framework and points "Global" to it.
@@ -243,23 +300,18 @@ func Setup(t *testing.T) (err error) {
 		CouchbaseBackupImage:          runtimeParams.CouchbaseBackupImage,
 	}
 
-	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0, Global.PodCreateTimeout)
-	if err != nil {
-		return err
-	}
-
 	Global.LogDir, err = makeLogDir()
 	if err != nil {
 		return err
 	}
 
-	for _, kubeConf := range runtimeParams.KubeConfig {
+	for _, kubeConf := range runtimeParams.ClusterConfigs {
 		clusterSpec, cerr := createKubeClusterObject(kubeConf)
 		if cerr != nil {
 			return cerr
 		}
 
-		Global.ClusterSpec[kubeConf.ClusterName] = clusterSpec
+		Global.ClusterSpec[kubeConf.Name] = clusterSpec
 	}
 
 	// Set any defaults.
@@ -272,10 +324,14 @@ func Setup(t *testing.T) (err error) {
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
 	e2espec.SetPlatform(runtimeParams.Platform)
 
-	logrus.Info("Docker Registry")
-	logrus.Info(" →  server: " + runtimeParams.DockerServer)
-	logrus.Info(" →  username: " + runtimeParams.DockerUsername)
-	logrus.Info(" →  password: " + strings.Repeat("*", len(runtimeParams.DockerPassword)))
+	logrus.Info("Docker Registries")
+
+	for _, registry := range runtimeParams.RegistryConfigs {
+		logrus.Info(" →  server: " + registry.Server)
+		logrus.Info("    username: " + registry.Username)
+		logrus.Info("    password: " + strings.Repeat("*", len(registry.Password)))
+	}
+
 	logrus.Info("Container Images")
 	logrus.Info(" →  couchbase operator: " + runtimeParams.OperatorImage)
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
@@ -286,11 +342,13 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase exporter upgrade: " + runtimeParams.CouchbaseExporterImageUpgrade)
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
 
+	logrus.Info("Clusters")
+
 	for _, config := range Global.ClusterSpec {
-		logrus.Info("Cluster: ", config.Name)
-		logrus.Info(" →  path: " + config.KubeConfPath)
-		logrus.Info(" →  context: " + config.Context)
-		logrus.Info(" →  namespace: " + config.Namespace)
+		logrus.Info(" →  name: " + config.Name)
+		logrus.Info("    path: " + config.KubeConfPath)
+		logrus.Info("    context: " + config.Context)
+		logrus.Info("    namespace: " + config.Namespace)
 	}
 
 	logrus.Info("Kubernetes")
@@ -329,7 +387,7 @@ func cleanUpNamespace() (err error) {
 		}
 
 		// Clean-up Deployments and pods
-		if err := DeleteOperatorCompletely(k8s, Global.Deployment.Name); err != nil {
+		if err := DeleteOperatorCompletely(k8s, config.OperatorResourceName); err != nil {
 			return err
 		}
 
@@ -361,9 +419,9 @@ func Teardown() error {
 	return nil
 }
 
-func createKubeClusterObject(c KubeConfData) (*types.Cluster, error) {
+func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: c.ClusterConfig},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: c.Config},
 		&clientcmd.ConfigOverrides{CurrentContext: c.Context},
 	).ClientConfig()
 	if err != nil {
@@ -393,10 +451,10 @@ func createKubeClusterObject(c KubeConfData) (*types.Cluster, error) {
 		KubeClient:    kubernetes.NewForConfigOrDie(config),
 		DynamicClient: dynamic.NewForConfigOrDie(config),
 		RESTMapper:    restMapper,
-		KubeConfPath:  c.ClusterConfig,
+		KubeConfPath:  c.Config,
 		Context:       c.Context,
 		Namespace:     c.Namespace,
-		Name:          c.ClusterName,
+		Name:          c.Name,
 	}, nil
 }
 
@@ -561,14 +619,14 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		// re-creating docker secrets
 		logrus.Info("Recreating docker auth secret in default namespace")
 
-		if err := recreateDockerAuthSecret(k8s.KubeClient, "default"); err != nil {
+		if err := recreateDockerAuthSecret(k8s, "default"); err != nil {
 			return err
 		}
 
 		if k8s.Namespace != "default" {
 			logrus.Infof("Recreating docker auth secret in %v namespace", k8s.Namespace)
 
-			if err := recreateDockerAuthSecret(k8s.KubeClient, k8s.Namespace); err != nil {
+			if err := recreateDockerAuthSecret(k8s, k8s.Namespace); err != nil {
 				return err
 			}
 		}
@@ -576,7 +634,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		// creating DAC
 		logrus.Infof("Creating admission controller")
 
-		if err := createAdmissionController(k8s.KubeClient); err != nil {
+		if err := createAdmissionController(k8s); err != nil {
 			return err
 		}
 	}
@@ -636,13 +694,13 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 	logrus.Info("Recreating role")
 
-	if err := recreateRoles(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := recreateRoles(k8s, config.OperatorResourceName); err != nil {
 		return err
 	}
 
 	logrus.Info("Recreating service account")
 
-	if err := RecreateServiceAccount(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := RecreateServiceAccount(k8s, config.OperatorResourceName); err != nil {
 		return err
 	}
 
@@ -668,7 +726,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	// delete and create operator
 	logrus.Infof("Cleaning up namespace %s before deployment in %s", k8s.Namespace, k8s.Name)
 
-	if err := DeleteOperatorCompletely(k8s, Global.Deployment.Name); err != nil {
+	if err := DeleteOperatorCompletely(k8s, config.OperatorResourceName); err != nil {
 		return fmt.Errorf("failed to delete operator: %v", err)
 	}
 
@@ -691,7 +749,9 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 }
 
 func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(f.Deployment); err != nil {
+	deployment := CreateDeploymentObject(k8s, f.OpImage, 0, f.PodCreateTimeout)
+
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
 		return err
 	}
 

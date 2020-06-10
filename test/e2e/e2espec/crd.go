@@ -248,30 +248,25 @@ func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
 	return buckets
 }
 
-// imagePullSecret to use to apply to pods.  Ignored if empty.
-var imagePullSecret string
-
-// SetImagePullSecret sets the privaye image pull secret for this module.
-// TODO: globals are banned!!
-func SetImagePullSecret(s string) {
-	imagePullSecret = s
-}
-
-// ApplyImagePullSecret adds an image pull secret to all the Couchbase server pods so that
+// ApplyImagePullSecret adds image pull secrets to all the Couchbase server pods so that
 // they can use private repositories.
-func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster) {
-	if imagePullSecret != "" {
-		for i := range cluster.Spec.Servers {
-			if cluster.Spec.Servers[i].Pod == nil {
-				cluster.Spec.Servers[i].Pod = &v1.PodTemplateSpec{}
-			}
+func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster, imagePullSecrets []string) {
+	if imagePullSecrets == nil {
+		return
+	}
 
-			cluster.Spec.Servers[i].Pod.Spec.ImagePullSecrets = []v1.LocalObjectReference{
-				{
-					Name: imagePullSecret,
-				},
-			}
+	references := make([]v1.LocalObjectReference, len(imagePullSecrets))
+
+	for i, secret := range imagePullSecrets {
+		references[i].Name = secret
+	}
+
+	for i := range cluster.Spec.Servers {
+		if cluster.Spec.Servers[i].Pod == nil {
+			cluster.Spec.Servers[i].Pod = &v1.PodTemplateSpec{}
 		}
+
+		cluster.Spec.Servers[i].Pod.Spec.ImagePullSecrets = references
 	}
 }
 

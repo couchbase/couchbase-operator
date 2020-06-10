@@ -11,18 +11,12 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/config"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-)
-
-const (
-	dockerPullSecretName = "test-docker-pull-secret"
 )
 
 // Results is a global result store.
@@ -210,40 +204,53 @@ func RemoveServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
 // RecreateDockerAuthSecret deletes existing secrets and creates a new one if specified.
 // This secret, if defined, will be added to the operator and admission controllers in
 // order to pull from a private repository.
-func recreateDockerAuthSecret(kubeClient kubernetes.Interface, namespace string) error {
-	// Clean up the old authentication secret if it exists
-	if err := kubeClient.CoreV1().Secrets(namespace).Delete(dockerPullSecretName, nil); err != nil && !errors.IsNotFound(err) {
+func recreateDockerAuthSecret(k8s *types.Cluster, namespace string) error {
+	pullSecretLabel := "type"
+	pullSecretValue := "qe-docker-pull-secret"
+
+	// Clean up the old authentication secrets if they exist.
+	if err := k8s.KubeClient.CoreV1().Secrets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", pullSecretLabel, pullSecretValue)}); err != nil {
 		return err
 	}
 
-	// If specified create the authentication secret
-	if runtimeParams.DockerServer == "" || runtimeParams.DockerUsername == "" || runtimeParams.DockerPassword == "" {
-		return nil
+	if k8s.PullSecrets == nil {
+		k8s.PullSecrets = map[string][]string{}
 	}
 
-	// auth string is simply "username:password" base64 encoded
-	auth := runtimeParams.DockerUsername + ":" + runtimeParams.DockerPassword
-	auth = base64.StdEncoding.EncodeToString([]byte(auth))
+	k8s.PullSecrets[namespace] = make([]string, len(runtimeParams.RegistryConfigs))
 
-	// authentication data is encoded as per "~/.docker/config.json", and created by "docker login"
-	data := `{"auths":{"` + runtimeParams.DockerServer + `":{"auth":"` + auth + `"}}}`
+	// If specified create the authentication secrets
+	for i, registry := range runtimeParams.RegistryConfigs {
+		// auth string is simply "username:password" base64 encoded
+		auth := registry.Username + ":" + registry.Password
+		auth = base64.StdEncoding.EncodeToString([]byte(auth))
 
-	// create the new secret
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: dockerPullSecretName,
-		},
-		Type: v1.SecretTypeDockerConfigJson,
-		Data: map[string][]byte{
-			".dockerconfigjson": []byte(data),
-		},
+		// authentication data is encoded as per "~/.docker/config.json", and created by "docker login"
+		data := `{"auths":{"` + registry.Server + `":{"auth":"` + auth + `"}}}`
+
+		// create the new secret
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-docker-pull-secret-",
+				Labels: map[string]string{
+					pullSecretLabel: pullSecretValue,
+				},
+			},
+			Type: v1.SecretTypeDockerConfigJson,
+			Data: map[string][]byte{
+				".dockerconfigjson": []byte(data),
+			},
+		}
+
+		newSecret, err := k8s.KubeClient.CoreV1().Secrets(namespace).Create(secret)
+		if err != nil {
+			return err
+		}
+
+		// Register that we have a pull secret, this will be used for all couchbase
+		// clusters and deployments.
+		k8s.PullSecrets[namespace][i] = newSecret.Name
 	}
-	if _, err := kubeClient.CoreV1().Secrets(namespace).Create(secret); err != nil {
-		return err
-	}
-
-	// Register with the cluster creation module that we have a pull secret.
-	e2espec.SetImagePullSecret(dockerPullSecretName)
 
 	return nil
 }

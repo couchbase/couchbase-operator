@@ -2,9 +2,10 @@
 # If specified this specifies credentials to access a private docker registry.
 # This will attach a "pull secret" to operator and admission controller depoyment
 # specs that allow the images to be pulled.
-#docker-server: "https://index.docker.io/v1/"
-#docker-username: "couchbase-test"
-#docker-password: "password"
+#registries:
+#- server: "https://index.docker.io/v1/"
+#  username: "couchbase-test"
+#  password: "password"
 
 # Container images to use for testing
 operator-image: couchbase/couchbase-operator:v1

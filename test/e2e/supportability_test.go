@@ -17,6 +17,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/config"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -456,7 +457,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 
 	for _, deployment := range deployments.Items {
-		operator := deployment.Spec.Template.Spec.Containers[0].Image == framework.Global.Deployment.Spec.Template.Spec.Containers[0].Image
+		operator := deployment.Spec.Template.Spec.Containers[0].Image == framework.Global.OpImage
 		if !operator && !all {
 			continue
 		}
@@ -1113,15 +1114,12 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
 	f := framework.Global
 
 	// Delete existing Deployment
-	if err := framework.DeleteOperatorCompletely(k8s, f.Deployment.Name); err != nil {
+	if err := framework.DeleteOperatorCompletely(k8s, config.OperatorResourceName); err != nil {
 		return err
 	}
 
 	// Create new deployment object to deploy
-	deployment, err := framework.CreateDeploymentObject(imageName, port, f.PodCreateTimeout)
-	if err != nil {
-		return err
-	}
+	deployment := framework.CreateDeploymentObject(k8s, imageName, port, f.PodCreateTimeout)
 
 	t.Logf("Deploying operator using image '%s' and port %d", imageName, port)
 

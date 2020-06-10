@@ -35,6 +35,10 @@ type Cluster struct {
 	Namespace string
 	// Name is the cluster name
 	Name string
+	// PullSecrets is the list of pull secrets defined in this cluster.  These are
+	// identified on a per-namespace basis due to the operator running in a different
+	// namespace to the DAC.
+	PullSecrets map[string][]string
 
 	// Hacks - remove me
 

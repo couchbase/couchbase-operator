@@ -6,8 +6,6 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-
-	appsv1 "k8s.io/api/apps/v1"
 )
 
 // Main framework structure
@@ -16,7 +14,6 @@ type Framework struct {
 	CbopinfoPath                  string
 	OpImage                       string
 	SyncGatewayImage              string
-	Deployment                    *appsv1.Deployment
 	KubeType                      string
 	KubeVersion                   string
 	ClusterSpec                   types.ClusterMap
@@ -53,12 +50,43 @@ type initializedCluster struct {
 
 type initializedClusterList []initializedCluster
 
-// Runtime configuration
-type KubeConfData struct {
-	ClusterName   string `yaml:"name"`
-	ClusterConfig string `yaml:"config"`
-	Context       string `yaml:"context"`
-	Namespace     string `yaml:"namespace"`
+// ClusterConfig holds configuration data about a cluster to use for
+// testing.
+type ClusterConfig struct {
+	// Name is the human readable name of the configuration.  This is referenced
+	// explicitly by suite definitions.
+	Name string `yaml:"name"`
+
+	// Config is the path to a Kubernetes configuration file, typically ~/.kube/conf.
+	Config string `yaml:"config"`
+
+	// Context is the context within the Kubernetes configuration file to use.
+	// This is the mechanism Kubernetes uses for defining multiple users or clusters
+	// in the same configuration file.
+	Context string `yaml:"context"`
+
+	// Namespace is the namespace to use for the Kubernetes cluster configuration.
+	// For most tests this can be arbitrary and be anything.  For tests using inter-
+	// cluster DNS forwarding the namespaces must be distinct between clusters.
+	// Namespaces will be dynamically created by the framework, but not garbage
+	// collected at present which is potentially a resource leak on long running
+	// clusters.
+	Namespace string `yaml:"namespace"`
+}
+
+// RegistryConfig defines a container image registry.  Registry configurations will
+// automatically be added to all Operator/DAC deployments as image pull secrets.  They
+// will be added to all Couchbase clusters also.  This allows testing of all assets
+// from any private repository.
+type RegistryConfig struct {
+	// Server is the registry server to use e.g. "https://index.docker.io/v1/".
+	Server string `json:"server"`
+
+	// Username is the user/organization to authenticate as.
+	Username string `json:"username"`
+
+	// Passowrd is the authentication password for the organization.
+	Password string `json:"password"`
 }
 
 // Struct to read and store test_config yaml passed by the user during testing
@@ -77,20 +105,20 @@ type TestRunParam struct {
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`
 
-	KubeConfig []KubeConfData `yaml:"kube-config"`
+	// Cluster configs are named virtual clusters (i.e. they may be resident on the
+	// same physical cluster, but use a different namespace).  Tests are run against
+	// these virtual clusters, and are explicitly referenced by test suites.
+	// Note: When all clusters are homogeneous, then you can just pick one.  Better
+	// still you can run single-cluster tests concurrently and gate execution based
+	// on allocating from the available pool.  The net result, you go a lot faster.
+	ClusterConfigs []ClusterConfig `yaml:"kube-config"`
 
 	SkipTearDown         bool `yaml:"skip-tear-down"`
 	CollectLogsOnFailure bool `yaml:"collectLogsOnFailure"`
 
-	// DockerServer, if defined, creates a pull secret and associates
-	// it with Operator and Admission Controller deployments.
-	DockerServer string `yaml:"docker-server"`
-	// DockerUsername is the docker registry username to use, required when
-	// DockerServer is specified.
-	DockerUsername string `yaml:"docker-username"`
-	// DockerPassword is the docker registry password to use, required when
-	// DockerServer is specified.
-	DockerPassword string `yaml:"docker-password"`
+	// RegistryConfigs define private container registries that need to be defined
+	// as docker pull secrets in order to access private container images.
+	RegistryConfigs []RegistryConfig `yaml:"registries"`
 
 	// TestRetries allows you to retry a test N times before giving up.
 	TestRetries *int `yaml:"testRetries"`

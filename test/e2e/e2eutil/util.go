@@ -1060,13 +1060,13 @@ func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster) {
 // once all the dependant pods are cleaned up.  This allows us to explicitly make alterations
 // while the operator is not running and see what happens on a restart without introducing race
 // conditions.
-func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment *appsv1.Deployment, timeout time.Duration) {
-	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deployment.Name, metav1.NewDeleteOptions(0)); err != nil {
+func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment string, timeout time.Duration) {
+	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deployment, metav1.NewDeleteOptions(0)); err != nil {
 		Die(t, err)
 	}
 
 	callback := func() error {
-		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deployment.Name, metav1.GetOptions{})
+		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deployment, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil

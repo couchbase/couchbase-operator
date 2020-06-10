@@ -16,7 +16,13 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 	// This is the only place where all cluster creations converge due to code sprawl.
 	// So regardless of whether the CRD was hand crafted, or a cookie cutter we are
 	// guaranteed to apply the correct pod policy mutations here before every creation.
-	e2espec.ApplyImagePullSecret(cl)
+	var pullSecrets []string
+
+	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil {
+		pullSecrets = k8s.PullSecrets[k8s.Namespace]
+	}
+
+	e2espec.ApplyImagePullSecret(cl, pullSecrets)
 
 	cl.Namespace = k8s.Namespace
 
