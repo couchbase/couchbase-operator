@@ -26,7 +26,7 @@ var (
 )
 
 const (
-	ImagePattern      = `^[\w_\.\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$`
+	ImagePattern      = `^(.*?(:\d+)?/)?.*?/.*?(:.*?\d+\.\d+\.\d+.*|@sha256:[0-9a-f]{64})$`
 	wallClockTime     = `^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$`
 	bucketNamePattern = `^[a-zA-Z0-9-_%\.]+$`
 	BucketPattern     = `^\*$|^[a-zA-Z0-9-_%\.]+$`
