@@ -35,7 +35,9 @@ func TestExposedFeatureIP(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
@@ -70,7 +72,9 @@ func TestExposedFeatureDNS(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
@@ -117,7 +121,9 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
@@ -171,7 +177,9 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
@@ -218,7 +226,9 @@ func TestConsoleServiceDNS(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
@@ -263,7 +273,9 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
@@ -315,7 +327,9 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true

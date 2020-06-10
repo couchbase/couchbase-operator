@@ -165,6 +165,8 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:6.5.0", "Docker image to use for couchbase backup")
 	flag.StringVar(&params.SuiteToRun, "suite", "", "Test suite to run")
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
+	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
+	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
 	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
@@ -341,6 +343,8 @@ func Setup() (err error) {
 		CouchbaseExporterImage:        runtimeParams.CouchbaseExporterImage,
 		CouchbaseExporterImageUpgrade: runtimeParams.CouchbaseExporterImageUpgrade,
 		CouchbaseBackupImage:          runtimeParams.CouchbaseBackupImage,
+		BucketType:                    runtimeParams.BucketType,
+		CompressionMode:               runtimeParams.CompressionMode,
 	}
 
 	if runtimeParams.StorageClassName != "" {
@@ -390,6 +394,8 @@ func Setup() (err error) {
 	logrus.Info(" →  couchbase exporter: " + runtimeParams.CouchbaseExporterImage)
 	logrus.Info(" →  couchbase exporter upgrade: " + runtimeParams.CouchbaseExporterImageUpgrade)
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
+	logrus.Info(" →  Bucket Type: " + runtimeParams.BucketType)
+	logrus.Info(" →  Compression Mode: " + runtimeParams.CompressionMode)
 
 	logrus.Info(util.PrettyHeading("Clusters"))
 

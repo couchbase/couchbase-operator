@@ -65,12 +65,13 @@ func TestFullIncremental(t *testing.T) {
 	// Create a normal cluster.
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	backup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
@@ -107,12 +108,13 @@ func TestFullOnly(t *testing.T) {
 	// Create a normal cluster.
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
@@ -159,13 +161,14 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	}
 
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create this backup to run every 2 minutes so we can test the backup still runs successfully after a failure.
 	fullBackup := createTestBackup(v2.FullOnly, "*/2 * * * *", "")
@@ -222,12 +225,14 @@ func TestBackupPVCReconcile(t *testing.T) {
 	numOfDocs := 200
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "")
@@ -292,12 +297,13 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	numOfDocs := 200
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create initial backup
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
@@ -362,12 +368,13 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	numOfDocs := 200
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create initial backup
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
@@ -426,12 +433,13 @@ func TestBackupAndRestore(t *testing.T) {
 	numOfDocs := 2000
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "")
@@ -463,19 +471,19 @@ func TestBackupAndRestore(t *testing.T) {
 	}
 
 	// delete bucket
-	e2eutil.MustDeleteBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 2*time.Minute)
+	e2eutil.MustDeleteBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
 
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 5*time.Minute)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 5*time.Minute)
 
 	// create new restore
 	e2eutil.MustNewBackupRestore(t, targetKube, restore)
 
 	// restore job is too fast, just validate bucket item count
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -509,12 +517,13 @@ func TestUpdateBackupStatus(t *testing.T) {
 	numOfDocs := 200
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
@@ -561,12 +570,13 @@ func TestMultipleBackups(t *testing.T) {
 	numOfDocs := 200
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create Backup object 1.
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
@@ -626,13 +636,14 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 		},
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
@@ -681,13 +692,14 @@ func TestFullOnlyOverTLS(t *testing.T) {
 		},
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, 2*time.Minute)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")

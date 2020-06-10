@@ -123,7 +123,9 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
@@ -159,7 +161,9 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	clusterSize := 7
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(class1Size)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
@@ -218,7 +222,9 @@ func TestRzaResizeCluster(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)

@@ -25,6 +25,9 @@ type Framework struct {
 	CouchbaseExporterImage        string
 	CouchbaseExporterImageUpgrade string
 	CouchbaseBackupImage          string
+	BucketType                    string
+	CompressionMode               string
+
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
 	// tests to select the cluster configuration to use.
@@ -95,6 +98,8 @@ type TestRunParam struct {
 	CouchbaseExporterImageUpgrade string `yaml:"couchbase-exporter-image-upgrade"`
 	CouchbaseBackupImage          string `yaml:"couchbase-backup-image"`
 	SuiteToRun                    string `yaml:"suite"`
+	BucketType                    string `yaml:"bucket-type"`
+	CompressionMode               string `yaml:"compression-mode"`
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`

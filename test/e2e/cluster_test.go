@@ -72,9 +72,10 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, constants.Size1)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
 	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
@@ -260,7 +261,8 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// Runtime configuration
@@ -301,7 +303,8 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// Runtime configuration.
@@ -354,7 +357,8 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	clusterSize := 2
 
 	// create 2 node cluster with admin console
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// pause operator
@@ -793,12 +797,13 @@ func TestManageMultipleClusters(t *testing.T) {
 		clusters = append(clusters, e2eutil.MustNewClusterBasic(t, targetKube, clusterSize))
 	}
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	for _, testCouchbase := range clusters {
 		// When each cluster is ready create a bucket and verify it appears in the
 		// cluster status.
-		e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/Buckets/0/BucketName", "default"), time.Minute)
+		e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/Buckets/0/bucket.GetName()", "default"), time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		// Check the events match what we expect:

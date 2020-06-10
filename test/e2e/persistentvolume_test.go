@@ -103,7 +103,7 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucketTwoReplicas.Name}, time.Minute)
 	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
 
 	// When ready terminate a node, expect Server to auto failover and the operator
@@ -182,7 +182,8 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
-	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -377,7 +378,9 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
@@ -390,7 +393,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// Create a expected RZA results map for verification
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
@@ -448,7 +451,9 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
@@ -511,10 +516,11 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	// Create cluster spec for RZA feature
 	availableServerGroups := getAvailabilityZones(t, targetKube)
-
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) / len(availableServerGroups) * len(availableServerGroups)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
@@ -529,7 +535,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// Create a expected RZA results map for verification
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)

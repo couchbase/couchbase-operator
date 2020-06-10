@@ -34,6 +34,10 @@ func skipAnalytics(t *testing.T) {
 	if version.Major() < 6 {
 		t.Skip("beta feature unsupported")
 	}
+
+	if f.BucketType == "memcached" {
+		t.Skip("Bucket type not supported")
+	}
 }
 
 // Create cluster with Analytics service enabled
@@ -55,22 +59,24 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// When ready, insert documents into our bucket.  Create a dataset and link to our bucket.
 	// Verify the number of documents in the dataset match those in the bucket.
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 0, numOfDocs)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
 
 	for _, query := range queries {
 		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
 	}
 
 	time.Sleep(time.Minute) // let analytics catch up
-	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, time.Minute)
+	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, bucket.GetName(), time.Minute)
 	datasetItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset, time.Minute)
 
 	if datasetItemCount != itemCount {
@@ -110,11 +116,13 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	}
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// When ready generate workload and resize the cluster.  We expect the number of
 	// documents in dataset1 to equal those in the bucket, and those in datasets
@@ -123,7 +131,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
 	}
 
-	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)
+	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())
 	defer stop()
 
 	for _, newClusterSize := range []int{2, 3, 2, 1} {
@@ -133,7 +141,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	stop()
 
 	time.Sleep(time.Minute) // let analytics catch up
-	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, time.Minute)
+	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, bucket.GetName(), time.Minute)
 	dataset1ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset1, time.Minute)
 	dataset2ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset2, time.Minute)
 	dataset3ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset3, time.Minute)
@@ -186,17 +194,19 @@ func TestAnalyticsKillPods(t *testing.T) {
 	}
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// When ready start generating workload and kill some pods.  We expect the number of
 	// documents in dataset1 to equal those in the bucket, and those in datasets
 	// 2 and 3 to equal those in the bucket.
-	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)
+	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())
 	defer stop()
 
 	for _, query := range queries {
@@ -211,7 +221,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	stop()
 
 	time.Sleep(time.Minute) // let analytics catch up
-	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, time.Minute)
+	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, bucket.GetName(), time.Minute)
 	dataset1ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset1, time.Minute)
 	dataset2ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset2, time.Minute)
 	dataset3ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset3, time.Minute)
@@ -267,7 +277,9 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	pvcName := "test"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
@@ -279,12 +291,12 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// When ready start generating workload and kill some pods.  We expect the number of
 	// documents in dataset1 to equal those in the bucket, and those in datasets
 	// 2 and 3 to equal those in the bucket.
-	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)
+	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())
 	defer stop()
 
 	for _, query := range queries {
@@ -299,7 +311,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	stop()
 
 	time.Sleep(time.Minute) // let analytics catch up
-	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, time.Minute)
+	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, bucket.GetName(), time.Minute)
 	dataset1ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset1, time.Minute)
 	dataset2ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset2, time.Minute)
 	dataset3ItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset3, time.Minute)

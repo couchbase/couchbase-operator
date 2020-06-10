@@ -58,9 +58,10 @@ func TestPrometheusMetrics(t *testing.T) {
 		},
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
@@ -85,8 +86,10 @@ func TestPrometheusMetricsEnable(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// Enable monitoring.
 	monitoring := enableMonitoring(f)
@@ -120,8 +123,10 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// Enable monitoring.
 	monitoring := enableMonitoring(f)
@@ -131,7 +136,7 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 	// Perform Bucket Ops: Inserting 200 documents in the default Bucket.
-	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 200)
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, bucket.GetName(), 200)
 
 	// Perform ClusterOps: Failover a given node.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 3, true)
@@ -174,8 +179,10 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// creating auth secret.
 	secret := &corev1.Secret{
@@ -234,8 +241,10 @@ func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// Enable monitoring.
 	monitoring := enableMonitoring(f)

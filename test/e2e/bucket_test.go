@@ -16,8 +16,15 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
+
+func skipEditBucket(t *testing.T) {
+	f := framework.Global
+
+	if f.BucketType == "memcached" {
+		t.Skip("Memcached buckets cannot be edited")
+	}
+}
 
 func TestBucketAddRemoveBasic(t *testing.T) {
 	// Platform configuration.
@@ -33,7 +40,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		"bucket4",
 	}
 
-	buckets := []runtime.Object{
+	buckets := []metav1.Object{
 		&couchbasev2.CouchbaseBucket{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: names[0],
@@ -134,7 +141,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 
 	buckets := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucket := range buckets {
-		name := e2eutil.MustGetBucketName(t, bucket)
+		name := bucket.GetName()
 		e2eutil.MustNewBucket(t, targetKube, bucket)
 		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{name}, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
@@ -163,43 +170,44 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 
 // TestEditBucket tests modifying various bucket parameters and reverting them.
 func TestEditBucket(t *testing.T) {
+	skipEditBucket(t)
 	// Platform configuration.
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
 	// Constants
-	bucketName := "default"
 	enabled := true
 	disabled := false
 
 	// Create the cluster.
-	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
 
 	// Create a direct connection to a couchbase node.
 	// When healthy change the memory quota, replicas, whether flushes are allowed and the compression mode.
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", int64(128)), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", int64(128)), time.Minute)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MemoryQuota", e2espec.NewResourceQuantityMi(256)), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", int64(256)), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketMemoryQuota", int64(256)), time.Minute)
 
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/Replicas", 2), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 2), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketReplicas", 2), time.Minute)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/Replicas", 1), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
 
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/EnableFlush", disabled), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", disabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/EnableFlush", disabled), time.Minute)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/EnableFlush", enabled), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", enabled), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/EnableFlush", enabled), time.Minute)
 
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CouchbaseBucketCompressionModeActive), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", couchbaseutil.CompressionModeActive), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/CompressionMode", couchbaseutil.CompressionModeActive), time.Minute)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CouchbaseBucketCompressionModeOff), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", couchbaseutil.CompressionModeOff), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/CompressionMode", couchbaseutil.CompressionModeOff), time.Minute)
 	e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/CompressionMode", couchbasev2.CouchbaseBucketCompressionModePassive), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Test("/CompressionMode", couchbaseutil.CompressionModePassive), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/CompressionMode", couchbaseutil.CompressionModePassive), time.Minute)
 
 	// Avoid a race where Couchbase has been updated but the event not raise yet.
 	time.Sleep(10 * time.Second)
@@ -228,25 +236,24 @@ func TestEditBucket(t *testing.T) {
 // 8. Verify that the operator reverts the change
 // 9. Check the events to make sure the operator took the correct actions.
 func TestRevertExternalBucketUpdates(t *testing.T) {
+	skipEditBucket(t)
 	// Platform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
-	// Static configuration.
-	bucketName := "default"
-
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, constants.Size1)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/EnableFlush", true), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Replace("/BucketReplicas", 3), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Replace("/IoPriority", couchbaseutil.IoPriorityTypeLow), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucketName, jsonpatch.NewPatchSet().Test("/IoPriority", couchbaseutil.IoPriorityTypeHigh), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Test("/EnableFlush", true), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/BucketReplicas", 3), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/IoPriority", couchbaseutil.IoPriorityTypeLow), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Test("/IoPriority", couchbaseutil.IoPriorityTypeHigh), time.Minute)
 	time.Sleep(10 * time.Second) // Wait for event to become visible
 
 	// Check the events match what we expect:
@@ -273,7 +280,8 @@ func TestBucketUnmanaged(t *testing.T) {
 	clusterSize := 3
 
 	// Create a bucket.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	// Create a cluster with buckets unmanaged.
 	couchbase := e2espec.NewBasicCluster(clusterSize)
@@ -281,7 +289,7 @@ func TestBucketUnmanaged(t *testing.T) {
 	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
 
 	// Ensure the bucket doesn't get created.
-	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{e2espec.DefaultBucket.Name}, time.Minute); err == nil {
+	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{bucket.GetName()}, time.Minute); err == nil {
 		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
 	}
 
@@ -352,12 +360,14 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	foreignBucketName := "foreign"
 
 	// Create the cluster
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
-	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 10)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, bucket.GetName(), 10)
 
 	// Pause the operator, failover the victim, then create a new bucket and populate it.
 	// The operator - when restarted - should flag the node for delta recovery, but Server

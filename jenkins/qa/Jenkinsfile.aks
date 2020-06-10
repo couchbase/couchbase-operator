@@ -24,6 +24,8 @@ pipeline {
     string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.0')
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.2')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.7.0-enterprise')
+    string(name: 'bucket_type', defaultValue: 'couchbase')
+    string(name: 'compression_mode', defaultValue: 'passive')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
     booleanParam(name: 'p0', defaultValue: true)
@@ -44,6 +46,8 @@ pipeline {
           string(name: 'mobile_image', value: params.mobile_image),
           string(name: 'platform', value: 'azure'),
           string(name: 'storage_class', value: 'default'),
+          string(name: 'bucket_type', value: params.bucket_type),
+          string(name: 'compression_mode', value: params.compression_mode),
           /* these should be credentials, not files */
           string(name: 'kubeconfig1', value: '~/.kube/config_aks_2.x_BasicCluster'),
           string(name: 'kubeconfig2', value: '~/.kube/config_aks_2.x_NewCluster1'),

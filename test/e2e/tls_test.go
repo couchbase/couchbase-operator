@@ -61,7 +61,10 @@ func TestTlsKillClusterNode(t *testing.T) {
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, clusterSize, ctx)
 
 	// Runtime configuration.
@@ -147,7 +150,10 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, clusterSize, ctx)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
@@ -191,7 +197,10 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, clusterSize, ctx)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
@@ -233,7 +242,9 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, clusterSize, ctx)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
@@ -276,7 +287,9 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, clusterSize, ctx)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
@@ -623,7 +636,10 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 
 	// Create the cluster with a valid 1 deep certificate chain.
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
-	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket)
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
 	cluster := e2eutil.MustNewSupportableTLSCluster(t, kubernetes, mdsGroupSize, ctx)
 
 	// Runtime configuration.

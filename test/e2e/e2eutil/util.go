@@ -379,7 +379,7 @@ func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, size int, ct
 }
 
 // NewBucket creates a bucket.
-func NewBucket(k8s *types.Cluster, bucket runtime.Object) (runtime.Object, error) {
+func NewBucket(k8s *types.Cluster, bucket metav1.Object) (metav1.Object, error) {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
 		ApplyGarbageCollectedObjectLabels(t)
@@ -395,13 +395,49 @@ func NewBucket(k8s *types.Cluster, bucket runtime.Object) (runtime.Object, error
 	}
 }
 
-func MustNewBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object) runtime.Object {
+func MustNewBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object) metav1.Object {
 	object, err := NewBucket(k8s, bucket)
 	if err != nil {
 		Die(t, err)
 	}
 
 	return object
+}
+
+func GetBucket(bucketType, compressionMode string) metav1.Object {
+	compressionmode := GetCompressionMode(compressionMode)
+
+	switch bucketType {
+	case "couchbase":
+		e2espec.DefaultBucket.Spec.CompressionMode = compressionmode
+		return e2espec.DefaultBucket
+	case "ephemeral":
+		e2espec.DefaultEphemeralBucket.Spec.CompressionMode = compressionmode
+		return e2espec.DefaultEphemeralBucket
+	case "memcached":
+		return e2espec.DefaultMemcachedBucket
+	default:
+		return e2espec.DefaultBucket
+	}
+}
+
+func GetCompressionMode(compressionMode string) couchbasev2.CouchbaseBucketCompressionMode {
+	switch compressionMode {
+	case "off":
+		return couchbasev2.CouchbaseBucketCompressionModeOff
+	case "passive":
+		return couchbasev2.CouchbaseBucketCompressionModePassive
+	case "active":
+		return couchbasev2.CouchbaseBucketCompressionModeActive
+	default:
+		return couchbasev2.CouchbaseBucketCompressionModePassive
+	}
+}
+
+func MustGetBucket(t *testing.T, bucketType, compressionMode string) metav1.Object {
+	bucket := GetBucket(bucketType, compressionMode)
+
+	return bucket
 }
 
 func NewBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseBackup, error) {
@@ -452,7 +488,7 @@ func MustDeleteBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbas
 	}
 }
 
-func DeleteBucket(k8s *types.Cluster, bucket runtime.Object) error {
+func DeleteBucket(k8s *types.Cluster, bucket metav1.Object) error {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
 		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
@@ -465,32 +501,10 @@ func DeleteBucket(k8s *types.Cluster, bucket runtime.Object) error {
 	}
 }
 
-func MustDeleteBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object) {
+func MustDeleteBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object) {
 	if err := DeleteBucket(k8s, bucket); err != nil {
 		Die(t, err)
 	}
-}
-
-func GetBucketName(bucket runtime.Object) (string, error) {
-	switch t := bucket.(type) {
-	case *couchbasev2.CouchbaseBucket:
-		return t.Name, nil
-	case *couchbasev2.CouchbaseEphemeralBucket:
-		return t.Name, nil
-	case *couchbasev2.CouchbaseMemcachedBucket:
-		return t.Name, nil
-	default:
-		return "", fmt.Errorf("unsupported bucket type")
-	}
-}
-
-func MustGetBucketName(t *testing.T, bucket runtime.Object) string {
-	name, err := GetBucketName(bucket)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return name
 }
 
 func AddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
@@ -606,7 +620,7 @@ func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.
 	}
 }
 
-func PatchBucket(k8s *types.Cluster, bucket runtime.Object, patches jsonpatch.PatchSet, timeout time.Duration) (runtime.Object, error) {
+func PatchBucket(k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.PatchSet, timeout time.Duration) (metav1.Object, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -637,6 +651,30 @@ func PatchBucket(k8s *types.Cluster, bucket runtime.Object, patches jsonpatch.Pa
 			}
 
 			bucket = updated
+		case *couchbasev2.CouchbaseEphemeralBucket:
+			before, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Get(t.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, retryutil.RetryOkError(err)
+			}
+
+			// Apply the patch set to the bucket
+			after := before.DeepCopy()
+			if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
+				return false, retryutil.RetryOkError(err)
+			}
+
+			// If we are not modifiying e.g. just testing, then return ok
+			if reflect.DeepEqual(before, after) {
+				return true, nil
+			}
+
+			// Attempt to post the update, updating the bucket
+			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Update(after)
+			if err != nil {
+				return false, retryutil.RetryOkError(err)
+			}
+
+			bucket = updated
 		default:
 			return false, fmt.Errorf("unsupported type")
 		}
@@ -646,7 +684,7 @@ func PatchBucket(k8s *types.Cluster, bucket runtime.Object, patches jsonpatch.Pa
 	})
 }
 
-func MustPatchBucket(t *testing.T, k8s *types.Cluster, bucket runtime.Object, patches jsonpatch.PatchSet, timeout time.Duration) runtime.Object {
+func MustPatchBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.PatchSet, timeout time.Duration) metav1.Object {
 	bucket, err := PatchBucket(k8s, bucket, patches, timeout)
 	if err != nil {
 		Die(t, err)

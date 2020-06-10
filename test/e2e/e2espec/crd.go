@@ -13,7 +13,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // bucket settings
@@ -30,7 +29,6 @@ var (
 			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 
@@ -46,7 +44,6 @@ var (
 			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 
@@ -62,7 +59,6 @@ var (
 			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
 			EnableIndexReplica: false,
-			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
 
@@ -71,6 +67,15 @@ var (
 			Name: e2e_constants.DefaultBucket,
 		},
 		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+			MemoryQuota: NewResourceQuantityMi(256),
+		},
+	}
+
+	DefaultMemcachedBucket = &couchbasev2.CouchbaseMemcachedBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.DefaultBucket,
+		},
+		Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
 			MemoryQuota: NewResourceQuantityMi(256),
 		},
 	}
@@ -115,8 +120,8 @@ func SetPlatform(p couchbasev2.PlatformType) {
 	platform = p
 }
 
-func GenerateValidBucketSettings(bucketTypes []string) []runtime.Object {
-	buckets := []runtime.Object{}
+func GenerateValidBucketSettings(bucketTypes []string) []metav1.Object {
+	buckets := []metav1.Object{}
 
 	for _, bucketType := range bucketTypes {
 		switch {

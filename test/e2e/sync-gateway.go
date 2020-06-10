@@ -41,15 +41,16 @@ func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	clusterSize := 3
 
 	// Create the cluster in the target cluster.
-	e2eutil.MustNewBucket(t, kubernetes2, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes2, bucket)
 	cluster := e2eutil.MustNewXDCRCluster(t, kubernetes2, clusterSize, nil, tls, policy)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes2, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes2, cluster, []string{bucket.GetName()}, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.
-	e2eutil.MustCreateSyncGateway(t, kubernetes1, cluster, framework.Global.SyncGatewayImage, e2espec.DefaultBucket.Name, nil, dns, tls, time.Minute)
+	e2eutil.MustCreateSyncGateway(t, kubernetes1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), nil, dns, tls, time.Minute)
 
 	// Ensure meta-data documents appear in the Couchbase cluster.
-	e2eutil.MustVerifyDocCountInBucketNonZero(t, kubernetes2, cluster, e2espec.DefaultBucket.Name, time.Minute)
+	e2eutil.MustVerifyDocCountInBucketNonZero(t, kubernetes2, cluster, bucket.GetName(), time.Minute)
 }
 
 // TestSyncGatewayCreateLocal tests connectivity within the same Kubernetes cluster.
@@ -216,14 +217,16 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	e2eutil.MustNewUser(t, k8s1, user)
 	e2eutil.MustNewGroup(t, k8s1, group)
 	e2eutil.MustNewRoleBinding(t, k8s1, binding)
-	e2eutil.MustNewBucket(t, k8s1, e2espec.DefaultBucket)
+
+	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
+	e2eutil.MustNewBucket(t, k8s1, bucket)
 
 	cluster := e2eutil.MustNewClusterBasic(t, k8s1, clusterSize)
-	e2eutil.MustWaitUntilBucketsExists(t, k8s1, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, k8s1, cluster, []string{bucket.GetName()}, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.
-	e2eutil.MustCreateSyncGateway(t, k8s1, cluster, framework.Global.SyncGatewayImage, e2espec.DefaultBucket.Name, secret, nil, nil, time.Minute)
+	e2eutil.MustCreateSyncGateway(t, k8s1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), secret, nil, nil, time.Minute)
 
 	// Ensure meta-data documents appear in the Couchbase cluster.
-	e2eutil.MustVerifyDocCountInBucketNonZero(t, k8s1, cluster, e2espec.DefaultBucket.Name, time.Minute)
+	e2eutil.MustVerifyDocCountInBucketNonZero(t, k8s1, cluster, bucket.GetName(), time.Minute)
 }

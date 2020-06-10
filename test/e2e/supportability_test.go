@@ -923,7 +923,8 @@ func TestLogCollect(t *testing.T) {
 	cluster2Size := constants.Size1
 	cluster3Size := constants.Size1
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
 	cluster1 := e2eutil.MustNewClusterBasic(t, targetKube, cluster1Size)
 	cluster2 := e2eutil.MustNewClusterBasic(t, targetKube, cluster2Size)
 	cluster3 := e2eutil.MustNewClusterBasic(t, targetKube, cluster3Size)
@@ -1567,9 +1568,11 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	victims := 6
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
 
 	// Cross check number of persistent vol claims matches the defined spec.
 	expectedPvcMap := map[string]int{}
@@ -1619,12 +1622,14 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	maxLogCount := 2
 
 	// Create the cluster
-	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
 	cluster := e2espec.NewSupportableCluster(mdsGroupSize)
 	cluster.Spec.Logging.LogRetentionTime = "15m"
 	cluster.Spec.Logging.LogRetentionCount = maxLogCount
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{e2espec.DefaultBucket.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
 
 	// Track pods we create and their expected number of persistent volumes.
 	expectedPvcMap := map[string]int{}
