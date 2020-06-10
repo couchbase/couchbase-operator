@@ -1140,6 +1140,18 @@ func FlagPodReady(client *client.Client, name string) error {
 		return fmt.Errorf("pod %s not found", name)
 	}
 
+	// Don't be tempted to just call exec all the time.  A memory leak in a
+	// dependency causes OOM and eviction, so don't do work when not necessary.
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == constants.CouchbaseContainerName {
+			if status.Ready {
+				return nil
+			}
+
+			break
+		}
+	}
+
 	if err := exec(client.KubeClient, pod, []string{"touch", readinessFile}); err != nil {
 		return err
 	}

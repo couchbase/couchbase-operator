@@ -24,11 +24,11 @@ func DumpOperatorYAML(conf *Config) error {
 		return nil
 	}
 
-	if err := DumpYAML(conf, "operator-service-account", GetOperatorServiceAccount()); err != nil {
+	if err := DumpYAML(conf, "operator-service-account", GetOperatorServiceAccount(conf.Namespace)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-role", GetOperatorRole()); err != nil {
+	if err := DumpYAML(conf, "operator-role", GetOperatorRole(conf.Namespace)); err != nil {
 		return err
 	}
 
@@ -36,11 +36,11 @@ func DumpOperatorYAML(conf *Config) error {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.OperatorImage, conf.ImagePullSecret, 10*time.Minute)); err != nil {
+	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.Namespace, conf.OperatorImage, conf.ImagePullSecret, 10*time.Minute)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-service", GenerateOperatorService()); err != nil {
+	if err := DumpYAML(conf, "operator-service", GenerateOperatorService(conf.Namespace)); err != nil {
 		return err
 	}
 
@@ -48,14 +48,15 @@ func DumpOperatorYAML(conf *Config) error {
 }
 
 // GetOperatorRole generates the cluster role to run with.
-func GetOperatorRole() *rbacv1.Role {
+func GetOperatorRole(namespace string) *rbacv1.Role {
 	return &rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1",
 			Kind:       "Role",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: OperatorResourceName,
+			Name:      OperatorResourceName,
+			Namespace: namespace,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -211,14 +212,15 @@ func GetOperatorRole() *rbacv1.Role {
 }
 
 // GetOperatorServiceAccount generates the service account to run as.
-func GetOperatorServiceAccount() *corev1.ServiceAccount {
+func GetOperatorServiceAccount(namespace string) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "ServiceAccount",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: OperatorResourceName,
+			Name:      OperatorResourceName,
+			Namespace: namespace,
 		},
 	}
 }
@@ -231,7 +233,8 @@ func GetOperatorRoleBinding(namespace string) *rbacv1.RoleBinding {
 			Kind:       "RoleBinding",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: OperatorResourceName,
+			Name:      OperatorResourceName,
+			Namespace: namespace,
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -249,7 +252,7 @@ func GetOperatorRoleBinding(namespace string) *rbacv1.RoleBinding {
 }
 
 // GetOperatorDeployment returns the canonical way to run the operator.
-func GetOperatorDeployment(image string, imagePullSecret string, podCreateTimeout fmt.Stringer, extraArgs ...string) *appsv1.Deployment {
+func GetOperatorDeployment(namespace, image, imagePullSecret string, podCreateTimeout fmt.Stringer, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -257,7 +260,8 @@ func GetOperatorDeployment(image string, imagePullSecret string, podCreateTimeou
 			Kind:       "Deployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: OperatorResourceName,
+			Name:      OperatorResourceName,
+			Namespace: namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -312,6 +316,15 @@ func GetOperatorDeployment(image string, imagePullSecret string, podCreateTimeou
 									ContainerPort: 8383,
 								},
 							},
+							ReadinessProbe: &corev1.Probe{
+								Handler: corev1.Handler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path:   "/readyz",
+										Port:   intstr.FromString("http"),
+										Scheme: corev1.URISchemeHTTP,
+									},
+								},
+							},
 						},
 					},
 				},
@@ -331,14 +344,15 @@ func GetOperatorDeployment(image string, imagePullSecret string, podCreateTimeou
 }
 
 // Required by istio.
-func GenerateOperatorService() *corev1.Service {
+func GenerateOperatorService(namespace string) *corev1.Service {
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Service",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: OperatorResourceName,
+			Name:      OperatorResourceName,
+			Namespace: namespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{

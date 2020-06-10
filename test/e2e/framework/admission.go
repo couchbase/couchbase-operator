@@ -39,7 +39,7 @@ func createAdmissionController(client kubernetes.Interface) error {
 	})
 	key, cert, _ := req.Generate(ca, validFrom, validTo)
 
-	serviceAccount := config.GetAdmissionServiceAccount()
+	serviceAccount := config.GetAdmissionServiceAccount(admissionNamespace)
 	if _, err := client.CoreV1().ServiceAccounts(admissionNamespace).Create(serviceAccount); err != nil {
 		return err
 	}
@@ -54,17 +54,17 @@ func createAdmissionController(client kubernetes.Interface) error {
 		return err
 	}
 
-	secret := config.GetAdmissionSecret(key, cert)
+	secret := config.GetAdmissionSecret(admissionNamespace, key, cert)
 	if _, err := client.CoreV1().Secrets(admissionNamespace).Create(secret); err != nil {
 		return err
 	}
 
-	deployment := config.GetAdmissionDeployment(runtimeParams.AdmissionControllerImage, dockerPullSecretName, "-v", "1")
+	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, dockerPullSecretName, "-v", "1")
 	if _, err := client.AppsV1().Deployments(admissionNamespace).Create(deployment); err != nil {
 		return err
 	}
 
-	service := config.GetAdmissionService()
+	service := config.GetAdmissionService(admissionNamespace)
 	if _, err := client.CoreV1().Services(admissionNamespace).Create(service); err != nil {
 		return err
 	}

@@ -292,6 +292,11 @@ func serveDefault(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
+// serveReadiness reports that the server is running.
+func serveReadiness(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
 // serveCouchbaseClustersValidate handles CouchbaseCluster validation requests.
 func serveCouchbaseClustersValidate(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, couchbaseClustersValidate)
@@ -312,6 +317,7 @@ func Serve(config *Config) {
 	}
 
 	http.HandleFunc("/", serveDefault)
+	http.HandleFunc("/readyz", serveReadiness)
 	http.HandleFunc("/couchbaseclusters/validate", serveCouchbaseClustersValidate)
 	http.HandleFunc("/couchbaseclusters/mutate", serveCouchbaseClustersMutate)
 

@@ -261,7 +261,7 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 		return err
 	}
 
-	roleSpec := config.GetOperatorRole()
+	roleSpec := config.GetOperatorRole(k8s.Namespace)
 	roleSpec.Name = roleName
 
 	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(roleSpec)
@@ -287,7 +287,7 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 	}
 
 	// Create service account given by the name
-	serviceAccount := config.GetOperatorServiceAccount()
+	serviceAccount := config.GetOperatorServiceAccount(k8s.Namespace)
 	serviceAccount.Name = serviceAccountName
 
 	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(serviceAccount)

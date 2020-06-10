@@ -204,7 +204,7 @@ func startTimeoutTimer() {
 }
 
 func CreateDeploymentObject(operatorImage string, operatorPort int, podCreateTimeout fmt.Stringer) (deployment *appsv1.Deployment, err error) {
-	deployment = config.GetOperatorDeployment(operatorImage, dockerPullSecretName, podCreateTimeout, "--zap-level", "debug")
+	deployment = config.GetOperatorDeployment("", operatorImage, dockerPullSecretName, podCreateTimeout, "--zap-level", "debug")
 
 	// Manually set the HTTP port.
 	if operatorPort != 0 {
@@ -591,6 +591,16 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	}
 
 	e2eutil.CleanK8sCluster(k8s)
+
+	// Clean up any state locls that may prevent the framework working
+	// across operator versions.
+	logrus.Info("Cleaning stale locks...")
+
+	if err := k8s.KubeClient.CoreV1().ConfigMaps(k8s.Namespace).Delete("couchbase-operator", metav1.NewDeleteOptions(0)); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
 
 	logrus.Info("Deleting orphaned pods")
 
