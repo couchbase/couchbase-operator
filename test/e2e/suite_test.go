@@ -14,8 +14,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-
-	"github.com/sirupsen/logrus"
 )
 
 func collectClusterLogs(t *testing.T, logDir string) {
@@ -83,71 +81,59 @@ func goroutineLeakCheck(expected int) {
 	}
 }
 
-func runSuite(t *testing.T) {
+func TestOperator(t *testing.T) {
 	f := framework.Global
 
-	// Over riding pullImage to true since if new cluster is created, images should be pulled
-	logrus.Info("Starting suite ", f.SuiteYmlData.SuiteName)
+	for _, testName := range f.SuiteYmlData.TestCase {
+		// Reset any state in preparation for this test.
+		f.Reset()
 
-	for _, testGroup := range f.SuiteYmlData.TestCaseGroup {
-		// Add the cluster names to the global test clusters so the
-		// individual tests can reference them.
-		f.TestClusters = testGroup.ClusterName
-
-		for _, currTestCase := range testGroup.TestCase {
-			testName := currTestCase.TcName
-
-			if _, ok := TestFuncMap[testName]; !ok {
-				t.Logf("Skipping %s.. Undefined test", testName)
-				continue
-			}
-
-			testFunc := TestFuncMap[testName]
-			decoratorArgs := framework.DecoratorArgs{
-				KubeNames: testGroup.ClusterName,
-			}
-
-			testFunc = framework.RecoverDecorator(testFunc, decoratorArgs)
-
-			if testFunc == nil {
-				continue
-			}
-
-			// Either the test or Couchbase Server may suffer from instability so
-			// we allow a retry.  This means that we get a better idea of overall
-			// pass rates without having to rerun the entire suite and collate the
-			// results.
-			//
-			// Unstable tests will be listed in the suite output so pay attention as
-			// these may be bugs that need to be raised or fixed. Secondly do not rely
-			// on retries as it makes the tests take longer and costs us more money!
-			unstable := false
-			pass := false
-
-			for attempt := 0; attempt < f.TestRetries; attempt++ {
-				if pass = runTest(t, testName, testFunc); pass {
-					if attempt != 0 {
-						unstable = true
-					}
-
-					break
-				}
-			}
-
-			// Give real time feedback ...
-			if pass {
-				fmt.Println("PASS")
-			} else {
-				fmt.Println("FAIL")
-			}
-
-			result := framework.TestResult{
-				Name:     testName,
-				Result:   pass,
-				Unstable: unstable,
-			}
-			framework.Results = append(framework.Results, result)
+		if _, ok := TestFuncMap[testName]; !ok {
+			t.Logf("Skipping %s.. Undefined test", testName)
+			continue
 		}
+
+		testFunc := TestFuncMap[testName]
+		testFunc = framework.RecoverDecorator(testFunc)
+
+		if testFunc == nil {
+			continue
+		}
+
+		// Either the test or Couchbase Server may suffer from instability so
+		// we allow a retry.  This means that we get a better idea of overall
+		// pass rates without having to rerun the entire suite and collate the
+		// results.
+		//
+		// Unstable tests will be listed in the suite output so pay attention as
+		// these may be bugs that need to be raised or fixed. Secondly do not rely
+		// on retries as it makes the tests take longer and costs us more money!
+		unstable := false
+		pass := false
+
+		for attempt := 0; attempt < f.TestRetries; attempt++ {
+			if pass = runTest(t, testName, testFunc); pass {
+				if attempt != 0 {
+					unstable = true
+				}
+
+				break
+			}
+		}
+
+		// Give real time feedback ...
+		if pass {
+			fmt.Println(framework.PrettyResult(true), framework.PrettyHeading("ok"))
+		} else {
+			fmt.Println(framework.PrettyResult(false), framework.PrettyHeading("fail"))
+		}
+
+		result := framework.TestResult{
+			Name:     testName,
+			Result:   pass,
+			Unstable: unstable,
+		}
+		framework.Results = append(framework.Results, result)
 	}
 }
 
@@ -159,14 +145,12 @@ func getOperatorRestartCounts() map[string]int {
 	result := map[string]int{}
 
 	for _, cluster := range f.TestClusters {
-		k8s := f.ClusterSpec[cluster]
-
-		restarts, err := f.GetOperatorRestartCount(k8s)
+		restarts, err := f.GetOperatorRestartCount(cluster)
 		if err != nil {
-			fmt.Println("WARN: unable to get restart counts on cluster", cluster, ":", err)
+			fmt.Println("WARN: unable to get restart counts on cluster", cluster.Name, ":", err)
 		}
 
-		result[cluster] = int(restarts)
+		result[cluster.Name] = int(restarts)
 	}
 
 	return result
@@ -220,19 +204,10 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 
 	// Cleanup the namespace.
 	if !f.SkipTeardown {
-		for clusterName, cluster := range f.ClusterSpec {
-			e2eutil.CleanUpCluster(t, cluster, f.LogDir, clusterName, name)
+		for _, cluster := range f.ClusterSpec {
+			e2eutil.CleanUpCluster(t, cluster, f.LogDir, cluster.Name, name)
 		}
 	}
 
 	return pass
-}
-
-func TestOperator(t *testing.T) {
-	if err := framework.Setup(t); err != nil {
-		t.Fatal("Failed to setup framework: " + err.Error())
-	}
-
-	runSuite(t)
-	framework.AnalyzeResults(t)
 }

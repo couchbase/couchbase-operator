@@ -1,9 +1,4 @@
 ---
-suite: TestSystem
 timeout: 7d
-tcGroups:
-  - name: Group1
-    clusters:
-      - AuxillaryCluster1
-    testcases:
-      - name: TestFeaturesAll
+testcases:
+- TestFeaturesAll

@@ -1,20 +1,15 @@
 ---
-suite: TestCRDValidation
 timeout: 6h
-tcGroups:
-  - name: Group1
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestValidationCreate
-      - name: TestNegValidationCreate
-      - name: TestValidationDefaultCreate
-      - name: TestNegValidationDefaultCreate
-      - name: TestNegValidationConstraintsCreate
-      - name: TestValidationApply
-      - name: TestNegValidationApply
-      - name: TestValidationDefaultApply
-      - name: TestNegValidationConstraintsApply
-      - name: TestNegValidationImmutableApply
-      - name: TestRBACValidationCreate
-      - name: TestRBACValidationLDAP
+testcases:
+- TestValidationCreate
+- TestNegValidationCreate
+- TestValidationDefaultCreate
+- TestNegValidationDefaultCreate
+- TestNegValidationConstraintsCreate
+- TestValidationApply
+- TestNegValidationApply
+- TestValidationDefaultApply
+- TestNegValidationConstraintsApply
+- TestNegValidationImmutableApply
+- TestRBACValidationCreate
+- TestRBACValidationLDAP

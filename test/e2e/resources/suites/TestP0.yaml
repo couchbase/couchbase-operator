@@ -1,246 +1,171 @@
 ---
-suite: TestP0
 timeout: 12h
-tcGroups:
-  - name: ClusterTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestResizeClusterWithBucket
-      - name: TestBasicMDSScaling
-      - name: TestDenyCommunityEdition
-      - name: TestAutoCompactionUpdate
+testcases:
+# Cluster Tests
+- TestResizeClusterWithBucket
+- TestBasicMDSScaling
+- TestDenyCommunityEdition
+- TestAutoCompactionUpdate
 
-  - name: BucketTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestBucketUnmanaged
-      - name: TestBucketSelection
-      - name: TestBucketWithExplicitName
-      - name: TestBucketWithSameExplicitNameAndDifferentType
+# Bucket Tests
+- TestBucketUnmanaged
+- TestBucketSelection
+- TestBucketWithExplicitName
+- TestBucketWithSameExplicitNameAndDifferentType
 
-  - name: ServiceTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestEditServiceConfig
-      - name: TestCreateClusterDataServiceNotFirst
-      - name: TestRemoveLastDataService
-      - name: TestSwapNodesBetweenServices
+# Service Tests
+- TestEditServiceConfig
+- TestCreateClusterDataServiceNotFirst
+- TestRemoveLastDataService
+- TestSwapNodesBetweenServices
 
-  - name: PodTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestPodResourcesCannotBePlaced
-      - name: TestFirstNodePodResourcesCannotBePlaced
-      - name: TestRemoveServerClassWithNodeService
+# Pod Tests
+- TestPodResourcesCannotBePlaced
+- TestFirstNodePodResourcesCannotBePlaced
+- TestRemoveServerClassWithNodeService
 
-  - name: RecoveryTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestRecoveryAfterTwoPodFailureNoBucket
-      - name: TestRecoveryAfterOnePodFailureBucketOneReplica
-      - name: TestRecoveryAfterTwoPodFailureBucketOneReplica
-      - name: TestRecoveryAfterOnePodFailureBucketTwoReplica
-      - name: TestRecoveryAfterTwoPodFailureBucketTwoReplica
+# Recovery Tests
+- TestRecoveryAfterTwoPodFailureNoBucket
+- TestRecoveryAfterOnePodFailureBucketOneReplica
+- TestRecoveryAfterTwoPodFailureBucketOneReplica
+- TestRecoveryAfterOnePodFailureBucketTwoReplica
+- TestRecoveryAfterTwoPodFailureBucketTwoReplica
 
-  - name: AntiAffinityTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestAntiAffinityOff
-      - name: TestAntiAffinityOnCannotBePlaced
+# Anti-Affinity Tests
+- TestAntiAffinityOff
+- TestAntiAffinityOnCannotBePlaced
 
-  - name: OperatorTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestKillOperator
-      - name: TestKillOperatorAndUpdateClusterConfig
+# Operator Tests
+- TestKillOperator
+- TestKillOperatorAndUpdateClusterConfig
 
-  - name: TLS case
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestTlsKillClusterNode
-      - name: TestTlsResizeCluster
-      - name: TestTLSRotate
-      - name: TestTLSRotateChain
-      - name: TestTLSRotateCA
-      - name: TestTLSRotateInvalid
-      - name: TestMutualTLSCreateCluster
-      - name: TestMutualTLSEnable
-      - name: TestMutualTLSDisable
-      - name: TestMutualTLSRotateClient
-      - name: TestMutualTLSRotateClientChain
-      - name: TestMutualTLSRotateCA
-      - name: TestMutualTLSRotateInvalid
-      - name: TestMandatoryMutualTLSCreateCluster
-      - name: TestMandatoryMutualTLSEnable
-      - name: TestMandatoryMutualTLSDisable
-      - name: TestMandatoryMutualTLSRotateClient
-      - name: TestMandatoryMutualTLSRotateClientChain
-      - name: TestMandatoryMutualTLSRotateCA
-      - name: TestMandatoryMutualTLSRotateInvalid
+# TLS Tests
+- TestTlsKillClusterNode
+- TestTlsResizeCluster
+- TestTLSRotate
+- TestTLSRotateChain
+- TestTLSRotateCA
+- TestTLSRotateInvalid
+- TestMutualTLSCreateCluster
+- TestMutualTLSEnable
+- TestMutualTLSDisable
+- TestMutualTLSRotateClient
+- TestMutualTLSRotateClientChain
+- TestMutualTLSRotateCA
+- TestMutualTLSRotateInvalid
+- TestMandatoryMutualTLSCreateCluster
+- TestMandatoryMutualTLSEnable
+- TestMandatoryMutualTLSDisable
+- TestMandatoryMutualTLSRotateClient
+- TestMandatoryMutualTLSRotateClientChain
+- TestMandatoryMutualTLSRotateCA
+- TestMandatoryMutualTLSRotateInvalid
 
-  - name: XdcrCasesIntraCluster
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestXdcrCreateClusterLocal
-      - name: TestXdcrCreateClusterLocalTLS
-      - name: TestXdcrCreateClusterLocalMutualTLS
-      - name: TestXdcrCreateClusterLocalMandatoryMutualTLS
+# XDCR Intra-Cluster Tests
+- TestXdcrCreateClusterLocal
+- TestXdcrCreateClusterLocalTLS
+- TestXdcrCreateClusterLocalMutualTLS
+- TestXdcrCreateClusterLocalMandatoryMutualTLS
 
-  - name: XdcrCases
-    clusters:
-      - BasicCluster
-      - NewCluster1
-    testcases:
-      - name: TestXdcrCreateClusterRemote
-      - name: TestXdcrCreateClusterRemoteTLS
-      - name: TestXdcrCreateClusterRemoteMutualTLS
-      - name: TestXdcrCreateClusterRemoteMandatoryMutualTLS
-      - name: TestXdcrSourceNodeDown
-      - name: TestXdcrSourceNodeAdd
-      - name: TestXdcrTargetNodeServiceDelete
+# XDCR Inter-Cluster Tests
+- TestXdcrCreateClusterRemote
+- TestXdcrCreateClusterRemoteTLS
+- TestXdcrCreateClusterRemoteMutualTLS
+- TestXdcrCreateClusterRemoteMandatoryMutualTLS
+- TestXdcrSourceNodeDown
+- TestXdcrSourceNodeAdd
+- TestXdcrTargetNodeServiceDelete
 
-  - name: SyncGatewayIntraCluster
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestSyncGatewayCreateLocal
-      - name: TestSyncGatewayCreateLocalTLS
-      - name: TestSyncGatewayCreateLocalMutualTLS
-      - name: TestSyncGatewayCreateLocalMandatoryMutualTLS
-      - name: TestSyncGatewayRBAC
+# Sync Gateway Intra-Cluster Tests
+- TestSyncGatewayCreateLocal
+- TestSyncGatewayCreateLocalTLS
+- TestSyncGatewayCreateLocalMutualTLS
+- TestSyncGatewayCreateLocalMandatoryMutualTLS
+- TestSyncGatewayRBAC
 
-  - name: SyncGatewayInterCluster
-    clusters:
-      - BasicCluster
-      - NewCluster1
-    testcases:
-      - name: TestSyncGatewayCreateRemote
-      - name: TestSyncGatewayCreateRemoteTLS
-      - name: TestSyncGatewayCreateRemoteMutualTLS
-      - name: TestSyncGatewayCreateRemoteMandatoryMutualTLS
+# Sync Gateway Inter-Cluster Tests
+- TestSyncGatewayCreateRemote
+- TestSyncGatewayCreateRemoteTLS
+- TestSyncGatewayCreateRemoteMutualTLS
+- TestSyncGatewayCreateRemoteMandatoryMutualTLS
 
-  - name: RzaTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestRzaResizeCluster
+# Server Group Tests
+- TestRzaResizeCluster
 
-  - name: PersistentVolumeTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestPersistentVolumeAutoFailover
-      - name: TestPersistentVolumeAutoRecovery
+# Persistent Volume Tests
+- TestPersistentVolumeAutoFailover
+- TestPersistentVolumeAutoRecovery
 
-  - name: FailoverTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestServerGroupAutoFailover
-      - name: TestMultiNodeAutoFailover
+# Auto Failover Tests
+- TestServerGroupAutoFailover
+- TestMultiNodeAutoFailover
 
-  - name: AnalyticsTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestAnalyticsResizeCluster
+# Analytics Tests
+- TestAnalyticsResizeCluster
 
-  - name: SupportabilityTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestNegLogCollectValidateArgs
-      - name: TestLogCollect
-      - name: TestExtendedDebugWithNonDefaultValues
-      - name: TestCollectLogFromEphemeralPodsUsingLogPVKillProcess
-      - name: TestLogRedactionWithPvVerify
-      - name: TestLogCollectListJson
+# Supportability Tests
+- TestNegLogCollectValidateArgs
+- TestLogCollect
+- TestExtendedDebugWithNonDefaultValues
+- TestCollectLogFromEphemeralPodsUsingLogPVKillProcess
+- TestLogRedactionWithPvVerify
+- TestLogCollectListJson
 
-  - name: UpgradeTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestUpgradeInvalidDowngrade
-      - name: TestUpgradeInvalidUpgrade
-      - name: TestUpgrade
-      - name: TestUpgradeSupportableKillStatefulPodOnCreate
-      - name: TestUpgradeSupportableKillStatefulPodOnRebalance
+# Upgrade Tests
+- TestUpgradeInvalidDowngrade
+- TestUpgradeInvalidUpgrade
+- TestUpgrade
+- TestUpgradeSupportableKillStatefulPodOnCreate
+- TestUpgradeSupportableKillStatefulPodOnRebalance
 
-  - name: NetworkingTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestExposedFeatureIP
-      - name: TestExposedFeatureDNS
-      - name: TestExposedFeatureDNSModify
-      - name: TestExposedFeatureServiceTypeModify
-      - name: TestConsoleServiceDNS
-      - name: TestConsoleServiceDNSModify
-      - name: TestConsoleServiceTypeModify
-      - name: TestExposedFeatureTrafficPolicyCluster
+# Networking Tests
+- TestExposedFeatureIP
+- TestExposedFeatureDNS
+- TestExposedFeatureDNSModify
+- TestExposedFeatureServiceTypeModify
+- TestConsoleServiceDNS
+- TestConsoleServiceDNSModify
+- TestConsoleServiceTypeModify
+- TestExposedFeatureTrafficPolicyCluster
 
-  - name: RBACTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestRBACDeleteUser
-      - name: TestRBACUpdateRole
-      - name: TestRBACDeleteRole
+# RBAC Tests
+- TestRBACDeleteUser
+- TestRBACUpdateRole
+- TestRBACDeleteRole
 
-  - name: LDAPTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestLDAPCreateAdminUser
-      - name: TestLDAPCDeleteUser
-      - name: TestLDAPDeleteRole
-      - name: TestLDAPUpdateRole
+# LDAP Tests
+- TestLDAPCreateAdminUser
+- TestLDAPCDeleteUser
+- TestLDAPDeleteRole
+- TestLDAPUpdateRole
 
-  - name: AutomatedBackupTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestFullIncremental
-      - name: TestFullOnly
-      - name: TestBackupAndRestore
-      - name: TestFullIncrementalOverTLS
-      - name: TestFullOnlyOverTLS
-      - name: TestMultipleBackups
+# Automated Backup Tests
+- TestFullIncremental
+- TestFullOnly
+- TestBackupAndRestore
+- TestFullIncrementalOverTLS
+- TestFullOnlyOverTLS
+- TestMultipleBackups
 
-  - name: MonitoringTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestPrometheusMetrics
-      - name: TestPrometheusMetricsEnable
-      - name: TestPrometheusMetricsEnableAndPerformOps
-      - name: TestPrometheusMetricsBearerTokenAuth
-      - name: TestPrometheusMetricsEnableAndUpgrade
+# Monitoring Tests
+- TestPrometheusMetrics
+- TestPrometheusMetricsEnable
+- TestPrometheusMetricsEnableAndPerformOps
+- TestPrometheusMetricsBearerTokenAuth
+- TestPrometheusMetricsEnableAndUpgrade
 
-  - name: NodeToNodeEncryptionTests
-    clusters:
-    - BasicCluster
-    testcases:
-    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNode
-    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenScale
-    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenKillPod
-    - name: TestCreateClusterWithTLSThenEnableControlPlaneNodeToNode
-    - name: TestCreateClusterWithTLSAnControlPlanedNodeToNodeThenDisableNodeToNode
-    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToFullNodeToNode
-    - name: TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificate
-    - name: TestCreateClusterWithTLSAndFullNodeToNode
-    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenScale
-    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenKillPod
-    - name: TestCreateClusterWithTLSThenEnableFullNodeToNode
-    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode
-    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode
-    - name: TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate
+# Node-To-Node Encryption Tests
+- TestCreateClusterWithTLSAndControlPlaneNodeToNode
+- TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenScale
+- TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenKillPod
+- TestCreateClusterWithTLSThenEnableControlPlaneNodeToNode
+- TestCreateClusterWithTLSAnControlPlanedNodeToNodeThenDisableNodeToNode
+- TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToFullNodeToNode
+- TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificate
+- TestCreateClusterWithTLSAndFullNodeToNode
+- TestCreateClusterWithTLSAndFullNodeToNodeThenScale
+- TestCreateClusterWithTLSAndFullNodeToNodeThenKillPod
+- TestCreateClusterWithTLSThenEnableFullNodeToNode
+- TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode
+- TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode
+- TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate

@@ -1,190 +1,128 @@
 ---
-suite: TestP1
 timeout: 16h
-tcGroups:
-  - name: ClusterTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestInvalidBaseImage
-      - name: TestInvalidVersion
-      - name: TestManageMultipleClusters
+testcases:
+# Cluster Tests
+- TestInvalidBaseImage
+- TestInvalidVersion
+- TestManageMultipleClusters
 
-  - name: NodeTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestNodeUnschedulable
-      - name: TestNodeServiceDownRecovery
-      - name: TestNodeServiceDownDuringRebalance
-      - name: TestNodeManualFailover
-      - name: TestKillNodesAfterRebalanceAndFailover
-      - name: TestRemoveForeignNode
-      - name: TestReplaceManuallyRemovedNode
+# Node Tests
+- TestNodeUnschedulable
+- TestNodeServiceDownRecovery
+- TestNodeServiceDownDuringRebalance
+- TestNodeManualFailover
+- TestKillNodesAfterRebalanceAndFailover
+- TestRemoveForeignNode
+- TestReplaceManuallyRemovedNode
 
-  - name: RecoveryTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestNodeRecoveryAfterMemberAdd
-      - name: TestNodeRecoveryKilledNewMember
-      - name: TestRecoveryAfterOneNsServerFailureBucketOneReplica
-      - name: TestRecoveryAfterOneNodeUnreachableBucketOneReplica
-      - name: TestRecoveryNodeTmpUnreachableBucketOneReplica
+# Recovery Tests
+- TestNodeRecoveryAfterMemberAdd
+- TestNodeRecoveryKilledNewMember
+- TestRecoveryAfterOneNsServerFailureBucketOneReplica
+- TestRecoveryAfterOneNodeUnreachableBucketOneReplica
+- TestRecoveryNodeTmpUnreachableBucketOneReplica
 
-  - name: AntiAffinityTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestAntiAffinityOnCannotBeScaled
+# Anti-Affinity Tests
+- TestAntiAffinityOnCannotBeScaled
 
-  - name: BucketTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestBucketAddRemoveExtended
-      - name: TestRevertExternalBucketUpdates
-      - name: TestDeltaRecoveryImpossible
+# Bucket Tests
+- TestBucketAddRemoveExtended
+- TestRevertExternalBucketUpdates
+- TestDeltaRecoveryImpossible
 
-  - name: OperatorTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestPauseOperator
+# Operator Tests
+- TestPauseOperator
 
-  - name: PodTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestNegPodResourcesBasic
+# Pod Tests
+- TestNegPodResourcesBasic
 
-  - name: TlsTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestTlsRemoveOperatorCertificateAndAddBack
-      - name: TestTlsRemoveClusterCertificateAndAddBack
-      - name: TestTlsRemoveOperatorCertificateAndResizeCluster
-      - name: TestTlsRemoveClusterCertificateAndResizeCluster
-      - name: TestTlsNegRSACertificateDnsName
-      - name: TestTlsCertificateExpiry
-      - name: TestTlsNegCertificateExpiredBeforeDeployment
-      - name: TestTlsCertificateDeployedBeforeValidity
-      - name: TestTlsGenerateWrongCACertType
-      - name: TestTLSRotateCAAndScale
-      - name: TestTLSRotateCAAndKillOperator
+# TLS Tests
+- TestTlsRemoveOperatorCertificateAndAddBack
+- TestTlsRemoveClusterCertificateAndAddBack
+- TestTlsRemoveOperatorCertificateAndResizeCluster
+- TestTlsRemoveClusterCertificateAndResizeCluster
+- TestTlsNegRSACertificateDnsName
+- TestTlsCertificateExpiry
+- TestTlsNegCertificateExpiredBeforeDeployment
+- TestTlsCertificateDeployedBeforeValidity
+- TestTlsGenerateWrongCACertType
+- TestTLSRotateCAAndScale
+- TestTLSRotateCAAndKillOperator
 
-  - name: SupportableTlsTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestTLSRotateCAKillPodAndKillOperator
+# Supportable TLS Tests
+- TestTLSRotateCAKillPodAndKillOperator
 
-  - name: XdcrCases
-    clusters:
-      - BasicCluster
-      - NewCluster1
-    testcases:
-      - name: TestXDCRPauseReplication
-      - name: TestXdcrRebalanceOutSourceClusterNodes
-      - name: TestXdcrRebalanceOutTargetClusterNodes
-      - name: TestXdcrRemoveSourceClusterNodes
-      - name: TestXdcrRemoveTargetClusterNodes
-      - name: TestXdcrResizedOutSourceClusterNodes
-      - name: TestXdcrResizedOutTargetClusterNodes
-      - name: TestXDCRDeleteReplication
-      - name: TestXDCRFilterExp
+# XDCR Tests
+- TestXDCRPauseReplication
+- TestXdcrRebalanceOutSourceClusterNodes
+- TestXdcrRebalanceOutTargetClusterNodes
+- TestXdcrRemoveSourceClusterNodes
+- TestXdcrRemoveTargetClusterNodes
+- TestXdcrResizedOutSourceClusterNodes
+- TestXdcrResizedOutTargetClusterNodes
+- TestXDCRDeleteReplication
+- TestXDCRFilterExp
 
-  - name: RzaTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestRzaAntiAffinityOn
-      - name: TestRzaAntiAffinityOff
+# Server Groups Tests
+- TestRzaAntiAffinityOn
+- TestRzaAntiAffinityOff
 
-  - name: PersistentVolumeTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestPersistentVolumeKillAllPods
-      - name: TestPersistentVolumeKillPodAndOperator
-      - name: TestPersistentVolumeKillAllPodsAndOperator
-      - name: TestPersistentVolumeRzaNodesKilled
-      - name: TestPersistentVolumeRzaNodesKilledUnbalanced
-      - name: TestPersistentVolumeRzaFailover
-      - name: TestPersistentVolumeResizeCluster
+# Persistent Volume Tests
+- TestPersistentVolumeKillAllPods
+- TestPersistentVolumeKillPodAndOperator
+- TestPersistentVolumeKillAllPodsAndOperator
+- TestPersistentVolumeRzaNodesKilled
+- TestPersistentVolumeRzaNodesKilledUnbalanced
+- TestPersistentVolumeRzaFailover
+- TestPersistentVolumeResizeCluster
 
-  # May be fixed in 6.0.4+
-  #- name: AnalyticsTests
-  #  clusters:
-  #    - BasicCluster
-  #  testcases:
-  #    - name: TestAnalyticsKillPods
-  #    - name: TestAnalyticsKillPodsWithPVC
+# May be fixed in 6.0.4+
+# Analytics Tests
+# - TestAnalyticsKillPods
+# - TestAnalyticsKillPodsWithPVC
 
-  - name: EventingTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestEventingResizeCluster
-      - name: TestEventingKillEventingPods
+# Eventing Tests
+- TestEventingResizeCluster
+- TestEventingKillEventingPods
 
-  - name: SupportabilityTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestLogCollectRbacPermission
-      - name: TestLogCollectInvalid
-      - name: TestExtendedDebugKillOperatorDuringLogCollection
-      - name: TestCollectLogFromEphemeralPodsWithOperatorKilled
-      - name: TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess
-      - name: TestEphemeralLogCollectResizeCluster
-      - name: TestLogCollectWithClusterResizeAndServerPodKilled
-      - name: TestLogCollectWithCustomRetentionAndSize
+# Supportability Tests
+- TestLogCollectRbacPermission
+- TestLogCollectInvalid
+- TestExtendedDebugKillOperatorDuringLogCollection
+- TestCollectLogFromEphemeralPodsWithOperatorKilled
+- TestCollectLogFromEphemeralPodsWithOperatorKilledKillProcess
+- TestEphemeralLogCollectResizeCluster
+- TestLogCollectWithClusterResizeAndServerPodKilled
+- TestLogCollectWithCustomRetentionAndSize
 
-  - name: UpgradeTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestUpgradeSupportableKillStatelessPodOnCreate
-      - name: TestUpgradeSupportableKillStatelessPodOnRebalance
-      - name: TestUpgradeRollback
-      - name: TestUpgradeKillPodOnCreate
-      - name: TestUpgradeInvalidRollback
-      - name: TestUpgradeSupportable
-      - name: TestUpgradeEnv
-      - name: TestUpgradeToSupportable
-      - name: TestUpgradeToTLS
-      - name: TestUpgradePVC
+# Upgrade Tests
+- TestUpgradeSupportableKillStatelessPodOnCreate
+- TestUpgradeSupportableKillStatelessPodOnRebalance
+- TestUpgradeRollback
+- TestUpgradeKillPodOnCreate
+- TestUpgradeInvalidRollback
+- TestUpgradeSupportable
+- TestUpgradeEnv
+- TestUpgradeToSupportable
+- TestUpgradeToTLS
+- TestUpgradePVC
 
-  - name: StatusTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestStatusRecovery
+# Status Tests
+- TestStatusRecovery
 
-  - name: RBACTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestRBACRemoveUserFromBinding
-      - name: TestRBACDeleteBinding
-      - name: TestRBACWithLDAPAuth
-      - name: TestRBACSelection
+# RBAC Tests
+- TestRBACRemoveUserFromBinding
+- TestRBACDeleteBinding
+- TestRBACWithLDAPAuth
+- TestRBACSelection
 
-  - name: LDAPTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestLDAPRemoveUserFromBinding
-      - name: TestLDAPDeleteBinding
+# LDAP Tests
+- TestLDAPRemoveUserFromBinding
+- TestLDAPDeleteBinding
 
-  - name: AutomatedBackupTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestFailedBackupBehaviour
-      - name: TestBackupPVCReconcile
-      - name: TestReplaceFullOnlyBackup
-      - name: TestReplaceFullIncrementalBackup
-      - name: TestUpdateBackupStatus
+# Automated Backup Tests
+- TestFailedBackupBehaviour
+- TestBackupPVCReconcile
+- TestReplaceFullOnlyBackup
+- TestReplaceFullIncrementalBackup
+- TestUpdateBackupStatus

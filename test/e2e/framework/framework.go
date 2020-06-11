@@ -12,7 +12,6 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"strings"
-	"testing"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -124,6 +123,8 @@ func (v *RegistryConfigValue) String() string {
 	return ""
 }
 
+var useANSIColor bool
+
 func readYamlData() (err error) {
 	// Provide some sane defaults.
 	params := TestRunParam{
@@ -152,11 +153,16 @@ func readYamlData() (err error) {
 	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. NAME,FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
+	flag.BoolVar(&useANSIColor, "color", false, "Prettify output")
 
 	// File based configuration (meat-space friendly)
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
 
 	flag.Parse()
+
+	if useANSIColor {
+		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
+	}
 
 	params.ClusterConfigs = clusters.values
 	params.RegistryConfigs = registries.values
@@ -187,6 +193,7 @@ func readYamlData() (err error) {
 
 	logrus.Info("Using suite file ", suiteFilePath)
 
+	suiteName = runtimeParams.SuiteToRun
 	suiteData, err = getSuiteDataFromYml(suiteFilePath)
 
 	return err
@@ -227,11 +234,6 @@ func GetDuration(timeoutStr string) time.Duration {
 // startTimeoutTimer starts timeout trigger based on given value in suiteData.Timeout.
 func startTimeoutTimer() {
 	go func() {
-		// In case of SystemTests, timeout will be set as part of test case
-		if suiteData.SuiteName == "TestSystem" {
-			logrus.Info("Skipping setting timer")
-		}
-
 		timeoutDuration := GetDuration(suiteData.Timeout)
 
 		logrus.Infof("Setting timeout of %v from %v", timeoutDuration, time.Now())
@@ -273,7 +275,7 @@ func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPo
 }
 
 // Setup setups a test framework and points "Global" to it.
-func Setup(t *testing.T) (err error) {
+func Setup() (err error) {
 	// Always run the test at least once, unless overridden by the config.
 	testRetries := 1
 
@@ -288,7 +290,6 @@ func Setup(t *testing.T) (err error) {
 		SkipTeardown:                  runtimeParams.SkipTearDown,
 		CollectLogs:                   runtimeParams.CollectLogsOnFailure,
 		SuiteYmlData:                  suiteData,
-		ClusterSpec:                   types.ClusterMap{},
 		CouchbaseServerImage:          runtimeParams.CouchbaseServerImage,
 		CouchbaseServerImageUpgrade:   runtimeParams.CouchbaseServerImageUpgrade,
 		StorageClassName:              runtimeParams.StorageClassName,
@@ -305,13 +306,15 @@ func Setup(t *testing.T) (err error) {
 		return err
 	}
 
-	for _, kubeConf := range runtimeParams.ClusterConfigs {
+	Global.ClusterSpec = make([]*types.Cluster, len(runtimeParams.ClusterConfigs))
+
+	for i, kubeConf := range runtimeParams.ClusterConfigs {
 		clusterSpec, cerr := createKubeClusterObject(kubeConf)
 		if cerr != nil {
 			return cerr
 		}
 
-		Global.ClusterSpec[kubeConf.Name] = clusterSpec
+		Global.ClusterSpec[i] = clusterSpec
 	}
 
 	// Set any defaults.
@@ -324,7 +327,7 @@ func Setup(t *testing.T) (err error) {
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
 	e2espec.SetPlatform(runtimeParams.Platform)
 
-	logrus.Info("Docker Registries")
+	logrus.Info(PrettyHeading("Docker Registries"))
 
 	for _, registry := range runtimeParams.RegistryConfigs {
 		logrus.Info(" →  server: " + registry.Server)
@@ -332,7 +335,7 @@ func Setup(t *testing.T) (err error) {
 		logrus.Info("    password: " + strings.Repeat("*", len(registry.Password)))
 	}
 
-	logrus.Info("Container Images")
+	logrus.Info(PrettyHeading("Container Images"))
 	logrus.Info(" →  couchbase operator: " + runtimeParams.OperatorImage)
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
 	logrus.Info(" →  couchbase server: " + runtimeParams.CouchbaseServerImage)
@@ -342,7 +345,7 @@ func Setup(t *testing.T) (err error) {
 	logrus.Info(" →  couchbase exporter upgrade: " + runtimeParams.CouchbaseExporterImageUpgrade)
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
 
-	logrus.Info("Clusters")
+	logrus.Info(PrettyHeading("Clusters"))
 
 	for _, config := range Global.ClusterSpec {
 		logrus.Info(" →  name: " + config.Name)
@@ -351,9 +354,9 @@ func Setup(t *testing.T) (err error) {
 		logrus.Info("    namespace: " + config.Namespace)
 	}
 
-	logrus.Info("Kubernetes")
+	logrus.Info(PrettyHeading("Kubernetes"))
 	logrus.Info(" →  storage class: " + runtimeParams.StorageClassName)
-	logrus.Info("Logs")
+	logrus.Info(PrettyHeading("Logs"))
 	logrus.Info(" →  directory: " + Global.LogDir)
 
 	// Setup the cbopinfo absolute path so it will not change if we move directories
@@ -823,8 +826,19 @@ func deleteOperator(k8s *types.Cluster, deploymentName string) error {
 	return nil
 }
 
+// GetCluster allocates a cluster for a tests and records it as in-use
+// for later debug analysis and output if needed.
 func (f *Framework) GetCluster(index int) *types.Cluster {
-	return f.ClusterSpec[f.TestClusters[index]]
+	cluster := f.ClusterSpec[index]
+
+	f.TestClusters = append(f.TestClusters, cluster)
+
+	return cluster
+}
+
+// Reset preforms any per-test clean up operations.
+func (f *Framework) Reset() {
+	f.TestClusters = []*types.Cluster{}
 }
 
 func makeLogDir() (string, error) {

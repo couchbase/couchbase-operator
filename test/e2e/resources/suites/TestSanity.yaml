@@ -1,75 +1,43 @@
 ---
-suite: TestSanity
 timeout: 4h
-tcGroups:
-  - name: ClusterTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestCreateCluster
-      - name: TestCreateBucketCluster
-      - name: TestResizeCluster
-      - name: TestEditClusterSettings
+testcases:
+# ClusterTests
+- TestCreateCluster
+- TestCreateBucketCluster
+- TestResizeCluster
+- TestEditClusterSettings
 
-  - name: BucketTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestBucketAddRemoveBasic
-      - name: TestEditBucket
+# BucketTests
+- TestBucketAddRemoveBasic
+- TestEditBucket
 
-  - name: RecoveryTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestRecoveryAfterOnePodFailureNoBucket
+# RecoveryTests
+- TestRecoveryAfterOnePodFailureNoBucket
 
-  - name: PodTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestAntiAffinityOn
-      - name: TestPodResourcesBasic
+# PodTests
+- TestAntiAffinityOn
+- TestPodResourcesBasic
 
-  - name: TlsTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestTlsCreateCluster
+# TlsTests
+- TestTlsCreateCluster
 
-  - name: XdcrTests
-    clusters:
-      - BasicCluster
-      - NewCluster1
-    testcases:
-      - name: TestXdcrCreateCluster
+# XdcrTests
+- TestXdcrCreateCluster
 
-  - name: ServerGroupTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestRzaCreateClusterWithStaticConfig
-      - name: TestRzaCreateClusterWithClassBasedConfig
+# ServerGroupTests
+- TestRzaCreateClusterWithStaticConfig
+- TestRzaCreateClusterWithClassBasedConfig
 
-  - name: PersistentVolumeTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestPersistentVolumeCreateCluster
+# PersistentVolumeTests
+- TestPersistentVolumeCreateCluster
 
-  - name: SupportabilityTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestLogCollectValidateArguments
-      - name: TestExtendedDebugWithDefaultValues
-      - name: TestCollectLogFromEphemeralPodsUsingLogPV
-      - name: TestLogCollectWithDefaultRetentionAndSize
-      - name: TestLogRedactionVerify
+# SupportabilityTests
+- TestLogCollectValidateArguments
+- TestExtendedDebugWithDefaultValues
+- TestCollectLogFromEphemeralPodsUsingLogPV
+- TestLogCollectWithDefaultRetentionAndSize
+- TestLogRedactionVerify
 
-  - name: CouchbaseServerServiceTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestAnalyticsCreateDataSet
-      - name: TestEventingCreateEventingCluster
+# CouchbaseServerServiceTests
+- TestAnalyticsCreateDataSet
+- TestEventingCreateEventingCluster

@@ -1,17 +1,12 @@
 ---
-suite: TestRBAC
 timeout: 4h
-tcGroups:
-  - name: RBACTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestRBACValidationCreate
-      - name: TestRBACValidationLDAP
-      - name: TestRBACDeleteUser
-      - name: TestRBACUpdateRole
-      - name: TestRBACDeleteRole
-      - name: TestRBACRemoveUserFromBinding
-      - name: TestRBACDeleteBinding
-      - name: TestRBACWithLDAPAuth
-      - name: TestRBACSelection
+testcases:
+- TestRBACValidationCreate
+- TestRBACValidationLDAP
+- TestRBACDeleteUser
+- TestRBACUpdateRole
+- TestRBACDeleteRole
+- TestRBACRemoveUserFromBinding
+- TestRBACDeleteBinding
+- TestRBACWithLDAPAuth
+- TestRBACSelection

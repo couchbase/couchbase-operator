@@ -62,6 +62,3 @@ func (c *Cluster) APIHostname() (string, error) {
 
 	return u.Hostname(), nil
 }
-
-// ClusterMap maps a cluster name to its configuration.
-type ClusterMap map[string]*Cluster

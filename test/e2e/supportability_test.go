@@ -1154,7 +1154,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	// Create Couchbase cluster
 	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
-	defer e2eutil.CleanUpCluster(t, targetKube, f.LogDir, f.TestClusters[0], t.Name())
+	defer e2eutil.CleanUpCluster(t, targetKube, f.LogDir, k8s.Name, t.Name())
 
 	// Collect logs
 	args.add(cbCluster.Name, "")

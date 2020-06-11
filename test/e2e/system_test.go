@@ -203,7 +203,7 @@ func CheckJob(t *testing.T, jobStatus map[string]string) {
 }
 
 func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName string) {
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.ClusterSpec[0]
 
 	fmt.Printf("deleting %v\n", jobName)
 
@@ -223,7 +223,7 @@ func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName st
 }
 
 func CreateJob(t *testing.T, f *framework.Framework, kubeName string, jobSpec *batchv1.Job) *batchv1.Job {
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.ClusterSpec[0]
 
 	job, err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Create(jobSpec)
 	if err != nil {
@@ -240,8 +240,8 @@ func CreateJob(t *testing.T, f *framework.Framework, kubeName string, jobSpec *b
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
 
-	kubeName := f.TestClusters[0]
-	targetKube := f.ClusterSpec[kubeName]
+	targetKube := f.ClusterSpec[0]
+	kubeName := targetKube.Name
 	clusterSize := 4
 	pvcName := "couchbase"
 	leaveJobsRunning := false

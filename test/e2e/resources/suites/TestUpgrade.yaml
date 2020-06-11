@@ -1,24 +1,15 @@
 ---
-suite: TestUpgrade
 timeout: 4h
-tcGroups:
-  - name: EphemeralTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestUpgrade
-      - name: TestUpgradeRollback
-      - name: TestUpgradeKillPodOnCreate
-      - name: TestUpgradeInvalidUpgrade
-      - name: TestUpgradeInvalidDowngrade
-      - name: TestUpgradeInvalidRollback
-  - name: SupportableTests
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestUpgradeSupportable
-      - name: TestUpgradeSupportableKillStatefulPodOnCreate
-      - name: TestUpgradeSupportableKillStatefulPodOnRebalance
-      - name: TestUpgradeSupportableKillStatelessPodOnCreate
-      - name: TestUpgradeSupportableKillStatelessPodOnRebalance
+testcases:
+- TestUpgrade
+- TestUpgradeRollback
+- TestUpgradeKillPodOnCreate
+- TestUpgradeInvalidUpgrade
+- TestUpgradeInvalidDowngrade
+- TestUpgradeInvalidRollback
+- TestUpgradeSupportable
+- TestUpgradeSupportableKillStatefulPodOnCreate
+- TestUpgradeSupportableKillStatefulPodOnRebalance
+- TestUpgradeSupportableKillStatelessPodOnCreate
+- TestUpgradeSupportableKillStatelessPodOnRebalance
 

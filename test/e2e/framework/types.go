@@ -16,7 +16,7 @@ type Framework struct {
 	SyncGatewayImage              string
 	KubeType                      string
 	KubeVersion                   string
-	ClusterSpec                   types.ClusterMap
+	ClusterSpec                   []*types.Cluster
 	LogDir                        string
 	SkipTeardown                  bool
 	SuiteYmlData                  SuiteData
@@ -28,7 +28,7 @@ type Framework struct {
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
 	// tests to select the cluster configuration to use.
-	TestClusters []string
+	TestClusters []*types.Cluster
 	// CouchbaseServerImage is the image of Couchbase server we are running with
 	CouchbaseServerImage string
 	// CouchbaseServerImageUpgrade is the image of Couchbase server we are upgrading to
@@ -136,11 +136,6 @@ type TestRunParam struct {
 // TestFunc defines the test function type
 type TestFunc func(*testing.T)
 
-// DecoratorArgs will be used to pass arguments to decorators
-type DecoratorArgs struct {
-	KubeNames []string
-}
-
 // Map to store Testcase name to their respective Function objects
 type FuncMap map[string]TestFunc
 
@@ -153,13 +148,6 @@ type TestResult struct {
 
 // To decode test-suite yaml file
 type SuiteData struct {
-	SuiteName     string `yaml:"suite"`
-	Timeout       string `yaml:"timeout"`
-	TestCaseGroup []struct {
-		GroupName   string   `yaml:"name"`
-		ClusterName []string `yaml:"clusters"`
-		TestCase    []struct {
-			TcName string `yaml:"name"`
-		} `yaml:"testcases"`
-	} `yaml:"tcGroups"`
+	Timeout  string   `yaml:"timeout"`
+	TestCase []string `yaml:"testcases"`
 }

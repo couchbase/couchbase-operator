@@ -1,12 +1,4 @@
 ---
-suite: TestSanity
 timeout: 4h
-tcGroups:
-  - name: PersistentVolumeTests
-    clusters:
-      - NewCluster1
-    testcases:
-      #- name: TestPersistentVolumeKillAllPods
-      #- name: TestPersistentVolumeKillPodAndOperator
-      #- name: TestPersistentVolumeKillAllPodsAndOperator
-      - name: TestPersistentVolumeRzaNodesKilled
+testcases:
+- TestPersistentVolumeRzaNodesKilled

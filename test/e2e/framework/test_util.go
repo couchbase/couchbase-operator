@@ -13,6 +13,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	"github.com/sirupsen/logrus"
+
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,12 +24,54 @@ import (
 // Results is a global result store.
 var Results = []TestResult{}
 
+// Closest we can get to unicorn mode for now...
+func PrettyResult(pass bool) string {
+	result := ""
+
+	if useANSIColor {
+		if pass {
+			result += "\033[1;32m"
+		} else {
+			result += "\033[1;31m"
+		}
+	}
+
+	if pass {
+		result += "✔"
+	} else {
+		result += "✗"
+	}
+
+	if useANSIColor {
+		result += "\033[0m"
+	}
+
+	return result
+}
+
+func PrettyHeading(s string) string {
+	result := ""
+
+	if useANSIColor {
+		result += "\033[1m"
+	}
+
+	result += s
+
+	if useANSIColor {
+		result += "\033[0m"
+	}
+
+	return result
+}
+
 // analyzeResults accepts a list of test results and displays success rates.
-func AnalyzeResults(t *testing.T) {
-	t.Logf("Suite Test Results: \n")
+func AnalyzeResults() {
+	if len(Results) == 0 {
+		return
+	}
 
-	//structs for xml
-
+	// Define datastructures necessary for Junit output.
 	type TestCase struct {
 		XMLName xml.Name `xml:"testcase"`
 		Name    string   `xml:"name,attr"`
@@ -46,72 +90,52 @@ func AnalyzeResults(t *testing.T) {
 		Testcases []TestCase `xml:"testcase"`
 	}
 
-	failures := []string{}
-	instabilities := []string{}
 	testcases := []TestCase{}
+
+	// Dump out the human readable summary.
+	logrus.Info(PrettyHeading("Test Summary"))
+
+	var fail int
 
 	for i, result := range Results {
 		if result.Result {
-			t.Logf("%d: %s...PASS", i+1, result.Name)
+			logrus.Infof("%4d: %s %s", i+1, result.Name, PrettyResult(true))
 
 			testcases = append(testcases, TestCase{Name: result.Name, Time: "0"})
 		} else {
-			t.Logf("%d: %s...FAIL", i+1, result.Name)
+			logrus.Infof("%4d: %s %s", i+1, result.Name, PrettyResult(false))
 
 			testcases = append(testcases, TestCase{Name: result.Name, Time: "0", Error: "fail"})
-			failures = append(failures, result.Name)
-		}
-
-		if result.Unstable {
-			testcases = append(testcases, TestCase{Name: result.Name, Time: "0", Error: "unstable"})
-			instabilities = append(instabilities, result.Name)
+			fail++
 		}
 	}
 
+	total := len(Results)
+	pass := total - fail
+	passRate := (float64(pass) / float64(total)) * 100.0
+	failRate := 100.0 - passRate
+
+	logrus.Info(PrettyHeading("Suite Summary"))
+	logrus.Infof(" %s Passes: %d (%0.2f%%)", PrettyResult(true), pass, passRate)
+	logrus.Infof(" %s Failures: %d (%0.2f%%)", PrettyResult(false), fail, failRate)
+
+	// Dump out Junit statistics.
 	testsuite := TestSuite{
-		Name:      suiteData.SuiteName,
-		Tests:     strconv.Itoa(len(Results)),
-		Errors:    strconv.Itoa(len(instabilities)),
-		Failures:  strconv.Itoa(len(failures)),
+		Name:      suiteName,
+		Tests:     strconv.Itoa(total),
+		Failures:  strconv.Itoa(fail),
 		Skip:      "0",
 		Time:      "0",
 		Testcases: testcases,
 	}
-
-	pass := float64(len(Results) - len(failures))
-	fail := float64(len(failures))
-	total := float64(len(Results))
-	passRate := (pass / total) * 100.0
-
-	if fail > 0 {
-		t.Logf("Failures: ")
-
-		for i, test := range failures {
-			t.Logf("%d: %s", i+1, test)
-		}
-	}
-
-	if len(instabilities) > 0 {
-		t.Log("Unstable tests:")
-
-		for i, test := range instabilities {
-			t.Logf("%d: %s", i+1, test)
-		}
-	}
-
-	t.Logf("\n Pass: %f \n Fail: %f \n Pass Rate: %f", pass, fail, passRate)
 
 	if xmlstring, err := xml.MarshalIndent(testsuite, "", "    "); err == nil {
 		xmlstring = []byte(xml.Header + string(xmlstring))
 
 		err := ioutil.WriteFile("results.xml", xmlstring, 0644)
 		if err != nil {
-			t.Fatalf("Failed to write test XML: %v", err)
+			logrus.Warnf("Failed to write test XML: %v", err)
 		}
-	}
-
-	if fail > 0 {
-		t.Fatalf("suite contains failures")
 	}
 }
 
@@ -360,7 +384,7 @@ func waitForServiceAccountDeleted(k8s *types.Cluster, serviceAccountName string,
 	}
 }
 
-func RecoverDecorator(test TestFunc, args DecoratorArgs) TestFunc {
+func RecoverDecorator(test TestFunc) TestFunc {
 	wrapperFunc := func(t *testing.T) {
 		defer func(t *testing.T) {
 			if r := recover(); r != nil {

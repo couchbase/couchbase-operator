@@ -25,12 +25,18 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	if err := framework.Setup(); err != nil {
+		logrus.Error(err)
+		os.Exit(1)
+	}
+
 	// Run Test module
 	code := m.Run()
 
+	framework.AnalyzeResults()
+
 	if err := framework.Teardown(); err != nil {
-		logrus.Errorf("Failed to teardown framework: %v", err)
-		os.Exit(1)
+		logrus.Warnf("Failed to teardown framework: %v", err)
 	}
 
 	os.Exit(code)
