@@ -244,7 +244,7 @@ image-artifacts: binaries
 
 # This target (and only this target) is invoked by the production build job.
 # This job will archive all files that end up in the dist/ directory.
-dist: artifacts image-artifacts
+dist: touch-generated artifacts image-artifacts
 	rm -rf dist
 	mkdir dist
 	cp build/couchbase-operator-image_*.tgz dist
