@@ -1,11 +1,14 @@
 package e2e
 
 import (
-	"os"
+	"bytes"
+	"context"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -307,16 +310,33 @@ var (
 )
 
 func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, events []eventschema.Validatable) {
-	clusterEvents, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, couchbase)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
 	eventSeq := &eventschema.Sequence{Validators: events}
 
-	v := &eventschema.Validator{Events: clusterEvents, Schema: eventSeq}
-	if err := v.Validate(os.Stdout); err != nil {
+	out := &bytes.Buffer{}
+
+	// Wrap the check in a retry, to avoid race conditions when any synchronization
+	// we do have, isn't enough to guarantee the state of the event stream.
+	callback := func() error {
+		clusterEvents, err := e2eutil.GetCouchbaseEvents(k8s.KubeClient, couchbase)
+		if err != nil {
+			return err
+		}
+
+		out.Reset()
+
+		v := &eventschema.Validator{Events: clusterEvents, Schema: eventSeq}
+		if err := v.Validate(out); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		t.Log(out.String())
 		t.Error(err)
 	}
 }
