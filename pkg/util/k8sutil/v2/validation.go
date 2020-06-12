@@ -577,8 +577,28 @@ func GetCouchbaseBackupCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 								"repo": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"repoList": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
+								"backups": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "array",
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"full": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+												"incremental": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+												"name": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											Required: []string{
+												"full",
+												"name",
+											},
+										},
+									},
 								},
 								"running": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
@@ -737,8 +757,28 @@ func GetCouchbaseBackupRestoreCRD() *apiextensionsv1beta1.CustomResourceDefiniti
 								"repo": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "string",
 								},
-								"repoList": apiextensionsv1beta1.JSONSchemaProps{
-									Type: "string",
+								"backups": apiextensionsv1beta1.JSONSchemaProps{
+									Type: "array",
+									Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+										Schema: &apiextensionsv1beta1.JSONSchemaProps{
+											Type: "object",
+											Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+												"full": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+												"incremental": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+												"name": apiextensionsv1beta1.JSONSchemaProps{
+													Type: "string",
+												},
+											},
+											Required: []string{
+												"full",
+												"name",
+											},
+										},
+									},
 								},
 								"running": apiextensionsv1beta1.JSONSchemaProps{
 									Type: "boolean",
