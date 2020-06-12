@@ -523,8 +523,9 @@ func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 
 		for _, index := range indexes {
 			member := couchbaseutil.Member{
-				Name:      couchbaseutil.CreateMemberName(couchbase.Name, index),
-				Namespace: couchbase.Namespace,
+				Name:        couchbaseutil.CreateMemberName(couchbase.Name, index),
+				ClusterName: couchbase.Name,
+				Namespace:   couchbase.Namespace,
 			}
 
 			data.Add("otpNode", string(member.GetOTPNode()))
