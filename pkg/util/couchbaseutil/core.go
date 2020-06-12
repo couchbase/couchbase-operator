@@ -274,12 +274,12 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 			return err
 		}
 	case "text/plain":
-		s, ok := result.([]byte)
+		s, ok := result.(*[]byte)
 		if !ok {
 			return fmt.Errorf("unexpected type decode for text/plain")
 		}
 
-		copy(s, body)
+		copy(*s, body)
 	default:
 		return fmt.Errorf("unexpected content type %s", contentType)
 	}
