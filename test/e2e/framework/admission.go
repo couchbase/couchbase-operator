@@ -66,7 +66,7 @@ func createAdmissionController(k8s *types.Cluster) error {
 	// cbopcfg...
 	var pullSecret string
 
-	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil {
+	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil && len(k8s.PullSecrets[k8s.Namespace]) > 0 {
 		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
 	}
 

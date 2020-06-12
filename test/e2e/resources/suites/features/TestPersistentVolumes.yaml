@@ -1,17 +1,12 @@
 ---
-suite: TestPersistentVolumes
-tcGroups:
-  - name: PersistentVolumeTests
-    clusters:
-      - NewCluster1
-    testcases:
-      - name: TestPersistentVolumeCreateCluster
-      - name: TestPersistentVolumeAutoFailover
-      - name: TestPersistentVolumeNodeFailover
-      - name: TestPersistentVolumeKillAllPods
-      - name: TestPersistentVolumeKillPodAndOperator
-      - name: TestPersistentVolumeKillAllPodsAndOperator
-      - name: TestPersistentVolumeRzaNodesKilled
-      - name: TestPersistentVolumeRzaFailover
-      - name: TestPersistentVolumeResizeCluster
-      - name: TestAnalyticsKillPodsWithPVC
+testcases:
+- TestPersistentVolumeCreateCluster
+- TestPersistentVolumeAutoFailover
+- TestPersistentVolumeNodeFailover
+- TestPersistentVolumeKillAllPods
+- TestPersistentVolumeKillPodAndOperator
+- TestPersistentVolumeKillAllPodsAndOperator
+- TestPersistentVolumeRzaNodesKilled
+- TestPersistentVolumeRzaFailover
+- TestPersistentVolumeResizeCluster
+- TestAnalyticsKillPodsWithPVC

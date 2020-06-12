@@ -21,8 +21,7 @@ The test configuration is defined in `./resources/test_config.yaml`. The default
 operator-image: couchbase/couchbase-operator:v1
 namespace: default
 kube-config:
-  - name: BasicCluster
-    config: /root/.kube/config
+- config: /root/.kube/config
 duration: 7
 skip-tear-down: false
 suite: TestCustom
@@ -54,23 +53,10 @@ Test Suite Descriptor
 All tests are run as described in a test suite descriptor file. The default test suite is `TestCustom.yaml`. This suite is intended to be modified for custom testing such as running individual tests or custom sanity tests. The file has the following contents:
 
 ```
-suite: TestCustom
-tcGroups:
-  - name: Group1
-    clusters:
-      - BasicCluster
-    testcases:
-      - name: TestCreateCluster
+testcases:
+- TestCreateCluster
 ```
 
 The following are descriptions of the field in `TestCustom.yaml` but are standard for all test suite descriptors:
 
-`suite`: the name of the test suite. This value needs to be placed in `test_config.yaml` for the suite to run.
-
-`tcGroups`: test are put into groups that have the same cluster topology requirements. Each `tcGroup` requires a name, a set of required clusters, and a set of tests to run.
-
-`tcGroups, name`: name of the `tcGroup`. All groups should have unique names.
-
-`tcGroup, clusters`: list of clusters required by the test in the `tcGroup`. If the cluster does not exist (no kubeconfig with that name was passed into `test_config.yaml`), the framework will attempt to create the cluster from the resources defined in `cluster_conf.yaml`.
-
-`tcGroups, testcases`: list of test cases to run. Each test case requires a name of valid test listed in `./util.go`.
+`testcases`: list of test cases to run. Each test case requires a name of valid test listed in `./util.go`.

@@ -202,7 +202,7 @@ func CheckJob(t *testing.T, jobStatus map[string]string) {
 	}
 }
 
-func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName string) {
+func DeleteJob(t *testing.T, f *framework.Framework, jobName string) {
 	targetKube := f.ClusterSpec[0]
 
 	fmt.Printf("deleting %v\n", jobName)
@@ -222,7 +222,7 @@ func DeleteJob(t *testing.T, f *framework.Framework, kubeName string, jobName st
 	}
 }
 
-func CreateJob(t *testing.T, f *framework.Framework, kubeName string, jobSpec *batchv1.Job) *batchv1.Job {
+func CreateJob(t *testing.T, f *framework.Framework, jobSpec *batchv1.Job) *batchv1.Job {
 	targetKube := f.ClusterSpec[0]
 
 	job, err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Create(jobSpec)
@@ -241,7 +241,6 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
 
 	targetKube := f.ClusterSpec[0]
-	kubeName := targetKube.Name
 	clusterSize := 4
 	pvcName := "couchbase"
 	leaveJobsRunning := false
@@ -433,7 +432,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 	rbacOp = supplyScope(testScope, rbacOp)
 	jobSpec := CreateJobSpec(rbacOp)
-	job := CreateJob(t, f, kubeName, jobSpec)
+	job := CreateJob(t, f, jobSpec)
 	// wait for job to succeed
 	singleResults := make(chan map[string]string, 1)
 
@@ -442,7 +441,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	jobStatus := <-singleResults
 
 	CheckJob(t, jobStatus)
-	DeleteJob(t, f, kubeName, jobStatus["jobName"])
+	DeleteJob(t, f, jobStatus["jobName"])
 	time.Sleep(3 * time.Second)
 
 	rbacOp = operation{
@@ -454,7 +453,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	}
 	rbacOp = supplyScope(testScope, rbacOp)
 	jobSpec = CreateJobSpec(rbacOp)
-	job = CreateJob(t, f, kubeName, jobSpec)
+	job = CreateJob(t, f, jobSpec)
 	// wait for job to succeed
 	singleResults = make(chan map[string]string, 1)
 
@@ -463,7 +462,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	jobStatus = <-singleResults
 
 	CheckJob(t, jobStatus)
-	DeleteJob(t, f, kubeName, jobStatus["jobName"])
+	DeleteJob(t, f, jobStatus["jobName"])
 	time.Sleep(3 * time.Second)
 
 	// run the system test
@@ -490,7 +489,7 @@ outerLoop:
 				CheckJob(t, result)
 
 				if !leaveJobsRunning {
-					DeleteJob(t, f, kubeName, result["jobName"])
+					DeleteJob(t, f, result["jobName"])
 				}
 
 				delete(jobList, result["jobName"])
@@ -504,7 +503,7 @@ outerLoop:
 				if i < len(testDef.ops) {
 					op := testDef.ops[i]
 					jobSpec := CreateJobSpec(op)
-					job := CreateJob(t, f, kubeName, jobSpec)
+					job := CreateJob(t, f, jobSpec)
 
 					fmt.Printf("launched: job=%v cycle=%v index:%v lastIndex:%v \n", job.Name, cycles, i, len(testDef.ops))
 					// if wait, wait for success before launching next job
@@ -517,7 +516,7 @@ outerLoop:
 						CheckJob(t, jobStatus)
 
 						if !leaveJobsRunning {
-							DeleteJob(t, f, kubeName, jobStatus["jobName"])
+							DeleteJob(t, f, jobStatus["jobName"])
 						}
 					} else {
 						go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, op.duration, op.timeout, results)

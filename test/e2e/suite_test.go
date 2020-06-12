@@ -139,18 +139,18 @@ func TestOperator(t *testing.T) {
 
 // getOperatorRestartCounts returns the restart counts for the operator in each
 // cluster.
-func getOperatorRestartCounts() map[string]int {
+func getOperatorRestartCounts() []int {
 	f := framework.Global
 
-	result := map[string]int{}
+	result := make([]int, len(f.ClusterSpec))
 
-	for _, cluster := range f.TestClusters {
+	for i, cluster := range f.TestClusters {
 		restarts, err := f.GetOperatorRestartCount(cluster)
 		if err != nil {
-			fmt.Println("WARN: unable to get restart counts on cluster", cluster.Name, ":", err)
+			fmt.Println("WARN: unable to get restart counts on cluster", i, ":", err)
 		}
 
-		result[cluster.Name] = int(restarts)
+		result[i] = int(restarts)
 	}
 
 	return result
@@ -158,7 +158,7 @@ func getOperatorRestartCounts() map[string]int {
 
 // operatorRestarted returns whether the operator restarted/crashed during this
 // test.
-func operatorRestarted(before map[string]int) bool {
+func operatorRestarted(before []int) bool {
 	after := getOperatorRestartCounts()
 
 	restarted := false
@@ -204,8 +204,8 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 
 	// Cleanup the namespace.
 	if !f.SkipTeardown {
-		for _, cluster := range f.ClusterSpec {
-			e2eutil.CleanUpCluster(t, cluster, f.LogDir, cluster.Name, name)
+		for i, cluster := range f.ClusterSpec {
+			e2eutil.CleanUpCluster(t, cluster, f.LogDir, i, name)
 		}
 	}
 

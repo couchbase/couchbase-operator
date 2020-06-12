@@ -69,22 +69,21 @@ func Init() error {
 }
 
 // ClusterConfigValue allows multiple cluster configurations to be passed on the command line
-// e.g. --cluster BasicCluster,~/.kube/conf,,default --cluster NewCluster1,~/kubeconfig,,remote
+// e.g. --cluster ~/.kube/conf,,default --cluster ~/kubeconfig,,remote
 type ClusterConfigValue struct {
 	values []ClusterConfig
 }
 
 func (v *ClusterConfigValue) Set(value string) error {
 	fields := strings.Split(value, ",")
-	if len(fields) != 4 {
-		return fmt.Errorf("invalid cluster config value, expected NAME,FILE,CONTEXT,NAMESPACE")
+	if len(fields) != 3 {
+		return fmt.Errorf("invalid cluster config value, expected FILE,CONTEXT,NAMESPACE")
 	}
 
 	config := ClusterConfig{
-		Name:      fields[0],
-		Config:    fields[1],
-		Context:   fields[2],
-		Namespace: fields[3],
+		Config:    fields[0],
+		Context:   fields[1],
+		Namespace: fields[2],
 	}
 
 	v.values = append(v.values, config)
@@ -123,6 +122,21 @@ func (v *RegistryConfigValue) String() string {
 	return ""
 }
 
+// TestConfigValue represents an explicit set of tests to run, so you can choose to
+// not run a 12h suite and only a single 5m test.
+type TestConfigValue struct {
+	values []string
+}
+
+func (v *TestConfigValue) Set(value string) error {
+	v.values = append(v.values, value)
+	return nil
+}
+
+func (v *TestConfigValue) String() string {
+	return ""
+}
+
 var useANSIColor bool
 
 func readYamlData() (err error) {
@@ -136,6 +150,8 @@ func readYamlData() (err error) {
 	var clusters ClusterConfigValue
 
 	var registries RegistryConfigValue
+
+	var tests TestConfigValue
 
 	// CLI based configuration (CI/computer friendly)
 	flag.StringVar(&params.KubeType, "platform-type", "kubernetes", "Either kubernetes or openshift")
@@ -151,8 +167,9 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.SuiteToRun, "suite", "", "Test suite to run")
 	flag.StringVar(&params.StorageClassName, "storage-class", "default", "Storage class to use")
 	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
-	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. NAME,FILE,CONTEXT,NAMESPACE")
+	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
+	flag.Var(&tests, "test", "Individual test to run, overrides -suite if specified")
 	flag.BoolVar(&useANSIColor, "color", false, "Prettify output")
 
 	// File based configuration (meat-space friendly)
@@ -167,10 +184,30 @@ func readYamlData() (err error) {
 	params.ClusterConfigs = clusters.values
 	params.RegistryConfigs = registries.values
 
+	// We are using the CLI to configure if the suite or tests are explcitly stated.
+	withExplicitTests := len(tests.values) > 0
+	useCLI := params.SuiteToRun != "" || withExplicitTests
+
 	// Use either the CLI parameters, or the YAML file.  I suspect the YAML
 	// method will suffer a quick death...
-	if params.SuiteToRun != "" {
+	if useCLI {
 		params.Platform = couchbasev2.PlatformType(platform)
+
+		// If no cluster configurations were specified, then provide some
+		// sane defaults.  At most we need two clusters in different namespaces
+		// to run XDCR/client tests.
+		if len(params.ClusterConfigs) == 0 {
+			params.ClusterConfigs = []ClusterConfig{
+				{
+					Config:    "~/.kube/config",
+					Namespace: "default",
+				},
+				{
+					Config:    "~/.kube/config",
+					Namespace: "remote",
+				},
+			}
+		}
 
 		// Heretical use of global variables alert.
 		runtimeParams = params
@@ -189,14 +226,28 @@ func readYamlData() (err error) {
 		}
 	}
 
-	suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
+	// When using an explcit list of tests, fake a suite... otherwise load one
+	// up from disk.
+	if withExplicitTests {
+		suiteName = "custom"
+		suiteData = SuiteData{
+			// Timeout is pointless, expect users to specify -test.timeout instead.
+			Timeout:  "24h",
+			TestCase: tests.values,
+		}
+	} else {
+		suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
 
-	logrus.Info("Using suite file ", suiteFilePath)
+		logrus.Info("Using suite file ", suiteFilePath)
 
-	suiteName = runtimeParams.SuiteToRun
-	suiteData, err = getSuiteDataFromYml(suiteFilePath)
+		suiteName = runtimeParams.SuiteToRun
+		suiteData, err = getSuiteDataFromYml(suiteFilePath)
+		if err != nil {
+			return err
+		}
+	}
 
-	return err
+	return nil
 }
 
 // Returs time.Duration from given string
@@ -259,7 +310,7 @@ func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPo
 	// cbopcfg...
 	var pullSecret string
 
-	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil {
+	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil && len(k8s.PullSecrets[k8s.Namespace]) > 0 {
 		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
 	}
 
@@ -348,8 +399,7 @@ func Setup() (err error) {
 	logrus.Info(PrettyHeading("Clusters"))
 
 	for _, config := range Global.ClusterSpec {
-		logrus.Info(" →  name: " + config.Name)
-		logrus.Info("    path: " + config.KubeConfPath)
+		logrus.Info(" →  path: " + config.KubeConfPath)
 		logrus.Info("    context: " + config.Context)
 		logrus.Info("    namespace: " + config.Namespace)
 	}
@@ -378,7 +428,7 @@ func Setup() (err error) {
 
 func cleanUpNamespace() (err error) {
 	for _, k8s := range Global.ClusterSpec {
-		logrus.Infof("Cleaning up namespace %s in %s", k8s.Namespace, k8s.Name)
+		logrus.Infof("Cleaning up namespace %s", k8s.Namespace)
 
 		// Remove secrets
 		if k8s.DefaultSecret != nil {
@@ -457,7 +507,6 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 		KubeConfPath:  c.Config,
 		Context:       c.Context,
 		Namespace:     c.Namespace,
-		Name:          c.Name,
 	}, nil
 }
 
@@ -727,7 +776,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	}
 
 	// delete and create operator
-	logrus.Infof("Cleaning up namespace %s before deployment in %s", k8s.Namespace, k8s.Name)
+	logrus.Infof("Cleaning up namespace %s before deployment", k8s.Namespace)
 
 	if err := DeleteOperatorCompletely(k8s, config.OperatorResourceName); err != nil {
 		return fmt.Errorf("failed to delete operator: %v", err)

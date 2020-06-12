@@ -448,7 +448,7 @@ func runValidationTest(t *testing.T, targetKube *types.Cluster, testDefs []testD
 
 	// Removing deployment if any
 	if !f.SkipTeardown {
-		e2eutil.CleanUpCluster(t, targetKube, f.LogDir, targetKube.Name, t.Name())
+		e2eutil.CleanUpCluster(t, targetKube, f.LogDir, 0, t.Name())
 	}
 }
 

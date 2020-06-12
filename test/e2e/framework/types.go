@@ -53,10 +53,6 @@ type initializedClusterList []initializedCluster
 // ClusterConfig holds configuration data about a cluster to use for
 // testing.
 type ClusterConfig struct {
-	// Name is the human readable name of the configuration.  This is referenced
-	// explicitly by suite definitions.
-	Name string `yaml:"name"`
-
 	// Config is the path to a Kubernetes configuration file, typically ~/.kube/conf.
 	Config string `yaml:"config"`
 

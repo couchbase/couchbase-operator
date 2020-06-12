@@ -695,9 +695,9 @@ func DestroyCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couch
 	}
 }
 
-func CleanUpCluster(t *testing.T, k8s *types.Cluster, logDir, kubeName, testName string) {
+func CleanUpCluster(t *testing.T, k8s *types.Cluster, logDir string, cluster int, testName string) {
 	// Creates dir for kubename
-	logDir = filepath.Join(logDir, kubeName)
+	logDir = filepath.Join(logDir, strconv.Itoa(cluster))
 
 	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
 		t.Log(err)
