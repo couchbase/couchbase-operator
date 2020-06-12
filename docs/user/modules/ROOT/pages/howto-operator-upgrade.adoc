@@ -118,6 +118,15 @@ To run the upgrade, in each required namespace, run the following.
 $ ./cbopconv --namespace default
 ----
 
+[IMPORTANT]
+====
+The requirements for TLS certificates have changed from Operator version 2.0.0 onward.
+TLS certificates should be upgraded before starting the resource upgrade procedure.
+Please consult the xref:tutorial-tls.adoc#creating-a-couchbase-cluster-server-certificate[TLS tutorial] for certificate requirements, in particular the mandatory X.509 subject alternative names.
+The `cbopconv` tool will refuse to upgrade clusters until this step has been performed.
+The Operator will handle certificate rotation upon restart in the next step, however it can be performed before the entire upgrade procedure is started.
+====
+
 [NOTE]
 ====
 You can safely install the Dynamic Admission Controller -- on its own -- before running this update step.

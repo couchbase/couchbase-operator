@@ -284,7 +284,10 @@ ____
 
 === spec.paused
 
-This field specifies whether or not the Operator is currently managing this cluster. This parameter should generally be set to `true`, but may be set to `false` if you decide to make manual changes to the cluster. By disabling the Operator you can change the cluster configuration without having to worry about the Operator reverting the changes. However, before re-enabling the Operator, ensure that the Kubernetes configuration matches the cluster configuration.
+This field specifies whether or not the Operator is currently managing this cluster.
+This parameter may be set to `true` if you decide to make manual changes to the cluster.
+By disabling Operator management, you can change the cluster configuration without having to worry about the Operator reverting the changes.
+However, before re-enabling the Operator, ensure that the Kubernetes configuration matches the cluster configuration.
 
 ____
 _Field rules:_ The `paused` field is optional and defaults to `false` if not specified.
