@@ -368,7 +368,11 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 
 	// Wait for the operator to successfully connect before continuing.
 	name := fmt.Sprintf("%s/%s/%s", clusterName, replication.Spec.Bucket, replication.Spec.RemoteBucket)
-	if err = WaitForClusterEvent(srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name), 5*time.Minute); err != nil {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	if err = WaitForClusterEvent(ctx, srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
 		return
 	}
 
@@ -377,7 +381,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 
 // EstablishXDCRReplication creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, ctx *TLSContext) (cleanup func(), err error) {
+func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, tls *TLSContext) (cleanup func(), err error) {
 	// Create the remote cluster secret.
 	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
 	secret := &corev1.Secret{
@@ -399,20 +403,20 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	// Define the TLS secret if we are using it.
 	tlsSecret := ""
 
-	if ctx != nil {
+	if tls != nil {
 		tlsSecret = fmt.Sprintf("%s-xdcr-tls", target.Name)
 		secret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tlsSecret,
 			},
 			Data: map[string][]byte{
-				couchbasev2.RemoteClusterTLSCA: ctx.CA.Certificate,
+				couchbasev2.RemoteClusterTLSCA: tls.CA.Certificate,
 			},
 		}
 
 		if target.Spec.Networking.TLS.ClientCertificatePolicy != nil {
-			secret.Data[couchbasev2.RemoteClusterTLSCertificate] = ctx.ClientCert
-			secret.Data[couchbasev2.RemoteClusterTLSKey] = ctx.ClientKey
+			secret.Data[couchbasev2.RemoteClusterTLSCertificate] = tls.ClientCert
+			secret.Data[couchbasev2.RemoteClusterTLSKey] = tls.ClientKey
 		}
 
 		if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
@@ -451,14 +455,14 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	}
 
 	// If we are using TLS then attach the CA and optional client cert/key.
-	if ctx != nil {
+	if tls != nil {
 		xdcr.RemoteClusters[0].TLS = &couchbasev2.RemoteClusterTLS{
 			Secret: &tlsSecret,
 		}
 	}
 
 	// If we are not using client authentication then we need the remote username and password.
-	if ctx == nil || target.Spec.Networking.TLS.ClientCertificatePolicy == nil {
+	if tls == nil || target.Spec.Networking.TLS.ClientCertificatePolicy == nil {
 		xdcr.RemoteClusters[0].AuthenticationSecret = &xdcrSecret
 	}
 
@@ -468,7 +472,11 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 
 	// Wait for the operator to successfully connect before continuing.
 	name := fmt.Sprintf("%s/%s/%s", clusterName, replication.Spec.Bucket, replication.Spec.RemoteBucket)
-	if err = WaitForClusterEvent(srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name), 5*time.Minute); err != nil {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	if err = WaitForClusterEvent(ctx, srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
 		return
 	}
 

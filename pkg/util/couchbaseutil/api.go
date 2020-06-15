@@ -582,7 +582,7 @@ func DeleteUser(user *User) *Request {
 
 // GetUser gets a named user.
 func GetUser(id string, domain AuthDomain, user *User) *Request {
-	return NewRequest((*Client).Get, fmt.Sprintf("/settings/rbac/users/%v/%v", user.Domain, user.ID), nil, user)
+	return NewRequest((*Client).Get, fmt.Sprintf("/settings/rbac/users/%v/%v", domain, id), nil, user)
 }
 
 // ListGroups lists all groups.

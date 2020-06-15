@@ -91,6 +91,8 @@ func TestLDAPCDeleteUser(t *testing.T) {
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
+	defer echan.Cancel()
+
 	// Create User
 	user, _, _ := mustCreateLDAPBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
@@ -125,6 +127,8 @@ func TestLDAPDeleteRole(t *testing.T) {
 	// Expect user delete event to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, group, _ := mustCreateLDAPBoundUser(t, targetKube)
@@ -207,6 +211,8 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
+	defer echan.Cancel()
+
 	// Add new user to role binding
 	subject := couchbasev2.CouchbaseRoleBindingSubject{
 		Kind: e2e_constants.CouchbaseSubjectUserKind,
@@ -252,6 +258,8 @@ func TestLDAPDeleteBinding(t *testing.T) {
 	// Expect user delete event to eventually occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, _, binding := mustCreateLDAPBoundUser(t, targetKube)

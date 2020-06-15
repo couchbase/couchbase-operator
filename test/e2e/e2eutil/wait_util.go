@@ -490,7 +490,7 @@ func WaitUntilOperatorReady(k8s *types.Cluster, label string) error {
 }
 
 // waits until the provided condition type occurs with associated status.
-func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) error {
+func WaitForClusterEvent(ctx context.Context, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event) error {
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
 	}
@@ -516,12 +516,11 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.Couchb
 	now := metav1.Now()
 
 	resultChan := watch.ResultChan()
-	timeoutChan := time.After(timeout)
 
 	for {
 		select {
-		case <-timeoutChan:
-			return fmt.Errorf("time out waiting for cluster event %s, %s", event.Reason, event.Message)
+		case <-ctx.Done():
+			return ctx.Err()
 
 		case watchEvent := <-resultChan:
 			crdEvent := watchEvent.Object.(*v1.Event)
@@ -540,7 +539,10 @@ func WaitForClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.Couchb
 }
 
 func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
-	if err := WaitForClusterEvent(k8s.KubeClient, cl, event, timeout); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := WaitForClusterEvent(ctx, k8s.KubeClient, cl, event); err != nil {
 		Die(t, err)
 	}
 }
@@ -1167,7 +1169,8 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 
 		defer cleanup()
 
-		err = couchbaseutil.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), nil).On(client.client, client.host)
+		u := &couchbaseutil.User{}
+		err = couchbaseutil.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host)
 
 		return err == nil, err
 	})
@@ -1353,21 +1356,81 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 	})
 }
 
+// AsyncOperation wraps up an asynchronous operation, in a generic way.
+type AsyncOperation struct {
+	// ctx is a cancellable context e.g. must be initialized with either
+	// WithCancel or WithTimeout.
+	ctx context.Context
+
+	// cancel allows the operation to be cancelled.
+	cancel func()
+
+	// err is the channel used to propagate errors from the operation.
+	err chan error
+}
+
+// NewAsyncOperationWithTimeout creates an asynchronous operation with a
+// finite life span.
+func NewAsyncOperationWithTimeout(timeout time.Duration) *AsyncOperation {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
+	op := &AsyncOperation{
+		ctx:    ctx,
+		cancel: cancel,
+		err:    make(chan error),
+	}
+
+	return op
+}
+
+// Run executes the specified function with the operation's cancellable context.
+func (a *AsyncOperation) Run(f func(context.Context) error) {
+	go func() {
+		a.err <- f(a.ctx)
+	}()
+}
+
+// WaitForCompletion blocks waiting for the operation to complete.
+// Once finished it will close the error channel.
+func (a *AsyncOperation) WaitForCompletion() error {
+	err := <-a.err
+
+	close(a.err)
+
+	return err
+}
+
+// Cancel must be defered at the call site to shutdown the operation in
+// all circumstances.
+func (a *AsyncOperation) Cancel() {
+	// Stop the operation.
+	a.cancel()
+
+	// If the error channel has been closed, then do nothing.  If it has not
+	// then wait for the operation to shutdown, consume from the channel to
+	// unblock the sender, and close the channel.
+	if _, ok := <-a.err; ok {
+		close(a.err)
+	}
+}
+
 // WaitForPendingClusterEvent returns a channel to be
 // populated with result of a pending cluster event.
-func WaitForPendingClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) chan error {
-	echan := make(chan error)
+func WaitForPendingClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) *AsyncOperation {
+	f := func(ctx context.Context) error {
+		return WaitForClusterEvent(ctx, kubeClient, cl, event)
+	}
 
-	go func() {
-		echan <- WaitForClusterEvent(kubeClient, cl, event, timeout)
-	}()
+	op := NewAsyncOperationWithTimeout(timeout)
 
-	return echan
+	op.Run(f)
+
+	return op
 }
 
 // MustReceiveErrorValue requires error from channel is nil.
-func MustReceiveErrorValue(t *testing.T, echan chan error) {
-	if err := <-echan; err != nil {
+func MustReceiveErrorValue(t *testing.T, op *AsyncOperation) {
+	if err := op.WaitForCompletion(); err != nil {
 		Die(t, err)
 	}
 }

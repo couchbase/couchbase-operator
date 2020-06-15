@@ -70,6 +70,8 @@ func TestRBACDeleteUser(t *testing.T) {
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
+	defer echan.Cancel()
+
 	// Create User
 	user, _, _ := mustCreateBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
@@ -105,6 +107,8 @@ func TestRBACDeleteRole(t *testing.T) {
 	// Expect user delete event to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, group, _ := mustCreateBoundUser(t, targetKube)
@@ -187,6 +191,8 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
 
+	defer echan.Cancel()
+
 	// Add new user to role binding
 	subject := couchbasev2.CouchbaseRoleBindingSubject{
 		Kind: e2e_constants.CouchbaseSubjectUserKind,
@@ -232,6 +238,8 @@ func TestRBACDeleteBinding(t *testing.T) {
 	// Expect user delete event to eventually occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, _, binding := mustCreateBoundUser(t, targetKube)
