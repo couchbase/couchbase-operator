@@ -268,7 +268,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
+
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
@@ -276,7 +276,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		DefaultClaim: pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		pvcTemplate,
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)

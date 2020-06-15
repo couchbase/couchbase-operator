@@ -45,12 +45,35 @@ import (
 func lazyBoundStorageClass(t *testing.T, cluster *types.Cluster) bool {
 	f := framework.Global
 
-	sc, err := cluster.KubeClient.StorageV1().StorageClasses().Get(f.StorageClassName, metav1.GetOptions{})
+	// When explcitly stated, lookup the storage class.
+	if f.StorageClassName != nil {
+		sc, err := cluster.KubeClient.StorageV1().StorageClasses().Get(*f.StorageClassName, metav1.GetOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
+	}
+
+	// When implicit (default), then lookup the default storage class that will
+	// be used by Kubernetes.
+	scs, err := cluster.KubeClient.StorageV1().StorageClasses().List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
+	for _, sc := range scs.Items {
+		value, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]
+		if !ok {
+			continue
+		}
+
+		if value == "true" {
+			return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
+		}
+	}
+
+	return false
 }
 
 // supportsMultipleVolumeClaims returns true if multiple PVCs can be supported by a test.
@@ -1685,7 +1708,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	pvcName := "couchbase"
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
-	pvcTemplate := createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2)
+
 	cbCluster := e2espec.NewBasicCluster(clusterSize)
 	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	cbCluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
@@ -1698,7 +1721,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 		},
 	}
 	cbCluster.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		pvcTemplate,
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, cbCluster)
 

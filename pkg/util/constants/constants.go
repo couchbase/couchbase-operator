@@ -46,9 +46,8 @@ const (
 	LabelVolumeName = "couchbase_volume"
 	LabelBackup     = "couchbase_backup"
 
-	AnnotationVolumeNodeConf    = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
-	AnnotationVolumeMountPath   = "path"
-	AnnotationVolumeBindingMode = "storageclass.couchbase.com/binding-mode"
+	AnnotationVolumeNodeConf  = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
+	AnnotationVolumeMountPath = "path"
 
 	ServerGroupLabel = "failure-domain.beta.kubernetes.io/zone"
 

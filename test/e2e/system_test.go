@@ -292,9 +292,9 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 				},
 			},
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
-				createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 1),
-				createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName+"-data", 4),
-				createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName+"-index", 4),
+				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 1),
+				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName+"-data", 4),
+				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName+"-index", 4),
 			},
 		},
 	}

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -19,34 +18,21 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // This will create a Persistent volume claim data
 // for adding into the cluster CRD.
-func createPersistentVolumeClaimSpec(t *testing.T, k8s *types.Cluster, storageClass, pvcName string, resourceQtyVal int64) corev1.PersistentVolumeClaim {
-	sc, err := k8s.KubeClient.StorageV1().StorageClasses().Get(storageClass, metav1.GetOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	annotations := map[string]string{}
-
-	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		annotations[operator_constants.AnnotationVolumeBindingMode] = string(storagev1.VolumeBindingWaitForFirstConsumer)
-	}
-
+func createPersistentVolumeClaimSpec(storageClass *string, pvcName string, resourceQtyVal int64) corev1.PersistentVolumeClaim {
 	resourceQuantity := apiresource.NewQuantity(resourceQtyVal*1024*1024*1024, apiresource.BinarySI)
 
 	return corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        pvcName,
-			Annotations: annotations,
+			Name: pvcName,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			StorageClassName: &storageClass,
+			StorageClassName: storageClass,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					"storage": *resourceQuantity,
@@ -110,7 +96,7 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 		DataClaim:    pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
@@ -160,7 +146,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 		DataClaim:    pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -242,7 +228,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -293,7 +279,7 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -343,7 +329,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -397,7 +383,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
@@ -468,7 +454,7 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -536,7 +522,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
@@ -602,7 +588,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		createPersistentVolumeClaimSpec(t, targetKube, f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 

@@ -33,7 +33,7 @@ type Framework struct {
 	CouchbaseServerImage string
 	// CouchbaseServerImageUpgrade is the image of Couchbase server we are upgrading to
 	CouchbaseServerImageUpgrade string
-	StorageClassName            string
+	StorageClassName            *string
 	// PodCreateTimeout is the time we expect to wait when pods are failing to be
 	// created.
 	PodCreateTimeout time.Duration

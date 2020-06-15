@@ -165,7 +165,7 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.2", "Docker image to use for couchbase exporter upgrades")
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:6.5.0", "Docker image to use for couchbase backup")
 	flag.StringVar(&params.SuiteToRun, "suite", "", "Test suite to run")
-	flag.StringVar(&params.StorageClassName, "storage-class", "default", "Storage class to use")
+	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
@@ -336,12 +336,15 @@ func Setup() (err error) {
 		SuiteYmlData:                  suiteData,
 		CouchbaseServerImage:          runtimeParams.CouchbaseServerImage,
 		CouchbaseServerImageUpgrade:   runtimeParams.CouchbaseServerImageUpgrade,
-		StorageClassName:              runtimeParams.StorageClassName,
 		PodCreateTimeout:              5 * time.Minute,
 		SyncGatewayImage:              runtimeParams.SyncGatewayImage,
 		CouchbaseExporterImage:        runtimeParams.CouchbaseExporterImage,
 		CouchbaseExporterImageUpgrade: runtimeParams.CouchbaseExporterImageUpgrade,
 		CouchbaseBackupImage:          runtimeParams.CouchbaseBackupImage,
+	}
+
+	if runtimeParams.StorageClassName != "" {
+		Global.StorageClassName = &runtimeParams.StorageClassName
 	}
 
 	Global.LogDir, err = makeLogDir()
@@ -366,7 +369,7 @@ func Setup() (err error) {
 	}
 
 	// Setting required spec values from test_config yaml
-	e2espec.SetStorageClassName(runtimeParams.StorageClassName)
+	e2espec.SetStorageClassName(Global.StorageClassName)
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
 	e2espec.SetPlatform(runtimeParams.Platform)
 

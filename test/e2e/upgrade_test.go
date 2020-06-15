@@ -652,7 +652,7 @@ func TestUpgradeToSupportable(t *testing.T) {
 				Annotations: map[string]string{},
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				StorageClassName: &f.StorageClassName,
+				StorageClassName: f.StorageClassName,
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceStorage: *e2espec.NewResourceQuantityMi(1024),

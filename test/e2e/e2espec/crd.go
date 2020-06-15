@@ -103,12 +103,10 @@ func SetCouchbaseServerImage(imageName string) {
 	}
 }
 
-var storageClassName string
+var storageClassName *string
 
-func SetStorageClassName(storageClassNameIn string) {
-	if storageClassNameIn = strings.TrimSpace(storageClassNameIn); storageClassNameIn != "" {
-		storageClassName = storageClassNameIn
-	}
+func SetStorageClassName(storageClassNameIn *string) {
+	storageClassName = storageClassNameIn
 }
 
 var platform couchbasev2.PlatformType
@@ -382,7 +380,7 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 					Annotations: map[string]string{},
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					StorageClassName: &storageClassName,
+					StorageClassName: storageClassName,
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: *NewResourceQuantityMi(1024),
@@ -479,7 +477,7 @@ func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			StorageClassName: &storageClassName,
+			StorageClassName: storageClassName,
 			Resources:        resources,
 		},
 	}
