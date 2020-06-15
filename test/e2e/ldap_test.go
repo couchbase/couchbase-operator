@@ -5,6 +5,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -26,7 +27,23 @@ func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster, namespace string)
 	return user, group, binding
 }
 
+func skipLDAP(t *testing.T) {
+	tag, err := k8sutil.CouchbaseVersion(framework.Global.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	version, err := couchbaseutil.NewVersion(tag)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	threshold, _ := couchbaseutil.NewVersion("6.5.0")
+	if version.Less(threshold) {
+		t.Skip("unsupported couchbase version")
+	}
+}
+
 func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.CouchbaseCluster {
+	skipLDAP(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -55,6 +72,8 @@ func setupLDAP(t *testing.T, k8s *types.Cluster, namespace string) *couchbasev2.
 }
 
 func TestLDAPCreateAdminUser(t *testing.T) {
+	skipLDAP(t)
+
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -78,6 +97,8 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 
 // TestRBACDeleteUser verifies basic user deletion
 func TestLDAPCDeleteUser(t *testing.T) {
+	skipLDAP(t)
+
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -89,6 +110,8 @@ func TestLDAPCDeleteUser(t *testing.T) {
 	// Expect user delete event eventually to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, _, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
@@ -113,6 +136,8 @@ func TestLDAPCDeleteUser(t *testing.T) {
 
 // TestLDAPDeleteRole verifies that deleting a group results in deleting User
 func TestLDAPDeleteRole(t *testing.T) {
+	skipLDAP(t)
+
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -124,6 +149,8 @@ func TestLDAPDeleteRole(t *testing.T) {
 	// Expect user delete event to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, group, _ := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)
@@ -150,6 +177,8 @@ func TestLDAPDeleteRole(t *testing.T) {
 // TestLDAPUpdateRole changes cluster role to a bucket role and verifies
 // reconciliation with couchbase
 func TestLDAPUpdateRole(t *testing.T) {
+	skipLDAP(t)
+
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	timeout := 2 * time.Minute
@@ -185,6 +214,7 @@ func TestLDAPUpdateRole(t *testing.T) {
 // removed from the binding and since it doesn't have a role
 // in any other binding the user is also deleted
 func TestLDAPRemoveUserFromBinding(t *testing.T) {
+	skipLDAP(t)
 
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -206,6 +236,8 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 	// Expect user delete event eventually occur
 	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Add new user to role binding
 	subject := couchbasev2.CouchbaseRoleBindingSubject{
@@ -241,6 +273,7 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 // TestLDAPDeleteBinding tests that user is deleted when entire
 // rolebinding is deleted
 func TestLDAPDeleteBinding(t *testing.T) {
+	skipLDAP(t)
 
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -254,6 +287,8 @@ func TestLDAPDeleteBinding(t *testing.T) {
 	// Expect user delete event to eventually occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, _, binding := mustCreateLDAPBoundUser(t, targetKube, targetKube.Namespace)

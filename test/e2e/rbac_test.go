@@ -6,11 +6,12 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/gocbmgr"
+	cbmgr "github.com/couchbase/gocbmgr"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -28,8 +29,25 @@ func mustCreateBoundUser(t *testing.T, k8s *types.Cluster, namespace string) (*c
 	return user, group, binding
 }
 
+func skipRBACTest(t *testing.T) {
+	tag, err := k8sutil.CouchbaseVersion(framework.Global.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	version, err := couchbaseutil.NewVersion(tag)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+	threshold, _ := couchbaseutil.NewVersion("6.5.0")
+	if version.Less(threshold) {
+		t.Skip("unsupported couchbase version")
+	}
+}
+
 // Create cluster with user and cluster admin binding
 func TestRBACCreateAdminUser(t *testing.T) {
+	skipRBACTest(t)
+
 	// Plaform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -57,6 +75,8 @@ func TestRBACCreateAdminUser(t *testing.T) {
 
 // TestRBACDeleteUser verifies basic user deletion
 func TestRBACDeleteUser(t *testing.T) {
+	skipRBACTest(t)
+
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	timeout := 2 * time.Minute
@@ -68,6 +88,8 @@ func TestRBACDeleteUser(t *testing.T) {
 	// Expect user delete event eventually to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, _, _ := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
@@ -92,6 +114,8 @@ func TestRBACDeleteUser(t *testing.T) {
 
 // TestRBACDeleteRole verifies that deleting a role results in deleting User
 func TestRBACDeleteRole(t *testing.T) {
+	skipRBACTest(t)
+
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 
@@ -104,6 +128,8 @@ func TestRBACDeleteRole(t *testing.T) {
 	// Expect user delete event to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, group, _ := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
@@ -130,6 +156,8 @@ func TestRBACDeleteRole(t *testing.T) {
 // TestRBACUpdateRole changes cluster role to a bucket role and verifies
 // reconciliation with couchbase
 func TestRBACUpdateRole(t *testing.T) {
+	skipRBACTest(t)
+
 	f := framework.Global
 	targetKube := f.GetCluster(0)
 	timeout := 2 * time.Minute
@@ -165,6 +193,7 @@ func TestRBACUpdateRole(t *testing.T) {
 // removed from the binding and since it doesn't have a role
 // in any other binding the user is also deleted
 func TestRBACRemoveUserFromBinding(t *testing.T) {
+	skipRBACTest(t)
 
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -186,6 +215,8 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 	// Expect user delete event eventually occur
 	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Add new user to role binding
 	subject := couchbasev2.CouchbaseRoleBindingSubject{
@@ -221,6 +252,7 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 // TestRBACDeleteBinding tests that user is deleted when entire
 // rolebinding is deleted
 func TestRBACDeleteBinding(t *testing.T) {
+	skipRBACTest(t)
 
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -234,6 +266,8 @@ func TestRBACDeleteBinding(t *testing.T) {
 	// Expect user delete event to eventually occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
 	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
 
 	// Create User
 	user, _, binding := mustCreateBoundUser(t, targetKube, targetKube.Namespace)
@@ -258,6 +292,8 @@ func TestRBACDeleteBinding(t *testing.T) {
 
 // Verify RBAC auth can be applied to LDAP users
 func TestRBACWithLDAPAuth(t *testing.T) {
+	skipRBACTest(t)
+
 	// Plaform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
@@ -296,6 +332,8 @@ func TestRBACWithLDAPAuth(t *testing.T) {
 // TestRBACSelection ensures the operator only creates users that match the
 // label selector.
 func TestRBACSelection(t *testing.T) {
+	skipRBACTest(t)
+
 	// Plaform configuration.
 	f := framework.Global
 	targetKube := f.GetCluster(0)
