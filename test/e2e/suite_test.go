@@ -47,7 +47,6 @@ func collectClusterLogs(t *testing.T, logDir string) {
 		args.addEnvironmentDefaults()
 		args.add("--collectinfo", "")
 		args.add("--collectinfo-collect", "all")
-		args.add("--system", "")
 
 		execOut, err := runCbopinfoCmd(args.slice())
 		execOutStr := strings.TrimSpace(string(execOut))
