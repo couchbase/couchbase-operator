@@ -34,8 +34,6 @@ type Framework struct {
 	// CouchbaseServerImageUpgrade is the image of Couchbase server we are upgrading to
 	CouchbaseServerImageUpgrade string
 	StorageClassName            string
-	// TestRetries allows you to retry a test N times before giving up.
-	TestRetries int `yaml:"testRetries"`
 	// PodCreateTimeout is the time we expect to wait when pods are failing to be
 	// created.
 	PodCreateTimeout time.Duration
@@ -115,9 +113,6 @@ type TestRunParam struct {
 	// RegistryConfigs define private container registries that need to be defined
 	// as docker pull secrets in order to access private container images.
 	RegistryConfigs []RegistryConfig `yaml:"registries"`
-
-	// TestRetries allows you to retry a test N times before giving up.
-	TestRetries *int `yaml:"testRetries"`
 
 	// Platform allows you to explicitly specify the platform type.  DO NOT USE THIS
 	// 99% of the time, your tests should not rely on platform behaviour and be generic,

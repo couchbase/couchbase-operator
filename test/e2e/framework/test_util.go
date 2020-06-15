@@ -2,18 +2,12 @@ package framework
 
 import (
 	"encoding/base64"
-	"encoding/xml"
 	"fmt"
 	"io/ioutil"
-	"runtime/debug"
-	"strconv"
-	"testing"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-
-	"github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
@@ -24,23 +18,44 @@ import (
 // Results is a global result store.
 var Results = []TestResult{}
 
+// ResultType is used to encode the test case result type.
+type ResultType string
+
+const (
+	// ResultTypePass means the test passed.
+	ResultTypePass ResultType = "✔"
+
+	// ResultTypeFail means the test failed.
+	ResultTypeFail ResultType = "✗"
+
+	// ResultTypeSkip means the test was skipped, most likely this is due
+	// to the test being incompatible with the environment or dynamic
+	// configuration parameters.
+	ResultTypeSkip ResultType = "?"
+
+	// ResultTypeErr means the test itself errored, at present this means
+	// it raise a panic.
+	ResultTypeErr ResultType = "!"
+)
+
 // Closest we can get to unicorn mode for now...
-func PrettyResult(pass bool) string {
+func PrettyResult(t ResultType) string {
 	result := ""
 
 	if useANSIColor {
-		if pass {
+		switch t {
+		case ResultTypePass:
 			result += "\033[1;32m"
-		} else {
+		case ResultTypeFail:
 			result += "\033[1;31m"
+		case ResultTypeSkip:
+			result += "\033[1;34m"
+		case ResultTypeErr:
+			result += "\033[1;33m"
 		}
 	}
 
-	if pass {
-		result += "✔"
-	} else {
-		result += "✗"
-	}
+	result += string(t)
 
 	if useANSIColor {
 		result += "\033[0m"
@@ -63,80 +78,6 @@ func PrettyHeading(s string) string {
 	}
 
 	return result
-}
-
-// analyzeResults accepts a list of test results and displays success rates.
-func AnalyzeResults() {
-	if len(Results) == 0 {
-		return
-	}
-
-	// Define datastructures necessary for Junit output.
-	type TestCase struct {
-		XMLName xml.Name `xml:"testcase"`
-		Name    string   `xml:"name,attr"`
-		Time    string   `xml:"time,attr"`
-		Error   string   `xml:"error,omitempty"`
-	}
-
-	type TestSuite struct {
-		XMLName   xml.Name   `xml:"testsuite"`
-		Name      string     `xml:"name,attr"`
-		Tests     string     `xml:"tests,attr"`
-		Errors    string     `xml:"errors,attr"`
-		Failures  string     `xml:"failures,attr"`
-		Skip      string     `xml:"skip,attr"`
-		Time      string     `xml:"time,attr"`
-		Testcases []TestCase `xml:"testcase"`
-	}
-
-	testcases := []TestCase{}
-
-	// Dump out the human readable summary.
-	logrus.Info(PrettyHeading("Test Summary"))
-
-	var fail int
-
-	for i, result := range Results {
-		if result.Result {
-			logrus.Infof("%4d: %s %s", i+1, result.Name, PrettyResult(true))
-
-			testcases = append(testcases, TestCase{Name: result.Name, Time: "0"})
-		} else {
-			logrus.Infof("%4d: %s %s", i+1, result.Name, PrettyResult(false))
-
-			testcases = append(testcases, TestCase{Name: result.Name, Time: "0", Error: "fail"})
-			fail++
-		}
-	}
-
-	total := len(Results)
-	pass := total - fail
-	passRate := (float64(pass) / float64(total)) * 100.0
-	failRate := 100.0 - passRate
-
-	logrus.Info(PrettyHeading("Suite Summary"))
-	logrus.Infof(" %s Passes: %d (%0.2f%%)", PrettyResult(true), pass, passRate)
-	logrus.Infof(" %s Failures: %d (%0.2f%%)", PrettyResult(false), fail, failRate)
-
-	// Dump out Junit statistics.
-	testsuite := TestSuite{
-		Name:      suiteName,
-		Tests:     strconv.Itoa(total),
-		Failures:  strconv.Itoa(fail),
-		Skip:      "0",
-		Time:      "0",
-		Testcases: testcases,
-	}
-
-	if xmlstring, err := xml.MarshalIndent(testsuite, "", "    "); err == nil {
-		xmlstring = []byte(xml.Header + string(xmlstring))
-
-		err := ioutil.WriteFile("results.xml", xmlstring, 0644)
-		if err != nil {
-			logrus.Warnf("Failed to write test XML: %v", err)
-		}
-	}
 }
 
 // Read Test run params from test_config yaml file.
@@ -382,20 +323,4 @@ func waitForServiceAccountDeleted(k8s *types.Cluster, serviceAccountName string,
 			return nil
 		}
 	}
-}
-
-func RecoverDecorator(test TestFunc) TestFunc {
-	wrapperFunc := func(t *testing.T) {
-		defer func(t *testing.T) {
-			if r := recover(); r != nil {
-				debug.PrintStack()
-				t.Logf("Recovered: %v", r)
-				t.Fatal("test failed due to panic")
-			}
-		}(t)
-
-		test(t)
-	}
-
-	return wrapperFunc
 }

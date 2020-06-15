@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/couchbase/couchbase-operator/test/e2e/analyzer"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	"github.com/sirupsen/logrus"
@@ -33,7 +34,7 @@ func TestMain(m *testing.M) {
 	// Run Test module
 	code := m.Run()
 
-	framework.AnalyzeResults()
+	analyzer.Report(framework.SuiteName)
 
 	if err := framework.Teardown(); err != nil {
 		logrus.Warnf("Failed to teardown framework: %v", err)

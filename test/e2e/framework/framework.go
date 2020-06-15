@@ -229,7 +229,7 @@ func readYamlData() (err error) {
 	// When using an explcit list of tests, fake a suite... otherwise load one
 	// up from disk.
 	if withExplicitTests {
-		suiteName = "custom"
+		SuiteName = "custom"
 		suiteData = SuiteData{
 			// Timeout is pointless, expect users to specify -test.timeout instead.
 			Timeout:  "24h",
@@ -240,7 +240,7 @@ func readYamlData() (err error) {
 
 		logrus.Info("Using suite file ", suiteFilePath)
 
-		suiteName = runtimeParams.SuiteToRun
+		SuiteName = runtimeParams.SuiteToRun
 		suiteData, err = getSuiteDataFromYml(suiteFilePath)
 		if err != nil {
 			return err
@@ -327,13 +327,6 @@ func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPo
 
 // Setup setups a test framework and points "Global" to it.
 func Setup() (err error) {
-	// Always run the test at least once, unless overridden by the config.
-	testRetries := 1
-
-	if runtimeParams.TestRetries != nil {
-		testRetries = *runtimeParams.TestRetries
-	}
-
 	// Initialize Global from runtime info
 	Global = &Framework{
 		KubeType:                      runtimeParams.KubeType,
@@ -344,7 +337,6 @@ func Setup() (err error) {
 		CouchbaseServerImage:          runtimeParams.CouchbaseServerImage,
 		CouchbaseServerImageUpgrade:   runtimeParams.CouchbaseServerImageUpgrade,
 		StorageClassName:              runtimeParams.StorageClassName,
-		TestRetries:                   testRetries,
 		PodCreateTimeout:              5 * time.Minute,
 		SyncGatewayImage:              runtimeParams.SyncGatewayImage,
 		CouchbaseExporterImage:        runtimeParams.CouchbaseExporterImage,

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/analyzer"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -92,47 +93,7 @@ func TestOperator(t *testing.T) {
 			continue
 		}
 
-		testFunc := TestFuncMap[testName]
-		testFunc = framework.RecoverDecorator(testFunc)
-
-		if testFunc == nil {
-			continue
-		}
-
-		// Either the test or Couchbase Server may suffer from instability so
-		// we allow a retry.  This means that we get a better idea of overall
-		// pass rates without having to rerun the entire suite and collate the
-		// results.
-		//
-		// Unstable tests will be listed in the suite output so pay attention as
-		// these may be bugs that need to be raised or fixed. Secondly do not rely
-		// on retries as it makes the tests take longer and costs us more money!
-		unstable := false
-		pass := false
-
-		for attempt := 0; attempt < f.TestRetries; attempt++ {
-			if pass = runTest(t, testName, testFunc); pass {
-				if attempt != 0 {
-					unstable = true
-				}
-
-				break
-			}
-		}
-
-		// Give real time feedback ...
-		if pass {
-			fmt.Println(framework.PrettyResult(true), framework.PrettyHeading("ok"))
-		} else {
-			fmt.Println(framework.PrettyResult(false), framework.PrettyHeading("fail"))
-		}
-
-		result := framework.TestResult{
-			Name:     testName,
-			Result:   pass,
-			Unstable: unstable,
-		}
-		framework.Results = append(framework.Results, result)
+		runTest(t, testName, TestFuncMap[testName])
 	}
 }
 
@@ -188,7 +149,14 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 	// Run the test, catch and report any goroutine leaks or operator crashes
 	restartCounts := getOperatorRestartCounts()
 	preGoroutines := runtime.NumGoroutine()
-	pass := t.Run(name, test)
+
+	instrumentedTest := func(t *testing.T) {
+		defer analyzer.New().Report(t)
+
+		test(t)
+	}
+
+	pass := t.Run(name, instrumentedTest)
 
 	goroutineLeakCheck(preGoroutines)
 

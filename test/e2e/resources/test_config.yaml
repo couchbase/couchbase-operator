@@ -47,9 +47,6 @@ StorageClassName: standard
 # Service account to use while running Tests
 serviceAccountName: default
 
-# Retries of the test, useful to mitigate Couchbase server misbehaviour
-testRetries: 2
-
 # Couchbase backup image to use
 couchbase-backup-image: couchbase/operator-backup:6.5.0
 
