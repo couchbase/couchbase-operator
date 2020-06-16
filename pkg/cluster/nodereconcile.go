@@ -176,6 +176,7 @@ func (m *MemberState) LogStatus(cluster string) {
 type ReconcileMachine struct {
 	runningPods   couchbaseutil.MemberSet
 	knownNodes    couchbaseutil.MemberSet
+	newNodes      couchbaseutil.MemberSet
 	ejectNodes    couchbaseutil.MemberSet
 	unknownNodes  couchbaseutil.MemberSet
 	couchbase     *MemberState
@@ -232,6 +233,7 @@ func (c *Cluster) newReconcileMachine(pods []*v1.Pod) (*ReconcileMachine, error)
 	fsm := &ReconcileMachine{
 		runningPods:   podsToMemberSet(pods),
 		knownNodes:    couchbaseutil.NewMemberSet(),
+		newNodes:      couchbaseutil.NewMemberSet(),
 		ejectNodes:    couchbaseutil.NewMemberSet(),
 		couchbase:     state,
 		state:         ReconcileInit,
@@ -324,19 +326,6 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 	// unless user is initiating the removal and only logs are mounted
 	for _, m := range c.members {
 		r.removeVolumes[m.Name] = !c.memberHasLogVolumes(m.Name)
-	}
-
-	// TEMPORARY HACK
-	if updated, err := k8sutil.WouldUpdateExposedFeatures(c.k8s, c.members, c.cluster); err != nil {
-		return err
-	} else if updated {
-		needsReconcile = true
-	}
-
-	if updated, err := c.wouldReconcileMemberAlternateAddresses(); err != nil {
-		return err
-	} else if updated {
-		needsReconcile = true
 	}
 
 	if updated, err := c.wouldReconcileServerGroups(); err != nil {
@@ -771,6 +760,7 @@ func handleAddNode(r *ReconcileMachine, c *Cluster) error {
 
 			r.knownNodes.Add(m)
 			r.runningPods.Add(m)
+			r.newNodes.Add(m)
 			addCount++
 		}
 	}
@@ -838,6 +828,7 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 	// Update book keeping
 	r.knownNodes.Add(member)
 	r.runningPods.Add(member)
+	r.newNodes.Add(member)
 	r.knownNodes.Remove(candidate.Name)
 	r.ejectNodes.Add(candidate)
 	r.couchbase.NeedsRebalance = true
@@ -871,7 +862,7 @@ func handleServerGroups(r *ReconcileMachine, c *Cluster) error {
 // benefit of external clients such as xdcr which would not function until the
 // balance in has completed otherwise.
 func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
-	if err := c.reconcileExposedFeatures(); err != nil {
+	if err := c.reconcilePodServices(); err != nil {
 		return err
 	}
 

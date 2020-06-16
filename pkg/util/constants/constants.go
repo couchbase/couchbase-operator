@@ -28,6 +28,7 @@ var (
 
 	PodSpecAnnotation             = "pod.couchbase.com/spec"
 	PVCSpecAnnotation             = "pvc.couchbase.com/spec"
+	SVCSpecAnnotation             = "svc.couchbase.com/spec"
 	PodTLSAnnotation              = "pod.couchbase.com/tls"
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"

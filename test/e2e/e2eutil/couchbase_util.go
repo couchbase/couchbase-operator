@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -1193,5 +1194,20 @@ func MustCheckN2NEnabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.
 func MustCheckN2NDisabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel string, timeout time.Duration) {
 	if err := CheckN2N(k8s, cluster, false, encryptionLevel, timeout); err != nil {
 		Die(t, err)
+	}
+}
+
+func ClusterListOpt(cluster *couchbasev2.CouchbaseCluster) metav1.ListOptions {
+	return metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(k8sutil.LabelsForCluster(cluster)).String(),
+	}
+}
+
+func NodeListOpt(cluster *couchbasev2.CouchbaseCluster, memberName string) metav1.ListOptions {
+	l := k8sutil.LabelsForCluster(cluster)
+	l[constants.LabelNode] = memberName
+
+	return metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(l).String(),
 	}
 }

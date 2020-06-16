@@ -769,7 +769,6 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	// * Server class successfully removed.
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonNodeServiceCreated}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		e2eutil.ClusterScaleDownSequence(mdsGroupSize2),

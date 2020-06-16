@@ -42,7 +42,7 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	// Establish DNS for cluster communication.
-	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster.Namespace, c.cluster.Name, c.cluster.AsOwner()); err != nil {
+	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster); err != nil {
 		return err
 	}
 
@@ -103,6 +103,14 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}
 
 	if err := c.reconcileAdminService(); err != nil {
+		return err
+	}
+
+	if err := c.reconcilePodServices(); err != nil {
+		return err
+	}
+
+	if err := c.reconcileMemberAlternateAddresses(); err != nil {
 		return err
 	}
 
@@ -545,43 +553,77 @@ func (c *Cluster) reconcileBuckets() error {
 // reconcile changes to selected pod labels for
 // the nodePort service exposing admin console.
 func (c *Cluster) reconcileAdminService() error {
-	status, err := k8sutil.UpdateAdminConsole(c.k8s, c.cluster, &c.cluster.Status)
-	if err != nil {
-		log.Error(err, "UI service update failed", "cluster", c.namespacedName())
-		return err
-	}
-
 	serviceName := k8sutil.ConsoleServiceName(c.cluster.Name)
 
-	switch status {
-	case k8sutil.ReconcileStatusCreated:
-		log.Info("UI service created", "cluster", c.namespacedName(), "name", serviceName)
-		c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(serviceName, c.cluster))
-	case k8sutil.ReconcileStatusDeleted:
+	_, ok := c.k8s.Services.Get(serviceName)
+
+	// If the service exists, and it shouldn't delete it.
+	if ok && !c.cluster.Spec.Networking.ExposeAdminConsole {
+		if err := c.k8s.KubeClient.CoreV1().Services(c.cluster.Namespace).Delete(serviceName, metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
+
 		log.Info("UI service deleted", "cluster", c.namespacedName(), "name", serviceName)
+
 		c.raiseEvent(k8sutil.AdminConsoleSvcDeleteEvent(serviceName, c.cluster))
-	case k8sutil.ReconcileStatusUpdated:
-		log.Info("UI service updated", "cluster", c.namespacedName(), "name", serviceName)
+
+		return nil
+	}
+
+	if c.cluster.Spec.Networking.ExposeAdminConsole {
+		if err := k8sutil.ReconcileAdminConsole(c.k8s, c.cluster); err != nil {
+			return err
+		}
+
+		// Service didn't exist, notify that it now does!
+		if !ok {
+			log.Info("UI service created", "cluster", c.namespacedName(), "name", serviceName)
+
+			c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(serviceName, c.cluster))
+
+			return nil
+		}
 	}
 
 	return nil
 }
 
-// reconcileExposedFeatures looks at the requested exported feature set in the
+// reconcilePodServices looks at the requested exported feature set in the
 // specification and add/removes services as requested, raising events as
 // appropriate.
-func (c *Cluster) reconcileExposedFeatures() error {
-	status, err := k8sutil.UpdateExposedFeatures(c.k8s, c.members, c.cluster, &c.cluster.Status)
-	if err != nil {
-		return err
+func (c *Cluster) reconcilePodServices() error {
+	// When exposed features exist, then ensure every member has the correct
+	// service associated with it.
+	if c.cluster.Spec.HasExposedFeatures() {
+		for _, member := range c.members {
+			_, ok := c.k8s.Services.Get(member.Name)
+
+			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, member); err != nil {
+				return err
+			}
+
+			if !ok {
+				log.Info("Created pod service", "cluster", c.namespacedName(), "name", member.Name)
+			}
+		}
 	}
 
-	for _, service := range status.Added {
-		c.raiseEvent(k8sutil.NodeServiceCreateEvent(service, c.cluster))
-	}
+	// For every pod service ensure it has an associated member and that exposed
+	// services are enabled, otherwise delete it.
+	for _, service := range c.k8s.Services.List() {
+		if _, ok := service.Labels[constants.LabelNode]; !ok {
+			continue
+		}
 
-	for _, service := range status.Removed {
-		c.raiseEvent(k8sutil.NodeServiceDeleteEvent(service, c.cluster))
+		if _, ok := c.members[service.Name]; ok && c.cluster.Spec.HasExposedFeatures() {
+			continue
+		}
+
+		if err := c.k8s.KubeClient.CoreV1().Services(service.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
+
+		log.Info("Deleted pod service", "cluster", c.namespacedName(), "name", service.Name)
 	}
 
 	return nil
@@ -1009,49 +1051,6 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	}
 
 	return nil
-}
-
-// TEMPORARY HACK
-// Does exactly the same as above but tells us if we need to do anything.
-func (c *Cluster) wouldReconcileMemberAlternateAddresses() (bool, error) {
-	// Examine each member in turn as they will have different node
-	// addresses (i.e. you must be using anti affinity or kubernetes
-	// has no way of addressing individual cluster nodes).
-	for _, member := range c.members {
-		// Grab the current configuration
-		existingAddresses, err := c.getAlternateAddressesExternal(member)
-		if err != nil {
-			// If we cannot make contact then just continue, it may have been deleted
-			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name)
-			return false, nil
-		}
-
-		// If we don't have any exposed ports, but the node reports it is configured so
-		// then remove the configuration.
-		if !c.cluster.Spec.HasExposedFeatures() {
-			if existingAddresses != nil {
-				return true, err
-			}
-
-			continue
-		}
-
-		// Get the requested alternate address specification.
-		addresses, err := c.createAlternateAddressesExternal(member)
-		if err != nil {
-			return false, err
-		}
-
-		// Check to see if we need to perform any updates, ignoring if not
-		if reflect.DeepEqual(addresses, existingAddresses) {
-			continue
-		}
-
-		// Perform the update
-		return true, nil
-	}
-
-	return false, nil
 }
 
 // Get alternate addresses from server, when server is
@@ -1968,7 +1967,7 @@ func (c *Cluster) reconcileBackup() error {
 		return err
 	}
 
-	pvcs := generateBackupPVCs(currentBackups, c.cluster.Name)
+	pvcs := generateBackupPVCs(currentBackups, c.cluster)
 
 	// existing backups tells us about the state of the backup CRDs
 	existing := map[string]bool{}

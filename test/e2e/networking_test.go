@@ -50,7 +50,7 @@ func TestExposedFeatureIP(t *testing.T) {
 // TestExposedFeatureDNS tests alternate addresses are populated with DNS addresses with
 // a DNS enabled cluster.
 func TestExposedFeatureDNS(t *testing.T) {
-	t.Skip("requires DDNS")
+	t.Skip("requires DDNS - addressability checks will fail without this")
 
 	// Platform configuration.
 	f := framework.Global
@@ -97,7 +97,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 // TestExposedFeatureDNSModify tests modifications to the DNS configuration are mirrored by
 // node services.
 func TestExposedFeatureDNSModify(t *testing.T) {
-	t.Skip("requires DDNS")
+	t.Skip("requires DDNS - addressability checks will fail without this")
 
 	// Platform configuration.
 	f := framework.Global
@@ -151,7 +151,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 // TestExposedFeatureServiceTypeModify tests modifications to the node service type are mirrored
 // by the node services.
 func TestExposedFeatureServiceTypeModify(t *testing.T) {
-	t.Skip("requires DDNS")
+	t.Skip("requires DDNS - addressability checks will fail without this")
 
 	// Platform configuration.
 	f := framework.Global
@@ -340,7 +340,6 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeNodePort, time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/AdminConsoleServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
-	e2eutil.MustCheckConsoleServiceStatus(t, targetKube, testCouchbase, 10*time.Minute)
 }
 
 // TestExposedFeatureTrafficPolicyCluster ensures an external traffic policy of
@@ -366,9 +365,63 @@ func TestExposedFeatureTrafficPolicyCluster(t *testing.T) {
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-		eventschema.Event{Reason: k8sutil.EventReasonNodeServiceCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestLoadBalancerSourceRanges tests that we can create a cluster with IP
+// source ranges set, remove them and add them back again, and observe that it
+// is happening.
+func TestLoadBalancerSourceRanges(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	sourceRanges := []string{
+		"192.168.0.1/32",
+	}
+
+	// Create the cluster.
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	tlsOptions := &e2eutil.TLSOpts{
+		ClusterName: clusterName,
+		ExtraAltNames: []string{
+			fmt.Sprintf("*.%s", domain),
+		},
+	}
+
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
+
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase.Name = clusterName
+	testCouchbase.Spec.Networking.ExposeAdminConsole = true
+	testCouchbase.Spec.Networking.AdminConsoleServiceTemplate = &couchbasev2.ServiceTemplateSpec{
+		Spec: &corev1.ServiceSpec{
+			Type:                     corev1.ServiceTypeLoadBalancer,
+			LoadBalancerSourceRanges: sourceRanges,
+		},
+	}
+	testCouchbase.Spec.Networking.DNS = &couchbasev2.DNS{
+		Domain: domain,
+	}
+	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			ServerSecret:   ctx.ClusterSecretName,
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	// Ensure the source ranges are correctly installed, then remove and verify, then
+	// add back again and verify.
+	e2eutil.MustCheckConsoleServiceLoadBalancerSourceRanges(t, targetKube, testCouchbase, sourceRanges, time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/Networking/AdminConsoleServiceTemplate/Spec/LoadBalancerSourceRanges"), time.Minute)
+	e2eutil.MustCheckConsoleServiceLoadBalancerSourceRanges(t, targetKube, testCouchbase, nil, time.Minute)
+	_ = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Networking/AdminConsoleServiceTemplate/Spec/LoadBalancerSourceRanges", sourceRanges), time.Minute)
+	e2eutil.MustCheckConsoleServiceLoadBalancerSourceRanges(t, targetKube, testCouchbase, sourceRanges, time.Minute)
 }

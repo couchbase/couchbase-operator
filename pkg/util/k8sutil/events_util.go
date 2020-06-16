@@ -37,8 +37,6 @@ const (
 	EventReasonGroupEdited             = "GroupEdited"
 	EventReasonServiceCreated          = "ServiceCreated"
 	EventReasonServiceDeleted          = "ServiceDeleted"
-	EventReasonNodeServiceCreated      = "NodeServiceCreated"
-	EventReasonNodeServiceDeleted      = "NodeServiceDeleted"
 	EventReasonUpgradeStarted          = "UpgradeStarted"
 	EventReasonUpgradeFinished         = "UpgradeFinished"
 	EventReasonRollbackStarted         = "RollbackStarted"
@@ -335,24 +333,6 @@ func AdminConsoleSvcDeleteEvent(svcName string, cl *couchbasev2.CouchbaseCluster
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonServiceDeleted
 	event.Message = fmt.Sprintf("Service for admin console `%s` was deleted", svcName)
-
-	return event
-}
-
-func NodeServiceCreateEvent(service couchbasev2.Service, cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	event := newClusterEvent(cl)
-	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonNodeServiceCreated
-	event.Message = fmt.Sprintf("Node service for %s was created", service.String())
-
-	return event
-}
-
-func NodeServiceDeleteEvent(service couchbasev2.Service, cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	event := newClusterEvent(cl)
-	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonNodeServiceDeleted
-	event.Message = fmt.Sprintf("Node service for %s was deleted", service.String())
 
 	return event
 }

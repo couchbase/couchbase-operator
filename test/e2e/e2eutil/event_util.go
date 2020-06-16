@@ -136,36 +136,11 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 // ClusterCreateSequenceWithExposedFeatures is a common function for generating cluster
 // creation events, with specific featuresets.
 func ClusterCreateSequenceWithExposedFeatures(size int, features ...couchbasev2.ExposedFeature) eventschema.Validatable {
-	services := map[string]interface{}{}
-
-	for _, feature := range features {
-		switch feature {
-		case couchbasev2.FeatureAdmin:
-			services["admin"] = nil
-		case couchbasev2.FeatureXDCR:
-			services["admin"] = nil
-			services["index"] = nil
-			services["data"] = nil
-		case couchbasev2.FeatureClient:
-			services["admin"] = nil
-			services["index"] = nil
-			services["query"] = nil
-			services["search"] = nil
-			services["analytics"] = nil
-			services["eventing"] = nil
-			services["data"] = nil
-		}
-	}
-
 	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Repeat{
 				Times:     size,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			},
-			eventschema.Repeat{
-				Times:     len(services),
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonNodeServiceCreated},
 			},
 		},
 	}

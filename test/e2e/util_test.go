@@ -267,6 +267,7 @@ var (
 		"TestConsoleServiceDNSModify":            TestConsoleServiceDNSModify,
 		"TestConsoleServiceTypeModify":           TestConsoleServiceTypeModify,
 		"TestExposedFeatureTrafficPolicyCluster": TestExposedFeatureTrafficPolicyCluster,
+		"TestLoadBalancerSourceRanges":           TestLoadBalancerSourceRanges,
 
 		// Status tests
 		"TestStatusRecovery": TestStatusRecovery,

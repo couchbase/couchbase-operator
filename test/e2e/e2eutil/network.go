@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -341,6 +342,32 @@ func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev2.Couchb
 
 func MustCheckConsoleServiceStatus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := CheckConsoleServiceStatus(k8s, couchbase, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// CheckConsoleServiceLoadBalancerSourceRanges checks that loda balancer source ranges
+// are as we expect.
+func CheckConsoleServiceLoadBalancerSourceRanges(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, sourceRanges []string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if !reflect.DeepEqual(service.Spec.LoadBalancerSourceRanges, sourceRanges) {
+			return fmt.Errorf("wanted %v, has %v", sourceRanges, service.Spec.LoadBalancerSourceRanges)
+		}
+
+		return nil
+	})
+}
+
+func MustCheckConsoleServiceLoadBalancerSourceRanges(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, sourceRanges []string, timeout time.Duration) {
+	if err := CheckConsoleServiceLoadBalancerSourceRanges(k8s, couchbase, sourceRanges, timeout); err != nil {
 		Die(t, err)
 	}
 }

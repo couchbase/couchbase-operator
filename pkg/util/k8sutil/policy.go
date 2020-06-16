@@ -18,11 +18,11 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 	required := &policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
-			Labels: LabelsForCluster(cluster.Name),
+			Labels: LabelsForCluster(cluster),
 		},
 		Spec: policyv1beta1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: LabelsForCluster(cluster.Name),
+				MatchLabels: LabelsForCluster(cluster),
 			},
 			MinAvailable: &intstr.IntOrString{
 				IntVal: int32(cluster.Spec.TotalSize() - 1),

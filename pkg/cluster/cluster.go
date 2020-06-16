@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -153,7 +152,7 @@ type Cluster struct {
 // these days, maintaining the structured JSON, so perhaps we should do the same
 // and adjust tooling to match.
 func (c *Cluster) namespacedName() string {
-	return types.NamespacedName{Namespace: c.cluster.Namespace, Name: c.cluster.Name}.String()
+	return c.cluster.NamespacedName()
 }
 
 // New is called when we first observe a CouchbaseCluster resource.  This may be due to
@@ -174,7 +173,7 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	// Initialize Kubernetes clients and caches.
 	var err error
 
-	c.k8s, err = client.NewClient(c.ctx, c.cluster.Namespace, labels.SelectorFromSet(k8sutil.LabelsForCluster(c.cluster.Name)))
+	c.k8s, err = client.NewClient(c.ctx, c.cluster.Namespace, labels.SelectorFromSet(k8sutil.LabelsForCluster(c.cluster)))
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +268,7 @@ func (c *Cluster) setup() error {
 	}
 
 	// Establish DNS for cluster communication.
-	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster.Namespace, c.cluster.Name, c.cluster.AsOwner()); err != nil {
+	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster); err != nil {
 		return err
 	}
 
@@ -495,7 +494,12 @@ func (c *Cluster) logUpdate(old, new interface{}) {
 		return
 	}
 
-	log.Info("Resource updated", "cluster", c.namespacedName(), "diff", d)
+	// reflect.DeepEqual doesn't make the difference between a nil map and an
+	// empty one, so this could be legitimately triggered even if there is no
+	// difference.
+	if d != "" {
+		log.Info("Resource updated", "cluster", c.namespacedName(), "diff", d)
+	}
 }
 
 func (c *Cluster) updateCRStatus() error {

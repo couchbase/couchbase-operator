@@ -810,13 +810,33 @@ type IPv4Prefix string
 
 type IPV4PrefixList []IPv4Prefix
 
+// ObjectMeta is a sanitized object metadata object that exposes
+// what we allow a user to modify.
+type ObjectMeta struct {
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// ServiceTemplateSpec is a sanitized version of a service that exposes
+// what we allow a user to modify.
+type ServiceTemplateSpec struct {
+	ObjectMeta `json:"metadata,inline,omitempty"`
+	Spec       *v1.ServiceSpec `json:"spec,omitempty"`
+}
+
 type CouchbaseClusterNetworkingSpec struct {
 	// ExposeAdminConsole creates a service referencing the admin console.
 	ExposeAdminConsole bool `json:"exposeAdminConsole,omitempty"`
 
+	// DEPRECATED from Couchbase Server 6.5.0 onwards.
 	// AdminConsoleServices is a selector to choose specific services to expose via the admin console.
 	AdminConsoleServices ServiceList `json:"adminConsoleServices,omitempty"`
 
+	// AdminConsoleServiceTemplate provides user access to every possible
+	// field so they can control anything they want.
+	AdminConsoleServiceTemplate *ServiceTemplateSpec `json:"adminConsoleServiceTemplate,omitempty"`
+
+	// DEPRECATED this will be removed in a later release.
 	// AdminConsoleServiceType defines whether to create a NodePort or LoadBalancer service.
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
@@ -826,10 +846,16 @@ type CouchbaseClusterNetworkingSpec struct {
 	// xdcr=8091,8092,11210, and thus may overlap.
 	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
 
+	// ExposedFeatureServiceTemplate provides user access to every possible
+	// field so they can control anything they want.
+	ExposedFeatureServiceTemplate *ServiceTemplateSpec `json:"exposedFeatureServiceTemplate,omitempty"`
+
+	// DEPRECATED this will be removed in a later release.
 	// ExposedFeatureServiceType defines whether to create a NodePort or LoadBalancer service.
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	ExposedFeatureServiceType v1.ServiceType `json:"exposedFeatureServiceType,omitempty"`
 
+	// DEPRECATED this will be removed in a later release.
 	// ExposedFeatureTrafficPolicy defines how packets should be routed.
 	// +kubebuilder:validation:Enum=Cluster;Local
 	ExposedFeatureTrafficPolicy *v1.ServiceExternalTrafficPolicyType `json:"exposedFeatureTrafficPolicy,omitempty"`
@@ -840,11 +866,13 @@ type CouchbaseClusterNetworkingSpec struct {
 	// DNS points to information for Dynamic DNS support.
 	DNS *DNS `json:"dns,omitempty"`
 
+	// DEPRECATED this will be removed in a later release.
 	// ServiceAnnotations allows services to be annotated with custom labels.
 	// Operator annotations are merged on top of these so have precedence as
 	// they are required for correct operation.
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 
+	// DEPRECATED this will be removed in a later release.
 	// LoadBalancerSourceRanges applies only when an exposed service is of type
 	// LoadBalancer and limits the source IP ranges that are allowed to use the
 	// service.
@@ -1258,14 +1286,6 @@ type ClusterStatus struct {
 
 	// Name of groups active within cluster
 	Groups []string `json:"groups,omitempty"`
-
-	// port exposing couchbase cluster
-	AdminConsolePort    string `json:"adminConsolePort,omitempty"`
-	AdminConsolePortSSL string `json:"adminConsolePortSSL,omitempty"`
-
-	// ExposedFeatures keeps tabs on what features are currently
-	// exposed as node ports
-	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
 }
 
 type BucketStatus struct {

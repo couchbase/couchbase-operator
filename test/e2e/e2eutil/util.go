@@ -742,7 +742,7 @@ func DeleteCbCluster(t *testing.T, k8s *types.Cluster, cbCluster *couchbasev2.Co
 
 	t.Logf("Killing pods: %v", killPods)
 
-	if err := KillMembers(k8s.KubeClient, k8s.Namespace, cbCluster.Name, killPods...); err != nil {
+	if err := KillMembers(k8s.KubeClient, cbCluster, killPods...); err != nil {
 		t.Logf("Failed to kill members: %v", err)
 	}
 }
@@ -756,9 +756,9 @@ func CleanK8sCluster(k8s *types.Cluster) {
 	}
 }
 
-func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName string, names ...string) error {
+func KillMembers(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster, names ...string) error {
 	for _, name := range names {
-		if err := KillMember(kubecli, namespace, clusterName, name, true); err != nil {
+		if err := KillMember(kubecli, cluster, name, true); err != nil {
 			return err
 		}
 	}
@@ -767,13 +767,13 @@ func KillMembers(kubecli kubernetes.Interface, namespace string, clusterName str
 }
 
 // Kill member deletes Pod and optionally checks for any associated Volume to delete.
-func KillMember(kubecli kubernetes.Interface, namespace, clusterName, name string, removeVolumes bool) error {
-	if err := kubecli.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil {
+func KillMember(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster, name string, removeVolumes bool) error {
+	if err := kubecli.CoreV1().Pods(cluster.Namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil {
 		return err
 	}
 
 	if removeVolumes {
-		if err := kubecli.CoreV1().PersistentVolumeClaims(namespace).DeleteCollection(metav1.NewDeleteOptions(0), k8sutil.NodeListOpt(name, clusterName)); err != nil {
+		if err := kubecli.CoreV1().PersistentVolumeClaims(cluster.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), NodeListOpt(cluster, name)); err != nil {
 			return err
 		}
 	}
@@ -869,7 +869,7 @@ func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cl
 }
 
 func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, numToKill int) {
-	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
+	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(ClusterListOpt(cl))
 	if err != nil {
 		Die(t, err)
 	}
@@ -886,7 +886,7 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev2.Couchb
 
 	t.Logf("Killing pods: %v", killPods)
 
-	if err := KillMembers(kubeCli, cl.Namespace, cl.Name, killPods...); err != nil {
+	if err := KillMembers(kubeCli, cl, killPods...); err != nil {
 		Die(t, err)
 	}
 
@@ -899,12 +899,12 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev2.Couchb
 
 func KillPodForMember(kubeCli kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, memberID int) error {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
-	return KillMember(kubeCli, cl.Namespace, cl.Name, name, true)
+	return KillMember(kubeCli, cl, name, true)
 }
 
 func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, memberID int, removeVolumes bool) {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
-	if err := KillMember(k8s.KubeClient, cl.Namespace, cl.Name, name, removeVolumes); err != nil {
+	if err := KillMember(k8s.KubeClient, cl, name, removeVolumes); err != nil {
 		Die(t, err)
 	}
 }

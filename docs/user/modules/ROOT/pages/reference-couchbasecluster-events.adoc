@@ -80,10 +80,6 @@ ServiceCreated::
 A cluster service was created.
 ServiceDeleted::
 A cluster service was deleted.
-NodeServiceCreated::
-A node service was created.
-NodeServiceDeleted::
-A node service was deleted.
 
 == Cluster Lifecycle
 

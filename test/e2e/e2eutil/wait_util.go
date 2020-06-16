@@ -192,7 +192,7 @@ func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *couchbasev2.Couchbas
 	defer cancel()
 
 	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
-		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(k8sutil.ClusterListOpt(couchbase.Name))
+		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(ClusterListOpt(couchbase))
 		if err != nil {
 			return false, err
 		}
@@ -387,7 +387,7 @@ func waitResourcesDeleted(kubeClient kubernetes.Interface, cl *couchbasev2.Couch
 	defer cancel()
 
 	err := retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
-		list, err := kubeClient.CoreV1().Services(cl.Namespace).List(k8sutil.ClusterListOpt(cl.Name))
+		list, err := kubeClient.CoreV1().Services(cl.Namespace).List(ClusterListOpt(cl))
 		if err != nil {
 			return false, err
 		}
@@ -406,7 +406,7 @@ func waitResourcesDeleted(kubeClient kubernetes.Interface, cl *couchbasev2.Couch
 }
 
 func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName string, cl *couchbasev2.CouchbaseCluster) error {
-	_, err := WaitPodsDeleted(kubeClient, cl.Namespace, k8sutil.NodeListOpt(cl.Name, podName))
+	_, err := WaitPodsDeleted(kubeClient, cl.Namespace, NodeListOpt(cl, podName))
 	if err != nil {
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}

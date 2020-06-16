@@ -28,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -145,12 +144,6 @@ func GetServerGroup(client *client.Client, name string) (string, error) {
 	return serverGroup, nil
 }
 
-func ClusterListOpt(clusterName string) metav1.ListOptions {
-	return metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(LabelsForCluster(clusterName)).String(),
-	}
-}
-
 // getNodeServiceSelectors returns a key/value map to identify a specific node
 // in the cluster.
 // In general all services are applied to all nodes in the Couchbase cluster.
@@ -159,27 +152,39 @@ func ClusterListOpt(clusterName string) metav1.ListOptions {
 // that can be performed via the UI).
 func getNodeServiceSelectors(cluster *couchbasev2.CouchbaseCluster, nodeName string) map[string]string {
 	// Apply to a specific couchbase pod within the named cluster
-	selectors := LabelsForCluster(cluster.Name)
+	selectors := LabelsForCluster(cluster)
 	selectors[constants.LabelNode] = nodeName
 
 	return selectors
 }
 
-// LabelsForCluster returns a basic set of labels which will identify a couchbase
-// pod within a specific cluster.
-func LabelsForCluster(clusterName string) map[string]string {
-	return map[string]string{
-		constants.LabelCluster: clusterName,
-		constants.LabelApp:     constants.App,
-	}
+func selectorForDataService(cluster *couchbasev2.CouchbaseCluster) map[string]string {
+	labels := LabelsForCluster(cluster)
+	labels["couchbase_service_data"] = "enabled"
+
+	return labels
 }
 
-func NodeListOpt(clusterName, memberName string) metav1.ListOptions {
-	l := LabelsForCluster(clusterName)
-	l[constants.LabelNode] = memberName
+func LabelsForNodeResource(cluster *couchbasev2.CouchbaseCluster, name string) map[string]string {
+	labels := LabelsForClusterResource(cluster)
+	labels[constants.LabelNode] = name
 
-	return metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(l).String(),
+	return labels
+}
+
+func LabelsForClusterResource(cluster *couchbasev2.CouchbaseCluster) map[string]string {
+	labels := LabelsForCluster(cluster)
+	labels[constants.ResourceVersionAnnotation] = version.Version
+
+	return labels
+}
+
+// LabelsForCluster returns a basic set of labels which will identify a couchbase
+// pod within a specific cluster.
+func LabelsForCluster(cluster *couchbasev2.CouchbaseCluster) map[string]string {
+	return map[string]string{
+		constants.LabelCluster: cluster.Name,
+		constants.LabelApp:     constants.App,
 	}
 }
 

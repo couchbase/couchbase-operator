@@ -314,7 +314,7 @@ func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPo
 		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
 	}
 
-	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, podCreateTimeout, "--zap-level", "debug")
+	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, podCreateTimeout, "--zap-level", "2")
 	e2eutil.ApplyGarbageCollectedObjectLabels(&deployment.Spec.Template.ObjectMeta)
 
 	// Manually set the HTTP port.

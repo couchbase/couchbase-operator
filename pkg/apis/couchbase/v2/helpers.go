@@ -11,6 +11,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
@@ -335,13 +336,29 @@ func (cs *ClusterSpec) HasExposedFeatures() bool {
 // IsExposedFeatureServiceTypePublic returns whether exposed ports will be public and
 // therefore need to be TLS protected and may have DDNS entries created.
 func (cs *ClusterSpec) IsExposedFeatureServiceTypePublic() bool {
-	return cs.Networking.ExposedFeatureServiceType == v1.ServiceTypeLoadBalancer
+	if cs.Networking.ExposedFeatureServiceType == v1.ServiceTypeLoadBalancer {
+		return true
+	}
+
+	if cs.Networking.ExposedFeatureServiceTemplate != nil && cs.Networking.ExposedFeatureServiceTemplate.Spec != nil && cs.Networking.ExposedFeatureServiceTemplate.Spec.Type == v1.ServiceTypeLoadBalancer {
+		return true
+	}
+
+	return false
 }
 
 // IsAdminConsoleServiceTypePublic returns whether exposed ports will be public and
 // therefore need to be TLS protected and may have DDNS entries created.
 func (cs *ClusterSpec) IsAdminConsoleServiceTypePublic() bool {
-	return cs.Networking.AdminConsoleServiceType == v1.ServiceTypeLoadBalancer
+	if cs.Networking.AdminConsoleServiceType == v1.ServiceTypeLoadBalancer {
+		return true
+	}
+
+	if cs.Networking.AdminConsoleServiceTemplate != nil && cs.Networking.AdminConsoleServiceTemplate.Spec != nil && cs.Networking.AdminConsoleServiceTemplate.Spec.Type == v1.ServiceTypeLoadBalancer {
+		return true
+	}
+
+	return false
 }
 
 func (tp *TLSPolicy) IsSecureClient() bool {
@@ -594,4 +611,9 @@ func IsClusterRole(role RoleName) bool {
 	}
 
 	return false
+}
+
+// NamespacedName returns a canonical and unique cluster name for logging.
+func (c *CouchbaseCluster) NamespacedName() string {
+	return types.NamespacedName{Namespace: c.Namespace, Name: c.Name}.String()
 }

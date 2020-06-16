@@ -15,12 +15,14 @@ spec:
       managed: true
   networking:
     exposeAdminConsole: true
-    adminConsoleServices:
-      - data
+    adminConsoleServiceTemplate:
+      spec:
+        type: NodePort
     exposedFeatures:
       - xdcr
-    exposedFeatureServiceType: NodePort
-    adminConsoleServiceType: NodePort
+    exposedFeatureServiceTemplate:
+      spec:
+        type: NodePort
   buckets:
     managed: true
   servers:

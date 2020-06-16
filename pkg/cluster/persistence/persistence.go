@@ -83,7 +83,7 @@ func New(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (
 		configMap = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   couchbase.Name,
-				Labels: k8sutil.LabelsForCluster(couchbase.Name),
+				Labels: k8sutil.LabelsForCluster(couchbase),
 				OwnerReferences: []metav1.OwnerReference{
 					couchbase.AsOwner(),
 				},

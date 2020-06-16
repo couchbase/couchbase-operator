@@ -1,9 +1,9 @@
 package k8sutil
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -12,11 +12,17 @@ import (
 	cberrors "github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/diff"
+
+	//"github.com/evanphx/json-patch"
+	"github.com/imdario/mergo"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var log = logf.Log.WithName("kubernetes")
 
 const (
 	// Used to annotate services which belong to an SRV record.
@@ -257,50 +263,6 @@ var (
 	}
 )
 
-// When we update a service we can return a status telling what happened.
-type ReconcileStatus string
-
-const (
-	ReconcileStatusError     ReconcileStatus = "error"
-	ReconcileStatusCreated   ReconcileStatus = "created"
-	ReconcileStatusDeleted   ReconcileStatus = "deleted"
-	ReconcileStatusUpdated   ReconcileStatus = "updated"
-	ReconcileStatusUnchanged ReconcileStatus = "unchanged"
-)
-
-// createServiceManifest creates a basic service with a type, ports, labels and pod selectors.
-func createServiceManifest(svcName string, serviceType v1.ServiceType, ports []v1.ServicePort, labels, selector map[string]string) *v1.Service {
-	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   svcName,
-			Labels: labels,
-		},
-		Spec: v1.ServiceSpec{
-			Type:                     serviceType,
-			Ports:                    ports,
-			Selector:                 selector,
-			PublishNotReadyAddresses: true,
-		},
-	}
-
-	ApplyBaseAnnotations(svc)
-
-	return svc
-}
-
-func createService(c *client.Client, ns string, svc *v1.Service, owner metav1.OwnerReference) (*v1.Service, error) {
-	addOwnerRefToObject(svc, owner)
-	return c.KubeClient.CoreV1().Services(ns).Create(svc)
-}
-
-func deleteService(c *client.Client, ns, name string, opts *metav1.DeleteOptions) error {
-	return c.KubeClient.CoreV1().Services(ns).Delete(name, opts)
-}
-
-func updateService(c *client.Client, ns string, svc *v1.Service) (*v1.Service, error) {
-	return c.KubeClient.CoreV1().Services(ns).Update(svc)
-}
-
 // dnsAdminConsoleName returns the DNS name for the admin console.
 func dnsAdminConsoleName(cluster *couchbasev2.CouchbaseCluster) string {
 	return "console." + cluster.Spec.Networking.DNS.Domain
@@ -309,15 +271,6 @@ func dnsAdminConsoleName(cluster *couchbasev2.CouchbaseCluster) string {
 // ConsoleServiceName generates the console service name.
 func ConsoleServiceName(clusterName string) string {
 	return clusterName + "-ui"
-}
-
-// labelsForNodeService returns a set of labels which identify a cluster service
-// for a specific node.
-func labelsForNodeService(clusterName, nodeName string) map[string]string {
-	labels := LabelsForCluster(clusterName)
-	labels[constants.LabelNode] = nodeName
-
-	return labels
 }
 
 // getPeerServicePorts returns the set of all possible ports.  When running in a
@@ -332,14 +285,16 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 		switch len(rule) {
 		case 1:
 			ports = append(ports, v1.ServicePort{
-				Name: fmt.Sprintf("tcp-%v", rule[0]),
-				Port: int32(rule[0]),
+				Name:     fmt.Sprintf("tcp-%v", rule[0]),
+				Port:     int32(rule[0]),
+				Protocol: v1.ProtocolTCP,
 			})
 		case 2:
 			for i := rule[0]; i <= rule[1]; i++ {
 				ports = append(ports, v1.ServicePort{
-					Name: fmt.Sprintf("tcp-%v", i),
-					Port: int32(i),
+					Name:     fmt.Sprintf("tcp-%v", i),
+					Port:     int32(i),
+					Protocol: v1.ProtocolTCP,
 				})
 			}
 		default:
@@ -350,119 +305,69 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 	return ports, nil
 }
 
-func updatePeerService(current, requested *v1.Service) bool {
-	updated := false
-
-	if !reflect.DeepEqual(current.Labels, requested.Labels) {
-		current.Labels = requested.Labels
-		updated = true
-	}
-
-	if !reflect.DeepEqual(current.Annotations, requested.Annotations) {
-		current.Annotations = requested.Annotations
-		updated = true
-	}
-
-	if current.Spec.PublishNotReadyAddresses != requested.Spec.PublishNotReadyAddresses {
-		current.Spec.PublishNotReadyAddresses = requested.Spec.PublishNotReadyAddresses
-		updated = true
-	}
-
-	if !reflect.DeepEqual(current.Spec.LoadBalancerSourceRanges, requested.Spec.LoadBalancerSourceRanges) {
-		current.Spec.LoadBalancerSourceRanges = requested.Spec.LoadBalancerSourceRanges
-		updated = true
-	}
-
-	// Filled in by the API, so reset to what we generate
-	for i := range current.Spec.Ports {
-		current.Spec.Ports[i].TargetPort = intstr.IntOrString{}
-	}
-
-	// Unlike NodePort services we don't need to preserve TargetPorts so
-	// can just copy over the whole Spec.
-	if !reflect.DeepEqual(current.Spec, requested.Spec) {
-		current.Spec = requested.Spec
-		updated = true
-	}
-
-	return updated
-}
-
-// reconcilePeerService either creates the peer service if it doesn't exist
-// or updates an existing version if it has been edited or has been upgraded.
-func reconcilePeerService(c *client.Client, namespace, name string, owner metav1.OwnerReference) error {
-	serviceName := name
-
+// generatePeerService returns an idealized peer service.  This is the main headless
+// service for a couchbase cluster that establishes DNS addressing for all pods.
+func generatePeerService(cluster *couchbasev2.CouchbaseCluster) (*v1.Service, error) {
 	ports, err := getPeerServicePorts()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	labels := LabelsForCluster(name)
-	requested := createServiceManifest(serviceName, v1.ServiceTypeClusterIP, ports, labels, labels)
-	requested.Spec.ClusterIP = v1.ClusterIPNone
+	service := &v1.Service{}
 
-	// Create if it doesn't exist.
-	current, found := c.Services.Get(serviceName)
-	if !found {
-		_, err := createService(c, namespace, requested, owner)
-		return err
+	// Fill in metadata.
+	service.Name = cluster.Name
+	service.Labels = mergeLabels(service.Labels, LabelsForClusterResource(cluster))
+	service.OwnerReferences = []metav1.OwnerReference{
+		cluster.AsOwner(),
 	}
 
-	// Update an existing service if it does exist.
-	if !updatePeerService(current, requested) {
-		return nil
-	}
+	// Fill in spec.
+	service.Spec.ClusterIP = v1.ClusterIPNone
+	service.Spec.PublishNotReadyAddresses = true
+	service.Spec.Selector = LabelsForCluster(cluster)
+	service.Spec.Ports = ports
 
-	if _, err := updateService(c, namespace, current); err != nil {
-		return err
-	}
-
-	return nil
+	return service, nil
 }
 
-// reconcileDiscoveryService either creates the discovery service if it doesn't exist
-// or updates an existing version if it has been edited or has been upgraded.
-func reconcileDiscoveryService(c *client.Client, namespace, name string, owner metav1.OwnerReference) error {
-	serviceName := name + "-srv"
+// generateDiscoveryService returns an idealized service for CCCP bootstrap via
+// SRV records, the only real difference from the main peer service is that it selects
+// only data nodes, which apparently isn't necessary from 6.5.0 onward...
+func generateDiscoveryService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
+	service := &v1.Service{}
 
-	labels := LabelsForCluster(name)
-
-	// Create a service which defines only data nodes.  This is the expected way clients
-	// using SRV records will connect, meaning they will only ever bootstrap via memcached
-	selectors := LabelsForCluster(name)
-	selectors["couchbase_service_data"] = "enabled"
-
-	requested := createServiceManifest(serviceName, v1.ServiceTypeClusterIP, srvServicePorts, labels, selectors)
-	requested.Spec.ClusterIP = v1.ClusterIPNone
-
-	// Create if it doesn't exist.
-	current, found := c.Services.Get(serviceName)
-	if !found {
-		_, err := createService(c, namespace, requested, owner)
-		return err
+	// Fill in metadata.
+	service.Name = cluster.Name + "-srv"
+	service.Labels = mergeLabels(service.Labels, LabelsForClusterResource(cluster))
+	service.OwnerReferences = []metav1.OwnerReference{
+		cluster.AsOwner(),
 	}
 
-	// Update an existing service if it does exist.
-	if !updatePeerService(current, requested) {
-		return nil
-	}
+	// Fill in spec.
+	service.Spec.ClusterIP = v1.ClusterIPNone
+	service.Spec.PublishNotReadyAddresses = true
+	service.Spec.Selector = selectorForDataService(cluster)
+	service.Spec.Ports = srvServicePorts
 
-	if _, err := updateService(c, namespace, current); err != nil {
-		return err
-	}
-
-	return nil
+	return service
 }
 
 // ReconcilePeerServices creates/updates all cluster-wide services required for
 // communication to and discovery of the cluster.
-func ReconcilePeerServices(c *client.Client, namespace, name string, owner metav1.OwnerReference) error {
-	if err := reconcilePeerService(c, namespace, name, owner); err != nil {
+func ReconcilePeerServices(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
+	requested, err := generatePeerService(cluster)
+	if err != nil {
 		return err
 	}
 
-	if err := reconcileDiscoveryService(c, namespace, name, owner); err != nil {
+	if err := reconcileService(c, cluster, requested); err != nil {
+		return err
+	}
+
+	requested = generateDiscoveryService(cluster)
+
+	if err := reconcileService(c, cluster, requested); err != nil {
 		return err
 	}
 
@@ -470,8 +375,9 @@ func ReconcilePeerServices(c *client.Client, namespace, name string, owner metav
 }
 
 // adminConsoleSelector generates a selector matching pods running all the requested services.
+// This is lagacy, apparently all nodes behave the same on 6.5.0.
 func adminConsoleSelector(cluster *couchbasev2.CouchbaseCluster) map[string]string {
-	labels := LabelsForCluster(cluster.Name)
+	labels := LabelsForCluster(cluster)
 
 	for _, s := range cluster.Spec.Networking.AdminConsoleServices {
 		k := "couchbase_service_" + s.String()
@@ -483,146 +389,309 @@ func adminConsoleSelector(cluster *couchbasev2.CouchbaseCluster) map[string]stri
 
 // generateConsoleService creates a new Service resource based on the cluster specification.
 func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
-	// If the service is public, remove non TLS ports.
+	// The console service only exposes 8091/18091, insecure ports
+	// are filtered out when using public networking.
 	ports := filterInsecurePorts(uiServicePorts, cluster.Spec.IsAdminConsoleServiceTypePublic())
 
-	// Label as belonging to the operator, and the specific cluster
-	labels := LabelsForCluster(cluster.Name)
+	// Use either a blank service or the user specified template.
+	service := &v1.Service{}
 
-	// Select all nodes belonging to the cluster and with the specified services.
-	selectors := adminConsoleSelector(cluster)
+	if cluster.Spec.Networking.AdminConsoleServiceTemplate != nil {
+		service.Labels = cluster.Spec.Networking.AdminConsoleServiceTemplate.Labels
+		service.Annotations = cluster.Spec.Networking.AdminConsoleServiceTemplate.Annotations
 
-	// Create the basic service.
-	service := createServiceManifest(ConsoleServiceName(cluster.Name), cluster.Spec.Networking.AdminConsoleServiceType, ports, labels, selectors)
-	service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
+		if cluster.Spec.Networking.AdminConsoleServiceTemplate.Spec != nil {
+			service.Spec = *cluster.Spec.Networking.AdminConsoleServiceTemplate.Spec
+		}
+	}
+
+	// Apply deprecated fields, these have precedence for backwards compatibility,
+	// but only apply if they have been set e.g. not the zero value.
+	if cluster.Spec.Networking.ServiceAnnotations != nil {
+		service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
+	}
+
+	if cluster.Spec.Networking.AdminConsoleServiceType != "" {
+		service.Spec.Type = cluster.Spec.Networking.AdminConsoleServiceType
+	}
+
+	if cluster.Spec.Networking.LoadBalancerSourceRanges != nil {
+		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges.StringSlice()
+	}
+
+	// Fill in metadata.
+	service.Name = ConsoleServiceName(cluster.Name)
+	service.Labels = mergeLabels(service.Labels, LabelsForClusterResource(cluster))
+	service.OwnerReferences = []metav1.OwnerReference{
+		cluster.AsOwner(),
+	}
+
+	// Fill in spec.
+	service.Spec.PublishNotReadyAddresses = true
+	service.Spec.Selector = adminConsoleSelector(cluster)
+	service.Spec.Ports = ports
 
 	// If a DNS domain is specified add a DNS name for use with TLS.
 	if cluster.Spec.Networking.DNS != nil {
+		if service.Annotations == nil {
+			service.Annotations = map[string]string{}
+		}
+
 		service.Annotations[constants.DNSAnnotation] = dnsAdminConsoleName(cluster)
 	}
 
+	// Also set the external traffic policy to Local which means the load balancer is
+	// responsible for routing traffic to the destination and not Kubernetes.  For
+	// ELB at least this appears to keep sessions open to the same console instance.
 	if cluster.Spec.IsAdminConsoleServiceTypePublic() {
-		// Also set the external traffic policy to Local which means the load balancer is
-		// responsible for routing traffic to the destination and not Kubernetes.  For
-		// ELB at least this appears to keep sessions open to the same console instance.
 		service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	}
 
-		// AWS ELB does not support IP based session stickiness, instead we rely on
-		// the load balancer keeping TCP connection alive.  It's not perfect but we
-		// can work until NS server get into gear.
-		if cluster.Spec.Platform != couchbasev2.PlatformTypeAWS {
-			service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
-		}
-
-		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges.StringSlice()
-	} else {
-		// Ensure client sessions are maintained by routing to the same backend node based
-		// on the client IP address.
+	// Ensure client sessions are maintained by routing to the same backend node based
+	// on the client IP address, server's authentication cookies are only valid for the
+	// host they were created on. AWS ELB does not support IP based session stickiness,
+	// instead we rely on the load balancer keeping TCP connection alive.  It's not perfect
+	// but we can work until NS server get into gear.
+	if !cluster.Spec.IsAdminConsoleServiceTypePublic() || cluster.Spec.Platform != couchbasev2.PlatformTypeAWS {
 		service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	}
 
 	return service
 }
 
-// getServiceNodePort returns the string representation of a NodePort for a named port.
-func getServiceNodePort(svc *v1.Service, portName string) string {
-	for _, port := range svc.Spec.Ports {
-		if port.Name == portName {
-			return strconv.Itoa(int(port.NodePort))
-		}
-	}
-
-	return ""
-}
-
-// updateConsoleService updates the console service with the requested state returning
-// true if anything happened.
-func updateConsoleService(service, requested *v1.Service) bool {
-	updated := false
-
-	// This handles spec.ddns.domain updates.
-	if !reflect.DeepEqual(service.Annotations, requested.Annotations) {
-		service.Annotations = requested.Annotations
-		updated = true
-	}
-
-	if service.Spec.PublishNotReadyAddresses != requested.Spec.PublishNotReadyAddresses {
-		service.Spec.PublishNotReadyAddresses = requested.Spec.PublishNotReadyAddresses
-		updated = true
-	}
-
-	// This handles spec.adminConsoleServices updates.
-	if !reflect.DeepEqual(service.Spec.Selector, requested.Spec.Selector) {
-		service.Spec.Selector = requested.Spec.Selector
-		updated = true
-	}
-
-	// This handles spec.adminConsoleServiceType updates.
-	if service.Spec.Type != requested.Spec.Type {
-		service.Spec.Type = requested.Spec.Type
-		updated = true
-	}
-
-	// sync session affinity from generated service since this value
-	// may also change when Type  or Platform changes
-	if service.Spec.SessionAffinity != requested.Spec.SessionAffinity {
-		service.Spec.SessionAffinity = requested.Spec.SessionAffinity
-		updated = true
-	}
-
-	return updated
-}
-
-// UpdateAdminConsole looks for the cluster's admin console service, creates it if not
+// ReconcileAdminConsole looks for the cluster's admin console service, creates it if not
 // present but requested, deletes it if present but unrequested and performs udpdates
 // to the configurable service parameters.
-func UpdateAdminConsole(c *client.Client, cluster *couchbasev2.CouchbaseCluster, status *couchbasev2.ClusterStatus) (ReconcileStatus, error) {
-	// Lookup the console service.
-	name := cluster.Name + "-ui"
+func ReconcileAdminConsole(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
+	requested := generateConsoleService(cluster)
 
-	service, found := c.Services.Get(name)
-	if !found {
-		if !cluster.Spec.Networking.ExposeAdminConsole {
-			return ReconcileStatusUnchanged, nil
+	return reconcileService(c, cluster, requested)
+}
+
+// depthFirstPrune takes a current object and recursively removes any scalars
+// that are defined in the original, but no longer in the requested.  This means
+// a managed field has been unmanaged and configuration must be removed.
+func depthFirstPrune(current, original, requested map[string]interface{}) map[string]interface{} {
+	pruned := map[string]interface{}{}
+
+	for key, value := range current {
+		switch cc := value.(type) {
+		case map[string]interface{}:
+			// Recursively descend through maps depth first, only adding the
+			// key to the pruned object if the returned child is not empty.
+			oc, _ := original[key].(map[string]interface{})
+			rc, _ := requested[key].(map[string]interface{})
+
+			uc := depthFirstPrune(cc, oc, rc)
+
+			if len(uc) == 0 {
+				break
+			}
+
+			pruned[key] = uc
+		default:
+			// Scalars and arrays should be pruned if they were in the original, and
+			// are not in the requested object.
+			_, ook := original[key]
+			_, rok := requested[key]
+
+			if ook && !rok {
+				break
+			}
+
+			pruned[key] = value
+		}
+	}
+
+	return pruned
+}
+
+// prune removes from the current object any items defined in the original but not
+// in the current.
+func prune(currentJSON, originalJSON, requestedJSON []byte) ([]byte, error) {
+	current := map[string]interface{}{}
+	if err := json.Unmarshal(currentJSON, &current); err != nil {
+		return nil, err
+	}
+
+	original := map[string]interface{}{}
+	if err := json.Unmarshal(originalJSON, &original); err != nil {
+		return nil, err
+	}
+
+	requested := map[string]interface{}{}
+	if err := json.Unmarshal(requestedJSON, &requested); err != nil {
+		return nil, err
+	}
+
+	updated := depthFirstPrune(current, original, requested)
+
+	updatedJSON, err := json.Marshal(updated)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedJSON, nil
+}
+
+// reconcileService creates or updates a service.
+func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, requested *v1.Service) error {
+	requestedJSON, err := json.Marshal(requested)
+	if err != nil {
+		return err
+	}
+
+	// Check to see if the console service exists.
+	// If it doesn't and its being managed, then create it.
+	current, ok := c.Services.Get(requested.Name)
+	if !ok {
+		log.V(2).Info("Creating service", "cluster", cluster.NamespacedName(), "name", requested.Name, "requested", string(requestedJSON))
+
+		// Annotate the service with the current specification.
+		if requested.Annotations == nil {
+			requested.Annotations = map[string]string{}
 		}
 
-		service = generateConsoleService(cluster)
+		requested.Annotations[constants.SVCSpecAnnotation] = string(requestedJSON)
 
-		var err error
-
-		if service, err = createService(c, cluster.Namespace, service, cluster.AsOwner()); err != nil {
-			return ReconcileStatusError, err
+		// Create the service.
+		if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Create(requested); err != nil {
+			return err
 		}
 
-		status.AdminConsolePort = getServiceNodePort(service, couchbaseUIPortName)
-		status.AdminConsolePortSSL = getServiceNodePort(service, couchbaseUIPortNameTLS)
-
-		return ReconcileStatusCreated, nil
+		return nil
 	}
 
-	// If it exists but doesn't want to, delete it.
-	if !cluster.Spec.Networking.ExposeAdminConsole {
-		if err := deleteService(c, cluster.Namespace, name, nil); err != nil {
-			return ReconcileStatusError, err
+	// Annotation does not exist, upgrade it to have the current requested spec.
+	// This makes the assumption that people are not bold enough to modify while
+	// performing the upgrade.
+	originalJSONString, ok := current.Annotations[constants.SVCSpecAnnotation]
+	if !ok {
+		log.V(2).Info("Upgrading service", "cluster", cluster.NamespacedName(), "name", requested.Name, "requested", string(requestedJSON))
+
+		if current.Annotations == nil {
+			current.Annotations = map[string]string{}
 		}
 
-		status.AdminConsolePort = ""
-		status.AdminConsolePortSSL = ""
+		current.Annotations[constants.SVCSpecAnnotation] = string(requestedJSON)
 
-		return ReconcileStatusDeleted, nil
+		if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Update(current); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
-	// Check for modifications and update if necessary.  We only allow dynamic
-	// modification of the pod selector and the service type.
-	if !updateConsoleService(service, generateConsoleService(cluster)) {
-		return ReconcileStatusUnchanged, nil
+	originalJSON := []byte(originalJSONString)
+
+	original := &v1.Service{}
+	if err := json.Unmarshal(originalJSON, original); err != nil {
+		return err
 	}
 
-	if _, err := updateService(c, cluster.Namespace, service); err != nil {
-		return ReconcileStatusError, err
+	// Consider the current resource without the annotation.
+	// Beware modifying the cache entry, it may have unintended side effects
+	// next time around e.g. no annotation, upgrade with the wrong spec,
+	// ignore a change.
+	current = current.DeepCopy()
+
+	delete(current.Annotations, constants.SVCSpecAnnotation)
+
+	currentJSON, err := json.Marshal(current)
+	if err != nil {
+		return err
 	}
 
-	return ReconcileStatusUpdated, nil
+	log.V(2).Info("Merging service", "cluster", cluster.NamespacedName(), "name", requested.Name, "requested", string(requestedJSON), "current", string(currentJSON))
+
+	// First pass merges the requested specification on top of the current
+	// specification, this will add new struct and map fields, and update
+	// any ones that have been modified either by the specification or an
+	// external third party.  Third party modification to unamanged attributes
+	// are preserved by this operation. Lists (i.e. the ports) cannot be merged
+	// as they preserve ordering, and are just copied over verbatim.  This will
+	// be handled specially later, it does however delete any ports that are
+	// undefined by the required resource.
+	merged := current.DeepCopy()
+	if err := mergo.Merge(merged, requested, mergo.WithOverride); err != nil {
+		return err
+	}
+
+	// Mergo dosn't like the meta/v1.Time type, it overwrites with null even though
+	// it's a zero value.
+	merged.CreationTimestamp = current.CreationTimestamp
+
+	// Second pass prunes values that were managed, but are now not defined.
+	// To do this we use the original resource annotation to identify things
+	// that were managed but are now not when compared to the requesed resource.
+	mergedJSON, err := json.Marshal(merged)
+	if err != nil {
+		return err
+	}
+
+	log.V(2).Info("Pruning service", "cluster", cluster.NamespacedName(), "name", requested.Name, "merged", string(mergedJSON), "original", string(originalJSON), "requested", string(requestedJSON))
+
+	prunedJSON, err := prune(mergedJSON, originalJSON, requestedJSON)
+	if err != nil {
+		return err
+	}
+
+	pruned := &v1.Service{}
+	if err := json.Unmarshal(prunedJSON, pruned); err != nil {
+		return err
+	}
+
+	// Third pass should be unnecessary, but too many people insist on using
+	// node port addressing, so preserve port numbers, lest people's clients
+	// stop working.  To be frank, I consider this their own fault for not
+	// using stable and highly-available network addressing in the first place.
+	for i, port := range pruned.Spec.Ports {
+		for _, old := range current.Spec.Ports {
+			if port.Name == old.Name {
+				pruned.Spec.Ports[i].TargetPort = old.TargetPort
+				pruned.Spec.Ports[i].NodePort = old.NodePort
+
+				break
+			}
+		}
+	}
+
+	updatedJSON, err := json.Marshal(pruned)
+	if err != nil {
+		return err
+	}
+
+	log.V(2).Info("Comparing service", "cluster", cluster.NamespacedName(), "name", requested.Name, "original", string(currentJSON), "updated", string(updatedJSON))
+
+	// Check for updates, updating the resource if required.
+	if reflect.DeepEqual(current, pruned) {
+		return nil
+	}
+
+	d, err := diff.Diff(current, pruned)
+	if err != nil {
+		return err
+	}
+
+	// Deep equal isn't 100% accurate, and defines an nil list and
+	// an empty list as different.
+	if d == "" {
+		return nil
+	}
+
+	log.V(1).Info("Updating service", "cluster", cluster.NamespacedName(), "diff", d)
+
+	if pruned.Annotations == nil {
+		pruned.Annotations = map[string]string{}
+	}
+
+	pruned.Annotations[constants.SVCSpecAnnotation] = string(requestedJSON)
+
+	if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Update(pruned); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // GetExposedServiceName returns the service name generated for each service port group.
@@ -693,18 +762,6 @@ func listRequestedPorts(serviceNames couchbasev2.ServiceList) []v1.ServicePort {
 	return ports
 }
 
-// serviceExists scans a list of services and returns true if the named
-// service exists.
-func serviceExists(services []*v1.Service, name string) bool {
-	for _, service := range services {
-		if service.Name == name {
-			return true
-		}
-	}
-
-	return false
-}
-
 // portExists returns true if a named port exists.
 func portExists(ports []v1.ServicePort, name string) bool {
 	for _, port := range ports {
@@ -723,20 +780,6 @@ func intersectPorts(a, b []v1.ServicePort) []v1.ServicePort {
 
 	for _, port := range a {
 		if portExists(b, port.Name) {
-			d = append(d, port)
-		}
-	}
-
-	return d
-}
-
-// subtractPorts performs a boolean subtraction of ports based on name.
-// It returns a subset of a.
-func subtractPorts(a, b []v1.ServicePort) []v1.ServicePort {
-	d := []v1.ServicePort{}
-
-	for _, port := range a {
-		if !portExists(b, port.Name) {
 			d = append(d, port)
 		}
 	}
@@ -777,12 +820,7 @@ func filterConfiguredPorts(ports []v1.ServicePort, services couchbasev2.ServiceL
 }
 
 // memberServices returns the enabled services for a specific member.
-func memberServices(cluster *couchbasev2.CouchbaseCluster, members couchbaseutil.MemberSet, name string) (couchbasev2.ServiceList, error) {
-	member, ok := members[name]
-	if !ok {
-		return nil, cberrors.NewErrUnknownMember(name)
-	}
-
+func memberServices(cluster *couchbasev2.CouchbaseCluster, member *couchbaseutil.Member) (couchbasev2.ServiceList, error) {
 	class := cluster.Spec.GetServerConfigByName(member.ServerConfig)
 	if class == nil {
 		return nil, cberrors.NewErrUnknownServerClass(member.ServerConfig)
@@ -799,314 +837,92 @@ type UpdateExposedFeatureStatus struct {
 	Removed couchbasev2.ServiceList
 }
 
-// listExposedServices returns all services which are associated with specific pod ports.
-func listExposedServices(c *client.Client) (services []*v1.Service) {
-	// Filter out non-node services
-	for _, service := range c.Services.List() {
-		if _, ok := service.Labels[constants.LabelNode]; ok {
-			services = append(services, service)
-		}
-	}
-
-	return
-}
-
 // generateExposedService creates a Kubernetes Service resource for the requested member.
-func generateExposedService(name string, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, ports []v1.ServicePort) (*v1.Service, error) {
-	// Define the new service name.
-	exposedServiceName := GetExposedServiceName(name)
-
-	// Attempt to lookup the enabled services on this pod.
-	enabledServices, err := memberServices(cluster, members, name)
+func generateExposedService(member *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster) (*v1.Service, error) {
+	// The ports to expose are first determined by the exposed feature set,
+	// then they are filtered based on the services the member is exposing,
+	// then finally based on whether we are enforcing use of TLS.
+	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.Networking.ExposedFeatures)
 	if err != nil {
 		return nil, err
 	}
 
-	// Remove any ports related to services not exposed on the node.
-	allowedPorts := filterConfiguredPorts(ports, enabledServices)
+	enabledServices, err := memberServices(cluster, member)
+	if err != nil {
+		return nil, err
+	}
 
-	// Create the new service
-	labels := labelsForNodeService(cluster.Name, name)
-	selectors := getNodeServiceSelectors(cluster, name)
-	service := createServiceManifest(exposedServiceName, cluster.Spec.Networking.ExposedFeatureServiceType, allowedPorts, labels, selectors)
-	service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
+	ports := listRequestedPorts(serviceNames)
+	ports = filterConfiguredPorts(ports, enabledServices)
+	ports = filterInsecurePorts(ports, cluster.Spec.IsExposedFeatureServiceTypePublic())
 
-	if cluster.Spec.IsExposedFeatureServiceTypePublic() {
+	// Use either a blank service or the user specified template.
+	service := &v1.Service{}
+
+	if cluster.Spec.Networking.ExposedFeatureServiceTemplate != nil {
+		service.Labels = cluster.Spec.Networking.ExposedFeatureServiceTemplate.Labels
+		service.Annotations = cluster.Spec.Networking.ExposedFeatureServiceTemplate.Annotations
+
+		if cluster.Spec.Networking.ExposedFeatureServiceTemplate.Spec != nil {
+			service.Spec = *cluster.Spec.Networking.ExposedFeatureServiceTemplate.Spec
+		}
+	}
+
+	// Apply deprecated fields, these have precedence for backwards compatibility,
+	// but only apply if they have been set e.g. not the zero value.
+	if cluster.Spec.Networking.ServiceAnnotations != nil {
+		service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
+	}
+
+	if cluster.Spec.Networking.ExposedFeatureServiceType != "" {
+		service.Spec.Type = cluster.Spec.Networking.ExposedFeatureServiceType
+	}
+
+	if cluster.Spec.Networking.LoadBalancerSourceRanges != nil {
 		service.Spec.LoadBalancerSourceRanges = cluster.Spec.Networking.LoadBalancerSourceRanges.StringSlice()
 	}
 
+	// Fill in the metadata.
+	service.Name = member.Name
+	service.Labels = mergeLabels(service.Labels, LabelsForNodeResource(cluster, member.Name))
+	service.OwnerReferences = []metav1.OwnerReference{
+		cluster.AsOwner(),
+	}
+
+	// Fill in the spec.
+	service.Spec.PublishNotReadyAddresses = true
+	service.Spec.Selector = getNodeServiceSelectors(cluster, member.Name)
+	service.Spec.Ports = ports
+
 	// If a DNS domain is specified annotate with the pod DNS name.
 	if cluster.Spec.Networking.DNS != nil {
-		// TODO: data nodes only please
-		// TODO: await input from external-dns
-		//service.Annotations[srvAnnotaion] = GetSRVName(cluster)
-		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, name)
+		if service.Annotations == nil {
+			service.Annotations = map[string]string{}
+		}
+
+		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, member.Name)
 	}
 
 	// Enforce that traffic has to come directly to the k8s node avoiding the
 	// penalty of an extra hop and SNAT.
-	service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-	if cluster.Spec.Networking.ExposedFeatureTrafficPolicy != nil {
-		service.Spec.ExternalTrafficPolicy = *cluster.Spec.Networking.ExposedFeatureTrafficPolicy
+	if service.Spec.ExternalTrafficPolicy == "" {
+		service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 	}
 
 	return service, nil
 }
 
-// createExposedServices creates external services for pods if required.  Don't create services if
-// there are no ports to expose or the service already exists.
-func createExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, ports []v1.ServicePort) (creations []*v1.Service, err error) {
-	if !cluster.Spec.HasExposedFeatures() {
-		return
-	}
-
-	for _, member := range members {
-		// Generate the requested resource
-		var service *v1.Service
-
-		service, err = generateExposedService(member.Name, members, cluster, ports)
-
-		// If the server class is missing then we allow for the node to balanced out.
-		if err != nil {
-			switch {
-			case cberrors.IsErrUnknownServerClass(err):
-				err = nil
-				continue
-			default:
-				return
-			}
-		}
-
-		// Ignore if the service already exists, this will get handled by the update code.
-		if serviceExists(services, service.Name) {
-			continue
-		}
-
-		// Only create if allowed
-		if len(service.Spec.Ports) != 0 {
-			creations = append(creations, service)
-		}
-	}
-
-	return
-}
-
-// updateExposedService applies any modifications to the existing service and returns
-// true if an update is required.
-func updateExposedService(service, requested *v1.Service) bool {
-	updated := false
-
-	// This handles spec.ddns.domain updates.
-	if !reflect.DeepEqual(service.Annotations, requested.Annotations) {
-		service.Annotations = requested.Annotations
-		updated = true
-	}
-
-	// This handles updates to the service type
-	if service.Spec.Type != requested.Spec.Type {
-		service.Spec.Type = requested.Spec.Type
-		service.Spec.Type = requested.Spec.Type
-		updated = true
-	}
-
-	// This handles traffic policy updates
-	if service.Spec.ExternalTrafficPolicy != requested.Spec.ExternalTrafficPolicy {
-		service.Spec.Type = requested.Spec.Type
-		service.Spec.ExternalTrafficPolicy = requested.Spec.ExternalTrafficPolicy
-		updated = true
-	}
-
-	if !reflect.DeepEqual(service.Spec.LoadBalancerSourceRanges, requested.Spec.LoadBalancerSourceRanges) {
-		service.Spec.LoadBalancerSourceRanges = requested.Spec.LoadBalancerSourceRanges
-		updated = true
-	}
-
-	// This handles updates to spec.exposedFeatures
-	existingPorts := intersectPorts(service.Spec.Ports, requested.Spec.Ports)
-	requiredPorts := subtractPorts(requested.Spec.Ports, existingPorts)
-
-	portsAdded := len(requiredPorts) != 0
-	portsRemoved := len(existingPorts) != len(service.Spec.Ports)
-
-	if portsAdded || portsRemoved {
-		updatedPorts := existingPorts
-		updatedPorts = append(updatedPorts, requiredPorts...)
-
-		service.Spec.Type = requested.Spec.Type
-		service.Spec.Ports = updatedPorts
-		updated = true
-	}
-
-	return updated
-}
-
-// updateExposedServices examines existing external services.  It first filters the allowable ports on
-// a per-member basis so as not to expose services not enabled or allowable by the specification.  It then
-// returns an services which require an update or deletion.
-func updateExposedServices(services []*v1.Service, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, ports []v1.ServicePort) (updates, deletions []*v1.Service, err error) {
-	for _, service := range services {
-		// Extract metadata from the service
-		memberName, ok := service.Labels[constants.LabelNode]
-		if !ok {
-			err = fmt.Errorf("exposed service %s missing node label", service.Name)
-			return
-		}
-
-		// Generate the requested resource
-		var requested *v1.Service
-
-		// If the server class is missing then we allow for the node to balanced out.
-		// If the member is missing we delete it.
-		requested, err = generateExposedService(memberName, members, cluster, ports)
-		if err != nil {
-			switch {
-			case cberrors.IsErrUnknownServerClass(err):
-				err = nil
-				continue
-			case cberrors.IsErrUnknownMember(err):
-				deletions = append(deletions, service)
-				err = nil
-
-				continue
-			default:
-				return
-			}
-		}
-
-		// Delete the service if nothing needs to be exposed.
-		if len(requested.Spec.Ports) == 0 {
-			deletions = append(deletions, service)
-			continue
-		}
-
-		// Update if necessary.
-		if updateExposedService(service, requested) {
-			updates = append(updates, service)
-		}
-	}
-
-	return
-}
-
-// UpdateExposedFeatures handles adding and removing per-pod node ports for all
-// services.  Rather than specify individual ports we instead allow addition/deletion
-// via feature sets.  There is some overlap between sets so we perform a boolean union
-// before processing.  The function returns lists of added and removed services so
-// client code can perform any notifications, these are lexically sorted for determinism.
-func UpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster, status *couchbasev2.ClusterStatus) (*UpdateExposedFeatureStatus, error) {
-	// For each feature set accumulate a unique set of services to expose, then map these to
-	// a set of ports we wish to expose.
-	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.Networking.ExposedFeatures)
+func ReconcilePodService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, member *couchbaseutil.Member) error {
+	requested, err := generateExposedService(member, cluster)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	ports := listRequestedPorts(serviceNames)
-
-	// Filter out any insecure ports if we need to
-	ports = filterInsecurePorts(ports, cluster.Spec.IsExposedFeatureServiceTypePublic())
-
-	// Get a list of pre-existing external services that belong to our members.
-	services := listExposedServices(c)
-
-	// Calculate the services that need creating  based on the member status and
-	// cluster specification.
-	creations, err := createExposedServices(services, members, cluster, ports)
-	if err != nil {
-		return nil, err
+	if err := reconcileService(c, cluster, requested); err != nil {
+		return err
 	}
 
-	// Calculate the services that need updating or deleting based on the member status
-	// and cluster specification.
-	updates, deletions, err := updateExposedServices(services, members, cluster, ports)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create any required services, buffering exposed ports if we aren't using public
-	// DNS based addressing.
-	for _, service := range creations {
-		if _, err := createService(c, cluster.Namespace, service, cluster.AsOwner()); err != nil {
-			return nil, err
-		}
-
-		if cluster.Spec.IsExposedFeatureServiceTypePublic() {
-			continue
-		}
-	}
-
-	// Update any required services, buffering exposed ports if we aren't using public
-	// DNS based addressing.
-	for _, service := range updates {
-		if _, err := updateService(c, cluster.Namespace, service); err != nil {
-			return nil, err
-		}
-
-		if cluster.Spec.IsExposedFeatureServiceTypePublic() {
-			continue
-		}
-	}
-
-	// Delete any required services.
-	for _, service := range deletions {
-		if err := deleteService(c, cluster.Namespace, service.Name, nil); err != nil {
-			return nil, err
-		}
-	}
-
-	// Calculate which services have been added or removed
-	prevServiceNames, err := exposedFeatureSetToServiceList(status.ExposedFeatures)
-	if err != nil {
-		return nil, err
-	}
-
-	ret := &UpdateExposedFeatureStatus{
-		Added:   serviceNames.Sub(prevServiceNames),
-		Removed: prevServiceNames.Sub(serviceNames),
-	}
-	sort.Sort(ret.Added)
-	sort.Sort(ret.Removed)
-
-	// Finally update the status
-	status.ExposedFeatures = cluster.Spec.Networking.ExposedFeatures
-
-	return ret, nil
-}
-
-// TEMPORARY HACK
-// Does exactly the same as above but tells us if we need to do anything.
-func WouldUpdateExposedFeatures(c *client.Client, members couchbaseutil.MemberSet, cluster *couchbasev2.CouchbaseCluster) (bool, error) {
-	// For each feature set accumulate a unique set of services to expose
-	serviceNames, err := exposedFeatureSetToServiceList(cluster.Spec.Networking.ExposedFeatures)
-	if err != nil {
-		return false, err
-	}
-
-	// Create the list of ports each node should have
-	ports := listRequestedPorts(serviceNames)
-
-	// Filter out any insecure ports if we need to
-	ports = filterInsecurePorts(ports, cluster.Spec.IsExposedFeatureServiceTypePublic())
-
-	// Get a list of all cluster services that belong to a specific nodes
-	services := listExposedServices(c)
-
-	// Calculate the services that need creating  based on the member status and
-	// cluster specification.
-	creations, err := createExposedServices(services, members, cluster, ports)
-	if err != nil {
-		return false, err
-	}
-
-	// Calculate the services that need updating or deleting based on the member status
-	// and cluster specification.
-	updates, deletions, err := updateExposedServices(services, members, cluster, ports)
-	if err != nil {
-		return false, err
-	}
-
-	// Flag we need a reconcile if any services are created, updated or deleted.
-	return len(creations)+len(updates)+len(deletions) != 0, nil
+	return nil
 }
 
 // GetAlternateAddressExternalPorts polls the pod service for any alternate ports

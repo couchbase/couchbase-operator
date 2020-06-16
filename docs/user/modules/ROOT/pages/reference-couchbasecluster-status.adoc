@@ -40,10 +40,6 @@ status:
     - my-cluster-0001
     - my-cluster-0002
   currentVersion: {couchbase-version}
-  adminConsolePort: "30245"
-  adminConsolePortSSL: "31749"
-  exposedFeatures:
-  - xdcr
   buckets:
     - compressionMode: passive
       conflictResolution: seqno
@@ -251,34 +247,6 @@ When a cluster is upgraded it will remain at the initial cluster version until a
 
 ____
 _Field rules:_ This field will be a string.
-____
-
-=== status.adminConsolePort (DEPRECATED)
-
-The `NodePort` that is listening for connection to the Couchbase web console.
-
-Use xref:howto-ui.adoc#port-forwarding[port-forwarding] to connect to the console, or xref:howto-client-sdks.adoc#ip-based-addressing[service lookup] to derive the correct connection string.
-
-____
-_Field rules:_ This field will be a string.
-____
-
-=== status.adminConsolePortSSL (DEPRECATED)
-
-The `NodePort` that is listening for connection to the Couchbase web console.
-
-Use xref:howto-ui.adoc#port-forwarding[port-forwarding] to connect to the console, or xref:howto-client-sdks.adoc#ip-based-addressing[service lookup] to derive the correct connection string.
-
-____
-_Field rules:_ This field will be a string.
-____
-
-=== status.exposedFeatures[]
-
-The set of xref:concept-couchbase-networking.adoc#exposed-features[exposed features] currently associated with per-node services.
-
-____
-_Field rules:_ This field will be a list of strings, and either `admin`, `xdcr` or `client`.
 ____
 
 === status.buckets[]
