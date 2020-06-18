@@ -13,6 +13,26 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// ResultType is used to encode the test case result type.
+type ResultType string
+
+const (
+	// ResultTypePass means the test passed.
+	ResultTypePass ResultType = "✔"
+
+	// ResultTypeFail means the test failed.
+	ResultTypeFail ResultType = "✗"
+
+	// ResultTypeSkip means the test was skipped, most likely this is due
+	// to the test being incompatible with the environment or dynamic
+	// configuration parameters.
+	ResultTypeSkip ResultType = "?"
+
+	// ResultTypeErr means the test itself errored, at present this means
+	// it raise a panic.
+	ResultTypeErr ResultType = "!"
+)
+
 // Cluster represents a Kubernetes cluster.
 type Cluster struct {
 	// KubeClient is a Kubernetes client for the cluster.

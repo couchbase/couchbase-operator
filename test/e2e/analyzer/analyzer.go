@@ -2,12 +2,15 @@ package analyzer
 
 import (
 	"encoding/xml"
+	"fmt"
 	"io/ioutil"
+	"runtime/debug"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 
 	"github.com/sirupsen/logrus"
 )
@@ -69,12 +72,30 @@ type result struct {
 	runtime time.Duration
 
 	// result is the result of the test.
-	result framework.ResultType
+	result types.ResultType
+
+	// message is an optional message for failed and errored tests.
+	message string
+
+	// stack is an option stack trace for a failed or errored test.
+	stack string
 }
 
 // results is the global list of results.  This is ordered by the completion
 // time of the test.
 var results []result
+
+// message is used by Die to pass failure messages to the junit output.
+var message string
+
+// stack is used by Die to pass failure stack traces to the junit output.
+var stack string
+
+// RecordFailureMessage is used by Die to pass failure messages to the junit output.
+func RecordFailureMessage(m, s string) {
+	message = m
+	stack = s
+}
 
 // Analyzer is an abstract type that is instantiated by every test.  It
 // encapsulates analysis functionality.
@@ -107,26 +128,33 @@ func (a *analyzerImpl) Report(t *testing.T) {
 
 	var statusString string
 
+	recoverError := recover()
+
 	switch {
-	case recover() != nil:
+	case recoverError != nil:
 		statusString = "error"
-		r.result = framework.ResultTypeErr
+		r.result = types.ResultTypeErr
+		r.message = fmt.Sprintf("%v", recoverError)
+		r.stack = string(debug.Stack())
 
 		// Flag the caught exception as a failure so it gets propagated.
 		// Because we caught it it will look like a pass otherwise.
 		t.Fail()
 	case t.Failed():
+		// Note that all tests failures need to use Die for this to work.
 		statusString = "fail"
-		r.result = framework.ResultTypeFail
+		r.result = types.ResultTypeFail
+		r.message = message
+		r.stack = stack
 	case t.Skipped():
 		statusString = "skipped"
-		r.result = framework.ResultTypeSkip
+		r.result = types.ResultTypeSkip
 	default:
 		statusString = "ok"
-		r.result = framework.ResultTypePass
+		r.result = types.ResultTypePass
 	}
 
-	logrus.Infof("%s %s", framework.PrettyResult(r.result), statusString)
+	logrus.Infof("%s %s", util.PrettyResult(r.result), statusString)
 
 	results = append(results, r)
 }
@@ -149,12 +177,12 @@ func Report(suiteName string) {
 
 	var totalTime time.Duration
 
-	logrus.Info(framework.PrettyHeading("Test Summary"))
+	logrus.Info(util.PrettyHeading("Test Summary"))
 
 	cases := make([]JUnitTestCase, totalResults)
 
 	for i, r := range results {
-		logrus.Infof("%4d: %s %s", i+1, r.name, framework.PrettyResult(r.result))
+		logrus.Infof("%4d: %s %s", i+1, r.name, util.PrettyResult(r.result))
 
 		totalTime += r.runtime
 
@@ -164,19 +192,21 @@ func Report(suiteName string) {
 		}
 
 		switch r.result {
-		case framework.ResultTypeErr:
+		case types.ResultTypeErr:
 			errors++
 
 			testCase.Error = &JUnitError{
-				Description: "test panic",
+				Message:     r.message,
+				Description: r.stack,
 			}
-		case framework.ResultTypeFail:
+		case types.ResultTypeFail:
 			failures++
 
 			testCase.Failure = &JUnitFailure{
-				Description: "unknown reason",
+				Message:     r.message,
+				Description: r.stack,
 			}
-		case framework.ResultTypeSkip:
+		case types.ResultTypeSkip:
 			skipped++
 
 			testCase.Skipped = &JUnitSkipped{}
@@ -187,26 +217,26 @@ func Report(suiteName string) {
 		cases[i] = testCase
 	}
 
-	logrus.Info(framework.PrettyHeading("Suite Summary"))
+	logrus.Info(util.PrettyHeading("Suite Summary"))
 
 	if passes > 0 {
 		passRate := (float64(passes) / float64(totalResults)) * 100.0
-		logrus.Infof(" %s Passes: %d (%0.2f%%)", framework.PrettyResult(framework.ResultTypePass), passes, passRate)
+		logrus.Infof(" %s Passes: %d (%0.2f%%)", util.PrettyResult(types.ResultTypePass), passes, passRate)
 	}
 
 	if failures > 0 {
 		failRate := (float64(failures) / float64(totalResults)) * 100.0
-		logrus.Infof(" %s Failures: %d (%0.2f%%)", framework.PrettyResult(framework.ResultTypeFail), failures, failRate)
+		logrus.Infof(" %s Failures: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeFail), failures, failRate)
 	}
 
 	if errors > 0 {
 		errorRate := (float64(errors) / float64(totalResults)) * 100.0
-		logrus.Infof(" %s Errors: %d (%0.2f%%)", framework.PrettyResult(framework.ResultTypeErr), errors, errorRate)
+		logrus.Infof(" %s Errors: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeErr), errors, errorRate)
 	}
 
 	if skipped > 0 {
 		skipRate := (float64(skipped) / float64(totalResults)) * 100.0
-		logrus.Infof(" %s Skipped: %d (%0.2f%%)", framework.PrettyResult(framework.ResultTypeSkip), skipped, skipRate)
+		logrus.Infof(" %s Skipped: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeSkip), skipped, skipRate)
 	}
 
 	testSuite := &JUnitTestSuite{

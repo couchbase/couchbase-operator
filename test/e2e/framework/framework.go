@@ -23,6 +23,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 
 	"github.com/ghodss/yaml"
 	"github.com/sirupsen/logrus"
@@ -137,8 +138,6 @@ func (v *TestConfigValue) String() string {
 	return ""
 }
 
-var useANSIColor bool
-
 func readYamlData() (err error) {
 	// Provide some sane defaults.
 	params := TestRunParam{
@@ -170,14 +169,14 @@ func readYamlData() (err error) {
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
 	flag.Var(&tests, "test", "Individual test to run, overrides -suite if specified")
-	flag.BoolVar(&useANSIColor, "color", false, "Prettify output")
+	flag.BoolVar(&util.UseANSIColor, "color", false, "Prettify output")
 
 	// File based configuration (meat-space friendly)
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
 
 	flag.Parse()
 
-	if useANSIColor {
+	if util.UseANSIColor {
 		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
 	}
 
@@ -374,7 +373,7 @@ func Setup() (err error) {
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
 	e2espec.SetPlatform(runtimeParams.Platform)
 
-	logrus.Info(PrettyHeading("Docker Registries"))
+	logrus.Info(util.PrettyHeading("Docker Registries"))
 
 	for _, registry := range runtimeParams.RegistryConfigs {
 		logrus.Info(" →  server: " + registry.Server)
@@ -382,7 +381,7 @@ func Setup() (err error) {
 		logrus.Info("    password: " + strings.Repeat("*", len(registry.Password)))
 	}
 
-	logrus.Info(PrettyHeading("Container Images"))
+	logrus.Info(util.PrettyHeading("Container Images"))
 	logrus.Info(" →  couchbase operator: " + runtimeParams.OperatorImage)
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
 	logrus.Info(" →  couchbase server: " + runtimeParams.CouchbaseServerImage)
@@ -392,7 +391,7 @@ func Setup() (err error) {
 	logrus.Info(" →  couchbase exporter upgrade: " + runtimeParams.CouchbaseExporterImageUpgrade)
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
 
-	logrus.Info(PrettyHeading("Clusters"))
+	logrus.Info(util.PrettyHeading("Clusters"))
 
 	for _, config := range Global.ClusterSpec {
 		logrus.Info(" →  path: " + config.KubeConfPath)
@@ -400,9 +399,9 @@ func Setup() (err error) {
 		logrus.Info("    namespace: " + config.Namespace)
 	}
 
-	logrus.Info(PrettyHeading("Kubernetes"))
+	logrus.Info(util.PrettyHeading("Kubernetes"))
 	logrus.Info(" →  storage class: " + runtimeParams.StorageClassName)
-	logrus.Info(PrettyHeading("Logs"))
+	logrus.Info(util.PrettyHeading("Logs"))
 	logrus.Info(" →  directory: " + Global.LogDir)
 
 	// Setup the cbopinfo absolute path so it will not change if we move directories

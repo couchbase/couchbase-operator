@@ -130,13 +130,6 @@ type TestFunc func(*testing.T)
 // Map to store Testcase name to their respective Function objects
 type FuncMap map[string]TestFunc
 
-// TestResult simply maps a test name to a pass/fail flag
-type TestResult struct {
-	Name     string
-	Result   bool
-	Unstable bool
-}
-
 // To decode test-suite yaml file
 type SuiteData struct {
 	Timeout  string   `yaml:"timeout"`

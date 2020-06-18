@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/analyzer"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -1356,8 +1357,12 @@ func AddLabelToNode(t *testing.T, kubeClient kubernetes.Interface, node v1.Node,
 }
 
 func Die(t *testing.T, err error) {
+	stackTrace := string(debug.Stack())
+
+	analyzer.RecordFailureMessage(err.Error(), stackTrace)
+
 	t.Log(err)
-	t.Log(string(debug.Stack()))
+	t.Log(stackTrace)
 	t.FailNow()
 }
 
