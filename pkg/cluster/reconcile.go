@@ -602,7 +602,8 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 	}
 
 	// Set the cluster name and memory quotas.
-	if err := couchbaseutil.SetPoolsDefault(defaults).On(c.api, m); err != nil {
+	// This needs a retry, I've seen DDNS instability.
+	if err := couchbaseutil.SetPoolsDefault(defaults).RetryFor(time.Minute).On(c.api, m); err != nil {
 		return err
 	}
 
@@ -645,6 +646,8 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 		FailoverServerGroup: settings.AutoFailoverServerGroup,
 	}
 
+	// This needs a retry, setting the username and password causes server to
+	// do something that may reject requests for a short period.
 	return couchbaseutil.SetAutoFailoverSettings(autoFailoverSettings).RetryFor(time.Minute).On(c.api, m)
 }
 
