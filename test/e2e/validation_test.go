@@ -271,6 +271,29 @@ func patchResources(resources resourceList, patches patchMap) error {
 	return nil
 }
 
+// getStorageClass selects either the framework specified storage class name
+// (so as to maintain backwards compatibility) or selects one from the system.
+// We should just use the system default anyway as that makes all the tests
+// use the same configuration!
+func getStorageClass(t *testing.T, cluster *types.Cluster) string {
+	f := framework.Global
+
+	if f.StorageClassName != nil {
+		return *f.StorageClassName
+	}
+
+	scs, err := cluster.KubeClient.StorageV1().StorageClasses().List(metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if len(scs.Items) == 0 {
+		t.Skip("test requires a storage class on the platform")
+	}
+
+	return scs.Items[0].Name
+}
+
 func runValidationTest(t *testing.T, targetKube *types.Cluster, testDefs []testDef, command string) {
 	f := framework.Global
 
@@ -376,7 +399,7 @@ func runValidationTest(t *testing.T, targetKube *types.Cluster, testDefs []testD
 					if !ok {
 						e2eutil.Die(t, fmt.Errorf("unexpected data type"))
 					}
-					if err := unstructured.SetNestedField(pvct, f.StorageClassName, "spec", "storageClassName"); err != nil {
+					if err := unstructured.SetNestedField(pvct, getStorageClass(t, targetKube), "spec", "storageClassName"); err != nil {
 						e2eutil.Die(t, err)
 					}
 				}
