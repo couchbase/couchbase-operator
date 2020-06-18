@@ -1211,3 +1211,60 @@ func NodeListOpt(cluster *couchbasev2.CouchbaseCluster, memberName string) metav
 		LabelSelector: labels.SelectorFromSet(l).String(),
 	}
 }
+
+// MustCheckStatusVersion checks that the status version is as we expect.
+func MustCheckStatusVersion(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, version string, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if c.Status.CurrentVersion != version {
+			return fmt.Errorf("expected %s, got %s", version, c.Status.CurrentVersion)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustCheckStatusVersionFor checks that the status version is as we expect
+// for a set amount of time, in case it is reverted by something.
+func MustCheckStatusVersionFor(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, version string, period time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), period)
+	defer cancel()
+
+	for {
+		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			Die(t, err)
+		}
+
+		if c.Status.CurrentVersion != version {
+			Die(t, fmt.Errorf("expected %s, got %s", version, c.Status.CurrentVersion))
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+// MustGetCouchbaseVersion extracts the semantic version from the image tag.
+func MustGetCouchbaseVersion(t *testing.T, image string) string {
+	version, err := k8sutil.CouchbaseVersion(image)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return version
+}

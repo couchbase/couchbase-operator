@@ -165,6 +165,7 @@ func TestUpgrade(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
@@ -175,6 +176,8 @@ func TestUpgrade(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Image", f.CouchbaseServerImageUpgrade), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

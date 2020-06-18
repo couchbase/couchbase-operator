@@ -1553,9 +1553,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return err
 	}
 
-	c.cluster.Status.CurrentVersion = version
-
-	if err := c.updateCRStatus(); err != nil {
+	if err := c.state.Update(persistence.Version, version); err != nil {
 		return err
 	}
 
