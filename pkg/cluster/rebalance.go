@@ -242,7 +242,7 @@ func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPN
 	// the rebalance, the cluster status may indicate that all expected members are balanced
 	// in, and there are no nodes we don't expect.  It may have happened too quickly to
 	// be observed!
-	if err := c.verifyRebalance(ms); err != nil {
+	if err := c.verifyRebalance(); err != nil {
 		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 		return err
 	}
@@ -271,7 +271,7 @@ func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPN
 	return nil
 }
 
-func (c *Cluster) verifyRebalance(members couchbaseutil.MemberSet) error {
+func (c *Cluster) verifyRebalance() error {
 	// Error checking... perfom this a few times as there is a race between when
 	// we check and when Server reports rebalance is complete.
 	retryFunc := func() error {
@@ -286,7 +286,7 @@ func (c *Cluster) verifyRebalance(members couchbaseutil.MemberSet) error {
 		}
 
 		// All Operator members should be active Couchbase nodes.
-		for name := range members {
+		for name := range c.members {
 			state, ok := status.NodeStates[name]
 			if !ok {
 				return fmt.Errorf("node %s not found in cluster", name)
@@ -299,7 +299,7 @@ func (c *Cluster) verifyRebalance(members couchbaseutil.MemberSet) error {
 
 		// All Couchbase nodes should be Operator members.
 		for name := range status.NodeStates {
-			if _, ok := members[name]; !ok {
+			if _, ok := c.members[name]; !ok {
 				return fmt.Errorf("node %s unexpectedly clustered", name)
 			}
 		}

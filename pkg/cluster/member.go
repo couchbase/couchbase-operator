@@ -34,8 +34,9 @@ func (c *Cluster) updateMembers() error {
 		}
 
 		// Add any nodes that Couchbase knows about that we do not.
-		// We will just kick them out anyway.
-		members.Append(status.UnknownMembers)
+		// Don't overwrite anything derived from PVCs as the member
+		// metadata will be garbage from Couchbase.
+		members.Merge(status.UnknownMembers)
 
 		for name, member := range runningMembers {
 			state, ok := status.NodeStates[name]

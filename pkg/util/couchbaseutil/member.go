@@ -225,6 +225,16 @@ func (ms MemberSet) Append(other MemberSet) {
 	}
 }
 
+// Merges one set into another, retaining the original
+// member if set.
+func (ms MemberSet) Merge(other MemberSet) {
+	for name, member := range other {
+		if _, ok := ms[name]; !ok {
+			ms.Add(member)
+		}
+	}
+}
+
 // Names returns a sorted list of member names.
 func (ms MemberSet) Names() []string {
 	names := []string{}
