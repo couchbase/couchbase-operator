@@ -610,6 +610,8 @@ func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 			}
 
 			r.couchbase.NeedsRebalance = true
+
+			r.knownNodes.Add(m)
 		} else {
 			log.Info("Add back pod not in the specification, deleting", "cluster", c.namespacedName(), "name", m.Name, "class", m.ServerConfig)
 
