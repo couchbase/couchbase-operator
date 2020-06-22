@@ -74,7 +74,7 @@ To generate a certificate for the cluster `cb-example` in the `default` namespac
 
 [source,console]
 ----
-$ ./easyrsa --subject-alt-name=DNS:*.cb-example,DNS:*.cb-example.default,DNS:*.cb-example.default.svc,DNS:cb-example-srv,DNS:cb-example-srv.default,DNS:cb-example-srv.default.svc,DNS:localhost build-server-full couchbase-server nopass
+$ ./easyrsa --subject-alt-name='DNS:*.cb-example,DNS:*.cb-example.default,DNS:*.cb-example.default.svc,DNS:cb-example-srv,DNS:cb-example-srv.default,DNS:cb-example-srv.default.svc,DNS:localhost' build-server-full couchbase-server nopass
 ----
 
 The key/certificate pair can be found in `pki/private/couchbase-server.key` and `pki/issued/couchbase-server.crt` and used as `pkey.pem` and `chain.pem`, respectively, in the xref:reference-couchbasecluster.adoc#spec-networking-tls-static-serversecret[`spec.networking.tls.static.serverSecret`] cluster parameter.
