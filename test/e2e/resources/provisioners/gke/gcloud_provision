@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 gcloud_provision
@@ -76,13 +76,13 @@ volumeBindingMode: WaitForFirstConsumer
 def gcloud(*cmd):
     """Runs a gcloud command raising an exception on error"""
 
-    return str(subprocess.check_output(['gcloud'] + list(cmd) + ['--quiet'])).strip()
+    return subprocess.check_output(['gcloud'] + list(cmd) + ['--quiet']).decode().strip()
 
 
 def kubectl(*cmd):
     """Runs a kubectl command raising an exception on error"""
 
-    return str(subprocess.check_output(['kubectl'] + list(cmd))).strip()
+    return subprocess.check_output(['kubectl'] + list(cmd)).decode().strip()
 
 
 def context_name(args, region):
@@ -157,7 +157,7 @@ def start(args):
 
         # Add in a useful storage class
         with tempfile.NamedTemporaryFile() as manifest:
-            manifest.write(STORAGE_CLASS)
+            manifest.write(STORAGE_CLASS.encode())
             manifest.flush()
 
             kubectl('create', '-f', manifest.name,
@@ -198,7 +198,7 @@ def main():
     elif args.command == 'stop':
         stop(args)
     else:
-        print 'invalid command {}'.format(args.command)
+        print('invalid command {}'.format(args.command))
         sys.exit(1)
 
 
