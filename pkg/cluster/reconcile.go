@@ -1580,26 +1580,26 @@ func replicationKey(r couchbaseutil.Replication) string {
 	return fmt.Sprintf("%s/%s/%s", r.ToCluster, r.FromBucket, r.ToBucket)
 }
 
-func (c *Cluster) listReplications(r *couchbaseutil.ReplicationList) error {
+func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
 	tasks := &couchbaseutil.TaskList{}
 	if err := couchbaseutil.ListTasks(tasks).On(c.api, c.readyMembers()); err != nil {
-		return err
+		return nil, err
 	}
 
 	tasks = tasks.FilterType(couchbaseutil.TaskTypeXDCR)
 
-	replications := make([]couchbaseutil.Replication, len(*tasks))
+	replications := make(couchbaseutil.ReplicationList, len(*tasks))
 
-	for _, task := range *tasks {
+	for i, task := range *tasks {
 		// Parse the target to recover lost information.
 		// Should be in the form /remoteClusters/c4c9af9ad62d8b5f665edac5ffc9c1be/buckets/default
 		if task.Target == "" {
-			return fmt.Errorf("listReplications: target not populated")
+			return nil, fmt.Errorf("listReplications: target not populated")
 		}
 
 		parts := strings.Split(task.Target, "/")
 		if len(parts) != 5 {
-			return fmt.Errorf("listReplications: target incorrectly formatted: %v", task.Target)
+			return nil, fmt.Errorf("listReplications: target incorrectly formatted: %v", task.Target)
 		}
 
 		uuid := parts[2]
@@ -1608,17 +1608,17 @@ func (c *Cluster) listReplications(r *couchbaseutil.ReplicationList) error {
 		// Lookup the UUID to recover the cluster name.
 		cluster, err := c.getRemoteClusterByUUID(uuid)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// Lookup the settings to recover the compression type.
 		settings := &couchbaseutil.ReplicationSettings{}
 		if err := couchbaseutil.GetReplicationSettings(settings, uuid, task.Source, to).On(c.api, c.readyMembers()); err != nil {
-			return err
+			return nil, err
 		}
 
 		// By now your eyeballs will be dry from all the rolling they are doing.
-		replications = append(replications, couchbaseutil.Replication{
+		replications[i] = couchbaseutil.Replication{
 			FromBucket:       task.Source,
 			ToCluster:        cluster.Name,
 			ToBucket:         to,
@@ -1627,12 +1627,10 @@ func (c *Cluster) listReplications(r *couchbaseutil.ReplicationList) error {
 			CompressionType:  settings.CompressionType,
 			FilterExpression: task.FilterExpression,
 			PauseRequested:   settings.PauseRequested,
-		})
+		}
 	}
 
-	*r = replications
-
-	return nil
+	return replications, nil
 }
 
 // getRemoteClusterByName helps manage the utter horror show that is XDCR
@@ -1761,8 +1759,8 @@ func (c *Cluster) reconcileXDCR() error {
 		return err
 	}
 
-	currentReplications := &couchbaseutil.ReplicationList{}
-	if err := c.listReplications(currentReplications); err != nil {
+	currentReplications, err := c.listReplications()
+	if err != nil {
 		return err
 	}
 
@@ -1790,7 +1788,7 @@ CreateNextReplication:
 	for requestedIndex := range requestedReplications {
 		requested := requestedReplications[requestedIndex]
 
-		for _, current := range *currentReplications {
+		for _, current := range currentReplications {
 			if replicationKey(current) == replicationKey(requested) {
 				if !reflect.DeepEqual(current, requested) {
 					log.Info("Updating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(requested))
@@ -1822,7 +1820,7 @@ CreateNextReplication:
 
 	// Delete any orphaned replications...
 DeleteNextReplication:
-	for _, currentReplication := range *currentReplications {
+	for _, currentReplication := range currentReplications {
 		current := currentReplication
 
 		for _, requested := range requestedReplications {
