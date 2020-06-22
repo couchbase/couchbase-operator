@@ -123,7 +123,7 @@ type Request struct {
 
 	// host is the function used to extract the HTTP host URL from a
 	// member.  If nil this defaults to ClientURL.
-	Host func(*Member) string
+	Host func(Member) string
 
 	// path is the HTTP path to call.
 	Path string
@@ -161,7 +161,7 @@ func NewRequestError(err error) *Request {
 
 // InPlaintext forces the API requests to be in plaintext.
 func (r *Request) InPlaintext() *Request {
-	r.Host = (*Member).GetHostURLPlaintext
+	r.Host = Member.GetHostURLPlaintext
 	return r
 }
 
@@ -183,7 +183,7 @@ func (r *Request) On(client *Client, target interface{}) error {
 
 	// Set a default address resolution function if none is specified.
 	if r.Host == nil {
-		r.Host = (*Member).GetHostURL
+		r.Host = Member.GetHostURL
 	}
 
 	// Translate the specified targets into a list of hosts.
@@ -194,7 +194,7 @@ func (r *Request) On(client *Client, target interface{}) error {
 		for _, member := range t {
 			hosts = append(hosts, r.Host(member))
 		}
-	case *Member:
+	case Member:
 		hosts = append(hosts, r.Host(t))
 	case string:
 		hosts = append(hosts, t)

@@ -267,9 +267,9 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	log.Info("Operator added member", "cluster", c.namespacedName(), "name", m.Name)
+	log.Info("Operator added member", "cluster", c.namespacedName(), "name", m.Name())
 
-	c.raiseEvent(k8sutil.MemberAddEvent(m.Name, c.cluster))
+	c.raiseEvent(k8sutil.MemberAddEvent(m.Name(), c.cluster))
 
 	if err := c.initMember(m, c.cluster.Spec.Servers[idx]); err != nil {
 		return err
@@ -442,12 +442,8 @@ func (c *Cluster) updateCRStatus() error {
 	return nil
 }
 
-func (c *Cluster) isSecureClient() bool {
-	return c.cluster.Spec.Networking.TLS.IsSecureClient()
-}
-
-func (c *Cluster) createPod(ctx context.Context, m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
-	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name, "image", c.cluster.Spec.CouchbaseImage())
+func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name(), "image", c.cluster.Spec.CouchbaseImage())
 
 	_, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec)
 
@@ -472,19 +468,19 @@ func (c *Cluster) removePod(name string, removeVolumes bool) error {
 
 // Delete pod and create with same name.
 // Persisted members will reuse volume mounts.
-func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
-	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
+func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
+	config := c.cluster.Spec.GetServerConfigByName(m.Config())
 	if config == nil {
-		return fmt.Errorf("config for pod does not exist: %s", m.ServerConfig)
+		return fmt.Errorf("config for pod does not exist: %s", m.Config())
 	}
 
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
 
-	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name, opts); err != nil {
+	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name(), opts); err != nil {
 		return err
 	}
 
-	if err := c.waitForDeletePod(m.Name, 120); err != nil {
+	if err := c.waitForDeletePod(m.Name(), 120); err != nil {
 		return err
 	}
 
@@ -506,8 +502,8 @@ func (c *Cluster) recreatePod(m *couchbaseutil.Member) error {
 }
 
 // wait with context.
-func (c *Cluster) waitForCreatePod(ctx context.Context, member *couchbaseutil.Member) error {
-	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name, member.GetHostPort()); err != nil {
+func (c *Cluster) waitForCreatePod(ctx context.Context, member couchbaseutil.Member) error {
+	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name(), member.GetHostPort()); err != nil {
 		return err
 	}
 
@@ -525,14 +521,14 @@ func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
 	return nil
 }
 
-func (c *Cluster) isPodRecoverable(m *couchbaseutil.Member) bool {
-	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
+func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
+	config := c.cluster.Spec.GetServerConfigByName(m.Config())
 	if config == nil {
 		return false
 	}
 
-	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name); err != nil {
-		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name, "reason", err)
+	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name()); err != nil {
+		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
 		return false
 	}
 
@@ -546,11 +542,11 @@ func (c *Cluster) recoverClusterDown() error {
 		m := c.members[name]
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
-				return fmt.Errorf("node %s could not be recovered: %s", m.Name, err.Error())
+				return fmt.Errorf("node %s could not be recovered: %s", m.Name(), err.Error())
 			}
 
-			log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name)
-			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name, c.cluster))
+			log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name())
+			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name(), c.cluster))
 
 			break
 		}
@@ -680,7 +676,7 @@ func (c *Cluster) initCouchbaseClient() error {
 
 	c.api = couchbaseutil.New(c.ctx, c.namespacedName(), c.username, c.password)
 
-	if c.isSecureClient() {
+	if c.cluster.IsTLSEnabled() {
 		// Grab the operator secret
 		secretName := c.cluster.Spec.Networking.TLS.Static.OperatorSecret
 
@@ -731,7 +727,7 @@ func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
 }
 
 // Adds a new member to our cluster object and updates the cluster status.
-func (c *Cluster) clusterAddMember(member *couchbaseutil.Member) error {
+func (c *Cluster) clusterAddMember(member couchbaseutil.Member) error {
 	firstMember := c.members.Empty()
 
 	c.members.Add(member)

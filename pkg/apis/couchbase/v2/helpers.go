@@ -361,12 +361,8 @@ func (cs *ClusterSpec) IsAdminConsoleServiceTypePublic() bool {
 	return false
 }
 
-func (tp *TLSPolicy) IsSecureClient() bool {
-	if tp == nil || tp.Static == nil {
-		return false
-	}
-
-	return len(tp.Static.OperatorSecret) != 0
+func (c *CouchbaseCluster) IsTLSEnabled() bool {
+	return c.Spec.Networking.TLS != nil && c.Spec.Networking.TLS.Static != nil
 }
 
 // Set ready members from list.

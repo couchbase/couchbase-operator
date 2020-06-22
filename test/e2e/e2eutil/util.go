@@ -955,15 +955,15 @@ func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couc
 	}
 }
 
-func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m *couchbaseutil.Member) (*v1.Pod, error) {
+func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m couchbaseutil.Member) (*v1.Pod, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: m.Name,
+			Name: m.Name(),
 			Labels: map[string]string{
 				operator_constants.LabelApp:      "couchbase",
 				operator_constants.LabelCluster:  cl.Name,
-				operator_constants.LabelNode:     m.Name,
-				operator_constants.LabelNodeConf: m.ServerConfig,
+				operator_constants.LabelNode:     m.Name(),
+				operator_constants.LabelNodeConf: m.Config(),
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				cl.AsOwner(),
@@ -973,13 +973,13 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m *co
 			Containers: []v1.Container{
 				k8sutil.CouchbaseContainer(cl.Spec.Image),
 			},
-			Hostname:  m.Name,
+			Hostname:  m.Name(),
 			Subdomain: cl.Name,
 		},
 	}
 
 	for _, config := range cl.Spec.Servers {
-		if config.Name == m.ServerConfig {
+		if config.Name == m.Config() {
 			p, err := k8s.KubeClient.CoreV1().Pods(cl.Namespace).Create(pod)
 			if err != nil {
 				return nil, err
@@ -997,7 +997,7 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m *co
 		}
 	}
 
-	return nil, NewErrServerConfigNotFound(m.ServerConfig)
+	return nil, NewErrServerConfigNotFound(m.Config())
 }
 
 func deleteCouchbaseOperator(k8s *types.Cluster) error {

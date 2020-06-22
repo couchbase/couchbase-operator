@@ -17,7 +17,7 @@ import (
 )
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
-func tlsValid(member *couchbaseutil.Member, ca, clientCert, clientKey []byte, cert *x509.Certificate) bool {
+func tlsValid(member couchbaseutil.Member, ca, clientCert, clientKey []byte, cert *x509.Certificate) bool {
 	serverChain, err := netutil.GetTLSState(member.GetHostPortTLS(), ca, clientCert, clientKey)
 	if err == nil && serverChain[0].Equal(cert) {
 		return true
@@ -27,16 +27,16 @@ func tlsValid(member *couchbaseutil.Member, ca, clientCert, clientKey []byte, ce
 }
 
 // reloadCA insecurely reloads the cluster CA certificate.
-func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
+func (c *Cluster) reloadCA(member couchbaseutil.Member, cacert []byte) error {
 	oldcacert := []byte{}
-	if err := couchbaseutil.GetClusterCACert(oldcacert).On(c.api, member); err != nil {
+	if err := couchbaseutil.GetClusterCACert(oldcacert).InPlaintext().On(c.api, member); err != nil {
 		return err
 	}
 
 	if !reflect.DeepEqual(cacert, oldcacert) {
 		log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name)
 
-		if err := couchbaseutil.SetClusterCACert(cacert).On(c.api, member); err != nil {
+		if err := couchbaseutil.SetClusterCACert(cacert).InPlaintext().On(c.api, member); err != nil {
 			return err
 		}
 	}
@@ -45,13 +45,13 @@ func (c *Cluster) reloadCA(member *couchbaseutil.Member, cacert []byte) error {
 }
 
 // reloadChain does an insecure reload of the TLS certificates and keys.
-func (c *Cluster) reloadChain(member *couchbaseutil.Member) error {
-	return couchbaseutil.ReloadNodeCert().On(c.api, member)
+func (c *Cluster) reloadChain(member couchbaseutil.Member) error {
+	return couchbaseutil.ReloadNodeCert().InPlaintext().On(c.api, member)
 }
 
 // reloadChainAndVerify reloads the certificate chain for a member when necessary,
 // waiting until the certificate is presented by the server.
-func (c *Cluster) reloadChainAndVerify(member *couchbaseutil.Member, cacert, clientCert, clientKey []byte, cert *x509.Certificate) error {
+func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cacert, clientCert, clientKey []byte, cert *x509.Certificate) error {
 	log.Info("Reloading certificate chain", "cluster", c.namespacedName(), "name", member.Name)
 
 	// Wait for the certificate data to be updated. NS server has a few quirks (as per usual... sigh).
@@ -146,14 +146,7 @@ func (c *Cluster) getTLSClientData() (chain []byte, key []byte, err error) {
 
 // reconcileMemberTLS reconciles both the CA and certificate chain on Couchbase server.
 // This is done in plain text due to races involving required mTLS.
-func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key []byte, leaf *x509.Certificate) (bool, error) {
-	secureClient := member.SecureClient
-	member.SecureClient = false
-
-	defer func() {
-		member.SecureClient = secureClient
-	}()
-
+func (c *Cluster) reconcileMemberTLS(member couchbaseutil.Member, ca, cert, key []byte, leaf *x509.Certificate) (bool, error) {
 	// Try connect to the target node, if it doesn't respond we assume it's
 	// deleted or the admin service has gone down and needs a reconcile to fix it.
 	ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
@@ -183,7 +176,7 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 	}
 
 	// If the pods doesn't have TLS enabled then ignore it.
-	pod, found := c.k8s.Pods.Get(member.Name)
+	pod, found := c.k8s.Pods.Get(member.Name())
 	if !found {
 		return false, nil
 	}
@@ -274,7 +267,7 @@ func (c *Cluster) reconcileTLS(members couchbaseutil.MemberSet) error {
 	}
 
 	// Insecure cluster, ignore.
-	if !c.cluster.Spec.Networking.TLS.IsSecureClient() {
+	if !c.cluster.IsTLSEnabled() {
 		return nil
 	}
 

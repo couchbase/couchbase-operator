@@ -58,74 +58,112 @@ func (otpNodes OTPNodeList) StringSlice() []string {
 	return out
 }
 
-// Member is the core internal representation of a Couchbase server node.
-type Member struct {
-	// Name is the pod name of a member.
-	Name string
+type Member interface {
+	Name() string
+	Config() string
+	UseTLS() bool
+	Version() string
+	GetDNSName() string
+	GetHostPort() string
+	GetHostPortTLS() string
+	GetHostURL() string
+	GetHostURLPlaintext() string
+	GetHostName() HostName
+	GetOTPNode() OTPNode
+}
 
-	// Cluster name is the Couchbase cluster a member belongs to.
-	ClusterName string
+// memberImpl is the core internal representation of a Couchbase server node.
+type memberImpl struct {
+	// name is the pod name of a member.
+	name string
 
-	// Namespace is the namespace the Couchbase cluster resides in.
-	Namespace string
+	// cluster is the Couchbase cluster a member belongs to.
+	cluster string
 
-	// ServerConfig is the server class (spec.servers.name) the member belongs to.
-	ServerConfig string
+	// namespace is the namespace the Couchbase cluster resides in.
+	namespace string
 
-	// SecureClient defines whether this member will be communicated with over
+	// config is the server class (spec.servers.name) the member belongs to.
+	config string
+
+	// useTLS defines whether this member will be communicated with over
 	// plain text or TLS.
-	SecureClient bool
+	useTLS bool
 
-	// Version is the Couchbase server version this member is using.
-	Version string
+	// version is the Couchbase server version this member is using.
+	version string
+}
+
+// NewMember returns a new member that is created or managed by the operator
+// as we are in possession of all the metadata that entails.
+func NewMember(namespace, cluster, name, version, config string, useTLS bool) Member {
+	return &memberImpl{
+		namespace: namespace,
+		cluster:   cluster,
+		name:      name,
+		version:   version,
+		config:    config,
+		useTLS:    useTLS,
+	}
+}
+
+// NewPartialMember returns a new member that is only partially known about
+// in that we don't know its configuration or how to communicate with it.
+// What we do know is enough to address it and refer to it in Couchbase server.
+func NewPartialMember(namespace, cluster, name string) Member {
+	return &memberImpl{
+		namespace: namespace,
+		cluster:   cluster,
+		name:      name,
+	}
 }
 
 // GetDNSName returns the member's DNS name.  The host name is generated for an endpoint
 // associated with a cluster-wide headless service.
-func (m Member) GetDNSName() string {
-	return fmt.Sprintf("%s.%s.%s.svc", m.Name, m.ClusterName, m.Namespace)
+func (m *memberImpl) GetDNSName() string {
+	return fmt.Sprintf("%s.%s.%s.svc", m.name, m.cluster, m.namespace)
 }
 
 // GetHostPort returns the member's host and port.  The port is dynamic based on the TLS
 // configuration, if TLS is enabled, we will use the TLS admin port.
-func (m Member) GetHostPort() string {
+func (m *memberImpl) GetHostPort() string {
 	return fmt.Sprintf("%s:%d", m.GetDNSName(), m.clientPort())
 }
 
 // GetHostPortTLS is used to force the use of TLS, in particular for probing the TLS
 // state before upgrading client connections.
-func (m Member) GetHostPortTLS() string {
+func (m *memberImpl) GetHostPortTLS() string {
 	return fmt.Sprintf("%s:18091", m.GetDNSName())
 }
 
 // GetHostURL return the member's host URL (without a path).  The scheme and port are
 // based on the TLS configuration, if TLS is enabled, we will use HTTPS and the TLS admin
 // port.  This is how the Operator will communicate with Couchbase server.
-func (m Member) GetHostURL() string {
+func (m *memberImpl) GetHostURL() string {
 	return fmt.Sprintf("%s://%s", m.clientScheme(), m.GetHostPort())
 }
 
 // GetHostURLPlaintext is for use when we need to force the use of HTTP, typically
 // during TLS reconciliation where the TLS state would usually prohibit this.
-func (m Member) GetHostURLPlaintext() string {
+func (m *memberImpl) GetHostURLPlaintext() string {
 	return fmt.Sprintf("http://%s:8091", m.GetDNSName())
 }
 
 // GetHostName returns what Couchbase calls a host name; a combination of DNS and port.
-func (m Member) GetHostName() HostName {
+func (m *memberImpl) GetHostName() HostName {
 	return HostName(m.GetHostPort())
 }
 
 // GetOTPNode is an anachronism and is used to operator the Couchbase cluster even though
 // nothing on the client ever refers to nodes this way!  While this can be mapped from a
 // /pools/default, it's quicker and less error prone to just to procedurally generate it.
-func (m Member) GetOTPNode() OTPNode {
+func (m *memberImpl) GetOTPNode() OTPNode {
 	return OTPNode(fmt.Sprintf("ns_1@%s", m.GetDNSName()))
 }
 
 // clientScheme returns the URL scheme for a member dependant upon the TLS mode.
-func (m Member) clientScheme() string {
-	if m.SecureClient {
+func (m *memberImpl) clientScheme() string {
+	if m.useTLS {
 		return "https"
 	}
 
@@ -133,23 +171,47 @@ func (m Member) clientScheme() string {
 }
 
 // clientPort returns the admin port dependant on the member TLS mode.
-func (m Member) clientPort() int {
-	if m.SecureClient {
+func (m *memberImpl) clientPort() int {
+	if m.useTLS {
 		return adminPortTLS
 	}
 
 	return adminPort
 }
 
+func (m *memberImpl) Name() string {
+	return m.name
+}
+
+func (m *memberImpl) Config() string {
+	if m.config == "" {
+		return "unknown"
+	}
+
+	return m.config
+}
+
+func (m *memberImpl) Version() string {
+	if m.version == "" {
+		return "unknown"
+	}
+
+	return m.version
+}
+
+func (m *memberImpl) UseTLS() bool {
+	return m.useTLS
+}
+
 // MemberSet is a mapping from member/pod name to the member.
-type MemberSet map[string]*Member
+type MemberSet map[string]Member
 
 // NewMemberSet creates a new member set from the list of members.
-func NewMemberSet(ms ...*Member) MemberSet {
+func NewMemberSet(ms ...Member) MemberSet {
 	res := MemberSet{}
 
 	for _, m := range ms {
-		res[m.Name] = m
+		res[m.Name()] = m
 	}
 
 	return res
@@ -209,8 +271,8 @@ func (ms MemberSet) Empty() bool {
 }
 
 // Add adds a new member to the member set.
-func (ms MemberSet) Add(m *Member) {
-	ms[m.Name] = m
+func (ms MemberSet) Add(m Member) {
+	ms[m.Name()] = m
 }
 
 // Remove removes the named member from the member set.
@@ -218,8 +280,8 @@ func (ms MemberSet) Remove(name string) {
 	delete(ms, name)
 }
 
-// Append adds the specified member set to the receiver.
-func (ms MemberSet) Append(other MemberSet) {
+// MergeWithOverwrite adds the specified member set to the receiver.
+func (ms MemberSet) MergeWithOverwrite(other MemberSet) {
 	for _, m := range other {
 		ms.Add(m)
 	}
@@ -240,7 +302,7 @@ func (ms MemberSet) Names() []string {
 	names := []string{}
 
 	for _, m := range ms {
-		names = append(names, m.Name)
+		names = append(names, m.Name())
 	}
 
 	sort.Strings(names)
@@ -264,7 +326,7 @@ func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
 	rv := NewMemberSet()
 
 	for _, m := range ms {
-		if m.ServerConfig == config {
+		if m.Config() == config {
 			rv.Add(m)
 		}
 	}
@@ -274,6 +336,6 @@ func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
 
 // CreateMemberName is a helper function that defines a member name based on
 // cluster and numerical index.
-func CreateMemberName(clusterName string, member int) string {
-	return fmt.Sprintf("%s-%04d", clusterName, member)
+func CreateMemberName(cluster string, member int) string {
+	return fmt.Sprintf("%s-%04d", cluster, member)
 }

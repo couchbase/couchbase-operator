@@ -200,7 +200,7 @@ func (c *Cluster) logFailedMember(message, name string) {
 }
 
 // Create a new Couchbase cluster member.
-func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbaseutil.Member, err error) {
+func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbaseutil.Member, err error) {
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
@@ -235,13 +235,13 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 			_ = c.decPodIndex()
 			// Deleting volumes, even log volumes
 			// if node doesn't get to start
-			_ = c.removePod(newMember.Name, true)
+			_ = c.removePod(newMember.Name(), true)
 		}
 	}()
 
 	if err := c.createPod(ctx, newMember, serverSpec); err != nil {
-		c.logFailedMember("Member creation failed", newMember.Name)
-		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name, err)
+		c.logFailedMember("Member creation failed", newMember.Name())
+		return nil, fmt.Errorf("fail to create member's pod (%s): %v", newMember.Name(), err)
 	}
 
 	// Synchronize on pod creation and service availability
@@ -249,8 +249,8 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 		// We will delete the pod on error, so collect any ephemeral debug we can before
 		// discarding it forever.  This will capture errors such as users specifying the
 		// wrong image name (pull error), PVCs taking an age to become bound etc.
-		c.logFailedMember("Member creation failed", newMember.Name)
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
+		c.logFailedMember("Member creation failed", newMember.Name())
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 
 		return nil, err
 	}
@@ -264,18 +264,18 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 	// Check the pod is EE.  DNS should be working (as checked by the wait above), but
 	// it has been observed that this may still need a retry.
 	info := &couchbaseutil.PoolsInfo{}
-	if err := couchbaseutil.GetPools(info).RetryFor(time.Minute).On(c.api, newMember); err != nil {
+	if err := couchbaseutil.GetPools(info).InPlaintext().RetryFor(time.Minute).On(c.api, newMember); err != nil {
 		return nil, err
 	}
 
 	if !info.Enterprise {
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 		return nil, fmt.Errorf("couchbase server reports community edition")
 	}
 
 	// Enable TLS if requested
 	if err := c.initMemberTLS(ctx, newMember, c.cluster.Spec); err != nil {
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name, c.cluster))
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 		return nil, err
 	}
 
@@ -305,7 +305,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m *couchbas
 }
 
 // Creates and adds a new Couchbase cluster member.
-func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil.Member, error) {
+func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.Member, error) {
 	// Create the new member
 	newMember, err := c.createMember(serverSpec)
 	if err != nil {
@@ -332,7 +332,7 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (*couchbaseutil
 	}
 
 	log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", newMember.Name)
-	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name, c.cluster))
+	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name(), c.cluster))
 
 	return newMember, nil
 }
@@ -356,12 +356,12 @@ func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 }
 
 // Cancel a node addition.
-func (c *Cluster) cancelAddMember(member *couchbaseutil.Member) error {
+func (c *Cluster) cancelAddMember(member couchbaseutil.Member) error {
 	if err := couchbaseutil.CancelAddNode(member.GetOTPNode()).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
-	c.raiseEvent(k8sutil.FailedAddNodeEvent(member.Name, c.cluster))
+	c.raiseEvent(k8sutil.FailedAddNodeEvent(member.Name(), c.cluster))
 
 	return nil
 }
@@ -625,7 +625,7 @@ func (c *Cluster) reconcilePodServices() error {
 	// service associated with it.
 	if c.cluster.Spec.HasExposedFeatures() {
 		for _, member := range c.members {
-			_, ok := c.k8s.Services.Get(member.Name)
+			_, ok := c.k8s.Services.Get(member.Name())
 
 			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, member); err != nil {
 				if cberrors.IsErrUnknownServerClass(err) {
@@ -664,7 +664,7 @@ func (c *Cluster) reconcilePodServices() error {
 }
 
 // initializes the first member in the cluster.
-func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
 	log.Info("Initial pod creating", "cluster", c.namespacedName())
 	settings := c.cluster.Spec.ClusterSettings
 
@@ -728,7 +728,7 @@ func (c *Cluster) initMember(m *couchbaseutil.Member, serverSpec couchbasev2.Ser
 }
 
 // Initialize a member with TLS certificates.
-func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs couchbasev2.ClusterSpec) error {
+func (c *Cluster) initMemberTLS(ctx context.Context, m couchbaseutil.Member, cs couchbasev2.ClusterSpec) error {
 	if cs.Networking.TLS != nil {
 		// Static configuration:
 		// * Upload the cluster CA certifcate
@@ -750,16 +750,13 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m *couchbaseutil.Member, cs
 			}
 
 			// Update Couchbase's TLS configuration
-			if err := couchbaseutil.SetClusterCACert(ca).On(c.api, m); err != nil {
+			if err := couchbaseutil.SetClusterCACert(ca).InPlaintext().On(c.api, m); err != nil {
 				return err
 			}
 
-			if err := couchbaseutil.ReloadNodeCert().On(c.api, m); err != nil {
+			if err := couchbaseutil.ReloadNodeCert().InPlaintext().On(c.api, m); err != nil {
 				return err
 			}
-
-			// Enable TLS verification now the certs are installed.
-			m.SecureClient = true
 
 			// Wait for the port to come backup with the correct certificate chain
 			if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), ca); err != nil {
@@ -986,22 +983,22 @@ func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
 // addresses should be. For public addresses we maintain the default ports, however set the
 // alternate address to the DDNS name.  For private addresses these will be an IP based on the
 // node address and node ports in the 30000 range.
-func (c *Cluster) createAlternateAddressesExternal(member *couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
+func (c *Cluster) createAlternateAddressesExternal(member couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
 	var hostname string
 
 	if c.cluster.Spec.Networking.DNS != nil {
 		// Use the user provided DNS name.
-		hostname = k8sutil.GetDNSName(c.cluster, member.Name)
+		hostname = k8sutil.GetDNSName(c.cluster, member.Name())
 	} else {
 		// Lookup the node IP the pod is running on.
 		var err error
-		hostname, err = k8sutil.GetHostIP(c.k8s, member.Name)
+		hostname, err = k8sutil.GetHostIP(c.k8s, member.Name())
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.k8s, c.cluster.Namespace, member.Name)
+	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.k8s, c.cluster.Namespace, member.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -1089,7 +1086,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 
 // Get alternate addresses from server, when server is
 // exposed over LoadBalancer then Ports can be ignored.
-func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
+func (c *Cluster) getAlternateAddressesExternal(member couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
 	existingAddresses := &couchbaseutil.AlternateAddressesExternal{}
 	if err := c.getAlternateAddressesExternalInto(member, existingAddresses); err != nil {
 		return nil, err
@@ -1100,7 +1097,7 @@ func (c *Cluster) getAlternateAddressesExternal(member *couchbaseutil.Member) (*
 	}
 
 	// Remove Ports if member features are exposed with a loadbalancer
-	if svc, found := c.k8s.Services.Get(member.Name); found {
+	if svc, found := c.k8s.Services.Get(member.Name()); found {
 		if svc.Spec.Type == v1.ServiceTypeLoadBalancer {
 			existingAddresses.Ports = nil
 		}
@@ -1382,14 +1379,14 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 }
 
 // Verify volumes of a single member.
-func (c *Cluster) verifyMemberVolumes(m *couchbaseutil.Member) error {
-	config := c.cluster.Spec.GetServerConfigByName(m.ServerConfig)
+func (c *Cluster) verifyMemberVolumes(m couchbaseutil.Member) error {
+	config := c.cluster.Spec.GetServerConfigByName(m.Config())
 	if config == nil {
 		// Server class configuration has been deleted, and the member will too
 		return nil
 	}
 
-	err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name)
+	err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name())
 	if err != nil {
 		if _, ok := err.(cberrors.ErrNoVolumeMounts); ok {
 			// Pod is not configured for volumes
@@ -1430,8 +1427,8 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
-func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
-	var candidate *couchbaseutil.Member
+func (c *Cluster) needsUpgrade() (couchbaseutil.Member, int, string, error) {
+	var candidate couchbaseutil.Member
 
 	var targetConfiguration int
 
@@ -1448,12 +1445,12 @@ func (c *Cluster) needsUpgrade() (*couchbaseutil.Member, int, string, error) {
 		}
 
 		// Get what the member should look like.
-		serverClass := c.cluster.Spec.GetServerConfigByName(member.ServerConfig)
+		serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
 		if serverClass == nil {
 			continue
 		}
 
-		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member.Name, c.cluster, *serverClass)
+		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member.Name(), c.cluster, *serverClass)
 		if err != nil {
 			return nil, -1, "", err
 		}
@@ -2236,11 +2233,11 @@ func (c *Cluster) reconcileSecuritySettings() error {
 	// See if any nodes are in the wrong state.
 	updatableMembers := couchbaseutil.NewMemberSet()
 
-	for _, m := range c.members {
+	for name, m := range c.members {
 		s := &couchbaseutil.NodeNetworkConfiguration{}
 		if err := c.getNodeNetworkConfiguration(m, s); err != nil {
 			// As the message says, this is "fine"
-			log.Info("failed to get node network configuration", "cluster", c.namespacedName(), "pod", m.Name, "error", err)
+			log.Info("failed to get node network configuration", "cluster", c.namespacedName(), "pod", name, "error", err)
 			return nil
 		}
 
@@ -2383,7 +2380,7 @@ func (c *Cluster) reconcileSecuritySettings() error {
 // getAlternateAddressesExternal gets the alternate addresses for this node.
 // It is *NOT* an error condition for this not to exist, which is an indication
 // that the client code is not clever enough to handle the snafu.
-func (c *Cluster) getAlternateAddressesExternalInto(m *couchbaseutil.Member, alternateAddresses *couchbaseutil.AlternateAddressesExternal) error {
+func (c *Cluster) getAlternateAddressesExternalInto(m couchbaseutil.Member, alternateAddresses *couchbaseutil.AlternateAddressesExternal) error {
 	nodeServices := &couchbaseutil.NodeServices{}
 	if err := couchbaseutil.GetNodeServices(nodeServices).On(c.api, m); err != nil {
 		return err
@@ -2408,7 +2405,7 @@ func (c *Cluster) getAlternateAddressesExternalInto(m *couchbaseutil.Member, alt
 }
 
 // getNodeNetworkConfiguration gets the network configuration settings for a node.
-func (c *Cluster) getNodeNetworkConfiguration(m *couchbaseutil.Member, s *couchbaseutil.NodeNetworkConfiguration) error {
+func (c *Cluster) getNodeNetworkConfiguration(m couchbaseutil.Member, s *couchbaseutil.NodeNetworkConfiguration) error {
 	node := &couchbaseutil.NodeInfo{}
 	if err := couchbaseutil.GetNodesSelf(node).On(c.api, m); err != nil {
 		return err

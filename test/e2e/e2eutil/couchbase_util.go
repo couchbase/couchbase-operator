@@ -338,7 +338,7 @@ func MustInsertJSONDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *cou
 }
 
 // Add a node to the cluster.
-func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member *couchbaseutil.Member) error {
+func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member couchbaseutil.Member) error {
 	username, password, err := GetClusterAuth(k8s.KubeClient, couchbase.Namespace, k8s.DefaultSecret.Name)
 	if err != nil {
 		return err
@@ -422,7 +422,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 	return retryutil.Retry(ctx, time.Second, callback)
 }
 
-func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member *couchbaseutil.Member) {
+func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member couchbaseutil.Member) {
 	if err := AddNode(k8s, couchbase, services, member); err != nil {
 		Die(t, err)
 	}
@@ -499,14 +499,10 @@ func MustEjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 	}
 }
 
-func MemberFromSpecProps(couchbase *couchbasev2.CouchbaseCluster, serverConfig string, memberIndex int) *couchbaseutil.Member {
-	return &couchbaseutil.Member{
-		Name:         couchbaseutil.CreateMemberName(couchbase.Name, memberIndex),
-		ClusterName:  couchbase.Name,
-		Namespace:    couchbase.Namespace,
-		ServerConfig: serverConfig,
-		SecureClient: false,
-	}
+func MemberFromSpecProps(couchbase *couchbasev2.CouchbaseCluster, serverConfig string, memberIndex int) couchbaseutil.Member {
+	name := couchbaseutil.CreateMemberName(couchbase.Name, memberIndex)
+
+	return couchbaseutil.NewMember(couchbase.Namespace, couchbase.Name, name, "", serverConfig, false)
 }
 
 func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, timeout time.Duration) error {
@@ -524,12 +520,9 @@ func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 		data := url.Values{}
 
 		for _, index := range indexes {
-			member := couchbaseutil.Member{
-				Name:        couchbaseutil.CreateMemberName(couchbase.Name, index),
-				ClusterName: couchbase.Name,
-				Namespace:   couchbase.Namespace,
-			}
+			name := couchbaseutil.CreateMemberName(couchbase.Name, index)
 
+			member := couchbaseutil.NewPartialMember(couchbase.Namespace, couchbase.Name, name)
 			data.Add("otpNode", string(member.GetOTPNode()))
 		}
 

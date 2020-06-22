@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 )
@@ -127,14 +126,7 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 		// some source we don't trust.
 		if _, ok := members[name]; !ok {
 			// Fake it until you make it...
-			member := &couchbaseutil.Member{
-				Name:         name,
-				ClusterName:  c.cluster.Name,
-				Namespace:    c.cluster.Namespace,
-				ServerConfig: "unknown",
-				SecureClient: false,
-				Version:      strings.Split(node.Version, "-")[0],
-			}
+			member := couchbaseutil.NewPartialMember(c.cluster.Namespace, c.cluster.Name, name)
 
 			status.UnknownMembers.Add(member)
 		}

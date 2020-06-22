@@ -43,9 +43,9 @@ const (
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m *couchbaseutil.Member, config couchbasev2.ServerConfig) (*v1.Pod, error) {
+func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig) (*v1.Pod, error) {
 	// First work out what persistent volumes we need.
-	pvcState, err := GetPodVolumes(client, m.Name, cluster, config)
+	pvcState, err := GetPodVolumes(client, m.Name(), cluster, config)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 		serverGroup = pvcState.availabilityZone
 	}
 
-	serverGroup, err = scheduler.Create(config.Name, m.Name, serverGroup)
+	serverGroup, err = scheduler.Create(config.Name, m.Name(), serverGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -478,7 +478,7 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 // in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
-func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState) (*v1.Pod, error) {
+func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
 	container := couchbaseContainer(cluster.Spec.CouchbaseImage(), &config)
 	container.ReadinessProbe = &v1.Probe{
@@ -505,8 +505,8 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	}
 
 	// For metadata, override the name and merge the labels and annotations.
-	pod.Name = m.Name
-	pod.Labels = mergeLabels(pod.Labels, createCouchbasePodLabels(m.Name, cluster.Name, config))
+	pod.Name = m.Name()
+	pod.Labels = mergeLabels(pod.Labels, createCouchbasePodLabels(m.Name(), cluster.Name, config))
 	ApplyBaseAnnotations(pod)
 
 	// Populate the main specification, overriding whatever the template specified.
@@ -514,7 +514,7 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 		container,
 	}
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
-	pod.Spec.Hostname = m.Name
+	pod.Spec.Hostname = m.Name()
 	pod.Spec.Subdomain = cluster.Name
 	pod.Spec.SecurityContext = cluster.Spec.SecurityContext
 	pod.Spec.ReadinessGates = []v1.PodReadinessGate{
@@ -1062,6 +1062,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 
 		// claim must be bound to a volume
 		if pvc.Status.Phase != v1.ClaimBound {
+			// BUG: tell me why you are ignoring it in the logs!
 			continue
 		}
 
@@ -1072,30 +1073,29 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 
 		// require members to have path
 		if _, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; !ok {
+			// BUG: tell me why you are ignoring it in the logs!
 			continue
 		}
 
-		m := couchbaseutil.Member{
-			ClusterName:  cluster,
-			Namespace:    namespace,
-			SecureClient: secure,
-		}
-
-		var ok bool
-
-		if m.Name, ok = pvc.Labels[constants.LabelNode]; !ok {
+		name, ok := pvc.Labels[constants.LabelNode]
+		if !ok {
+			// BUG: tell me why you are ignoring it in the logs!
 			continue
 		}
 
-		if m.ServerConfig, ok = pvc.Annotations[constants.AnnotationVolumeNodeConf]; !ok {
+		config, ok := pvc.Annotations[constants.AnnotationVolumeNodeConf]
+		if !ok {
+			// BUG: tell me why you are ignoring it in the logs!
 			continue
 		}
 
-		if m.Version, ok = pvc.Annotations[constants.CouchbaseVersionAnnotationKey]; !ok {
+		version, ok := pvc.Annotations[constants.CouchbaseVersionAnnotationKey]
+		if !ok {
+			// BUG: tell me why you are ignoring it in the logs!
 			continue
 		}
 
-		ms.Add(&m)
+		ms.Add(couchbaseutil.NewMember(namespace, cluster, name, version, config, secure))
 	}
 
 	return ms, nil

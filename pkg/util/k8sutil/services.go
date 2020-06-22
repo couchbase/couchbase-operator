@@ -819,10 +819,10 @@ func filterConfiguredPorts(ports []v1.ServicePort, services couchbasev2.ServiceL
 }
 
 // memberServices returns the enabled services for a specific member.
-func memberServices(cluster *couchbasev2.CouchbaseCluster, member *couchbaseutil.Member) (couchbasev2.ServiceList, error) {
-	class := cluster.Spec.GetServerConfigByName(member.ServerConfig)
+func memberServices(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member) (couchbasev2.ServiceList, error) {
+	class := cluster.Spec.GetServerConfigByName(member.Config())
 	if class == nil {
-		return nil, cberrors.NewErrUnknownServerClass(member.ServerConfig)
+		return nil, cberrors.NewErrUnknownServerClass(member.Config())
 	}
 
 	// Append the admin service, this is not explicitly enabled
@@ -837,7 +837,7 @@ type UpdateExposedFeatureStatus struct {
 }
 
 // generateExposedService creates a Kubernetes Service resource for the requested member.
-func generateExposedService(member *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster) (*v1.Service, error) {
+func generateExposedService(member couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster) (*v1.Service, error) {
 	// The ports to expose are first determined by the exposed feature set,
 	// then they are filtered based on the services the member is exposing,
 	// then finally based on whether we are enforcing use of TLS.
@@ -882,15 +882,15 @@ func generateExposedService(member *couchbaseutil.Member, cluster *couchbasev2.C
 	}
 
 	// Fill in the metadata.
-	service.Name = member.Name
-	service.Labels = mergeLabels(service.Labels, LabelsForNodeResource(cluster, member.Name))
+	service.Name = member.Name()
+	service.Labels = mergeLabels(service.Labels, LabelsForNodeResource(cluster, member.Name()))
 	service.OwnerReferences = []metav1.OwnerReference{
 		cluster.AsOwner(),
 	}
 
 	// Fill in the spec.
 	service.Spec.PublishNotReadyAddresses = true
-	service.Spec.Selector = getNodeServiceSelectors(cluster, member.Name)
+	service.Spec.Selector = getNodeServiceSelectors(cluster, member.Name())
 	service.Spec.Ports = ports
 
 	// If a DNS domain is specified annotate with the pod DNS name.
@@ -899,7 +899,7 @@ func generateExposedService(member *couchbaseutil.Member, cluster *couchbasev2.C
 			service.Annotations = map[string]string{}
 		}
 
-		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, member.Name)
+		service.Annotations[constants.DNSAnnotation] = GetDNSName(cluster, member.Name())
 	}
 
 	// Enforce that traffic has to come directly to the k8s node avoiding the
@@ -911,7 +911,7 @@ func generateExposedService(member *couchbaseutil.Member, cluster *couchbasev2.C
 	return service, nil
 }
 
-func ReconcilePodService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, member *couchbaseutil.Member) error {
+func ReconcilePodService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member) error {
 	requested, err := generateExposedService(member, cluster)
 	if err != nil {
 		return err

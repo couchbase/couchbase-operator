@@ -17,8 +17,8 @@ func (c *Cluster) updateMembers() error {
 
 	// All pods are members as are persistent volume claims.
 	members := couchbaseutil.MemberSet{}
-	members.Append(runningMembers)
-	members.Append(c.pvcMembers())
+	members.Merge(runningMembers)
+	members.Merge(c.pvcMembers())
 
 	// The ready set is nodes that are in the active state.
 	ready := couchbaseutil.MemberSet{}
@@ -67,29 +67,21 @@ func (c *Cluster) updateMembers() error {
 	return nil
 }
 
-func (c *Cluster) newMember(id int, serverSpecName, image string) (*couchbaseutil.Member, error) {
+func (c *Cluster) newMember(id int, serverSpecName, image string) (couchbaseutil.Member, error) {
 	version, err := k8sutil.CouchbaseVersion(image)
 	if err != nil {
 		return nil, err
 	}
 
 	name := couchbaseutil.CreateMemberName(c.cluster.Name, id)
-	member := &couchbaseutil.Member{
-		Name:         name,
-		ClusterName:  c.cluster.Name,
-		Namespace:    c.cluster.Namespace,
-		ServerConfig: serverSpecName,
-		SecureClient: false,
-		Version:      version,
-	}
 
-	return member, nil
+	return couchbaseutil.NewMember(c.cluster.Namespace, c.cluster.Name, name, version, serverSpecName, c.cluster.IsTLSEnabled()), nil
 }
 
 func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
 	members := couchbaseutil.MemberSet{}
 
-	pvcMembers, err := k8sutil.PVCToMemberset(c.k8s, c.cluster.Name, c.cluster.Namespace, c.isSecureClient())
+	pvcMembers, err := k8sutil.PVCToMemberset(c.k8s, c.cluster.Name, c.cluster.Namespace, c.cluster.IsTLSEnabled())
 	if err != nil {
 		log.Error(err, "Member discovery failed", "cluster", c.namespacedName())
 	} else {
@@ -122,15 +114,7 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 
 		_, secure := pod.Annotations[constants.PodTLSAnnotation]
 
-		m := &couchbaseutil.Member{
-			Name:         pod.Name,
-			ClusterName:  cluster,
-			Namespace:    pod.Namespace,
-			ServerConfig: config,
-			SecureClient: secure,
-			Version:      version,
-		}
-		members.Add(m)
+		members.Add(couchbaseutil.NewMember(pod.Namespace, cluster, pod.Name, version, config, secure))
 	}
 
 	return members
