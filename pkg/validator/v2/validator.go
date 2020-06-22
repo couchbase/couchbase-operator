@@ -741,12 +741,12 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// version check
 	currentVersionString, err := k8sutil.CouchbaseVersion(customResource.Spec.Image)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("unsupported Couchbase version"))
+		errs = append(errs, fmt.Errorf("unsupported Couchbase version: %v", err))
 	}
 
 	currentVersion, err := couchbaseutil.NewVersion(currentVersionString)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("unsupported Couchbase version"))
+		errs = append(errs, fmt.Errorf("unsupported Couchbase version: %v", err))
 	} else {
 		// current version must be equal or greater than min version
 		minVersion, _ := couchbaseutil.NewVersion(constants.CouchbaseVersionMin)

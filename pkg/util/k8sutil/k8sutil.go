@@ -46,11 +46,12 @@ func ApplyBaseAnnotations(object metav1.Object) {
 func CouchbaseVersion(image string) (string, error) {
 	parts := strings.Split(image, ":")
 
-	if len(parts) != 2 {
+	lenParts := len(parts)
+	if lenParts < 2 {
 		return "", fmt.Errorf("invalid image string: %s", image)
 	}
 
-	version := parts[1]
+	version := parts[lenParts-1]
 
 	// lookup version associated with sha256 digest
 	if couchbaseutil.IsSHA256Version(version) {

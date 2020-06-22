@@ -40,7 +40,7 @@ func NewVersion(version string) (*Version, error) {
 	// Gather semver and optional edition with expected format
 	// "<edition>-<semver>" or "<semver>-<edition>", ie:
 	//			"5.5.0" and "enterprise-5.5.0" and "5.5.0-beta"
-	re := regexp.MustCompile(`^(?:(\w+)-)?(\d+)\.(\d+)\.(\d+)(?:-(\w+))?`)
+	re := regexp.MustCompile(`^(?:[0-9]+.*:)?(?:(\w+)-)?(\d+)\.(\d+)\.(\d+)(?:-(\w+))?`)
 
 	matches := re.FindStringSubmatch(version)
 	if len(matches) == 0 {

@@ -23,6 +23,14 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBackup
 status:
   archive: /data/backups
+  backups:
+  - full: cb-example-2020-03-16T19_10_10
+    name: 2020-03-16T19_10_10.637314674Z
+  - full: cb-example-2020-03-16T18_09_09
+    incrementals:
+    - 2020-03-16T18_16_08.037612813Z
+    - 2020-03-16T18_18_12.465643387Z
+    name: 2020-03-16T18_09_09.429763803Z
   capacityUsed: 1.76Gi
   cronjob: cbbackup-full-full
   duration: 13s
@@ -37,7 +45,6 @@ status:
     "0", "deletions_backedup": "0", "deletions_failed": "0"}}}'
   pod: cbbackup-full-full-1584385800-n6xm8
   repo: cb-example-2020-03-16T19_10_10
-  repoList: cb-example-2020-03-16T19_09_09, cb-example-2020-03-16T19_10_10
   running: false
 ----
 
@@ -78,6 +85,14 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBackupRestore
 status:
   archive: /data/backups
+  backups:
+  - full: cb-example-2020-03-16T19_10_10
+    name: 2020-03-16T19_10_10.637314674Z
+  - full: cb-example-2020-03-16T18_09_09
+    incrementals:
+    - 2020-03-16T18_16_08.037612813Z
+    - 2020-03-16T18_18_12.465643387Z
+    name: 2020-03-16T18_09_09.429763803Z
   capacityUsed: 2.03Gi
   duration: 11s
   failed: false
@@ -91,8 +106,6 @@ status:
     1992294, "total_items": "100000", "total_items_size_bytes": 20143144}'
   pod: cbrestore-ts4br
   repo: cb-example-2020-03-16T19_10_10
-  repoList: cb-example-2020-03-16T19_08_10, cb-example-2020-03-16T19_09_09, cb-example-2020-03-16T19_10_10,
-    cb-example-2020-03-16T19_11_09, cb-example-2020-03-16T19_12_10
   running: false
 ----
 
@@ -132,6 +145,15 @@ This absolute path cannot be changed currently so this field really exists for v
 
 ____
 _Field rules:_ This field will be a string and should always be `{backup-archive}` after the first backup is run.
+____
+
+=== status.backups
+
+`backups` is a list of all the repos that exist in the backup archive `{backup-archive}`, which should aid in selecting one to create a `CouchbaseBackupRestore`.
+Each entry will require a singular entry for `name` and `full`, where `full` is the first backup taken inside a repo.
+`incremental` is a list of strings that corresponds to the incremental backups taken after the full backup.
+____
+_Field rules:_ This field will be a list of strings.
 ____
 
 === status.capacityUsed
@@ -218,13 +240,6 @@ ____
 
 The name of the folder that we are currently working in or most recently performed operations in.
 
-____
-_Field rules:_ This field will be a string.
-____
-
-=== status.repoList
-
-repoList provides a list of all the repos that exist in the backup archive `{backup-archive}`, which should aid in selecting one to create a `CouchbaseBackupRestore`.
 ____
 _Field rules:_ This field will be a string.
 ____

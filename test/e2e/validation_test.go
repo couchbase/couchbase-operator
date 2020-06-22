@@ -480,6 +480,20 @@ func TestValidationCreate(t *testing.T) {
 
 	supportedTimeUnits := []string{"ns", "us", "ms", "s", "m", "h"}
 
+	supportedImagePatterns := []string{
+		"registry.tld/org/image:6.5.0",
+		"registry.tld:1234/org/image:6.5.0",
+		"registry.tld:1234/org/image:prefix-6.5.0",
+		"registry.tld:1234/org/image:6.5.0-s",
+		"192.168.0.1/org/image:6.5.0",
+		"192.168.0.1:1234/org/image:6.5.0",
+		"org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
+		"registry.tld/org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
+		"registry.tld:1234/org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
+		"192.168.0.1/org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
+		"192.168.0.1:1234/org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
+	}
+
 	testDefs := []testDef{
 		{
 			name: "TestValidateDefault",
@@ -491,6 +505,16 @@ func TestValidationCreate(t *testing.T) {
 		testDefCase := testDef{
 			name:      "TestValidateLogRetentionTime_" + timeUnit,
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/logging/logRetentionTime", "1"+timeUnit)},
+		}
+		testDefs = append(testDefs, testDefCase)
+	}
+
+	// Cases to verify valid image patterns
+	for i, pattern := range supportedImagePatterns {
+		testDefCase := testDef{
+			name:       fmt.Sprintf("TestValidateImagePattern_%d", i),
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", pattern)},
+			shouldFail: false,
 		}
 		testDefs = append(testDefs, testDefCase)
 	}

@@ -649,6 +649,7 @@ const (
 type ClusterSpec struct {
 	// BaseImage is the base couchbase image name that will be used to launch
 	// couchbase clusters. This is useful for private registries, etc.
+	// +kubebuilder:validation:Pattern="^(.*?(:\\d+)?/)?.*?/.*?(:.*?\\d+\\.\\d+\\.\\d+.*|@sha256:[0-9a-f]{64})$"
 	Image string `json:"image"`
 
 	// Paused is to pause the control of the operator for the couchbase cluster.
