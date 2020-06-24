@@ -113,6 +113,8 @@ testcases:
 - TestCollectLogFromEphemeralPodsUsingLogPVKillProcess
 - TestLogRedactionWithPvVerify
 - TestLogCollectListJson
+- TestCollectLogFromEphemeralPodsUsingLogPV
+- TestLogCollectWithDefaultRetentionAndSize
 
 # Upgrade Tests
 - TestUpgradeInvalidDowngrade

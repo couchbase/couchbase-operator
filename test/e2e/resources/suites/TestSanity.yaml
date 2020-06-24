@@ -26,6 +26,7 @@ testcases:
 
 # XdcrTests
 - TestXdcrCreateCluster
+- TestXdcrCreateClusterRemote
 
 # ServerGroupTests
 - TestRzaCreateClusterWithStaticConfig
@@ -37,10 +38,17 @@ testcases:
 # SupportabilityTests
 - TestLogCollectValidateArguments
 - TestExtendedDebugWithDefaultValues
-- TestCollectLogFromEphemeralPodsUsingLogPV
-- TestLogCollectWithDefaultRetentionAndSize
 - TestLogRedactionVerify
 
 # CouchbaseServerServiceTests
 - TestAnalyticsCreateDataSet
 - TestEventingCreateEventingCluster
+
+# MonitoringTests
+- TestPrometheusMetrics
+
+# BackupTests
+- TestFullIncremental
+
+# RBACTests
+- TestRBACCreateAdminUser
