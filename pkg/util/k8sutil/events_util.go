@@ -7,6 +7,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	v1 "k8s.io/api/core/v1"
@@ -488,7 +489,7 @@ func newClusterEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 func GetEventsForResource(client kubernetes.Interface, namespace, kind, name string) ([]v1.Event, error) {
 	events, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	// Also build up data structures necessary for sorting

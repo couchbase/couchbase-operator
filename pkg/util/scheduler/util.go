@@ -28,7 +28,7 @@ func (s *serverList) sort() {
 // pop alphabetically sorts a server list, removes and returns the tail item.
 func (s *serverList) pop() (string, error) {
 	if len(s.servers) == 0 {
-		return "", fmt.Errorf("%w: pop from empty server list", errors.ErrInternalError)
+		return "", fmt.Errorf("%w: pop from empty server list", errors.NewStackTracedError(errors.ErrInternalError))
 	}
 
 	item := len(s.servers) - 1
@@ -47,7 +47,7 @@ func (s *serverList) del(name string) error {
 		}
 	}
 
-	return fmt.Errorf("%w: del of non-existent server from server list", errors.ErrInternalError)
+	return fmt.Errorf("%w: del of non-existent server from server list", errors.NewStackTracedError(errors.ErrInternalError))
 }
 
 // serverGroups maps server group names to a list of servers.

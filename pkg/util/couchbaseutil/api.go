@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/urlencoding"
 
@@ -202,12 +203,12 @@ func (r *Request) On(client *Client, target interface{}) error {
 	case string:
 		hosts = append(hosts, t)
 	default:
-		return fmt.Errorf("%w: unknown target type %v", ErrTypeError, t)
+		return fmt.Errorf("%w: unknown target type %v", errors.NewStackTracedError(ErrTypeError), t)
 	}
 
 	// Generate a closure to iterate over the hosts trying the call.
 	callMembers := func(c *Client, r *Request) error {
-		lastError := ErrMemberError
+		lastError := errors.NewStackTracedError(ErrMemberError)
 
 		for _, host := range hosts {
 			if err := r.method(c, r, host); err != nil {

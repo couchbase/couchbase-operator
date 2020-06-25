@@ -92,6 +92,12 @@ type StackTracedError struct {
 }
 
 func NewStackTracedError(err error) error {
+	// You may end up wrapping nil accidentally, so just ignore it.
+	// This is considered bad as a stack trace isn't free.
+	if err == nil {
+		return nil
+	}
+
 	// Collect upto 64 program counters.
 	pcs := make([]uintptr, 64)
 

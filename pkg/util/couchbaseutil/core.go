@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
@@ -50,7 +51,7 @@ func (c *Client) makeClient() {
 		// Construct a HTTP request
 		req, err := http.NewRequest("GET", "/pools", nil)
 		if err != nil {
-			return fmt.Errorf("uuid check: %w", err)
+			return fmt.Errorf("uuid check: %w", errors.NewStackTracedError(err))
 		}
 
 		req.URL.Host = addr
@@ -59,17 +60,17 @@ func (c *Client) makeClient() {
 
 		// Perform the transaction
 		if err = req.Write(conn); err != nil {
-			return fmt.Errorf("uuid check: %w", err)
+			return fmt.Errorf("uuid check: %w", errors.NewStackTracedError(err))
 		}
 
 		resp, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
-			return fmt.Errorf("uuid check: %w", err)
+			return fmt.Errorf("uuid check: %w", errors.NewStackTracedError(err))
 		}
 
 		// Check the status code was 2XX
 		if resp.StatusCode/100 != 2 {
-			return fmt.Errorf("%w: uuid check: unexpected status code '%s' from %s", ErrStatusError, resp.Status, addr)
+			return fmt.Errorf("%w: uuid check: unexpected status code '%s' from %s", errors.NewStackTracedError(ErrStatusError), resp.Status, addr)
 		}
 
 		defer resp.Body.Close()
@@ -77,7 +78,7 @@ func (c *Client) makeClient() {
 		// Read the body
 		buffer, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("uuid check: %w", err)
+			return fmt.Errorf("uuid check: %w", errors.NewStackTracedError(err))
 		}
 
 		// Parse the JSON body into our anonymous struct, we only care about the UUID
@@ -86,7 +87,7 @@ func (c *Client) makeClient() {
 		}
 
 		if err = json.Unmarshal(buffer, &body); err != nil {
-			return fmt.Errorf("uuid check: json error '%w' from %s", err, addr)
+			return fmt.Errorf("uuid check: json error '%w' from %s", errors.NewStackTracedError(err), addr)
 		}
 
 		// UUID is a string if set or an empty array otherwise :/
@@ -96,14 +97,14 @@ func (c *Client) makeClient() {
 		case string:
 			uuid = t
 		case []interface{}:
-			return fmt.Errorf("%w: uuid is unset", ErrUUIDError)
+			return fmt.Errorf("%w: uuid is unset", errors.NewStackTracedError(ErrUUIDError))
 		default:
-			return fmt.Errorf("%w: uuid is unexpected type: %s", ErrUUIDError, reflect.TypeOf(t))
+			return fmt.Errorf("%w: uuid is unexpected type: %s", errors.NewStackTracedError(ErrUUIDError), reflect.TypeOf(t))
 		}
 
 		// Finally check the UUID is as we expect.  Will be empty if no body was found
 		if uuid != c.uuid {
-			return fmt.Errorf("%w: uuid check: wanted %s got %s from %s", ErrUUIDError, c.uuid, uuid, addr)
+			return fmt.Errorf("%w: uuid check: wanted %s got %s from %s", errors.NewStackTracedError(ErrUUIDError), c.uuid, uuid, addr)
 		}
 
 		return nil
@@ -122,7 +123,7 @@ func (c *Client) makeClient() {
 
 		conn, err := dialer.DialContext(ctx, network, addr)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewStackTracedError(err)
 		}
 
 		// Check the UUID of the host matches our configuration before
@@ -157,7 +158,7 @@ func (c *Client) makeClient() {
 			if c.tls.ClientAuth != nil {
 				cert, err := tls.X509KeyPair(c.tls.ClientAuth.Cert, c.tls.ClientAuth.Key)
 				if err != nil {
-					return nil, err
+					return nil, errors.NewStackTracedError(err)
 				}
 
 				tlsClientConfig.Certificates = append(tlsClientConfig.Certificates, cert)
@@ -173,7 +174,7 @@ func (c *Client) makeClient() {
 
 		conn, err := tls.DialWithDialer(dialer, network, addr, tlsClientConfig)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewStackTracedError(err)
 		}
 
 		// Check the UUID of the host matches our configuration before
@@ -242,7 +243,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	response, err := c.client.Do(request)
 	if err != nil {
 		logLabels = append(logLabels, "error", err)
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	logLabels = append(logLabels, "status", response.Status)
@@ -252,7 +253,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	if log.V(2).Enabled() {
@@ -263,7 +264,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 
 	// Anything outside of a 2XX we regard as an error.
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("%w: request failed %v %v %v: %v", ErrStatusError, request.Method, request.URL.String(), response.Status, string(body))
+		return fmt.Errorf("%w: request failed %v %v %v: %v", errors.NewStackTracedError(ErrStatusError), request.Method, request.URL.String(), response.Status, string(body))
 	}
 
 	// Don't care about the returned data, just report success.
@@ -275,17 +276,17 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	switch contentType := response.Header.Get("Content-Type"); contentType {
 	case "application/json":
 		if err := json.Unmarshal(body, result); err != nil {
-			return err
+			return errors.NewStackTracedError(err)
 		}
 	case "text/plain":
 		s, ok := result.(*[]byte)
 		if !ok {
-			return fmt.Errorf("%w: unexpected type decode for text/plain", ErrTypeError)
+			return fmt.Errorf("%w: unexpected type decode for text/plain", errors.NewStackTracedError(ErrTypeError))
 		}
 
 		copy(*s, body)
 	default:
-		return fmt.Errorf("%w: unexpected content type %s", ErrTypeError, contentType)
+		return fmt.Errorf("%w: unexpected content type %s", errors.NewStackTracedError(ErrTypeError), contentType)
 	}
 
 	return nil
@@ -294,7 +295,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 func (c *Client) Get(r *Request, host string) error {
 	req, err := http.NewRequest("GET", host+r.Path, nil)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	req.Header = defaultHeaders()
@@ -305,7 +306,7 @@ func (c *Client) Get(r *Request, host string) error {
 func (c *Client) Post(r *Request, host string) error {
 	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	req.Header = defaultHeaders()
@@ -317,7 +318,7 @@ func (c *Client) Post(r *Request, host string) error {
 func (c *Client) PostJSON(r *Request, host string) error {
 	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	req.Header = defaultHeaders()
@@ -329,7 +330,7 @@ func (c *Client) PostJSON(r *Request, host string) error {
 func (c *Client) PostNoContentType(r *Request, host string) error {
 	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	req.Header = defaultHeaders()
@@ -340,7 +341,7 @@ func (c *Client) PostNoContentType(r *Request, host string) error {
 func (c *Client) Put(r *Request, host string) error {
 	req, err := http.NewRequest("PUT", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	req.Header = defaultHeaders()
@@ -352,7 +353,7 @@ func (c *Client) Put(r *Request, host string) error {
 func (c *Client) PutJSON(r *Request, host string) error {
 	req, err := http.NewRequest("PUT", host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	req.Header = defaultHeaders()
@@ -364,7 +365,7 @@ func (c *Client) PutJSON(r *Request, host string) error {
 func (c *Client) Delete(r *Request, host string) error {
 	req, err := http.NewRequest("DELETE", host+r.Path, nil)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	req.Header = defaultHeaders()

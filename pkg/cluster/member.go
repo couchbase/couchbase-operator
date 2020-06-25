@@ -79,16 +79,7 @@ func (c *Cluster) newMember(id int, serverSpecName, image string) (couchbaseutil
 }
 
 func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
-	members := couchbaseutil.MemberSet{}
-
-	pvcMembers, err := k8sutil.PVCToMemberset(c.k8s, c.cluster.Name, c.cluster.Namespace, c.cluster.IsTLSEnabled())
-	if err != nil {
-		log.Error(err, "Member discovery failed", "cluster", c.namespacedName())
-	} else {
-		members = pvcMembers
-	}
-
-	return members
+	return k8sutil.PVCToMemberset(c.k8s, c.cluster.Name, c.cluster.Namespace, c.cluster.IsTLSEnabled())
 }
 
 func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {

@@ -343,7 +343,7 @@ func (c *Cluster) reconcileTLS(members couchbaseutil.MemberSet) error {
 
 	cert, err := x509.ParseCertificate(chainPem[0].Bytes)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Quiesce persistent connections, NS server doesn't quite work if some are

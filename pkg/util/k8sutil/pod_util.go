@@ -214,7 +214,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 
 		specJSON, err := json.Marshal(required.Spec)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewStackTracedError(err)
 		}
 
 		required.Annotations[constants.PVCSpecAnnotation] = string(specJSON)
@@ -225,7 +225,7 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 
 			if annotation, ok := pvc.Annotations[constants.PVCSpecAnnotation]; ok {
 				if err := json.Unmarshal([]byte(annotation), &existingSpec); err != nil {
-					return nil, err
+					return nil, errors.NewStackTracedError(err)
 				}
 			}
 
@@ -363,7 +363,7 @@ func createPersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolu
 
 	pvc, err := client.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	return pvc, nil
@@ -402,7 +402,7 @@ func deletePodVolumes(client *client.Client, memberName string) error {
 
 	for _, pvc := range listMemberPVCS(client, memberName) {
 		if err := client.KubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, CascadeDeleteOptions(0)); err != nil {
-			return err
+			return errors.NewStackTracedError(err)
 		}
 
 		name := pvc.Name
@@ -570,7 +570,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	// We work in exactly the same way as a `kubectl apply command`.
 	specJSON, err := json.Marshal(pod.Spec)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	pod.Annotations[constants.PodSpecAnnotation] = string(specJSON)
@@ -1048,7 +1048,7 @@ func findMemberPVC(client *client.Client, memberName, path string) (*v1.Persiste
 }
 
 // Recreate list of members from persistent volumes.
-func PVCToMemberset(client *client.Client, cluster, namespace string, secure bool) (couchbaseutil.MemberSet, error) {
+func PVCToMemberset(client *client.Client, cluster, namespace string, secure bool) couchbaseutil.MemberSet {
 	ms := couchbaseutil.MemberSet{}
 
 	for _, pvc := range client.PersistentVolumeClaims.List() {
@@ -1095,7 +1095,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 		ms.Add(couchbaseutil.NewMember(namespace, cluster, name, version, config, secure))
 	}
 
-	return ms, nil
+	return ms
 }
 
 // pod is recoverable if it has volume mounts with existing
@@ -1123,8 +1123,7 @@ func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, po
 	for mountName := range mountPaths {
 		mountPath := pathForVolumeMountName(mountName)
 
-		_, err := findMemberPVC(client, podName, mountPath)
-		if err != nil {
+		if _, err := findMemberPVC(client, podName, mountPath); err != nil {
 			return err
 		}
 	}
@@ -1169,14 +1168,14 @@ func FlagPodReady(client *client.Client, name string) error {
 
 	mergePatch, err := json.Marshal(condition)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Yes it's ugly, but efficient.
 	mergePatch = []byte(`{"status":{"conditions":[` + string(mergePatch) + `]}}`)
 
 	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(pod.Name, apitypes.StrategicMergePatchType, mergePatch, "status"); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	return nil

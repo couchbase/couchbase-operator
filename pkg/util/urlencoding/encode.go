@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
 var ErrTypeUnsupported = fmt.Errorf("unsupported urlencoding type")
@@ -58,7 +60,7 @@ func encode(v reflect.Value) (string, error) {
 		return "[" + strings.Join(items, ",") + "]", nil
 	}
 
-	return "", fmt.Errorf("unsupported type %v %v: %w", v, v.Type(), ErrTypeUnsupported)
+	return "", fmt.Errorf("unsupported type %v %v: %w", v, v.Type(), errors.NewStackTracedError(ErrTypeUnsupported))
 }
 
 // options is an array of options.
@@ -100,7 +102,7 @@ func Marshal(m interface{}) ([]byte, error) {
 	// Buffer for building a key/value mapping
 	data := &url.Values{}
 	if err := marshal(m, data); err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	return []byte(data.Encode()), nil
@@ -148,7 +150,7 @@ func marshal(m interface{}, data *url.Values) error {
 					return err
 				}
 			default:
-				return fmt.Errorf("unhandled type %v for field %s: %w", fv.Kind(), st.Name, ErrTypeUnsupported)
+				return fmt.Errorf("unhandled type %v for field %s: %w", fv.Kind(), st.Name, errors.NewStackTracedError(ErrTypeUnsupported))
 			}
 
 			continue

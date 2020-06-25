@@ -230,7 +230,7 @@ func DeletePod(client *client.Client, namespace, podName string, opts *metav1.De
 	err := client.KubeClient.CoreV1().Pods(namespace).Delete(podName, opts)
 	if err != nil {
 		if !IsKubernetesResourceNotFoundError(err) {
-			return err
+			return errors.NewStackTracedError(err)
 		}
 	}
 
@@ -238,7 +238,12 @@ func DeletePod(client *client.Client, namespace, podName string, opts *metav1.De
 }
 
 func CreatePod(client *client.Client, namespace string, pod *v1.Pod) (*v1.Pod, error) {
-	return client.KubeClient.CoreV1().Pods(namespace).Create(pod)
+	pod, err := client.KubeClient.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	return pod, nil
 }
 
 // Waits for a pod to be created and for it to respond to TCP connections on
@@ -252,7 +257,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 		// TODO: cache me, used my cbopinfo :/
 		pod, err := kubeCli.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
 		if err != nil {
-			return err
+			return errors.NewStackTracedError(err)
 		}
 
 		if pod.Status.Phase != v1.PodRunning {
@@ -283,7 +288,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 			return nil
 		}
 
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// watch for pod deletion event
@@ -293,7 +298,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 
 	watcher, err := kubeCli.CoreV1().Pods(namespace).Watch(opts)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	events := watcher.ResultChan()
@@ -302,7 +307,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 		select {
 		// Handle timeout and cancellation events
 		case <-ctx.Done():
-			return fmt.Errorf("%w: Pod Deletion error - error deleting pod %v", ctx.Err(), podName)
+			return fmt.Errorf("%w: Pod Deletion error - error deleting pod %v", errors.NewStackTracedError(ctx.Err()), podName)
 		// Process K8S events for our chosen pod
 		case ev := <-events:
 			if ev.Object == nil {
@@ -326,7 +331,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 func GetKubernetesVersion(kubeCli kubernetes.Interface) (constants.KubernetesVersion, error) {
 	version, err := kubeCli.Discovery().ServerVersion()
 	if err != nil {
-		return constants.KubernetesVersionUnknown, err
+		return constants.KubernetesVersionUnknown, errors.NewStackTracedError(err)
 	}
 
 	return ParseKubernetesVersion(version.Major, version.Minor, version.GitVersion)
@@ -371,7 +376,12 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 }
 
 func GetStorageClass(kubeCli kubernetes.Interface, name string) (*storage.StorageClass, error) {
-	return kubeCli.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
+	class, err := kubeCli.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	return class, nil
 }
 
 func GetPodUptime(client *client.Client, name string) int {

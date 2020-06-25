@@ -5,7 +5,6 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
@@ -28,7 +27,7 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 
 	ApplyGarbageCollectedObjectLabels(cl)
 
-	res, err := k8sutil.CreateCouchbaseCluster(k8s.CRClient, cl)
+	res, err := CreateCouchbaseCluster(k8s.CRClient, cl)
 	if err != nil {
 		return res, err
 	}
@@ -41,7 +40,7 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 func DeleteCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) error {
 	t.Logf("deleting couchbase cluster: %v", cl.Name)
 
-	err := k8sutil.DeleteCouchbaseCluster(k8s.CRClient, cl)
+	err := DeleteCouchbaseCluster(k8s.CRClient, cl)
 	if err != nil {
 		return err
 	}

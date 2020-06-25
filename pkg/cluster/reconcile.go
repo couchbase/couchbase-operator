@@ -205,7 +205,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("PodCreateTimeout improperly formatted: %w", err)
+		return nil, fmt.Errorf("PodCreateTimeout improperly formatted: %w", errors.NewStackTracedError(err))
 	}
 
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
@@ -1483,13 +1483,13 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.Member, int, string, error) {
 
 		if annotation, ok := actual.Annotations[constants.PodSpecAnnotation]; ok {
 			if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
-				return nil, -1, "", err
+				return nil, -1, "", errors.NewStackTracedError(err)
 			}
 		}
 
 		requestedSpec := &v1.PodSpec{}
 		if err := json.Unmarshal([]byte(requested.Annotations[constants.PodSpecAnnotation]), requestedSpec); err != nil {
-			return nil, -1, "", err
+			return nil, -1, "", errors.NewStackTracedError(err)
 		}
 
 		if reflect.DeepEqual(actualSpec, requestedSpec) && pvcsEqual {
@@ -2005,13 +2005,13 @@ func (c *Cluster) reconcileBackup() error {
 
 			if annotation, ok := current.Annotations[constants.CronjobSpecAnnotation]; ok {
 				if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
-					return err
+					return errors.NewStackTracedError(err)
 				}
 			}
 
 			requestedSpec := &v1beta1.CronJobSpec{}
 			if err := json.Unmarshal([]byte(cronjob.Annotations[constants.CronjobSpecAnnotation]), requestedSpec); err != nil {
-				return err
+				return errors.NewStackTracedError(err)
 			}
 
 			if !reflect.DeepEqual(actualSpec, requestedSpec) {

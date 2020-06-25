@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
 var ErrInvalidResourceName = fmt.Errorf("unsupported resource name")
@@ -82,7 +84,7 @@ func ServiceListFromStringArray(arr []string) (ServiceList, error) {
 		case "cbas", "analytics":
 			list = append(list, AnalyticsService)
 		default:
-			return list, fmt.Errorf("%w: invalid service name: %s", ErrInvalidResourceName, svc)
+			return list, fmt.Errorf("%w: invalid service name: %s", errors.NewStackTracedError(ErrInvalidResourceName), svc)
 		}
 	}
 
@@ -128,7 +130,7 @@ func (c *ClusterInfo) GetNode(hostname HostName) (*NodeInfo, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("%w: unable to lookup node %s", ErrMissingResource, hostname)
+	return nil, fmt.Errorf("%w: unable to lookup node %s", errors.NewStackTracedError(ErrMissingResource), hostname)
 }
 
 // PoolsDefaults returns a struct which could be used with the /pools/default API.
@@ -302,7 +304,7 @@ func (t TaskList) GetTask(taskType TaskType) (*Task, error) {
 
 		if temp.Type == taskType {
 			if task != nil {
-				return nil, fmt.Errorf("%w: found more than one task of type %v", ErrDuplicatedResource, taskType)
+				return nil, fmt.Errorf("%w: found more than one task of type %v", errors.NewStackTracedError(ErrDuplicatedResource), taskType)
 			}
 
 			task = temp
@@ -310,7 +312,7 @@ func (t TaskList) GetTask(taskType TaskType) (*Task, error) {
 	}
 
 	if task == nil {
-		return nil, fmt.Errorf("%w: no task of type %v found", ErrMissingResource, taskType)
+		return nil, fmt.Errorf("%w: no task of type %v found", errors.NewStackTracedError(ErrMissingResource), taskType)
 	}
 
 	return task, nil
@@ -382,7 +384,7 @@ func (b BucketList) Get(name string) (*Bucket, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("%w: bucket %s not found", ErrMissingResource, name)
+	return nil, fmt.Errorf("%w: bucket %s not found", errors.NewStackTracedError(ErrMissingResource), name)
 }
 
 type BucketBasicStats struct {
@@ -551,7 +553,7 @@ func (b *Bucket) UnmarshalJSON(data []byte) error {
 	var jsonData map[string]interface{}
 
 	if err := json.Unmarshal(data, &jsonData); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// unmarshal as BucketStatus if nodes key exists
@@ -564,7 +566,7 @@ func (b *Bucket) UnmarshalJSON(data []byte) error {
 
 	bucket := BucketAlias{}
 	if err := json.Unmarshal(data, &bucket); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	*b = Bucket(bucket)
@@ -576,7 +578,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	// unmarshalling data as bucket status
 	status := BucketStatus{}
 	if err := json.Unmarshal(data, &status); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Generic things across all bucket types
@@ -735,7 +737,7 @@ func (r *AutoCompactionDatabaseFragmentationThreshold) UnmarshalJSON(b []byte) e
 	}
 
 	if err := json.Unmarshal(b, &s); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	*r = AutoCompactionDatabaseFragmentationThreshold(s.t)
@@ -769,7 +771,7 @@ func (r *AutoCompactionViewFragmentationThreshold) UnmarshalJSON(b []byte) error
 	}
 
 	if err := json.Unmarshal(b, &s); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	*r = AutoCompactionViewFragmentationThreshold(s.t)
@@ -895,7 +897,7 @@ func (s *LDAPSettings) UnmarshalJSON(data []byte) error {
 
 	err := json.Unmarshal(data, &jsonData)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Remove dnMapping if it cannot be properly cast
@@ -905,7 +907,7 @@ func (s *LDAPSettings) UnmarshalJSON(data []byte) error {
 
 			data, err = json.Marshal(jsonData)
 			if err != nil {
-				return err
+				return errors.NewStackTracedError(err)
 			}
 		}
 	}
@@ -915,7 +917,7 @@ func (s *LDAPSettings) UnmarshalJSON(data []byte) error {
 	settings := LDAPSettingsAlias{}
 
 	if err := json.Unmarshal(data, &settings); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	*s = LDAPSettings(settings)
@@ -941,7 +943,7 @@ func (s *LDAPSettings) FormEncode() ([]byte, error) {
 	if s.AuthenticationEnabled {
 		dnData, err := json.Marshal(s.UserDNMapping)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, errors.NewStackTracedError(err)
 		}
 
 		data.Set("userDNMapping", string(dnData))

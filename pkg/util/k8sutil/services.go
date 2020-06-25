@@ -523,24 +523,24 @@ func depthFirstPrune(current, original, requested map[string]interface{}) map[st
 func prune(currentJSON, originalJSON, requestedJSON []byte) ([]byte, error) {
 	current := map[string]interface{}{}
 	if err := json.Unmarshal(currentJSON, &current); err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	original := map[string]interface{}{}
 	if err := json.Unmarshal(originalJSON, &original); err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	requested := map[string]interface{}{}
 	if err := json.Unmarshal(requestedJSON, &requested); err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	updated := depthFirstPrune(current, original, requested)
 
 	updatedJSON, err := json.Marshal(updated)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	return updatedJSON, nil
@@ -550,7 +550,7 @@ func prune(currentJSON, originalJSON, requestedJSON []byte) ([]byte, error) {
 func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, requested *v1.Service) error {
 	requestedJSON, err := json.Marshal(requested)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Check to see if the console service exists.
@@ -568,7 +568,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 
 		// Create the service.
 		if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Create(requested); err != nil {
-			return err
+			return errors.NewStackTracedError(err)
 		}
 
 		return nil
@@ -588,7 +588,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 		current.Annotations[constants.SVCSpecAnnotation] = string(requestedJSON)
 
 		if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Update(current); err != nil {
-			return err
+			return errors.NewStackTracedError(err)
 		}
 
 		return nil
@@ -598,7 +598,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 
 	original := &v1.Service{}
 	if err := json.Unmarshal(originalJSON, original); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Consider the current resource without the annotation.
@@ -611,7 +611,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 
 	currentJSON, err := json.Marshal(current)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	log.V(2).Info("Merging service", "cluster", cluster.NamespacedName(), "name", requested.Name, "requested", string(requestedJSON), "current", string(currentJSON))
@@ -626,7 +626,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 	// undefined by the required resource.
 	merged := current.DeepCopy()
 	if err := mergo.Merge(merged, requested, mergo.WithOverride); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Mergo dosn't like the meta/v1.Time type, it overwrites with null even though
@@ -638,7 +638,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 	// that were managed but are now not when compared to the requesed resource.
 	mergedJSON, err := json.Marshal(merged)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	log.V(2).Info("Pruning service", "cluster", cluster.NamespacedName(), "name", requested.Name, "merged", string(mergedJSON), "original", string(originalJSON), "requested", string(requestedJSON))
@@ -650,7 +650,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 
 	pruned := &v1.Service{}
 	if err := json.Unmarshal(prunedJSON, pruned); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Third pass should be unnecessary, but too many people insist on using
@@ -670,7 +670,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 
 	updatedJSON, err := json.Marshal(pruned)
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	log.V(2).Info("Comparing service", "cluster", cluster.NamespacedName(), "name", requested.Name, "original", string(currentJSON), "updated", string(updatedJSON))
@@ -700,7 +700,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 	pruned.Annotations[constants.SVCSpecAnnotation] = string(requestedJSON)
 
 	if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Update(pruned); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	return nil

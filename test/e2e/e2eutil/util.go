@@ -769,7 +769,7 @@ func CleanUpCluster(t *testing.T, k8s *types.Cluster, logDir string, cluster int
 func DeleteCbCluster(t *testing.T, k8s *types.Cluster, cbCluster *couchbasev2.CouchbaseCluster) {
 	t.Logf("Attempting to delete: [%v]", cbCluster.Name)
 
-	if err := k8sutil.DeleteCouchbaseCluster(k8s.CRClient, cbCluster); err != nil {
+	if err := DeleteCouchbaseCluster(k8s.CRClient, cbCluster); err != nil {
 		t.Logf("Error: %v", err)
 	} else {
 		t.Logf("Successfully deleted: [%v]", cbCluster.Name)

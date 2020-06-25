@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// This isn't Unwrap()able.  Don't use it in Operator code.  It's only used in test
+// at present.
 type RetryOkError error
 
 // Retry retries f every interval until the context si closed or times out.

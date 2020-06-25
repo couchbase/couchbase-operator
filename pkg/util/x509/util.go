@@ -109,7 +109,7 @@ func GeneratePrivateKey(keyType KeyType) (crypto.PrivateKey, error) {
 	case KeyTypeEllipticP521:
 		return ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	default:
-		return nil, errors.ErrPrivateKeyInvalid
+		return nil, errors.NewStackTracedError(errors.ErrPrivateKeyInvalid)
 	}
 }
 
@@ -121,7 +121,7 @@ func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 	if pkcs8 {
 		bytes, err := x509.MarshalPKCS8PrivateKey(key)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewStackTracedError(err)
 		}
 
 		block = &pem.Block{
@@ -138,7 +138,7 @@ func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 		case *ecdsa.PrivateKey:
 			bytes, err := x509.MarshalECPrivateKey(t)
 			if err != nil {
-				return nil, err
+				return nil, errors.NewStackTracedError(err)
 			}
 
 			block = &pem.Block{
@@ -147,13 +147,13 @@ func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 			}
 		default:
 			info := reflect.TypeOf(t)
-			return nil, fmt.Errorf("%w: %v", errors.ErrPrivateKeyInvalid, info.Name())
+			return nil, fmt.Errorf("%w: %v", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid), info.Name())
 		}
 	}
 
 	data := &bytes.Buffer{}
 	if err := pem.Encode(data, block); err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	return data.Bytes(), nil
@@ -168,7 +168,7 @@ func CreateCertificate(cert []byte) ([]byte, error) {
 
 	data := &bytes.Buffer{}
 	if err := pem.Encode(data, block); err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	return data.Bytes(), nil
@@ -179,10 +179,15 @@ func CreateCertificate(cert []byte) ([]byte, error) {
 func CreateCertificateRequest(req *x509.CertificateRequest, key crypto.PrivateKey) (*x509.CertificateRequest, error) {
 	csr, err := x509.CreateCertificateRequest(rand.Reader, req, key)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
-	return x509.ParseCertificateRequest(csr)
+	crt, err := x509.ParseCertificateRequest(csr)
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	return crt, nil
 }
 
 // ParseCertificate accepts a PEM encoded certificate and returns the
@@ -190,10 +195,15 @@ func CreateCertificateRequest(req *x509.CertificateRequest, key crypto.PrivateKe
 func ParseCertificate(data []byte) (*x509.Certificate, error) {
 	pem, _ := pem.Decode(data)
 	if pem == nil {
-		return nil, errors.ErrCertificateInvalid
+		return nil, errors.NewStackTracedError(errors.ErrCertificateInvalid)
 	}
 
-	return x509.ParseCertificate(pem.Bytes)
+	crt, err := x509.ParseCertificate(pem.Bytes)
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	return crt, nil
 }
 
 // CertificateAuthority represents a certificate authority with public
@@ -291,7 +301,7 @@ func generateSerial() (*big.Int, error) {
 
 	serialNumber, err := rand.Int(rand.Reader, serialLimit)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	return new(big.Int).Abs(serialNumber), nil
@@ -310,11 +320,11 @@ func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 	case *ecdsa.PublicKey:
 		subjectPublicKey = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 	default:
-		return nil, errors.ErrPublicKeyInvalid
+		return nil, errors.NewStackTracedError(errors.ErrPublicKeyInvalid)
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	sum := sha1.Sum(subjectPublicKey) // nolint:gosec
@@ -360,7 +370,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 		cert.IsCA = true
 		cert.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageCRLSign
 	default:
-		return nil, errors.ErrCertificateInvalid
+		return nil, errors.NewStackTracedError(errors.ErrCertificateInvalid)
 	}
 
 	// If the CA certificate is nil we just want to self sign
@@ -371,7 +381,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 
 	data, err := x509.CreateCertificate(rand.Reader, cert, cacert, req.PublicKey, ca.key)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	pem, err := CreateCertificate(data)

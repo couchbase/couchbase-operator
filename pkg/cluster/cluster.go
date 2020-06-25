@@ -433,7 +433,7 @@ func (c *Cluster) updateCRStatus() error {
 	// these updates between reconcile executions (see handleUpdateEvent).
 	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	// Ignore the case where nothing needs to be updated
@@ -447,7 +447,7 @@ func (c *Cluster) updateCRStatus() error {
 	cluster.Status = c.cluster.Status
 
 	if _, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
-		return err
+		return errors.NewStackTracedError(err)
 	}
 
 	return nil
@@ -498,7 +498,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
-		return fmt.Errorf("PodCreateTimeout improperly formatted: %w", err)
+		return fmt.Errorf("PodCreateTimeout improperly formatted: %w", errors.NewStackTracedError(err))
 	}
 
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
@@ -663,7 +663,7 @@ func (c *Cluster) setupAuth() error {
 	if err != nil {
 		// Doesn't exist yet, assume the cluster is just starting up
 		// so set it.
-		if !persistence.IsKeyError(err) {
+		if !goerrors.Is(err, persistence.ErrKeyError) {
 			return err
 		}
 
@@ -845,7 +845,7 @@ func (c *Cluster) getPodIndex() (int, error) {
 
 	podIndex, err := strconv.Atoi(podIndexStr)
 	if err != nil {
-		return -1, err
+		return -1, errors.NewStackTracedError(err)
 	}
 
 	return podIndex, nil

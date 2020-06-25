@@ -44,7 +44,7 @@ func (c *Cluster) generateCronJobs(backups []couchbasev2.CouchbaseBackup) ([]*ba
 
 		specJSON, err := json.Marshal(cronjob.Spec)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewStackTracedError(err)
 		}
 
 		cronjob.Annotations[constants.CronjobSpecAnnotation] = string(specJSON)
@@ -435,7 +435,7 @@ func (c *Cluster) deleteBackups() error {
 		// no "owner" backup exists, must have been deleted. cleanup cronjobs which in turn deletes jobs + pods
 		if _, ok := c.k8s.CouchbaseBackups.Get(backupToDelete); !ok {
 			if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(cronjob.Name, &metav1.DeleteOptions{}); err != nil {
-				return err
+				return errors.NewStackTracedError(err)
 			}
 
 			log.Info("Backup Cronjob deleted", "cbbackup", backupToDelete, "cronjob", cronjob.Name)

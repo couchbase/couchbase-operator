@@ -3,6 +3,8 @@
 package diff
 
 import (
+	"github.com/couchbase/couchbase-operator/pkg/errors"
+
 	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
 )
@@ -12,12 +14,12 @@ import (
 func Diff(old, new interface{}) (string, error) {
 	oldBytes, err := yaml.Marshal(old)
 	if err != nil {
-		return "", err
+		return "", errors.NewStackTracedError(err)
 	}
 
 	newBytes, err := yaml.Marshal(new)
 	if err != nil {
-		return "", err
+		return "", errors.NewStackTracedError(err)
 	}
 
 	return cmp.Diff(string(oldBytes), string(newBytes)), nil

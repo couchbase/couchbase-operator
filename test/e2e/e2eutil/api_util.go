@@ -23,6 +23,18 @@ func GetCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.Couchbase
 	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
 }
 
+func CreateCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Create(cl)
+}
+
+func DeleteCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) error {
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Delete(cl.Name, nil)
+}
+
+func UpdateCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Update(cl)
+}
+
 // Gets events for a CouchbaseCluster and returns them sorted by time (oldest to newest).
 func GetCouchbaseEvents(kubeCli kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (EventList, error) {
 	list, err := kubeCli.CoreV1().Events(couchbase.Namespace).List(metav1.ListOptions{FieldSelector: "involvedObject.name=" + couchbase.Name})

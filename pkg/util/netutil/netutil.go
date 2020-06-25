@@ -34,7 +34,7 @@ func WaitForHostPort(ctx context.Context, hostport string) error {
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			return err
+			return errors.NewStackTracedError(err)
 		}
 	}
 }
@@ -71,7 +71,7 @@ func WaitForHostPortTLS(ctx context.Context, hostport string, cacert []byte) err
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
-			return err
+			return errors.NewStackTracedError(err)
 		}
 	}
 }
@@ -90,7 +90,7 @@ func GetTLSState(hostport string, cacert, clientCert, clientKey []byte) ([]*x509
 	if clientCert != nil {
 		clientCertificate, err := tls.X509KeyPair(clientCert, clientKey)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewStackTracedError(err)
 		}
 
 		tlsClientConfig.Certificates = append(tlsClientConfig.Certificates, clientCertificate)
@@ -98,7 +98,7 @@ func GetTLSState(hostport string, cacert, clientCert, clientKey []byte) ([]*x509
 
 	conn, err := tls.Dial("tcp", hostport, &tlsClientConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	defer conn.Close()
@@ -112,14 +112,14 @@ func GetTLSState(hostport string, cacert, clientCert, clientKey []byte) ([]*x509
 func GetFreePort() (string, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return "", err
+		return "", errors.NewStackTracedError(err)
 	}
 
 	defer listener.Close()
 
 	_, port, err := net.SplitHostPort(listener.Addr().String())
 	if err != nil {
-		return "", err
+		return "", errors.NewStackTracedError(err)
 	}
 
 	return port, nil

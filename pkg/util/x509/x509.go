@@ -57,7 +57,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 	ca, err := x509.ParseCertificate(caPem[0].Bytes)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("CA failed to decode: %w", err))
+		errs = append(errs, fmt.Errorf("CA failed to decode: %w", errors.NewStackTracedError(err)))
 		return
 	}
 
@@ -73,7 +73,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 	for _, block := range chainPem {
 		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("chain failed to decode: %w", err))
+			errs = append(errs, fmt.Errorf("chain failed to decode: %w", errors.NewStackTracedError(err)))
 			return
 		}
 
@@ -98,7 +98,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 	// Verify the certificate validates on its own (valid for both server and client)
 	if _, err := cert.Verify(verifyOptions); err != nil {
-		errs = append(errs, fmt.Errorf("certificate cannot be verified: %w", err))
+		errs = append(errs, fmt.Errorf("certificate cannot be verified: %w", errors.NewStackTracedError(err)))
 	}
 
 	// Verify the certificate validates for each supplied zone (valid for server only)
@@ -110,7 +110,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 		verifyOptions.DNSName = hostname
 		if _, err := cert.Verify(verifyOptions); err != nil {
-			errs = append(errs, fmt.Errorf("certificate cannot be verified for zone: %w", err))
+			errs = append(errs, fmt.Errorf("certificate cannot be verified for zone: %w", errors.NewStackTracedError(err)))
 		}
 	}
 
