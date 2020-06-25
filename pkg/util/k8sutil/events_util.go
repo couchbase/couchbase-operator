@@ -60,9 +60,19 @@ const (
 	EventReasonBackupRestoreCreated    = "BackupRestoreCreated"
 	EventReasonBackupRestoreDeleted    = "BackupRestoreDeleted"
 	EventReasonSecuritySettingsUpdated = "SecuritySettingsUpdated"
+	EventReasonAdminPasswordChanged    = "AdminPasswordChanged"
 
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )
+
+func EventReasonAdminPasswordChangedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonAdminPasswordChanged
+	event.Message = fmt.Sprintf("The cluster admin password was changed")
+
+	return event
+}
 
 func MemberCreationFailedEvent(memberName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)

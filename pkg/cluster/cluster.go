@@ -195,7 +195,7 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	// Spawn the janitor process which monitors persistent log volumes.
 	go newJanitor(c).run()
 
-	if err := c.setupAuth(c.cluster.Spec.Security.AdminSecret); err != nil {
+	if err := c.setupAuth(); err != nil {
 		return nil, err
 	}
 
@@ -242,6 +242,10 @@ func (c *Cluster) create() error {
 	}
 
 	if err := c.state.Insert(persistence.Version, version); err != nil {
+		return err
+	}
+
+	if err := c.state.Insert(persistence.Password, c.password); err != nil {
 		return err
 	}
 
@@ -625,24 +629,38 @@ func (c *Cluster) updateMemberStatusWithClusterInfo(ready, unready couchbaseutil
 }
 
 // Use username and password from secret store.
-func (c *Cluster) setupAuth(authSecret string) error {
-	secret, found := c.k8s.Secrets.Get(authSecret)
+func (c *Cluster) setupAuth() error {
+	secret, found := c.k8s.Secrets.Get(c.cluster.Spec.Security.AdminSecret)
 	if !found {
-		return fmt.Errorf("unable to get admin secret %s", authSecret)
+		return fmt.Errorf("unable to get admin secret %s", c.cluster.Spec.Security.AdminSecret)
 	}
 
 	data := secret.Data
 	if username, ok := data[constants.AuthSecretUsernameKey]; ok {
 		c.username = string(username)
 	} else {
-		return cberrors.ErrSecretMissingUsername{Reason: authSecret}
+		return cberrors.ErrSecretMissingUsername{Reason: c.cluster.Spec.Security.AdminSecret}
 	}
 
-	if password, ok := data[constants.AuthSecretPasswordKey]; ok {
-		c.password = string(password)
-	} else {
-		return cberrors.ErrSecretMissingPassword{Reason: authSecret}
+	// The stored password trumps everything, because it's not infeasible
+	// the the user will try to rotate it with the operator down.
+	password, err := c.state.Get(persistence.Password)
+	if err != nil {
+		// Doesn't exist yet, assume the cluster is just starting up
+		// so set it.
+		if !persistence.IsKeyError(err) {
+			return err
+		}
+
+		passwordRaw, ok := data[constants.AuthSecretPasswordKey]
+		if !ok {
+			return fmt.Errorf("mssing passsword")
+		}
+
+		password = string(passwordRaw)
 	}
+
+	c.password = password
 
 	return nil
 }

@@ -52,3 +52,6 @@ testcases:
 
 # RBACTests
 - TestRBACCreateAdminUser
+
+# Security tests
+- TestRotateAdminPassword

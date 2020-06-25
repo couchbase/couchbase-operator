@@ -133,7 +133,8 @@ func GetOperatorRole(namespace string) *rbacv1.Role {
 				Verbs: []string{
 					"get",    // used by the controller-runtime for leadership.
 					"create", // used by the controller-runtime for leadership.
-					"update", // used my the operator for persistent state.
+					"update", // used by the controller-runtime for leadership.
+					"delete", // used to migrate persistent state to 2.1
 				},
 			},
 			{
@@ -186,9 +187,11 @@ func GetOperatorRole(namespace string) *rbacv1.Role {
 					"secrets",
 				},
 				Verbs: []string{
-					"get",   // used by the operator to get cluster and TLS secrets.
-					"list",  // used by the operator for caching
-					"watch", // used by the operator for caching
+					"get",    // used by the operator to get cluster and TLS secrets.
+					"create", // used by the operator for persistent state
+					"update", // used by the operator for persistent state
+					"list",   // used by the operator for caching
+					"watch",  // used by the operator for caching
 				},
 			},
 			// Require read/write of pod disruption budgets.

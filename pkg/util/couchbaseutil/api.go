@@ -90,6 +90,10 @@ func (c *Client) SetUUID(uuid string) {
 	c.makeClient()
 }
 
+func (c *Client) SetPassword(password string) {
+	c.password = password
+}
+
 // SetTLS updates the client TLS settings.  Creates a new client object to
 // flush existing persistent connections.
 func (c *Client) SetTLS(tls *TLSAuth) {
@@ -694,4 +698,12 @@ func Failover(otpNodes OTPNodeList, unsafe bool) *Request {
 	}
 
 	return NewRequest((*Client).Post, "/controller/failOver", []byte(data.Encode()), nil)
+}
+
+// ChangePassword changes the password for the current user, in our case, admin.
+func ChangePassword(password string) *Request {
+	data := url.Values{}
+	data.Add("password", password)
+
+	return NewRequest((*Client).Post, "/controller/changePassword", []byte(data.Encode()), nil)
 }

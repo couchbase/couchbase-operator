@@ -42,13 +42,20 @@ import (
 // randomSuffix generates a 5 character random suffix to be appended to
 // k8s resources to avoid namespace collisions (especially events).
 func RandomSuffix() string {
+	return RandomString(5)
+}
+
+// RandomString generates an arbitrary length random string.  Not cryptographically
+// secure, but who cares, this is a test suite :D  At present this uses the dictionary
+// 0-9a-z as that is compatible with DNS names and Couchbase Server passwords.
+func RandomString(length int) string {
 	// Seed the PRNG so we get vagely random suffixes across runs
 	rand.Seed(time.Now().UnixNano())
 
 	// Generate a random 5 character suffix for the cluster name
 	suffix := ""
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < length; i++ {
 		// Our alphabet is 0-9 a-z, so 36 characters
 		ordinal := rand.Intn(36)
 		// Less than 10 places it in the 0-9 range, otherwise in
@@ -1030,13 +1037,13 @@ func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster) {
 // once all the dependant pods are cleaned up.  This allows us to explicitly make alterations
 // while the operator is not running and see what happens on a restart without introducing race
 // conditions.
-func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment string, timeout time.Duration) {
-	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deployment, metav1.NewDeleteOptions(0)); err != nil {
+func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment *appsv1.Deployment, timeout time.Duration) {
+	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deployment.Name, metav1.NewDeleteOptions(0)); err != nil {
 		Die(t, err)
 	}
 
 	callback := func() error {
-		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deployment, metav1.GetOptions{})
+		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -1050,6 +1057,29 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment s
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		Die(t, err)
+	}
+
+	// Be very sure the operator is dead
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		Die(t, err)
+	}
+
+	callback = func() error {
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return err
+		}
+
+		if len(pods.Items) > 0 {
+			return fmt.Errorf("pods still exist")
+		}
+
+		return nil
+	}
 
 	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
 		Die(t, err)

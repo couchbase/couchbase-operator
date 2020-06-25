@@ -32,6 +32,18 @@ const (
 	extendedRetryPeriod = 3 * time.Minute
 )
 
+// reconcile is the main function for the whole cluster lifecycle.  It works like this:
+//
+// * Deletes any completed pods, these are not considered as members, but do pollute the
+//   namespace and will prevent clusters from being resurrected.  Pods typically enter this
+//   state when Kubernetes comes back from the dead.
+// * Setup any networking, this is essential for the Operator to be able to contact any
+//   pods to perform initialization or reconciliation actions.
+// * Create an initial member if there are no members, this handles creation and recovery
+//   if an in-memory cluster has vanished.
+// * Fix up TLS, we will be completely unable to communicate with the cluster if this is
+//   not performed first.
+// * Topology and feature updates.
 func (c *Cluster) reconcile() error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
 	defer log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
@@ -71,6 +83,12 @@ func (c *Cluster) reconcile() error {
 
 	// And make sure we have security guarantees in place.
 	if err := c.reconcileSecuritySettings(); err != nil {
+		return err
+	}
+
+	// Update the password after we have done TLS to ensure we can actually talk to
+	// the API.
+	if err := c.reconcileAdminPassword(); err != nil {
 		return err
 	}
 
@@ -2430,6 +2448,47 @@ func (c *Cluster) reconcileCompletedPods() error {
 
 		log.Info("Deleted terminated pod", "cluster", c.namespacedName(), "name", pod.Name)
 	}
+
+	return nil
+}
+
+// reconcileAdminPassword compares the source-of-truth in the perisistent cache
+// with what's in the secret, rotating both the cluster and cache.  While not
+// atomic, you'd have to be very unlucky for the former to happen and the operator
+// bomb out before the latter!
+func (c *Cluster) reconcileAdminPassword() error {
+	secret, found := c.k8s.Secrets.Get(c.cluster.Spec.Security.AdminSecret)
+	if !found {
+		return fmt.Errorf("unable to get admin secret %s", c.cluster.Spec.Security.AdminSecret)
+	}
+
+	passwordRaw, ok := secret.Data[constants.AuthSecretPasswordKey]
+	if !ok {
+		return fmt.Errorf("secret missing password")
+	}
+
+	password := string(passwordRaw)
+
+	if password == c.password {
+		return nil
+	}
+
+	log.Info("Rotating admin password", "cluster", c.namespacedName())
+
+	if err := couchbaseutil.ChangePassword(password).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	if err := c.state.Upsert(persistence.Password, password); err != nil {
+		return err
+	}
+
+	// Update all the places the password is cached.
+	c.password = password
+
+	c.api.SetPassword(password)
+
+	c.raiseEvent(k8sutil.EventReasonAdminPasswordChangedEvent(c.cluster))
 
 	return nil
 }

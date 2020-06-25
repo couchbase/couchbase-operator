@@ -315,6 +315,11 @@ var (
 
 		// Epehemeral Recovery
 		"TestAutoRecoveryEpehemeralWithNoAutofailover": TestAutoRecoveryEpehemeralWithNoAutofailover,
+
+		// Security tests
+		"TestRotateAdminPassword":              TestRotateAdminPassword,
+		"TestRotateAdminPasswordAndRestart":    TestRotateAdminPasswordAndRestart,
+		"TestRotateAdminPasswordDuringRestart": TestRotateAdminPasswordDuringRestart,
 	}
 )
 
