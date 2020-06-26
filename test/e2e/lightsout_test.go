@@ -4,8 +4,10 @@ import (
 	"testing"
 	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -45,21 +47,21 @@ func TestLightsOutEphemeral(t *testing.T) {
 // TestLightsOutPersistent tests turning the power off and the operator recovering
 // a persistent cluster.
 func TestLightsOutPersistent(t *testing.T) {
-	// What happens here is the stateless services in the supportable cluster
-	// are populated from the PVC initially, then server as the volumes are
-	// detached and ignored.
-	t.Skip("unsupported")
-
 	// Platform configuration.
 	f := framework.Global
 	kubernetes := f.GetCluster(0)
 
 	// Static configuration.
-	mdsGroupSize := 2
+	mdsGroupSize := 3
 	clusterSize := mdsGroupSize * 2
+	recoveryPolicy := couchbasev2.PrioritzeUptime
 
 	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
+	// Set an aggressive recovery policy so that the two failed query nodes get
+	// kicked out.
+	cluster := e2espec.NewSupportableCluster(mdsGroupSize)
+	cluster.Spec.RecoveryPolicy = &recoveryPolicy
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Once the cluster is up and running, stop the operator and terminate all the
 	// pods (e.g. turn the datacenter off).  Restart the operator and expect it to
@@ -75,7 +77,7 @@ func TestLightsOutPersistent(t *testing.T) {
 	// * Cluster recovered
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, clusterSize),
+		e2eutil.PodDownWithPVCRecoverySequenceWithEphemeral(clusterSize, mdsGroupSize, mdsGroupSize),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

@@ -455,7 +455,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 
 		// Ephemeral clusters are handled either automatically by server or
 		// manually by the user.
-		if !c.isPodRecoverable(m) {
+		if !c.isPodRecoverable(m) && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritzeDataIntegrity {
 			return fmt.Errorf("pod down, waiting for auto-failover on cluster: %s, pod: %s", c.namespacedName(), m.Name)
 		}
 
@@ -474,6 +474,11 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 
 			pendingFailovers++
 
+			continue
+		}
+
+		// If this is an ephemeral pod, then let volume backed ones take priority.
+		if !c.isPodRecoverable(m) {
 			continue
 		}
 
@@ -497,6 +502,36 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 	// happen.
 	if pendingFailovers != 0 {
 		return fmt.Errorf("waiting for pod failover")
+	}
+
+	// By this point we know:
+	// * Things that cannot be recovered (have no PVC) and the user is demanding data
+	//   integrity, and have been rejected.
+	// * Things that haven't timed out yet, and have been rejected.
+	// * Things that can be recovered (have a PVC) have been, these are enforced to
+	//   be stateful services that require persistence e.g. data, index, analytics.
+	// Leaving us with:
+	// * Nothing to do
+	// * Stuff that server thinks cannot be failed over e.g. a bunch of query nodes.
+	// Give the system a helping hand...
+	if len(r.couchbase.DownNodes) > 0 && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritzeUptime {
+		log.Info("Forcing failover of unrecoverable nodes", "cluster", c.namespacedName())
+
+		otpNodes := couchbaseutil.OTPNodeList{}
+
+		for _, member := range r.couchbase.DownNodes {
+			log.Info("Failing over node", "cluster", c.namespacedName(), "name", member.Name)
+
+			otpNodes = append(otpNodes, member.GetOTPNode())
+		}
+
+		if err := couchbaseutil.Failover(otpNodes, true).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		r.transitionState(ReconcileNotifyFinished)
+
+		return nil
 	}
 
 	c.cluster.Status.SetReadyCondition()

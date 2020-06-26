@@ -1036,8 +1036,8 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 			continue
 		}
 
-		// reject log volumes that have been marked as detached
-		if _, ok := pvc.Annotations[constants.VolumeDetachedAnnotation]; ok {
+		// reject log volumes, they cannot be brought back to life.
+		if IsLogPVC(pvc) {
 			continue
 		}
 

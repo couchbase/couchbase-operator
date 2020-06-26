@@ -678,3 +678,20 @@ func DisableExternalListener(s *NodeNetworkConfiguration) *Request {
 
 	return NewRequest((*Client).Post, "/node/controller/disableExternalListener", data, nil)
 }
+
+// Failover forces a down node to go into the failed state so the operator can start to recover it.
+// THIS IS VERY DANGEROUS AND CAN DESTROY A USER'S DATASET.  ONLY USE IF YOU KNOW WHAT YOU ARE
+// DOING.  AND I REALLY REALLY MEAN IT.
+func Failover(otpNodes OTPNodeList, unsafe bool) *Request {
+	data := url.Values{}
+
+	for _, otpNode := range otpNodes {
+		data.Add("otpNode", string(otpNode))
+	}
+
+	if unsafe {
+		data.Add("allowUnsafe", "true")
+	}
+
+	return NewRequest((*Client).Post, "/controller/failOver", []byte(data.Encode()), nil)
+}

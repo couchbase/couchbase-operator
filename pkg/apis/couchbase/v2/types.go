@@ -646,6 +646,23 @@ const (
 	PlatformTypeAzure PlatformType = "azure"
 )
 
+// This controls how aggressive we are when recovering cluster topology.
+// +kubebuilder:valudation:Enum=PrioritzeDataIntegrity;PrioritzeUptime
+type RecoveryPolicy string
+
+const (
+	// PrioritzeDataIntegrity listens to Couchbase Server, assuming it knows
+	// best what it is safe to do.  This is the default value.
+	PrioritzeDataIntegrity RecoveryPolicy = "PrioritzeDataIntegrity"
+
+	// PrioritzeUptime ignores Couchbase server after the auto-failover time
+	// period and may result in data loss.  This is perfect for in-memory caches
+	// as they can tolerate such behaviour.  It also handles things like ephemeral
+	// pods in a supported cluster e.g. losing all of your query nodes it not a
+	// big problem.
+	PrioritzeUptime RecoveryPolicy = "PrioritzeUptime"
+)
+
 type ClusterSpec struct {
 	// BaseImage is the base couchbase image name that will be used to launch
 	// couchbase clusters. This is useful for private registries, etc.
@@ -654,6 +671,9 @@ type ClusterSpec struct {
 
 	// Paused is to pause the control of the operator for the couchbase cluster.
 	Paused bool `json:"paused,omitempty"`
+
+	// This controls how aggressive we are when recovering cluster topology.
+	RecoveryPolicy *RecoveryPolicy `json:"recoveryPolicy,omitempty"`
 
 	// AntiAffinity determines if the couchbase-operator tries to avoid putting
 	// the couchbase members in the same cluster onto the same node.

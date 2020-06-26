@@ -601,3 +601,13 @@ func IsClusterRole(role RoleName) bool {
 func (c *CouchbaseCluster) NamespacedName() string {
 	return types.NamespacedName{Namespace: c.Namespace, Name: c.Name}.String()
 }
+
+// GetRecoveryPolicy returns the user provided recovery policy or a safe default if
+// none is specified.
+func (c *CouchbaseCluster) GetRecoveryPolicy() RecoveryPolicy {
+	if c.Spec.RecoveryPolicy == nil {
+		return PrioritzeDataIntegrity
+	}
+
+	return *c.Spec.RecoveryPolicy
+}

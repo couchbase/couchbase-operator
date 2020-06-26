@@ -312,6 +312,9 @@ var (
 		// Lights-out Recovery
 		"TestLightsOutEphemeral":  TestLightsOutEphemeral,
 		"TestLightsOutPersistent": TestLightsOutPersistent,
+
+		// Epehemeral Recovery
+		"TestAutoRecoveryEpehemeralWithNoAutofailover": TestAutoRecoveryEpehemeralWithNoAutofailover,
 	}
 )
 

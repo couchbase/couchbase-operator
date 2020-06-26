@@ -295,6 +295,40 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 	return events
 }
 
+// PodDownWithPVCRecoverySequenceWithEphemeral is shat to expect when the platform
+// goes down with some ephemeral pods in the cluster.  The persistent pods will
+// be recovered first, then the operator needs to failover the ephemeral pods and
+// recreate them, they are gone as it is.
+func PodDownWithPVCRecoverySequenceWithEphemeral(clusterSize, persistentVictims, ephemeralVictims int) eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+			eventschema.Repeat{
+				Times:     clusterSize - 1,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			},
+			eventschema.Repeat{
+				Times:     persistentVictims - 1,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+			},
+			eventschema.Repeat{
+				Times:     ephemeralVictims,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+			},
+			eventschema.Repeat{
+				Times:     ephemeralVictims,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Repeat{
+				Times:     ephemeralVictims,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}
+
 // PodDownFailedWithPVCRecoverySequence is a common sequence when stateful pods are
 // failed over but Couchbase before Operator recovery.
 func PodDownFailedWithPVCRecoverySequence(victims int) eventschema.Validatable {

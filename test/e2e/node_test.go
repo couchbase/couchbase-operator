@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -801,5 +802,57 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownFailoverRecoverySequence(),
 	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestAutoRecoveryEpehemeralWithNoAutofailover tests that a single replica with
+// two nodes down (data loss), ignores server when we tell it to and just nukes the
+// pods in preference of hanving something working and not broken.
+func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	targetKube := f.GetCluster(0)
+
+	// Static configuration.
+	clusterSize := 5
+	victimIndex1 := 0
+	victimIndex2 := 1
+	recoveryPolicy := couchbasev2.PrioritzeUptime
+
+	// Create the cluster.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase.Spec.RecoveryPolicy = &recoveryPolicy
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+
+	// Generate workload during the operation.
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+
+	// Kill a two pods and wait for the cluster to recover.
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
+	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 2, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster is created
+	// * Pods go down and fail over
+	// * Replacements are balanced in
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
