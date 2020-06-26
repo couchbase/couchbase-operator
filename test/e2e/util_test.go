@@ -3,6 +3,7 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -341,8 +342,7 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 	defer cancel()
 
 	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
-		t.Log(out.String())
-		t.Error(err)
+		e2eutil.Die(t, fmt.Errorf(out.String()))
 	}
 }
 

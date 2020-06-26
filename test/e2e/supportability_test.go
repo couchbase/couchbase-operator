@@ -1815,12 +1815,12 @@ func TestLogCollectListJson(t *testing.T) {
 	testHasErrors := false
 
 	if err := verifyLogCollectListJSON(targetKube, cbCluster.Name, execOutStr, &errMsgList); err != nil {
-		t.Error(err)
+		e2eutil.Die(t, err)
 	}
 
 	testHasErrors = errMsgList.PrintFailures(t) || testHasErrors
 
 	if testHasErrors {
-		t.Fail()
+		e2eutil.Die(t, fmt.Errorf("test has errors"))
 	}
 }
