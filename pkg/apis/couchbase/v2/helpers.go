@@ -395,18 +395,6 @@ func (cs *ClusterStatus) SetVersion(v string) {
 	cs.CurrentVersion = v
 }
 
-func (cs *ClusterStatus) IsFailed() bool {
-	if cs == nil {
-		return false
-	}
-
-	return cs.Phase == ClusterPhaseFailed
-}
-
-func (cs *ClusterStatus) SetPhase(p ClusterPhase) {
-	cs.Phase = p
-}
-
 func (cs *ClusterStatus) SetClusterID(uuid string) {
 	cs.ClusterID = uuid
 }
@@ -417,10 +405,6 @@ func (cs *ClusterStatus) PauseControl() {
 
 func (cs *ClusterStatus) Control() {
 	cs.ControlPaused = false
-}
-
-func (cs *ClusterStatus) SetReason(r string) {
-	cs.Reason = r
 }
 
 func (cs *ClusterStatus) SetScalingUpCondition(from, to int) {

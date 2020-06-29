@@ -1223,16 +1223,6 @@ type ClientCertificatePath struct {
 	Delimiter string `json:"delimiter,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Creating;Running;Failed
-type ClusterPhase string
-
-const (
-	ClusterPhaseNone     ClusterPhase = ""
-	ClusterPhaseCreating ClusterPhase = "Creating"
-	ClusterPhaseRunning  ClusterPhase = "Running"
-	ClusterPhaseFailed   ClusterPhase = "Failed"
-)
-
 type ClusterCondition struct {
 	// Type is the type of condition
 	Type ClusterConditionType `json:"type"`
@@ -1260,10 +1250,6 @@ const (
 )
 
 type ClusterStatus struct {
-	// Phase is the cluster running phase
-	Phase  ClusterPhase `json:"phase,omitempty"`
-	Reason string       `json:"reason,omitempty"`
-
 	// ControlPaused indicates the operator pauses the control of the cluster.
 	ControlPaused bool `json:"controlPaused,omitempty"`
 

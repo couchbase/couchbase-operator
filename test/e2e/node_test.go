@@ -37,7 +37,7 @@ func TestDenyCommunityEdition(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
 
 	// Expect the cluster to enter a failed state
-	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 15*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
 }
 
 // Tests editing service spec

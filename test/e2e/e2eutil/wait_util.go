@@ -310,30 +310,6 @@ func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *c
 	}
 }
 
-// WaitClusterPhaseFailed expects the cluster to enter a failed state, useful for passing
-// quickly rather than wating for a cluster to not become healthy.
-func WaitClusterPhaseFailed(t *testing.T, crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	err := retryutil.Retry(ctx, retryInterval, func() (bool, error) {
-		cluster, err := GetCouchbaseCluster(crClient, cl)
-		if err != nil {
-			return false, err
-		}
-
-		return cluster.Status.Phase == couchbasev2.ClusterPhaseFailed, nil
-	})
-
-	return err
-}
-
-func MustWaitClusterPhaseFailed(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	if err := WaitClusterPhaseFailed(t, k8s.CRClient, cluster, timeout); err != nil {
-		Die(t, err)
-	}
-}
-
 func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

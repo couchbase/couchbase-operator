@@ -158,7 +158,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
 	e2eutil.MustWaitForFirstPodContainerWaiting(t, targetKube, testCouchbase, time.Minute, "ErrImagePull", "ImagePullBackOff")
-	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 15*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
 
 	// Check the events match what we expect:
 	// * First member creation failed
@@ -182,7 +182,7 @@ func TestInvalidVersion(t *testing.T) {
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
 	e2eutil.MustWaitForFirstPodContainerWaiting(t, targetKube, testCouchbase, time.Minute, "ErrImagePull", "ImagePullBackOff")
-	e2eutil.MustWaitClusterPhaseFailed(t, targetKube, testCouchbase, 15*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
 
 	// Check the events match what we expect:
 	// * First member creation failed
