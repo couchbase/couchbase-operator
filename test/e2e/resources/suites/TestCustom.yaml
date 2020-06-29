@@ -1,4 +1,4 @@
 ---
 timeout: 4h
 testcases:
-- TestCreateBucketCluster
+- TestXdcrSourceNodeDown

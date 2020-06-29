@@ -616,6 +616,11 @@ func (c *Cluster) reconcilePodServices() error {
 			_, ok := c.k8s.Services.Get(member.Name)
 
 			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, member); err != nil {
+				if cberrors.IsErrUnknownServerClass(err) {
+					log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
+					continue
+				}
+
 				return err
 			}
 
