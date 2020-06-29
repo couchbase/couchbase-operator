@@ -664,24 +664,11 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 			return err
 		}
 
-		// Creating required namespaces and cluster roles before deploying the operator
-		if err := createK8SNamespace(k8s); err != nil {
-			return err
-		}
-
 		// re-creating docker secrets
 		logrus.Info("Recreating docker auth secret in default namespace")
 
 		if err := recreateDockerAuthSecret(k8s, "default"); err != nil {
 			return err
-		}
-
-		if k8s.Namespace != "default" {
-			logrus.Infof("Recreating docker auth secret in %v namespace", k8s.Namespace)
-
-			if err := recreateDockerAuthSecret(k8s, k8s.Namespace); err != nil {
-				return err
-			}
 		}
 
 		// creating DAC
@@ -692,13 +679,21 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		}
 	}
 
-	if f.initializedClusters.isClusterNamespaceInitialized(k8s) {
-		return nil
-	}
-
 	// Creating required namespaces and cluster roles before deploying the operator
 	if err := createK8SNamespace(k8s); err != nil {
 		return err
+	}
+
+	if k8s.Namespace != "default" {
+		logrus.Infof("Recreating docker auth secret in %v namespace", k8s.Namespace)
+
+		if err := recreateDockerAuthSecret(k8s, k8s.Namespace); err != nil {
+			return err
+		}
+	}
+
+	if f.initializedClusters.isClusterNamespaceInitialized(k8s) {
+		return nil
 	}
 
 	e2eutil.CleanK8sCluster(k8s)
