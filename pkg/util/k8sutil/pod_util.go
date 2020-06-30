@@ -1,13 +1,13 @@
 package k8sutil
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
@@ -19,10 +19,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/remotecommand"
 )
 
 const (
@@ -34,12 +32,12 @@ const (
 	CouchbaseVolumeMountIndexDir    = "/mnt/index"
 	defaultSubPathName              = "default"
 	etcSubPathName                  = "etc"
-	readinessFile                   = "/tmp/ready"
 	prometheusPort                  = 9091
 	serverSecretMountPath           = "/var/run/secrets/couchbase.com/couchbase-server-tls"
 	operatorSecretMountPath         = "/var/run/secrets/couchbase.com/couchbase-operator-tls"
 	metricsTokenMountPath           = "/var/run/secrets/couchbase.com/metrics-token"
 	MetricsContainerName            = "metrics"
+	podReadinessCondition           = v1.PodConditionType("pod.couchbase.com/readiness")
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -458,7 +456,17 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
 	container := couchbaseContainer(cluster.Spec.CouchbaseImage(), &config)
-	container.ReadinessProbe = couchbaseReadinessProbe()
+	container.ReadinessProbe = &v1.Probe{
+		Handler: v1.Handler{
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.FromInt(8091),
+			},
+		},
+		InitialDelaySeconds: 10,
+		TimeoutSeconds:      5,
+		PeriodSeconds:       20,
+		FailureThreshold:    1,
+	}
 
 	if pvcState != nil {
 		container.VolumeMounts = pvcState.volumeMounts
@@ -484,6 +492,11 @@ func CreateCouchbasePodSpec(client *client.Client, m *couchbaseutil.Member, clus
 	pod.Spec.Hostname = m.Name
 	pod.Spec.Subdomain = cluster.Name
 	pod.Spec.SecurityContext = cluster.Spec.SecurityContext
+	pod.Spec.ReadinessGates = []v1.PodReadinessGate{
+		{
+			ConditionType: podReadinessCondition,
+		},
+	}
 
 	// If anti-affinity is set then ensure no two pods from the same cluster
 	// run on the same hosts.
@@ -972,20 +985,6 @@ func applyPodTLSConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
 	return nil
 }
 
-func couchbaseReadinessProbe() *v1.Probe {
-	return &v1.Probe{
-		Handler: v1.Handler{
-			Exec: &v1.ExecAction{
-				Command: []string{"test", "-f", readinessFile},
-			},
-		},
-		InitialDelaySeconds: 10,
-		TimeoutSeconds:      5,
-		PeriodSeconds:       20,
-		FailureThreshold:    1,
-	}
-}
-
 // IsPodReady returns false if the Pod Status is nil.
 func IsPodReady(pod *v1.Pod) bool {
 	condition := getPodReadyCondition(&pod.Status)
@@ -1116,62 +1115,40 @@ func IsLogPVC(pvc *v1.PersistentVolumeClaim) bool {
 	return path == CouchbaseVolumeMountLogsDir
 }
 
-// exec shells onto a pod and runs a command.
-func exec(client kubernetes.Interface, pod *v1.Pod, command []string) error {
-	config, err := InClusterConfig()
-	if err != nil {
-		return err
-	}
-
-	// Generate the REST request
-	req := client.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(pod.Namespace).
-		Name(pod.Name).
-		SubResource("exec")
-	req.VersionedParams(&v1.PodExecOptions{
-		Container: constants.CouchbaseContainerName,
-		Command:   command,
-		Stdout:    true,
-	}, scheme.ParameterCodec)
-
-	// Create an executor running over HTTP2
-	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
-	if err != nil {
-		return fmt.Errorf("remote command on %s failed: %v", pod.Name, err)
-	}
-
-	// Finally run the command
-	stdout := &bytes.Buffer{}
-
-	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
-		return fmt.Errorf("remote command on %s failed: %v", pod.Name, err)
-	}
-
-	return nil
-}
-
-// FlagPodReady adds a file on the pod that flags the pod is ready and can be safely
-// killed by Kubernetes.
+// FlagPodReady adds a readiness gate to the pod so we can have explicit control over
+// pod eviction, when used in conjunction with a pod disruption budget, through the
+// pod resource only.
 func FlagPodReady(client *client.Client, name string) error {
 	pod, found := client.Pods.Get(name)
 	if !found {
 		return fmt.Errorf("pod %s not found", name)
 	}
 
-	// Don't be tempted to just call exec all the time.  A memory leak in a
-	// dependency causes OOM and eviction, so don't do work when not necessary.
-	for _, status := range pod.Status.ContainerStatuses {
-		if status.Name == constants.CouchbaseContainerName {
-			if status.Ready {
-				return nil
-			}
-
-			break
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == podReadinessCondition {
+			return nil
 		}
 	}
 
-	if err := exec(client.KubeClient, pod, []string{"touch", readinessFile}); err != nil {
+	now := metav1.Time{
+		Time: time.Now(),
+	}
+
+	condition := v1.PodCondition{
+		Type:               podReadinessCondition,
+		Status:             v1.ConditionTrue,
+		LastTransitionTime: now,
+	}
+
+	mergePatch, err := json.Marshal(condition)
+	if err != nil {
+		return err
+	}
+
+	// Yes it's ugly, but efficient.
+	mergePatch = []byte(`{"status":{"conditions":[` + string(mergePatch) + `]}}`)
+
+	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(pod.Name, apitypes.StrategicMergePatchType, mergePatch, "status"); err != nil {
 		return err
 	}
 

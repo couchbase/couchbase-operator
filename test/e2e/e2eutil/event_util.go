@@ -245,6 +245,27 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 	}
 }
 
+// KubernetesUpgradeSequenceEphemeral is the expected even sequence for a Kubernets upgrade with
+// an epehemeral cluster.  Note the down even is optional as the Operator may get evicted at
+// the same time as a pod and miss the event as Couchbase has already failed over the pod.
+func KubernetesUpgradeSequenceEphemeral(clusterSize int) eventschema.Validatable {
+	return eventschema.RepeatAtLeast{
+		Times: clusterSize,
+		Validator: eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Optional{
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+				},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		},
+	}
+}
+
 // ServerCrashRecoverySequence is generated when you kill NS server.
 func ServerCrashRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{

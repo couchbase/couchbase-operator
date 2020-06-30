@@ -143,6 +143,7 @@ func GetOperatorRole(namespace string) *rbacv1.Role {
 				},
 				Resources: []string{
 					"pods",
+					"pods/status",
 					"services",
 					"persistentvolumeclaims",
 				},
@@ -153,17 +154,7 @@ func GetOperatorRole(namespace string) *rbacv1.Role {
 					"create", // used by the operator to create resources.
 					"update", // used by the operator to modify resources.
 					"delete", // used by the operator to delete resources.
-				},
-			},
-			{
-				APIGroups: []string{
-					"",
-				},
-				Resources: []string{
-					"pods/exec",
-				},
-				Verbs: []string{
-					"create", // used by the operator to signify readiness.
+					"patch",  // used by the operator to modify resources.
 				},
 			},
 			{

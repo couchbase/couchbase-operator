@@ -181,3 +181,6 @@ testcases:
 # Security tests
 - TestRotateAdminPasswordAndRestart
 - TestRotateAdminPasswordDuringRestart
+
+# Kubernetes Upgrade Tests
+- TestPodReadiness

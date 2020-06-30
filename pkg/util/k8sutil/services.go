@@ -14,7 +14,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 
-	//"github.com/evanphx/json-patch"
 	"github.com/imdario/mergo"
 
 	v1 "k8s.io/api/core/v1"

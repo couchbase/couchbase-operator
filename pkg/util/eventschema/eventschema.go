@@ -250,3 +250,30 @@ func (e Optional) Validate(c *Validator) error {
 
 	return nil
 }
+
+// RepeatAtLeast is a greedy validator that expects to validate at least N times
+// up to any number.
+type RepeatAtLeast struct {
+	Times     int
+	Validator Validatable
+}
+
+// Validate matches the validator as many times as it can.  If the total number of
+// matches is less than the required minimum then throw an error.
+func (e RepeatAtLeast) Validate(c *Validator) error {
+	var times int
+
+	for {
+		if err := e.Validator.Validate(c); err != nil {
+			break
+		}
+
+		times++
+	}
+
+	if times < e.Times {
+		return fmt.Errorf("failed to validate at least %d times", e.Times)
+	}
+
+	return nil
+}

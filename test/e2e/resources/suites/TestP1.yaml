@@ -126,3 +126,6 @@ testcases:
 - TestReplaceFullOnlyBackup
 - TestReplaceFullIncrementalBackup
 - TestUpdateBackupStatus
+
+# Kubernetes Upgrade Tests
+- TestKubernetesRollingUpgrade

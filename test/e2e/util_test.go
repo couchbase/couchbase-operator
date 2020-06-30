@@ -320,6 +320,10 @@ var (
 		"TestRotateAdminPassword":              TestRotateAdminPassword,
 		"TestRotateAdminPasswordAndRestart":    TestRotateAdminPasswordAndRestart,
 		"TestRotateAdminPasswordDuringRestart": TestRotateAdminPasswordDuringRestart,
+
+		// Kubernetes Rolling Upgrade
+		"TestPodReadiness":             TestPodReadiness,
+		"TestKubernetesRollingUpgrade": TestKubernetesRollingUpgrade,
 	}
 )
 

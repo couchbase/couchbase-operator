@@ -1,12 +1,16 @@
 package e2eutil
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
@@ -60,6 +64,105 @@ func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnsch
 	}
 
 	return err
+}
+
+// MustRollingUpgrade simulates a Kubernetes rolling upgrade.
+func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	for _, n := range nodes.Items {
+		// Kick everything off the node immediately.
+		node, err := k8s.KubeClient.CoreV1().Nodes().Get(n.Name, metav1.GetOptions{})
+		if err != nil {
+			Die(t, err)
+		}
+
+		node.Spec.Taints = []v1.Taint{
+			{
+				Key:    "couchbase-qe",
+				Value:  "rocks",
+				Effect: v1.TaintEffectNoExecute,
+			},
+		}
+
+		if _, err = k8s.KubeClient.CoreV1().Nodes().Update(node); err != nil {
+			Die(t, err)
+		}
+
+		// Wait for application controllers to recover.
+		time.Sleep(30 * time.Second)
+
+		// Wait for PDBs to allow eviction before scheduling the next death.
+		callback := func() error {
+			pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(k8s.Namespace).List(metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+
+			for _, pdb := range pdbs.Items {
+				if pdb.Status.CurrentHealthy <= pdb.Status.DesiredHealthy {
+					return fmt.Errorf("unable to evict any pods, current %v <= desired %v", pdb.Status.CurrentHealthy, pdb.Status.DesiredHealthy)
+				}
+			}
+
+			return nil
+		}
+
+		if err := retryutil.RetryOnErr(ctx, 10*time.Second, callback); err != nil {
+			Die(t, err)
+		}
+
+		// Untaint the node.
+		node, err = k8s.KubeClient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+		if err != nil {
+			Die(t, err)
+		}
+
+		node.Spec.Taints = nil
+
+		if _, err := k8s.KubeClient.CoreV1().Nodes().Update(node); err != nil {
+			Die(t, err)
+		}
+	}
+}
+
+// MustValidatePodReadiness checks a pod has the the correct readiness condition.
+func MustValidatePodReadiness(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, index int, status v1.ConditionStatus, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	name := couchbaseutil.CreateMemberName(cluster.Name, index)
+
+	callback := func() error {
+		pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type != v1.PodReady {
+				continue
+			}
+
+			if condition.Status != status {
+				return fmt.Errorf("ready status %v not as expected %v", condition.Status, status)
+			}
+
+			return nil
+		}
+
+		return fmt.Errorf("ready status not set")
+	}
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		Die(t, err)
+	}
 }
 
 // GetNodeForPod returns a reference to the node a pod runs on.
