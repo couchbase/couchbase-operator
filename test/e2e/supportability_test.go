@@ -1586,7 +1586,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	// Kill stateless pods repeatedly waiting for recovery each time.
 	for victim := mdsGroupSize; victim < mdsGroupSize+victims; victim++ {
 		e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
-		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
+		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
 	}
 
 	// Check that log volumes are persisted.
