@@ -146,7 +146,7 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 		e2eutil.DeleteSyncGateway(cluster)
 
 		if err := e2eutil.CleanTestResources(k8s); err != nil {
-			fmt.Println("Warning: Test resources not cleaned")
+			fmt.Println("Warning: Test resources not cleaned, Error: ", err)
 		}
 	}
 
@@ -180,7 +180,7 @@ func runTest(t *testing.T, name string, test func(*testing.T)) bool {
 			e2eutil.CleanUpCluster(t, cluster, f.LogDir, i, name)
 
 			if err := e2eutil.CleanTestResources(k8s); err != nil {
-				fmt.Println("Warning: Test resources not cleaned")
+				fmt.Println("Warning: Test resources not cleaned, Error: ", err)
 			}
 		}
 	}

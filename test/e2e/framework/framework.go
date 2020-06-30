@@ -316,7 +316,6 @@ func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreat
 	}
 
 	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, podCreateTimeout, "--zap-level", "debug")
-	e2eutil.ApplyGarbageCollectedObjectLabels(&deployment.Spec.Template.ObjectMeta)
 
 	return deployment
 }

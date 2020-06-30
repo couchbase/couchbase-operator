@@ -1636,11 +1636,6 @@ func CleanTestResources(k8s *types.Cluster) error {
 		&couchbasev2.CouchbaseCluster{},
 		&couchbasev2.CouchbaseRoleBinding{},
 		&couchbasev2.CouchbaseBackupRestore{},
-		&v1.ConfigMap{},
-		&v1.Endpoints{},
-		&v1.Namespace{},
-		&v1.PersistentVolumeClaim{},
-		&v1.Pod{},
 		&v1.Secret{},
 		&v1.Service{},
 		&v1.ServiceAccount{},
@@ -1673,13 +1668,15 @@ func CleanTestResources(k8s *types.Cluster) error {
 			return err
 		}
 
-		// Delete the resources...
-		if err := k8s.DynamicClient.Resource(mapping.Resource).Namespace(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: "owner=couchbaseqe"}); err != nil {
-			if err.Error() == "the server could not find the requested resource" {
-				return nil
-			}
-
+		resources, err := k8s.DynamicClient.Resource(mapping.Resource).Namespace(k8s.Namespace).List(metav1.ListOptions{LabelSelector: "owner=couchbaseqe"})
+		if err != nil {
 			return err
+		}
+
+		for _, resource := range resources.Items {
+			if err = k8s.DynamicClient.Resource(mapping.Resource).Namespace(k8s.Namespace).Delete(resource.GetName(), metav1.NewDeleteOptions(0)); err != nil {
+				return err
+			}
 		}
 	}
 
