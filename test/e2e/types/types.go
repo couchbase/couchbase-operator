@@ -6,6 +6,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
@@ -57,6 +58,9 @@ type Cluster struct {
 	// identified on a per-namespace basis due to the operator running in a different
 	// namespace to the DAC.
 	PullSecrets map[string][]string
+	// OperatorDeployment is a tailored deployment of the Operator for this
+	// specific namespace/cluster combination.
+	OperatorDeployment *appsv1.Deployment
 
 	// Hacks - remove me
 

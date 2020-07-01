@@ -604,9 +604,9 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 
 	// When the cluster is ready, restart the operator and swap out the all certificates for new ones and verify
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout), time.Minute)
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustCreateOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout))
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
 
@@ -646,10 +646,10 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 
 	// When the cluster is ready, kill a stateful pod,  restart the operator and swap out the all certificates for new ones and verify
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout), time.Minute)
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustCreateOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout))
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victimIndex), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)

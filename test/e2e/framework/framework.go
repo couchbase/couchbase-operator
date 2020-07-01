@@ -306,7 +306,7 @@ func startTimeoutTimer() {
 	}()
 }
 
-func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPort int, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
+func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
 	// This just picks the first, so ordering is important unless we sort out
 	// cbopcfg...
 	var pullSecret string
@@ -317,12 +317,6 @@ func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPo
 
 	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, podCreateTimeout, "--zap-level", "debug")
 	e2eutil.ApplyGarbageCollectedObjectLabels(&deployment.Spec.Template.ObjectMeta)
-
-	// Manually set the HTTP port.
-	if operatorPort != 0 {
-		listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(operatorPort)
-		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
-	}
 
 	return deployment
 }
@@ -694,6 +688,10 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		}
 	}
 
+	// Once pull secrets are defined, then we can create the Operator Deployment object
+	// per cluster.
+	k8s.OperatorDeployment = createOperatorDeployment(k8s, f.OpImage, f.PodCreateTimeout)
+
 	if f.initializedClusters.isClusterNamespaceInitialized(k8s) {
 		return nil
 	}
@@ -799,9 +797,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 }
 
 func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
-	deployment := CreateDeploymentObject(k8s, f.OpImage, 0, f.PodCreateTimeout)
-
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(k8s.OperatorDeployment); err != nil {
 		return err
 	}
 

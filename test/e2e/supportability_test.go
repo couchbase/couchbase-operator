@@ -1135,15 +1135,15 @@ func TestLogCollectRbacPermission(t *testing.T) {
 }
 
 func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port int) error {
-	f := framework.Global
-
 	// Delete existing Deployment
 	if err := framework.DeleteOperatorCompletely(k8s, config.OperatorResourceName); err != nil {
 		return err
 	}
 
 	// Create new deployment object to deploy
-	deployment := framework.CreateDeploymentObject(k8s, imageName, port, f.PodCreateTimeout)
+	deployment := k8s.OperatorDeployment.DeepCopy()
+	deployment.Spec.Template.Spec.Containers[0].Image = imageName
+	deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--listen-addr=0.0.0.0:%d", port))
 
 	t.Logf("Deploying operator using image '%s' and port %d", imageName, port)
 

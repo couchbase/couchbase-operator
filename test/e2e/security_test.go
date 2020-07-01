@@ -56,8 +56,8 @@ func TestRotateAdminPasswordAndRestart(t *testing.T) {
 	// scaling operation so we can observe the operator actually being able
 	// to talk to server.
 	e2eutil.MustRotateClusterPassword(t, kubernetes)
-	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout), time.Minute)
-	e2eutil.MustCreateOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout))
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
@@ -85,9 +85,9 @@ func TestRotateAdminPasswordDuringRestart(t *testing.T) {
 	// Create the cluster.
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
 
-	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout), time.Minute)
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustRotateClusterPassword(t, kubernetes)
-	e2eutil.MustCreateOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout))
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:

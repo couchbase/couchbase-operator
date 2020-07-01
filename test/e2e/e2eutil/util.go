@@ -1037,13 +1037,13 @@ func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster) {
 // once all the dependant pods are cleaned up.  This allows us to explicitly make alterations
 // while the operator is not running and see what happens on a restart without introducing race
 // conditions.
-func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment *appsv1.Deployment, timeout time.Duration) {
-	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deployment.Name, metav1.NewDeleteOptions(0)); err != nil {
+func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, timeout time.Duration) {
+	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(k8s.OperatorDeployment.Name, metav1.NewDeleteOptions(0)); err != nil {
 		Die(t, err)
 	}
 
 	callback := func() error {
-		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deployment.Name, metav1.GetOptions{})
+		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(k8s.OperatorDeployment.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -1063,7 +1063,7 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment *
 	}
 
 	// Be very sure the operator is dead
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(k8s.OperatorDeployment.Spec.Selector)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1088,8 +1088,8 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment *
 
 // MustCreateOperatorDeployment is the partner of MustDeleteOperatorDeployment which is used to
 // restart the operator synchronously, potentially after modifying resources.
-func MustCreateOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment *appsv1.Deployment) {
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
+func MustCreateOperatorDeployment(t *testing.T, k8s *types.Cluster) {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(k8s.OperatorDeployment); err != nil {
 		Die(t, err)
 	}
 }

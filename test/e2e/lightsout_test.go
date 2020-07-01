@@ -27,9 +27,9 @@ func TestLightsOutEphemeral(t *testing.T) {
 	// Once the cluster is up and running, stop the operator and terminate all the
 	// pods (e.g. turn the datacenter off).  Restart the operator and expect it to
 	// bring the cluster back to life!
-	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout), time.Minute)
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustTerminateAllPods(t, kubernetes, cluster)
-	e2eutil.MustCreateOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout))
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
@@ -65,9 +65,9 @@ func TestLightsOutPersistent(t *testing.T) {
 	// Once the cluster is up and running, stop the operator and terminate all the
 	// pods (e.g. turn the datacenter off).  Restart the operator and expect it to
 	// bring the cluster back to life!
-	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout), time.Minute)
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustTerminateAllPods(t, kubernetes, cluster)
-	e2eutil.MustCreateOperatorDeployment(t, kubernetes, framework.CreateDeploymentObject(kubernetes, f.OpImage, 0, f.PodCreateTimeout))
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
