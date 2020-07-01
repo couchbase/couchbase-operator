@@ -57,12 +57,17 @@ ____
 _Field rules:_ This field is required and must be set to `CouchbaseMemcachedBucket`
 ____
 
+[#metadata-name]
 === metadata.name
 
-The metadata name defines the name of the resource.
+The metadata name defines the name of the resource, and is used as the bucket name by default.
 The name must be unique for the kind defined.
 Furthermore the name must be unique for all bucket kinds defined and used by the cluster.
 For example you cannot have a `CouchbaseMemcachedBucket` named "default" and a CouchbaseBucket also named "default".
+
+Like other Kubernetes resource names, the metadata name is restricted to the character limits of https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names[DNS label names^].
+This means that this field cannot accept the full character set that Couchbase supports for bucket names.
+If you wish to use a bucket name that would otherwise be supported by Couchbase, but contains characters that are outside of the limits for DNS label names, then you can use the <<spec-name,spec.name>> field to override the metadata name becoming the bucket name.
 
 ____
 _Field rules:_ This field is required and must be unique as described above.
@@ -89,17 +94,18 @@ spec:
   enableFlush: false
 ----
 
+[#spec-name]
 === spec.name
 
 This field allows the name of a bucket to be overridden.
-By default, the bucket name will be that specified as the resource name in `metadata.name`.
-This has limitations in that the metadata name is limited to the character set defined by a DNS label.
+By default, the bucket name will be that which is specified as the resource name in <<metadata-name,`metadata.name`>>.
+This has limitations in that the metadata name is limited to the character set of https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names[DNS label names^].
 Couchbase Server allows characters outside of the DNS label character set.
 By specifying this field you may use any character that Couchbase Server supports.
 You may also use this field to allow multiple buckets in the same namespace -- whose resource names differ as they must be unique -- to have the same actual bucket name in Couchbase.
 
 ____
-_Field rules_: This field is optional and must be a string containing the characters `a-zA-Z0-9-_%.`.
+_Field rules_: This field is optional and must be a string containing a maximum of 100 of the following characters `a-zA-Z0-9-_%.`.
 ____
 
 === spec.memoryQuota
