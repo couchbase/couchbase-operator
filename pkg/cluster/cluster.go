@@ -355,6 +355,16 @@ func (c *Cluster) runReconcile() {
 		return
 	}
 
+	// First thing we must do is fix up TLS or we may not be able to talk to the
+	// cluster for anything else.
+	if err := c.reconcileTLS(podsToMemberSet(running)); err != nil {
+		log.Error(err, "Failed to reconcile cluster TLS", "cluster", c.namespacedName(), "error", err)
+		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
+		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
+
+		return
+	}
+
 	// Members are updated each iteration by performing a union of Kubernetes resources
 	// we discover, and any hosts that Couchbase knows about, if we can actually talk
 	// to it.  By performing no caching the behaviour of the systems is identical during

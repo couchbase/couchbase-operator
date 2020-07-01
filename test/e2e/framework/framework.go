@@ -418,7 +418,9 @@ func Setup() (err error) {
 
 	Global.CbopinfoPath = wd + "/../../build/bin/cbopinfo"
 
-	for _, k8s := range Global.ClusterSpec {
+	for i, k8s := range Global.ClusterSpec {
+		logrus.Info(util.PrettyHeading(fmt.Sprintf("Configuring Cluster %d", i)))
+
 		if err = Global.SetupFramework(k8s); err != nil {
 			return err
 		}

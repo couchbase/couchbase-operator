@@ -75,12 +75,6 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
-	// First thing we must do is fix up TLS or we may not be able to talk to the
-	// cluster for anything else.
-	if err := c.reconcileTLS(); err != nil {
-		return err
-	}
-
 	// And make sure we have security guarantees in place.
 	if err := c.reconcileSecuritySettings(); err != nil {
 		return err

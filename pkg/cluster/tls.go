@@ -203,7 +203,7 @@ func (c *Cluster) reconcileMemberTLS(member *couchbaseutil.Member, ca, cert, key
 
 // reconcileClientAuthentication reconciles client ceritifcate policy.  Note this must be
 // done over plaintext or the logic would become next to impossible to comprehend.
-func (c *Cluster) reconcileClientAuthentication() error {
+func (c *Cluster) reconcileClientAuthentication(members couchbaseutil.MemberSet) error {
 	// Reconcile client ceritifcate policy. Defaults to disable (implied by nil policy).
 	settings := &couchbaseutil.ClientCertAuth{
 		State:    "disable",
@@ -225,12 +225,12 @@ func (c *Cluster) reconcileClientAuthentication() error {
 	// The ordering constraints when using mTLS make the process very messy, so
 	// this is always done over HTTP.
 	existingSettings := &couchbaseutil.ClientCertAuth{}
-	if err := couchbaseutil.GetClientCertAuth(existingSettings).InPlaintext().On(c.api, c.readyMembers()); err != nil {
+	if err := couchbaseutil.GetClientCertAuth(existingSettings).InPlaintext().On(c.api, members); err != nil {
 		return err
 	}
 
 	if !reflect.DeepEqual(existingSettings, settings) {
-		if err := couchbaseutil.SetClientCertAuth(settings).InPlaintext().On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.SetClientCertAuth(settings).InPlaintext().On(c.api, members); err != nil {
 			return err
 		}
 
@@ -238,7 +238,7 @@ func (c *Cluster) reconcileClientAuthentication() error {
 		// live, lest we get non-determinism.
 		callback := func() error {
 			currentSettings := &couchbaseutil.ClientCertAuth{}
-			if err := couchbaseutil.GetClientCertAuth(currentSettings).InPlaintext().On(c.api, c.readyMembers()); err != nil {
+			if err := couchbaseutil.GetClientCertAuth(currentSettings).InPlaintext().On(c.api, members); err != nil {
 				return err
 			}
 
@@ -267,7 +267,12 @@ func (c *Cluster) reconcileClientAuthentication() error {
 // nightmare with required mTLS.  We always ensure TLS client settings
 // are enforced on exit from this function as we don't ever want to
 // leak sensitive information.
-func (c *Cluster) reconcileTLS() error {
+func (c *Cluster) reconcileTLS(members couchbaseutil.MemberSet) error {
+	// Nothing to do.
+	if members.Empty() {
+		return nil
+	}
+
 	// Insecure cluster, ignore.
 	if !c.cluster.Spec.Networking.TLS.IsSecureClient() {
 		return nil
@@ -354,7 +359,7 @@ func (c *Cluster) reconcileTLS() error {
 	// Update the CA and any server certificate chains that require it.
 	changed := false
 
-	for _, member := range c.members {
+	for _, member := range members {
 		change, err := c.reconcileMemberTLS(member, cacert, clientCert, clientKey, cert)
 		if err != nil {
 			return err
@@ -378,7 +383,7 @@ func (c *Cluster) reconcileTLS() error {
 	}
 
 	// Reconcile client ceritifcate policy.
-	if err := c.reconcileClientAuthentication(); err != nil {
+	if err := c.reconcileClientAuthentication(members); err != nil {
 		return err
 	}
 

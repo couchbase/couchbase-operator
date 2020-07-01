@@ -1298,16 +1298,29 @@ func GetMemberPVC(k8s *types.Cluster, memberName string, index int, mountName co
 	return k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(name, metav1.GetOptions{})
 }
 
-func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, ctx *TLSContext) error {
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + ctx.ClusterName})
+func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext) error {
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
 	if err != nil {
 		return fmt.Errorf("unable to get couchbase pods: %v", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
 	// TLS handshake with pods
-	for _, pod := range pods.Items {
-		if err := tlsCheckForPod(t, k8s, pod.GetName(), ctx); err != nil {
-			return fmt.Errorf("TLS verification failed: %v", err)
+	for i := range pods.Items {
+		pod := pods.Items[i]
+
+		callback := func() error {
+			if err := tlsCheckForPod(t, k8s, pod.GetName(), tls); err != nil {
+				return fmt.Errorf("TLS verification failed: %v", err)
+			}
+
+			return nil
+		}
+
+		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+			return err
 		}
 	}
 
