@@ -1431,17 +1431,10 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
-func (c *Cluster) needsUpgrade() (couchbaseutil.Member, int, string, error) {
-	var candidate couchbaseutil.Member
+func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
+	candidates := couchbaseutil.MemberSet{}
 
-	var targetConfiguration int
-
-	var d string
-
-	// Names returns a sorted list for determinism.
-	for _, name := range c.members.Names() {
-		member := c.members[name]
-
+	for name, member := range c.members {
 		// Get what the member actually looks like.
 		actual, exists := c.k8s.Pods.Get(name)
 		if !exists {
@@ -1456,7 +1449,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.Member, int, string, error) {
 
 		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member.Name(), c.cluster, *serverClass)
 		if err != nil {
-			return nil, -1, "", err
+			return nil, err
 		}
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
@@ -1471,7 +1464,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.Member, int, string, error) {
 
 		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState)
 		if err != nil {
-			return nil, -1, "", err
+			return nil, err
 		}
 
 		// Check the specification at creation with the ones that are requested
@@ -1483,35 +1476,38 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.Member, int, string, error) {
 
 		if annotation, ok := actual.Annotations[constants.PodSpecAnnotation]; ok {
 			if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
-				return nil, -1, "", errors.NewStackTracedError(err)
+				return nil, errors.NewStackTracedError(err)
 			}
 		}
 
 		requestedSpec := &v1.PodSpec{}
 		if err := json.Unmarshal([]byte(requested.Annotations[constants.PodSpecAnnotation]), requestedSpec); err != nil {
-			return nil, -1, "", errors.NewStackTracedError(err)
+			return nil, errors.NewStackTracedError(err)
 		}
 
 		if reflect.DeepEqual(actualSpec, requestedSpec) && pvcsEqual {
-			targetConfiguration++
 			continue
 		}
 
-		if candidate == nil {
-			d, err = diff.Diff(actualSpec, requestedSpec)
-			if err != nil {
-				log.Error(err, "cluster", c.namespacedName())
-			}
-
-			if !pvcsEqual {
-				d += pvcState.Diff()
-			}
-
-			candidate = member
+		d, err := diff.Diff(actualSpec, requestedSpec)
+		if err != nil {
+			log.Error(err, "cluster", c.namespacedName())
 		}
+
+		if d == "" {
+			continue
+		}
+
+		if !pvcsEqual {
+			d += pvcState.Diff()
+		}
+
+		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", d)
+
+		candidates.Add(member)
 	}
 
-	return candidate, targetConfiguration, d, nil
+	return candidates, nil
 }
 
 // reportUpgrade looks at the current state and any existing upgrade status
@@ -1555,12 +1551,12 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	// Check to see if there are any more upgrade candidates.
 	// If there are then we are still upgrading.
-	candidate, _, _, err := c.needsUpgrade()
+	candidates, err := c.needsUpgrade()
 	if err != nil {
 		return err
 	}
 
-	if candidate != nil {
+	if !candidates.Empty() {
 		return nil
 	}
 

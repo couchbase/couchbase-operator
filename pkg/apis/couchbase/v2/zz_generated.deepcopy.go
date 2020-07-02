@@ -233,6 +233,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(RecoveryPolicy)
 		**out = **in
 	}
+	if in.UpgradeStrategy != nil {
+		in, out := &in.UpgradeStrategy, &out.UpgradeStrategy
+		*out = new(UpgradeStrategy)
+		**out = **in
+	}
 	in.ClusterSettings.DeepCopyInto(&out.ClusterSettings)
 	if in.VolumeClaimTemplates != nil {
 		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates

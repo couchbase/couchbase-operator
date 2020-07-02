@@ -335,9 +335,12 @@ func handleInit(r *ReconcileMachine, c *Cluster) error {
 		needsReconcile = true
 	}
 
-	if candidate, _, _, err := c.needsUpgrade(); err != nil {
+	candidates, err := c.needsUpgrade()
+	if err != nil {
 		return err
-	} else if candidate != nil {
+	}
+
+	if !candidates.Empty() {
 		needsReconcile = true
 	}
 	// TEMPORARY HACK END
@@ -816,20 +819,36 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 	}
 
 	// Nothing to do, move along.
-	candidate, targetCount, diff, err := c.needsUpgrade()
+	candidates, err := c.needsUpgrade()
 	if err != nil {
 		return err
 	}
 
-	if candidate == nil {
+	if candidates.Empty() {
 		r.transitionState(ReconcileServerGroups)
 		return nil
 	}
 
-	log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name(), "diff", diff)
+	// Calculate the number of nodes already in the target state before we
+	// potentially mutate the candidates.
+	upgraded := len(c.members) - len(candidates)
+
+	// If we are in "safe" mode then deterministically select the lowest named
+	// member and set that as the candidate only.
+	if c.cluster.GetUpgradeStrategy() == couchbasev2.RollingUpgrade {
+		name := candidates.Names()[0]
+
+		candidates = couchbaseutil.NewMemberSet(candidates[name])
+	}
+
+	// Do any events/conditions that make the upgrade observable.
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return err
+	}
 
 	status := &couchbasev2.UpgradeStatus{
-		TargetCount: targetCount,
+		TargetCount: upgraded,
 		TotalCount:  len(c.members),
 	}
 
@@ -839,34 +858,39 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 		return err
 	}
 
-	// Remove the candidate from the scheduler.
-	if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
-		return err
+	for _, candidate := range candidates {
+		log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name(), "source", candidate.Version(), "target", targetVersion)
+
+		// Remove the candidate from the scheduler.
+		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
+			return err
+		}
+
+		// Grab the server class.
+		class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
+		if class == nil {
+			return fmt.Errorf("upgrade unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
+
+		// Add the new member.
+		member, err := c.addMember(*class)
+		if err != nil {
+			return fmt.Errorf("upgrade failed to add new node to cluster: %w", err)
+		}
+
+		// Update book keeping
+		r.knownNodes.Add(member)
+		r.runningPods.Add(member)
+		r.newNodes.Add(member)
+		r.knownNodes.Remove(candidate.Name())
+		r.ejectNodes.Add(candidate)
+
+		if c.memberHasLogVolumes(candidate.Name()) {
+			r.removeVolumes[candidate.Name()] = true
+		}
 	}
 
-	// Grab the server class.
-	class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
-	if class == nil {
-		return fmt.Errorf("upgrade unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
-	}
-
-	// Add the new member.
-	member, err := c.addMember(*class)
-	if err != nil {
-		return fmt.Errorf("upgrade failed to add new node to cluster: %w", err)
-	}
-
-	// Update book keeping
-	r.knownNodes.Add(member)
-	r.runningPods.Add(member)
-	r.newNodes.Add(member)
-	r.knownNodes.Remove(candidate.Name())
-	r.ejectNodes.Add(candidate)
 	r.couchbase.NeedsRebalance = true
-
-	if c.memberHasLogVolumes(candidate.Name()) {
-		r.removeVolumes[candidate.Name()] = true
-	}
 
 	r.transitionState(ReconcileServerGroups)
 

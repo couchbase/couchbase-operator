@@ -664,6 +664,24 @@ const (
 	PrioritzeUptime RecoveryPolicy = "PrioritzeUptime"
 )
 
+// This controls how aggressive to be with upgrades.
+// +kubebuilder:validation:Enum=RollingUpgrade;ImmediateUpgrade
+type UpgradeStrategy string
+
+const (
+	// RollingUpgrade is a one-at-a-time upgrade strategy.
+	// It's safer in that it can be rolled-back and only affects a single node
+	// at a time, therefore giving potentially higher front-end performance.
+	// Upgrades will take longer.
+	RollingUpgrade UpgradeStrategy = "RollingUpgrade"
+
+	// ImmediateUpgrade is an all-at-once upgrade strategy.
+	// It's less safe, cannot be reverted halfway through, and affects all nodes
+	// at once so performance may suffer.  Upgrades however will take a fraction
+	// of the time.
+	ImmediateUpgrade UpgradeStrategy = "ImmediateUpgrade"
+)
+
 type ClusterSpec struct {
 	// BaseImage is the base couchbase image name that will be used to launch
 	// couchbase clusters. This is useful for private registries, etc.
@@ -675,6 +693,9 @@ type ClusterSpec struct {
 
 	// This controls how aggressive we are when recovering cluster topology.
 	RecoveryPolicy *RecoveryPolicy `json:"recoveryPolicy,omitempty"`
+
+	// This controls how aggressive we are when performing a cluster upgrade.
+	UpgradeStrategy *UpgradeStrategy `json:"upgradeStrategy,omitempty"`
 
 	// AntiAffinity determines if the couchbase-operator tries to avoid putting
 	// the couchbase members in the same cluster onto the same node.

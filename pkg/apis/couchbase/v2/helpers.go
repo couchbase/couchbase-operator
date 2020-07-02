@@ -599,3 +599,13 @@ func (c *CouchbaseCluster) GetRecoveryPolicy() RecoveryPolicy {
 
 	return *c.Spec.RecoveryPolicy
 }
+
+// GetUpgradeStrategy returns the user provided upgrade strategy or a safe default if
+// none is specified.
+func (c *CouchbaseCluster) GetUpgradeStrategy() UpgradeStrategy {
+	if c.Spec.UpgradeStrategy == nil {
+		return RollingUpgrade
+	}
+
+	return *c.Spec.UpgradeStrategy
+}

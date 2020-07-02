@@ -39,6 +39,20 @@ var (
 	}
 )
 
+// immediateUpgradeSequence is what to expect when a cluster is upgraded all at once.
+func immediateUpgradeSequence(clusterSize int) eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+			eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		},
+	}
+}
+
 // upgradeFailedAddRecoverableSequence is a common sequence for generating events for a new
 // member being added, the pod being killed before a rebalance can commence, and the
 // recovery steps.  Due to a race condition the pod may actually go down rather than enter
@@ -771,6 +785,47 @@ func TestUpgradePVC(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpgradeImmediate tests an immediate upgrade.
+func TestUpgradeImmediate(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes := f.GetCluster(0)
+
+	// Skip if not correctly configured
+	skipUpgrade(t)
+
+	// Static configuration.
+	clusterSize := constants.Size3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
+	upgradeStrategy := couchbasev2.ImmediateUpgrade
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster.Spec.UpgradeStrategy = &upgradeStrategy
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
+	// then the cluster to become healthy after upgrade has completed.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Image", f.CouchbaseServerImageUpgrade), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		immediateUpgradeSequence(clusterSize),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

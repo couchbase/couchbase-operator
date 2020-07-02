@@ -258,6 +258,7 @@ var (
 		"TestUpgradeToSupportable":                          TestUpgradeToSupportable,
 		"TestUpgradeToTLS":                                  TestUpgradeToTLS,
 		"TestUpgradePVC":                                    TestUpgradePVC,
+		"TestUpgradeImmediate":                              TestUpgradeImmediate,
 
 		// Networking tests
 		"TestExposedFeatureIP":                   TestExposedFeatureIP,
