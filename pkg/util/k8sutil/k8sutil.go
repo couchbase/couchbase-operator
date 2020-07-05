@@ -56,7 +56,7 @@ func CouchbaseVersion(image string) (string, error) {
 
 	// lookup version associated with sha256 digest
 	if couchbaseutil.IsSHA256Version(version) {
-		return couchbaseutil.GetSHA256Version(version)
+		return couchbaseutil.GetSHA256Version(version), nil
 	}
 
 	return version, nil
