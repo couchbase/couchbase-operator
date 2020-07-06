@@ -52,7 +52,6 @@ testcases:
 - TestTLSRotateChain
 - TestTLSRotateCA
 - TestTLSRotateInvalid
-- TestMutualTLSCreateCluster
 - TestMutualTLSEnable
 - TestMutualTLSDisable
 - TestMutualTLSRotateClient
@@ -125,6 +124,7 @@ testcases:
 - TestUpgrade
 - TestUpgradeSupportableKillStatefulPodOnCreate
 - TestUpgradeSupportableKillStatefulPodOnRebalance
+- TestUpgradeImmediate
 
 # Networking Tests
 - TestExposedFeatureIP

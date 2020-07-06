@@ -170,13 +170,13 @@ func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 			eventschema.Repeat{
 				Times:     size - 1,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
 	}
 }
