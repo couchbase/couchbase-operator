@@ -1591,6 +1591,10 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return err
 	}
 
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
