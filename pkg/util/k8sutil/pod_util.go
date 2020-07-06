@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
 	v1 "k8s.io/api/core/v1"
@@ -402,8 +403,32 @@ func DeleteCouchbasePod(client *client.Client, namespace, name string, opts *met
 
 // list and delete persistent volumes associated with the member.
 func deletePodVolumes(client *client.Client, memberName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
 	for _, pvc := range listMemberPVCS(client, memberName) {
 		if err := client.KubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, CascadeDeleteOptions(0)); err != nil {
+			return err
+		}
+
+		name := pvc.Name
+
+		// The PVC should be seen to disappear, or the member may be
+		// 'brought back to life' by other code.
+		callback := func() error {
+			pvc, ok := client.PersistentVolumeClaims.Get(name)
+			if !ok {
+				return nil
+			}
+
+			if pvc.DeletionTimestamp != nil {
+				return nil
+			}
+
+			return fmt.Errorf("PVC still visible")
+		}
+
+		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
 			return err
 		}
 	}
@@ -1030,6 +1055,11 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 	ms := couchbaseutil.MemberSet{}
 
 	for _, pvc := range client.PersistentVolumeClaims.List() {
+		// Ignore deleting PVCs
+		if pvc.DeletionTimestamp != nil {
+			continue
+		}
+
 		// claim must be bound to a volume
 		if pvc.Status.Phase != v1.ClaimBound {
 			continue
