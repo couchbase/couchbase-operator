@@ -900,6 +900,11 @@ func (in *CouchbaseClusterNetworkingSpec) DeepCopyInto(out *CouchbaseClusterNetw
 		*out = make(IPV4PrefixList, len(*in))
 		copy(*out, *in)
 	}
+	if in.NetworkPlatform != nil {
+		in, out := &in.NetworkPlatform, &out.NetworkPlatform
+		*out = new(NetworkPlatform)
+		**out = **in
+	}
 	return
 }
 

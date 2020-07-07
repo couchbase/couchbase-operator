@@ -524,6 +524,21 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		},
 	}
 
+	// If we are in istio mode, add in DNS configuration to avoid hairpinning
+	// which causes death with mTLS enabled.  Also note that Analytics is broke
+	// with this until 6.5.1.
+	if cluster.Spec.Networking.NetworkPlatform != nil && *cluster.Spec.Networking.NetworkPlatform == couchbasev2.NetworkPlatformIstio {
+		pod.Spec.HostAliases = []v1.HostAlias{
+			{
+				IP: "127.0.0.1",
+				Hostnames: []string{
+					"localhost",
+					m.GetDNSName(),
+				},
+			},
+		}
+	}
+
 	// If anti-affinity is set then ensure no two pods from the same cluster
 	// run on the same hosts.
 	if cluster.Spec.AntiAffinity {
@@ -689,192 +704,42 @@ func CouchbaseContainer(image string) v1.Container {
 	return couchbaseContainer(image, nil)
 }
 
+func couchbaseContainerPorts() ([]v1.ContainerPort, error) {
+	// Create a service which defines A records for all pods, we use this internally
+	// to address nodes via stable names (IPs are not fixed)
+	ports := []v1.ContainerPort{}
+
+	for _, rule := range allTheThings {
+		switch len(rule) {
+		case 1:
+			ports = append(ports, v1.ContainerPort{
+				Name:          fmt.Sprintf("tcp-%v", rule[0]),
+				ContainerPort: int32(rule[0]),
+				Protocol:      v1.ProtocolTCP,
+			})
+		case 2:
+			for i := rule[0]; i <= rule[1]; i++ {
+				ports = append(ports, v1.ContainerPort{
+					Name:          fmt.Sprintf("tcp-%v", i),
+					ContainerPort: int32(i),
+					Protocol:      v1.ProtocolTCP,
+				})
+			}
+		default:
+			return nil, fmt.Errorf("%w: illegal port rule: %v", errors.NewStackTracedError(errors.ErrInternalError), rule)
+		}
+	}
+
+	return ports, nil
+}
+
 func couchbaseContainer(image string, config *couchbasev2.ServerConfig) v1.Container {
+	ports, _ := couchbaseContainerPorts()
+
 	c := v1.Container{
 		Name:  constants.CouchbaseContainerName,
 		Image: image,
-		Ports: []v1.ContainerPort{
-			{
-				Name:          adminServicePortName,
-				ContainerPort: int32(adminServicePort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          indexServicePortName,
-				ContainerPort: int32(indexServicePort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          queryServicePortName,
-				ContainerPort: int32(queryServicePort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          searchServicePortName,
-				ContainerPort: int32(searchServicePort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsServicePortName,
-				ContainerPort: int32(analyticsServicePort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          eventingServicePortName,
-				ContainerPort: int32(eventingServicePort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          indexerAdminPortName,
-				ContainerPort: int32(indexerAdminPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          indexerScanPortName,
-				ContainerPort: int32(indexerScanPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          indexerHTTPPortName,
-				ContainerPort: int32(indexerHTTPPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          indexerSTInitPortName,
-				ContainerPort: int32(indexerSTInitPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          indexerSTCatchupPortName,
-				ContainerPort: int32(indexerSTCatchupPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          indexerSTMainPortName,
-				ContainerPort: int32(indexerSTMainPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsAdminPortName,
-				ContainerPort: int32(analyticsAdminPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsCCHTTPPortName,
-				ContainerPort: int32(analyticsCCHTTPPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsCCClusterPortName,
-				ContainerPort: int32(analyticsCCClusterPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsCCClientPortName,
-				ContainerPort: int32(analyticsCCClientPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsConsolePortName,
-				ContainerPort: int32(analyticsConsolePort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsClusterPortName,
-				ContainerPort: int32(analyticsClusterPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsDataPortName,
-				ContainerPort: int32(analyticsDataPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsResultPortName,
-				ContainerPort: int32(analyticsResultPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsMessagingPortName,
-				ContainerPort: int32(analyticsMessagingPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsAuthPortName,
-				ContainerPort: int32(analyticsAuthPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsReplicationPortName,
-				ContainerPort: int32(analyticsReplicationPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsMetadataPortName,
-				ContainerPort: int32(analyticsMetadataPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsMetadataCallbackPortName,
-				ContainerPort: int32(analyticsMetadataCallbackPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          dataServicePortNameTLS,
-				ContainerPort: int32(dataServicePortTLS),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          dataServicePortName,
-				ContainerPort: int32(dataServicePort),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          "cb-moxi",
-				ContainerPort: int32(11211),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          "cb-xdcr-ssl-1",
-				ContainerPort: int32(11214),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          "cb-xdcr-ssl-2",
-				ContainerPort: int32(11215),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          adminServicePortNameTLS,
-				ContainerPort: int32(adminServicePortTLS),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          indexServicePortNameTLS,
-				ContainerPort: int32(indexServicePortTLS),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          queryServicePortNameTLS,
-				ContainerPort: int32(queryServicePortTLS),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          searchServicePortNameTLS,
-				ContainerPort: int32(searchServicePortTLS),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          analyticsServicePortNameTLS,
-				ContainerPort: int32(analyticsServicePortTLS),
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				Name:          eventingServicePortNameTLS,
-				ContainerPort: int32(eventingServicePortTLS),
-				Protocol:      v1.ProtocolTCP,
-			},
-		},
+		Ports: ports,
 	}
 
 	if config != nil {

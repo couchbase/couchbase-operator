@@ -867,6 +867,16 @@ type ServiceTemplateSpec struct {
 	Spec       *v1.ServiceSpec `json:"spec,omitempty"`
 }
 
+// NetworkPlatform defines any hacks we have to do to work on specific
+// netwoork meshes.
+// +kubebuilder:validation:Enum=Istio
+type NetworkPlatform string
+
+const (
+	// NetworkPlatformIstio is for Istio service mesh.
+	NetworkPlatformIstio NetworkPlatform = "Istio"
+)
+
 type CouchbaseClusterNetworkingSpec struct {
 	// ExposeAdminConsole creates a service referencing the admin console.
 	ExposeAdminConsole bool `json:"exposeAdminConsole,omitempty"`
@@ -920,6 +930,10 @@ type CouchbaseClusterNetworkingSpec struct {
 	// LoadBalancer and limits the source IP ranges that are allowed to use the
 	// service.
 	LoadBalancerSourceRanges IPV4PrefixList `json:"loadBalancerSourceRanges,omitempty"`
+
+	// NetworkPlatform is used to enable support for vairous netwokring
+	// technologoes.
+	NetworkPlatform *NetworkPlatform `json:"networkPlatform,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {

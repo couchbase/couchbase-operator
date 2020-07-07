@@ -783,6 +783,9 @@ func (f *Framework) setupCluster(t *testing.T, index int) (*types.Cluster, func(
 	namespace := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: namespacePrefix,
+			Labels: map[string]string{
+				"istio-injection": "enabled",
+			},
 		},
 	}
 
