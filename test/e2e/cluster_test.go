@@ -803,7 +803,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	for _, testCouchbase := range clusters {
 		// When each cluster is ready create a bucket and verify it appears in the
 		// cluster status.
-		e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/Buckets/0/bucket.GetName()", "default"), time.Minute)
+		e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/Buckets/0/BucketName", "default"), time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		// Check the events match what we expect:

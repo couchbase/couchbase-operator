@@ -502,6 +502,7 @@ func MustEjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 func MemberFromSpecProps(couchbase *couchbasev2.CouchbaseCluster, serverConfig string, memberIndex int) *couchbaseutil.Member {
 	return &couchbaseutil.Member{
 		Name:         couchbaseutil.CreateMemberName(couchbase.Name, memberIndex),
+		ClusterName:  couchbase.Name,
 		Namespace:    couchbase.Namespace,
 		ServerConfig: serverConfig,
 		SecureClient: false,
