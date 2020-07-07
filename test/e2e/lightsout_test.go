@@ -16,7 +16,9 @@ import (
 func TestLightsOutEphemeral(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -48,7 +50,9 @@ func TestLightsOutEphemeral(t *testing.T) {
 func TestLightsOutPersistent(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	mdsGroupSize := 3

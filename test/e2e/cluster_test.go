@@ -26,8 +26,8 @@ import (
 // 4. Check the events to make sure the operator took the correct actions.
 func TestResizeCluster(t *testing.T) {
 	// Platform configuration.
-	f := framework.Global
-	targetKube := f.GetCluster(0)
+	targetKube, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -65,7 +65,9 @@ func TestResizeCluster(t *testing.T) {
 func TestResizeClusterWithBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -107,8 +109,8 @@ func TestResizeClusterWithBucket(t *testing.T) {
 // 5. Change autofailover timeout from 30 to 31 ( verify via rest call to cluster).
 func TestEditClusterSettings(t *testing.T) {
 	// Platform configuration.
-	f := framework.Global
-	targetKube := f.GetCluster(0)
+	targetKube, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -148,7 +150,9 @@ func TestEditClusterSettings(t *testing.T) {
 // TestInvalidBaseImage tests cluster with invalid image repos fail.
 func TestInvalidBaseImage(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
@@ -172,7 +176,9 @@ func TestInvalidBaseImage(t *testing.T) {
 // TestInvalidBaseImage tests cluster with invalid version repos fail.
 func TestInvalidVersion(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
@@ -202,7 +208,9 @@ func TestInvalidVersion(t *testing.T) {
 func TestNodeUnschedulable(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
@@ -254,7 +262,9 @@ func TestNodeUnschedulable(t *testing.T) {
 func TestNodeServiceDownRecovery(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -296,7 +306,9 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size5
@@ -350,7 +362,9 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 func TestReplaceManuallyRemovedNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	removePodMemberID := 1
@@ -394,7 +408,9 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 func TestBasicMDSScaling(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -534,7 +550,9 @@ func TestBasicMDSScaling(t *testing.T) {
 func TestSwapNodesBetweenServices(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -623,7 +641,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	mdsGroup1Size := 1
@@ -672,7 +692,9 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 func TestRemoveLastDataService(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	mdsGroup1Size := 1
@@ -731,7 +753,9 @@ func TestRemoveLastDataService(t *testing.T) {
 func TestRemoveServerClassWithNodeService(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	mdsGroupSize1 := 1
@@ -785,7 +809,9 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 func TestManageMultipleClusters(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size2

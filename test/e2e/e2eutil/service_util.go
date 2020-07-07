@@ -10,8 +10,6 @@ import (
 )
 
 func CreateService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error) {
-	ApplyGarbageCollectedObjectLabels(service)
-
 	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Create(service)
 	if err != nil {
 		return nil, err

@@ -11,7 +11,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1 "k8s.io/api/core/v1"
@@ -205,66 +204,4 @@ func MustGetNodeForPod(t *testing.T, k8s *types.Cluster, name string) *v1.Node {
 	}
 
 	return node
-}
-
-// MustGetAvailabiltyZoneForPod returns the availability zone a pod runs on.
-func MustGetAvailabiltyZoneForPod(t *testing.T, k8s *types.Cluster, name string) string {
-	node := MustGetNodeForPod(t, k8s, name)
-
-	availaibiltyZone, ok := node.Labels[constants.FailureDomainZoneLabel]
-	if !ok {
-		Die(t, fmt.Errorf("node missing availability zone label"))
-	}
-
-	return availaibiltyZone
-}
-
-func MustEvacuateAvailabilityZone(t *testing.T, k8s *types.Cluster, zone string) func() {
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		Die(t, err)
-	}
-
-	zoneNodes := []*v1.Node{}
-
-	for index, node := range nodes.Items {
-		nodeZone, ok := node.Labels[constants.FailureDomainZoneLabel]
-		if !ok {
-			Die(t, fmt.Errorf("node missing availability zone label"))
-		}
-
-		if nodeZone == zone {
-			zoneNodes = append(zoneNodes, &nodes.Items[index])
-		}
-	}
-
-	for _, node := range zoneNodes {
-		node.Spec.Taints = []v1.Taint{
-			{
-				Key:    "NoExecute",
-				Value:  "NoExecute",
-				Effect: v1.TaintEffectNoExecute,
-			},
-		}
-
-		node.Spec.Unschedulable = true
-
-		if _, err := k8s.KubeClient.CoreV1().Nodes().Update(node); err != nil {
-			Die(t, err)
-		}
-	}
-
-	return func() {
-		for _, node := range zoneNodes {
-			newNode, err := k8s.KubeClient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
-			if err != nil {
-				Die(t, err)
-			}
-
-			newNode.Spec.Taints = []v1.Taint{}
-			if _, err := k8s.KubeClient.CoreV1().Nodes().Update(newNode); err != nil {
-				Die(t, err)
-			}
-		}
-	}
 }

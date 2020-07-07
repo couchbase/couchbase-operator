@@ -16,7 +16,9 @@ import (
 func TestCreateCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -39,7 +41,9 @@ func TestCreateCluster(t *testing.T) {
 func TestCreateBucketCluster(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3

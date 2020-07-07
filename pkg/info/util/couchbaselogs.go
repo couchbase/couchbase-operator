@@ -123,7 +123,13 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 			return fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 		}
 
-		if err := ioutil.WriteFile(filepath.Base(header.Name), stdout.Bytes(), 0600); err != nil {
+		path := filepath.Base(header.Name)
+
+		if context.Config.Directory != "" {
+			path = filepath.Join(context.Config.Directory, path)
+		}
+
+		if err := ioutil.WriteFile(path, stdout.Bytes(), 0600); err != nil {
 			return err
 		}
 	}

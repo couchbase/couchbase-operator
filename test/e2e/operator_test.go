@@ -18,7 +18,9 @@ import (
 func TestPauseOperator(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -55,7 +57,9 @@ func TestPauseOperator(t *testing.T) {
 func TestKillOperator(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -80,7 +84,9 @@ func TestKillOperator(t *testing.T) {
 func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1

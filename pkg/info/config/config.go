@@ -50,6 +50,8 @@ type Configuration struct {
 	OperatorMetricsPort string
 	// ServerImage defines the server image to use for log collection
 	ServerImage string
+	// Directory records where to store the files
+	Directory string
 }
 
 const (
@@ -63,6 +65,7 @@ const (
 	collectInfoRedactFlag   = "collectinfo-redact"
 	collectInfoListFlag     = "collectinfo-list"
 	collectInfoCollectFlag  = "collectinfo-collect"
+	directoryFlag           = "directory"
 )
 
 // Parse parses configuration from the command line and returns an initialized
@@ -81,6 +84,7 @@ func Parse() Configuration {
 	flagSet.StringVar(&c.OperatorMetricsPort, operatorMetricsPortFlag, "8383", "Operator metrics port")
 	flagSet.StringVar(&c.ServerImage, serverImageFlag, "couchbase/server:enterprise-6.0.1", "Couchbase server image")
 	flagSet.StringVar(&c.CollectInfoCollect, collectInfoCollectFlag, "", "Collect couchbase server logs non-interactively, requires the -"+collectInfoFlag+" flag to be set")
+	flagSet.StringVar(&c.Directory, directoryFlag, "", "Collect logs in a specific directory")
 	flagSet.BoolVar(&c.All, allFlag, false, "Collect all resources from the namespace")
 	flagSet.BoolVar(&c.System, systemFlag, false, "Collect kube-system resources and logs")
 	flagSet.BoolVar(&c.CollectInfo, collectInfoFlag, false, "Collect couchbase server logs")

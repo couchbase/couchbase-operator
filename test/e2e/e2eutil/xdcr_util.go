@@ -327,13 +327,9 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 		Data: dstK8s.DefaultSecret.Data,
 	}
 
-	ApplyGarbageCollectedObjectLabels(secret)
-
 	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
 		return
 	}
-
-	ApplyGarbageCollectedObjectLabels(replication)
 
 	if replicationSpec, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
 		return
@@ -390,8 +386,6 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 		Data: dstK8s.DefaultSecret.Data,
 	}
 
-	ApplyGarbageCollectedObjectLabels(secret)
-
 	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
 		return
 	}
@@ -419,9 +413,6 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 			return
 		}
 	}
-
-	ApplyGarbageCollectedObjectLabels(secret)
-	ApplyGarbageCollectedObjectLabels(replication)
 
 	if _, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
 		return

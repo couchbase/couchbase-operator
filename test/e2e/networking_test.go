@@ -29,7 +29,9 @@ const (
 func TestExposedFeatureIP(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -56,7 +58,9 @@ func TestExposedFeatureDNS(t *testing.T) {
 
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
@@ -105,7 +109,9 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -161,7 +167,9 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -210,7 +218,9 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 func TestConsoleServiceDNS(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
@@ -257,7 +267,9 @@ func TestConsoleServiceDNS(t *testing.T) {
 func TestConsoleServiceDNSModify(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -310,7 +322,9 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 func TestConsoleServiceTypeModify(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -361,7 +375,9 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 func TestExposedFeatureTrafficPolicyCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -391,7 +407,9 @@ func TestExposedFeatureTrafficPolicyCluster(t *testing.T) {
 func TestLoadBalancerSourceRanges(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1

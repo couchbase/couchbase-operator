@@ -55,14 +55,16 @@ func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 
 // TestSyncGatewayCreateLocal tests connectivity within the same Kubernetes cluster.
 func TestSyncGatewayCreateLocal(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	testSyncGatewayCreate(t, k8s1, k8s1, nil, nil, nil)
 }
 
 // TestSyncGatewayCreateLocalTLS tests TLS connectivity within the same Kubernetes cluster.
 func TestSyncGatewayCreateLocalTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
@@ -71,7 +73,8 @@ func TestSyncGatewayCreateLocalTLS(t *testing.T) {
 
 // TestSyncGatewayCreateLocalMutualTLS tests mTLS connectivity within the same Kubernetes cluster.
 func TestSyncGatewayCreateLocalMutualTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
@@ -81,7 +84,8 @@ func TestSyncGatewayCreateLocalMutualTLS(t *testing.T) {
 
 // TestSyncGatewayCreateLocalMandatoryMutualTLS tests mandatory mTLS connectivity within the same Kubernetes cluster.
 func TestSyncGatewayCreateLocalMandatoryMutualTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
@@ -91,22 +95,20 @@ func TestSyncGatewayCreateLocalMandatoryMutualTLS(t *testing.T) {
 
 // TestSyncGatewayCreateRemote tests connectivity to a remote Kubernetes cluster.
 func TestSyncGatewayCreateRemote(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
-	k8s2 := framework.Global.GetCluster(1)
-
-	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	testSyncGatewayCreate(t, k8s1, k8s2, dns, nil, nil)
 }
 
 // TestSyncGatewayCreateRemoteTLS tests TLS connectivity to a remote Kubernetes cluster.
 func TestSyncGatewayCreateRemoteTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
-	k8s2 := framework.Global.GetCluster(1)
-
-	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -115,11 +117,10 @@ func TestSyncGatewayCreateRemoteTLS(t *testing.T) {
 
 // TestSyncGatewayCreateRemoteMutualTLS tests mTLS connectivity to a remote Kubernetes cluster.
 func TestSyncGatewayCreateRemoteMutualTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
-	k8s2 := framework.Global.GetCluster(1)
-
-	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -129,11 +130,10 @@ func TestSyncGatewayCreateRemoteMutualTLS(t *testing.T) {
 
 // TestSyncGatewayCreateRemoteMandatoryMutualTLS tests mandatory mTLS connectivity to a remote Kubernetes cluster.
 func TestSyncGatewayCreateRemoteMandatoryMutualTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
-	k8s2 := framework.Global.GetCluster(1)
-
-	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -143,10 +143,11 @@ func TestSyncGatewayCreateRemoteMandatoryMutualTLS(t *testing.T) {
 
 // TestSyncGatewayRBAC tests SGW works end-to-end with the bucket_full_access role.
 func TestSyncGatewayRBAC(t *testing.T) {
-	skipRBAC(t)
-
 	// Platform configuration.
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	skipRBAC(t)
 
 	// Static configuration.
 	// NOTE: the secret handling is a hack, by default the sync-gateway configuration will
@@ -166,7 +167,6 @@ func TestSyncGatewayRBAC(t *testing.T) {
 			constants.AuthSecretPasswordKey: []byte(password),
 		},
 	}
-	e2eutil.ApplyGarbageCollectedObjectLabels(secret)
 
 	user := &couchbasev2.CouchbaseUser{
 		ObjectMeta: metav1.ObjectMeta{

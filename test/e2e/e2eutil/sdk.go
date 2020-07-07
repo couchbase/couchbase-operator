@@ -13,7 +13,6 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,7 +22,7 @@ var backoffLimit int32 = 0
 // jobTemplate is the static part of every SDK job.
 var jobTemplate = &batchv1.Job{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: "sdk",
+		GenerateName: "sdk-",
 	},
 	Spec: batchv1.JobSpec{
 		BackoffLimit: &backoffLimit,
@@ -42,7 +41,7 @@ var jobTemplate = &batchv1.Job{
 
 // createSDKJob creates an SDK test job for the specified image with the necessary configuration.
 // See inline comments for the API.
-func createSDKJob(t *testing.T, remote *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket metav1.Object, image string, tls *TLSContext, cccp bool) *batchv1.Job {
+func createSDKJob(t *testing.T, local, remote *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket metav1.Object, image string, tls *TLSContext, cccp bool) (*batchv1.Job, error) {
 	// Old things do things need to be treated specially.
 	service := cluster.Name
 
@@ -67,8 +66,28 @@ func createSDKJob(t *testing.T, remote *types.Cluster, cluster *couchbasev2.Couc
 		fmt.Sprintf("-bucket=%s", bucket.GetName()),
 	}
 
+	// When TLS is defined we need to create a secret containing the certificates
+	// and keys.
+	var secretName string
+
 	if tls != nil {
 		args = append(args, "-cafile=/etc/sdk/ca.pem")
+
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "sdk-",
+			},
+			Data: map[string][]byte{
+				"ca.pem": tls.CA.Certificate,
+			},
+		}
+
+		newSecret, err := local.KubeClient.CoreV1().Secrets(local.Namespace).Create(secret)
+		if err != nil {
+			return nil, err
+		}
+
+		secretName = newSecret.Name
 	}
 
 	t.Logf("testing SDK with image \"%s\"", image)
@@ -84,7 +103,7 @@ func createSDKJob(t *testing.T, remote *types.Cluster, cluster *couchbasev2.Couc
 				Name: "config",
 				VolumeSource: corev1.VolumeSource{
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: "sdk",
+						SecretName: secretName,
 					},
 				},
 			},
@@ -99,38 +118,22 @@ func createSDKJob(t *testing.T, remote *types.Cluster, cluster *couchbasev2.Couc
 		}
 	}
 
-	return job
+	newJob, err := local.KubeClient.BatchV1().Jobs(local.Namespace).Create(job)
+	if err != nil {
+		return nil, err
+	}
+
+	return newJob, nil
 }
 
 // MustCreateSDKJob creates an SDK test job and sets it running.
 func MustCreateSDKJob(t *testing.T, local, remote *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket metav1.Object, image string, tls *TLSContext, cccp bool) *batchv1.Job {
-	if tls != nil {
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "sdk",
-			},
-			Data: map[string][]byte{
-				"ca.pem": tls.CA.Certificate,
-			},
-		}
-
-		ApplyGarbageCollectedObjectLabels(secret)
-
-		if _, err := local.KubeClient.CoreV1().Secrets(local.Namespace).Create(secret); err != nil {
-			Die(t, err)
-		}
-	}
-
-	job := createSDKJob(t, remote, cluster, bucket, image, tls, cccp)
-
-	ApplyGarbageCollectedObjectLabels(job)
-
-	newJob, err := local.KubeClient.BatchV1().Jobs(local.Namespace).Create(job)
+	job, err := createSDKJob(t, local, remote, cluster, bucket, image, tls, cccp)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return newJob
+	return job
 }
 
 // MustWaitForSDKJobCompletion waits for the SDK test job to complete.  If it fails then
@@ -206,55 +209,4 @@ func getJobLogs(t *testing.T, local *types.Cluster, job *batchv1.Job) string {
 	}
 
 	return string(raw)
-}
-
-// CleanupSDKResources is a best effort clean up that should be run after each test.
-// Note: Most of this goes away with parallel testing.  The rest is handled by doing
-// dynamic allocation of resource names, but I'll wait until this all gets cleaned
-// down and we can run in parallel.
-func CleanupSDKResources(t *testing.T, local *types.Cluster) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	job, err := local.KubeClient.BatchV1().Jobs(local.Namespace).Get("sdk", metav1.GetOptions{})
-	if err != nil {
-		t.Logf("failed to get sdk job resource: %v", err)
-	} else {
-		selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
-		if err != nil {
-			t.Logf("failed to create sdk job selector: %v", err)
-		}
-
-		_ = local.KubeClient.CoreV1().Pods(local.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: selector.String()})
-	}
-
-	_ = local.KubeClient.BatchV1().Jobs(local.Namespace).Delete("sdk", metav1.NewDeleteOptions(0))
-
-	callback := func() error {
-		_, err := local.KubeClient.BatchV1().Jobs(local.Namespace).Get("sdk", metav1.GetOptions{})
-		if err != nil && errors.IsNotFound(err) {
-			return nil
-		}
-
-		return fmt.Errorf("sdk job resource still exists")
-	}
-
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
-		t.Logf("failed to delete sdk job resource: %v", err)
-	}
-
-	_ = local.KubeClient.CoreV1().Secrets(local.Namespace).Delete("sdk", metav1.NewDeleteOptions(0))
-
-	callback = func() error {
-		_, err := local.KubeClient.CoreV1().Secrets(local.Namespace).Get("sdk", metav1.GetOptions{})
-		if err != nil && errors.IsNotFound(err) {
-			return nil
-		}
-
-		return fmt.Errorf("sdk secret resource still exists")
-	}
-
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
-		t.Logf("failed to delete sdk secret resource: %v", err)
-	}
 }

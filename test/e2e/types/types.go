@@ -36,6 +36,8 @@ const (
 
 // Cluster represents a Kubernetes cluster.
 type Cluster struct {
+	// Static configuration.
+
 	// KubeClient is a Kubernetes client for the cluster.
 	KubeClient kubernetes.Interface
 	// DynamicClient is an untyped client.
@@ -44,28 +46,39 @@ type Cluster struct {
 	RESTMapper meta.RESTMapper
 	// CRClient is a Kubernetes client for CouchbaseCluster resources.
 	CRClient versioned.Interface
-	// DefaultSecret is the secret to use defining admin credentials.
-	DefaultSecret *v1.Secret
 	// Config is the REST configuration to use to directly access the Kubernetes API.
 	Config *rest.Config
 	// KubeConfPath is the path to use to get the Kubernetes client configuration.
 	KubeConfPath string
 	// Context is the context used in the Kubernetes config
 	Context string
+
+	// Dynamic configuration.
+
 	// Namespace is the namespace to use
 	Namespace string
-	// PullSecrets is the list of pull secrets defined in this cluster.  These are
-	// identified on a per-namespace basis due to the operator running in a different
-	// namespace to the DAC.
-	PullSecrets map[string][]string
+	// PullSecrets is the list of pull secrets defined in this cluster.
+	PullSecrets []string
 	// OperatorDeployment is a tailored deployment of the Operator for this
 	// specific namespace/cluster combination.
 	OperatorDeployment *appsv1.Deployment
+	// DefaultSecret is the secret to use defining admin credentials.
+	DefaultSecret *v1.Secret
 
 	// Hacks - remove me
 
 	// SupportsMultipleVolumeClaims overrides dynamic checks of storage classes.
 	SupportsMultipleVolumeClaims bool
+}
+
+// Copy performs a shallow copy of a cluster, static content only should be
+// populated, the dynamic bits will get filled in during allocation.
+func (c *Cluster) Copy() *Cluster {
+	out := &Cluster{}
+
+	*out = *c
+
+	return out
 }
 
 // APIHost returns the Kubernetes endpoint.  If you are using this please reconsider why

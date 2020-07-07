@@ -57,7 +57,9 @@ func setupLDAP(t *testing.T, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 
 func TestLDAPCreateAdminUser(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -80,7 +82,9 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 // TestRBACDeleteUser verifies basic user deletion.
 func TestLDAPCDeleteUser(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -117,7 +121,9 @@ func TestLDAPCDeleteUser(t *testing.T) {
 // TestLDAPDeleteRole verifies that deleting a group results in deleting User.
 func TestLDAPDeleteRole(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -156,7 +162,10 @@ func TestLDAPDeleteRole(t *testing.T) {
 // reconciliation with couchbase.
 func TestLDAPUpdateRole(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
 	timeout := 2 * time.Minute
 
 	// Cluster
@@ -191,7 +200,10 @@ func TestLDAPUpdateRole(t *testing.T) {
 // in any other binding the user is also deleted.
 func TestLDAPRemoveUserFromBinding(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
 	timeout := 2 * time.Minute
 
 	// Cluster
@@ -247,7 +259,9 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 // rolebinding is deleted.
 func TestLDAPDeleteBinding(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	timeout := 2 * time.Minute
 

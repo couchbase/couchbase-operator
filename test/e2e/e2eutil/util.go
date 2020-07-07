@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime/debug"
@@ -27,16 +28,12 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // randomSuffix generates a 5 character random suffix to be appended to
@@ -389,13 +386,10 @@ func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, size int, ct
 func NewBucket(k8s *types.Cluster, bucket metav1.Object) (metav1.Object, error) {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
-		ApplyGarbageCollectedObjectLabels(t)
 		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Create(t)
 	case *couchbasev2.CouchbaseEphemeralBucket:
-		ApplyGarbageCollectedObjectLabels(t)
 		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).Create(t)
 	case *couchbasev2.CouchbaseMemcachedBucket:
-		ApplyGarbageCollectedObjectLabels(t)
 		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).Create(t)
 	default:
 		return nil, fmt.Errorf("unsupported bucket type")
@@ -448,7 +442,6 @@ func MustGetBucket(t *testing.T, bucketType, compressionMode string) metav1.Obje
 }
 
 func NewBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseBackup, error) {
-	ApplyGarbageCollectedObjectLabels(backup)
 	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Create(backup)
 }
 
@@ -462,7 +455,6 @@ func MustNewBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.Couchba
 }
 
 func NewBackupRestore(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackupRestore) (*couchbasev2.CouchbaseBackupRestore, error) {
-	ApplyGarbageCollectedObjectLabels(backup)
 	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(k8s.Namespace).Create(backup)
 }
 
@@ -743,65 +735,6 @@ func MustPatchReplication(t *testing.T, k8s *types.Cluster, replication *couchba
 	return replication
 }
 
-func DestroyCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
-	if err := DeleteCluster(t, k8s, cluster); err != nil {
-		Die(t, err)
-	}
-}
-
-func CleanUpCluster(t *testing.T, k8s *types.Cluster, logDir string, cluster int, testName string) {
-	// Creates dir for kubename
-	logDir = filepath.Join(logDir, strconv.Itoa(cluster))
-
-	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
-		t.Log(err)
-		return
-	}
-
-	// Pulls operator pod logs
-	if err := WriteLogs(k8s, logDir, testName); err != nil {
-		t.Logf("Error: %v", err)
-	}
-
-	CleanK8sCluster(k8s)
-}
-
-func DeleteCbCluster(t *testing.T, k8s *types.Cluster, cbCluster *couchbasev2.CouchbaseCluster) {
-	t.Logf("Attempting to delete: [%v]", cbCluster.Name)
-
-	if err := DeleteCouchbaseCluster(k8s.CRClient, cbCluster); err != nil {
-		t.Logf("Error: %v", err)
-	} else {
-		t.Logf("Successfully deleted: [%v]", cbCluster.Name)
-	}
-
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbCluster.Name})
-	if err != nil {
-		t.Logf("Error: Failed to get pods %v", err)
-	}
-
-	killPods := []string{}
-
-	for _, pod := range pods.Items {
-		killPods = append(killPods, pod.Name)
-	}
-
-	t.Logf("Killing pods: %v", killPods)
-
-	if err := KillMembers(k8s.KubeClient, cbCluster, killPods...); err != nil {
-		t.Logf("Failed to kill members: %v", err)
-	}
-}
-
-func CleanK8sCluster(k8s *types.Cluster) {
-	// Ensure all existing PVCs are deleted before continuing.  In the cloud these may take a
-	// while to fully disappear, and may bleed through into other tests, especially ones that
-	// cover supportability.
-	if err := DeleteAndWaitForPVCDeletion(k8s, 5*time.Minute); err != nil {
-		fmt.Println("Warning: Unable to delete PVCs:", err)
-	}
-}
-
 func KillMembers(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster, names ...string) error {
 	for _, name := range names {
 		if err := KillMember(kubecli, cluster, name, true); err != nil {
@@ -827,24 +760,11 @@ func KillMember(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseClus
 	return nil
 }
 
-func RemovePersistentVolumesOfPod(k8s *types.Cluster, clusterName string, memberID int) error {
-	podMemberName := couchbaseutil.CreateMemberName(clusterName, memberID)
-
-	pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + podMemberName})
-	if err != nil {
-		return fmt.Errorf("unable to fetch persistent volume list for pod %s: %v", podMemberName, err)
-	}
-
-	for _, pvc := range pvcList.Items {
-		if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Delete(pvc.Name, &metav1.DeleteOptions{}); err != nil {
-			return fmt.Errorf("failed to delete persistent volume claim %s: %v", pvc.Name, err)
-		}
-	}
-
-	return nil
-}
-
 func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
+	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+		return err
+	}
+
 	options := metav1.ListOptions{LabelSelector: constants.CouchbaseOperatorLabel}
 
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(options)
@@ -861,11 +781,7 @@ func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 			return err
 		}
 
-		if strings.Contains(testName, "/") {
-			testName = strings.Split(testName, "/")[1]
-		}
-
-		logFile := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", testName, pod.Name))
+		logFile := filepath.Join(logDir, fmt.Sprintf("%s.log", pod.Name))
 
 		if err := ioutil.WriteFile(logFile, data, 0644); err != nil {
 			return err
@@ -1020,7 +936,7 @@ func KillOperatorAndWaitForRecovery(k8s *types.Cluster) error {
 		return fmt.Errorf("failed to kill couchbase operator: %v", err)
 	}
 
-	if err := WaitUntilOperatorReady(k8s, constants.CouchbaseOperatorLabel); err != nil {
+	if err := WaitUntilOperatorReady(k8s, 5*time.Minute); err != nil {
 		return fmt.Errorf("failed to recover couchbase operator: %v", err)
 	}
 
@@ -1124,36 +1040,6 @@ func GetOperatorName(k8s *types.Cluster) (string, error) {
 
 	if len(operatorPods) == 0 {
 		return "", fmt.Errorf("no pods available")
-	}
-
-	if len(operatorPods) > 1 {
-		return "couchbase-operator", fmt.Errorf("too many couchbase operators")
-	}
-
-	return operatorPods[0], nil
-}
-
-func MustGetOperatorName(t *testing.T, k8s *types.Cluster) string {
-	name, err := GetOperatorName(k8s)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return name
-}
-
-func GetNodeNames(kubeCli kubernetes.Interface) (string, error) {
-	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("name", "couchbase-operator")))
-
-	pods, err := kubeCli.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		return "couchbase-operator", err
-	}
-
-	operatorPods := []string{}
-
-	for i := 0; i < len(pods.Items); i++ {
-		operatorPods = append(operatorPods, pods.Items[i].Name)
 	}
 
 	if len(operatorPods) > 1 {
@@ -1290,14 +1176,6 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 	return result
 }
 
-// Construct expected name for the PersistentVolumeClaim which belongs to member
-// where 'index' specifies the Nth claim generated from the specs template.
-// Only specs with multiple VolumeMounts should return volumes with index > 0.
-func GetMemberPVC(k8s *types.Cluster, memberName string, index int, mountName couchbasev2.VolumeMountName) (*v1.PersistentVolumeClaim, error) {
-	name := k8sutil.NameForPersistentVolumeClaim(memberName, index, mountName)
-	return k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(name, metav1.GetOptions{})
-}
-
 func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext) error {
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
 	if err != nil {
@@ -1333,29 +1211,6 @@ func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, ctx *TLSContext) {
 	}
 }
 
-func DeletePodsWithLabel(t *testing.T, k8s *types.Cluster, label string) error {
-	t.Logf("deleting pods with label: %v", label)
-
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: label})
-	if err != nil {
-		return err
-	}
-
-	for _, pod := range pods.Items {
-		err := deletePod(t, k8s, pod.Name)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, err = WaitPodsDeleted(k8s.KubeClient, k8s.Namespace, metav1.ListOptions{LabelSelector: label})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func deletePod(t *testing.T, k8s *types.Cluster, podName string) error {
 	t.Logf("deleting pod: %v", podName)
 
@@ -1373,74 +1228,10 @@ func deletePod(t *testing.T, k8s *types.Cluster, podName string) error {
 	return err
 }
 
-func DeleteDaemonSetsWithLabel(t *testing.T, k8s *types.Cluster, label string) error {
-	t.Logf("deleting pods with label: %v", label)
-
-	dsList, err := k8s.KubeClient.ExtensionsV1beta1().DaemonSets(k8s.Namespace).List(metav1.ListOptions{LabelSelector: label})
-	if err != nil {
-		return err
-	}
-
-	for _, ds := range dsList.Items {
-		err := DeleteDaemonSet(t, k8s, ds.Name)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, err = WaitDaemonSetsDeleted(k8s, metav1.ListOptions{LabelSelector: label})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func DeleteDaemonSet(t *testing.T, k8s *types.Cluster, dsName string) error {
-	t.Logf("deleting daemonset: %v", dsName)
-
-	err := k8s.KubeClient.ExtensionsV1beta1().DaemonSets(k8s.Namespace).Delete(dsName, metav1.NewDeleteOptions(0))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func AddLabelToNodes(t *testing.T, kubeClient kubernetes.Interface, labelKey, labelValue string) error {
-	t.Logf("adding label %v:%v to all nodes", labelKey, labelValue)
-
-	k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	for _, node := range k8sNodeList.Items {
-		if err := AddLabelToNode(t, kubeClient, node, labelKey, labelValue); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func AddLabelToNode(t *testing.T, kubeClient kubernetes.Interface, node v1.Node, labelKey, labelValue string) error {
-	t.Logf("adding label %v:%v to node %v", labelKey, labelValue, node.Name)
-
-	currentLables := node.ObjectMeta.Labels
-	currentLables[labelKey] = labelValue
-
-	if _, err := kubeClient.CoreV1().Nodes().Update(&node); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func Die(t *testing.T, err error) {
 	stackTrace := string(debug.Stack())
 
-	analyzer.RecordFailureMessage(err.Error(), stackTrace)
+	analyzer.RecordFailureMessage(t, err.Error(), stackTrace)
 
 	t.Log(err)
 	t.Log(stackTrace)
@@ -1520,8 +1311,6 @@ func GenerateWorkload(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 		},
 	}
 
-	ApplyGarbageCollectedObjectLabels(pod)
-
 	if _, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Create(pod); err != nil {
 		return nil, err
 	}
@@ -1580,109 +1369,6 @@ func MustGetUUID(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	return uuid
 }
 
-func CleanupBackup(k8s *types.Cluster) {
-	backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).List(metav1.ListOptions{})
-	if err != nil {
-		fmt.Println("Warning: Unable to list couchbasebackups: ", err)
-	}
-
-	for _, backup := range backups.Items {
-		listOptions := metav1.ListOptions{LabelSelector: operator_constants.LabelBackup + "=" + backup.Name}
-
-		if err := k8s.KubeClient.BatchV1().Jobs(k8s.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), listOptions); err != nil {
-			fmt.Println("Warning: Unable to delete backup jobs: ", err)
-		}
-
-		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(listOptions)
-		if err != nil {
-			fmt.Println("Warning: Unable to list backup pods: ", err)
-		}
-
-		for _, pod := range pods.Items {
-			if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				fmt.Println("Warning: Unable to delete backup pods: ", err)
-			}
-		}
-	}
-}
-
-func ApplyGarbageCollectedObjectLabels(resource metav1.Object) {
-	labels := resource.GetLabels()
-
-	if labels == nil {
-		labels = map[string]string{}
-	}
-
-	labels["owner"] = "couchbaseqe"
-	resource.SetLabels(labels)
-}
-
-func CleanTestResources(k8s *types.Cluster) error {
-	// Add any types we want to clean up here...
-	objects := []runtime.Object{
-		//&admissionregistrationv1beta1.MutatingWebhookConfiguration{},
-		//&admissionregistrationv1beta1.ValidatingWebhookConfiguration{},
-		//&apiextensionsv1beta1.CustomResourceDefinition{},
-		&appsv1.Deployment{},
-		&batchv1.Job{},
-		// &batchv1beta1.CronJob{},
-		&couchbasev2.CouchbaseBucket{},
-		&couchbasev2.CouchbaseEphemeralBucket{},
-		&couchbasev2.CouchbaseMemcachedBucket{},
-		&couchbasev2.CouchbaseReplication{},
-		&couchbasev2.CouchbaseGroup{},
-		&couchbasev2.CouchbaseUser{},
-		&couchbasev2.CouchbaseBackup{},
-		&couchbasev2.CouchbaseCluster{},
-		&couchbasev2.CouchbaseRoleBinding{},
-		&couchbasev2.CouchbaseBackupRestore{},
-		&v1.Secret{},
-		&v1.Service{},
-		&v1.ServiceAccount{},
-		//&rbacv1.ClusterRole{},
-		//&rbacv1.ClusterRoleBinding{},
-		//&rbacv1.Role{},
-		//&rbacv1.RoleBinding{},
-	}
-
-	for _, object := range objects {
-		// Use the scheme to translate from object type into API kind metadata...
-		gvks, unversioned, err := scheme.Scheme.ObjectKinds(object)
-		if err != nil {
-			return err
-		}
-
-		if unversioned {
-			return fmt.Errorf("unknown what to do")
-		}
-
-		if len(gvks) != 1 {
-			return fmt.Errorf("too many gvks")
-		}
-
-		gvk := gvks[0]
-
-		// Use the rest mapper to go from the group/version/kind into api parameters...
-		mapping, err := k8s.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return err
-		}
-
-		resources, err := k8s.DynamicClient.Resource(mapping.Resource).Namespace(k8s.Namespace).List(metav1.ListOptions{LabelSelector: "owner=couchbaseqe"})
-		if err != nil {
-			return err
-		}
-
-		for _, resource := range resources.Items {
-			if err = k8s.DynamicClient.Resource(mapping.Resource).Namespace(k8s.Namespace).Delete(resource.GetName(), metav1.NewDeleteOptions(0)); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // MustTerminateAllPods kills pods by causing the root process to shutdown.  This results in
 // the same state as if cluster was powered off and back on again.
 func MustTerminateAllPods(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
@@ -1699,5 +1385,93 @@ func MustTerminateAllPods(t *testing.T, kubernetes *types.Cluster, cluster *couc
 		if _, _, err := ExecShellInPod(kubernetes, pod.Name, "kill -TERM 1"); err != nil {
 			t.Logf("command may have failed, but that may be because the pod died: %v", err)
 		}
+	}
+}
+
+// ArgumentList represents parameters to cbopinfo.  They are modelled as a
+// map to support keys and values (an empty value is ignored) and to allow
+// simple overriding (uniqueness).
+type ArgumentList map[string]string
+
+// Slice returns the flattened ArgumentList with empty values removed.
+func (a ArgumentList) Slice() []string {
+	args := []string{}
+
+	for k, v := range a {
+		args = append(args, k)
+
+		if v != "" {
+			args = append(args, v)
+		}
+	}
+
+	return args
+}
+
+// Add adds a new key and value to the argument list.
+func (a ArgumentList) Add(k, v string) {
+	a[k] = v
+}
+
+// AddClusterDefaults adds in configuration specific default arguments that must
+// be used for a successful run.
+func (a ArgumentList) AddClusterDefaults(k8s *types.Cluster) {
+	a.Add("--kubeconfig", k8s.KubeConfPath)
+	a.Add("--namespace", k8s.Namespace)
+
+	if k8s.Context != "" {
+		a.Add("--context", k8s.Context)
+	}
+}
+
+// AddEnvironmentDefaults adds in configuration specific default arguments for deployments
+// that should be used for a successful run.
+func (a ArgumentList) AddEnvironmentDefaults(operatorImage string) {
+	a.Add("--operator-image", operatorImage)
+}
+
+// Clone duplicates an argument list.
+func (a ArgumentList) Clone() ArgumentList {
+	n := ArgumentList{}
+
+	for k, v := range a {
+		n[k] = v
+	}
+
+	return n
+}
+
+// Generic function to run cbopinfo command.
+func Cbopinfo(path string, cmdArgs []string) ([]byte, error) {
+	return exec.Command(path, cmdArgs...).CombinedOutput()
+}
+
+func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPath, operatorImage string, collectServerLogs bool) {
+	// Create and move to the log directory.
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		t.Logf("Failed to create dir %s: %v", logDir, err)
+		return
+	}
+
+	// Collect logs from all known resources (e.g. sgw and other external services
+	// will get collected).  Don't collect server logs by default, this takes an
+	// abosulte eternity.
+	args := ArgumentList{}
+	args.AddClusterDefaults(cluster)
+	args.AddEnvironmentDefaults(operatorImage)
+	args.Add("--all", "")
+	args.Add("--directory", logDir)
+
+	if collectServerLogs {
+		args.Add("--collectinfo", "")
+		args.Add("--collectinfo-collect", "all")
+	}
+
+	execOut, err := Cbopinfo(cbopinfoPath, args.Slice())
+	execOutStr := strings.TrimSpace(string(execOut))
+
+	if err != nil {
+		t.Logf("cbopinfo returned: %s", execOutStr)
+		t.Logf("cbopinfo command failed: %v", err)
 	}
 }

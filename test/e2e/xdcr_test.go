@@ -231,14 +231,16 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 
 // TestXdcrCreateClusterLocal tests establishing an XDCR connection within the same cluster.
 func TestXdcrCreateClusterLocal(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, nil, nil)
 }
 
 // TestXdcrCreateClusterLocalTLS tests establishing a TLS XDCR connection within the same cluster.
 func TestXdcrCreateClusterLocalTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
@@ -247,7 +249,8 @@ func TestXdcrCreateClusterLocalTLS(t *testing.T) {
 
 // TestXdcrCreateClusterLocalMutualTLS tests establishing an mTLS XDCR connection within the same cluster.
 func TestXdcrCreateClusterLocalMutualTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
@@ -257,7 +260,8 @@ func TestXdcrCreateClusterLocalMutualTLS(t *testing.T) {
 
 // TestXdcrCreateClusterLocalMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection within the same cluster.
 func TestXdcrCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
+	k8s1, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
@@ -267,22 +271,20 @@ func TestXdcrCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
 
 // TestXdcrCreateClusterRemote tests establishing an XDCR connection to a k8s2 cluster.
 func TestXdcrCreateClusterRemote(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
-	k8s2 := framework.Global.GetCluster(1)
-
-	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, nil, nil)
 }
 
 // TestXdcrCreateClusterRemoteTLS tests establishing a TLS XDCR connection to a k8s2 cluster.
 func TestXdcrCreateClusterRemoteTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
-	k8s2 := framework.Global.GetCluster(1)
-
-	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -291,11 +293,10 @@ func TestXdcrCreateClusterRemoteTLS(t *testing.T) {
 
 // TestXdcrCreateClusterRemoteMutualTLS tests establishing an mTLS XDCR connection to a k8s2 cluster.
 func TestXdcrCreateClusterRemoteMutualTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
-	k8s2 := framework.Global.GetCluster(1)
-
-	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -305,11 +306,10 @@ func TestXdcrCreateClusterRemoteMutualTLS(t *testing.T) {
 
 // TestXdcrCreateClusterRemoteMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection to a k8s2 cluster.
 func TestXdcrCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
-	k8s1 := framework.Global.GetCluster(0)
-	k8s2 := framework.Global.GetCluster(1)
-
-	dns, cleanup := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -320,9 +320,8 @@ func TestXdcrCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
 // TestXdcrCreateCluster tests establishing an XDCR connection.
 func TestXdcrCreateCluster(t *testing.T) {
 	// Platform configuration.
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -366,9 +365,8 @@ func TestXdcrCreateCluster(t *testing.T) {
 // TestXDCRPauseReplication tests a replication can be paused and restarted again.
 func TestXDCRPauseReplication(t *testing.T) {
 	// Platform configuration.
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -425,9 +423,8 @@ func TestXDCRPauseReplication(t *testing.T) {
 // XDCR replication.
 func TestXdcrSourceNodeDown(t *testing.T) {
 	// Platform configuration.
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
 
 	// Static configuration.
 	xdcrCluster1Size := constants.Size5
@@ -481,9 +478,8 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 // replication.
 func TestXdcrSourceNodeAdd(t *testing.T) {
 	// Platform configuration.
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -535,9 +531,8 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 // target cluster required by an XDCR replication.
 func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 	// Platform configuration.
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -588,9 +583,9 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 // Cluster nodes from the source bucket cluster are rebalanced out.
 // one by one until there is only one node in cluster.
 func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationEject)
 }
 
@@ -598,9 +593,9 @@ func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 // Cluster nodes from the destination bucket cluster are rebalanced out.
 // one by one until there is only one node in cluster.
 func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationEject)
 }
 
@@ -608,9 +603,9 @@ func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 // Cluster nodes from the source bucket cluster are killed one by one.
 // At the end all nodes are replaced by new nodes in the cluster.
 func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationDelete)
 }
 
@@ -618,36 +613,35 @@ func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
 // Cluster nodes from the destination bucket cluster are killed one by one.
 // At the end all nodes are replaced by new nodes in the cluster.
 func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationDelete)
 }
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes of source bucket cluster is resized to single node cluster.
 func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationScaleDown)
 }
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes of destination bucket cluster is resized to single node cluster.
 func TestXdcrResizedOutTargetClusterNodes(t *testing.T) {
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationScaleDown)
 }
 
 // TestXDCRDeleteReplication tests a replication can be deleted.
 func TestXDCRDeleteReplication(t *testing.T) {
 	// Platform configuration.
-	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -706,8 +700,9 @@ func TestXDCRDeleteReplication(t *testing.T) {
 func TestXDCRFilterExp(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	k8s1 := f.GetCluster(0)
-	k8s2 := f.GetCluster(1)
+
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1

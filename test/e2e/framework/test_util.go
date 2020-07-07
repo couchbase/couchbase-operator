@@ -48,30 +48,6 @@ func getSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	return
 }
 
-func createK8SNamespace(k8s *types.Cluster) error {
-	namespaceList, err := k8s.KubeClient.CoreV1().Namespaces().List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	// Return if namespace already exists
-	for _, temNs := range namespaceList.Items {
-		if temNs.GetName() == k8s.Namespace {
-			return nil
-		}
-	}
-
-	nsLabel := map[string]string{
-		"name": k8s.Namespace,
-	}
-
-	nsSpec := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: k8s.Namespace, Labels: nsLabel}}
-
-	_, err = k8s.KubeClient.CoreV1().Namespaces().Create(nsSpec)
-
-	return err
-}
-
 func removeRole(k8s *types.Cluster, roleName string) error {
 	if err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Delete(roleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
@@ -104,20 +80,16 @@ func RemoveServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
 // RecreateDockerAuthSecret deletes existing secrets and creates a new one if specified.
 // This secret, if defined, will be added to the operator and admission controllers in
 // order to pull from a private repository.
-func recreateDockerAuthSecret(k8s *types.Cluster, namespace string) error {
+func recreateDockerAuthSecret(k8s *types.Cluster, namespace string) ([]string, error) {
 	pullSecretLabel := "type"
 	pullSecretValue := "qe-docker-pull-secret"
 
 	// Clean up the old authentication secrets if they exist.
 	if err := k8s.KubeClient.CoreV1().Secrets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", pullSecretLabel, pullSecretValue)}); err != nil {
-		return err
+		return nil, err
 	}
 
-	if k8s.PullSecrets == nil {
-		k8s.PullSecrets = map[string][]string{}
-	}
-
-	k8s.PullSecrets[namespace] = make([]string, len(runtimeParams.RegistryConfigs))
+	pullSecrets := make([]string, len(runtimeParams.RegistryConfigs))
 
 	// If specified create the authentication secrets
 	for i, registry := range runtimeParams.RegistryConfigs {
@@ -144,15 +116,15 @@ func recreateDockerAuthSecret(k8s *types.Cluster, namespace string) error {
 
 		newSecret, err := k8s.KubeClient.CoreV1().Secrets(namespace).Create(secret)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// Register that we have a pull secret, this will be used for all couchbase
 		// clusters and deployments.
-		k8s.PullSecrets[namespace][i] = newSecret.Name
+		pullSecrets[i] = newSecret.Name
 	}
 
-	return nil
+	return pullSecrets, nil
 }
 
 func recreateRoles(k8s *types.Cluster, roleName string) error {

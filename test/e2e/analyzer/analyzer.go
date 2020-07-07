@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"runtime/debug"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -85,16 +86,31 @@ type result struct {
 // time of the test.
 var results []result
 
-// message is used by Die to pass failure messages to the junit output.
-var message string
+// errorMessage is passed from the exception mechanism to cache the error.
+type errorMessage struct {
+	// message is used by Die to pass failure messages to the junit output.
+	message string
 
-// stack is used by Die to pass failure stack traces to the junit output.
-var stack string
+	// stack is used by Die to pass failure stack traces to the junit output.
+	stack string
+}
+
+// errorMessages is a map from test name to error message/stack trace.
+var errorMessages map[string]errorMessage
 
 // RecordFailureMessage is used by Die to pass failure messages to the junit output.
-func RecordFailureMessage(m, s string) {
-	message = m
-	stack = s
+func RecordFailureMessage(t *testing.T, m, s string) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	if errorMessages == nil {
+		errorMessages = map[string]errorMessage{}
+	}
+
+	errorMessages[t.Name()] = errorMessage{
+		message: m,
+		stack:   s,
+	}
 }
 
 // Analyzer is an abstract type that is instantiated by every test.  It
@@ -119,20 +135,32 @@ func New() Analyzer {
 	}
 }
 
+// lock is held during concurrent writes when running parallel tests.
+var lock sync.Mutex
+
 // Report submits a test report.
 func (a *analyzerImpl) Report(t *testing.T) {
+	lock.Lock()
+	defer lock.Unlock()
+
 	r := result{
 		name:    t.Name(),
 		runtime: time.Since(a.start),
 	}
 
-	var statusString string
-
 	recoverError := recover()
+
+	var message string
+
+	var stack string
+
+	if msg, ok := errorMessages[t.Name()]; ok {
+		message = msg.message
+		stack = msg.stack
+	}
 
 	switch {
 	case recoverError != nil:
-		statusString = "error"
 		r.result = types.ResultTypeErr
 		r.message = fmt.Sprintf("%v", recoverError)
 		r.stack = string(debug.Stack())
@@ -142,19 +170,16 @@ func (a *analyzerImpl) Report(t *testing.T) {
 		t.Fail()
 	case t.Failed():
 		// Note that all tests failures need to use Die for this to work.
-		statusString = "fail"
 		r.result = types.ResultTypeFail
 		r.message = message
 		r.stack = stack
 	case t.Skipped():
-		statusString = "skipped"
 		r.result = types.ResultTypeSkip
 	default:
-		statusString = "ok"
 		r.result = types.ResultTypePass
 	}
 
-	logrus.Infof("%s %s", util.PrettyResult(r.result), statusString)
+	logrus.Infof("%s %s", t.Name(), util.PrettyResult(r.result))
 
 	results = append(results, r)
 }

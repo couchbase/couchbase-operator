@@ -56,7 +56,9 @@ func cronScheduleOnceIn(duration time.Duration) string {
 
 func TestFullIncremental(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -99,7 +101,9 @@ func TestFullIncremental(t *testing.T) {
 
 func TestFullOnly(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -142,7 +146,9 @@ func TestFullOnly(t *testing.T) {
 // Tests --purge behaviour is working as expected - this should allow us to ignore the previous backup and start anew.
 func TestFailedBackupBehaviour(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -216,7 +222,9 @@ func TestFailedBackupBehaviour(t *testing.T) {
 // N.B. Obviously all old data on the old PVC is gone forever and cannot be recovered.
 func TestBackupPVCReconcile(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -288,7 +296,9 @@ func TestBackupPVCReconcile(t *testing.T) {
 // create new full/incremental CouchbaseBackup.
 func TestReplaceFullOnlyBackup(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -359,7 +369,9 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 // create new full-only CouchbaseBackup.
 func TestReplaceFullIncrementalBackup(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -424,7 +436,10 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 
 func TestBackupAndRestore(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
 	fullFreq := 2
 
 	// Create a normal cluster.
@@ -509,7 +524,9 @@ func TestBackupAndRestore(t *testing.T) {
 // LastSuccess, RepoList and Duration fields will be updated once the job is finished.
 func TestUpdateBackupStatus(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Create a normal cluster.
 	clusterSize := constants.Size3
@@ -561,7 +578,9 @@ func TestUpdateBackupStatus(t *testing.T) {
 
 func TestMultipleBackups(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	clusterSize := constants.Size3
 	// Create a normal cluster.
@@ -615,7 +634,9 @@ func TestMultipleBackups(t *testing.T) {
 
 func TestFullIncrementalOverTLS(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	clusterSize := constants.Size3
 	// Create the cluster.
@@ -671,7 +692,9 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 
 func TestFullOnlyOverTLS(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Create the cluster.
 	clusterSize := constants.Size3

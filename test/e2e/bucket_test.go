@@ -29,7 +29,9 @@ func skipEditBucket(t *testing.T) {
 func TestBucketAddRemoveBasic(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration
 	clusterSize := 3
@@ -130,7 +132,9 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 func TestBucketAddRemoveExtended(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -170,10 +174,13 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 
 // TestEditBucket tests modifying various bucket parameters and reverting them.
 func TestEditBucket(t *testing.T) {
-	skipEditBucket(t)
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipEditBucket(t)
 
 	// Constants
 	enabled := true
@@ -236,10 +243,13 @@ func TestEditBucket(t *testing.T) {
 // 8. Verify that the operator reverts the change
 // 9. Check the events to make sure the operator took the correct actions.
 func TestRevertExternalBucketUpdates(t *testing.T) {
-	skipEditBucket(t)
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipEditBucket(t)
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -274,7 +284,9 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 func TestBucketUnmanaged(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -307,7 +319,9 @@ func TestBucketUnmanaged(t *testing.T) {
 func TestBucketSelection(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -352,7 +366,9 @@ func TestBucketSelection(t *testing.T) {
 func TestDeltaRecoveryImpossible(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -404,7 +420,9 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 func TestBucketWithExplicitName(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Constants
 	clusterSize := 1
@@ -433,7 +451,9 @@ func TestBucketWithExplicitName(t *testing.T) {
 func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Constants
 	clusterSize := 1

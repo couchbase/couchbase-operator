@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/config"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -17,11 +18,15 @@ type tgzBackend struct {
 	buffer bytes.Buffer
 	// writer is the TAR writer which populates buffer
 	writer *tar.Writer
+	// directory is an optional directory to write files to
+	directory string
 }
 
 // NewTGZ returns a new initialized TGZ backend.
 func NewTGZ(config *config.Configuration) (Backend, error) {
-	b := &tgzBackend{}
+	b := &tgzBackend{
+		directory: config.Directory,
+	}
 	b.writer = tar.NewWriter(&b.buffer)
 
 	return b, nil
@@ -55,6 +60,10 @@ func (b *tgzBackend) Close() error {
 
 	// Create the target file
 	path := util.ArchiveName() + ".tar.gz"
+
+	if b.directory != "" {
+		path = filepath.Join(b.directory, path)
+	}
 
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {

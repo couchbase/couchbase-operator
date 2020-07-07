@@ -44,7 +44,9 @@ func enableMonitoring(f *framework.Framework) *couchbasev2.CouchbaseClusterMonit
 func TestPrometheusMetrics(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -79,7 +81,9 @@ func TestPrometheusMetrics(t *testing.T) {
 func TestPrometheusMetricsEnable(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -116,7 +120,9 @@ func TestPrometheusMetricsEnable(t *testing.T) {
 func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -165,7 +171,10 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
 	// MonitoringAuthSecret is the name used for all Monitoring Authorisation secret.
 	var monitoringAuthSecret string = "cb-metrics-token"
 
@@ -193,8 +202,6 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 			"token": "hello",
 		},
 	}
-
-	e2eutil.ApplyGarbageCollectedObjectLabels(secret)
 
 	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(secret); err != nil {
 		e2eutil.Die(t, err)
@@ -234,7 +241,9 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3

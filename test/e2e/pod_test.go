@@ -18,7 +18,9 @@ import (
 func TestPodResourcesBasic(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -49,7 +51,9 @@ func TestPodResourcesBasic(t *testing.T) {
 func TestNegPodResourcesBasic(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -83,7 +87,9 @@ func TestNegPodResourcesBasic(t *testing.T) {
 func TestPodResourcesCannotBePlaced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
 	minMem := e2eutil.MustGetMinNodeMem(t, targetKube)
 	memoryRequest := 0.9 * minMem
@@ -116,7 +122,9 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -139,7 +147,9 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 func TestAntiAffinityOn(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
@@ -160,7 +170,9 @@ func TestAntiAffinityOn(t *testing.T) {
 func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
@@ -185,7 +197,9 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
@@ -211,7 +225,9 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 func TestAntiAffinityOff(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1

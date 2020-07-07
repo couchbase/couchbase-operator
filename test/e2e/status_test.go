@@ -17,7 +17,9 @@ import (
 func TestStatusRecovery(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1

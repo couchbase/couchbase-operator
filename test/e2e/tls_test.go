@@ -21,7 +21,9 @@ import (
 func TestTlsCreateCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -51,7 +53,9 @@ func TestTlsCreateCluster(t *testing.T) {
 func TestTlsKillClusterNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -101,7 +105,9 @@ func TestTlsKillClusterNode(t *testing.T) {
 func TestTlsResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -141,7 +147,9 @@ func TestTlsResizeCluster(t *testing.T) {
 func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -188,7 +196,9 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -233,7 +243,9 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -278,7 +290,9 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -321,7 +335,9 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 // Cluster creation should fail due to the invalid DNS value.
 func TestTlsNegRSACertificateDnsName(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	opts := &e2eutil.TLSOpts{
 		AltNames: []string{
@@ -342,7 +358,9 @@ func TestTlsNegRSACertificateDnsName(t *testing.T) {
 func TestTlsCertificateExpiry(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -378,7 +396,9 @@ func TestTlsCertificateExpiry(t *testing.T) {
 // Cluster creation should fail.
 func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Set the cert creation date 10 years in the past
 	validTo := time.Now().In(time.UTC)
@@ -398,7 +418,9 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 // Cluster creation should not happen until the validity time crosses the current time.
 func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	validFrom := time.Now().In(time.UTC).Add(30 * time.Second)
 	opts := &e2eutil.TLSOpts{
@@ -414,7 +436,9 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 // Cluster deployment should fail.
 func TestTlsGenerateWrongCACertType(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	caCertType := e2eutil.CertTypeServer
 	opts := &e2eutil.TLSOpts{
@@ -431,7 +455,9 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 // Cluster deployment should fail.
 func TestTlsGenerateWrongCertType(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	clusterCertType := e2eutil.CertTypeClient
 	opts := &e2eutil.TLSOpts{
@@ -448,7 +474,9 @@ func TestTlsGenerateWrongCertType(t *testing.T) {
 func TestTLSRotate(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -479,7 +507,9 @@ func TestTLSRotate(t *testing.T) {
 func TestTLSRotateChain(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -511,7 +541,9 @@ func TestTLSRotateChain(t *testing.T) {
 func TestTLSRotateCA(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -549,7 +581,9 @@ func TestTLSRotateCA(t *testing.T) {
 func TestTLSRotateCAAndScale(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -593,7 +627,9 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 func TestTLSRotateCAAndKillOperator(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -626,7 +662,9 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -686,7 +724,9 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 func TestTLSRotateInvalid(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -751,11 +791,13 @@ func skipMutualTLSCheck(t *testing.T) {
 
 // testMutualTLSCreateCluster ensures a cluster can be created with mTLS enabled.
 func testMutualTLSCreateCluster(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
-	skipMutualTLSCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -786,11 +828,13 @@ func TestMandatoryMutualTLSCreateCluster(t *testing.T) {
 
 // testMutualTLSEnable tests mTLS can be enabled on a TLS cluster.
 func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
-	skipMutualTLSCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -835,11 +879,13 @@ func TestMandatoryMutualTLSEnable(t *testing.T) {
 
 // testMutualTLSDisable tests mTLS can be disabled on a TLS cluster.
 func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
-	skipMutualTLSCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -877,11 +923,13 @@ func TestMandatoryMutualTLSDisable(t *testing.T) {
 
 // testMutualTLSRotateClient ensures we can rotate the operator client certificate.
 func testMutualTLSRotateClient(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
-	skipMutualTLSCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -919,11 +967,13 @@ func TestMandatoryMutualTLSRotateClient(t *testing.T) {
 // testMutualTLSRotateClientChain ensure we can rotate operator client certificate and
 // support certificate chains.
 func testMutualTLSRotateClientChain(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
-	skipMutualTLSCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -960,11 +1010,13 @@ func TestMandatoryMutualTLSRotateClientChain(t *testing.T) {
 
 // testMutualTLSRotateCA ensures we can rotate eveything.
 func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
-	skipMutualTLSCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1008,11 +1060,13 @@ func TestMandatoryMutualTLSRotateCA(t *testing.T) {
 // testMutualTLSRotateClientChain ensure we can rotate operator client certificate and
 // support certificate chains.
 func testMutualTLSRotateInvalid(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
-	skipMutualTLSCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1078,11 +1132,13 @@ func getEncryptionLevel(encryptionType couchbasev2.NodeToNodeEncryptionType) str
 
 // testCreateClusterWithTLSAndNodeToNode creates a cluster with N2N initially enabled.
 func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
-	skipN2NCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1126,11 +1182,13 @@ func TestCreateClusterWithTLSAndFullNodeToNode(t *testing.T) {
 // testCreateClusterWithTLSAndNodeToNodeThenScale creates a cluster with N2N initially enabled
 // and ensures scaling works.
 func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
-	skipN2NCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
 
 	// Static configuration.
 	clusterSize := 3
@@ -1179,11 +1237,13 @@ func TestCreateClusterWithTLSAndFullNodeToNodeThenScale(t *testing.T) {
 // testCreateClusterWithTLSAndNodeToNodeThenKillPod creates a cluster with N2N initially enabled
 // and kills a pod.
 func testCreateClusterWithTLSAndNodeToNodeThenKillPod(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
-	skipN2NCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1234,11 +1294,13 @@ func TestCreateClusterWithTLSAndFullNodeToNodeThenKillPod(t *testing.T) {
 // testCreateClusterWithTLSThenEnableNodeToNode creates a cluster and enables N2N after
 // provisioning.
 func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
-	skipN2NCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1283,11 +1345,13 @@ func TestCreateClusterWithTLSThenEnableFullNodeToNode(t *testing.T) {
 // testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode tests disabling node to node
 // encryption, unlikely though it is to be required.
 func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
-	skipN2NCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1344,11 +1408,13 @@ func TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode(t *testing.T
 // testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode tests modifying N2N mode
 // settings.
 func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T, encryptionType, newEncryptionType couchbasev2.NodeToNodeEncryptionType) {
-	skipN2NCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1398,11 +1464,13 @@ func TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode
 }
 
 func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
-	skipN2NCheck(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3

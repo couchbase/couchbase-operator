@@ -24,7 +24,9 @@ import (
 func TestDenyCommunityEdition(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Don't run this on Openshift etc. as there is no community edition.
 	skipEnterpriseOnlyPlatform(t)
@@ -47,7 +49,9 @@ func TestDenyCommunityEdition(t *testing.T) {
 func TestEditServiceConfig(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -78,7 +82,9 @@ func TestEditServiceConfig(t *testing.T) {
 func TestNodeManualFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size2
@@ -115,7 +121,9 @@ func TestNodeManualFailover(t *testing.T) {
 func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -172,7 +180,9 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -227,7 +237,9 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -301,7 +313,9 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 func TestRemoveForeignNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -347,7 +361,9 @@ func TestRemoveForeignNode(t *testing.T) {
 func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5
@@ -387,7 +403,9 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5
@@ -429,7 +447,9 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5
@@ -476,7 +496,9 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5
@@ -526,7 +548,9 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5
@@ -568,7 +592,9 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5
@@ -612,7 +638,9 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size5
@@ -660,7 +688,9 @@ func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
 
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5
@@ -698,7 +728,9 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5
@@ -748,7 +780,9 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -806,7 +840,9 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 5

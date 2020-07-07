@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -94,7 +95,7 @@ func NewCapabilities(client kubernetes.Interface) (*Capabilities, error) {
 func MustNewCapabilities(t *testing.T, client kubernetes.Interface) *Capabilities {
 	cluster, err := NewCapabilities(client)
 	if err != nil {
-		t.Fatal(err)
+		e2eutil.Die(t, err)
 	}
 
 	return cluster

@@ -19,7 +19,9 @@ import (
 func TestPodReadiness(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -46,7 +48,9 @@ func TestPodReadiness(t *testing.T) {
 func TestKubernetesRollingUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -63,10 +67,10 @@ func TestKubernetesRollingUpgrade(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Ensure the nodes are cleaned up afterwards whatever happens.
-	cleanup := func() {
+	cleanupTaints := func() {
 		_ = f.RemoveK8SNodeTaints(kubernetes.KubeClient)
 	}
-	defer cleanup()
+	defer cleanupTaints()
 
 	// Perform the upgrade.
 	// If you are lucky eveictions happen clusterSize times, if not then the size of the

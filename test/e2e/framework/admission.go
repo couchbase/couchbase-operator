@@ -26,7 +26,7 @@ const (
 
 // createAdmissionController creates all the necessary resources to deploy the
 // admission controller.
-func createAdmissionController(k8s *types.Cluster) error {
+func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 	client := k8s.KubeClient
 
 	validFrom := time.Now()
@@ -66,8 +66,8 @@ func createAdmissionController(k8s *types.Cluster) error {
 	// cbopcfg...
 	var pullSecret string
 
-	if k8s.PullSecrets != nil && k8s.PullSecrets[admissionNamespace] != nil && len(k8s.PullSecrets[admissionNamespace]) > 0 {
-		pullSecret = k8s.PullSecrets[admissionNamespace][0]
+	if pullSecrets != nil && len(k8s.PullSecrets) > 0 {
+		pullSecret = pullSecrets[0]
 	}
 
 	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, pullSecret, "-v", "1")

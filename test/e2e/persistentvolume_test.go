@@ -41,8 +41,6 @@ func createPersistentVolumeClaimSpec(storageClass *string, pvcName string, resou
 		},
 	}
 
-	e2eutil.ApplyGarbageCollectedObjectLabels(&pvc)
-
 	return pvc
 }
 
@@ -79,7 +77,9 @@ func mustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, expectedPvcMa
 func TestPersistentVolumeAutoFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -128,7 +128,9 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -175,7 +177,9 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 // Create test bucket and verify.
 func TestPersistentVolumeCreateCluster(t *testing.T) {
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	mdsGroupSize := 2
@@ -212,7 +216,9 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 func TestPersistentVolumeKillAllPods(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -262,7 +268,9 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -313,7 +321,9 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -364,7 +374,9 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -437,7 +449,9 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -506,7 +520,9 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 // Operator should replace killed pods with new one with same name and reuse PVC.
 func TestPersistentVolumeRzaFailover(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -577,7 +593,9 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 func TestPersistentVolumeResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")

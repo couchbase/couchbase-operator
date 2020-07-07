@@ -20,7 +20,9 @@ import (
 // This should trigger server group failover in the cluster.
 func TestServerGroupAutoFailover(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	availableServerGroupList := getAvailabilityZones(t, targetKube)
 	if len(availableServerGroupList) < 3 {
@@ -87,7 +89,9 @@ func TestServerGroupAutoFailover(t *testing.T) {
 func TestMultiNodeAutoFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 9

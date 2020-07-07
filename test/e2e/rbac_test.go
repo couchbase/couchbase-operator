@@ -33,7 +33,9 @@ func mustCreateBoundUser(t *testing.T, k8s *types.Cluster) (*couchbasev2.Couchba
 func TestRBACCreateAdminUser(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -59,7 +61,10 @@ func TestRBACCreateAdminUser(t *testing.T) {
 // TestRBACDeleteUser verifies basic user deletion.
 func TestRBACDeleteUser(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
 	timeout := 2 * time.Minute
 
 	// Create Cluster
@@ -96,7 +101,9 @@ func TestRBACDeleteUser(t *testing.T) {
 // TestRBACDeleteRole verifies that deleting a role results in deleting User.
 func TestRBACDeleteRole(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	timeout := 2 * time.Minute
 
@@ -136,7 +143,10 @@ func TestRBACDeleteRole(t *testing.T) {
 // reconciliation with couchbase.
 func TestRBACUpdateRole(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
 	timeout := 2 * time.Minute
 
 	// Cluster
@@ -171,7 +181,10 @@ func TestRBACUpdateRole(t *testing.T) {
 // in any other binding the user is also deleted.
 func TestRBACRemoveUserFromBinding(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
 	timeout := 2 * time.Minute
 
 	// Cluster
@@ -227,7 +240,9 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 // rolebinding is deleted.
 func TestRBACDeleteBinding(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	timeout := 2 * time.Minute
 
@@ -266,7 +281,9 @@ func TestRBACDeleteBinding(t *testing.T) {
 func TestRBACWithLDAPAuth(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
@@ -305,7 +322,9 @@ func TestRBACWithLDAPAuth(t *testing.T) {
 func TestRBACSelection(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1

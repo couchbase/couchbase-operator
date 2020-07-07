@@ -43,11 +43,13 @@ func skipAnalytics(t *testing.T) {
 // Create cluster with Analytics service enabled
 // Deploy analytics bucket and verify for bucket creation and data replication.
 func TestAnalyticsCreateDataSet(t *testing.T) {
-	skipAnalytics(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipAnalytics(t)
 
 	// Static configuration.
 	clusterSize := 3
@@ -97,11 +99,13 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 // Create analytics bucket with data sets and connect with couchbase bucket.
 // Resize cluster with analytics nodes and check for data and functional consistency.
 func TestAnalyticsResizeCluster(t *testing.T) {
-	skipAnalytics(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipAnalytics(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -175,11 +179,13 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 // Deploy analytics enabled couchbase cluster and populate data.
 // Kill analytics enabled node and check the cluster status.
 func TestAnalyticsKillPods(t *testing.T) {
-	skipAnalytics(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipAnalytics(t)
 
 	// Static configuration.
 	clusterSize := 3
@@ -253,11 +259,13 @@ func TestAnalyticsKillPods(t *testing.T) {
 // Kill analytics enabled node and check the cluster and PVC status.
 // Kill all analytics nodes at once and check for node recovery.
 func TestAnalyticsKillPodsWithPVC(t *testing.T) {
-	skipAnalytics(t)
-
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipAnalytics(t)
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")

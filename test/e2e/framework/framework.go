@@ -1,7 +1,6 @@
 package framework
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -9,9 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime/pprof"
 	"strconv"
 	"strings"
+	"sync"
+	"testing"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -19,7 +19,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/analyzer"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -33,7 +33,6 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -63,9 +62,6 @@ func Init() error {
 		return err
 	}
 
-	// Start the timeout timer, after reading in suite configuration.
-	startTimeoutTimer()
-
 	return nil
 }
 
@@ -77,14 +73,18 @@ type ClusterConfigValue struct {
 
 func (v *ClusterConfigValue) Set(value string) error {
 	fields := strings.Split(value, ",")
-	if len(fields) != 3 {
-		return fmt.Errorf("invalid cluster config value, expected FILE,CONTEXT,NAMESPACE")
+
+	num := len(fields)
+	if num > 2 {
+		return fmt.Errorf("invalid cluster config value, expected FILE(,CONTEXT)")
 	}
 
 	config := ClusterConfig{
-		Config:    fields[0],
-		Context:   fields[1],
-		Namespace: fields[2],
+		Config: fields[0],
+	}
+
+	if num >= 2 {
+		config.Context = fields[1]
 	}
 
 	v.values = append(v.values, config)
@@ -168,6 +168,7 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
 	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
 	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
+	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs", false, "Whether to collect logs on failure")
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
 	flag.Var(&tests, "test", "Individual test to run, overrides -suite if specified")
@@ -200,12 +201,7 @@ func readYamlData() (err error) {
 		if len(params.ClusterConfigs) == 0 {
 			params.ClusterConfigs = []ClusterConfig{
 				{
-					Config:    "~/.kube/config",
-					Namespace: "default",
-				},
-				{
-					Config:    "~/.kube/config",
-					Namespace: "remote",
+					Config: "~/.kube/config",
 				},
 			}
 		}
@@ -283,36 +279,13 @@ func GetDuration(timeoutStr string) time.Duration {
 	return durationToReturn
 }
 
-// startTimeoutTimer starts timeout trigger based on given value in suiteData.Timeout.
-func startTimeoutTimer() {
-	go func() {
-		timeoutDuration := GetDuration(suiteData.Timeout)
-
-		logrus.Infof("Setting timeout of %v from %v", timeoutDuration, time.Now())
-
-		<-time.After(timeoutDuration)
-
-		logrus.Infof("Timeout happened at %v", time.Now())
-
-		// Dump out backtraces in case this is a deadlock situation.
-		profile := pprof.Lookup("goroutine")
-		if profile != nil {
-			buffer := &bytes.Buffer{}
-			_ = profile.WriteTo(buffer, 2)
-			logrus.Info(buffer.String())
-		}
-
-		panic("Test timed out..")
-	}()
-}
-
 func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
 	// This just picks the first, so ordering is important unless we sort out
 	// cbopcfg...
 	var pullSecret string
 
-	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil && len(k8s.PullSecrets[k8s.Namespace]) > 0 {
-		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
+	if k8s.PullSecrets != nil && len(k8s.PullSecrets) > 0 {
+		pullSecret = k8s.PullSecrets[0]
 	}
 
 	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, podCreateTimeout, "--zap-level", "debug")
@@ -328,6 +301,7 @@ func Setup() (err error) {
 		OpImage:                       runtimeParams.OperatorImage,
 		SkipTeardown:                  runtimeParams.SkipTearDown,
 		CollectLogs:                   runtimeParams.CollectLogsOnFailure,
+		CollectServerLogsOnFailure:    runtimeParams.CollectServerLogsOnFailure,
 		SuiteYmlData:                  suiteData,
 		CouchbaseServerImage:          runtimeParams.CouchbaseServerImage,
 		CouchbaseServerImageUpgrade:   runtimeParams.CouchbaseServerImageUpgrade,
@@ -395,7 +369,6 @@ func Setup() (err error) {
 	for _, config := range Global.ClusterSpec {
 		logrus.Info(" →  path: " + config.KubeConfPath)
 		logrus.Info("    context: " + config.Context)
-		logrus.Info("    namespace: " + config.Namespace)
 	}
 
 	logrus.Info(util.PrettyHeading("Kubernetes"))
@@ -417,52 +390,6 @@ func Setup() (err error) {
 		if err = Global.SetupFramework(k8s); err != nil {
 			return err
 		}
-	}
-
-	return nil
-}
-
-func cleanUpNamespace() (err error) {
-	for _, k8s := range Global.ClusterSpec {
-		logrus.Infof("Cleaning up namespace %s", k8s.Namespace)
-
-		// Remove secrets
-		if k8s.DefaultSecret != nil {
-			if err := e2eutil.DeleteSecret(k8s, k8s.DefaultSecret.Name, &metav1.DeleteOptions{}); err != nil {
-				if !k8sutil.IsKubernetesResourceNotFoundError(err) {
-					return fmt.Errorf("unable to delete the default secret: %v", err)
-				}
-			}
-		}
-
-		// Clean-up Deployments and pods
-		if err := DeleteOperatorCompletely(k8s, config.OperatorResourceName); err != nil {
-			return err
-		}
-
-		// Blow away any couchbase cluster resources (and friends)
-		e2eutil.CleanK8sCluster(k8s)
-	}
-
-	// TODO: check all deleted and wait
-	Global = nil
-
-	logrus.Info("Namespace cleaned-up successfully")
-
-	return
-}
-
-func Teardown() error {
-	if Global == nil {
-		return fmt.Errorf("framework is uninitialized")
-	}
-
-	if Global.SkipTeardown {
-		return nil
-	}
-
-	if err := cleanUpNamespace(); err != nil {
-		return err
 	}
 
 	return nil
@@ -502,20 +429,7 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 		RESTMapper:    restMapper,
 		KubeConfPath:  c.Config,
 		Context:       c.Context,
-		Namespace:     c.Namespace,
 	}, nil
-}
-
-func (f *Framework) CreateSecretInKubeCluster(k8s *types.Cluster) error {
-	secret, err := e2eutil.CreateSecret(k8s, e2espec.NewDefaultSecret(k8s.Namespace))
-	if err != nil {
-		err = fmt.Errorf("failed to create default couchbase secret: %v", err)
-		return err
-	}
-
-	k8s.DefaultSecret = secret
-
-	return err
 }
 
 func recreateCRDs(k8s *types.Cluster) error {
@@ -591,206 +505,66 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	})
 }
 
+const (
+	// namespacePrefix is used to denote namespaces owned by this application.
+	namespacePrefix = "test-"
+)
+
 // tells us if the underlying physical cluster on a host exists.
-func (l initializedClusterList) isClusterInitialized(host string) bool {
-	for _, cluster := range l {
-		if cluster.host == host {
-			return true
-		}
-	}
-
-	return false
-}
-
-// check that the namespace for this host is already initialized.
-func (l initializedClusterList) isClusterNamespaceInitialized(k8s *types.Cluster) bool {
-	for _, cluster := range l {
-		if cluster.host == k8s.Config.Host {
-			for _, ns := range cluster.namespaces {
-				if ns == k8s.Namespace {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-// add initializedCluster to the initializedClusterList.
-func (l initializedClusterList) initializeClusterNamespace(k8s *types.Cluster) (initializedClusterList, error) {
-	for _, cluster := range l {
-		if cluster.host == k8s.Config.Host {
-			for _, ns := range cluster.namespaces {
-				if ns == k8s.Namespace {
-					return nil, fmt.Errorf("requested namespace already exists on the requested host")
-				}
-			}
-
-			cluster.namespaces = append(cluster.namespaces, k8s.Namespace)
-
-			return l, nil
-		}
-	}
-
-	return append(l, initializedCluster{
-		host:       k8s.Config.Host,
-		namespaces: []string{k8s.Namespace},
-	}), nil
-}
-
 func (f *Framework) SetupFramework(k8s *types.Cluster) error {
-	if !f.initializedClusters.isClusterInitialized(k8s.Config.Host) {
-		if err := f.RemoveK8SNodeTaints(k8s.KubeClient); err != nil {
-			return err
-		}
-
-		// delete and recreate CRDs
-		logrus.Info("Recreating CRD")
-
-		if err := recreateCRDs(k8s); err != nil {
-			return err
-		}
-
-		// delete DAC
-		logrus.Infof("Deleting admission controller")
-
-		if err := deleteAdmissionController(k8s.KubeClient); err != nil {
-			return err
-		}
-
-		// re-creating docker secrets
-		logrus.Info("Recreating docker auth secret in default namespace")
-
-		if err := recreateDockerAuthSecret(k8s, "default"); err != nil {
-			return err
-		}
-
-		// creating DAC
-		logrus.Infof("Creating admission controller")
-
-		if err := createAdmissionController(k8s); err != nil {
-			return err
-		}
-	}
-
-	// Creating required namespaces and cluster roles before deploying the operator
-	if err := createK8SNamespace(k8s); err != nil {
+	if err := f.RemoveK8SNodeTaints(k8s.KubeClient); err != nil {
 		return err
 	}
 
-	if k8s.Namespace != "default" {
-		logrus.Infof("Recreating docker auth secret in %v namespace", k8s.Namespace)
+	logrus.Info("Cleaning-Up Namespaces")
 
-		if err := recreateDockerAuthSecret(k8s, k8s.Namespace); err != nil {
-			return err
-		}
-	}
-
-	// Once pull secrets are defined, then we can create the Operator Deployment object
-	// per cluster.
-	k8s.OperatorDeployment = createOperatorDeployment(k8s, f.OpImage, f.PodCreateTimeout)
-
-	if f.initializedClusters.isClusterNamespaceInitialized(k8s) {
-		return nil
-	}
-
-	e2eutil.CleanK8sCluster(k8s)
-
-	// Clean up any state locls that may prevent the framework working
-	// across operator versions.
-	logrus.Info("Cleaning stale locks...")
-
-	if err := k8s.KubeClient.CoreV1().ConfigMaps(k8s.Namespace).Delete("couchbase-operator", metav1.NewDeleteOptions(0)); err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	logrus.Info("Deleting orphaned pods")
-
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	namespaces, err := k8s.KubeClient.CoreV1().Namespaces().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
-	for _, pod := range pods.Items {
-		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
-			if errors.IsNotFound(err) {
-				continue
-			}
-
-			return err
+	for _, namespace := range namespaces.Items {
+		if !strings.HasPrefix(namespace.Name, namespacePrefix) {
+			continue
 		}
 
-		logrus.Infof("Pod deleted: %v", pod.Name)
+		if namespace.DeletionTimestamp != nil {
+			continue
+		}
+
+		if err := k8s.KubeClient.CoreV1().Namespaces().Delete(namespace.Name, metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
 	}
 
-	endpoints, err := k8s.KubeClient.CoreV1().Endpoints(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	// delete and recreate CRDs
+	logrus.Info("Recreating CRD")
+
+	if err := recreateCRDs(k8s); err != nil {
+		return err
+	}
+
+	// delete DAC
+	logrus.Infof("Deleting admission controller")
+
+	if err := deleteAdmissionController(k8s.KubeClient); err != nil {
+		return err
+	}
+
+	// re-creating docker secrets
+	logrus.Info("Recreating docker auth secret in default namespace")
+
+	secrets, err := recreateDockerAuthSecret(k8s, "default")
 	if err != nil {
 		return err
 	}
 
-	for _, endpoint := range endpoints.Items {
-		if err := k8s.KubeClient.CoreV1().Endpoints(k8s.Namespace).Delete(endpoint.Name, metav1.NewDeleteOptions(0)); err != nil {
-			return err
-		}
+	// creating DAC
+	logrus.Infof("Creating admission controller")
 
-		logrus.Infof("Endpoint deleted: %v", endpoint.Name)
-	}
-
-	logrus.Info("Recreating role")
-
-	if err := recreateRoles(k8s, config.OperatorResourceName); err != nil {
+	if err := createAdmissionController(k8s, secrets); err != nil {
 		return err
 	}
-
-	logrus.Info("Recreating service account")
-
-	if err := RecreateServiceAccount(k8s, config.OperatorResourceName); err != nil {
-		return err
-	}
-
-	logrus.Info("Recreating role binding")
-
-	if err := recreateRoleBindings(k8s); err != nil {
-		return err
-	}
-
-	// deleting secrets
-	logrus.Info("Deleting secrets")
-
-	if err := e2eutil.DeleteSecret(k8s, "basic-test-secret", &metav1.DeleteOptions{}); err == nil {
-		logrus.Infof("Secret deleted: %v", "basic-test-secret")
-	}
-
-	logrus.Info("Creating secret")
-
-	if err = f.CreateSecretInKubeCluster(k8s); err != nil {
-		return err
-	}
-
-	// delete and create operator
-	logrus.Infof("Cleaning up namespace %s before deployment", k8s.Namespace)
-
-	if err := DeleteOperatorCompletely(k8s, config.OperatorResourceName); err != nil {
-		return fmt.Errorf("failed to delete operator: %v", err)
-	}
-
-	logrus.Info("Setting up operator")
-
-	if err := f.SetupCouchbaseOperator(k8s); err != nil {
-		return fmt.Errorf("failed to setup couchbase operator: %v", err)
-	}
-
-	logrus.Info("Couchbase operator created successfully")
-
-	f.initializedClusters, err = f.initializedClusters.initializeClusterNamespace(k8s)
-	if err != nil {
-		return err
-	}
-
-	logrus.Info("E2E setup successfully")
 
 	return nil
 }
@@ -800,7 +574,7 @@ func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
 		return err
 	}
 
-	return e2eutil.WaitUntilOperatorReady(k8s, constants.CouchbaseOperatorLabel)
+	return e2eutil.WaitUntilOperatorReady(k8s, 5*time.Minute)
 }
 
 func (f *Framework) GetOperatorRestartCount(k8s *types.Cluster) (int32, error) {
@@ -868,19 +642,218 @@ func deleteOperator(k8s *types.Cluster, deploymentName string) error {
 	return nil
 }
 
-// GetCluster allocates a cluster for a tests and records it as in-use
-// for later debug analysis and output if needed.
-func (f *Framework) GetCluster(index int) *types.Cluster {
-	cluster := f.ClusterSpec[index]
+// allocationLock is used to control access to consurrent cluster use.
+var allocationLock sync.Mutex
 
-	f.TestClusters = append(f.TestClusters, cluster)
+// allocations is an array mapping cluster index to number of tests allocated.
+var allocations []int
 
-	return cluster
+// isAllocationExcluded is used to force scheduling of a cluster onto one different
+// from the list of exclusions.
+func isAllocationExcluded(index int, exclusions []int) bool {
+	for _, exclusion := range exclusions {
+		if index == exclusion {
+			return true
+		}
+	}
+
+	return false
 }
 
-// Reset preforms any per-test clean up operations.
-func (f *Framework) Reset() {
-	f.TestClusters = []*types.Cluster{}
+// allocate returns the least busy cluster.
+func (f *Framework) allocate(exclusions ...int) int {
+	allocationLock.Lock()
+	defer allocationLock.Unlock()
+
+	if allocations == nil {
+		allocations = make([]int, len(f.ClusterSpec))
+	}
+
+	smallest := 1000
+	smallestIndex := 0
+
+	for index, value := range allocations {
+		if isAllocationExcluded(index, exclusions) {
+			continue
+		}
+
+		if value >= smallest {
+			continue
+		}
+
+		smallest = value
+		smallestIndex = index
+	}
+
+	allocations[smallestIndex]++
+
+	return smallestIndex
+}
+
+// deallocate updates the allocator by freeing resources.
+func (f *Framework) deallocate(index int) {
+	allocationLock.Lock()
+	defer allocationLock.Unlock()
+
+	allocations[index]--
+}
+
+// SetupTest is called by parallelizable tests that require a single cluster
+// to run in.
+func (f *Framework) SetupTest(t *testing.T) (*types.Cluster, func()) {
+	// This will stop execution of the test here, it will allow the underlying
+	// go testing framework to release jobs based on the requested parallelism.
+	t.Parallel()
+
+	// Schedule a cluster to run on.
+	index1 := f.allocate()
+
+	cluster1, cleanup1 := f.setupCluster(t, index1)
+
+	// Start the test.
+	reporter := analyzer.New()
+
+	cleanup := func() {
+		// Report the test status.
+		reporter.Report(t)
+
+		cleanup1()
+	}
+
+	return cluster1, cleanup
+}
+
+// SetupTestExclusive is called by non-parallelizable tests that require a single cluster
+// to run in.
+func (f *Framework) SetupTestExclusive(t *testing.T) (*types.Cluster, func()) {
+	// Schedule a cluster to run on.
+	index1 := f.allocate()
+
+	cluster1, cleanup1 := f.setupCluster(t, index1)
+
+	// Start the test.
+	reporter := analyzer.New()
+
+	cleanup := func() {
+		// Report the test status.
+		reporter.Report(t)
+
+		cleanup1()
+	}
+
+	return cluster1, cleanup
+}
+
+// SetupTestRemote is called by parallelizable tests that require a local and a
+// remote cluster to run in.
+func (f *Framework) SetupTestRemote(t *testing.T) (*types.Cluster, *types.Cluster, func()) {
+	// This will stop execution of the test here, it will allow the underlying
+	// go testing framework to release jobs based on the requested parallelism.
+	t.Parallel()
+
+	// Schedule clusters to run on.
+	index1 := f.allocate()
+	index2 := f.allocate(index1)
+
+	cluster1, cleanup1 := f.setupCluster(t, index1)
+	cluster2, cleanup2 := f.setupCluster(t, index2)
+
+	// Start the test.
+	reporter := analyzer.New()
+
+	cleanup := func() {
+		// Report the test status.
+		reporter.Report(t)
+
+		cleanup1()
+		cleanup2()
+	}
+
+	return cluster1, cluster2, cleanup
+}
+
+// setupCluster takes an allocated cluster and makes a virtual cluster i.e.
+// unique namespace to run in, it then configures and starts the operator.
+// It returns a test-ready cluster and a clean up function to perform logging
+// and namespace deletion.
+func (f *Framework) setupCluster(t *testing.T, index int) (*types.Cluster, func()) {
+	cluster := f.ClusterSpec[index].Copy()
+
+	// Create a namespace.
+	namespace := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: namespacePrefix,
+		},
+	}
+
+	var err error
+
+	namespace, err = cluster.KubeClient.CoreV1().Namespaces().Create(namespace)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	cluster.Namespace = namespace.Name
+
+	// Setup any pull secrets in the new namespace.
+	secrets, err := recreateDockerAuthSecret(cluster, cluster.Namespace)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	cluster.PullSecrets = secrets
+
+	// Create the operator.
+	cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout)
+
+	if err := RecreateServiceAccount(cluster, cluster.OperatorDeployment.Name); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if err := recreateRoles(cluster, cluster.OperatorDeployment.Name); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if err := recreateRoleBindings(cluster); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if err := f.SetupCouchbaseOperator(cluster); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Create anything that's static across all tests (bad).
+	secret, err := e2eutil.CreateSecret(cluster, e2espec.NewDefaultSecret(cluster.Namespace))
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	cluster.DefaultSecret = secret
+
+	// Generate the clean up closure.
+	cleanup := func() {
+		logDir := filepath.Join(f.LogDir, t.Name(), cluster.Namespace)
+
+		// Collect operator logs
+		if err := e2eutil.WriteLogs(cluster, logDir, ""); err != nil {
+			t.Logf("Error: %v", err)
+		}
+
+		// Collect any kubernetes/server logs.
+		if t.Failed() && f.CollectLogs {
+			e2eutil.CollectLogs(t, cluster, logDir, f.CbopinfoPath, f.OpImage, f.CollectServerLogsOnFailure)
+		}
+
+		// Cleanup, which is now trivial.
+		if err := cluster.KubeClient.CoreV1().Namespaces().Delete(cluster.Namespace, metav1.NewDeleteOptions(0)); err != nil {
+			logrus.Warnf("failed to delete namespace %s", cluster.Namespace)
+		}
+
+		// Update the scheduler.
+		f.deallocate(index)
+	}
+
+	return cluster, cleanup
 }
 
 func makeLogDir() (string, error) {

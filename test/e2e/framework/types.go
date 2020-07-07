@@ -22,6 +22,7 @@ type Framework struct {
 	SuiteYmlData                  SuiteData
 	ClusterConfFile               string
 	CollectLogs                   bool
+	CollectServerLogsOnFailure    bool
 	CouchbaseExporterImage        string
 	CouchbaseExporterImageUpgrade string
 	CouchbaseBackupImage          string
@@ -40,16 +41,7 @@ type Framework struct {
 	// PodCreateTimeout is the time we expect to wait when pods are failing to be
 	// created.
 	PodCreateTimeout time.Duration
-	// tracks what clusters have already been initialized by the testing framework
-	initializedClusters initializedClusterList
 }
-
-type initializedCluster struct {
-	host       string
-	namespaces []string
-}
-
-type initializedClusterList []initializedCluster
 
 // ClusterConfig holds configuration data about a cluster to use for
 // testing.
@@ -61,14 +53,6 @@ type ClusterConfig struct {
 	// This is the mechanism Kubernetes uses for defining multiple users or clusters
 	// in the same configuration file.
 	Context string `yaml:"context"`
-
-	// Namespace is the namespace to use for the Kubernetes cluster configuration.
-	// For most tests this can be arbitrary and be anything.  For tests using inter-
-	// cluster DNS forwarding the namespaces must be distinct between clusters.
-	// Namespaces will be dynamically created by the framework, but not garbage
-	// collected at present which is potentially a resource leak on long running
-	// clusters.
-	Namespace string `yaml:"namespace"`
 }
 
 // RegistryConfig defines a container image registry.  Registry configurations will
@@ -112,8 +96,9 @@ type TestRunParam struct {
 	// on allocating from the available pool.  The net result, you go a lot faster.
 	ClusterConfigs []ClusterConfig `yaml:"kube-config"`
 
-	SkipTearDown         bool `yaml:"skip-tear-down"`
-	CollectLogsOnFailure bool `yaml:"collectLogsOnFailure"`
+	SkipTearDown               bool `yaml:"skip-tear-down"`
+	CollectLogsOnFailure       bool `yaml:"collectLogsOnFailure"`
+	CollectServerLogsOnFailure bool `json:"collectServerLogsOnFailure"`
 
 	// RegistryConfigs define private container registries that need to be defined
 	// as docker pull secrets in order to access private container images.

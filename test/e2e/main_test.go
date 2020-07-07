@@ -36,9 +36,5 @@ func TestMain(m *testing.M) {
 
 	analyzer.Report(framework.SuiteName)
 
-	if err := framework.Teardown(); err != nil {
-		logrus.Warnf("Failed to teardown framework: %v", err)
-	}
-
 	os.Exit(code)
 }

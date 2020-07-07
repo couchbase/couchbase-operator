@@ -172,7 +172,9 @@ func skipUpgrade(t *testing.T) {
 func TestUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -212,7 +214,9 @@ func TestUpgrade(t *testing.T) {
 func TestUpgradeRollback(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -257,7 +261,9 @@ func TestUpgradeRollback(t *testing.T) {
 func TestUpgradeKillPodOnCreate(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -304,7 +310,9 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 func TestUpgradeInvalidUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -324,7 +332,9 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 func TestUpgradeInvalidDowngrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -344,7 +354,9 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 func TestUpgradeInvalidRollback(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -368,7 +380,9 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 func TestUpgradeSupportable(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -411,7 +425,9 @@ func TestUpgradeSupportable(t *testing.T) {
 func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -464,7 +480,9 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -518,7 +536,9 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -571,7 +591,9 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
@@ -625,7 +647,9 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 func TestUpgradeEnv(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -664,7 +688,9 @@ func TestUpgradeEnv(t *testing.T) {
 func TestUpgradeToSupportable(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -718,7 +744,9 @@ func TestUpgradeToSupportable(t *testing.T) {
 func TestUpgradeToTLS(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
@@ -761,7 +789,9 @@ func TestUpgradeToTLS(t *testing.T) {
 func TestUpgradePVC(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Static configuration.
 	mdsGroupSize := 2
@@ -794,7 +824,9 @@ func TestUpgradePVC(t *testing.T) {
 func TestUpgradeImmediate(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	kubernetes := f.GetCluster(0)
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Skip if not correctly configured
 	skipUpgrade(t)

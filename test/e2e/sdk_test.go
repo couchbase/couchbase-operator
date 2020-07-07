@@ -37,29 +37,21 @@ func testSDK(t *testing.T, local, remote *types.Cluster, config sdkConfig) {
 
 	// When ready run the tests!
 	t.Run("V2", func(t *testing.T) {
-		defer e2eutil.CleanupSDKResources(t, local)
-
 		job := e2eutil.MustCreateSDKJob(t, local, remote, cluster, bucket, config.cccpImage, nil, true)
 		e2eutil.MustWaitForSDKJobCompletion(t, local, job, time.Minute)
 	})
 
 	t.Run("V2/TLS", func(t *testing.T) {
-		defer e2eutil.CleanupSDKResources(t, local)
-
 		job := e2eutil.MustCreateSDKJob(t, local, remote, cluster, bucket, config.cccpImage, tls, true)
 		e2eutil.MustWaitForSDKJobCompletion(t, local, job, time.Minute)
 	})
 
 	t.Run("V3", func(t *testing.T) {
-		defer e2eutil.CleanupSDKResources(t, local)
-
 		job := e2eutil.MustCreateSDKJob(t, local, remote, cluster, bucket, config.gcccpImage, nil, false)
 		e2eutil.MustWaitForSDKJobCompletion(t, local, job, time.Minute)
 	})
 
 	t.Run("V3/TLS", func(t *testing.T) {
-		defer e2eutil.CleanupSDKResources(t, local)
-
 		job := e2eutil.MustCreateSDKJob(t, local, remote, cluster, bucket, config.gcccpImage, tls, false)
 		e2eutil.MustWaitForSDKJobCompletion(t, local, job, time.Minute)
 	})
@@ -80,7 +72,8 @@ func TestSDK(t *testing.T) {
 
 		test := func(t *testing.T) {
 			test1 := func(t *testing.T) {
-				k8s1 := framework.Global.GetCluster(0)
+				k8s1, cleanup := framework.Global.SetupTest(t)
+				defer cleanup()
 
 				testSDK(t, k8s1, k8s1, config)
 			}

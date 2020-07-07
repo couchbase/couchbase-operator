@@ -116,7 +116,9 @@ func chooseServerGroups(groups []string, seed string, max int) []string {
 // Deploy the cluster through operator and verify the server groups are balanced.
 func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -145,7 +147,9 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 // Deploy the cb cluster and verify the server groups are balanced as specified in the CRD.
 func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
 	serverGroups := getAvailabilityZones(t, targetKube)
 
@@ -215,7 +219,9 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 // Scale up the couchbase nodes both general scalling and service based scalling.
 func TestRzaResizeCluster(t *testing.T) {
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -263,7 +269,9 @@ func TestRzaResizeCluster(t *testing.T) {
 func TestRzaAntiAffinityOn(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 	// WARNING: this assumes all AZs have the same number of nodes
@@ -301,7 +309,9 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 func TestRzaAntiAffinityOff(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
-	targetKube := f.GetCluster(0)
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 	// WARNING: this assumes all AZs have the same number of nodes

@@ -129,8 +129,6 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 		secret.Data["client.key"] = tls.ClientKey
 	}
 
-	ApplyGarbageCollectedObjectLabels(secret)
-
 	if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(secret); err != nil {
 		return err
 	}
@@ -202,8 +200,6 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 			Template: podTemplate,
 		},
 	}
-
-	ApplyGarbageCollectedObjectLabels(&deployment.Spec.Template.ObjectMeta)
 
 	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
 		return err

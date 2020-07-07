@@ -89,7 +89,7 @@ func (failures *failureList) PrintFailures(t *testing.T) bool {
 func (failures *failureList) CheckFailures(t *testing.T) {
 	failureExists := failures.PrintFailures(t)
 	if failureExists {
-		t.Fatal("failures in test")
+		e2eutil.Die(t, fmt.Errorf("failures in test"))
 	}
 }
 
@@ -294,8 +294,11 @@ func getStorageClass(t *testing.T, cluster *types.Cluster) string {
 	return scs.Items[0].Name
 }
 
-func runValidationTest(t *testing.T, targetKube *types.Cluster, testDefs []testDef, command string) {
+func runValidationTest(t *testing.T, testDefs []testDef, command string) {
 	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	// Stop the operator, we don't actually need it to validate the API and the tests will take forever.
 	_ = framework.DeleteOperatorCompletely(targetKube, config.OperatorResourceName)
@@ -468,16 +471,9 @@ func runValidationTest(t *testing.T, targetKube *types.Cluster, testDefs []testD
 			}
 		})
 	}
-
-	// Removing deployment if any
-	if !f.SkipTeardown {
-		e2eutil.CleanUpCluster(t, targetKube, f.LogDir, 0, t.Name())
-	}
 }
 
 func TestValidationCreate(t *testing.T) {
-	f := framework.Global
-
 	supportedTimeUnits := []string{"ns", "us", "ms", "s", "m", "h"}
 
 	supportedImagePatterns := []string{
@@ -520,12 +516,10 @@ func TestValidationCreate(t *testing.T) {
 		testDefs = append(testDefs, testDefCase)
 	}
 
-	runValidationTest(t, f.GetCluster(0), testDefs, "create")
+	runValidationTest(t, testDefs, "create")
 }
 
 func TestNegValidationCreate(t *testing.T) {
-	f := framework.Global
-
 	invalidExternalTraficPolicy := corev1.ServiceExternalTrafficPolicyType("Donkey")
 	testDefs := []testDef{
 		{
@@ -768,10 +762,9 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedErrors: []string{`spec.tls in body is required`},
 		},
 		{
-			name:           "TestValidateMissingDNSSubjectAltName",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", "acme.com")},
-			shouldFail:     true,
-			expectedErrors: []string{`certificate is valid for *.cluster, *.cluster.default, *.cluster.default.svc, *.cluster.default.svc.cluster.local, cluster-srv, cluster-srv.default, cluster-srv.default.svc, *.cluster-srv.default.svc.cluster.local, localhost, *.example.com, not host.acme.com`},
+			name:       "TestValidateMissingDNSSubjectAltName",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", "acme.com")},
+			shouldFail: true,
 		},
 		{
 			name:           "TestValidateAutoCompactionMinimum",
@@ -1114,12 +1107,10 @@ func TestNegValidationCreate(t *testing.T) {
 	}
 	testDefs = append(testDefs, testCase)
 
-	runValidationTest(t, f.GetCluster(0), testDefs, "create")
+	runValidationTest(t, testDefs, "create")
 }
 
 func TestValidationDefaultCreate(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name: "TestValidateClusterDefault",
@@ -1215,12 +1206,10 @@ func TestValidationDefaultCreate(t *testing.T) {
 			},
 		},
 	}
-	runValidationTest(t, f.GetCluster(0), testDefs, "create")
+	runValidationTest(t, testDefs, "create")
 }
 
 func TestNegValidationDefaultCreate(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			// dataServiceMemoryQuota will get mutated to the default of 256, but we have
@@ -1231,12 +1220,10 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 			expectedErrors: []string{"bucket memory allocation (500Mi) exceeds data service quota (256Mi) on cluster cluster"},
 		},
 	}
-	runValidationTest(t, f.GetCluster(0), testDefs, "create")
+	runValidationTest(t, testDefs, "create")
 }
 
 func TestNegValidationConstraintsCreate(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name:           "TestValidateAdminConsoleServicesUnique",
@@ -1275,13 +1262,11 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
 		},
 	}
-	runValidationTest(t, f.GetCluster(0), testDefs, "create")
+	runValidationTest(t, testDefs, "create")
 }
 
 // CRD apply tests.
 func TestValidationApply(t *testing.T) {
-	f := framework.Global
-
 	supportedTimeUnits := []string{"ns", "us", "ms", "s", "m", "h"}
 
 	testDefs := []testDef{
@@ -1299,12 +1284,10 @@ func TestValidationApply(t *testing.T) {
 		testDefs = append(testDefs, testDefCase)
 	}
 
-	runValidationTest(t, f.GetCluster(0), testDefs, "apply")
+	runValidationTest(t, testDefs, "apply")
 }
 
 func TestNegValidationApply(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name:           "TestValidateServerServicesImmutable",
@@ -1374,12 +1357,10 @@ func TestNegValidationApply(t *testing.T) {
 		testDefs = append(testDefs, testCase)
 	}
 
-	runValidationTest(t, f.GetCluster(0), testDefs, "apply")
+	runValidationTest(t, testDefs, "apply")
 }
 
 func TestValidationDefaultApply(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name:        "TestValidateApplyIndexServiceMemoryQuotaDefault",
@@ -1397,12 +1378,10 @@ func TestValidationDefaultApply(t *testing.T) {
 			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/cluster/autoFailoverTimeout", "120s")},
 		},
 	}
-	runValidationTest(t, f.GetCluster(0), testDefs, "apply")
+	runValidationTest(t, testDefs, "apply")
 }
 
 func TestNegValidationConstraintsApply(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name:           "TestValidateApplyAdminConsoleServicesUnique",
@@ -1436,12 +1415,10 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			expectedErrors: []string{"spec.evictionPolicy in body should be one of [valueOnly fullEviction]"},
 		},
 	}
-	runValidationTest(t, f.GetCluster(0), testDefs, "apply")
+	runValidationTest(t, testDefs, "apply")
 }
 
 func TestNegValidationImmutableApply(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		// Bucket spec updation
 		{
@@ -1532,13 +1509,11 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		},
 		// Poor po!
 	}
-	runValidationTest(t, f.GetCluster(0), testDefs, "apply")
+	runValidationTest(t, testDefs, "apply")
 }
 
 // Test cases for RBAC testing.
 func TestRBACValidationCreate(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name:       "TestValidateLDAPDomain",
@@ -1593,13 +1568,11 @@ func TestRBACValidationCreate(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, f.GetCluster(0), testDefs, "create")
+	runValidationTest(t, testDefs, "create")
 }
 
 // Test cases for LDAP Validation.
 func TestRBACValidationLDAP(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name:           "TestValidateHostnameRequired",
@@ -1652,14 +1625,12 @@ func TestRBACValidationLDAP(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, f.GetCluster(0), testDefs, "create")
+	runValidationTest(t, testDefs, "create")
 }
 
 // Test cases for RZA / Server group testing.
 // Deploy couchbase cluster over non existent server group.
 func TestRzaNegCreateCluster(t *testing.T) {
-	f := framework.Global
-
 	testDefs := []testDef{
 		{
 			name:           "TestValidateServerGroupsInvalid_1",
@@ -1673,5 +1644,5 @@ func TestRzaNegCreateCluster(t *testing.T) {
 			expectedErrors: []string{"spec.servergroups missing for "},
 		},
 	}
-	runValidationTest(t, f.GetCluster(0), testDefs, "create")
+	runValidationTest(t, testDefs, "create")
 }

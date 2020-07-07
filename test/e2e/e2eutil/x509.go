@@ -429,8 +429,6 @@ func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, 
 		},
 	}
 
-	ApplyGarbageCollectedObjectLabels(secret)
-
 	return secret
 }
 
@@ -445,8 +443,6 @@ func CreateClusterSecretData(namespace, secretName string, certPEM, keyPEM []byt
 			clusterTLSSecretKey:   keyPEM,
 		},
 	}
-
-	ApplyGarbageCollectedObjectLabels(secret)
 
 	return secret
 }

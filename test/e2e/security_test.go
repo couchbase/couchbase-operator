@@ -38,13 +38,15 @@ func testRotateAdminPassword(t *testing.T, kubernetes *types.Cluster, tls *e2eut
 }
 
 func TestRotateAdminPassword(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	testRotateAdminPassword(t, kubernetes, nil, nil)
 }
 
 func TestRotateAdminPasswordTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
@@ -52,7 +54,8 @@ func TestRotateAdminPasswordTLS(t *testing.T) {
 }
 
 func TestRotateAdminPasswordMutualTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
@@ -61,7 +64,8 @@ func TestRotateAdminPasswordMutualTLS(t *testing.T) {
 }
 
 func TestRotateAdminPasswordMandatoryMutualTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
@@ -104,13 +108,15 @@ func testRotateAdminPasswordAndRestart(t *testing.T, kubernetes *types.Cluster, 
 }
 
 func TestRotateAdminPasswordAndRestart(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	testRotateAdminPasswordAndRestart(t, kubernetes, nil, nil)
 }
 
 func TestRotateAdminPasswordAndRestartTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
@@ -118,7 +124,8 @@ func TestRotateAdminPasswordAndRestartTLS(t *testing.T) {
 }
 
 func TestRotateAdminPasswordAndRestartMutualTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
@@ -127,7 +134,8 @@ func TestRotateAdminPasswordAndRestartMutualTLS(t *testing.T) {
 }
 
 func TestRotateAdminPasswordAndRestartMandatoryMutualTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
@@ -165,13 +173,15 @@ func testRotateAdminPasswordDuringRestart(t *testing.T, kubernetes *types.Cluste
 }
 
 func TestRotateAdminPasswordDuringRestart(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	testRotateAdminPasswordDuringRestart(t, kubernetes, nil, nil)
 }
 
 func TestRotateAdminPasswordDuringRestartTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
@@ -179,7 +189,8 @@ func TestRotateAdminPasswordDuringRestartTLS(t *testing.T) {
 }
 
 func TestRotateAdminPasswordDuringRestartMutualTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
@@ -188,7 +199,8 @@ func TestRotateAdminPasswordDuringRestartMutualTLS(t *testing.T) {
 }
 
 func TestRotateAdminPasswordDuringRestartMandatoryMutualTLS(t *testing.T) {
-	kubernetes := framework.Global.GetCluster(0)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 

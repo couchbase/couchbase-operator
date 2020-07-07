@@ -19,8 +19,8 @@ import (
 
 	"github.com/go-openapi/errors"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,7 +31,6 @@ import (
 var retryInterval = 10 * time.Second
 
 type filterFunc func(*v1.Pod) bool
-type filterFuncDaemonSet func(*v1beta1.DaemonSet) bool
 
 // WaitForBackupCreation waits for a backup resources associated with a cluster to be created.
 func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) error {
@@ -88,51 +87,6 @@ func WaitForCronjob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster,
 
 func MustWaitForCronjob(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) {
 	if err := WaitForCronjob(k8s, couchbase, name, timeout); err != nil {
-		Die(t, err)
-	}
-}
-
-// this function waits for a job and also waits for it to succeed.
-func WaitForJob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration, waitForComplete bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
-		listOptions := metav1.ListOptions{}
-
-		jobs, err := k8s.KubeClient.BatchV1().Jobs(couchbase.Namespace).List(listOptions)
-		if err != nil {
-			return false, err
-		}
-
-		for _, job := range jobs.Items {
-			if strings.Contains(job.Name, name) {
-				if job.Status.Active == 1 {
-					return !waitForComplete, nil
-				}
-
-				if job.Status.Failed == 1 {
-					return false, fmt.Errorf("job %s failed", job.Name)
-				}
-
-				if job.Status.Succeeded == 1 {
-					return true, nil
-				}
-			}
-		}
-
-		return false, err
-	})
-}
-
-func MustWaitForJob(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) {
-	if err := WaitForJob(k8s, couchbase, name, timeout, false); err != nil {
-		Die(t, err)
-	}
-}
-
-func MustWaitForJobCompletion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) {
-	if err := WaitForJob(k8s, couchbase, name, timeout, true); err != nil {
 		Die(t, err)
 	}
 }
@@ -368,40 +322,8 @@ func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
-func waitResourcesDeleted(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	err := retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
-		list, err := kubeClient.CoreV1().Services(cl.Namespace).List(ClusterListOpt(cl))
-		if err != nil {
-			return false, err
-		}
-
-		if len(list.Items) > 0 {
-			return false, nil
-		}
-
-		return true, nil
-	})
-	if err != nil {
-		return fmt.Errorf("fail to wait services deleted: %v", err)
-	}
-
-	return nil
-}
-
 func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName string, cl *couchbasev2.CouchbaseCluster) error {
 	_, err := WaitPodsDeleted(kubeClient, cl.Namespace, NodeListOpt(cl, podName))
-	if err != nil {
-		return fmt.Errorf("fail to wait pods deleted: %v", err)
-	}
-
-	return nil
-}
-
-func WaitUntilPodDeleted(k8s *types.Cluster) error {
-	_, err := WaitPodsDeleted(k8s.KubeClient, k8s.Namespace, metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		return fmt.Errorf("fail to wait pods deleted: %v", err)
 	}
@@ -450,29 +372,30 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.L
 }
 
 // WaitUntilOperatorReady will wait until the first pod selected for couchbase-operator is ready.
-func WaitUntilOperatorReady(k8s *types.Cluster, label string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+func WaitUntilOperatorReady(k8s *types.Cluster, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	err := retryutil.Retry(ctx, time.Second, func() (bool, error) {
-		podList, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: label})
+	callback := func() error {
+		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(k8s.OperatorDeployment.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, err
+			return err
 		}
 
-		if len(podList.Items) > 0 {
-			if k8sutil.IsPodReady(&podList.Items[0]) {
-				return true, nil
+		for _, condition := range deployment.Status.Conditions {
+			if condition.Type == appsv1.DeploymentAvailable {
+				if condition.Status == v1.ConditionTrue {
+					return nil
+				}
+
+				return fmt.Errorf("operator deployment not ready")
 			}
 		}
 
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to wait for pods with label=(%v) to become ready: %v", label, err)
+		return fmt.Errorf("operator deployment missing Available condition")
 	}
 
-	return nil
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
 // waits until the provided condition type occurs with associated status.
@@ -629,149 +552,6 @@ func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType
 	}
 }
 
-func nodeReady(node v1.Node) bool {
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == "Ready" && condition.Status == "True" {
-			return true
-		}
-	}
-
-	return false
-}
-
-func allNodesReady(nodes []v1.Node) bool {
-	for _, node := range nodes {
-		if !nodeReady(node) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func WaitForKubeNodesToBeReady(kubeClient kubernetes.Interface, requiredNodesInCluster, waitTimeInSec int) error {
-	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
-	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
-
-	for {
-		select {
-		case <-timeOutChan:
-			return fmt.Errorf("timed out to get K8S node to ready state")
-
-		case <-tickChan:
-			nodesList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-			if err != nil {
-				continue
-			}
-
-			if allNodesReady(nodesList.Items) && len(nodesList.Items) == requiredNodesInCluster {
-				return nil
-			}
-		}
-	}
-}
-
-func WaitForPodsReadyWithLabel(t *testing.T, k8s *types.Cluster, waitTimeInSec int, label string) error {
-	t.Logf("waiting for pods to be ready in namesapce %v with label %v", k8s.Namespace, label)
-
-	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
-	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
-
-	for {
-		select {
-		case <-timeOutChan:
-			return fmt.Errorf("timed out waiting for pods to enter ready state")
-
-		case <-tickChan:
-			podReady := true
-
-			podList, _ := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: label})
-			for _, pod := range podList.Items {
-				if pod.Status.Phase != v1.PodRunning {
-					podReady = false
-					break
-				}
-
-				for _, condition := range pod.Status.Conditions {
-					if condition.Type == "Ready" && condition.Status != v1.ConditionTrue {
-						podReady = false
-					}
-				}
-			}
-
-			if podReady {
-				t.Logf("pods with label %v ready \n", label)
-				return nil
-			}
-		}
-	}
-}
-
-func WaitDaemonSetsDeleted(k8s *types.Cluster, lo metav1.ListOptions) ([]*v1beta1.DaemonSet, error) {
-	f := func(ds *v1beta1.DaemonSet) bool { return ds.DeletionTimestamp != nil }
-	return waitDaemonSetsDeleted(k8s, lo, f)
-}
-
-func waitDaemonSetsDeleted(k8s *types.Cluster, lo metav1.ListOptions, filters ...filterFuncDaemonSet) ([]*v1beta1.DaemonSet, error) {
-	var dss []*v1beta1.DaemonSet
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	err := retryutil.Retry(ctx, retryInterval, func() (bool, error) {
-		dsList, err := k8s.KubeClient.ExtensionsV1beta1().DaemonSets(k8s.Namespace).List(lo)
-		if err != nil {
-			return false, err
-		}
-
-		dss = nil
-
-		for i := range dsList.Items {
-			ds := &dsList.Items[i]
-			filtered := false
-
-			for _, filter := range filters {
-				if filter(ds) {
-					filtered = true
-				}
-			}
-
-			if !filtered {
-				dss = append(dss, ds)
-			}
-		}
-
-		return len(dss) == 0, nil
-	})
-
-	return dss, err
-}
-
-func WaitForExternalLoadBalancer(t *testing.T, k8s *types.Cluster, loadBalancerServiceName string, waitTimeInSec int) error {
-	timeOutChan := time.NewTimer(time.Duration(waitTimeInSec) * time.Second).C
-	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
-
-	for {
-		select {
-		case <-timeOutChan:
-			return fmt.Errorf("timed out to get K8S node to ready state")
-
-		case <-tickChan:
-			service, err := GetService(k8s, loadBalancerServiceName)
-			if err != nil {
-				continue
-			}
-
-			if len(service.Status.LoadBalancer.Ingress) > 0 {
-				if service.Status.LoadBalancer.Ingress[0].IP != "" {
-					t.Logf("load balancer ingress: %+v", service.Status.LoadBalancer.Ingress)
-					return nil
-				}
-			}
-		}
-	}
-}
-
 func WaitForPVC(k8s *types.Cluster, name string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -813,71 +593,6 @@ func WaitForPVCDeletion(ctx context.Context, k8s *types.Cluster) error {
 
 		if len(pvcs.Items) != 0 {
 			return false, nil
-		}
-
-		return true, nil
-	})
-}
-
-// DeleteAndWaitForPVCDeletion deletes all PVCs in the cluster and waits for them
-// to be deleted.  If this operation fails we retry again and again until it does
-// work or the context timeout triggers.
-func DeleteAndWaitForPVCDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	// Select all Couchbase PVCs in the namespace.
-	requirements := []labels.Requirement{}
-
-	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
-	if err != nil {
-		return err
-	}
-
-	requirements = append(requirements, *req)
-
-	selector := labels.NewSelector()
-	selector = selector.Add(requirements...)
-
-	// Retry deletion until success or the timeout context fires.
-	return retryutil.Retry(ctx, time.Second, func() (bool, error) {
-		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
-		if err != nil {
-			return false, retryutil.RetryOkError(err)
-		}
-
-		// Nothing to do, move along
-		if len(pvcs.Items) == 0 {
-			return true, nil
-		}
-
-		// If there are any finalizers make sure they aren't there, this causes most hangs
-		for i := range pvcs.Items {
-			pvc := pvcs.Items[i]
-
-			if len(pvc.Finalizers) == 0 {
-				continue
-			}
-
-			pvc.Finalizers = []string{}
-
-			if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Update(&pvc); err != nil {
-				return false, retryutil.RetryOkError(err)
-			}
-		}
-
-		for _, pvc := range pvcs.Items {
-			if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Delete(pvc.Name, metav1.NewDeleteOptions(0)); err != nil {
-				return false, retryutil.RetryOkError(err)
-			}
-		}
-
-		// Wait for upto a minute for the PVCs to be deleted before we retry the deletion.
-		waitContext, waitCancel := context.WithTimeout(ctx, time.Minute)
-		defer waitCancel()
-
-		if err := WaitForPVCDeletion(waitContext, k8s); err != nil {
-			return false, retryutil.RetryOkError(err)
 		}
 
 		return true, nil
@@ -1051,86 +766,6 @@ func MustWaitForFirstPodContainerWaiting(t *testing.T, k8s *types.Cluster, couch
 	}
 }
 
-func WaitForBucketDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		buckets, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(buckets.Items) != 0 {
-			return fmt.Errorf("waiting for %v buckets to delete", len(buckets.Items))
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
-}
-
-func WaitForEphemeralBucketDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		buckets, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(buckets.Items) != 0 {
-			return fmt.Errorf("waiting for %v ephemeral buckets to delete", len(buckets.Items))
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
-}
-
-func WaitForMemcachedBucketDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		buckets, err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(buckets.Items) != 0 {
-			return fmt.Errorf("waiting for %v memcached buckets to delete", len(buckets.Items))
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
-}
-
-func WaitForReplicationDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		replications, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(k8s.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(replications.Items) != 0 {
-			return fmt.Errorf("waiting for %v replications to delete", len(replications.Items))
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
-}
-
 func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1215,110 +850,6 @@ func MustWaitForClusterUserDeletion(t *testing.T, k8s *types.Cluster, couchbase 
 	}
 
 	return nil
-}
-
-func WaitForUserDeletion(k8s *types.Cluster, userName string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		users, err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		found := false
-
-		for _, u := range users.Items {
-			if u.Name == userName {
-				found = true
-				break
-			}
-		}
-
-		if found {
-			return fmt.Errorf("waiting for couchbase user `%s` to be deleted", userName)
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
-}
-
-func WaitForAllUserDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		users, err := k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(users.Items) != 0 {
-			return fmt.Errorf("waiting for %v couchbase users to delete", len(users.Items))
-		}
-
-		// and none of the users are remaining in status
-		for _, user := range users.Items {
-			err := WaitForUserDeletion(k8s, user.Name, timeout)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
-}
-
-func MustWaitForUserDeletion(t *testing.T, k8s *types.Cluster, userName string, timeout time.Duration) {
-	err := WaitForUserDeletion(k8s, userName, timeout)
-	if err != nil {
-		Die(t, err)
-	}
-}
-
-func WaitForGroupDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		groups, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(groups.Items) != 0 {
-			return fmt.Errorf("waiting for %v couchbase user groups to delete", len(groups.Items))
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
-}
-
-func WaitForRoleBindingDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		bindings, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).List(metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(bindings.Items) != 0 {
-			return fmt.Errorf("waiting for %v couchbase user role bindings to delete", len(bindings.Items))
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
 // WaitForCRDDeletion waits until CRD is deleted.
