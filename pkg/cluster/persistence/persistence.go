@@ -26,6 +26,9 @@ const (
 	// Version is the Couchbase version we are on or upgrading from.
 	Version PersistentKind = "version"
 
+	// Upgrading is flagged when an upgrade starts and removed on termination.
+	Upgrading PersistentKind = "upgrading"
+
 	// Password is the last known good admin password.
 	Password PersistentKind = "password"
 )
@@ -39,6 +42,8 @@ type PersistentStorage interface {
 	Upsert(PersistentKind, string) error
 	// Update a key, if it already exists.
 	Update(PersistentKind, string) error
+	// Delete a key, if it already exists.
+	Delete(PersistentKind) error
 	// Get a value.
 	Get(PersistentKind) (string, error)
 	// Clear clears persistent storage (e.g. ephemeral disaster recovery)
@@ -200,6 +205,17 @@ func (p *persistentStorageImpl) Update(kind PersistentKind, value string) error 
 	}
 
 	p.secret.Data[string(kind)] = []byte(value)
+
+	return p.flush()
+}
+
+// Delete a key if it exists.
+func (p *persistentStorageImpl) Delete(kind PersistentKind) error {
+	if _, ok := p.secret.Data[string(kind)]; !ok {
+		return NewKeyError(fmt.Sprintf("delete: key %v doesn't exist", kind))
+	}
+
+	delete(p.secret.Data, string(kind))
 
 	return p.flush()
 }

@@ -1322,25 +1322,13 @@ type MembersStatus struct {
 
 // Used to marshal and unmarshal information from the Upgrading condition.
 type UpgradeStatus struct {
-	State       string
-	Source      string
-	Target      string
 	TargetCount int
 	TotalCount  int
 }
 
 const (
 	// UpgradingMessageFormat is the message format used when the cluster is upgrading.
-	// The first field is the state of the operation, the second and third fields are
-	// the source and target versions respectively, the forth and fifth fields are the
-	// counts of members at the target version and total members respectively.
-	UpgradingMessageFormat = "Cluster %s from %s to %s (progress %d/%d)"
-	// UpgradingMessageStateUpgrading is used in the UpgradingMessageFormat to indicate
-	// an upgrade in progress.
-	UpgradingMessageStateUpgrading = "upgrading"
-	// UpgradingMessageStateRollback is used in the UpgradingMessageFormat to indicate
-	// a rollback in process.
-	UpgradingMessageStateRollback = "rolling-back"
+	UpgradingMessageFormat = "Cluster upgrading (progress %d/%d)"
 )
 
 type CouchbaseClusterMonitoringSpec struct {

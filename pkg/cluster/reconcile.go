@@ -1517,36 +1517,24 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.Member, int, string, error) {
 // reportUpgrade looks at the current state and any existing upgrade status
 // condition, makes condition updates and raises events.
 func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
-	// Look for an existing condition
-	condition := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
+	// Look for an existing upgrading condition in the persistent storage.
+	upgrading := true
 
-	if condition == nil {
-		// No existing condition, we are guaranteed to be upgrading.
-		status.State = couchbasev2.UpgradingMessageStateUpgrading
-		c.raiseEvent(k8sutil.UpgradeStartedEvent(status.Source, status.Target, c.cluster))
-	} else {
-		// There is an existing condition, check to see which way we are going.
-		// If we have switched directions we will need a new event.
-		oldStatus := couchbasev2.NewUpgradeStatus(condition.Message)
-		if status.Target != oldStatus.Target {
-			version, _ := couchbaseutil.NewVersion(status.Target)
-			oldVersion, _ := couchbaseutil.NewVersion(oldStatus.Target)
-
-			switch version.Compare(oldVersion) {
-			case 1:
-				// Upgrading
-				status.State = couchbasev2.UpgradingMessageStateUpgrading
-				c.raiseEvent(k8sutil.UpgradeStartedEvent(status.Source, status.Target, c.cluster))
-			case -1:
-				// Rolling back
-				status.State = couchbasev2.UpgradingMessageStateRollback
-				c.raiseEvent(k8sutil.RollbackStartedEvent(status.Source, status.Target, c.cluster))
-			}
-		} else {
-			status.State = oldStatus.State
-		}
+	if _, err := c.state.Get(persistence.Upgrading); err != nil {
+		upgrading = false
 	}
 
+	// No existing condition, we are guaranteed to be upgrading, as opposed to rolling back.
+	// Set the persistent flag and raise an event.
+	if !upgrading {
+		if err := c.state.Insert(persistence.Upgrading, "true"); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.UpgradeStartedEvent(c.cluster))
+	}
+
+	// All reports update the condition to reflect the current progress.
 	c.cluster.Status.SetUpgradingCondition(status)
 
 	if err := c.updateCRStatus(); err != nil {
@@ -1560,29 +1548,25 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 // If there was an unpgrade condition and the cluster no longer needs an upgrade clear
 // the condition and raise any necessary events.
 func (c *Cluster) reportUpgradeComplete() error {
-	// Still upgrading do nothing
-	if candidate, _, _, err := c.needsUpgrade(); err != nil {
-		return err
-	} else if candidate != nil {
-		return nil
-	}
-
 	// There is no condition, we weren't upgrading, do nothing
-	condition := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
-	if condition == nil {
+	if _, err := c.state.Get(persistence.Upgrading); err != nil {
 		return nil
 	}
 
-	status := couchbasev2.NewUpgradeStatus(condition.Message)
-	switch status.State {
-	case couchbasev2.UpgradingMessageStateUpgrading:
-		c.raiseEvent(k8sutil.UpgradeFinishedEvent(status.Source, status.Target, c.cluster))
-	case couchbasev2.UpgradingMessageStateRollback:
-		c.raiseEvent(k8sutil.RollbackFinishedEvent(status.Source, status.Target, c.cluster))
+	// Check to see if there are any more upgrade candidates.
+	// If there are then we are still upgrading.
+	candidate, _, _, err := c.needsUpgrade()
+	if err != nil {
+		return err
 	}
 
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
+	if candidate != nil {
+		return nil
+	}
 
+	// Upgrade has completed, raise and event, remove the cluster condition
+	// update the current cluster version and clear the upgrading flag in
+	// persistent storage.
 	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return err
@@ -1591,6 +1575,14 @@ func (c *Cluster) reportUpgradeComplete() error {
 	if err := c.state.Update(persistence.Version, version); err != nil {
 		return err
 	}
+
+	if err := c.state.Delete(persistence.Upgrading); err != nil {
+		return err
+	}
+
+	c.raiseEvent(k8sutil.UpgradeFinishedEvent(c.cluster))
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
 
 	if err := c.updateCRStatus(); err != nil {
 		return err

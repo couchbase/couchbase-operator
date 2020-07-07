@@ -39,8 +39,6 @@ const (
 	EventReasonServiceDeleted          = "ServiceDeleted"
 	EventReasonUpgradeStarted          = "UpgradeStarted"
 	EventReasonUpgradeFinished         = "UpgradeFinished"
-	EventReasonRollbackStarted         = "RollbackStarted"
-	EventReasonRollbackFinished        = "RollbackFinished"
 	EventReasonClusterSettingsEdited   = "ClusterSettingsEdited"
 	EventReasonTLSUpdated              = "TLSUpdated"
 	EventReasonTLSInvalid              = "TLSInvalid"
@@ -347,38 +345,20 @@ func AdminConsoleSvcDeleteEvent(svcName string, cl *couchbasev2.CouchbaseCluster
 	return event
 }
 
-func UpgradeStartedEvent(sourceVersion, targetVersion string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+func UpgradeStartedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonUpgradeStarted
-	event.Message = fmt.Sprintf("Started upgrade from %s to %s", sourceVersion, targetVersion)
+	event.Message = "Started upgrade"
 
 	return event
 }
 
-func UpgradeFinishedEvent(sourceVersion, targetVersion string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+func UpgradeFinishedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonUpgradeFinished
-	event.Message = fmt.Sprintf("Finished upgrade from %s to %s", sourceVersion, targetVersion)
-
-	return event
-}
-
-func RollbackStartedEvent(sourceVersion, targetVersion string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	event := newClusterEvent(cl)
-	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonRollbackStarted
-	event.Message = fmt.Sprintf("Started rollback from %s to %s", sourceVersion, targetVersion)
-
-	return event
-}
-
-func RollbackFinishedEvent(sourceVersion, targetVersion string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	event := newClusterEvent(cl)
-	event.Type = v1.EventTypeNormal
-	event.Reason = EventReasonRollbackFinished
-	event.Message = fmt.Sprintf("Finished rollback from %s to %s", sourceVersion, targetVersion)
+	event.Message = "Finished upgrade"
 
 	return event
 }

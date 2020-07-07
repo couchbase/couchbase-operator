@@ -514,15 +514,7 @@ func scalingMsg(from, to int) string {
 
 // Format creates an upgrade condition message.
 func (status *UpgradeStatus) Format() string {
-	return fmt.Sprintf(UpgradingMessageFormat, status.State, status.Source, status.Target, status.TargetCount, status.TotalCount)
-}
-
-// NewUpgradeStatus creates an UpgradeStatus from an upgrade condition message.
-func NewUpgradeStatus(message string) *UpgradeStatus {
-	status := &UpgradeStatus{}
-	fmt.Sscanf(message, UpgradingMessageFormat, &status.State, &status.Source, &status.Target, &status.TargetCount, &status.TotalCount)
-
-	return status
+	return fmt.Sprintf(UpgradingMessageFormat, status.TargetCount, status.TotalCount)
 }
 
 // clusterRoles apply cluster wide and don't require a bucket.

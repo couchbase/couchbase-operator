@@ -826,16 +826,9 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 		return nil
 	}
 
-	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
-	if err != nil {
-		return err
-	}
-
-	log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name(), "source", candidate.Version(), "target", targetVersion, "diff", diff)
+	log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name(), "diff", diff)
 
 	status := &couchbasev2.UpgradeStatus{
-		Source:      candidate.Version(),
-		Target:      targetVersion,
 		TargetCount: targetCount,
 		TotalCount:  len(c.members),
 	}

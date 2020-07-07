@@ -228,10 +228,11 @@ func TestUpgradeRollback(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		upgradeSequence,
-		eventschema.Event{Reason: k8sutil.EventReasonRollbackStarted},
-		upgradeSequence,
-		eventschema.Event{Reason: k8sutil.EventReasonRollbackFinished},
+		eventschema.Repeat{
+			Times:     2,
+			Validator: upgradeSequence,
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
