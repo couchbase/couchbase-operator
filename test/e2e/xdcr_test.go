@@ -211,11 +211,6 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 	// Check the events match what we expect:
 	// * Both clusters created
 	// * Source cluster establishes XDCR
-	k8s2CreateSequence := e2eutil.ClusterCreateSequence(clusterSize)
-	if policy != nil {
-		k8s2CreateSequence = e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize)
-	}
-
 	expectedEvents1 := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -223,8 +218,11 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
-		k8s2CreateSequence,
+		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
 	}
 
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
