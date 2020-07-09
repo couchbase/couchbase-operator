@@ -267,6 +267,9 @@ func (c *Cluster) create() error {
 		return err
 	}
 
+	// Notify that we have added a new member, this makes it callable.
+	c.clusterAddMember(m)
+
 	log.Info("Operator added member", "cluster", c.namespacedName(), "name", m.Name())
 
 	c.raiseEvent(k8sutil.MemberAddEvent(m.Name(), c.cluster))
@@ -726,16 +729,21 @@ func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
 	return -1
 }
 
-// Adds a new member to our cluster object and updates the cluster status.
-func (c *Cluster) clusterAddMember(member couchbaseutil.Member) error {
+// clusterCreateMember create a new member and adds it to our member list.
+func (c *Cluster) clusterCreateMember(member couchbaseutil.Member) error {
 	firstMember := c.members.Empty()
 
 	c.members.Add(member)
-	c.callableMembers.Add(member)
 
 	c.cluster.Status.Size = c.members.Size()
 
 	return c.updateMemberStatus(firstMember)
+}
+
+// clusterAddMember notifies that a new member has been added to the cluster
+// and can be called.
+func (c *Cluster) clusterAddMember(member couchbaseutil.Member) {
+	c.callableMembers.Add(member)
 }
 
 // Removes a member from our cluster object and updates the cluster status.

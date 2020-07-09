@@ -293,7 +293,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	}
 
 	// Notify that we have created a new member
-	if err := c.clusterAddMember(newMember); err != nil {
+	if err := c.clusterCreateMember(newMember); err != nil {
 		return nil, err
 	}
 
@@ -330,6 +330,9 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.
 	if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
 		return newMember, err
 	}
+
+	// Notify that we have added a new member, this makes it callable.
+	c.clusterAddMember(newMember)
 
 	log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", newMember.Name)
 	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name(), c.cluster))
