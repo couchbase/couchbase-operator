@@ -60,7 +60,7 @@ func TestFullIncremental(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	numOfDocs := 200
+	numOfDocs := 100
 
 	// Create a normal cluster.
 	imageName := getBackupImage(f)
@@ -103,7 +103,7 @@ func TestFullOnly(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	numOfDocs := 200
+	numOfDocs := 100
 
 	// Create a normal cluster.
 	imageName := getBackupImage(f)
@@ -150,7 +150,7 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 
 	// Create cluster.
-	numOfDocs := 200
+	numOfDocs := 100
 	testCouchbase := e2espec.NewSupportableCluster(mdsGroupSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Backup.Managed = true
@@ -222,7 +222,7 @@ func TestBackupPVCReconcile(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create cluster.
-	numOfDocs := 200
+	numOfDocs := 100
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -294,7 +294,7 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create a normal cluster.
-	numOfDocs := 200
+	numOfDocs := 100
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -365,7 +365,7 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create a normal cluster.
-	numOfDocs := 200
+	numOfDocs := 100
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -430,7 +430,7 @@ func TestBackupAndRestore(t *testing.T) {
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
-	numOfDocs := 2000
+	numOfDocs := 100
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -514,7 +514,7 @@ func TestUpdateBackupStatus(t *testing.T) {
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
-	numOfDocs := 200
+	numOfDocs := 100
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -567,7 +567,7 @@ func TestMultipleBackups(t *testing.T) {
 
 	clusterSize := constants.Size3
 	// Create a normal cluster.
-	numOfDocs := 200
+	numOfDocs := 100
 	imageName := getBackupImage(f)
 	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, imageName)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -621,7 +621,7 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 
 	clusterSize := constants.Size3
 	// Create the cluster.
-	numOfDocs := 200
+	numOfDocs := 100
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
@@ -677,7 +677,7 @@ func TestFullOnlyOverTLS(t *testing.T) {
 
 	// Create the cluster.
 	clusterSize := constants.Size3
-	numOfDocs := 200
+	numOfDocs := 100
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
