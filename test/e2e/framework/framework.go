@@ -141,6 +141,14 @@ func CreateDeploymentObject(operatorImage string, operatorPort int, podCreateTim
 	if operatorPort != 0 {
 		listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(operatorPort)
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
+
+		// Direct readiness probe to listening address
+		for i, port := range deployment.Spec.Template.Spec.Containers[0].Ports {
+			if port.Name == "http" {
+				deployment.Spec.Template.Spec.Containers[0].Ports[i].ContainerPort = int32(operatorPort)
+			}
+		}
+
 	}
 	return
 }
