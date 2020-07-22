@@ -255,7 +255,7 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 		return nil
 	}
 
-	if err := CreateBackupRole(k8s.KubeClient, k8s.Namespace); err != nil {
+	if err := CreateBackupRole(k8s); err != nil {
 		return err
 	}
 	roleSpec := config.GetOperatorRole(k8s.Namespace)
@@ -275,7 +275,7 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 		return err
 	}
 
-	if err := CreateBackupServiceAccount(k8s.KubeClient, k8s.Namespace); err != nil {
+	if err := CreateBackupServiceAccount(k8s); err != nil {
 		return err
 	}
 	// Create service account given by the name
@@ -293,7 +293,7 @@ func recreateRoleBindings(k8s *types.Cluster, clusterRoleName string) error {
 		return err
 	}
 
-	if err := CreateBackupRoleBinding(k8s.KubeClient, k8s.Namespace); err != nil {
+	if err := CreateBackupRoleBinding(k8s); err != nil {
 		return err
 	}
 	clusterRoleBindingSpec := config.GetOperatorRoleBinding(k8s.Namespace)
