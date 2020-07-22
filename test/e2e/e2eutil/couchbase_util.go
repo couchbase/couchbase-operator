@@ -1044,7 +1044,7 @@ func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled
 		}
 
 		for _, node := range clusterInfo.Nodes {
-			if node.NodeEncryption != enabled && string(securityInfo.ClusterEncryptionLevel) == encryptionLevel {
+			if node.NodeEncryption != enabled || string(securityInfo.ClusterEncryptionLevel) != encryptionLevel {
 				return fmt.Errorf("node %s encryption %v, expected %v", node.HostName, node.NodeEncryption, enabled)
 			}
 		}
