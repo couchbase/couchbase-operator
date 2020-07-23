@@ -493,9 +493,16 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 
 	// Use the user provided Pod template if provided.
 	pod := &v1.Pod{}
+
 	if config.Pod != nil {
-		pod.ObjectMeta = config.Pod.ObjectMeta
-		pod.Spec = config.Pod.Spec
+		// Always copy from cached data, don't modify the cache.
+		// Cache data is only updated when something has changed,
+		// any changes you make will linger and cause unexpected
+		// things to happen...
+		podTemplate := config.Pod.DeepCopy()
+
+		pod.ObjectMeta = podTemplate.ObjectMeta
+		pod.Spec = podTemplate.Spec
 	}
 
 	// For metadata, override the name and merge the labels and annotations.

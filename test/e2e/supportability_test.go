@@ -1145,6 +1145,15 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
 	deployment.Spec.Template.Spec.Containers[0].Image = imageName
 	deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--listen-addr=0.0.0.0:%d", port))
 
+	// Direct readiness probe to listening address
+	for i, containerPort := range deployment.Spec.Template.Spec.Containers[0].Ports {
+		if containerPort.Name != "http" {
+			continue
+		}
+
+		deployment.Spec.Template.Spec.Containers[0].Ports[i].ContainerPort = int32(port)
+	}
+
 	t.Logf("Deploying operator using image '%s' and port %d", imageName, port)
 
 	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {

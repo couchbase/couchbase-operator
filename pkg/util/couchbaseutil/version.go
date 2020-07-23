@@ -30,11 +30,7 @@ func NewVersion(version string) (*Version, error) {
 
 	// lookup version associated with sha256 digest
 	if IsSHA256Version(version) {
-		if v, err := GetSHA256Version(version); err == nil {
-			version = v
-		} else {
-			return nil, err
-		}
+		version = GetSHA256Version(version)
 	}
 
 	// Gather semver and optional edition with expected format
@@ -71,9 +67,9 @@ func IsSHA256Version(version string) bool {
 }
 
 // Get readable version from sha256.
-func GetSHA256Version(version string) (string, error) {
+func GetSHA256Version(version string) string {
 	if v, ok := constants.ImageDigests[version]; ok {
-		return v, nil
+		return v
 	}
 
 	// attempt additional lookup on associated config map
@@ -83,11 +79,13 @@ func GetSHA256Version(version string) (string, error) {
 
 		parts := re.FindStringSubmatch(digests)
 		if len(parts) == 2 {
-			return parts[1], nil
+			return parts[1]
 		}
 	}
 
-	return "", fmt.Errorf("%w: unknown version digest: %s", errors.ErrInvalidVersion, version)
+	// Trusting user provided a valid version since we don't
+	// know what version the digest maps to
+	return "9.9.9"
 }
 
 // Return the full version string.

@@ -1,105 +1,111 @@
+.Introduction
 * xref:overview.adoc[Introduction]
 * xref:whats-new.adoc[What's New?]
-* Getting Started
- ** xref:best-practices.adoc[Guidelines and Best Practices]
- ** xref:prerequisite-and-setup.adoc[Prerequisites and System Requirements]
- ** xref:prerequisite-cloud.adoc[Public Cloud Prerequisites]
- ** xref:install-kubernetes.adoc[Install the Operator on Kubernetes]
- ** xref:install-openshift.adoc[Install the Operator on OpenShift]
-* Learn
- ** Kubernetes Concepts
-  *** xref:concept-kubernetes-networking.adoc[Kubernetes Networking]
-  *** xref:concept-persistent-volumes.adoc[Persistent Volumes]
-  *** xref:concept-kubernetes-upgrade.adoc[Kubernetes Automated Upgrade]
- ** Operator Concepts
-  *** xref:concept-operator.adoc[Couchbase Operator Architecture]
-  *** xref:concept-operator-logging.adoc[Couchbase Operator Logging]
- ** Couchbase Cluster Concepts
-  *** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
-  *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
-  *** xref:concept-user-rbac.adoc[Couchbase User RBAC]
-  *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
-  *** xref:concept-mds.adoc[Couchbase Multi-Dimensional Scaling]
-  *** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
-  *** xref:concept-sizing.adoc[Couchbase Sizing]
-  *** xref:concept-vertical-scaling.adoc[Couchbase Cluster Vertical Scaling]
-  *** xref:concept-couchbase-networking.adoc[Couchbase Networking]
-  *** xref:concept-tls.adoc[Couchbase TLS]
-  *** xref:concept-server-groups.adoc[Couchbase Server Groups]
-  *** xref:concept-upgrade.adoc[Couchbase Upgrades]
-* Manage
- ** Operator
-  *** xref:howto-operator-upgrade.adoc[Upgrade the Operator]
-  *** xref:howto-troubleshooting.adoc[View Operator Logs]
-  *** xref:howto-roll-your-own.adoc[Create Your Own Operator Images]
- ** Couchbase Cluster
-  *** Lifecycle
-   **** xref:howto-couchbase-create.adoc[Create a Couchbase Deployment]
-   **** xref:howto-couchbase-update.adoc[Modify a Couchbase Deployment]
-   **** xref:howto-couchbase-upgrade.adoc[Upgrade a Couchbase Deployment]
-   **** xref:howto-couchbase-delete.adoc[Delete a Couchbase Deployment]
-   **** xref:howto-couchbase-scale.adoc[Scale a Couchbase Deployment]
-  *** Configure
-   **** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
-   **** xref:howto-persistent-volume-resize.adoc[Resize Persistent Volumes]
-   **** xref:howto-backup.adoc[Configure Backup & Restore]
-   **** xref:howto-mds.adoc[Configure Multi-Dimensional Scaling]
-   **** xref:howto-xdcr.adoc[Configure XDCR]
-   **** xref:howto-public-networking.adoc[Configure Public Networking]
-   **** xref:howto-nodeport-networking.adoc[Configure Node Port Networking]
-   **** xref:howto-server-groups.adoc[Configure Server Groups]
-   **** xref:howto-tls.adoc[Configure TLS]
-   **** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
-   **** xref:howto-tls-rotation.adoc[Rotate TLS Certificates]
-   **** xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection]
-   **** xref:howto-non-root-install.adoc[Configure Non-Root Installs]
-  *** Connect
-   **** xref:howto-ui.adoc[Access the Couchbase User Interface]
-   **** xref:howto-client-sdks.adoc[Configure Client SDKs]
- ** Kubernetes
-  *** xref:howto-storage-class.adoc[Create a Lazy Bound Storage Class]
- ** Helm
-  *** xref:helm-setup-guide.adoc[Helm Deployment]
-  *** xref:helm-managing-guide.adoc[Helm Management]
-* Reference
- ** Resource Types
-  *** xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
-   **** xref:reference-couchbasecluster-status.adoc[CouchbaseCluster Status]
-   **** xref:reference-couchbasecluster-events.adoc[CouchbaseCluster Events]
-  *** xref:reference-couchbasebackup.adoc[CouchbaseBackup Resource]
-   **** xref:reference-couchbasebackuprestore.adoc[CouchbaseBackupRestore Resource]
-   **** xref:reference-couchbasebackup-status.adoc[CouchbaseBackup and CouchbaseBackupRestore Status]
-  *** xref:reference-couchbasebucket.adoc[CouchbaseBucket Resource]
-  *** xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
-  *** xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
-  *** xref:reference-couchbasereplication.adoc[CouchbaseReplication Resource]
-  *** xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
-  *** xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
-  *** xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding Resource]
- ** Operator
-  *** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
-  *** xref:reference-operator-configuration.adoc[Operator Deployment Settings]
-  *** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
-  *** xref:reference-operator-logging.adoc[Operator Logging]
- ** Couchbase Cluster
-  *** xref:reference-couchbasecluster-services.adoc[CouchbaseCluster Services]
- ** Helm
-  *** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]
- ** Tools
-  *** xref:reference-cbopcfg.adoc[cbopcfg]
-  *** xref:reference-cbopinfo.adoc[cbopinfo]
-* Tutorials
- ** Sync Gateway
-  *** xref:tutorial-sync-gateway.adoc[Connecting Sync-Gateway to a Couchbase Cluster]
-  *** xref:tutorial-sync-gateway-clients.adoc[Exposing Sync-Gateway to Couchbase Lite Clients]
-  *** xref:tutorial-sync-gateway-manage.adoc[Managing Sync Gateway Cluster ]
- ** xref:tutorial-tls.adoc[Creating TLS Certificates]
- ** xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS]
- ** xref:tutorial-public-addressability.adoc[Public Networking with External DNS]
- ** xref:tutorial-velero-backup.adoc[Backup with VMware Velero]
- ** xref:tutorial-prometheus.adoc[Quick Start with Prometheus Monitoring]
- ** xref:tutorial-rbac-auth.adoc[Authenticating with Couchbase and LDAP]
- ** xref:tutorial-aks.adoc[Installing AKS]
- ** xref:tutorial-eks.adoc[Installing EKS]
- ** xref:tutorial-gke.adoc[Installing GKE]
-* xref:release-notes.adoc[Release Notes]
+.Getting Started
+* xref:best-practices.adoc[Guidelines and Best Practices]
+* xref:prerequisite-and-setup.adoc[Prerequisites and System Requirements]
+* xref:prerequisite-cloud.adoc[Public Cloud Prerequisites]
+* xref:install-kubernetes.adoc[Install the Operator on Kubernetes]
+* xref:install-openshift.adoc[Install the Operator on OpenShift]
+
+.Learn
+* Kubernetes Concepts
+ ** xref:concept-kubernetes-networking.adoc[Kubernetes Networking]
+ ** xref:concept-persistent-volumes.adoc[Persistent Volumes]
+ ** xref:concept-kubernetes-upgrade.adoc[Kubernetes Automated Upgrade]
+* Operator Concepts
+ ** xref:concept-operator.adoc[Couchbase Operator Architecture]
+ ** xref:concept-operator-logging.adoc[Couchbase Operator Logging]
+* Couchbase Cluster Concepts
+ ** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
+ ** xref:concept-rbac.adoc[Couchbase Resource RBAC]
+ ** xref:concept-user-rbac.adoc[Couchbase User RBAC]
+ ** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
+ ** xref:concept-mds.adoc[Couchbase Multi-Dimensional Scaling]
+ ** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
+ ** xref:concept-sizing.adoc[Couchbase Sizing]
+ ** xref:concept-vertical-scaling.adoc[Couchbase Cluster Vertical Scaling]
+ ** xref:concept-couchbase-networking.adoc[Couchbase Networking]
+ ** xref:concept-tls.adoc[Couchbase TLS]
+ ** xref:concept-server-groups.adoc[Couchbase Server Groups]
+ ** xref:concept-upgrade.adoc[Couchbase Upgrades]
+
+.Manage
+* Operator
+ ** xref:howto-operator-upgrade.adoc[Upgrade the Operator]
+ ** xref:howto-troubleshooting.adoc[View Operator Logs]
+ ** xref:howto-roll-your-own.adoc[Create Your Own Operator Images]
+* Couchbase Cluster
+ ** Lifecycle
+  *** xref:howto-couchbase-create.adoc[Create a Couchbase Deployment]
+  *** xref:howto-couchbase-update.adoc[Modify a Couchbase Deployment]
+  *** xref:howto-couchbase-upgrade.adoc[Upgrade a Couchbase Deployment]
+  *** xref:howto-couchbase-delete.adoc[Delete a Couchbase Deployment]
+  *** xref:howto-couchbase-scale.adoc[Scale a Couchbase Deployment]
+ ** Configure
+  *** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
+  *** xref:howto-persistent-volume-resize.adoc[Resize Persistent Volumes]
+  *** xref:howto-backup.adoc[Configure Backup & Restore]
+  *** xref:howto-mds.adoc[Configure Multi-Dimensional Scaling]
+  *** xref:howto-xdcr.adoc[Configure XDCR]
+  *** xref:howto-public-networking.adoc[Configure Public Networking]
+  *** xref:howto-nodeport-networking.adoc[Configure Node Port Networking]
+  *** xref:howto-server-groups.adoc[Configure Server Groups]
+  *** xref:howto-tls.adoc[Configure TLS]
+  *** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
+  *** xref:howto-tls-rotation.adoc[Rotate TLS Certificates]
+  *** xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection]
+  *** xref:howto-non-root-install.adoc[Configure Non-Root Installs]
+ ** Connect
+  *** xref:howto-ui.adoc[Access the Couchbase User Interface]
+  *** xref:howto-client-sdks.adoc[Configure Client SDKs]
+* Kubernetes
+ ** xref:howto-storage-class.adoc[Create a Lazy Bound Storage Class]
+* Helm
+ ** xref:helm-setup-guide.adoc[Helm Deployment]
+ ** xref:helm-managing-guide.adoc[Helm Management]
+
+.Reference
+* Resource Types
+ ** xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
+  *** xref:reference-couchbasecluster-status.adoc[CouchbaseCluster Status]
+  *** xref:reference-couchbasecluster-events.adoc[CouchbaseCluster Events]
+ ** xref:reference-couchbasebackup.adoc[CouchbaseBackup Resource]
+  *** xref:reference-couchbasebackuprestore.adoc[CouchbaseBackupRestore Resource]
+  *** xref:reference-couchbasebackup-status.adoc[CouchbaseBackup and CouchbaseBackupRestore Status]
+ ** xref:reference-couchbasebucket.adoc[CouchbaseBucket Resource]
+ ** xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
+ ** xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
+ ** xref:reference-couchbasereplication.adoc[CouchbaseReplication Resource]
+ ** xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
+ ** xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
+ ** xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding Resource]
+* Operator
+ ** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
+ ** xref:reference-operator-configuration.adoc[Operator Deployment Settings]
+ ** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
+ ** xref:reference-operator-logging.adoc[Operator Logging]
+* Couchbase Cluster
+ ** xref:reference-couchbasecluster-services.adoc[CouchbaseCluster Services]
+* Helm
+ ** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]
+* Tools
+ ** xref:reference-cbopcfg.adoc[cbopcfg]
+ ** xref:reference-cbopinfo.adoc[cbopinfo]
+
+.Tutorials
+* Sync Gateway
+ ** xref:tutorial-sync-gateway.adoc[Connecting Sync-Gateway to a Couchbase Cluster]
+ ** xref:tutorial-sync-gateway-clients.adoc[Exposing Sync-Gateway to Couchbase Lite Clients]
+ ** xref:tutorial-sync-gateway-manage.adoc[Managing Sync Gateway Cluster ]
+* xref:tutorial-tls.adoc[Creating TLS Certificates]
+* xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS]
+* xref:tutorial-public-addressability.adoc[Public Networking with External DNS]
+* xref:tutorial-velero-backup.adoc[Backup with VMware Velero]
+* xref:tutorial-prometheus.adoc[Quick Start with Prometheus Monitoring]
+* xref:tutorial-rbac-auth.adoc[Authenticating with Couchbase and LDAP]
+* xref:tutorial-aks.adoc[Installing AKS]
+* xref:tutorial-eks.adoc[Installing EKS]
+* xref:tutorial-gke.adoc[Installing GKE]
+
+.xref:release-notes.adoc[Release Notes]
