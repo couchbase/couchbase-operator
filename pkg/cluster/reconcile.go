@@ -641,7 +641,7 @@ func (c *Cluster) reconcilePodServices() error {
 			}
 
 			if !ok {
-				log.Info("Created pod service", "cluster", c.namespacedName(), "name", member.Name)
+				log.Info("Created pod service", "cluster", c.namespacedName(), "name", member.Name())
 			}
 		}
 	}

@@ -272,6 +272,27 @@ func ConsoleServiceName(clusterName string) string {
 	return clusterName + "-ui"
 }
 
+// getPeerServicePort gets a service port for a service.
+// This is aware of istio and special services that need SRV records.
+func getPeerServicePort(port int) v1.ServicePort {
+	name := fmt.Sprintf("tcp-%d", port)
+
+	switch {
+	case port == dataServicePort:
+		name = couchbaseSRVName
+	case port == dataServicePortTLS:
+		name = couchbaseSRVNameTLS
+	}
+
+	p := v1.ServicePort{
+		Name:     name,
+		Port:     int32(port),
+		Protocol: v1.ProtocolTCP,
+	}
+
+	return p
+}
+
 // getPeerServicePorts returns the set of all possible ports.  When running in a
 // service mesh it will deny access unless they are referenced by at least one
 // service.
@@ -283,18 +304,10 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 	for _, rule := range allTheThings {
 		switch len(rule) {
 		case 1:
-			ports = append(ports, v1.ServicePort{
-				Name:     fmt.Sprintf("tcp-%v", rule[0]),
-				Port:     int32(rule[0]),
-				Protocol: v1.ProtocolTCP,
-			})
+			ports = append(ports, getPeerServicePort(rule[0]))
 		case 2:
 			for i := rule[0]; i <= rule[1]; i++ {
-				ports = append(ports, v1.ServicePort{
-					Name:     fmt.Sprintf("tcp-%v", i),
-					Port:     int32(i),
-					Protocol: v1.ProtocolTCP,
-				})
+				ports = append(ports, getPeerServicePort(i))
 			}
 		default:
 			return nil, fmt.Errorf("%w: illegal port rule: %v", errors.ErrInternalError, rule)
