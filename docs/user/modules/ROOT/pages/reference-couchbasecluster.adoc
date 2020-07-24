@@ -330,7 +330,7 @@ ____
 
 === spec.securityContext
 
-This field is a Kubernetes PodSecurityContext object which is attached to all pods that are created by the Operator. If unspecified, this will default to the `couchbase` user, mount attached volumes as that user, and ensure that the containers are running as non-root. You may override the default behavior if using a custom container image or for testing purposes.
+This field is a Kubernetes https://v1-17.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#podsecuritycontext-v1-core[`PodSecurityContext`^] object which is attached to all pods that are created by the Operator. If unspecified, this will default to the `couchbase` user, mount attached volumes as that user, and ensure that the containers are running as non-root. You may override the default behavior if using a custom container image or for testing purposes.
 
 For additional information, see the xref:howto-non-root-install.adoc[non-root installation how-to].
 
@@ -1193,6 +1193,7 @@ This controls the set of server groups to schedule pods in.  Functionality is id
 
 This field specifies the environment variables (as key-values pairs) that should be set when the pod is started. This section is optional.
 Specified environment variables will be available in Couchbase server containers only.
+The env field is defined by the Kubernetes https://v1-17.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#envvar-v1-core[`EnvVar`^] type.
 
 ____
 _Field rules:_ This field must be a map of key-value pairs where both are strings.
@@ -1202,12 +1203,15 @@ ____
 
 This field specifies a reference to either a `Secret` or `ConfigMap` which is used to create environment variables when the pod is started.
 Specified environment variables will be available in Couchbase server containers only.
+The envFrom filed is defined by the Kubernetes https://v1-17.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#envfromsource-v1-core[`EnvFromSource`^] type.
 
 ____
 _Field rules:_ The value of this field must be an array of Kubernetes `EnvFromSource` types.  This field is optional.
 ____
 
 === spec.servers[].resources
+
+Pod resources are specified using a Kubernetes https://v1-17.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#resourcerequirements-v1-core[`ResourceRequirements`^] type:
 
 [source,yaml]
 ----
@@ -1291,7 +1295,7 @@ ____
 
 == spec.servers[].pod
 
-The `pod` attribute is based on the Kubernetes `PodTemplateSpec` structure and allows all supported configuration parameters to be modified.
+The `pod` attribute is based on the Kubernetes https://v1-17.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#podtemplatespec-v1-core[`PodTemplateSpec`^] structure and allows all supported configuration parameters to be modified.
 The Operator will override the following fields, therefore must not be explicitly set by the user:
 
 * `spec.command`
@@ -1764,6 +1768,7 @@ ____
 This list defines templates of persistent volume claims.
 At runtime, the Operator will create a persistent volume from these templates for each pod referencing them.
 Claims can request volumes from various types of storage systems as identified by the storage class name.
+Volume claim templates are based on the https://v1-17.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.17/#persistentvolumeclaim-v1-core[`PersistentVolumeClaim`^] Kubernetes type.
 
 [source,yaml]
 ----
