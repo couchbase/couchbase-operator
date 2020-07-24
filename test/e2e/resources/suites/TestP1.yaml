@@ -129,3 +129,14 @@ testcases:
 
 # Kubernetes Upgrade Tests
 - TestKubernetesRollingUpgrade
+
+# Security Tests
+- TestRotateAdminPasswordTLS
+- TestRotateAdminPasswordMutualTLS
+- TestRotateAdminPasswordMandatoryMutualTLS
+- TestRotateAdminPasswordAndRestartTLS
+- TestRotateAdminPasswordAndRestartMutualTLS
+- TestRotateAdminPasswordAndRestartMandatoryMutualTLS
+- TestRotateAdminPasswordDuringRestartTLS
+- TestRotateAdminPasswordDuringRestartMutualTLS
+- TestRotateAdminPasswordDuringRestartMandatoryMutualTLS

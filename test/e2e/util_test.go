@@ -317,9 +317,18 @@ var (
 		"TestAutoRecoveryEpehemeralWithNoAutofailover": TestAutoRecoveryEpehemeralWithNoAutofailover,
 
 		// Security tests
-		"TestRotateAdminPassword":              TestRotateAdminPassword,
-		"TestRotateAdminPasswordAndRestart":    TestRotateAdminPasswordAndRestart,
-		"TestRotateAdminPasswordDuringRestart": TestRotateAdminPasswordDuringRestart,
+		"TestRotateAdminPassword":                                TestRotateAdminPassword,
+		"TestRotateAdminPasswordTLS":                             TestRotateAdminPasswordTLS,
+		"TestRotateAdminPasswordMutualTLS":                       TestRotateAdminPasswordMutualTLS,
+		"TestRotateAdminPasswordMandatoryMutualTLS":              TestRotateAdminPasswordMandatoryMutualTLS,
+		"TestRotateAdminPasswordAndRestart":                      TestRotateAdminPasswordAndRestart,
+		"TestRotateAdminPasswordAndRestartTLS":                   TestRotateAdminPasswordAndRestartTLS,
+		"TestRotateAdminPasswordAndRestartMutualTLS":             TestRotateAdminPasswordAndRestartMutualTLS,
+		"TestRotateAdminPasswordAndRestartMandatoryMutualTLS":    TestRotateAdminPasswordAndRestartMandatoryMutualTLS,
+		"TestRotateAdminPasswordDuringRestart":                   TestRotateAdminPasswordDuringRestart,
+		"TestRotateAdminPasswordDuringRestartTLS":                TestRotateAdminPasswordDuringRestartTLS,
+		"TestRotateAdminPasswordDuringRestartMutualTLS":          TestRotateAdminPasswordDuringRestartMutualTLS,
+		"TestRotateAdminPasswordDuringRestartMandatoryMutualTLS": TestRotateAdminPasswordDuringRestartMandatoryMutualTLS,
 
 		// Kubernetes Rolling Upgrade
 		"TestPodReadiness":             TestPodReadiness,
