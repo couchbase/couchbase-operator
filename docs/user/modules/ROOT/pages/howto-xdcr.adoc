@@ -14,6 +14,9 @@ This page documents how to setup XDCR to replicate data to a different Kubernete
 In this scenario the remote cluster is accessible with Kubernetes based DNS.
 This applies to both xref:concept-couchbase-networking.adoc#intra-kubernetes-networking[intra-Kubernetes networking] and xref:concept-couchbase-networking.adoc#inter-kubernetes-networking-with-forwarded-dns[inter-Kubernetes networking with forwarded DNS].
 
+When using inter-Kubernetes networking, the local XDCR client must forward DNS requests to the remote cluster in order to resolve DNS names of the target Couchbase instances.
+Refer to the xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS] tutorial to understand how to configure forwarding DNS servers.
+
 TLS is optional with this configuration, but shown for completeness.
 To configure without TLS, omit any TLS related attributes.
 

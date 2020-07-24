@@ -21,6 +21,10 @@ While we discuss client SDKs, these configurations also apply to Couchbase Conne
 DNS based addressing is the simplest form of connecting a client to a Couchbase cluster.
 All supported DNS based solutions support dynamic, DNS based service discovery that provides fault-tolerance.
 
+When using xref:concept-couchbase-networking.adoc#inter-kubernetes-networking-with-forwarded-dns[inter-Kubernetes networking with forwarded DNS], the local client must forward DNS requests to the remote cluster in order to resolve DNS names of the target Couchbase instances.
+Refer to the xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS] tutorial to understand how to configure forwarding DNS servers.
+The xref:howto-xdcr.adoc#dns-based-addressing[XDCR configuration guide] has some pointers on how to configure client Pod DNS resolvers, and search domains, in order to correctly forward DNS requests to the remote cluster.
+
 All that is required to calculate the connection string is the cluster name and -- optionally -- the namespace it is running in.
 For the following examples we will use `my-cluster` and `my-namespace` respectively.
 
