@@ -52,5 +52,11 @@ func (r *couchbaseBackupResource) Write(b backend.Backend) error {
 }
 
 func (r *couchbaseBackupResource) References() []Reference {
-	return []Reference{}
+	references := []Reference{}
+
+	for _, couchbaseBackup := range r.couchbaseBackups {
+		references = append(references, newReference(r.Kind(), couchbaseBackup.Name))
+	}
+
+	return references
 }

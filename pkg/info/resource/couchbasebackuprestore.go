@@ -14,7 +14,7 @@ import (
 type couchbaseBackupRestoreResource struct {
 	context *context.Context
 
-	couchbaseBackups []couchbasev2.CouchbaseBackup
+	couchbaseBackupRestores []couchbasev2.CouchbaseBackupRestore
 }
 
 func NewCouchbaseBackupRestoreResource(context *context.Context) Resource {
@@ -28,29 +28,35 @@ func (r *couchbaseBackupRestoreResource) Kind() string {
 }
 
 func (r *couchbaseBackupRestoreResource) Fetch() error {
-	couchbaseBackups, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseBackups(r.context.Namespace()).List(metav1.ListOptions{})
+	couchbaseBackupRestores, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(r.context.Namespace()).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
-	r.couchbaseBackups = couchbaseBackups.Items
+	r.couchbaseBackupRestores = couchbaseBackupRestores.Items
 
 	return nil
 }
 
 func (r *couchbaseBackupRestoreResource) Write(b backend.Backend) error {
-	for _, couchbaseBackup := range r.couchbaseBackups {
-		data, err := yaml.Marshal(couchbaseBackup)
+	for _, couchbaseBackupRestore := range r.couchbaseBackupRestores {
+		data, err := yaml.Marshal(couchbaseBackupRestore)
 		if err != nil {
 			return err
 		}
 
-		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), couchbaseBackup.Name, couchbaseBackup.Name+".yaml"), string(data))
+		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.Kind(), couchbaseBackupRestore.Name, couchbaseBackupRestore.Name+".yaml"), string(data))
 	}
 
 	return nil
 }
 
 func (r *couchbaseBackupRestoreResource) References() []Reference {
-	return []Reference{}
+	references := []Reference{}
+
+	for _, couchbaseBackupRestore := range r.couchbaseBackupRestores {
+		references = append(references, newReference(r.Kind(), couchbaseBackupRestore.Name))
+	}
+
+	return references
 }

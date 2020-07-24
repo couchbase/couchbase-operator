@@ -137,28 +137,33 @@ func MustWaitForJobCompletion(t *testing.T, k8s *types.Cluster, couchbase *couch
 	}
 }
 
+// this function waits until expected non-empty values appear in backup status fields.
 func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, timeout time.Duration) (reflect.Value, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	var statusFieldValue reflect.Value
 
-	return statusFieldValue, retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
+	return statusFieldValue, retryutil.RetryOnErr(ctx, retryInterval, func() (err error) {
 		backup, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(backupName, metav1.GetOptions{})
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		statusFieldValue = reflect.ValueOf(backup.Status).FieldByName(statusField)
 		if reflect.DeepEqual(statusFieldValue, reflect.Zero(reflect.TypeOf(statusFieldValue)).Interface()) { // nil zero value
-			return false, fmt.Errorf("empty value panic, not found")
+			return fmt.Errorf("empty value panic, not found")
 		}
 
 		switch statusFieldValue.Type().Kind() {
 		case reflect.String:
-			return len(statusFieldValue.String()) != 0, nil
+			if len(statusFieldValue.String()) == 0 {
+				err = fmt.Errorf("string value is empty")
+			}
 		case reflect.Bool:
-			return statusFieldValue.Bool(), nil
+			if !statusFieldValue.Bool() {
+				err = fmt.Errorf("boolean value is false")
+			}
 		default:
 			if statusFieldValue.String() == "<*v1.Time Value>" {
 				timeValueStr := fmt.Sprintf("%s", statusFieldValue.Interface())
@@ -166,15 +171,20 @@ func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, tim
 
 				newTime, err := time.Parse(goTimeFmt, timeValueStr)
 				if err != nil {
-					return false, err
+					return err
 				}
 
-				return !newTime.IsZero(), nil
+				if newTime.IsZero() {
+					return fmt.Errorf("time value is the 0 value")
+				}
 			}
 
 			// isValid checks that v has a value, returns false if it is the 0 value
-			return statusFieldValue.IsValid(), nil
+			if !statusFieldValue.IsValid() {
+				err = fmt.Errorf("value is not valid or the 0 value")
+			}
 		}
+		return err
 	})
 }
 
