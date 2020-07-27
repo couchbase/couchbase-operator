@@ -969,7 +969,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 
 // tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
 // using TlsCheckForCluster which is safer.
-func tlsCheckForPod(t *testing.T, k8s *types.Cluster, podName string, ctx *TLSContext) error {
+func tlsCheckForPod(k8s *types.Cluster, podName string, ctx *TLSContext) error {
 	// Allocate a free port to use
 	sport, err := getFreePort()
 	if err != nil {
@@ -1012,15 +1012,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, podName string, ctx *TLSCo
 	// Verify the certificate is as the context expects.
 	podCert := conn.ConnectionState().PeerCertificates[0]
 	if !podCert.Equal(ctx.ServerCert) {
-		t.Logf("Unexpected server certificate!\n")
-		t.Logf("Expected:\n")
-		t.Logf("  Issuer: %v\n", ctx.ServerCert.Issuer.String())
-		t.Logf("  Serial: %v\n", ctx.ServerCert.SerialNumber)
-		t.Logf("Actual:\n")
-		t.Logf("  Issuer: %v\n", podCert.Issuer.String())
-		t.Logf("  Serial: %v\n", podCert.SerialNumber)
-
-		return fmt.Errorf("certificate mismatch")
+		return fmt.Errorf("server certificate mismatch, expected %v/%v, got %v/%v", ctx.ServerCert.Issuer.String(), ctx.ServerCert.SerialNumber, podCert.Issuer.String(), podCert.SerialNumber)
 	}
 
 	// Get the cluster CA and verify it matches the context's CA.
@@ -1056,15 +1048,7 @@ func tlsCheckForPod(t *testing.T, k8s *types.Cluster, podName string, ctx *TLSCo
 	}
 
 	if !cacert.Equal(ctx.CA.certificate) {
-		t.Logf("Unexpected CA certificate!\n")
-		t.Logf("Expected:\n")
-		t.Logf("  Issuer: %v\n", ctx.CA.certificate.Issuer.String())
-		t.Logf("  Serial: %v\n", ctx.CA.certificate.SerialNumber)
-		t.Logf("Actual:\n")
-		t.Logf("  Issuer: %v\n", cacert.Issuer.String())
-		t.Logf("  Serial: %v\n", cacert.SerialNumber)
-
-		return fmt.Errorf("certificate mismatch")
+		return fmt.Errorf("ca certificate mismatch, expected %v/%v, got %v/%v", ctx.CA.certificate.Issuer.String(), ctx.CA.certificate.SerialNumber, cacert.Issuer.String(), cacert.SerialNumber)
 	}
 
 	return nil

@@ -792,7 +792,7 @@ func TestUpgradeToTLS(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/Spec/Networking/TLS", tls), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -805,6 +805,60 @@ func TestUpgradeToTLS(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpgradeToMandatoryMutualTLS tests enabling TLS and mTLS at the same time.
+func TestUpgradeToMandatoryMutualTLS(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+	clusterSize := 3
+
+	// Create the cluster without TLS.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+
+	// When ready create the required TLS secrets and patch them into the running
+	// cluster.
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{ClusterName: cluster.Name})
+
+	tls := &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			ServerSecret:   ctx.ClusterSecretName,
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+		ClientCertificatePolicy: &policy,
+		ClientCertificatePaths: []couchbasev2.ClientCertificatePath{
+			{
+				Path: "subject.cn",
+			},
+		},
+	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/Spec/Networking/TLS", tls), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonCreateClientAuth)},
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

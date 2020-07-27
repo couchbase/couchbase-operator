@@ -35,7 +35,7 @@ func TestTlsCreateCluster(t *testing.T) {
 
 	// When the cluster is healthy, check the TLS is correctly configured.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -167,7 +167,7 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
 	secret := e2eutil.MustGetSecret(t, targetKube, ctx.OperatorSecretName)
 	e2eutil.MustDeleteSecret(t, targetKube, ctx.OperatorSecretName)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
@@ -216,7 +216,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
 	secret := e2eutil.MustGetSecret(t, targetKube, ctx.OperatorSecretName)
 	e2eutil.MustDeleteSecret(t, targetKube, ctx.OperatorSecretName)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
@@ -262,7 +262,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
 	secret := e2eutil.MustGetSecret(t, targetKube, ctx.ClusterSecretName)
 	e2eutil.MustDeleteSecret(t, targetKube, ctx.ClusterSecretName)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
@@ -309,7 +309,7 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
 	secret := e2eutil.MustGetSecret(t, targetKube, ctx.ClusterSecretName)
 	e2eutil.MustDeleteSecret(t, targetKube, ctx.ClusterSecretName)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), time.Minute)
@@ -378,7 +378,7 @@ func TestTlsCertificateExpiry(t *testing.T) {
 
 	// When the cluster is ready, check that TLS is valid, after the expiry period
 	// expect the TLS to become invalid.
-	e2eutil.MustCheckClusterTLS(t, targetKube, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), exipiry+30*time.Second)
 
 	// Check the events match what we expect:
@@ -488,15 +488,17 @@ func TestTLSRotate(t *testing.T) {
 	// When the cluster is ready, swap out the old certificate for a new one and verify
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificate(t, ctx, []string{})
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -522,15 +524,17 @@ func TestTLSRotateChain(t *testing.T) {
 	// When the cluster is ready, swap out the old certificate for a new chain and verify
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificateChain(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -556,8 +560,7 @@ func TestTLSRotateCA(t *testing.T) {
 	// When the cluster is ready, swap out the all certificates for new ones and verify
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster), 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -569,8 +572,11 @@ func TestTLSRotateCA(t *testing.T) {
 		eventschema.Optional{
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
 		},
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -598,8 +604,7 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 	// then make sure the operator can scale the cluster (e.g. talk to it with the new CA)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 	e2eutil.MustResizeCluster(t, 0, clusterSize+clusterScaleUpSize, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
@@ -613,8 +618,11 @@ func TestTLSRotateCAAndScale(t *testing.T) {
 		eventschema.Optional{
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
 		},
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
 		e2eutil.ClusterScaleUpSequence(clusterScaleUpSize),
 	}
 
@@ -643,15 +651,18 @@ func TestTLSRotateCAAndKillOperator(t *testing.T) {
 	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster), 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -690,22 +701,19 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victimIndex), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * TLS update event occurred for live nodes
 	// * Down member is recovered
-	// * TLS update exent occurred for recovered node
 	// * Cluster recovered
 	// * Prior to 6.5.0 the cluster rebalanced
+	// * TLS update event occurred for all nodes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 		eventschema.Optional{
 			Validator: eventschema.Sequence{
 				Validators: []eventschema.Validatable{
@@ -714,6 +722,11 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 				},
 			},
 		},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -807,7 +820,7 @@ func testMutualTLSCreateCluster(t *testing.T, policy couchbasev2.ClientCertifica
 	cluster := e2eutil.MustNewMutualTLSClusterBasic(t, kubernetes, clusterSize, ctx, policy)
 
 	// When the cluster is healthy, check the TLS is correctly configured.
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -851,9 +864,13 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 				Path: "subject.cn",
 			},
 		})
+
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonCreateClientAuth), 5*time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -861,7 +878,7 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonCreateClientAuth)},
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
@@ -895,9 +912,12 @@ func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePoli
 	cluster := e2eutil.MustNewMutualTLSClusterBasic(t, kubernetes, clusterSize, ctx, policy)
 
 	// Disable mTLS and ensure the cluster still works.
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/Spec/Networking/TLS/ClientCertificatePolicy"), time.Minute)
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonDeleteClientAuth), 5*time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -905,8 +925,8 @@ func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePoli
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonDeleteClientAuth)},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
 
@@ -940,8 +960,9 @@ func testMutualTLSRotateClient(t *testing.T, policy couchbasev2.ClientCertificat
 
 	// Rotate the certificate and ensure the cluster still works.
 	e2eutil.MustRotateClientCertificate(t, ctx)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -949,7 +970,7 @@ func testMutualTLSRotateClient(t *testing.T, policy couchbasev2.ClientCertificat
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
 
@@ -984,8 +1005,9 @@ func testMutualTLSRotateClientChain(t *testing.T, policy couchbasev2.ClientCerti
 
 	// Rotate the certificate and ensure the cluster still works.
 	e2eutil.MustRotateClientCertificateChain(t, ctx)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -993,7 +1015,7 @@ func testMutualTLSRotateClientChain(t *testing.T, policy couchbasev2.ClientCerti
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
 
@@ -1027,8 +1049,9 @@ func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePol
 
 	// Rotate the certificate and ensure the cluster still works.
 	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, ctx)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateCA), 5*time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1041,8 +1064,12 @@ func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePol
 		eventschema.Optional{
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
 		},
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
 
@@ -1494,15 +1521,17 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 
 	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
 	e2eutil.MustRotateServerCertificate(t, ctx, []string{})
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSUpdatedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
-		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

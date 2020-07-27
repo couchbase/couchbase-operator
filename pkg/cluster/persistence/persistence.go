@@ -33,6 +33,15 @@ const (
 
 	// Password is the last known good admin password.
 	Password PersistentKind = "password"
+
+	// CACertificate is the last known good CA certificate.
+	CACertificate PersistentKind = "ca"
+
+	// ClientCertificate is the last known good client certificate.
+	ClientCertificate PersistentKind = "clientCertificate"
+
+	// ClientKey is the last known good client key.
+	ClientKey PersistentKind = "clientKey"
 )
 
 // PersistentStorage defines a very simple key value store for persisting data,

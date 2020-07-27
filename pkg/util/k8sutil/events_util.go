@@ -373,11 +373,11 @@ func ClusterSettingsEditedEvent(settingName string, cl *couchbasev2.CouchbaseClu
 	return event
 }
 
-func TLSUpdatedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+func TLSUpdatedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonTLSUpdated
-	event.Message = "TLS configuration was updated"
+	event.Message = fmt.Sprintf("TLS certificate was updated for member %s", name)
 
 	return event
 }
@@ -391,11 +391,34 @@ func TLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return event
 }
 
-func ClientTLSUpdatedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+// ClientTLSUpdateReason is a symbolic constant message to aid debugging.
+type ClientTLSUpdateReason string
+
+const (
+	// ClientTLSUpdateReasonCreateCA is for when TLS is dynamically enabled.
+	ClientTLSUpdateReasonCreateCA ClientTLSUpdateReason = "CA certificate was added"
+
+	// ClientTLSUpdateReasonUpdateCA is for when a CA is rotated.
+	ClientTLSUpdateReasonUpdateCA ClientTLSUpdateReason = "CA certificate was updated"
+
+	// ClientTLSUpdateReasonDeleteCA is for when TLS is dynamically disabled.
+	ClientTLSUpdateReasonDeleteCA ClientTLSUpdateReason = "CA certificate was removed"
+
+	// ClientTLSUpdateReasonCreateClientAuth is for when mTLS is dynamically enabled.
+	ClientTLSUpdateReasonCreateClientAuth ClientTLSUpdateReason = "Client certificate was added"
+
+	// ClientTLSUpdateReasonUpdateClientAuth is for when client certificates are rotated.
+	ClientTLSUpdateReasonUpdateClientAuth ClientTLSUpdateReason = "Client certificate was updated"
+
+	// ClientTLSUpdateReasonDeleteClientAuth is for when mTLS is dynamically disabled.
+	ClientTLSUpdateReasonDeleteClientAuth ClientTLSUpdateReason = "Client certificate was removed"
+)
+
+func ClientTLSUpdatedEvent(cl *couchbasev2.CouchbaseCluster, why ClientTLSUpdateReason) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonClientTLSUpdated
-	event.Message = "Client TLS configuration was updated"
+	event.Message = string(why)
 
 	return event
 }

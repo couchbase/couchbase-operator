@@ -257,6 +257,7 @@ var (
 		"TestUpgradeEnv":                                    TestUpgradeEnv,
 		"TestUpgradeToSupportable":                          TestUpgradeToSupportable,
 		"TestUpgradeToTLS":                                  TestUpgradeToTLS,
+		"TestUpgradeToMandatoryMutualTLS":                   TestUpgradeToMandatoryMutualTLS,
 		"TestUpgradePVC":                                    TestUpgradePVC,
 		"TestUpgradeImmediate":                              TestUpgradeImmediate,
 

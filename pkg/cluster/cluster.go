@@ -250,6 +250,24 @@ func (c *Cluster) create() error {
 		return err
 	}
 
+	tls := c.api.GetTLS()
+
+	if tls != nil {
+		if err := c.state.Insert(persistence.CACertificate, string(tls.CACert)); err != nil {
+			return err
+		}
+
+		if tls.ClientAuth != nil {
+			if err := c.state.Insert(persistence.ClientCertificate, string(tls.ClientAuth.Cert)); err != nil {
+				return err
+			}
+
+			if err := c.state.Insert(persistence.ClientKey, string(tls.ClientAuth.Key)); err != nil {
+				return err
+			}
+		}
+	}
+
 	c.cluster.Status.CurrentVersion = version
 
 	if len(c.cluster.Spec.Servers) == 0 {
@@ -355,16 +373,6 @@ func (c *Cluster) runReconcile() {
 		// deterministically become running or succeeded/failed later.
 		log.Info("Pods pending creation, skipping", "cluster", c.namespacedName(), "running", len(running), "pending", len(pending))
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "pending").Inc()
-
-		return
-	}
-
-	// First thing we must do is fix up TLS or we may not be able to talk to the
-	// cluster for anything else.
-	if err := c.reconcileTLS(podsToMemberSet(running)); err != nil {
-		log.Error(err, "Failed to reconcile cluster TLS", "cluster", c.namespacedName(), "error", err)
-		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
-		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 
 		return
 	}
@@ -686,7 +694,59 @@ func (c *Cluster) initCouchbaseClient() error {
 
 	c.api = couchbaseutil.New(c.ctx, c.namespacedName(), c.username, c.password)
 
-	if c.cluster.IsTLSEnabled() {
+	// Our source of truth is always the persistent cache.  If the user has rotated
+	// TLS while the operator is down then we have only the new certificates, while
+	// server is using the the old configuration.  Likewise the user may have removed
+	// the TLS configuration entirely while down, but pods are flagged as TLS enabled
+	// so we need to honour that.
+	var ca []byte
+
+	var clientCert []byte
+
+	var clientKey []byte
+
+	log.V(2).Info("Looking for registry key", "key", persistence.CACertificate)
+
+	if caString, err := c.state.Get(persistence.CACertificate); err != nil {
+		if !goerrors.Is(err, persistence.ErrKeyError) {
+			return err
+		}
+	} else {
+		ca = []byte(caString)
+
+		log.V(2).Info("Found key", "value", caString)
+	}
+
+	log.V(2).Info("Looking for registry key", "key", persistence.ClientCertificate)
+
+	if clientCertString, err := c.state.Get(persistence.ClientCertificate); err != nil {
+		if !goerrors.Is(err, persistence.ErrKeyError) {
+			return err
+		}
+	} else {
+		clientCert = []byte(clientCertString)
+
+		log.V(2).Info("Found key", "value", clientCertString)
+	}
+
+	log.V(2).Info("Looking for registry key", "key", persistence.ClientKey)
+
+	if clientKeyString, err := c.state.Get(persistence.ClientKey); err != nil {
+		if !goerrors.Is(err, persistence.ErrKeyError) {
+			return err
+		}
+	} else {
+		clientKey = []byte(clientKeyString)
+
+		log.V(2).Info("Found key", "value", clientKeyString)
+	}
+
+	// If the persistent cache is not populated, but TLS is enabled, then there
+	// are two assumptions; this is either a new cluster, or it's an existing one
+	// being upgraded to this version.
+	if ca == nil && c.cluster.IsTLSEnabled() {
+		log.V(1).Info("No TLS configuration cached")
+
 		// Grab the operator secret
 		secretName := c.cluster.Spec.Networking.TLS.Static.OperatorSecret
 
@@ -700,18 +760,29 @@ func (c *Cluster) initCouchbaseClient() error {
 			return fmt.Errorf("unable to find %s in operator secret: %w", tlsOperatorSecretCACert, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
-		// Add the TLS context
-		tls := &couchbaseutil.TLSAuth{
-			CACert: secret.Data[tlsOperatorSecretCACert],
-		}
+		ca = secret.Data[tlsOperatorSecretCACert]
 
 		// Optionally enable client authentication
 		if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
-			clientCert, clientKey, err := c.getTLSClientData()
+			clientCertTemp, clientKeyTemp, err := c.getTLSClientData()
 			if err != nil {
 				return err
 			}
 
+			clientCert = clientCertTemp
+			clientKey = clientKeyTemp
+		}
+	}
+
+	// Finally if there is any TLS configuration available at all, then use it
+	// to populate the client.
+	if ca != nil {
+		// Add the TLS context
+		tls := &couchbaseutil.TLSAuth{
+			CACert: ca,
+		}
+
+		if clientCert != nil {
 			tls.ClientAuth = &couchbaseutil.TLSClientAuth{
 				Cert: clientCert,
 				Key:  clientKey,

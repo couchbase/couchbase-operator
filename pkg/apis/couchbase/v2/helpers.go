@@ -365,6 +365,10 @@ func (c *CouchbaseCluster) IsTLSEnabled() bool {
 	return c.Spec.Networking.TLS != nil && c.Spec.Networking.TLS.Static != nil
 }
 
+func (c *CouchbaseCluster) IsMutualTLSEnabled() bool {
+	return c.IsTLSEnabled() && c.Spec.Networking.TLS.ClientCertificatePolicy != nil
+}
+
 // Set ready members from list.
 func (ms *MembersStatus) SetReady(ready []string) {
 	ms.Ready = nil

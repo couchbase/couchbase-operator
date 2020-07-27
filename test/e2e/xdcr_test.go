@@ -219,10 +219,10 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Optional{
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)

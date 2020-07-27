@@ -111,12 +111,26 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
+	// Some features need to treat topology changes as atomic, the key one
+	// being TLS.
+	if err := c.reconcileTLSPreTopologyChange(); err != nil {
+		return err
+	}
+
 	if err := c.reconcileMembers(fsm); err != nil {
 		return err
 	}
 
 	// Update the status and ready list to reflect any new members added.
 	if err := c.updateMembers(); err != nil {
+		return err
+	}
+
+	if err := c.reportUpgradeComplete(); err != nil {
+		return err
+	}
+
+	if err := c.reconcileTLSPostTopologyChange(); err != nil {
 		return err
 	}
 
@@ -145,10 +159,6 @@ func (c *Cluster) reconcile() error {
 	}
 
 	if err := c.reconcileRBAC(); err != nil {
-		return err
-	}
-
-	if err := c.reportUpgradeComplete(); err != nil {
 		return err
 	}
 

@@ -456,6 +456,38 @@ func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *couchbasev2.C
 	}
 }
 
+// MustObserveClusterEvent differs from MustWaitForClusterEvent in that the latter waits for
+// an event after the time the function was called.  The former however expects that the event
+// has or will happen e.g. is less racy.  This requires that the event is unique within a test
+// run as multiple events of the same type will cause this to trigger.
+func MustObserveClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	opts := metav1.ListOptions{
+		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
+	}
+
+	callback := func() error {
+		events, err := k8s.KubeClient.CoreV1().Events(cluster.Namespace).List(opts)
+		if err != nil {
+			return err
+		}
+
+		for i := range events.Items {
+			if EqualEvent(&events.Items[i], event) {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("unable to locate event %v", event)
+	}
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 func WaitForBackupEvent(kubeClient kubernetes.Interface, b *couchbasev2.CouchbaseBackup, event *v1.Event, timeout time.Duration) error {
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.BackupCRDResourceKind},

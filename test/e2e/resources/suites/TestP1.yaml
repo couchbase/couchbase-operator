@@ -105,6 +105,7 @@ testcases:
 - TestUpgradeEnv
 - TestUpgradeToSupportable
 - TestUpgradeToTLS
+- TestUpgradeToMandatoryMutualTLS
 - TestUpgradePVC
 
 # Status Tests

@@ -410,11 +410,15 @@ func GetBucket(bucketType, compressionMode string) metav1.Object {
 
 	switch bucketType {
 	case "couchbase":
-		e2espec.DefaultBucket.Spec.CompressionMode = compressionmode
-		return e2espec.DefaultBucket
+		bucket := e2espec.DefaultBucket.DeepCopy()
+		bucket.Spec.CompressionMode = compressionmode
+
+		return bucket
 	case "ephemeral":
-		e2espec.DefaultEphemeralBucket.Spec.CompressionMode = compressionmode
-		return e2espec.DefaultEphemeralBucket
+		bucket := e2espec.DefaultEphemeralBucket.DeepCopy()
+		bucket.Spec.CompressionMode = compressionmode
+
+		return bucket
 	case "memcached":
 		return e2espec.DefaultMemcachedBucket
 	default:
@@ -1176,13 +1180,13 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 	return result
 }
 
-func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext) error {
+func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext, timeout time.Duration) error {
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
 	if err != nil {
 		return fmt.Errorf("unable to get couchbase pods: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	// TLS handshake with pods
@@ -1190,7 +1194,7 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext) error
 		pod := pods.Items[i]
 
 		callback := func() error {
-			if err := tlsCheckForPod(t, k8s, pod.GetName(), tls); err != nil {
+			if err := tlsCheckForPod(k8s, pod.GetName(), tls); err != nil {
 				return fmt.Errorf("TLS verification failed: %v", err)
 			}
 
@@ -1205,8 +1209,8 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext) error
 	return nil
 }
 
-func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, ctx *TLSContext) {
-	if err := TLSCheckForCluster(t, k8s, ctx); err != nil {
+func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, ctx *TLSContext, timeout time.Duration) {
+	if err := TLSCheckForCluster(t, k8s, ctx, timeout); err != nil {
 		Die(t, err)
 	}
 }

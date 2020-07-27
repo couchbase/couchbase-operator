@@ -90,8 +90,8 @@ func MemberRecoveredEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Ev
 	return k8sutil.MemberRecoveredEvent(name, cl)
 }
 
-func TLSUpdatedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	return k8sutil.TLSUpdatedEvent(cl)
+func TLSUpdatedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	return k8sutil.TLSUpdatedEvent(cl, name)
 }
 
 func TLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
