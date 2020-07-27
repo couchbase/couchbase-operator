@@ -184,3 +184,6 @@ testcases:
 
 # Kubernetes Upgrade Tests
 - TestPodReadiness
+
+# SDK Tests
+- TestSDK

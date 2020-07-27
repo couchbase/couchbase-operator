@@ -16,11 +16,15 @@ func MandatorySANs(clusterName, namespace string) []string {
 		fmt.Sprintf("*.%s.%s", clusterName, namespace),
 		// Used by the Operator for node connections.
 		fmt.Sprintf("*.%s.%s.svc", clusterName, namespace),
+		// Used for GCCCP SRV connectons.
+		fmt.Sprintf("*.%s.%s.svc.cluster.local", clusterName, namespace),
 		// Used by clients for connection in the same namespace.
 		fmt.Sprintf("%s-srv", clusterName),
 		// Used by clients for connection in a different/remote namespace.
 		fmt.Sprintf("%s-srv.%s", clusterName, namespace),
 		fmt.Sprintf("%s-srv.%s.svc", clusterName, namespace),
+		// Used for CCCP SRV connectons.
+		fmt.Sprintf("*.%s-srv.%s.svc.cluster.local", clusterName, namespace),
 		// Used for prometheus side-car and UI access.
 		"localhost",
 	}

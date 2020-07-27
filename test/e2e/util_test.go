@@ -324,6 +324,9 @@ var (
 		// Kubernetes Rolling Upgrade
 		"TestPodReadiness":             TestPodReadiness,
 		"TestKubernetesRollingUpgrade": TestKubernetesRollingUpgrade,
+
+		// SDK testing
+		"TestSDK": TestSDK,
 	}
 )
 

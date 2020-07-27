@@ -771,7 +771,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateMissingDNSSubjectAltName",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", "acme.com")},
 			shouldFail:     true,
-			expectedErrors: []string{`certificate is valid for *.cluster, *.cluster.default, *.cluster.default.svc, cluster-srv, cluster-srv.default, cluster-srv.default.svc, localhost, *.example.com, not host.acme.com`},
+			expectedErrors: []string{`certificate is valid for *.cluster, *.cluster.default, *.cluster.default.svc, *.cluster.default.svc.cluster.local, cluster-srv, cluster-srv.default, cluster-srv.default.svc, *.cluster-srv.default.svc.cluster.local, localhost, *.example.com, not host.acme.com`},
 		},
 		{
 			name:           "TestValidateAutoCompactionMinimum",
