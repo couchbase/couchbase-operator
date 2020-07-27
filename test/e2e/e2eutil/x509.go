@@ -484,7 +484,12 @@ type TLSOpts struct {
 
 // clusterSANs generates a valid set of SANs for a cluster.
 func (ctx *TLSContext) clusterSANs() []string {
-	return util_x509.MandatorySANs(ctx.ClusterName, ctx.Namespace)
+	sans := util_x509.MandatorySANs(ctx.ClusterName, ctx.Namespace)
+
+	// This is a temporary measure!
+	sans = append(sans, fmt.Sprintf("*.%s-srv.%s.svc.cluster.local", ctx.ClusterName, ctx.Namespace))
+
+	return sans
 }
 
 // InitClusterTLS accepts a key type (only RSA works for now) and returns a context
