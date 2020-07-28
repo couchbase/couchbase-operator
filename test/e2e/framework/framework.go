@@ -157,7 +157,7 @@ func readYamlData() (err error) {
 	flag.StringVar(&platform, "platform-vendor", "", "Either aws, gce or azure")
 	flag.StringVar(&params.OperatorImage, "operator-image", "couchbase/couchbase-operator:v1", "Docker image to use for the operator")
 	flag.StringVar(&params.AdmissionControllerImage, "admission-image", "couchbase/couchbase-operator-admission:v1", "Docker image to use for the admission controller")
-	flag.StringVar(&params.SyncGatewayImage, "mobile-image", "ouchbase/sync-gateway:2.7.0-enterprise", "Docker image to use for couchbase mobile")
+	flag.StringVar(&params.SyncGatewayImage, "mobile-image", "couchbase/sync-gateway:2.7.0-enterprise", "Docker image to use for couchbase mobile")
 	flag.StringVar(&params.CouchbaseServerImage, "server-image", "couchbase/server:6.5.0", "Docker image to use for couchbase server")
 	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade", "couchbase/server:6.5.1", "Docker image to use for couchbase server upgrades")
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.0", "Docker image to use for the couchbase exporter")
