@@ -3,10 +3,10 @@ package types
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -55,7 +55,7 @@ func (ab *kubeAbstractionImpl) GetSecret(namespace, name string) (*corev1.Secret
 	// Warning, this returns a valid pointer on error
 	secret, err := ab.client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		if k8sutil.IsKubernetesResourceNotFoundError(err) {
+		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
 
@@ -68,9 +68,9 @@ func (ab *kubeAbstractionImpl) GetSecret(namespace, name string) (*corev1.Secret
 // storageClassExists checks whether the named stoage class exists.
 func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageClass, error) {
 	// Warning, this returns a valid pointer on error
-	storageClass, err := k8sutil.GetStorageClass(ab.client, name)
+	storageClass, err := ab.client.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
 	if err != nil {
-		if k8sutil.IsKubernetesResourceNotFoundError(err) {
+		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
 

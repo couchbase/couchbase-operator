@@ -24,7 +24,6 @@ import (
 	"github.com/ghodss/yaml"
 
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -373,15 +372,6 @@ func ParseKubernetesVersion(versionMajor, versionMinor, gitVersion string) (cons
 	}
 
 	return constants.KubernetesVersion(fmt.Sprintf("%02d%02d", major, minor)), nil
-}
-
-func GetStorageClass(kubeCli kubernetes.Interface, name string) (*storage.StorageClass, error) {
-	class, err := kubeCli.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
-	if err != nil {
-		return nil, errors.NewStackTracedError(err)
-	}
-
-	return class, nil
 }
 
 func GetPodUptime(client *client.Client, name string) int {
