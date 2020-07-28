@@ -1047,7 +1047,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		existingAddresses, err := c.getAlternateAddressesExternal(member)
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
-			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name)
+			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
 			return nil
 		}
 

@@ -523,7 +523,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 		otpNodes := couchbaseutil.OTPNodeList{}
 
 		for _, member := range r.couchbase.DownNodes {
-			log.Info("Failing over node", "cluster", c.namespacedName(), "name", member.Name)
+			log.Info("Failing over node", "cluster", c.namespacedName(), "name", member.Name())
 
 			otpNodes = append(otpNodes, member.GetOTPNode())
 		}
@@ -924,13 +924,13 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 			for _, m := range addNodes {
 				info := &couchbaseutil.ClusterInfo{}
 				if err := couchbaseutil.GetPoolsDefault(info).On(c.api, c.readyMembers()); err != nil {
-					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name)
+					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name())
 					return err
 				}
 
 				node, err := info.GetNode(m.GetHostName())
 				if err != nil {
-					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name)
+					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name())
 					return err
 				}
 
