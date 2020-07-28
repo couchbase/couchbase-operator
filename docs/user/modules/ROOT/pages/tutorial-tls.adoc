@@ -51,6 +51,7 @@ In general, the required set of DNS subject alternative names (SANs) is:
 * `DNS:$\{cluster}-srv`
 * `DNS:$\{cluster}-srv.$\{namespace}`
 * `DNS:$\{cluster}-srv.$\{namespace}.svc`
+* `DNS:*.$\{cluster}-srv.$\{namespace}.svc.cluster.local`
 * `DNS:localhost`
 
 [NOTE]
