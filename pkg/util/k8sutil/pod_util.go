@@ -530,7 +530,7 @@ func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod
 			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 			// add the TLS server flags to the couchbase-exporter binary
-			container.Command = append(container.Command,
+			container.Args = append(container.Args,
 				"--cert", serverSecretMountPath+"/chain.pem",
 				"--key", serverSecretMountPath+"/pkey.key")
 
@@ -554,14 +554,14 @@ func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod
 			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 			// add the TLS server flags to the couchbase-exporter binary
-			container.Command = append(container.Command,
+			container.Args = append(container.Args,
 				"--ca", operatorSecretMountPath+"/ca.crt")
 
 		}
 
 		if cs.Networking.TLS.ClientCertificatePolicy != nil {
 			// add the TLS server flags to the couchbase-exporter binary
-			container.Command = append(container.Command,
+			container.Args = append(container.Args,
 				"--client-cert", operatorSecretMountPath+"/couchbase-operator.crt",
 				"--client-key", operatorSecretMountPath+"/couchbase-operator.key")
 		}
