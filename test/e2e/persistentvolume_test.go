@@ -302,7 +302,7 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	// Server should failover the node and the operator recovers the cluster.
 	e2eutil.MustDeleteCouchbaseOperator(t, targetKube)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victim), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the results are as expected:
@@ -569,7 +569,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range victims {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
+		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, false)
 	}
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 10*time.Minute)

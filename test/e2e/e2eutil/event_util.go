@@ -232,10 +232,14 @@ func ClusterScaleDownSequence(size int) eventschema.Validatable {
 }
 
 // PodDownFailoverRecoverySequence is a common function for generating down/failover/recovery events.
+// Observing the pod go down is optional, and not of any real consequence.  It's entirely possible
+// that the pod is failed while the Operator is inactive for whatever reason.
 func PodDownFailoverRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -355,9 +359,11 @@ func PodDownWithPVCRecoverySequenceWithEphemeral(clusterSize, persistentVictims,
 func PodDownFailedWithPVCRecoverySequence(victims int) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
-			eventschema.Repeat{
-				Times:     victims,
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			eventschema.Optional{
+				Validator: eventschema.Repeat{
+					Times:     victims,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+				},
 			},
 			eventschema.Repeat{
 				Times:     victims,

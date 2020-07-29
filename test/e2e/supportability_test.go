@@ -1415,12 +1415,14 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 
 	// Check the events match what we expect:
 	// * Cluster created
-	// * Pod goes down and fails
+	// * Pod goes down (optionally it may failover while the operator is down) and fails
 	// * Scales from 3 -> 1
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 		e2eutil.ClusterScaleDownSequence(2),
 	}

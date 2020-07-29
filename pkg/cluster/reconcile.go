@@ -242,6 +242,8 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 
 	if err := c.createPod(ctx, newMember, serverSpec); err != nil {
 		c.logFailedMember("Member creation failed", newMember.Name())
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
+
 		return nil, fmt.Errorf("fail to create member's pod (%s): %w", newMember.Name(), err)
 	}
 
@@ -335,7 +337,7 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.
 	// Notify that we have added a new member, this makes it callable.
 	c.clusterAddMember(newMember)
 
-	log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", newMember.Name)
+	log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", newMember.Name())
 	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name(), c.cluster))
 
 	return newMember, nil
@@ -1428,6 +1430,25 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 	return dataPath, indexPath, analyticsPaths
 }
 
+// resourcesEqual compares any-old object and returns true if they are the same.
+func (c *Cluster) resourcesEqual(current, requested interface{}) (bool, string) {
+	// Using diff here does a number of things to be aware of.  First it marshals
+	// the resources to JSON so that "omitempty" removes nil/empty iterables that
+	// reflect.DeepEqual would say aren't the same.  Secondly it also sorts maps
+	// so the output is deterministic.
+	d, err := diff.Diff(current, requested)
+	if err != nil {
+		log.Error(err, "cluster", c.namespacedName())
+		return true, ""
+	}
+
+	if d == "" {
+		return true, ""
+	}
+
+	return false, d
+}
+
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
@@ -1485,16 +1506,10 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			return nil, errors.NewStackTracedError(err)
 		}
 
-		if reflect.DeepEqual(actualSpec, requestedSpec) && pvcsEqual {
-			continue
-		}
+		podsEqual, d := c.resourcesEqual(actualSpec, requestedSpec)
 
-		d, err := diff.Diff(actualSpec, requestedSpec)
-		if err != nil {
-			log.Error(err, "cluster", c.namespacedName())
-		}
-
-		if d == "" {
+		// Nothing to do, carry on...
+		if podsEqual && pvcsEqual {
 			continue
 		}
 

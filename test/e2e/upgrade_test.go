@@ -124,13 +124,38 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.AnyOf{
+				Validators: []eventschema.Validatable{
+					// In the first incarnation, the candidate has already been
+					// ejected, so is removed while the upgraded node is failed
+					// and replaced.
+					eventschema.Sequence{
+						Validators: []eventschema.Validatable{
+							eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+							eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+							eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+							eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+							eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+							eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+						},
+					},
+					// In the second incarnation, the candidate is still active
+					// so the failed node is ejected and the upgrade restarts.
+					eventschema.Sequence{
+						Validators: []eventschema.Validatable{
+							eventschema.Optional{
+								Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+							},
+							eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+							eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+							eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+							upgradeSequence,
+						},
+					},
+				},
+			},
 		},
 	}
 }
