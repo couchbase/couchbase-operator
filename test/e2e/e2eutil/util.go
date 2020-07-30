@@ -347,6 +347,49 @@ func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, namespace st
 	return cluster
 }
 
+// NewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered
+func NewPrometheusTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy, enabled bool) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(size)
+	clusterSpec.GenerateName = "test-couchbase-"
+
+	if enabled {
+		clusterSpec.Spec.Monitoring = &couchbasev2.CouchbaseClusterMonitoringSpec{
+			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
+				Enabled: true,
+			},
+		}
+	}
+
+	if tls != nil {
+		clusterSpec.Name = tls.ClusterName
+		clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+			Static: &couchbasev2.StaticTLS{
+				ServerSecret:   tls.ClusterSecretName,
+				OperatorSecret: tls.OperatorSecretName,
+			},
+		}
+	}
+
+	if policy != nil {
+		clusterSpec.Spec.Networking.TLS.ClientCertificatePolicy = policy
+		clusterSpec.Spec.Networking.TLS.ClientCertificatePaths = []couchbasev2.ClientCertificatePath{
+			{
+				Path: "subject.cn",
+			},
+		}
+	}
+
+	return newClusterFromSpec(t, k8s, namespace, clusterSpec)
+}
+
+func MustNewPrometheusTLSClusterBasic(t *testing.T, k8s *types.Cluster, namespace string, size int, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy, enabled bool) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewPrometheusTLSClusterBasic(t, k8s, namespace, size, tls, policy, enabled)
+	if err != nil {
+		Die(t, err)
+	}
+	return cluster
+}
+
 // NewBucket creates a bucket.
 func NewBucket(k8s *types.Cluster, namespace string, bucket runtime.Object) (runtime.Object, error) {
 	switch t := bucket.(type) {

@@ -221,7 +221,13 @@ tcGroups:
       - NewCluster1
     testcases:
       - name: TestPrometheusMetrics
+      - name: TestPrometheusMetricsTLS
+      - name: TestPrometheusMetricsMutualTLS
+      - name: TestPrometheusMetricsMandatoryMutualTLS
       - name: TestPrometheusMetricsEnable
+      - name: TestPrometheusMetricsEnableTLS
+      - name: TestPrometheusMetricsEnableMutualTLS
+      - name: TestPrometheusMetricsEnableMandatoryMutualTLS
       - name: TestPrometheusMetricsEnableAndPerformOps
       - name: TestPrometheusMetricsBearerTokenAuth
 
