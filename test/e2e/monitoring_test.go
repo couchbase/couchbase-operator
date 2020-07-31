@@ -59,6 +59,11 @@ func testPrometheusMetrics(t *testing.T, targetKube *types.Cluster, tls *e2eutil
 
 	}
 
+	if tls != nil {
+		// When the cluster is healthy, check the TLS is correctly configured.
+		e2eutil.MustCheckClusterTLS(t, targetKube, targetKube.Namespace, tls)
+	}
+
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
@@ -175,9 +180,13 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
+	numOfDocs := 200
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, targetKube.Namespace, clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase.Name = "test-couchbase-" + e2eutil.RandomSuffix()
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, targetKube.Namespace, testCouchbase)
+
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
 
@@ -189,19 +198,22 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 	// Perform Bucket Ops: Inserting 200 documents in the default Bucket
-	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, 200)
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs)
 
 	// Perform ClusterOps: Failover a given node
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 3, true)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
 
-	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, `cbbucketstat_curr_items{bucket="default"}`, `200`, time.Minute)
-	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, `cbnode_failover_complete`, `1`, time.Minute)
+	bucketStat := `cbbucketstat_curr_items{bucket="default",cluster="` + testCouchbase.Name + `"}`
+	nodeStat := `cbnode_failover_complete{cluster="` + testCouchbase.Name + `"}`
+
+	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, bucketStat, `200`, time.Minute)
+	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, nodeStat, `1`, time.Minute)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
