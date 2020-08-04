@@ -344,6 +344,10 @@ var (
 
 		// SDK testing
 		"TestSDK": TestSDK,
+
+		// Hibernation tests
+		"TestHibernateEphemeralImmediate":   TestHibernateEphemeralImmediate,
+		"TestHibernateSupportableImmediate": TestHibernateSupportableImmediate,
 	}
 )
 

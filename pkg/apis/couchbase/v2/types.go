@@ -682,6 +682,23 @@ const (
 	ImmediateUpgrade UpgradeStrategy = "ImmediateUpgrade"
 )
 
+// HibernationStrategy defines how aggressive to be when putting a cluster to sleep.
+// +kubebuilder:validation:Enum=Immediate;DrainWriteQueues
+type HibernationStrategy string
+
+const (
+	// ImmediateHibernation is a forced hibernation and immediate terminates all
+	// pods.  This can be used in cases where clients are keeping the cluster
+	// awake by committing write traffic.
+	ImmediateHibernation HibernationStrategy = "Immediate"
+
+	// DrainWriteQueueHibernation is the safe method of hibernating as cluster.
+	// This assumes you have full control of clients and can stop them.  The
+	// cluster will eventually persist writes to disk and all transactions can
+	// be persisted across the hibernation.
+	DrainWriteQueueHibernation HibernationStrategy = "DrainWriteQueues"
+)
+
 type ClusterSpec struct {
 	// BaseImage is the base couchbase image name that will be used to launch
 	// couchbase clusters. This is useful for private registries, etc.
@@ -690,6 +707,12 @@ type ClusterSpec struct {
 
 	// Paused is to pause the control of the operator for the couchbase cluster.
 	Paused bool `json:"paused,omitempty"`
+
+	// Hibernate is whether to hibernate the cluster.
+	Hibernate bool `json:"hibernate,omitempty"`
+
+	// HibernationStrategy is how aggressive the are when hibernating.
+	HibernationStrategy *HibernationStrategy `json:"hibernationStrategy,omitempty"`
 
 	// This controls how aggressive we are when recovering cluster topology.
 	RecoveryPolicy *RecoveryPolicy `json:"recoveryPolicy,omitempty"`
@@ -1294,7 +1317,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;Upgrading
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;Upgrading;Hibernating
 type ClusterConditionType string
 
 const (
@@ -1303,6 +1326,7 @@ const (
 	ClusterConditionManageConfig ClusterConditionType = "ManageConfig"
 	ClusterConditionScaling      ClusterConditionType = "Scaling"
 	ClusterConditionUpgrading    ClusterConditionType = "Upgrading"
+	ClusterConditionHibernating  ClusterConditionType = "Hibernating"
 )
 
 type ClusterStatus struct {

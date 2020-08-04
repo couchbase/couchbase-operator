@@ -456,6 +456,16 @@ func (cs *ClusterStatus) SetUpgradingCondition(status *UpgradeStatus) {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetEnteringHibernatingCondition(message string) {
+	c := newClusterCondition(ClusterConditionHibernating, v1.ConditionFalse, "Hibernating", message)
+	cs.setClusterCondition(c)
+}
+
+func (cs *ClusterStatus) SetHibernatingCondition(message string) {
+	c := newClusterCondition(ClusterConditionHibernating, v1.ConditionTrue, "Hibernating", message)
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	for index, condition := range cs.Conditions {
 		if condition.Type == t {
@@ -612,4 +622,14 @@ func (c *CouchbaseCluster) GetUpgradeStrategy() UpgradeStrategy {
 	}
 
 	return *c.Spec.UpgradeStrategy
+}
+
+// GetHibernationStrategy return the user provided hibernation strategy or a safe
+// default if none specified.
+func (c *CouchbaseCluster) GetHibernationStrategy() HibernationStrategy {
+	if c.Spec.HibernationStrategy == nil {
+		return DrainWriteQueueHibernation
+	}
+
+	return *c.Spec.HibernationStrategy
 }

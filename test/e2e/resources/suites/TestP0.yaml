@@ -193,3 +193,7 @@ testcases:
 
 # SDK Tests
 - TestSDK
+
+# Hibernation tests
+- TestHibernateEphemeralImmediate
+- TestHibernateSupportableImmediate

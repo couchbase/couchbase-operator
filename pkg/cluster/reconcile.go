@@ -49,6 +49,17 @@ func (c *Cluster) reconcile() error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
 	defer log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
 
+	// Hibernation trumps all.
+	if c.cluster.Spec.Hibernate {
+		if err := c.hibernate(); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)
+
 	if err := c.reconcileCompletedPods(); err != nil {
 		return err
 	}
@@ -2501,6 +2512,31 @@ func (c *Cluster) reconcileAdminPassword() error {
 	c.api.SetPassword(password)
 
 	c.raiseEvent(k8sutil.EventReasonAdminPasswordChangedEvent(c.cluster))
+
+	return nil
+}
+
+// hibernate puts the cluster to sleep, zzzz.
+func (c *Cluster) hibernate() error {
+	pods := c.k8s.Pods.List()
+
+	for _, pod := range pods {
+		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", pod.Name)
+
+		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
+	}
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionAvailable)
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBalanced)
+	c.cluster.Status.SetHibernatingCondition("Cluster hibernating")
+
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+
+	log.Info("Cluster is hibernating", "cluster", c.namespacedName())
 
 	return nil
 }

@@ -288,21 +288,39 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 			return fmt.Errorf("requested size %d, reported size %d", cluster.Spec.TotalSize(), cl.Status.Size)
 		}
 
-		healthyConditions := map[couchbasev2.ClusterConditionType]v1.ConditionStatus{
+		requiredConditions := map[couchbasev2.ClusterConditionType]v1.ConditionStatus{
 			couchbasev2.ClusterConditionAvailable: v1.ConditionTrue,
 			couchbasev2.ClusterConditionBalanced:  v1.ConditionTrue,
+		}
+
+		optionalConditions := map[couchbasev2.ClusterConditionType]v1.ConditionStatus{
 			couchbasev2.ClusterConditionScaling:   v1.ConditionFalse,
 			couchbasev2.ClusterConditionUpgrading: v1.ConditionFalse,
 		}
 
-		for _, cond := range cl.Status.Conditions {
-			healthyCondition, ok := healthyConditions[cond.Type]
+	NextCondition:
+		for typ, status := range requiredConditions {
+			for _, condition := range cl.Status.Conditions {
+				if condition.Type == typ {
+					if condition.Status == status {
+						continue NextCondition
+					}
+
+					return fmt.Errorf("required condition %v is %v", typ, condition.Status)
+				}
+			}
+
+			return fmt.Errorf("required condition %v not defined", typ)
+		}
+
+		for _, condition := range cl.Status.Conditions {
+			status, ok := optionalConditions[condition.Type]
 			if !ok {
 				continue
 			}
 
-			if cond.Status != healthyCondition {
-				return fmt.Errorf("healthy condition %v is %v", cond.Type, cond.Status)
+			if condition.Status != status {
+				return fmt.Errorf("optional condition %v is %v", condition.Type, condition.Status)
 			}
 		}
 
@@ -545,37 +563,34 @@ func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, b *couchbasev2.Cou
 
 // waits until the provided condition type with associated status after specified timestamp.
 func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	after := time.Now()
-	timeoutChan := time.After(timeout)
-	tickChan := time.NewTicker(time.Second * time.Duration(1)).C
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
-	for {
-		select {
-		case <-timeoutChan:
-			return fmt.Errorf("timed out waiting for condition %s with status: %s", conditionType, status)
+	callback := func() error {
+		cluster, err := GetCouchbaseCluster(crClient, cl)
+		if err != nil {
+			return err
+		}
 
-		case <-tickChan:
-			// Get current cluster condition
-			cluster, err := GetCouchbaseCluster(crClient, cl)
-			if err != nil {
-				return err
-			}
-
-			// compare cluster conditions to desired condition
-			for _, condition := range cluster.Status.Conditions {
-				if condition.Type == conditionType && condition.Status == status {
-					conditionTime, err := time.Parse(time.RFC3339, condition.LastUpdateTime)
-					if err != nil {
-						return err
-					}
-
-					if conditionTime.After(after) {
-						return nil
-					}
+		// compare cluster conditions to desired condition
+		for _, condition := range cluster.Status.Conditions {
+			if condition.Type == conditionType {
+				if condition.Status == status {
+					return nil
 				}
+
+				return fmt.Errorf("condition exists, expected status %v, got %v", status, condition.Status)
 			}
 		}
+
+		return fmt.Errorf("condition does not exist")
 	}
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {

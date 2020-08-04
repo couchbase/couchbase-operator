@@ -540,7 +540,6 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 		return nil
 	}
 
-	c.cluster.Status.SetReadyCondition()
 	r.transitionState(ReconcileUnclusteredNodes)
 
 	return nil
