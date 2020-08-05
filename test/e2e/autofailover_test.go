@@ -99,12 +99,12 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	victimCount := len(victims)
 	autoFailoverTimeout := 10 * time.Second
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketThreeReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketThreeReplicas())
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = &metav1.Duration{Duration: autoFailoverTimeout}
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucketThreeReplicas.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucketThreeReplicas().Name}, time.Minute)
 
 	// When ready, kill the victim nodes, waiting long enough for server to perform
 	// auto failover, then expect recovery.  Yes to test this we have to be not running

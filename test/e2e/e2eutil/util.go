@@ -454,19 +454,19 @@ func GetBucket(bucketType, compressionMode string) metav1.Object {
 
 	switch bucketType {
 	case "couchbase":
-		bucket := e2espec.DefaultBucket.DeepCopy()
+		bucket := e2espec.DefaultBucket()
 		bucket.Spec.CompressionMode = compressionmode
 
 		return bucket
 	case "ephemeral":
-		bucket := e2espec.DefaultEphemeralBucket.DeepCopy()
+		bucket := e2espec.DefaultEphemeralBucket()
 		bucket.Spec.CompressionMode = compressionmode
 
 		return bucket
 	case "memcached":
-		return e2espec.DefaultMemcachedBucket
+		return e2espec.DefaultMemcachedBucket()
 	default:
-		return e2espec.DefaultBucket
+		return e2espec.DefaultBucket()
 	}
 }
 

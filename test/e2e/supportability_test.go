@@ -1312,9 +1312,9 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	clusterSize := mdsGroupSize * 2
 	victims := []int{2, 3}
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, mdsGroupSize)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, cbCluster, []string{e2espec.DefaultBucketTwoReplicas.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, cbCluster, []string{e2espec.DefaultBucketTwoReplicas().Name}, time.Minute)
 
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{}
@@ -1385,7 +1385,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	victim := 3
 
 	// Create the cluster (3 stateful nodes, 3 stateless nodes)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, mdsGroupSize)
 
 	// When ready, ensure the persistent volumes are allocated as expected.
@@ -1505,7 +1505,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	scaledService := 1
 
 	// Create the cluster (3 stateful and 3 stateless)
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	cbCluster := e2espec.NewSupportableCluster(mdsGroupSize)
 	cbCluster.Spec.Logging.LogRetentionCount = 3
 	cbCluster = e2eutil.MustNewClusterFromSpec(t, targetKube, cbCluster)
@@ -1695,7 +1695,7 @@ func TestLogRedactionVerify(t *testing.T) {
 	defer cleanup()
 
 	// Create Couchbase cluster
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	e2eutil.MustNewClusterBasic(t, targetKube, constants.Size3)
 
 	// Collect logs
@@ -1726,7 +1726,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	clusterSize := constants.Size3
 	pvcName := "couchbase"
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 
 	cbCluster := e2espec.NewBasicCluster(clusterSize)
 	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
@@ -1807,7 +1807,7 @@ func TestLogCollectListJson(t *testing.T) {
 	defer cleanup()
 
 	// Create Couchbase cluster
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, constants.Size3)
 
 	// Collect logs

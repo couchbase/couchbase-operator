@@ -185,7 +185,7 @@ func TestSyncGatewayRBAC(t *testing.T) {
 			Roles: []couchbasev2.Role{
 				{
 					Name:   couchbasev2.RoleApplicationAccess,
-					Bucket: e2espec.DefaultBucket.Name,
+					Bucket: e2espec.DefaultBucket().Name,
 				},
 			},
 		},

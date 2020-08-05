@@ -17,7 +17,7 @@ import (
 
 // bucket settings.
 var (
-	DefaultBucket = &couchbasev2.CouchbaseBucket{
+	defaultBucket = &couchbasev2.CouchbaseBucket{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: e2e_constants.DefaultBucket,
 		},
@@ -32,7 +32,7 @@ var (
 		},
 	}
 
-	DefaultBucketTwoReplicas = &couchbasev2.CouchbaseBucket{
+	defaultBucketTwoReplicas = &couchbasev2.CouchbaseBucket{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: e2e_constants.DefaultBucket,
 		},
@@ -47,7 +47,7 @@ var (
 		},
 	}
 
-	DefaultBucketThreeReplicas = &couchbasev2.CouchbaseBucket{
+	defaultBucketThreeReplicas = &couchbasev2.CouchbaseBucket{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: e2e_constants.DefaultBucket,
 		},
@@ -62,7 +62,7 @@ var (
 		},
 	}
 
-	DefaultEphemeralBucket = &couchbasev2.CouchbaseEphemeralBucket{
+	defaultEphemeralBucket = &couchbasev2.CouchbaseEphemeralBucket{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: e2e_constants.DefaultBucket,
 		},
@@ -71,7 +71,7 @@ var (
 		},
 	}
 
-	DefaultMemcachedBucket = &couchbasev2.CouchbaseMemcachedBucket{
+	defaultMemcachedBucket = &couchbasev2.CouchbaseMemcachedBucket{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: e2e_constants.DefaultBucket,
 		},
@@ -80,6 +80,26 @@ var (
 		},
 	}
 )
+
+func DefaultBucket() *couchbasev2.CouchbaseBucket {
+	return defaultBucket.DeepCopy()
+}
+
+func DefaultBucketTwoReplicas() *couchbasev2.CouchbaseBucket {
+	return defaultBucketTwoReplicas.DeepCopy()
+}
+
+func DefaultBucketThreeReplicas() *couchbasev2.CouchbaseBucket {
+	return defaultBucketThreeReplicas.DeepCopy()
+}
+
+func DefaultEphemeralBucket() *couchbasev2.CouchbaseEphemeralBucket {
+	return defaultEphemeralBucket.DeepCopy()
+}
+
+func DefaultMemcachedBucket() *couchbasev2.CouchbaseMemcachedBucket {
+	return defaultMemcachedBucket.DeepCopy()
+}
 
 func GetReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseReplication {
 	replication := &couchbasev2.CouchbaseReplication{

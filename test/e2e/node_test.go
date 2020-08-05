@@ -557,9 +557,9 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucketTwoReplicas.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucketTwoReplicas().Name}, time.Minute)
 
 	// Kill a single pod and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
@@ -602,12 +602,12 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	victimIndex2 := 1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucketTwoReplicas.Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucketTwoReplicas().Name}, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket.Name)()
+	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket().Name)()
 
 	// Kill a two pods and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)

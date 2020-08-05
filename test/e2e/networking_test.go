@@ -428,7 +428,7 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket())
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true

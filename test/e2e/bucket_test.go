@@ -331,8 +331,8 @@ func TestBucketSelection(t *testing.T) {
 	}
 
 	// Create a default bucket and a labelled bucket.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket)
-	bucket := e2espec.DefaultBucket.DeepCopy()
+	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket())
+	bucket := e2espec.DefaultBucket()
 	bucket.Name = bucketName
 	bucket.Labels = labels
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -345,7 +345,7 @@ func TestBucketSelection(t *testing.T) {
 	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
 
 	// Ensure the unlabelled bucket doesn't get created.
-	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{e2espec.DefaultBucket.Name}, time.Minute); err == nil {
+	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{e2espec.DefaultBucket().Name}, time.Minute); err == nil {
 		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
 	}
 
@@ -429,7 +429,7 @@ func TestBucketWithExplicitName(t *testing.T) {
 	bucketName := "Sweet_Carabine_Bah_Bah_Bah"
 
 	// Create the cluster.
-	bucketTyped := e2espec.DefaultBucket.DeepCopy()
+	bucketTyped := e2espec.DefaultBucket()
 	bucketTyped.Spec.Name = bucketName
 	e2eutil.MustNewBucket(t, kubernetes, bucketTyped)
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
@@ -466,7 +466,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	}
 
 	// Create the first cluster with a couchbase bucket.
-	bucketTyped1 := e2espec.DefaultBucket.DeepCopy()
+	bucketTyped1 := e2espec.DefaultBucket()
 	bucketTyped1.Name = ""
 	bucketTyped1.GenerateName = "bucket-"
 	bucketTyped1.Labels = labels1
@@ -483,7 +483,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster1, []string{bucketName}, time.Minute)
 
 	// Create the second cluster with an ephemeral bucket.
-	bucketTyped2 := e2espec.DefaultEphemeralBucket.DeepCopy()
+	bucketTyped2 := e2espec.DefaultEphemeralBucket()
 	bucketTyped2.Name = ""
 	bucketTyped2.GenerateName = "bucket-"
 	bucketTyped2.Labels = labels2
