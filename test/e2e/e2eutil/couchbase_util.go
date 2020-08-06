@@ -1165,8 +1165,18 @@ func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled
 		}
 
 		for _, node := range clusterInfo.Nodes {
-			if node.NodeEncryption != enabled || string(securityInfo.ClusterEncryptionLevel) != encryptionLevel {
-				return fmt.Errorf("node %s encryption %v, expected %v", node.HostName, node.NodeEncryption, enabled)
+			if !enabled && node.NodeEncryption {
+				return fmt.Errorf("node to node encryption unexpectedly enabled")
+			}
+
+			if enabled {
+				if !node.NodeEncryption {
+					return fmt.Errorf("node to node encryption unexpectedly disabled")
+				}
+
+				if encryptionLevel != string(securityInfo.ClusterEncryptionLevel) {
+					return fmt.Errorf("node to node encryption unexpectedly in the wrong mode, expected %v, got %v", encryptionLevel, securityInfo.ClusterEncryptionLevel)
+				}
 			}
 		}
 

@@ -157,7 +157,13 @@ testcases:
 
 # Monitoring Tests
 - TestPrometheusMetrics
+- TestPrometheusMetricsTLS
+- TestPrometheusMetricsMutualTLS
+- TestPrometheusMetricsMandatoryMutualTLS
 - TestPrometheusMetricsEnable
+- TestPrometheusMetricsEnableTLS
+- TestPrometheusMetricsEnableMutualTLS
+- TestPrometheusMetricsEnableMandatoryMutualTLS
 - TestPrometheusMetricsEnableAndPerformOps
 - TestPrometheusMetricsBearerTokenAuth
 - TestPrometheusMetricsEnableAndUpgrade

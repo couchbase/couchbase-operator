@@ -276,11 +276,17 @@ var (
 		"TestStatusRecovery": TestStatusRecovery,
 
 		// Monitoring tests
-		"TestPrometheusMetrics":                    TestPrometheusMetrics,
-		"TestPrometheusMetricsEnable":              TestPrometheusMetricsEnable,
-		"TestPrometheusMetricsEnableAndPerformOps": TestPrometheusMetricsEnableAndPerformOps,
-		"TestPrometheusMetricsBearerTokenAuth":     TestPrometheusMetricsBearerTokenAuth,
-		"TestPrometheusMetricsEnableAndUpgrade":    TestPrometheusMetricsEnableAndUpgrade,
+		"TestPrometheusMetrics":                         TestPrometheusMetrics,
+		"TestPrometheusMetricsTLS":                      TestPrometheusMetricsTLS,
+		"TestPrometheusMetricsMutualTLS":                TestPrometheusMetricsMutualTLS,
+		"TestPrometheusMetricsMandatoryMutualTLS":       TestPrometheusMetricsMandatoryMutualTLS,
+		"TestPrometheusMetricsEnable":                   TestPrometheusMetricsEnable,
+		"TestPrometheusMetricsEnableTLS":                TestPrometheusMetricsEnableTLS,
+		"TestPrometheusMetricsEnableMutualTLS":          TestPrometheusMetricsEnableMutualTLS,
+		"TestPrometheusMetricsEnableMandatoryMutualTLS": TestPrometheusMetricsEnableMandatoryMutualTLS,
+		"TestPrometheusMetricsEnableAndPerformOps":      TestPrometheusMetricsEnableAndPerformOps,
+		"TestPrometheusMetricsBearerTokenAuth":          TestPrometheusMetricsBearerTokenAuth,
+		"TestPrometheusMetricsEnableAndUpgrade":         TestPrometheusMetricsEnableAndUpgrade,
 
 		// Backup tests
 		"TestFullIncremental":              TestFullIncremental,
