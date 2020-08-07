@@ -23,10 +23,6 @@ const (
 
 // DumpAdmissionYAML dumps all admission controller resources to standard out.
 func DumpAdmissionYAML(conf *Config) error {
-	if conf.NoAdmission {
-		return nil
-	}
-
 	// Generate TLS configuration for the dynamic admission controller.
 	validFrom := time.Now()
 	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)
@@ -52,11 +48,11 @@ func DumpAdmissionYAML(conf *Config) error {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-cluster-role", GetAdmissionClusterRole()); err != nil {
+	if err := DumpYAML(conf, "admission-cluster-role", GetAdmissionRole(conf.Namespace, conf.Cluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-cluster-role-binding", GetAdmissionClusterRoleBinding(conf.Namespace)); err != nil {
+	if err := DumpYAML(conf, "admission-cluster-role-binding", GetAdmissionRoleBinding(conf.Namespace, conf.Cluster)); err != nil {
 		return err
 	}
 
@@ -72,55 +68,66 @@ func DumpAdmissionYAML(conf *Config) error {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-mutating-webhook", GetAdmissionMutatingWebhook(conf.Namespace, ca.Certificate)); err != nil {
+	if err := DumpYAML(conf, "admission-mutating-webhook", GetAdmissionMutatingWebhook(conf.Namespace, ca.Certificate, conf.Cluster, conf.NamespaceSelector.LabelSelector)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-validating-webhook", GetAdmissionValidatingWebhook(conf.Namespace, ca.Certificate)); err != nil {
+	if err := DumpYAML(conf, "admission-validating-webhook", GetAdmissionValidatingWebhook(conf.Namespace, ca.Certificate, conf.Cluster, conf.NamespaceSelector.LabelSelector)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// GetAdmissionClusterRole return the cluster role to run with.
-func GetAdmissionClusterRole() *rbacv1.ClusterRole {
-	return &rbacv1.ClusterRole{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "rbac.authorization.k8s.io/v1",
-			Kind:       "ClusterRole",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: AdmissionResourceName,
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{
-					couchbasev2.GroupName,
-				},
-				Resources: []string{
-					couchbasev2.ClusterCRDResourcePlural,
-					couchbasev2.BucketCRDResourcePlural,
-					couchbasev2.EphemeralBucketCRDResourcePlural,
-					couchbasev2.MemcachedBucketCRDResourcePlural,
-					couchbasev2.ReplicationCRDResourcePlural,
-					couchbasev2.UserCRDResourcePlural,
-					couchbasev2.GroupCRDResourcePlural,
-					couchbasev2.RoleBindingCRDResourcePlural,
-					couchbasev2.BackupCRDResourcePlural,
-					couchbasev2.BackupRestoreCRDResourcePlural,
-				},
-				Verbs: []string{
-					"list",
-				},
+// GetAdmissionRole return the (cluster) role to run with.
+func GetAdmissionRole(namespace string, cluster bool) metav1.Object {
+	metadata := metav1.ObjectMeta{
+		Name:      AdmissionResourceName,
+		Namespace: namespace,
+	}
+
+	rules := []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{
+				couchbasev2.GroupName,
 			},
+			Resources: []string{
+				couchbasev2.ClusterCRDResourcePlural,
+				couchbasev2.BucketCRDResourcePlural,
+				couchbasev2.EphemeralBucketCRDResourcePlural,
+				couchbasev2.MemcachedBucketCRDResourcePlural,
+				couchbasev2.ReplicationCRDResourcePlural,
+				couchbasev2.UserCRDResourcePlural,
+				couchbasev2.GroupCRDResourcePlural,
+				couchbasev2.RoleBindingCRDResourcePlural,
+				couchbasev2.BackupCRDResourcePlural,
+				couchbasev2.BackupRestoreCRDResourcePlural,
+			},
+			Verbs: []string{
+				"list",
+			},
+		},
+		{
+			APIGroups: []string{
+				"",
+			},
+			Resources: []string{
+				"secrets",
+			},
+			Verbs: []string{
+				"get",
+			},
+		},
+	}
+
+	if cluster {
+		clusterRules := []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{
 					"",
 				},
 				Resources: []string{
 					"namespaces",
-					"secrets",
 				},
 				Verbs: []string{
 					"get",
@@ -137,7 +144,27 @@ func GetAdmissionClusterRole() *rbacv1.ClusterRole {
 					"get",
 				},
 			},
+		}
+
+		rules = append(rules, clusterRules...)
+
+		return &rbacv1.ClusterRole{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "rbac.authorization.k8s.io/v1",
+				Kind:       "ClusterRole",
+			},
+			ObjectMeta: metadata,
+			Rules:      rules,
+		}
+	}
+
+	return &rbacv1.Role{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "rbac.authorization.k8s.io/v1",
+			Kind:       "Role",
 		},
+		ObjectMeta: metadata,
+		Rules:      rules,
 	}
 }
 
@@ -155,26 +182,47 @@ func GetAdmissionServiceAccount(namespace string) *corev1.ServiceAccount {
 	}
 }
 
-// GetAdmissionClusterRoleBinding generates the cluster role binding linking the role to the service account.
-func GetAdmissionClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding {
-	return &rbacv1.ClusterRoleBinding{
+// GetAdmissionRoleBinding generates the (cluster) role binding linking the role to the service account.
+func GetAdmissionRoleBinding(namespace string, cluster bool) metav1.Object {
+	metadata := metav1.ObjectMeta{
+		Name:      AdmissionResourceName,
+		Namespace: namespace,
+	}
+
+	subjects := []rbacv1.Subject{
+		{
+			Kind:      "ServiceAccount",
+			Name:      AdmissionResourceName,
+			Namespace: namespace,
+		},
+	}
+
+	if cluster {
+		return &rbacv1.ClusterRoleBinding{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "rbac.authorization.k8s.io/v1",
+				Kind:       "ClusterRoleBinding",
+			},
+			ObjectMeta: metadata,
+			Subjects:   subjects,
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     AdmissionResourceName,
+			},
+		}
+	}
+
+	return &rbacv1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1",
-			Kind:       "ClusterRoleBinding",
+			Kind:       "RoleBinding",
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: AdmissionResourceName,
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      AdmissionResourceName,
-				Namespace: namespace,
-			},
-		},
+		ObjectMeta: metadata,
+		Subjects:   subjects,
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
+			Kind:     "Role",
 			Name:     AdmissionResourceName,
 		},
 	}
@@ -315,16 +363,26 @@ func GetAdmissionService(namespace string) *corev1.Service {
 }
 
 // GetAdmissionMutatingWebhook creates a mutating webhook for the admission controller.
-func GetAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistrationv1beta1.MutatingWebhookConfiguration {
+func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, namespaceSelector *metav1.LabelSelector) *admissionregistrationv1beta1.MutatingWebhookConfiguration {
+	// You need a webhook per controller when running in namespaced mode.
+	// IF we resued the same one each time, we'd need to aggregate the webhooks
+	// and act as a client doing read/modify/write.  This is complex so instead
+	// just name them deterministically (for deletion) and make many resources.
+	name := AdmissionResourceName
+
+	if !cluster {
+		name = AdmissionResourceName + "-" + namespace
+	}
+
 	admissionControllerMutatePath := "/couchbaseclusters/mutate"
 
-	return &admissionregistrationv1beta1.MutatingWebhookConfiguration{
+	webhook := &admissionregistrationv1beta1.MutatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "admissionregistration.k8s.io/v1beta1",
 			Kind:       "MutatingWebhookConfiguration",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: AdmissionResourceName,
+			Name: name,
 		},
 		Webhooks: []admissionregistrationv1beta1.MutatingWebhook{
 			{
@@ -369,19 +427,37 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistra
 			},
 		},
 	}
+
+	// When in namespace scoped mode, the selector will be populated and must be
+	// added to the webhook.
+	if !cluster {
+		webhook.Webhooks[0].NamespaceSelector = namespaceSelector
+	}
+
+	return webhook
 }
 
 // GetAdmissionValidatingWebhook creates a validating webhook for the admission controller.
-func GetAdmissionValidatingWebhook(namespace string, ca []byte) *admissionregistrationv1beta1.ValidatingWebhookConfiguration {
+func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, namespaceSelector *metav1.LabelSelector) *admissionregistrationv1beta1.ValidatingWebhookConfiguration {
+	// You need a webhook per controller when running in namespaced mode.
+	// IF we resued the same one each time, we'd need to aggregate the webhooks
+	// and act as a client doing read/modify/write.  This is complex so instead
+	// just name them deterministically (for deletion) and make many resources.
+	name := AdmissionResourceName
+
+	if !cluster {
+		name = AdmissionResourceName + "-" + namespace
+	}
+
 	admissionControllerValidatePath := "/couchbaseclusters/validate"
 
-	return &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
+	webhook := &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "admissionregistration.k8s.io/v1beta1",
 			Kind:       "ValidatingWebhookConfiguration",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: AdmissionResourceName,
+			Name: name,
 		},
 		Webhooks: []admissionregistrationv1beta1.ValidatingWebhook{
 			{
@@ -426,4 +502,12 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte) *admissionregist
 			},
 		},
 	}
+
+	// When in namespace scoped mode, the selector will be populated and must be
+	// added to the webhook.
+	if !cluster {
+		webhook.Webhooks[0].NamespaceSelector = namespaceSelector
+	}
+
+	return webhook
 }

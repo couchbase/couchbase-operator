@@ -13,10 +13,6 @@ const (
 
 // DumpAdmissionYAML dumps all operator resources to standard out.
 func DumpBackupYAML(conf *Config) error {
-	if !conf.Backup {
-		return nil
-	}
-
 	if err := DumpYAML(conf, "backup-service-account", GetBackupServiceAccount(conf.Namespace)); err != nil {
 		return err
 	}

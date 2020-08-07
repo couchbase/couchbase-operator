@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -47,12 +48,24 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		return err
 	}
 
-	clusterRole := config.GetAdmissionClusterRole()
+	roleObject := config.GetAdmissionRole(admissionNamespace, true)
+
+	clusterRole, ok := roleObject.(*rbacv1.ClusterRole)
+	if !ok {
+		return fmt.Errorf("DAC role is not cluster scoped")
+	}
+
 	if _, err := client.RbacV1().ClusterRoles().Create(clusterRole); err != nil {
 		return err
 	}
 
-	clusterRoleBinding := config.GetAdmissionClusterRoleBinding(admissionNamespace)
+	roleBindingObject := config.GetAdmissionRoleBinding(admissionNamespace, true)
+
+	clusterRoleBinding, ok := roleBindingObject.(*rbacv1.ClusterRoleBinding)
+	if !ok {
+		return fmt.Errorf("DAC role binding is not cluster scoped")
+	}
+
 	if _, err := client.RbacV1().ClusterRoleBindings().Create(clusterRoleBinding); err != nil {
 		return err
 	}
@@ -81,12 +94,12 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		return err
 	}
 
-	mutatingWebhook := config.GetAdmissionMutatingWebhook(admissionNamespace, ca.Certificate)
+	mutatingWebhook := config.GetAdmissionMutatingWebhook(admissionNamespace, ca.Certificate, true, nil)
 	if _, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(mutatingWebhook); err != nil {
 		return err
 	}
 
-	validatingWebhook := config.GetAdmissionValidatingWebhook(admissionNamespace, ca.Certificate)
+	validatingWebhook := config.GetAdmissionValidatingWebhook(admissionNamespace, ca.Certificate, true, nil)
 	if _, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(validatingWebhook); err != nil {
 		return err
 	}

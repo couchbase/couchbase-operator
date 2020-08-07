@@ -41,7 +41,8 @@ The following command will install both the DAC and the Operator into the `defau
 
 [source,console]
 ----
-$ bin/cbopcfg | kubectl create -f -
+$ bin/cbopcfg admission -cluster | kubectl create -f -
+$ bin/cbopcfg operator | kubectl create -f -
 ----
 
 === Custom Installation
@@ -50,33 +51,17 @@ Alternatively, you may wish to install just the DAC in the `camelot` namespace:
 
 [source,console]
 ----
-$ bin/cbopcfg --no-operator --namespace camelot | kubectl create -f -
+$ bin/cbopcfg admission --namespace camelot --cluster | kubectl create -f -
 ----
 
 And then install just the Operator into the `asgard` namespace:
 
 [source,console]
 ----
-$ bin/cbopcfg --no-admission --namespace asgard | kubectl create -f -
+$ bin/cbopcfg operator --namespace asgard | kubectl create -f -
 ----
 
 For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
-
-.Versions prior to 2.0.2
-[NOTE]
-====
-If you're installing version 2.0.0 or 2.0.1 of the Autonomous Operator, you'll need to explicitly provide the namespace in `kubectl` (otherwise, the deployment will be created in the default namespace).
-
-[source,console]
-----
-$ bin/cbopcfg --no-operator --namespace camelot | kubectl create -n camelot -f -
-----
-
-[source,console]
-----
-$ bin/cbopcfg --no-admission --namespace asgard | kubectl create -n asgard -f -
-----
-====
 
 == Check the Status of the Operator
 You can use the following command to check on the status of the deployments:

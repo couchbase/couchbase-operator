@@ -20,16 +20,19 @@ func main() {
 		os.Exit(0)
 	}
 
-	configurators := []func(*config.Config) error{
-		config.DumpAdmissionYAML,
-		config.DumpOperatorYAML,
-		config.DumpBackupYAML,
+	var configurator func(*config.Config) error
+
+	switch c.Component {
+	case config.ComponentOperator:
+		configurator = config.DumpOperatorYAML
+	case config.ComponentAdmission:
+		configurator = config.DumpAdmissionYAML
+	case config.ComponentBackup:
+		configurator = config.DumpBackupYAML
 	}
 
-	for _, configurator := range configurators {
-		if err := configurator(c); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+	if err := configurator(c); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

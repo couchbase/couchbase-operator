@@ -31,6 +31,18 @@ Another benefit is that Couchbase specific configuration errors are synchronousl
 For these reasons the DAC is a required component of the Operator and must be installed.
 The DAC is a standalone service and processes Couchbase cluster resources for the entire Kubernetes cluster, therefore only a single instance is required.
 
+.Dynamic Admission Controller Security Models
+[TIP]
+====
+The recommended deployment model is to run a single instance of the DAC per Kubernetes cluster.
+This allows it access to resources at a cluster scope, such as namespace and storage classes.
+Granted access to cluster scoped resources allows a richer and more reliable experience: the DAC can alert when resources referred to in the custom resource are not present.
+A DAC may be run per-namespace to alleviate security concerns, however its functionality is reduced.
+
+In the following <<dynamic-admission-controller-architecture,DAC architecture section>>, when running the DAC namespaced, `ClusterRoles` and `ClusterRoleBindings` are replaced with `Roles` and `RoleBindings` respectively.
+====
+
+.Dynamic Admission Controller Security Rules
 [TIP]
 ====
 By default the DAC will check that Kubernetes secrets and storage classes exist and have not been misconfigured.
@@ -103,6 +115,16 @@ The Operator is designed to run in the same namespace as the Couchbase clusters 
 The Operator therefore needs one instance per namespace where Couchbase clusters are required to be provisioned.
 The Operator is a statically compiled binary, so does not require an operating system image.
 The Operator does not require any elevated privileges and may be run as any user.
+
+.Operator Security Models
+[TIP]
+====
+The recommended deployment method for the Operator is a single instance per-namespace.
+This allows staged upgrades of the Operator, only affecting a subset of Couchbase clusters at any one time.
+The Operator may be deployed at the cluster scope, where a single Operator controls all Couchbase clusters on the platform.
+
+In the following <<operator-resources,operator resources section>>, `Roles` and `RoleBindings` are replaced with `ClusterRoles` and `ClusterRoleBindings` respectively.
+====
 
 === Operator Resources
 

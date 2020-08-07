@@ -288,7 +288,7 @@ func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreat
 		pullSecret = k8s.PullSecrets[0]
 	}
 
-	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, podCreateTimeout, "--zap-level", "debug")
+	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, false, podCreateTimeout, "--zap-level", "debug")
 
 	return deployment
 }

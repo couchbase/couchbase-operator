@@ -20,23 +20,19 @@ const (
 
 // DumpOperatorYAML dumps all operator resources to standard out.
 func DumpOperatorYAML(conf *Config) error {
-	if conf.NoOperator {
-		return nil
-	}
-
 	if err := DumpYAML(conf, "operator-service-account", GetOperatorServiceAccount(conf.Namespace)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-role", GetOperatorRole(conf.Namespace)); err != nil {
+	if err := DumpYAML(conf, "operator-role", GetOperatorRole(conf.Namespace, conf.Cluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-role-binding", GetOperatorRoleBinding(conf.Namespace)); err != nil {
+	if err := DumpYAML(conf, "operator-role-binding", GetOperatorRoleBinding(conf.Namespace, conf.Cluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.Namespace, conf.OperatorImage, conf.ImagePullSecret, 10*time.Minute)); err != nil {
+	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.Namespace, conf.OperatorImage, conf.ImagePullSecret, conf.Cluster, 10*time.Minute)); err != nil {
 		return err
 	}
 
@@ -48,160 +44,175 @@ func DumpOperatorYAML(conf *Config) error {
 }
 
 // GetOperatorRole generates the cluster role to run with.
-func GetOperatorRole(namespace string) *rbacv1.Role {
+func GetOperatorRole(namespace string, cluster bool) metav1.Object {
+	metadata := metav1.ObjectMeta{
+		Name:      OperatorResourceName,
+		Namespace: namespace,
+	}
+
+	rules := []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{
+				"batch",
+			},
+			Resources: []string{
+				"jobs",
+				"cronjobs",
+			},
+			Verbs: []string{
+				"list",
+				"watch",
+				"create",
+				"update",
+				"delete",
+			},
+		},
+		{
+			APIGroups: []string{
+				couchbasev2.GroupName,
+			},
+			Resources: []string{
+				couchbasev2.ClusterCRDResourcePlural,
+				// Not supported by GKE 1.13 for some odd reason
+				//couchbasev2.ClusterCRDResourcePlural + "/status",
+			},
+			Verbs: []string{
+				"get",    // used by the operator to update status.
+				"list",   // used by the operator-sdk to discover couchbase clusters.
+				"watch",  // used by the operator-sdk to monitor changes.
+				"update", // used by the operator to update status.
+			},
+		},
+		{
+			APIGroups: []string{
+				couchbasev2.GroupName,
+			},
+			Resources: []string{
+				couchbasev2.BucketCRDResourcePlural,
+				couchbasev2.EphemeralBucketCRDResourcePlural,
+				couchbasev2.MemcachedBucketCRDResourcePlural,
+				couchbasev2.ReplicationCRDResourcePlural,
+				couchbasev2.UserCRDResourcePlural,
+				couchbasev2.GroupCRDResourcePlural,
+				couchbasev2.RoleBindingCRDResourcePlural,
+				couchbasev2.BackupCRDResourcePlural,
+			},
+			Verbs: []string{
+				"list",  // used by the operator for caching
+				"watch", // used by the operator for caching
+			},
+		},
+		{
+			APIGroups: []string{
+				couchbasev2.GroupName,
+			},
+			Resources: []string{
+				couchbasev2.BackupRestoreCRDResourcePlural,
+			},
+			Verbs: []string{
+				"list",   // used by the operator for caching
+				"watch",  // used by the operator for caching
+				"delete", // used by the operator to cleanup restores
+			},
+		},
+		{
+			APIGroups: []string{
+				"",
+			},
+			Resources: []string{
+				"configmaps",
+			},
+			Verbs: []string{
+				"get",    // used by the controller-runtime for leadership.
+				"create", // used by the controller-runtime for leadership.
+				"update", // used by the controller-runtime for leadership.
+				"delete", // used to migrate persistent state to 2.1
+			},
+		},
+		{
+			APIGroups: []string{
+				"",
+			},
+			Resources: []string{
+				"pods",
+				"pods/status",
+				"services",
+				"persistentvolumeclaims",
+			},
+			Verbs: []string{
+				"get",    // used by the operator to get specific resources.
+				"list",   // used by the operator for caching
+				"watch",  // used by the operator for caching
+				"create", // used by the operator to create resources.
+				"update", // used by the operator to modify resources.
+				"delete", // used by the operator to delete resources.
+				"patch",  // used by the operator to modify resources.
+			},
+		},
+		{
+			APIGroups: []string{
+				"",
+			},
+			Resources: []string{
+				"events",
+			},
+			Verbs: []string{
+				"list",   // used by the operator for supportability.
+				"create", // used by the operator to create events.
+				"update", // used by the operator to update events.
+			},
+		},
+		{
+			APIGroups: []string{
+				"",
+			},
+			Resources: []string{
+				"secrets",
+			},
+			Verbs: []string{
+				"get",    // used by the operator to get cluster and TLS secrets.
+				"create", // used by the operator for persistent state
+				"update", // used by the operator for persistent state
+				"list",   // used by the operator for caching
+				"watch",  // used by the operator for caching
+			},
+		},
+		// Require read/write of pod disruption budgets.
+		{
+			APIGroups: []string{
+				"policy",
+			},
+			Resources: []string{
+				"poddisruptionbudgets",
+			},
+			Verbs: []string{
+				"get",    // used by the operator to get pod disruption budgets.
+				"create", // used by the operator to create pod disruption budgets.
+				"delete", // used by the operator to delete pod disruption budgets.
+				"list",   // used by the operator for caching
+				"watch",  // used by the operator for caching
+			},
+		},
+	}
+
+	if cluster {
+		return &rbacv1.ClusterRole{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "rbac.authorization.k8s.io/v1",
+				Kind:       "ClusterRole",
+			},
+			ObjectMeta: metadata,
+			Rules:      rules,
+		}
+	}
+
 	return &rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1",
 			Kind:       "Role",
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      OperatorResourceName,
-			Namespace: namespace,
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{
-					"batch",
-				},
-				Resources: []string{
-					"jobs",
-					"cronjobs",
-				},
-				Verbs: []string{
-					"list",
-					"watch",
-					"create",
-					"update",
-					"delete",
-				},
-			},
-			{
-				APIGroups: []string{
-					couchbasev2.GroupName,
-				},
-				Resources: []string{
-					couchbasev2.ClusterCRDResourcePlural,
-					// Not supported by GKE 1.13 for some odd reason
-					//couchbasev2.ClusterCRDResourcePlural + "/status",
-				},
-				Verbs: []string{
-					"get",    // used by the operator to update status.
-					"list",   // used by the operator-sdk to discover couchbase clusters.
-					"watch",  // used by the operator-sdk to monitor changes.
-					"update", // used by the operator to update status.
-				},
-			},
-			{
-				APIGroups: []string{
-					couchbasev2.GroupName,
-				},
-				Resources: []string{
-					couchbasev2.BucketCRDResourcePlural,
-					couchbasev2.EphemeralBucketCRDResourcePlural,
-					couchbasev2.MemcachedBucketCRDResourcePlural,
-					couchbasev2.ReplicationCRDResourcePlural,
-					couchbasev2.UserCRDResourcePlural,
-					couchbasev2.GroupCRDResourcePlural,
-					couchbasev2.RoleBindingCRDResourcePlural,
-					couchbasev2.BackupCRDResourcePlural,
-				},
-				Verbs: []string{
-					"list",  // used by the operator for caching
-					"watch", // used by the operator for caching
-				},
-			},
-			{
-				APIGroups: []string{
-					couchbasev2.GroupName,
-				},
-				Resources: []string{
-					couchbasev2.BackupRestoreCRDResourcePlural,
-				},
-				Verbs: []string{
-					"list",   // used by the operator for caching
-					"watch",  // used by the operator for caching
-					"delete", // used by the operator to cleanup restores
-				},
-			},
-			{
-				APIGroups: []string{
-					"",
-				},
-				Resources: []string{
-					"configmaps",
-				},
-				Verbs: []string{
-					"get",    // used by the controller-runtime for leadership.
-					"create", // used by the controller-runtime for leadership.
-					"update", // used by the controller-runtime for leadership.
-					"delete", // used to migrate persistent state to 2.1
-				},
-			},
-			{
-				APIGroups: []string{
-					"",
-				},
-				Resources: []string{
-					"pods",
-					"pods/status",
-					"services",
-					"persistentvolumeclaims",
-				},
-				Verbs: []string{
-					"get",    // used by the operator to get specific resources.
-					"list",   // used by the operator for caching
-					"watch",  // used by the operator for caching
-					"create", // used by the operator to create resources.
-					"update", // used by the operator to modify resources.
-					"delete", // used by the operator to delete resources.
-					"patch",  // used by the operator to modify resources.
-				},
-			},
-			{
-				APIGroups: []string{
-					"",
-				},
-				Resources: []string{
-					"events",
-				},
-				Verbs: []string{
-					"list",   // used by the operator for supportability.
-					"create", // used by the operator to create events.
-					"update", // used by the operator to update events.
-				},
-			},
-			{
-				APIGroups: []string{
-					"",
-				},
-				Resources: []string{
-					"secrets",
-				},
-				Verbs: []string{
-					"get",    // used by the operator to get cluster and TLS secrets.
-					"create", // used by the operator for persistent state
-					"update", // used by the operator for persistent state
-					"list",   // used by the operator for caching
-					"watch",  // used by the operator for caching
-				},
-			},
-			// Require read/write of pod disruption budgets.
-			{
-				APIGroups: []string{
-					"policy",
-				},
-				Resources: []string{
-					"poddisruptionbudgets",
-				},
-				Verbs: []string{
-					"get",    // used by the operator to get pod disruption budgets.
-					"create", // used by the operator to create pod disruption budgets.
-					"delete", // used by the operator to delete pod disruption budgets.
-					"list",   // used by the operator for caching
-					"watch",  // used by the operator for caching
-				},
-			},
-		},
+		ObjectMeta: metadata,
+		Rules:      rules,
 	}
 }
 
@@ -220,23 +231,43 @@ func GetOperatorServiceAccount(namespace string) *corev1.ServiceAccount {
 }
 
 // GetOperatorRoleBinding generates the cluster role binding linking the role to the service account.
-func GetOperatorRoleBinding(namespace string) *rbacv1.RoleBinding {
+func GetOperatorRoleBinding(namespace string, cluster bool) metav1.Object {
+	metadata := metav1.ObjectMeta{
+		Name:      OperatorResourceName,
+		Namespace: namespace,
+	}
+
+	subjects := []rbacv1.Subject{
+		{
+			Kind:      "ServiceAccount",
+			Name:      OperatorResourceName,
+			Namespace: namespace,
+		},
+	}
+
+	if cluster {
+		return &rbacv1.ClusterRoleBinding{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "rbac.authorization.k8s.io/v1",
+				Kind:       "ClusterRoleBinding",
+			},
+			ObjectMeta: metadata,
+			Subjects:   subjects,
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     OperatorResourceName,
+			},
+		}
+	}
+
 	return &rbacv1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "rbac.authorization.k8s.io/v1",
 			Kind:       "RoleBinding",
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      OperatorResourceName,
-			Namespace: namespace,
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      OperatorResourceName,
-				Namespace: namespace,
-			},
-		},
+		ObjectMeta: metadata,
+		Subjects:   subjects,
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",
@@ -246,8 +277,24 @@ func GetOperatorRoleBinding(namespace string) *rbacv1.RoleBinding {
 }
 
 // GetOperatorDeployment returns the canonical way to run the operator.
-func GetOperatorDeployment(namespace, image, imagePullSecret string, podCreateTimeout fmt.Stringer, extraArgs ...string) *appsv1.Deployment {
+func GetOperatorDeployment(namespace, image, imagePullSecret string, cluster bool, podCreateTimeout fmt.Stringer, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
+
+	// IF we are running namespace scoped, then use the namespace metadata
+	// to set the environment variable and imit the Operator.  If not then
+	// set it to "" and let it have free reign over the whole cluster.
+	namespaceEnv := corev1.EnvVar{
+		Name: "WATCH_NAMESPACE",
+	}
+
+	if !cluster {
+		namespaceEnv.ValueFrom = &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "metadata.namespace",
+			},
+		}
+	}
+
 	deployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -283,14 +330,7 @@ func GetOperatorDeployment(namespace, image, imagePullSecret string, podCreateTi
 								"--pod-create-timeout=" + podCreateTimeout.String(),
 							}, extraArgs...),
 							Env: []corev1.EnvVar{
-								{
-									Name: "WATCH_NAMESPACE",
-									ValueFrom: &corev1.EnvVarSource{
-										FieldRef: &corev1.ObjectFieldSelector{
-											FieldPath: "metadata.namespace",
-										},
-									},
-								},
+								namespaceEnv,
 								{
 									Name: "POD_NAME",
 									ValueFrom: &corev1.EnvVarSource{

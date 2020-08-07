@@ -11,6 +11,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -140,7 +141,13 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 		return err
 	}
 
-	roleSpec := config.GetOperatorRole(k8s.Namespace)
+	roleObject := config.GetOperatorRole(k8s.Namespace, false)
+
+	roleSpec, ok := roleObject.(*rbacv1.Role)
+	if !ok {
+		return fmt.Errorf("operator role is not namspace scoped")
+	}
+
 	roleSpec.Name = roleName
 
 	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(roleSpec)
@@ -187,7 +194,12 @@ func recreateRoleBindings(k8s *types.Cluster) error {
 		return err
 	}
 
-	clusterRoleBindingSpec := config.GetOperatorRoleBinding(k8s.Namespace)
+	roleBindingObject := config.GetOperatorRoleBinding(k8s.Namespace, false)
+
+	clusterRoleBindingSpec, ok := roleBindingObject.(*rbacv1.RoleBinding)
+	if !ok {
+		return fmt.Errorf("operator role binding is not namespace scoped")
+	}
 
 	_, err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Create(clusterRoleBindingSpec)
 

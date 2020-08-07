@@ -82,28 +82,51 @@ $ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 
 === Options
 
+component::
+This positional parameter must be specified and maust be one of `operator`, `admission` or `backup`.
+This specifies the specific component to install.
+
 --namespace <string>::
-If specified this will override the default namespace `default`.
+If specified, this will override the default namespace `default`.
 Specifying the namespace is especially important when installing the dynamic admission controller as this flag affects TLS certificate generation.
 
 --operator-image <string>::
-If specified this will override the default operator image `couchbase/operator:{operator-version}`.
+If specified, this will override the default operator image `couchbase/operator:{operator-version}`.
 
 --dynamic-admission-controller-image <string>::
-If specified this will override the default admission controller image `couchbase/admission-controller:{operator-version}`.
+If specified, this will override the default admission controller image `couchbase/admission-controller:{operator-version}`.
 
 --image-pull-secret <string>::
-If specified this will add the image pull secret name to all deployments.
+If specified, this will add the image pull secret name to all deployments.
 This is required when pulling images from private container repositories such as the Red Hat container registry.
 
---no-operator::
-If specified the command will not emit operator configuration.
-
---no-admission::
-If specified the command will not emit admission controller configuration.
-
 --file::
-If specified individual YAML files are created rather than all output going to the console.
+If specified, individual YAML files are created rather than all output going to the console.
+
+--cluster::
+If specified, this will configure the DAC/Operator to run at the cluster scope (as opposed to namespace scope) meaning only one instance is required per Kubernetes cluster.
+
+--namespace-selector <string>::
+If specified, this configures admission webhooks to select a DAC instance in a specific namespace.
+This flag is required when `--cluster` is not set and `--no-admission` is not set e.g. you are creating a namespaced DAC.
++
+The format of the flag is a set of key/value pairs e.g. `key=value` or `key1=value1,key2=value2`, where both keys and values are strings.
+These key/value pairs define a label selector that defines what namespace the DAC is being installed into.
+Kubernetes does _not_ allow the selection of named namespaces, only labeled namespaces.
++
+For example, if you wanted to install the DAC into namespace `foo` first you would label it:
++
+[source,console]
+----
+$ kubectl label namespace foo namespace-name=foo
+----
++
+Then finally reference it in your DAC configuration:
++
+[source,console]
+----
+$ cbopcfg admission -namespace-selector namespace-name=foo
+----
 
 == Examples
 
@@ -111,19 +134,19 @@ To create configuration to run the operator in the `default` namespace.
 
 [source,console]
 ----
-$ cbopcfg | kubectl create -f -
+$ cbopcfg operator | kubectl create -f -
 ----
 
 To create a configuration file:
 
 [source,console]
 ----
-$ cbopcfg > operator.yaml
+$ cbopcfg operator > operator.yaml
 ----
 
 To create configuration to run on Red Hat Openshift:
 
 [source,console]
 ----
-$ cbopcfg --namespace myproject --image-pull-secret my-redhat-docker-credentials > operator.yaml
+$ cbopcfg operator --namespace myproject --image-pull-secret my-redhat-docker-credentials > operator.yaml
 ----
