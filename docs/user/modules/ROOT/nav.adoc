@@ -108,4 +108,5 @@
 * xref:tutorial-eks.adoc[Installing EKS]
 * xref:tutorial-gke.adoc[Installing GKE]
 
-.xref:release-notes.adoc[Release Notes]
+.Release Notes
+* xref:release-notes.adoc[Release Notes]

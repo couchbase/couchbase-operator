@@ -248,7 +248,7 @@ helm install my-release -f tls_values.yaml couchbase/couchbase-operator
 
 === Deploying Multiple Chart Instances (Releases)
 
-The example installation commands on this page assume the default namespace is used (they commands don't specify the `-n` option).
+The example installation commands on this page assume the default namespace is used (these commands don't specify the `-n` option).
 This is important to note because the Couchbase Helm Chart deploys both the Autonomous Operator and the Admission Controller by default, _and these components should not be deployed more than once in the same namespace_.
 If you install the default Couchbase Helm Chart multiple times in the same namespace, then you'll end up with multiple instances of the Autonomous Operator and the Admission Controller, which will cause errors in your deployments.
 
