@@ -2,6 +2,8 @@ package e2eutil
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -20,14 +22,15 @@ import (
 )
 
 // check that prometheus sidecar container is exporting the correct metrics
-// on all pods in the operator
-func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) (string, error) {
+// on all pods in the operator.
+func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) (string, error) {
 	// storing the prometheus metrics
 	responseDataStr := ""
 
 	listOptions := &metav1.ListOptions{
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
+
 	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(*listOptions)
 	if err != nil {
 		return responseDataStr, err
@@ -50,16 +53,49 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 		if err := pf.ForwardPorts(); err != nil {
 			return responseDataStr, err
 		}
+
 		defer pf.Close()
 
-		uri := fmt.Sprintf("http://localhost:%s%s", port, "/metrics")
-		resp, err := http.Get(uri)
-		if err != nil {
-			return "", fmt.Errorf("unable to collect %s for pod %s", uri, pod.Name)
+		scheme := "http"
+		client := &http.Client{}
+
+		if ctx != nil {
+			scheme = "https"
+
+			clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
+			if err != nil {
+				return "", err
+			}
+
+			tlsConfig := &tls.Config{
+				RootCAs: x509.NewCertPool(),
+				Certificates: []tls.Certificate{
+					clientCert,
+				},
+			}
+
+			tlsConfig.RootCAs.AddCert(ctx.CA.certificate)
+
+			client.Transport = &http.Transport{
+				TLSClientConfig: tlsConfig,
+			}
 		}
-		defer resp.Body.Close()
+
+		uri := fmt.Sprintf("%s://localhost:%s%s", scheme, port, "/metrics")
 
 		// Buffer up the responses
+		req, err := http.NewRequest(http.MethodGet, uri, nil)
+		if err != nil {
+			return "", err
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", err
+		}
+
+		defer resp.Body.Close()
+
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return "", fmt.Errorf("unable to read response %s for pod %s", uri, pod.Name)
@@ -82,20 +118,20 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 	return responseDataStr, nil
 }
 
-func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) string {
-	responseDataStr, err := CheckPrometheus(k8s, couchbase)
+func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) string {
+	responseDataStr, err := CheckPrometheus(k8s, couchbase, ctx)
 	if err != nil {
 		Die(t, err)
 	}
 	return responseDataStr
 }
 
-func ExposeMetric(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, metric, value string, timeout time.Duration) error {
+func ExposeMetric(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, tls *TLSContext, metric, value string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		responseDataStr, _ := CheckPrometheus(k8s, couchbase)
+		responseDataStr, _ := CheckPrometheus(k8s, couchbase, tls)
 		if !strings.Contains(responseDataStr, fmt.Sprintf("%s %s", metric, value)) {
 			return fmt.Errorf("response data does not contain expected value of the metric")
 		}
@@ -104,13 +140,13 @@ func ExposeMetric(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, m
 }
 
 // MustExposeMetric checks if the value of metric obtained from response data matches with the given value of that metric.
-func MustExposeMetric(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, metric, value string, timeout time.Duration) {
-	if err := ExposeMetric(k8s, couchbase, metric, value, timeout); err != nil {
+func MustExposeMetric(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, metric, value string, timeout time.Duration) {
+	if err := ExposeMetric(k8s, couchbase, ctx, metric, value, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, token []byte) (string, error) {
+func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, token []byte) (string, error) {
 	// storing the prometheus metrics
 	responseDataStr := ""
 
@@ -142,21 +178,46 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 		defer pf.Close()
 
 		// Create a Bearer string by appending string access token
-		bearer := fmt.Sprintf("Bearer %s", token)
-		// Create a new request using http
-		uri := fmt.Sprintf("http://localhost:%s%s", port, "/metrics")
-		req, _ := http.NewRequest("GET", uri, nil)
-		// add authorization header to the req
-		req.Header.Add("Authorization", bearer)
-
-		// Send request using http Client
+		scheme := "http"
 		client := &http.Client{}
-		resp, err := client.Do(req)
 
-		if err != nil {
-			fmt.Printf("unable to collect %s for pod %s\n", uri, pod.Name)
-			continue
+		if ctx != nil {
+			scheme = "https"
+
+			clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
+			if err != nil {
+				return "", err
+			}
+
+			tlsConfig := &tls.Config{
+				RootCAs: x509.NewCertPool(),
+				Certificates: []tls.Certificate{
+					clientCert,
+				},
+			}
+
+			tlsConfig.RootCAs.AddCert(ctx.CA.certificate)
+
+			client.Transport = &http.Transport{
+				TLSClientConfig: tlsConfig,
+			}
 		}
+
+		uri := fmt.Sprintf("%s://localhost:%s%s", scheme, port, "/metrics")
+
+		// Buffer up the responses
+		req, err := http.NewRequest(http.MethodGet, uri, nil)
+		if err != nil {
+			return "", err
+		}
+
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", err
+		}
+
 		defer resp.Body.Close()
 
 		// Buffer up the responses
@@ -183,8 +244,8 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 	return responseDataStr, nil
 }
 
-func MustCheckPrometheusWithAuthSecret(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, token []byte) string {
-	responseDataStr, err := CheckPrometheusWithAuthSecret(k8s, couchbase, token)
+func MustCheckPrometheusWithAuthSecret(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, token []byte) string {
+	responseDataStr, err := CheckPrometheusWithAuthSecret(k8s, couchbase, ctx, token)
 	if err != nil {
 		Die(t, err)
 	}

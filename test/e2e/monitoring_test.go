@@ -45,7 +45,7 @@ func testPrometheusMetrics(t *testing.T, targetKube *types.Cluster, tls *e2eutil
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewPrometheusTLSClusterBasic(t, targetKube, targetKube.Namespace, clusterSize, nil, nil, enabled)
+	testCouchbase := e2eutil.MustNewPrometheusTLSClusterBasic(t, targetKube, targetKube.Namespace, clusterSize, tls, policy, enabled)
 
 	e2eutil.MustNewBucket(t, targetKube, targetKube.Namespace, e2espec.DefaultBucket)
 	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucket.Name}, time.Minute)
@@ -67,11 +67,14 @@ func testPrometheusMetrics(t *testing.T, targetKube *types.Cluster, tls *e2eutil
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
-	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, tls)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Optional{
 			Validator: eventschema.Sequence{
@@ -208,13 +211,13 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
-	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase)
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
 
 	bucketStat := `cbbucketstat_curr_items{bucket="default",cluster="` + testCouchbase.Name + `"}`
 	nodeStat := `cbnode_failover_complete{cluster="` + testCouchbase.Name + `"}`
 
-	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, bucketStat, `200`, time.Minute)
-	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, nodeStat, `1`, time.Minute)
+	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, nil, bucketStat, `200`, time.Minute)
+	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, nil, nodeStat, `1`, time.Minute)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
@@ -279,7 +282,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	}
 
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
-	e2eutil.MustCheckPrometheusWithAuthSecret(t, targetKube, testCouchbase, token)
+	e2eutil.MustCheckPrometheusWithAuthSecret(t, targetKube, testCouchbase, nil, token)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
