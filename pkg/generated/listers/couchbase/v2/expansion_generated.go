@@ -7,6 +7,14 @@
 
 package v2
 
+// CouchbaseAutoscalerListerExpansion allows custom methods to be added to
+// CouchbaseAutoscalerLister.
+type CouchbaseAutoscalerListerExpansion interface{}
+
+// CouchbaseAutoscalerNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseAutoscalerNamespaceLister.
+type CouchbaseAutoscalerNamespaceListerExpansion interface{}
+
 // CouchbaseBackupListerExpansion allows custom methods to be added to
 // CouchbaseBackupLister.
 type CouchbaseBackupListerExpansion interface{}

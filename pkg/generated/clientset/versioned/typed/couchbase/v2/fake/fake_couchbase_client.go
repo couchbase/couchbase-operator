@@ -17,6 +17,10 @@ type FakeCouchbaseV2 struct {
 	*testing.Fake
 }
 
+func (c *FakeCouchbaseV2) CouchbaseAutoscalers(namespace string) v2.CouchbaseAutoscalerInterface {
+	return &FakeCouchbaseAutoscalers{c, namespace}
+}
+
 func (c *FakeCouchbaseV2) CouchbaseBackups(namespace string) v2.CouchbaseBackupInterface {
 	return &FakeCouchbaseBackups{c, namespace}
 }

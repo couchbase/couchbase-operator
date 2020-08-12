@@ -629,6 +629,43 @@ type CouchbaseRoleBindingList struct {
 	Items           []CouchbaseRoleBinding `json:"items"`
 }
 
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:shortName=cba
+// +kubebuilder:printcolumn:name="size",type="string",JSONPath=".spec.size"
+// +kubebuilder:printcolumn:name="servers",type="string",JSONPath=".spec.servers"
+// +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.size,statuspath=.status.size,selectorpath=.status.labelSelector
+type CouchbaseAutoscaler struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseAutoscalerSpec   `json:"spec"`
+	Status            CouchbaseAutoscalerStatus `json:"status,omitempty"`
+}
+
+type CouchbaseAutoscalerSpec struct {
+	// +kubebuilder:validation:MinLength=1
+	Servers string `json:"servers"`
+	// +kubebuilder:validation:Minimum=0
+	Size int `json:"size"`
+}
+
+type CouchbaseAutoscalerStatus struct {
+	LabelSelector string `json:"labelSelector"`
+	// +kubebuilder:validation:Minimum=0
+	Size int `json:"size"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// CouchbaseAutoscalerList is a list of Couchbase Autoscaler resources.
+type CouchbaseAutoscalerList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseAutoscaler `json:"items"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // CouchbaseClusterList is a list of Couchbase clusters.
 type CouchbaseClusterList struct {
@@ -1260,6 +1297,9 @@ type ServerConfig struct {
 	// EnvFrom allows the setting of environment variables from things like
 	// Secrets and ConfigMaps.
 	EnvFrom []v1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// Enabled defines whether Autoscale feature is enabled for this config
+	AutoscaleEnabled bool `json:"autoscaleEnabled,omitempty"`
 }
 
 type VolumeMountName string

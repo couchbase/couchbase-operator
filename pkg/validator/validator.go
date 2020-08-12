@@ -92,6 +92,10 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 		if t2, ok := updated.(*couchbasev2.CouchbaseBackup); ok {
 			return validationv2.CheckImmutableFieldsBackup(t, t2)
 		}
+	case *couchbasev2.CouchbaseAutoscaler:
+		if t2, ok := updated.(*couchbasev2.CouchbaseAutoscaler); ok {
+			return validationv2.CheckImmutableFieldsAutoscaler(t, t2)
+		}
 	}
 
 	return nil

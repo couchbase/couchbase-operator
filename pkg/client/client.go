@@ -73,6 +73,9 @@ type Client struct {
 	// CouchbaseBackupRestores is a read only cache of couchbase restores (namespace scoped)
 	CouchbaseBackupRestores *CouchbaseBackupRestoreCache
 
+	// CouchbaseAutoscalers is a read only cache of couchbase autoscaler resources (namespace scoped)
+	CouchbaseAutoscalers *CouchbaseAutoscalerCache
+
 	// Jobs is a read only cache of jobs
 	Jobs *JobCache
 
@@ -181,6 +184,11 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
+	c.CouchbaseAutoscalers, err = newCouchbaseAutoscalerCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -202,4 +210,5 @@ func (c *Client) Shutdown() {
 	c.CronJobs.stop()
 	c.CouchbaseBackups.stop()
 	c.CouchbaseBackupRestores.stop()
+	c.CouchbaseAutoscalers.stop()
 }

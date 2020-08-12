@@ -31,6 +31,8 @@ func prune(in interface{}) (interface{}, error) {
 
 				if pruned != nil {
 					out[k] = pruned
+				} else if k == "status" {
+					out[k] = make(map[string]interface{})
 				}
 			}
 		}

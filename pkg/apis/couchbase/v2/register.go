@@ -26,6 +26,8 @@ const (
 	GroupCRDResourcePlural           = "couchbasegroups"
 	RoleBindingCRDResourceKind       = "CouchbaseRoleBinding"
 	RoleBindingCRDResourcePlural     = "couchbaserolebindings"
+	AutoscalerCRDResourceKind        = "CouchbaseAutoscaler"
+	AutoscalerCRDResourcePlural      = "couchbaseautoscalers"
 	GroupVersion                     = "v2"
 	GroupName                        = "couchbase.com"
 	Group                            = GroupName + "/" + GroupVersion
@@ -39,6 +41,7 @@ const (
 	UserCRDName                      = UserCRDResourcePlural + "." + GroupName
 	GroupCRDName                     = GroupCRDResourcePlural + "." + GroupName
 	RoleBindingCRDName               = RoleBindingCRDResourcePlural + "." + GroupName
+	AutoscalerCRDName                = AutoscalerCRDResourcePlural + "." + GroupName
 )
 
 var (
@@ -60,6 +63,7 @@ func init() {
 	SchemeBuilder.Register(&CouchbaseRoleBinding{}, &CouchbaseRoleBindingList{})
 	SchemeBuilder.Register(&CouchbaseBackup{}, &CouchbaseBackupList{})
 	SchemeBuilder.Register(&CouchbaseBackupRestore{}, &CouchbaseBackupRestoreList{})
+	SchemeBuilder.Register(&CouchbaseAutoscaler{}, &CouchbaseAutoscalerList{})
 }
 
 func Resource(resource string) schema.GroupResource {
@@ -84,6 +88,8 @@ func Resource(resource string) schema.GroupResource {
 		return schema.GroupResource{Group: GroupName, Resource: BackupCRDResourceKind}
 	case "couchbasebackuprestore":
 		return schema.GroupResource{Group: GroupName, Resource: BackupRestoreCRDResourceKind}
+	case "couchbaseautoscaler":
+		return schema.GroupResource{Group: GroupName, Resource: AutoscalerCRDResourceKind}
 	default:
 		return schema.GroupResource{}
 	}

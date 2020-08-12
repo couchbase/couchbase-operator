@@ -180,6 +180,31 @@ func GetOperatorRole(namespace string, cluster bool) metav1.Object {
 		},
 		{
 			APIGroups: []string{
+				couchbasev2.GroupName,
+			},
+			Resources: []string{
+				couchbasev2.AutoscalerCRDResourcePlural,
+			},
+			Verbs: []string{
+				"list",   // used by the operator for caching
+				"watch",  // used by the operator for caching
+				"create", // used by the operator to create resources
+				"delete", // used to cleanup unused resources
+			},
+		},
+		{
+			APIGroups: []string{
+				couchbasev2.GroupName,
+			},
+			Resources: []string{
+				couchbasev2.AutoscalerCRDResourcePlural + "/status",
+			},
+			Verbs: []string{
+				"update", // used by the operator to update status subresource
+			},
+		},
+		{
+			APIGroups: []string{
 				"",
 			},
 			Resources: []string{

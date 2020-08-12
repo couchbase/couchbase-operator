@@ -179,6 +179,9 @@ var (
 		"TestLDAPRemoveUserFrom":  TestLDAPRemoveUserFromBinding,
 		"TestLDAPDeleteBinding":   TestLDAPDeleteBinding,
 
+		// Autoscaler cases
+		"TestAutoscalerValidation": TestAutoscalerValidation,
+
 		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,
 		"TestRzaCreateClusterWithClassBasedConfig": TestRzaCreateClusterWithClassBasedConfig,

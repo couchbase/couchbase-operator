@@ -1561,3 +1561,17 @@ func CheckImmutableFieldsBackup(prev, curr *couchbasev2.CouchbaseBackup) error {
 
 	return nil
 }
+
+func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler) error {
+	errs := []error{}
+
+	if prev.Spec.Servers != curr.Spec.Servers {
+		errs = append(errs, util.NewUpdateError("spec.servers", "body"))
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}

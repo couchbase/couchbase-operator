@@ -175,6 +175,7 @@ func GetAdmissionRole(namespace string, cluster bool) metav1.Object {
 				couchbasev2.RoleBindingCRDResourcePlural,
 				couchbasev2.BackupCRDResourcePlural,
 				couchbasev2.BackupRestoreCRDResourcePlural,
+				couchbasev2.AutoscalerCRDResourcePlural,
 			},
 			Verbs: []string{
 				"list",
@@ -477,6 +478,7 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 								couchbasev2.RoleBindingCRDResourcePlural,
 								couchbasev2.BackupCRDResourcePlural,
 								couchbasev2.BackupRestoreCRDResourcePlural,
+								couchbasev2.AutoscalerCRDResourcePlural,
 							},
 							APIVersions: []string{
 								"v1",
@@ -552,6 +554,7 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, na
 								couchbasev2.RoleBindingCRDResourcePlural,
 								couchbasev2.BackupCRDResourcePlural,
 								couchbasev2.BackupRestoreCRDResourcePlural,
+								couchbasev2.AutoscalerCRDResourcePlural,
 							},
 							APIVersions: []string{
 								"v1",

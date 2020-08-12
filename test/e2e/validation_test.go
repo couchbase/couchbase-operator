@@ -1663,6 +1663,30 @@ func TestRBACValidationLDAP(t *testing.T) {
 	runValidationTest(t, testDefs, "create")
 }
 
+// Test cases for Autoscaler Validation.
+func TestAutoscalerValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestAutoscalerDefaults",
+			shouldFail: false,
+		},
+		{
+			name:           "TestAutoscalerMissingServers",
+			mutations:      patchMap{"scaler": jsonpatch.NewPatchSet().Remove("/spec/servers")},
+			expectedErrors: []string{"CouchbaseAutoscaler.couchbase.com \"scaler\" is invalid: spec.servers: Required value"},
+			shouldFail:     true,
+		},
+		{
+			name:           "TestAutoscalerMissingSize",
+			mutations:      patchMap{"scaler": jsonpatch.NewPatchSet().Remove("/spec/size")},
+			expectedErrors: []string{"CouchbaseAutoscaler.couchbase.com \"scaler\" is invalid: spec.size: Required value"},
+			shouldFail:     true,
+		},
+	}
+
+	runValidationTest(t, testDefs, "create")
+}
+
 // Test cases for RZA / Server group testing.
 // Deploy couchbase cluster over non existent server group.
 func TestRzaNegCreateCluster(t *testing.T) {

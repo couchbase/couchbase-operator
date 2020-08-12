@@ -15,6 +15,7 @@ import (
 
 type CouchbaseV2Interface interface {
 	RESTClient() rest.Interface
+	CouchbaseAutoscalersGetter
 	CouchbaseBackupsGetter
 	CouchbaseBackupRestoresGetter
 	CouchbaseBucketsGetter
@@ -30,6 +31,10 @@ type CouchbaseV2Interface interface {
 // CouchbaseV2Client is used to interact with features provided by the couchbase.com group.
 type CouchbaseV2Client struct {
 	restClient rest.Interface
+}
+
+func (c *CouchbaseV2Client) CouchbaseAutoscalers(namespace string) CouchbaseAutoscalerInterface {
+	return newCouchbaseAutoscalers(c, namespace)
 }
 
 func (c *CouchbaseV2Client) CouchbaseBackups(namespace string) CouchbaseBackupInterface {

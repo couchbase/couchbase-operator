@@ -7,6 +7,8 @@
 
 package v2
 
+type CouchbaseAutoscalerExpansion interface{}
+
 type CouchbaseBackupExpansion interface{}
 
 type CouchbaseBackupRestoreExpansion interface{}

@@ -388,3 +388,13 @@ spec:
     str: oldest
   end:
     str: latest
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseAutoscaler
+metadata:
+  name: scaler
+spec:
+  servers: all_services
+  size: 3
+status:
+  labelSelector:  "couchbase_cluster = test-couchbase-cluster"

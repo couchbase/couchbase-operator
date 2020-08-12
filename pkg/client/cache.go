@@ -863,3 +863,53 @@ func (c *CouchbaseBackupRestoreCache) List() (resources []*couchbasev2.Couchbase
 func (c *CouchbaseBackupRestoreCache) stop() {
 	c.resourceCache.stop()
 }
+
+// CouchbaseAutoscalerCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseAutoscaler resources.
+type CouchbaseAutoscalerCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseiAutoscalerCache creates a new synchronized cache for CouchbaseAutoscaler resources.
+func newCouchbaseAutoscalerCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseAutoscalerCache, error) {
+	selector := labels.Everything()
+
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseAutoscaler{}, selector, couchbasev2.AutoscalerCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CouchbaseAutoscalerCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested couchbaseautoscaler based on name.
+func (c *CouchbaseAutoscalerCache) Get(name string) (*couchbasev2.CouchbaseAutoscaler, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*couchbasev2.CouchbaseAutoscaler), true
+}
+
+// list returns all couchbaseautoscalers.
+func (c *CouchbaseAutoscalerCache) List() (resources []*couchbasev2.CouchbaseAutoscaler) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseAutoscaler))
+	}
+
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseAutoscalerCache) stop() {
+	c.resourceCache.stop()
+}
