@@ -162,6 +162,7 @@ crd: $(CRD_FILE)
 $(CRD_FILE): $(APISRC_V2)
 	go run sigs.k8s.io/controller-tools/cmd/controller-gen crd paths=./pkg/apis/couchbase/v2 output:dir=example
 	@cat example/couchbase.com_*.yaml > $@
+	go run scripts/crd-transform.go -in $@ -out $@
 	@rm example/couchbase.com_*.yaml
 
 # Build target to test that e2e testing compiles.
