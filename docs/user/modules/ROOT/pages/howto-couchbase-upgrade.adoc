@@ -25,5 +25,5 @@ spec:
   image: couchbase/server:{couchbase-version} # <.>
 ----
 
-<.> The modification will trigger the Operator to detect that existing pod specifications do not match the existing pod specifications.
+<.> The modification will trigger the Operator to detect that existing pod specifications do not match the new pod specifications.
 This will perform a xref:concept-upgrade.adoc#upgrading-couchbase-server[rolling upgrade] of Couchbase Server.
