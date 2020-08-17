@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -275,7 +276,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, kubeName, command strin
 	targetKube := f.ClusterSpec[kubeName]
 
 	// Stop the operator, we don't actually need it to validate the API and the tests will take forever.
-	_ = framework.DeleteOperatorCompletely(targetKube.KubeClient, f.Deployment.Name, targetKube.Namespace)
+	_ = framework.DeleteOperatorCompletely(targetKube.KubeClient, config.OperatorResourceName, targetKube.Namespace)
 	defer func() { _ = f.SetupCouchbaseOperator(targetKube) }()
 
 	for _, test := range testDefs {

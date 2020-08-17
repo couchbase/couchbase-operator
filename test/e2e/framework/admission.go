@@ -10,6 +10,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,9 @@ const (
 // * Service
 // * Mutating webhook
 // * Validating webhook
-func createAdmissionController(client kubernetes.Interface) error {
+func createAdmissionController(k8s *types.Cluster) error {
+	client := k8s.KubeClient
+
 	validFrom := time.Now()
 	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)
 	ca, _ := e2eutil.NewCertificateAuthority(e2eutil.KeyTypeRSA, config.AdmissionResourceName+" CA", validFrom, validTo, e2eutil.CertTypeCA)
@@ -63,7 +66,15 @@ func createAdmissionController(client kubernetes.Interface) error {
 	if _, err := client.CoreV1().Secrets(admissionNamespace).Create(secret); err != nil {
 		return err
 	}
-	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, dockerPullSecretName, "-v", "1")
+	// This just picks the first, so ordering is important unless we sort out
+	// cbopcfg...
+	var pullSecret string
+
+	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil {
+		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
+	}
+
+	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, pullSecret, "-v", "1")
 	if _, err := client.AppsV1().Deployments(admissionNamespace).Create(deployment); err != nil {
 		return err
 	}

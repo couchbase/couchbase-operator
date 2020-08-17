@@ -65,7 +65,7 @@ func RandomSuffix() string {
 // Performs retries and garbage collection in the event of transient failure
 func newClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	// Create the cluster.
-	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	cluster, err := CreateCluster(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, namespace string, 
 
 func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, namespace string, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	// Create the cluster
-	cluster, err := CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	cluster, err := CreateCluster(t, k8s, namespace, clusterSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	return CreateCluster(t, k8s, namespace, clusterSpec)
 }
 
 // MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification
@@ -273,7 +273,7 @@ func MustNewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Serv
 
 func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, namespace string, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
-	return CreateCluster(t, k8s.CRClient, namespace, clusterSpec)
+	return CreateCluster(t, k8s, namespace, clusterSpec)
 }
 
 // NewStatefulCluster creates a cluster with persistent block storage, retrying if an
@@ -1026,13 +1026,13 @@ func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster, namesp
 // once all the dependant pods are cleaned up.  This allows us to explicitly make alterations
 // while the operator is not running and see what happens on a restart without introducing race
 // conditions.
-func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, namespace string, deployment *appsv1.Deployment, timeout time.Duration) {
-	if err := k8s.KubeClient.AppsV1().Deployments(namespace).Delete(deployment.Name, metav1.NewDeleteOptions(0)); err != nil {
+func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, deployment string, timeout time.Duration) {
+	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deployment, metav1.NewDeleteOptions(0)); err != nil {
 		Die(t, err)
 	}
 
 	callback := func() error {
-		_, err := k8s.KubeClient.AppsV1().Deployments(namespace).Get(deployment.Name, metav1.GetOptions{})
+		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deployment, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil

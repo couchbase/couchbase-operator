@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -238,7 +239,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	clusterSize := 3
 
 	// deleting monitoring secret
-	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(monitoringAuthSecret, nil); err != nil {
+	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(monitoringAuthSecret, nil); err != nil && errors.IsNotFound(err) {
 		fmt.Println("Warning: Unable to delete monitoring secret: ", err)
 	}
 

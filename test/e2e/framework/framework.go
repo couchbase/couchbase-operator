@@ -24,6 +24,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"k8s.io/api/core/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -31,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
@@ -134,23 +134,24 @@ func startTimeoutTimer() {
 	}()
 }
 
-func CreateDeploymentObject(operatorImage string, operatorPort int, podCreateTimeout fmt.Stringer) (deployment *appsv1.Deployment, err error) {
-	deployment = config.GetOperatorDeployment("", operatorImage, dockerPullSecretName, podCreateTimeout, "--zap-level", "debug")
+func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPort int, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
+	// This just picks the first, so ordering is important unless we sort out
+	// cbopcfg...
+	var pullSecret string
+
+	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil {
+		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
+	}
+
+	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, podCreateTimeout, "--zap-level", "debug")
 
 	// Manually set the HTTP port.
 	if operatorPort != 0 {
 		listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(operatorPort)
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
-
-		// Direct readiness probe to listening address
-		for i, port := range deployment.Spec.Template.Spec.Containers[0].Ports {
-			if port.Name == "http" {
-				deployment.Spec.Template.Spec.Containers[0].Ports[i].ContainerPort = int32(operatorPort)
-			}
-		}
-
 	}
-	return
+
+	return deployment
 }
 
 // Setup setups a test framework and points "Global" to it.
@@ -182,11 +183,6 @@ func Setup(t *testing.T) (err error) {
 		CouchbaseBackupImage:        runtimeParams.CouchbaseBackupImage,
 	}
 
-	Global.Deployment, err = CreateDeploymentObject(runtimeParams.OperatorImage, 0, Global.PodCreateTimeout)
-	if err != nil {
-		return err
-	}
-
 	Global.LogDir, err = makeLogDir()
 	if err != nil {
 		return err
@@ -210,10 +206,14 @@ func Setup(t *testing.T) (err error) {
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
 	e2espec.SetPlatform(runtimeParams.Platform)
 
-	logrus.Info("Docker Registry")
-	logrus.Info(" →  server: " + runtimeParams.DockerServer)
-	logrus.Info(" →  username: " + runtimeParams.DockerUsername)
-	logrus.Info(" →  password: " + strings.Repeat("*", len(runtimeParams.DockerPassword)))
+	logrus.Info("Docker Registries")
+
+	for _, registry := range runtimeParams.RegistryConfigs {
+		logrus.Info(" →  server: " + registry.Server)
+		logrus.Info("    username: " + registry.Username)
+		logrus.Info("    password: " + strings.Repeat("*", len(registry.Password)))
+	}
+
 	logrus.Info("Container Images")
 	logrus.Info(" →  couchbase operator: " + runtimeParams.OperatorImage)
 	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
@@ -261,7 +261,7 @@ func cleanUpNamespace() (err error) {
 		}
 
 		// Clean-up Deployments and pods
-		if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
+		if err := DeleteOperatorCompletely(k8s.KubeClient, config.OperatorResourceName, k8s.Namespace); err != nil {
 			return err
 		}
 
@@ -465,20 +465,22 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		}
 
 		// re-creating docker secrets
-		logrus.Info("Recreating docker auth secret in default namespace")
-		if err := recreateDockerAuthSecret(k8s.KubeClient, "default"); err != nil {
+		if err := recreateDockerAuthSecret(k8s, "default"); err != nil {
 			return err
 		}
+
 		if k8s.Namespace != "default" {
 			logrus.Infof("Recreating docker auth secret in %v namespace", k8s.Namespace)
-			if err := recreateDockerAuthSecret(k8s.KubeClient, k8s.Namespace); err != nil {
+
+			if err := recreateDockerAuthSecret(k8s, k8s.Namespace); err != nil {
 				return err
 			}
 		}
 
 		// creating DAC
 		logrus.Infof("Creating admission controller")
-		if err := createAdmissionController(k8s.KubeClient); err != nil {
+
+		if err := createAdmissionController(k8s); err != nil {
 			return err
 		}
 	}
@@ -531,15 +533,15 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	}
 
 	logrus.Info("Recreating role")
-	if err := recreateRoles(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := recreateRoles(k8s, config.OperatorResourceName); err != nil {
 		return err
 	}
 	logrus.Info("Recreating service account")
-	if err := RecreateServiceAccount(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := RecreateServiceAccount(k8s, config.OperatorResourceName); err != nil {
 		return err
 	}
 	logrus.Info("Recreating role binding")
-	if err := recreateRoleBindings(k8s, f.Deployment.Spec.Template.Spec.ServiceAccountName); err != nil {
+	if err := recreateRoleBindings(k8s, config.OperatorResourceName); err != nil {
 		return err
 	}
 
@@ -555,7 +557,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 	// delete and create operator
 	logrus.Infof("Cleaning up namespace %s before deployment in %s", k8s.Namespace, k8s.Name)
-	if err := DeleteOperatorCompletely(k8s.KubeClient, Global.Deployment.Name, k8s.Namespace); err != nil {
+	if err := DeleteOperatorCompletely(k8s.KubeClient, config.OperatorResourceName, k8s.Namespace); err != nil {
 		return fmt.Errorf("failed to delete operator: %v", err)
 	}
 	logrus.Info("Setting up operator")
@@ -569,12 +571,13 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 		return err
 	}
 
-	logrus.Info("E2E setup successfully")
 	return nil
 }
 
 func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(f.Deployment); err != nil {
+	deployment := CreateDeploymentObject(k8s, f.OpImage, 0, f.PodCreateTimeout)
+
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
 		return err
 	}
 	return e2eutil.WaitUntilOperatorReady(k8s.KubeClient, k8s.Namespace, constants.CouchbaseOperatorLabel)
