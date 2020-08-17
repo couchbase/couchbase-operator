@@ -49,6 +49,10 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, couchbase *couchbasev2.Cou
 			continue
 		}
 
+		if item.Reason == "FailedToUpdateEndpointSlices" {
+			continue
+		}
+
 		events = append(events, item)
 	}
 
