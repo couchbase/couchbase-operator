@@ -31,6 +31,13 @@ revision = $(if $(REVISION),$(REVISION),)
 # on above and beyond ours.  This should always be 1
 revisionRedHat = $(if $(REVISION_REDHAT),$(REVISION_REDHAT),1)
 
+# Revisioned version is used for package creation.
+ifeq ($(revision),)
+revisionedVersion = $(version)
+else
+revisionedVersion = $(version)-$(revision)
+endif
+
 # What exact revision is this?
 GIT_REVISION := $(shell git rev-parse HEAD)
 
@@ -214,12 +221,12 @@ tools-platform-specific:
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/windows/bin/cbopcfg.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 
 artifacts: tools crd
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(version) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os linux --version $(version) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os windows --version $(version) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os darwin --version $(version) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --version $(version) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --version $(version) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os linux --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os windows --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os darwin --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --version $(revisionedVersion) --bld_num $(bldNum)
 
 image-artifacts: binaries
 	# Create a subdirectory for the operator docker build
@@ -239,7 +246,7 @@ image-artifacts: binaries
 	cp Dockerfile.admission $(ADMISSION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.admission-rhel $(ADMISSION_ARTIFACTS)/Dockerfile.rhel
 	# Create the archive
-	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(productVersion).tgz .
+	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(revisionedVersion).tgz .
 	rm -rf $(ARTIFACTS)
 
 # This target (and only this target) is invoked by the production build job.
