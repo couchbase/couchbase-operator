@@ -1469,9 +1469,6 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	patchset := jsonpatch.NewPatchSet().Replace("/Spec/Networking/TLS/NodeToNodeEncryption", &newEncryptionType)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 
-	// TODO: race, check cluster state.
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.SecuritySettingsUpdatedEvent(testCouchbase, k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified), time.Minute)
-
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
