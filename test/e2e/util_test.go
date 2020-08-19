@@ -180,7 +180,15 @@ var (
 		"TestLDAPDeleteBinding":   TestLDAPDeleteBinding,
 
 		// Autoscaler cases
-		"TestAutoscalerValidation": TestAutoscalerValidation,
+		"TestAutoscalerValidation":  TestAutoscalerValidation,
+		"TestAutoscaleEnabled":      TestAutoscaleEnabled,
+		"TestAutoscaleDisabled":     TestAutoscaleDisabled,
+		"TestAutoscalerDeleted":     TestAutoscalerDeleted,
+		"TestAutoscaleSelectiveMDS": TestAutoscaleSelectiveMDS,
+		"TestAutoscaleUp":           TestAutoscaleUp,
+		"TestAutoscaleDown":         TestAutoscaleDown,
+		"TestAutoscaleMultiConfigs": TestAutoscaleMultiConfigs,
+		"TestAutoscaleConflict":     TestAutoscaleConflict,
 
 		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,

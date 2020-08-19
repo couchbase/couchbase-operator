@@ -38,8 +38,10 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	autoscalev2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 )
 
 // Init performs one time only initialization of the framework.  Dynamic calls to these
@@ -416,13 +418,15 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 	restMapper := restmapper.NewDiscoveryRESTMapper(groupresources)
 
 	return &types.Cluster{
-		Config:        config,
-		CRClient:      client.MustNew(config),
-		KubeClient:    kubernetes.NewForConfigOrDie(config),
-		DynamicClient: dynamic.NewForConfigOrDie(config),
-		RESTMapper:    restMapper,
-		KubeConfPath:  c.Config,
-		Context:       c.Context,
+		Config:          config,
+		CRClient:        client.MustNew(config),
+		KubeClient:      kubernetes.NewForConfigOrDie(config),
+		DynamicClient:   dynamic.NewForConfigOrDie(config),
+		AutoscaleClient: autoscalev2.NewForConfigOrDie(config),
+		APIRegClient:    apiregistrationv1.NewForConfigOrDie(config),
+		RESTMapper:      restMapper,
+		KubeConfPath:    c.Config,
+		Context:         c.Context,
 	}, nil
 }
 

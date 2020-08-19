@@ -3,6 +3,7 @@ package v2
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -170,6 +171,19 @@ func (sc *ServerConfig) GetDefaultVolumeClaim() string {
 	}
 
 	return ""
+}
+
+// Autoscale resources are named after cluster
+// and config to ensure uniqueness.
+func (sc *ServerConfig) AutoscalerName(cluster string) string {
+	// Name must be valid dns subdomain.
+	// Just going to remove potentially bad chars and replace with '-'
+	// instead of imposing restrictions on server config.
+	// Validation will warn of duplicates.
+	reg := regexp.MustCompile("[^A-Za-z0-9]+")
+	name := reg.ReplaceAllString(sc.Name, "-")
+
+	return name + "." + cluster
 }
 
 func (cs *ClusterSpec) Cleanup() {

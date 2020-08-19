@@ -9,6 +9,7 @@ package fake
 
 import (
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -126,4 +127,26 @@ func (c *FakeCouchbaseAutoscalers) Patch(name string, pt types.PatchType, data [
 		return nil, err
 	}
 	return obj.(*v2.CouchbaseAutoscaler), err
+}
+
+// GetScale takes name of the couchbaseAutoscaler, and returns the corresponding scale object, and an error if there is any.
+func (c *FakeCouchbaseAutoscalers) GetScale(couchbaseAutoscalerName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceAction(couchbaseautoscalersResource, c.ns, "scale", couchbaseAutoscalerName), &autoscalingv1.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscalingv1.Scale), err
+}
+
+// UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeCouchbaseAutoscalers) UpdateScale(couchbaseAutoscalerName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(couchbaseautoscalersResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscalingv1.Scale), err
 }

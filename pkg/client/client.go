@@ -184,7 +184,7 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
-	c.CouchbaseAutoscalers, err = newCouchbaseAutoscalerCache(ctx, c.CouchbaseClient, namespace)
+	c.CouchbaseAutoscalers, err = newCouchbaseAutoscalerCache(ctx, c.CouchbaseClient, namespace, selector)
 	if err != nil {
 		return nil, err
 	}

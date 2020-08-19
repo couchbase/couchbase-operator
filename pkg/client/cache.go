@@ -872,10 +872,9 @@ type CouchbaseAutoscalerCache struct {
 }
 
 // newCouchbaseiAutoscalerCache creates a new synchronized cache for CouchbaseAutoscaler resources.
-func newCouchbaseAutoscalerCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseAutoscalerCache, error) {
-	selector := labels.Everything()
-
+func newCouchbaseAutoscalerCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string, selector fmt.Stringer) (*CouchbaseAutoscalerCache, error) {
 	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseAutoscaler{}, selector, couchbasev2.AutoscalerCRDResourcePlural, namespace)
+
 	if err != nil {
 		return nil, err
 	}

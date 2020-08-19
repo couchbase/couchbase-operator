@@ -562,10 +562,11 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// Check to make sure:
 	// 1. Server names are unique
 	// 2. The data service is specified on at least one node
+	// 3. The derived autoscaler name will be unique
 	unique := make(map[string]bool)
 	hasDataService := false
 
-	for i := range customResource.Spec.Servers {
+	for i, config := range customResource.Spec.Servers {
 		if _, ok := unique[customResource.Spec.Servers[i].Name]; ok {
 			errs = append(errs, errors.DuplicateItems("spec.servers.name", "body"))
 		}
@@ -576,7 +577,12 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			}
 		}
 
+		if _, ok := unique[config.AutoscalerName(customResource.Name)]; ok {
+			errs = append(errs, errors.DuplicateItems("spec.servers.autoscaler.name", "body"))
+		}
+
 		unique[customResource.Spec.Servers[i].Name] = true
+		unique[config.AutoscalerName(customResource.Name)] = true
 	}
 
 	if !hasDataService {

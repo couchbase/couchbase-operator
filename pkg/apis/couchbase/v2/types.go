@@ -630,6 +630,8 @@ type CouchbaseRoleBindingList struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/autoscaling/v1.Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
@@ -1448,6 +1450,9 @@ type ClusterStatus struct {
 
 	// Name of groups active within cluster
 	Groups []string `json:"groups,omitempty"`
+
+	// Name of active autoscaler resources
+	Autoscalers []string `json:"autoscalers,omitempty"`
 }
 
 type BucketStatus struct {

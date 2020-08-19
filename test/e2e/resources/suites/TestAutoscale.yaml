@@ -1,0 +1,12 @@
+---
+timeout: 4h
+testcases:
+- TestAutoscalerValidation
+- TestAutoscaleEnabled
+- TestAutoscaleDisabled
+- TestAutoscalerDeleted
+- TestAutoscaleSelectiveMDS
+- TestAutoscaleUp
+- TestAutoscaleDown
+- TestAutoscaleMultiConfigs
+- TestAutoscaleConflict

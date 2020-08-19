@@ -325,6 +325,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Autoscalers != nil {
+		in, out := &in.Autoscalers, &out.Autoscalers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

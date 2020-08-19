@@ -60,6 +60,10 @@ const (
 	EventReasonBackupRestoreDeleted    = "BackupRestoreDeleted"
 	EventReasonSecuritySettingsUpdated = "SecuritySettingsUpdated"
 	EventReasonAdminPasswordChanged    = "AdminPasswordChanged"
+	EventAutoscalerCreated             = "EventAutoscalerCreated"
+	EventAutoscalerDeleted             = "EventAutoscalerDeleted"
+	EventAutoscaleUp                   = "EventAutoscaleUp"
+	EventAutoscaleDown                 = "EventAutoscaleDown"
 
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )
@@ -464,6 +468,42 @@ func ReplicationRemovedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonReplicationRemoved
 	event.Message = fmt.Sprintf("XDCR replication %s removed", name)
+
+	return event
+}
+
+func AutoscalerCreateEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventAutoscalerCreated
+	event.Message = fmt.Sprintf("Autoscaler for config `%s` added", name)
+
+	return event
+}
+
+func AutoscalerDeleteEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventAutoscalerDeleted
+	event.Message = fmt.Sprintf("Autoscaler for config `%s` removed", name)
+
+	return event
+}
+
+func AutoscaleUpEvent(cl *couchbasev2.CouchbaseCluster, name string, from int, to int) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventAutoscaleUp
+	event.Message = fmt.Sprintf("Autoscaling up conifg `%s` from %d to %d", name, from, to)
+
+	return event
+}
+
+func AutoscaleDownEvent(cl *couchbasev2.CouchbaseCluster, name string, from int, to int) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventAutoscaleDown
+	event.Message = fmt.Sprintf("Autoscaling down config `%s` from %d to %d", name, from, to)
 
 	return event
 }

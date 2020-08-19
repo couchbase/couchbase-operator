@@ -115,6 +115,14 @@ func BackupFailedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event
 	return k8sutil.BackupFailEvent(backup, c)
 }
 
+func AutoscaleUpEvent(cl *couchbasev2.CouchbaseCluster, configName string, from int, to int) *v1.Event {
+	return k8sutil.AutoscaleUpEvent(cl, configName, from, to)
+}
+
+func AutoscaleDownEvent(cl *couchbasev2.CouchbaseCluster, configName string, from int, to int) *v1.Event {
+	return k8sutil.AutoscaleDownEvent(cl, configName, from, to)
+}
+
 // ClusterCreateSequence is a common function for generating cluster creation events.
 func ClusterCreateSequence(size int) eventschema.Validatable {
 	if size == 1 {

@@ -973,6 +973,67 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 	})
 }
 
+func WaitUntilCouchbaseAutoscalerExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 10*time.Second, func() (bool, error) {
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		// find autoscalers in cluster status
+		_, found := couchbasev2.HasItem(autoscalerName, currCluster.Status.Autoscalers)
+		if !found {
+			return false, fmt.Errorf("waiting for autoscaler `%s` to be created", autoscalerName)
+		}
+
+		// get autoscaler from k8s
+		_, err = k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(couchbase.Namespace).Get(autoscalerName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return err == nil, err
+	})
+}
+
+func MustWaitUntilCouchbaseAutoscalerExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) {
+	if err := WaitUntilCouchbaseAutoscalerExists(k8s, couchbase, autoscalerName, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// WaitForCouchbaseAutoscalerDeletion waits for autoscaler to be deleted.
+func WaitForCouchbaseAutoscalerDeletion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, 1*time.Second, func() (bool, error) {
+		_, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(couchbase.Namespace).Get(autoscalerName, metav1.GetOptions{})
+		if err != nil {
+			if k8sutil.IsKubernetesResourceNotFoundError(err) {
+				// cr deleted ok
+				return true, nil
+			}
+
+			// cr doesn't exists, but for unknown reason
+			return false, retryutil.RetryOkError(err)
+		}
+
+		// cr still exists, retry
+		return false, nil
+	})
+}
+
+func MustWaitForCouchbaseAutoscalerDeletion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) {
+	err := WaitForCouchbaseAutoscalerDeletion(k8s, couchbase, autoscalerName, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
 // AsyncOperation wraps up an asynchronous operation, in a generic way.
 type AsyncOperation struct {
 	// ctx is a cancellable context e.g. must be initialized with either

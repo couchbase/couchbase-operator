@@ -189,6 +189,10 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
+	if err := c.reconcileAutoscalers(); err != nil {
+		return err
+	}
+
 	c.cluster.Status.Size = c.members.Size()
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
 	c.cluster.Status.SetBalancedCondition()
@@ -2598,6 +2602,110 @@ func (c *Cluster) hibernate() error {
 	}
 
 	log.Info("Cluster is hibernating", "cluster", c.namespacedName())
+
+	return nil
+}
+
+// Reconcile Autoscaler ensures all server configs have
+// associated Autoscaler CR. Applies changes when sizing
+// differs.
+func (c *Cluster) reconcileAutoscalers() error {
+	requestedAutoscalers := []string{}
+
+	for i, config := range c.cluster.Spec.Servers {
+		// Only allow autoscaling of desired configs
+		if config.AutoscaleEnabled {
+			requestedAutoscalers = append(requestedAutoscalers, config.Name)
+
+			// Get associated Autoscaler CR
+			name := config.AutoscalerName(c.cluster.Name)
+			autoscaler, ok := c.k8s.CouchbaseAutoscalers.Get(name)
+
+			if !ok {
+				// Create Autoscaler CR
+				var err error
+				autoscaler, err = k8sutil.CreateCouchbaseAutoscaler(c.k8s, c.cluster, config)
+
+				if err != nil {
+					return fmt.Errorf("failed to create autoscaler: %w", errors.NewStackTracedError(err))
+				}
+
+				// Eventing
+				message := fmt.Sprintf("Autoscaling enabled for config `%s`", config.Name)
+				log.Info(message, "cluster", c.namespacedName(), "name", config.Name)
+				c.raiseEventCached(k8sutil.AutoscalerCreateEvent(c.cluster, config.Name))
+			} else {
+				// Reconcile Autoscaler CR with CouchbaseCluster
+				requestedSize := autoscaler.Spec.Size
+				currentSize := config.Size
+				if currentSize != requestedSize {
+					// Apply size of Autoscaler CR to server config.
+					// It's possible that HPA did not initiate this,
+					// but since we implement the /scale api it's
+					// possible for cli or other custom implementations
+					// to trigger couchbase autoscaling
+					c.cluster.Spec.Servers[i].Size = autoscaler.Spec.Size
+					cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(c.cluster)
+					if err != nil {
+						return fmt.Errorf("failed to update cluster size: %w", errors.NewStackTracedError(err))
+					}
+					c.cluster = cluster
+
+					// Scaling Events
+					message := fmt.Sprintf("Autoscaled config `%s` from %d -> %d", config.Name, currentSize, requestedSize)
+					log.Info(message, "cluster", c.namespacedName(), "name", config.Name)
+					if currentSize < requestedSize {
+						c.raiseEventCached(k8sutil.AutoscaleUpEvent(c.cluster, config.Name, currentSize, requestedSize))
+					} else {
+						c.raiseEventCached(k8sutil.AutoscaleDownEvent(c.cluster, config.Name, currentSize, requestedSize))
+					}
+				}
+			}
+
+			// update status subresource to actual ready pods from group
+			configPods := 0
+
+			for _, pod := range c.k8s.Pods.List() {
+				if config.Name == pod.Labels[constants.LabelNodeConf] {
+					configPods++
+				}
+			}
+
+			if configPods != autoscaler.Status.Size {
+				autoscaler.Status.Size = configPods
+				_, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).UpdateStatus(autoscaler)
+
+				if err != nil {
+					return fmt.Errorf("%w: failed to update autoscaler status: %s", errors.NewStackTracedError(err), autoscaler.Name)
+				}
+			}
+		}
+	}
+
+	// Update couchbase cluster status with actual set of autoscalers
+	actualAutoscalers := []string{}
+
+	for _, autoscaler := range c.k8s.CouchbaseAutoscalers.List() {
+		// delete autoscaler if it is not requested
+		configName := autoscaler.Spec.Servers
+		if _, found := couchbasev2.HasItem(configName, requestedAutoscalers); !found {
+			err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).Delete(autoscaler.Name, metav1.NewDeleteOptions(0))
+			if err != nil {
+				return err
+			}
+
+			message := fmt.Sprintf("Autoscaling disabled for config `%s`", configName)
+			log.Info(message, "cluster", c.namespacedName(), "name", configName)
+			c.raiseEventCached(k8sutil.AutoscalerDeleteEvent(c.cluster, configName))
+
+			continue
+		}
+
+		// ensure autoscaler is added to status since it is requested for use
+		actualAutoscalers = append(actualAutoscalers, autoscaler.Name)
+	}
+
+	c.cluster.Status.Autoscalers = actualAutoscalers
 
 	return nil
 }

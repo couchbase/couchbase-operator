@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -458,6 +459,42 @@ func LogPod(client *client.Client, namespace, name string) (output string) {
 	}
 
 	return
+}
+
+// Create CouchbaseAutoscaler Resource.
+func CreateCouchbaseAutoscaler(client *client.Client, cl *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*couchbasev2.CouchbaseAutoscaler, error) {
+	// label resource for fetching
+	metaLabels := LabelsForCluster(cl)
+	metaLabels[constants.LabelNodeConf] = config.Name
+
+	// define selector of pods which belong to the config
+	selector := labels.SelectorFromSet(metaLabels)
+
+	autoscaler := &couchbasev2.CouchbaseAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   config.AutoscalerName(cl.Name),
+			Labels: metaLabels,
+		},
+		Spec: couchbasev2.CouchbaseAutoscalerSpec{
+			Servers: config.Name,
+			Size:    config.Size,
+		},
+	}
+
+	// Taking ownership to ensure cr is deleted with cluster
+	addOwnerRefToObject(autoscaler, cl.AsOwner())
+
+	// create autoscaler cr
+	autoscaler, err := client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(cl.Namespace).Create(autoscaler)
+	if err != nil {
+		return nil, err
+	}
+
+	// set status subresource
+	autoscaler.Status.Size = config.Size
+	autoscaler.Status.LabelSelector = selector.String()
+
+	return client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(cl.Namespace).UpdateStatus(autoscaler)
 }
 
 // NewResourceQuantityMi accepts an integral value representing megabytes (2^20)

@@ -317,7 +317,7 @@ func NewBasicCluster(size int) *couchbasev2.CouchbaseCluster {
 		Servers: []couchbasev2.ServerConfig{
 			{
 				Size: size,
-				Name: "test_config_1",
+				Name: e2e_constants.CouchbaseServerConfig,
 				Services: couchbasev2.ServiceList{
 					couchbasev2.DataService,
 					couchbasev2.QueryService,
@@ -353,7 +353,7 @@ func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
 		Servers: []couchbasev2.ServerConfig{
 			{
 				Size: size,
-				Name: "test_config_1",
+				Name: e2e_constants.CouchbaseServerConfig,
 				Services: couchbasev2.ServiceList{
 					couchbasev2.DataService,
 					couchbasev2.QueryService,
@@ -484,7 +484,7 @@ func NewBasicXdcrCluster(size int) *couchbasev2.CouchbaseCluster {
 		Servers: []couchbasev2.ServerConfig{
 			{
 				Size: size,
-				Name: "test_config_1",
+				Name: e2e_constants.CouchbaseServerConfig,
 				Services: couchbasev2.ServiceList{
 					couchbasev2.DataService,
 					couchbasev2.QueryService,
