@@ -435,6 +435,11 @@ func (cs *ClusterStatus) SetUnknownBalancedCondition() {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetCreatingCondition() {
+	c := newClusterCondition(ClusterConditionAvailable, v1.ConditionFalse, "Creating", "The cluster is being created")
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) SetUnavailableCondition(down []string) {
 	c := newClusterCondition(ClusterConditionAvailable, v1.ConditionFalse, "PartiallyAvailable",
 		fmt.Sprintf("The following nodes are down and not serving requests: %s", strings.Join(down, ", ")))

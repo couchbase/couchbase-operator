@@ -268,7 +268,12 @@ func (c *Cluster) create() error {
 		}
 	}
 
+	c.cluster.Status.SetCreatingCondition()
 	c.cluster.Status.CurrentVersion = version
+
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
 
 	if len(c.cluster.Spec.Servers) == 0 {
 		return fmt.Errorf("cluster create: no server specification defined: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))

@@ -594,7 +594,7 @@ type CouchbaseClusterList struct {
 // +kubebuilder:resource:shortName=cbc
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".status.currentVersion"
 // +kubebuilder:printcolumn:name="size",type="string",JSONPath=".status.size"
-// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="status",type="string",JSONPath=".status.conditions[?(@.type==\"Available\")].reason"
 // +kubebuilder:printcolumn:name="uuid",type="string",JSONPath=".status.clusterId"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
 type CouchbaseCluster struct {
@@ -1339,7 +1339,7 @@ type ClusterStatus struct {
 	// A unique cluster identifier
 	ClusterID string `json:"clusterId,omitempty"`
 	// Size is the current size of the cluster
-	Size int `json:"size,omitempty"`
+	Size int `json:"size"`
 	// Members are the couchbase members in the cluster
 	Members *MembersStatus `json:"members,omitempty"`
 	// CurrentVersion is the current cluster version
