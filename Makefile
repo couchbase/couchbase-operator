@@ -15,7 +15,6 @@ namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
 deploymentSpec = $(if $(DEPLOYMENTSPEC),$(DEPLOYMENTSPEC),$(PREFIX)/example/deployment.yaml)
 bldNum = $(if $(BLD_NUM),$(BLD_NUM),999)
 version = $(if $(VERSION),$(VERSION),2.0.0)
-productVersion = $(version)-$(bldNum)
 testname = $(E2E_TEST)
 
 # This allows the container tags to be explicitly set.
@@ -34,8 +33,10 @@ revisionRedHat = $(if $(REVISION_REDHAT),$(REVISION_REDHAT),1)
 # Revisioned version is used for package creation.
 ifeq ($(revision),)
 revisionedVersion = $(version)
+revisionedProductVersion = $(version)-$(bldNum)
 else
 revisionedVersion = $(version)-$(revision)
+revisionedProductVersion = $(version)-$(revision)-$(bldNum)
 endif
 
 # What exact revision is this?
@@ -247,7 +248,7 @@ image-artifacts: binaries
 	cp Dockerfile.admission $(ADMISSION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.admission-rhel $(ADMISSION_ARTIFACTS)/Dockerfile.rhel
 	# Create the archive
-	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(revisionedVersion).tgz .
+	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(revisionedProductVersion).tgz .
 	rm -rf $(ARTIFACTS)
 
 # This target (and only this target) is invoked by the production build job.
