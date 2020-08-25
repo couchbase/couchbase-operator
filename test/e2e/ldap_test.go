@@ -44,6 +44,8 @@ func setupLDAP(t *testing.T, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 	pod := e2espec.NewLDAPServerTLS(k8s.Namespace, ctx.LDAPSecretName)
 	_ = e2eutil.MustNewLDAPServer(t, k8s, pod)
 
+	e2eutil.MustCheckLDAPServer(t, k8s, pod.Name, ctx, 5*time.Minute)
+
 	// Create a cluster with LDAP Auth
 	testCouchbase := e2espec.NewLDAPClusterBasic(k8s.Namespace, clusterSize, ctx.LDAPSecretName, k8s.DefaultSecret.Name)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, k8s, testCouchbase)

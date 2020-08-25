@@ -28,3 +28,7 @@ var ErrAnyOf = fmt.Errorf("no anyof members matched")
 // ErrRepeatAtLeast is raised when the validor doesn't match or doesn't match
 // at least N times.
 var ErrRepeatAtLeast = fmt.Errorf("validator doesn't match atleast times")
+
+// ErrRepeatAtMost is raised when the validator doesn't match any or more
+// than N sequences.
+var ErrRepeatAtMost = fmt.Errorf("validator doesn't match any or atmost times")

@@ -1140,6 +1140,17 @@ func getSchedulableNodes(k8s *types.Cluster) ([]*v1.Node, error) {
 	return result, nil
 }
 
+// MustNumNodesAbsolute returns the number of nodes in the cluster
+// irrespective of scheduling constraints.
+func MustNumNodesAbsolute(t *testing.T, k8s *types.Cluster) int {
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return len(nodes.Items)
+}
+
 // MustNumNodes returns the number of nodes in the cluster.
 func MustNumNodes(t *testing.T, k8s *types.Cluster) int {
 	nodes, err := getSchedulableNodes(k8s)

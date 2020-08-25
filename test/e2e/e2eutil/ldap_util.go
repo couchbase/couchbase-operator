@@ -1,9 +1,13 @@
 package e2eutil
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
@@ -109,4 +113,49 @@ func CleanLDAPResources(k8s *types.Cluster) error {
 	}
 
 	return DeleteLDAPService(k8s)
+}
+
+// MustCheckLDAPServer ensures the LDAP server is up and running before letting
+// Couchbase loose with it.
+func MustCheckLDAPServer(t *testing.T, k8s *types.Cluster, pod string, tls *TLSContext, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	callback := func() error {
+		port, cleanup, err := forwardPort(k8s, k8s.Namespace, pod, "389")
+		if err != nil {
+			return err
+		}
+
+		defer cleanup()
+
+		if err := netutil.WaitForHostPort(ctx, "localhost:"+port); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		Die(t, err)
+	}
+
+	callback = func() error {
+		port, cleanup, err := forwardPort(k8s, k8s.Namespace, pod, "636")
+		if err != nil {
+			return err
+		}
+
+		defer cleanup()
+
+		if err := netutil.WaitForHostPortTLS(ctx, "localhost:"+port, tls.CA.Certificate); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		Die(t, err)
+	}
 }

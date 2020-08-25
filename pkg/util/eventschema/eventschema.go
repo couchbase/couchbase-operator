@@ -277,3 +277,30 @@ func (e RepeatAtLeast) Validate(c *Validator) error {
 
 	return nil
 }
+
+// RepeatAtMost is a greedy validator that expects at least one, and fewer than N
+// matches.
+type RepeatAtMost struct {
+	Times     int
+	Validator Validatable
+}
+
+// Validate matches the validator as many times as it can.  If no matches were found
+// and more than the required maximum then an error is raised.
+func (e RepeatAtMost) Validate(c *Validator) error {
+	var times int
+
+	for {
+		if err := e.Validator.Validate(c); err != nil {
+			break
+		}
+
+		times++
+	}
+
+	if times == 0 || times > e.Times {
+		return fmt.Errorf("%w: failed to validate at most %d times", ErrRepeatAtMost, e.Times)
+	}
+
+	return nil
+}

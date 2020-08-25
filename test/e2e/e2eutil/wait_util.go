@@ -447,7 +447,7 @@ func WaitForClusterEvent(ctx context.Context, kubeClient kubernetes.Interface, c
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("%w: failed to wait for event %v/%v", ctx.Err(), event.Reason, event.Message)
 
 		case watchEvent := <-resultChan:
 			crdEvent := watchEvent.Object.(*v1.Event)

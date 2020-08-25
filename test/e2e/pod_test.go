@@ -175,7 +175,7 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	defer cleanup()
 
 	// Static configuration.
-	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
+	clusterSize := e2eutil.MustNumNodesAbsolute(t, targetKube) + 1
 
 	// Create the cluster.
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
@@ -188,7 +188,7 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
-		eventschema.Repeat{Times: clusterSize - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.RepeatAtMost{Times: clusterSize - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

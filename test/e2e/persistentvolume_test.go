@@ -164,11 +164,28 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 
 	// Check the events are as expected:
 	// * Cluster created
-	// * Nodes goes down, operator recovers
+	// * Nodes go down, operator recovers in one of many different ways...
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, 2),
+		eventschema.AnyOf{
+			Validators: []eventschema.Validatable{
+				e2eutil.PodDownWithPVCRecoverySequence(clusterSize, 2),
+				eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Repeat{
+							Times:     2,
+							Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+						},
+						eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+						eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+						eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+					},
+				},
+			},
+		},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
