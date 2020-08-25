@@ -1523,3 +1523,25 @@ func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPa
 		t.Logf("cbopinfo command failed: %v", err)
 	}
 }
+
+// SkipVersion prevents a test running with a specific version of an image.
+func SkipVersion(t *testing.T, image, version string) {
+	parts := strings.Split(image, ":")
+	if len(parts) != 2 {
+		Die(t, fmt.Errorf("malformed image: %v", image))
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		Die(t, err)
+	}
+
+	v2, err := couchbaseutil.NewVersion(version)
+	if err != nil {
+		Die(t, err)
+	}
+
+	if v1.Equal(v2) {
+		t.Skip("test cannot run with image version")
+	}
+}

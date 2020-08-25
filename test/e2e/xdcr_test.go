@@ -108,6 +108,8 @@ const (
 // xdcrClusterRemoveNode removes nodes from the selected cluster in numerous
 // nefarious ways.
 func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcrCluster, operation xdcrOperation) {
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
 	// Static configuration.
 	clusterSize := constants.Size3
 	scaleDownSize := constants.Size1
@@ -323,6 +325,8 @@ func TestXdcrCreateCluster(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
 	// Static configuration.
 	clusterSize := constants.Size3
 
@@ -367,6 +371,8 @@ func TestXDCRPauseReplication(t *testing.T) {
 	// Platform configuration.
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
@@ -426,6 +432,8 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
 	// Static configuration.
 	xdcrCluster1Size := constants.Size5
 	xdcrCluster2Size := constants.Size2
@@ -481,6 +489,8 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
 	// Static configuration.
 	clusterSize := constants.Size1
 	clusterScaledSize := constants.Size3
@@ -533,6 +543,8 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 	// Platform configuration.
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -643,6 +655,8 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
 	// Static configuration.
 	clusterSize := 1
 
@@ -703,6 +717,8 @@ func TestXDCRFilterExp(t *testing.T) {
 
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
 
 	// Static configuration.
 	clusterSize := 1

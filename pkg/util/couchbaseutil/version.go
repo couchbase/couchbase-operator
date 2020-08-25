@@ -139,6 +139,11 @@ func (v *Version) Compare(o *Version) int {
 	return 0
 }
 
+// Equal returns true if v == o.
+func (v *Version) Equal(o *Version) bool {
+	return v.Compare(o) == 0
+}
+
 // Less returns true if v < o.
 func (v *Version) Less(o *Version) bool {
 	return v.Compare(o) < 0
