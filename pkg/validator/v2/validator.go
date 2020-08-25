@@ -1244,19 +1244,27 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 	allocated := resource.NewQuantity(0, resource.BinarySI)
 
 	for _, bucket := range buckets.Items {
-		allocated.Add(*bucket.Spec.MemoryQuota)
+		if bucket.Spec.MemoryQuota != nil {
+			allocated.Add(*bucket.Spec.MemoryQuota)
+		}
 	}
 
 	for _, bucket := range ephemeralBuckets.Items {
-		allocated.Add(*bucket.Spec.MemoryQuota)
+		if bucket.Spec.MemoryQuota != nil {
+			allocated.Add(*bucket.Spec.MemoryQuota)
+		}
 	}
 
 	for _, bucket := range memcachedBuckets.Items {
-		allocated.Add(*bucket.Spec.MemoryQuota)
+		if bucket.Spec.MemoryQuota != nil {
+			allocated.Add(*bucket.Spec.MemoryQuota)
+		}
 	}
 
-	if allocated.Cmp(*cluster.Spec.ClusterSettings.DataServiceMemQuota) > 0 {
-		return fmt.Errorf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
+	if cluster.Spec.ClusterSettings.DataServiceMemQuota != nil {
+		if allocated.Cmp(*cluster.Spec.ClusterSettings.DataServiceMemQuota) > 0 {
+			return fmt.Errorf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
+		}
 	}
 
 	return nil
