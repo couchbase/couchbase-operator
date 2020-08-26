@@ -638,3 +638,23 @@ func (c *CouchbaseCluster) GetHibernationStrategy() HibernationStrategy {
 
 	return *c.Spec.HibernationStrategy
 }
+
+// GetMinimumDurability returns a safe default for the bucket durability, because it's
+// always set to something, it allows the feature to be disabled when posted to the API.
+func (b *CouchbaseBucket) GetMinimumDurability() CouchbaseBucketMinimumDurability {
+	if b.Spec.MinimumDurability != "" {
+		return b.Spec.MinimumDurability
+	}
+
+	return CouchbaseBucketMinimumDurabilityNone
+}
+
+// GetMinimumDurability returns a safe default for the bucket durability, because it's
+// always set to something, it allows the feature to be disabled when posted to the API.
+func (b *CouchbaseEphemeralBucket) GetMinimumDurability() CouchbaseEphemeralBucketMinimumDurability {
+	if b.Spec.MinimumDurability != "" {
+		return b.Spec.MinimumDurability
+	}
+
+	return CouchbaseEphemeralBucketMinimumDurabilityNone
+}

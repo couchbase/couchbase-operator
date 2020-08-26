@@ -18,6 +18,7 @@ spec:
   enableFlush: true
   enableIndexReplica: false
   compressionMode: passive
+  minimumDurability: none
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
@@ -53,6 +54,7 @@ spec:
   conflictResolution: lww
   enableFlush: true
   compressionMode: passive
+  minimumDurability: none
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseEphemeralBucket

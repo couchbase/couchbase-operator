@@ -449,7 +449,7 @@ func MustNewBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object) metav
 	return object
 }
 
-func GetBucket(bucketType, compressionMode string) metav1.Object {
+func generateBucket(bucketType, compressionMode string, durability couchbasev2.CouchbaseBucketMinimumDurability) metav1.Object {
 	compressionmode := GetCompressionMode(compressionMode)
 
 	switch bucketType {
@@ -457,10 +457,18 @@ func GetBucket(bucketType, compressionMode string) metav1.Object {
 		bucket := e2espec.DefaultBucket()
 		bucket.Spec.CompressionMode = compressionmode
 
+		if durability != "" {
+			bucket.Spec.MinimumDurability = durability
+		}
+
 		return bucket
 	case "ephemeral":
 		bucket := e2espec.DefaultEphemeralBucket()
 		bucket.Spec.CompressionMode = compressionmode
+
+		if durability != "" {
+			bucket.Spec.MinimumDurability = couchbasev2.CouchbaseEphemeralBucketMinimumDurability(durability)
+		}
 
 		return bucket
 	case "memcached":
@@ -468,6 +476,14 @@ func GetBucket(bucketType, compressionMode string) metav1.Object {
 	default:
 		return e2espec.DefaultBucket()
 	}
+}
+
+func GetBucket(bucketType, compressionMode string) metav1.Object {
+	return generateBucket(bucketType, compressionMode, "")
+}
+
+func GetDurableBucket(bucketType, compressionMode string, durability couchbasev2.CouchbaseBucketMinimumDurability) metav1.Object {
+	return generateBucket(bucketType, compressionMode, durability)
 }
 
 func GetCompressionMode(compressionMode string) couchbasev2.CouchbaseBucketCompressionMode {
@@ -1542,6 +1558,28 @@ func SkipVersion(t *testing.T, image, version string) {
 	}
 
 	if v1.Equal(v2) {
+		t.Skip("test cannot run with image version")
+	}
+}
+
+// SkipVersionsBefore prevents a test running with old versions of an image.
+func SkipVersionsBefore(t *testing.T, image, version string) {
+	parts := strings.Split(image, ":")
+	if len(parts) != 2 {
+		Die(t, fmt.Errorf("malformed image: %v", image))
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		Die(t, err)
+	}
+
+	v2, err := couchbaseutil.NewVersion(version)
+	if err != nil {
+		Die(t, err)
+	}
+
+	if v1.Less(v2) {
 		t.Skip("test cannot run with image version")
 	}
 }

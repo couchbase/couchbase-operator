@@ -197,3 +197,7 @@ testcases:
 # Hibernation tests
 - TestHibernateEphemeralImmediate
 - TestHibernateSupportableImmediate
+
+# Durability tests
+- TestCreateDurableBucket
+- TestEditDurableBucket

@@ -359,6 +359,15 @@ const (
 	CompressionModeActive  CompressionMode = "active"
 )
 
+type Durability string
+
+const (
+	DurabilityNone                     Durability = "none"
+	DurabilityMajority                 Durability = "majority"
+	DurabilityMajorityAndPersistActive Durability = "majorityAndPersistActive"
+	DurabilityPersistToMajority        Durability = "persistToMajority"
+)
+
 type Bucket struct {
 	BucketName         string          `json:"name"`
 	BucketType         string          `json:"type"`
@@ -371,6 +380,7 @@ type Bucket struct {
 	EnableIndexReplica bool            `json:"enableIndexReplica"`
 	BucketPassword     string          `json:"password"`
 	CompressionMode    CompressionMode `json:"compressionMode"`
+	DurabilityMinLevel Durability      `json:"durabilityMinLevel"`
 }
 
 type BucketList []Bucket
@@ -397,6 +407,8 @@ type BucketBasicStats struct {
 	QuotaPercentUsed float64 `json:"quotaPercentUsed"`
 }
 
+// SM: THIS IS SO M****RF***KING ANNOYING.  HAVE A SINGLE SOURCE OF TRUTH!!!!!
+// THIS IS UTTERLY POINTLESS OVERENGINEERING.  (Fix me essentially).
 type BucketStatus struct {
 	Nodes                  []NodeInfo            `json:"nodes"`
 	BucketName             string                `json:"name"`
@@ -412,6 +424,7 @@ type BucketStatus struct {
 	Stats                  map[string]string     `json:"stats"`
 	VBServerMap            VBucketServerMap      `json:"vBucketServerMap"`
 	CompressionMode        CompressionMode       `json:"compressionMode"`
+	DurabilityMinLevel     Durability            `json:"durabilityMinLevel"`
 	BasicStats             BucketBasicStats      `json:"basicStats"`
 }
 
@@ -609,6 +622,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.BucketReplicas = status.ReplicaNumber
 	b.CompressionMode = status.CompressionMode
 	b.IoPriority = status.GetIoPriority()
+	b.DurabilityMinLevel = status.DurabilityMinLevel
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -652,6 +666,10 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 	if b.BucketType == "couchbase" {
 		data.Set("replicaIndex", BoolToStr(b.EnableIndexReplica))
+	}
+
+	if b.DurabilityMinLevel != "" {
+		data.Set("durabilityMinLevel", string(b.DurabilityMinLevel))
 	}
 
 	return []byte(data.Encode())

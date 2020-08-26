@@ -348,6 +348,10 @@ var (
 		// Hibernation tests
 		"TestHibernateEphemeralImmediate":   TestHibernateEphemeralImmediate,
 		"TestHibernateSupportableImmediate": TestHibernateSupportableImmediate,
+
+		// Durability tests
+		"TestCreateDurableBucket": TestCreateDurableBucket,
+		"TestEditDurableBucket":   TestEditDurableBucket,
 	}
 )
 

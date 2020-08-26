@@ -74,6 +74,43 @@ const (
 	CouchbaseBucketConflictResolutionTimestamp CouchbaseBucketConflictResolution = "lww"
 )
 
+// CouchbaseBucketMinimumDurability is the miniumum durability that writes to a bucket
+// should conform to.  Clients can explicitly write with a stricter policy.
+// +kubebuilder:validation:Enum=none;majority;majorityAndPersistActive;persistToMajority
+type CouchbaseBucketMinimumDurability string
+
+const (
+	// CouchbaseBucketMinimumDurabilityNone applies no durability constraints.
+	CouchbaseBucketMinimumDurabilityNone CouchbaseBucketMinimumDurability = "none"
+
+	// CouchbaseBucketMinimumDurabilityMajority ensures all writes are duplicated to
+	// the majority of nodes, in-memory.
+	CouchbaseBucketMinimumDurabilityMajority CouchbaseBucketMinimumDurability = "majority"
+
+	// CouchbaseBucketMinimumDurabilityMajorityAndPersistActive ensures all writes are
+	// duplicated to the majority of nodes, in-memory, and persisted to disk on the
+	// vbucket master copy.
+	CouchbaseBucketMinimumDurabilityMajorityAndPersistActive CouchbaseBucketMinimumDurability = "majorityAndPersistActive"
+
+	// CouchbaseBucketMinimumDurabilityPersistToMajority ensures all writes are persisted
+	// to the majority of disks on all nodes.
+	CouchbaseBucketMinimumDurabilityPersistToMajority CouchbaseBucketMinimumDurability = "persistToMajority"
+)
+
+// CouchbaseEphemeralBucketMinimumDurability is the miniumum durability that writes to a bucket
+// should conform to.  Clients can explicitly write with a stricter policy.
+// +kubebuilder:validation:Enum=none;majority
+type CouchbaseEphemeralBucketMinimumDurability string
+
+const (
+	// CouchbaseEphemeralBucketMinimumDurabilityNone applies no durability constraints.
+	CouchbaseEphemeralBucketMinimumDurabilityNone CouchbaseEphemeralBucketMinimumDurability = "none"
+
+	// CouchbaseEphemeralBucketMinimumDurabilityMajority ensures all writes are duplicated to
+	// the majority of nodes, in-memory.
+	CouchbaseEphemeralBucketMinimumDurabilityMajority CouchbaseEphemeralBucketMinimumDurability = "majority"
+)
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -297,6 +334,7 @@ type CouchbaseBucketSpec struct {
 	EnableFlush        bool                              `json:"enableFlush,omitempty"`
 	EnableIndexReplica bool                              `json:"enableIndexReplica,omitempty"`
 	CompressionMode    CouchbaseBucketCompressionMode    `json:"compressionMode,omitempty"`
+	MinimumDurability  CouchbaseBucketMinimumDurability  `json:"minimumDurability,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -329,12 +367,13 @@ type CouchbaseEphemeralBucketSpec struct {
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=3
-	Replicas           int                                    `json:"replicas,omitempty"`
-	IoPriority         CouchbaseBucketIOPriority              `json:"ioPriority,omitempty"`
-	EvictionPolicy     CouchbaseEphemeralBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
-	ConflictResolution CouchbaseBucketConflictResolution      `json:"conflictResolution,omitempty"`
-	EnableFlush        bool                                   `json:"enableFlush,omitempty"`
-	CompressionMode    CouchbaseBucketCompressionMode         `json:"compressionMode,omitempty"`
+	Replicas           int                                       `json:"replicas,omitempty"`
+	IoPriority         CouchbaseBucketIOPriority                 `json:"ioPriority,omitempty"`
+	EvictionPolicy     CouchbaseEphemeralBucketEvictionPolicy    `json:"evictionPolicy,omitempty"`
+	ConflictResolution CouchbaseBucketConflictResolution         `json:"conflictResolution,omitempty"`
+	EnableFlush        bool                                      `json:"enableFlush,omitempty"`
+	CompressionMode    CouchbaseBucketCompressionMode            `json:"compressionMode,omitempty"`
+	MinimumDurability  CouchbaseEphemeralBucketMinimumDurability `json:"minimumDurability,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

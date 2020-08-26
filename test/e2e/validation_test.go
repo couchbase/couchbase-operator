@@ -1058,6 +1058,18 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.networking.tls.nodeToNodeEncryption`},
 		},
+		{
+			name:           "TestValidateBucketDurabilityIllegal",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/minimumDurability", "flimsy")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.minimumDurability`},
+		},
+		{
+			name:           "TestValidateEphemeralBucketDurabilityIllegal",
+			mutations:      patchMap{"bucket3": jsonpatch.NewPatchSet().Replace("/spec/minimumDurability", "flimsy")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.minimumDurability`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]

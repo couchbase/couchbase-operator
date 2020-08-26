@@ -405,6 +405,11 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		}
 	}
 
+	durable, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "6.6.0")
+	if err != nil {
+		return nil, err
+	}
+
 	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
 	couchbaseEphemeralBuckets := c.k8s.CouchbaseEphemeralBuckets.List()
 	couchbaseMemcachedBuckets := c.k8s.CouchbaseMemcachedBuckets.List()
@@ -421,7 +426,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			name = bucket.Spec.Name
 		}
 
-		buckets = append(buckets, couchbaseutil.Bucket{
+		b := couchbaseutil.Bucket{
 			BucketName:         name,
 			BucketType:         constants.BucketTypeCouchbase,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
@@ -432,7 +437,13 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			EnableFlush:        bucket.Spec.EnableFlush,
 			EnableIndexReplica: bucket.Spec.EnableIndexReplica,
 			CompressionMode:    couchbaseutil.CompressionMode(bucket.Spec.CompressionMode),
-		})
+		}
+
+		if durable {
+			b.DurabilityMinLevel = couchbaseutil.Durability(bucket.GetMinimumDurability())
+		}
+
+		buckets = append(buckets, b)
 	}
 
 	for _, bucket := range couchbaseEphemeralBuckets {
@@ -446,7 +457,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			name = bucket.Spec.Name
 		}
 
-		buckets = append(buckets, couchbaseutil.Bucket{
+		b := couchbaseutil.Bucket{
 			BucketName:         name,
 			BucketType:         constants.BucketTypeEphemeral,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
@@ -456,7 +467,13 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			ConflictResolution: string(bucket.Spec.ConflictResolution),
 			EnableFlush:        bucket.Spec.EnableFlush,
 			CompressionMode:    couchbaseutil.CompressionMode(bucket.Spec.CompressionMode),
-		})
+		}
+
+		if durable {
+			b.DurabilityMinLevel = couchbaseutil.Durability(bucket.GetMinimumDurability())
+		}
+
+		buckets = append(buckets, b)
 	}
 
 	for _, bucket := range couchbaseMemcachedBuckets {
