@@ -208,5 +208,6 @@ This field sets the compression mode for the specified bucket.
 This parameter defaults to `passive` if not specified.
 
 ____
-_Field rules:_ This field is optional and must be either `off`, `passive` or `active`.
+_Field rules:_ This field is optional and must be either `"off"`, `passive` or `active`.
+Note that Kubernetes uses the https://yaml.org/type/bool.html[YAML 1.1^] specification, so `off` _must_ be in quotes (`"off"`) in order to be interpreted as a string, not a Boolean.
 ____
