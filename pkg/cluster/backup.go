@@ -173,7 +173,9 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
-								constants.LabelBackup: backup.Name,
+								constants.LabelApp:     constants.App,
+								constants.LabelCluster: c.cluster.Name,
+								constants.LabelBackup:  backup.Name,
 							},
 						},
 						Spec: corev1.PodSpec{
@@ -299,6 +301,8 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
+						constants.LabelApp:           constants.App,
+						constants.LabelCluster:       c.cluster.Name,
 						constants.LabelBackupRestore: restore.Name,
 					},
 				},

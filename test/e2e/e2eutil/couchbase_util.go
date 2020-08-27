@@ -146,13 +146,18 @@ func GetPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, services 
 		return nil, err
 	}
 
+	serverreq, err := labels.NewRequirement(constants.LabelServer, selection.Equals, []string{"true"})
+	if err != nil {
+		return nil, err
+	}
+
 	clusterreq, err := labels.NewRequirement(constants.LabelCluster, selection.Equals, []string{cluster.Name})
 	if err != nil {
 		return nil, err
 	}
 
 	selector := labels.NewSelector()
-	selector = selector.Add(*appreq, *clusterreq)
+	selector = selector.Add(*appreq, *serverreq, *clusterreq)
 
 	for _, service := range services {
 		requirement, err := labels.NewRequirement(fmt.Sprintf("couchbase_service_%s", string(service)), selection.Equals, []string{"enabled"})

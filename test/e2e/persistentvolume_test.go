@@ -103,7 +103,7 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{e2espec.DefaultBucketTwoReplicas().Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
 
 	// When ready terminate a node, expect Server to auto failover and the operator
@@ -422,7 +422,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Create a expected RZA results map for verification
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
@@ -568,7 +568,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Create a expected RZA results map for verification
 	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)

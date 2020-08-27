@@ -31,7 +31,7 @@ pipeline {
     string(name: 'refspec', defaultValue: 'refs/heads/master')
     string(name: 'server_image', defaultValue: 'couchbase/server:6.5.0')
     string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.5.1')
-    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:6.5.0')
+    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:6.5.1-106')
     string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.0')
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.2')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.7.0-enterprise')

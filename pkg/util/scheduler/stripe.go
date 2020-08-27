@@ -40,7 +40,7 @@ func getServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couch
 
 // NewStripeScheduler creates an initializes a new sripe scheduler, caching
 // state from the current set of pods for the cluster.
-func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
+func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
 	// Initialize data structures, creating maps for each server class
 	// and empty lists for each server group defined for that class
 	sched := &stripeSchedulerImpl{
@@ -63,7 +63,7 @@ func NewStripeScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseClust
 	}
 
 	// Populate the server group lists with pods
-	for _, pod := range podGetter.Get() {
+	for _, pod := range pods {
 		// Pod is faulty ignore it
 		if pod.Status.Phase != v1.PodPending && pod.Status.Phase != v1.PodRunning {
 			continue

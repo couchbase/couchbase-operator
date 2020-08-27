@@ -687,6 +687,7 @@ func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container
 func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.ServerConfig) map[string]string {
 	labels := map[string]string{
 		constants.LabelApp:      constants.App,
+		constants.LabelServer:   "true",
 		constants.LabelNode:     memberName,
 		constants.LabelNodeConf: ns.Name,
 		constants.LabelCluster:  clusterName,

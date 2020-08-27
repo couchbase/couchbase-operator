@@ -2,7 +2,8 @@ package scheduler
 
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/client"
+
+	corev1 "k8s.io/api/core/v1"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -30,15 +31,13 @@ type Scheduler interface {
 
 // New is a factory method to return the correct scheduler type for
 // the cluster configuration.
-func New(client *client.Client, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
-	podGetter := NewK8SPodGetter(client)
-
+func New(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
 	// At present we only support a scheduler which evenly stripes servers
 	// across server groups on a per server class basis
 	if cluster.Spec.ServerGroupsEnabled() {
-		return NewStripeScheduler(podGetter, cluster)
+		return NewStripeScheduler(pods, cluster)
 	}
 
 	// The default does virtually nothing
-	return NewNullScheduler(podGetter, cluster)
+	return NewNullScheduler(pods, cluster)
 }

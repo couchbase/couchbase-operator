@@ -963,7 +963,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
 
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 1, numOfDocs)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)

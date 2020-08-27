@@ -46,6 +46,8 @@ var (
 		resource.NewSecretResource,
 		resource.NewServiceResource,
 		resource.NewServiceAccountResource,
+		resource.NewJobResource,
+		resource.NewCronJobResource,
 	}
 
 	// Define all implied sub-resources we can collect information for

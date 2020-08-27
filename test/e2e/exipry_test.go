@@ -32,7 +32,7 @@ func TestBucketTTL(t *testing.T) {
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Insert some docs into the bucket and verify, then expect them to be deleted
 	// in a minute.
@@ -66,7 +66,7 @@ func TestBucketTTLUpdate(t *testing.T) {
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Add TTL and verify, update the TTL and verify, delete the TTL and verify.
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/Spec/MaxTTL", &metav1.Duration{Duration: time.Minute}), time.Minute)

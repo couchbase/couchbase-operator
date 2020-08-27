@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
-
-	v1 "k8s.io/api/core/v1"
 )
 
 // serverList is a list of servers in a server group.
@@ -152,41 +149,3 @@ func (s serverGroups) largestGroup() string {
 
 // serverClassGroupMap maps server classes to their server groups of pods.
 type serverClassGroupMap map[string]serverGroups
-
-// PodGetter is an abstraction around the Kubernetes API for the purpose of
-// testability.
-type PodGetter interface {
-	Get() []*v1.Pod
-}
-
-// k8sPodGetter gets pods related to the specified cluster via a specified client.
-type k8sPodGetter struct {
-	// client is a client for accessing Kubernetes
-	client *client.Client
-}
-
-// NewK8SPodGetter allocates and initializes a new k8sPodGetter.
-func NewK8SPodGetter(client *client.Client) PodGetter {
-	return &k8sPodGetter{
-		client: client,
-	}
-}
-
-// Get returns the set of pods associated with the defined cluster object.
-func (g *k8sPodGetter) Get() []*v1.Pod {
-	return g.client.Pods.List()
-}
-
-// nullPodGetter returns no pods, used for testing.
-type nullPodGetter struct {
-}
-
-// NewNullPodGetter returns a new null pod getter.
-func NewNullPodGetter() PodGetter {
-	return &nullPodGetter{}
-}
-
-// Get returns an empty pod list.
-func (g *nullPodGetter) Get() []*v1.Pod {
-	return []*v1.Pod{}
-}

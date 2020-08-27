@@ -34,7 +34,7 @@ func testSDK(t *testing.T, local, remote *types.Cluster, config sdkConfig) {
 	e2eutil.MustNewBucket(t, remote, bucket)
 
 	cluster := e2eutil.MustNewXDCRCluster(t, remote, clusterSize, nil, tls, nil)
-	e2eutil.MustWaitUntilBucketsExists(t, remote, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, remote, cluster, bucket, time.Minute)
 
 	// When ready run the tests!
 	t.Run("V2", func(t *testing.T) {

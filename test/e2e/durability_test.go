@@ -35,7 +35,7 @@ func TestCreateDurableBucket(t *testing.T) {
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
 
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityMinLevel", couchbaseutil.DurabilityMajority), time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
@@ -65,7 +65,7 @@ func TestEditDurableBucket(t *testing.T) {
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
 
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/Spec/MinimumDurability", couchbasev2.CouchbaseBucketMinimumDurabilityMajority), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityMinLevel", couchbaseutil.DurabilityMajority), time.Minute)
@@ -104,7 +104,7 @@ func TestLoadDurableBucket(t *testing.T) {
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
 
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 1, numOfDocs)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)

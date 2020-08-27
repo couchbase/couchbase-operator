@@ -1314,7 +1314,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, mdsGroupSize)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, cbCluster, []string{e2espec.DefaultBucketTwoReplicas().Name}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, cbCluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{}
@@ -1581,7 +1581,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Cross check number of persistent vol claims matches the defined spec.
 	expectedPvcMap := map[string]int{}
@@ -1640,7 +1640,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	cluster.Spec.Logging.LogRetentionTime = "15m"
 	cluster.Spec.Logging.LogRetentionCount = maxLogCount
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Track pods we create and their expected number of persistent volumes.
 	expectedPvcMap := map[string]int{}

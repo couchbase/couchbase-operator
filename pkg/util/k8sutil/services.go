@@ -299,7 +299,7 @@ func generatePeerService(cluster *couchbasev2.CouchbaseCluster) (*v1.Service, er
 	// Fill in spec.
 	service.Spec.ClusterIP = v1.ClusterIPNone
 	service.Spec.PublishNotReadyAddresses = true
-	service.Spec.Selector = LabelsForCluster(cluster)
+	service.Spec.Selector = selectorForClusterResource(cluster)
 	service.Spec.Ports = ports
 
 	return service, nil
@@ -351,7 +351,7 @@ func ReconcilePeerServices(c *client.Client, cluster *couchbasev2.CouchbaseClust
 // adminConsoleSelector generates a selector matching pods running all the requested services.
 // This is lagacy, apparently all nodes behave the same on 6.5.0.
 func adminConsoleSelector(cluster *couchbasev2.CouchbaseCluster) map[string]string {
-	labels := LabelsForCluster(cluster)
+	labels := selectorForClusterResource(cluster)
 
 	for _, s := range cluster.Spec.Networking.AdminConsoleServices {
 		k := "couchbase_service_" + s.String()

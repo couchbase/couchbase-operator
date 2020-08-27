@@ -301,6 +301,7 @@ var (
 		"TestMultipleBackups":              TestMultipleBackups,
 		"TestFullIncrementalOverTLS":       TestFullIncrementalOverTLS,
 		"TestFullOnlyOverTLS":              TestFullOnlyOverTLS,
+		"TestBackupRetention":              TestBackupRetention,
 
 		// Node-to-node Encryption
 		"TestCreateClusterWithTLSAndControlPlaneNodeToNode":                            TestCreateClusterWithTLSAndControlPlaneNodeToNode,

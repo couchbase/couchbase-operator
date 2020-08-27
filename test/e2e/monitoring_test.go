@@ -49,7 +49,7 @@ func testPrometheusMetrics(t *testing.T, targetKube *types.Cluster, tls *e2eutil
 	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	if !enabled {
 		// Enable monitoring
@@ -204,7 +204,7 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 			bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 			e2eutil.MustNewBucket(t, targetKube, bucket)
-			e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+			e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 			// Enable monitoring.
 			monitoring := enableMonitoring(f)
@@ -268,7 +268,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// creating auth secret.
 	secret := &corev1.Secret{
@@ -330,7 +330,7 @@ func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Enable monitoring.
 	monitoring := enableMonitoring(f)

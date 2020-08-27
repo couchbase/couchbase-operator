@@ -130,24 +130,6 @@ var (
 	}
 )
 
-// testPodGetter replaces the standard Kubernetes API driven method
-// of listing pods and simply returns what we have given it.
-type testPodGetter struct {
-	pods []*v1.Pod
-}
-
-// newTestStripePodGetter initialises a new testPodGetter.
-func newTestStripePodGetter(pods []*v1.Pod) PodGetter {
-	return &testPodGetter{
-		pods: pods,
-	}
-}
-
-// Get returns a list of precached pods.
-func (g *testPodGetter) Get() []*v1.Pod {
-	return g.pods
-}
-
 // podFixture returns a pod object with the node configuration (server class) set.
 func podFixture(name, class, group string) *v1.Pod {
 	pod := &v1.Pod{
@@ -227,9 +209,8 @@ func mustCreate(t *testing.T, s Scheduler, name, class, group string) string {
 // Adds a pod to global server groups and expects it to be scheduled deterministically.
 func TestStripeCreateGlobalSingle(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsEmpty)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsEmpty, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,9 +221,8 @@ func TestStripeCreateGlobalSingle(t *testing.T) {
 // Adds four pods to global server groups and expects them to be scheduled deterministically.
 func TestStripeCreateGlobalMultiple(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsEmpty)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsEmpty, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,9 +236,8 @@ func TestStripeCreateGlobalMultiple(t *testing.T) {
 // Adds three pods to override server groups and expects them to be scheduled deterministically.
 func TestStripeCreateOverrideMultiple(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsEmpty)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsEmpty, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,9 +250,8 @@ func TestStripeCreateOverrideMultiple(t *testing.T) {
 // TestStripe bad configurations error.
 func TestStripeInvalidConfiguration(t *testing.T) {
 	c := fixtureClusterInvalid
-	g := newTestStripePodGetter(fixturePodsEmpty)
 
-	_, err := NewStripeScheduler(g, c)
+	_, err := NewStripeScheduler(fixturePodsEmpty, c)
 	if err == nil {
 		t.Fatal("Scheduler accepted invalid configuration")
 	}
@@ -282,9 +260,8 @@ func TestStripeInvalidConfiguration(t *testing.T) {
 // TestStripe pods missing server class labels error.
 func TestStripeInvalidPodServerClassLabels(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsInvalidServerClassLabels)
 
-	_, err := NewStripeScheduler(g, c)
+	_, err := NewStripeScheduler(fixturePodsInvalidServerClassLabels, c)
 	if err == nil {
 		t.Fatal("Scheduler accepted pods with missing server class labels")
 	}
@@ -293,9 +270,8 @@ func TestStripeInvalidPodServerClassLabels(t *testing.T) {
 // Test pods missing server group labels error.
 func TestStripeInvalidPodServerGroupNodeSelector(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsInvalidServerGroupNodeSelector)
 
-	_, err := NewStripeScheduler(g, c)
+	_, err := NewStripeScheduler(fixturePodsInvalidServerGroupNodeSelector, c)
 	if err == nil {
 		t.Fatal("Scheduler accepted pods with missing server group labels")
 	}
@@ -304,9 +280,8 @@ func TestStripeInvalidPodServerGroupNodeSelector(t *testing.T) {
 // Test that pods are deterministically scheduled when initialised with existing pods.
 func TestStripeCreateGlobalExistingPods(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsCreate)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsCreate, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,9 +292,8 @@ func TestStripeCreateGlobalExistingPods(t *testing.T) {
 // Test that pods are deterministically scheduled when initialised with existing pods.
 func TestStripeCreateOverrideExistingPods(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsCreate)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsCreate, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,9 +304,8 @@ func TestStripeCreateOverrideExistingPods(t *testing.T) {
 // Test that scheduling a deletion of an empty server class errors.
 func TestStripeDeleteGlobalSingleEmptyClass(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsEmpty)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsEmpty, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,9 +318,8 @@ func TestStripeDeleteGlobalSingleEmptyClass(t *testing.T) {
 // Test that scheduling a deletion of a server is deterministic.
 func TestStripeDeleteGlobalSingle(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsDelete)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsDelete, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,9 +335,8 @@ func TestStripeDeleteGlobalSingle(t *testing.T) {
 // Test that scheduling a deletion of multiple servers is deterministic.
 func TestStripeDeleteGlobalMultiple(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsDelete)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsDelete, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,9 +364,8 @@ func TestStripeDeleteGlobalMultiple(t *testing.T) {
 // Test that deletion and addition occur correctly.
 func TestStipeDeleteCreateGlobalSingle(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsDelete)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsDelete, c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,9 +382,8 @@ func TestStipeDeleteCreateGlobalSingle(t *testing.T) {
 // Test that the scheduler correctly interrogates pod state.
 func TestStripeAddGlobalSingleOnPodFailure(t *testing.T) {
 	c := fixtureCluster
-	g := newTestStripePodGetter(fixturePodsFailure)
 
-	s, err := NewStripeScheduler(g, c)
+	s, err := NewStripeScheduler(fixturePodsFailure, c)
 	if err != nil {
 		t.Fatal(err)
 	}

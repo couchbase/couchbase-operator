@@ -12,7 +12,7 @@ import (
 // It looks at Kubernetes for pods and pvcs (this is ostensibly free).
 func (c *Cluster) updateMembers() error {
 	// Get all pods these are running and ready for attempted API access.
-	runningPods, _ := c.pollPods()
+	runningPods, _ := c.getClusterPodsByPhase()
 	runningMembers := podsToMemberSet(runningPods)
 
 	// All pods are members as are persistent volume claims.

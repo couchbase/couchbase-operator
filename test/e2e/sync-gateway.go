@@ -44,7 +44,7 @@ func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes2, bucket)
 	cluster := e2eutil.MustNewXDCRCluster(t, kubernetes2, clusterSize, nil, tls, policy)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes2, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, cluster, bucket, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.
 	e2eutil.MustCreateSyncGateway(t, kubernetes1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), nil, dns, tls, time.Minute)
@@ -222,7 +222,7 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	e2eutil.MustNewBucket(t, k8s1, bucket)
 
 	cluster := e2eutil.MustNewClusterBasic(t, k8s1, clusterSize)
-	e2eutil.MustWaitUntilBucketsExists(t, k8s1, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, k8s1, cluster, bucket, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.
 	e2eutil.MustCreateSyncGateway(t, k8s1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), secret, nil, nil, time.Minute)

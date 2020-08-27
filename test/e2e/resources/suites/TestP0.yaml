@@ -155,6 +155,7 @@ testcases:
 - TestFullIncrementalOverTLS
 - TestFullOnlyOverTLS
 - TestMultipleBackups
+#- TestBackupRetention
 
 # Monitoring Tests
 - TestPrometheusMetrics

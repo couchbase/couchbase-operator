@@ -105,7 +105,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
+	e2eutil.MustWaitUntilBucketsExist(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
 	// When ready, deploy an eventing function to create documents in a destination
 	// bucket based on source bucket documents. Populate the source and ensure the
@@ -146,7 +146,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
+	e2eutil.MustWaitUntilBucketsExist(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
 	// When ready deploy the eventing function and generate workload.  Scale the cluster
 	// up and down then stop the workload.  Expect the number of documents in the destination
@@ -205,7 +205,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, bucketNames, time.Minute)
+	e2eutil.MustWaitUntilBucketsExist(t, targetKube, testCouchbase, bucketNames, time.Minute)
 
 	// When ready deploy the eventing function and generate workload.  Kill pods in sequence
 	// then stop the workload.  Expect the number of documents in the destination bucket to

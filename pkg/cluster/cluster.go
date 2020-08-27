@@ -187,12 +187,6 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 
 	log.Info("Watching new cluster", "cluster", c.namespacedName())
 
-	// Initialize the scheduler for the initial pod
-	if c.scheduler, err = scheduler.New(c.k8s, c.cluster); err != nil {
-		log.Error(err, "Error initializing pod scheduler", "cluster", c.namespacedName())
-		return nil, err
-	}
-
 	// Spawn the janitor process which monitors persistent log volumes.
 	go newJanitor(c).run()
 
@@ -372,7 +366,7 @@ func (c *Cluster) runReconcile() {
 	// Otherwise indicate that we are in control.
 	c.cluster.Status.Control()
 
-	running, pending := c.pollPods()
+	running, pending := c.getClusterPodsByPhase()
 	if len(pending) > 0 {
 		// Pod startup might take long, e.g. pulling image. It would
 		// deterministically become running or succeeded/failed later.
@@ -579,8 +573,10 @@ func (c *Cluster) recoverClusterDown() error {
 	return nil
 }
 
-func (c *Cluster) pollPods() (running, pending []*v1.Pod) {
-	pods := c.k8s.Pods.List()
+// filterClusterPods returns a filtered list of pods that belong to this Couchbase cluster
+// instance.
+func (c *Cluster) filterClusterPods(pods []*v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
 
 	for _, pod := range pods {
 		// Avoid polling deleted pods
@@ -598,6 +594,32 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod) {
 			continue
 		}
 
+		if _, ok := pod.Labels[constants.LabelBackup]; ok {
+			log.V(1).Info("Backup pod ignored", "cluster", c.namespacedName(), "name", pod.Name)
+			continue
+		}
+
+		if _, ok := pod.Labels[constants.LabelBackupRestore]; ok {
+			log.V(1).Info("Restore pod ignored", "cluster", c.namespacedName(), "name", pod.Name)
+			continue
+		}
+
+		result = append(result, pod)
+	}
+
+	return result
+}
+
+// getClusterPods returns all pods related to the cluster, excluding any anciliary
+// ones such as backup and restore.
+func (c *Cluster) getClusterPods() []*v1.Pod {
+	return c.filterClusterPods(c.k8s.Pods.List())
+}
+
+func (c *Cluster) getClusterPodsByPhase() (running, pending []*v1.Pod) {
+	pods := c.getClusterPods()
+
+	for _, pod := range pods {
 		switch pod.Status.Phase {
 		case v1.PodRunning:
 			running = append(running, pod)
@@ -606,7 +628,7 @@ func (c *Cluster) pollPods() (running, pending []*v1.Pod) {
 		}
 	}
 
-	return running, pending
+	return
 }
 
 func (c *Cluster) updateMemberStatus(firstMember bool) error {

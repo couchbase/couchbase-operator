@@ -181,7 +181,7 @@ func MustWaitUntilPodSizeReached(t *testing.T, k8s *types.Cluster, couchbase *co
 	}
 }
 
-func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, buckets []string, timeout time.Duration) error {
+func WaitUntilBucketsExist(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, buckets []string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -242,8 +242,61 @@ func WaitUntilBucketsExists(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 	return nil
 }
 
-func MustWaitUntilBucketsExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, buckets []string, timeout time.Duration) {
-	if err := WaitUntilBucketsExists(k8s, couchbase, buckets, timeout); err != nil {
+func MustWaitUntilBucketsExist(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, buckets []string, timeout time.Duration) {
+	if err := WaitUntilBucketsExist(k8s, couchbase, buckets, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func getBucketName(bucket interface{}) (string, error) {
+	switch typed := bucket.(type) {
+	case *couchbasev2.CouchbaseBucket:
+		name := typed.Name
+
+		if typed.Spec.Name != "" {
+			name = typed.Spec.Name
+		}
+
+		return name, nil
+	case *couchbasev2.CouchbaseEphemeralBucket:
+		name := typed.Name
+
+		if typed.Spec.Name != "" {
+			name = typed.Spec.Name
+		}
+
+		return name, nil
+	case *couchbasev2.CouchbaseMemcachedBucket:
+		name := typed.Name
+
+		if typed.Spec.Name != "" {
+			name = typed.Spec.Name
+		}
+
+		return name, nil
+	case string:
+		return typed, nil
+	}
+
+	return "", fmt.Errorf("unhandled bucket type")
+}
+
+func WaitUntilBucketExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucket interface{}, timeout time.Duration) error {
+	name, err := getBucketName(bucket)
+	if err != nil {
+		return err
+	}
+
+	return WaitUntilBucketsExist(k8s, couchbase, []string{name}, timeout)
+}
+
+func MustWaitUntilBucketExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucket interface{}, timeout time.Duration) {
+	name, err := getBucketName(bucket)
+	if err != nil {
+		Die(t, err)
+	}
+
+	if err := WaitUntilBucketsExist(k8s, couchbase, []string{name}, timeout); err != nil {
 		Die(t, err)
 	}
 }

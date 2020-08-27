@@ -232,7 +232,7 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 	}
 
 	fsm := &ReconcileMachine{
-		runningPods:   podsToMemberSet(c.k8s.Pods.List()),
+		runningPods:   podsToMemberSet(c.getClusterPods()),
 		knownNodes:    couchbaseutil.NewMemberSet(),
 		newNodes:      couchbaseutil.NewMemberSet(),
 		ejectNodes:    couchbaseutil.NewMemberSet(),

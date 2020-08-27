@@ -96,7 +96,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// When the cluster is ready, pause the operator, and await aknowledgement.  Manually update the bucket, then kill
 	// and unpause the operator.  Verify the bucket was updated and wait for it to revert as the operator regains mastership.

@@ -683,6 +683,50 @@ func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.
 	}
 }
 
+func PatchBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseBackup, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return backup, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+		// Get the current backup resource
+		before, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Get(backup.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		// Apply the patch set to the backup
+		after := before.DeepCopy()
+		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		// If we are not modifiying e.g. just testing, then return ok
+		if reflect.DeepEqual(before, after) {
+			return true, nil
+		}
+
+		// Attempt to post the update, updating the backup
+		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Update(after)
+		if err != nil {
+			return false, retryutil.RetryOkError(err)
+		}
+
+		// Everything successful
+		backup = updated
+
+		return true, nil
+	})
+}
+
+func MustPatchBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseBackup {
+	backup, err := PatchBackup(k8s, backup, patches, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return backup
+}
+
 func PatchBucket(k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.PatchSet, timeout time.Duration) (metav1.Object, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -941,6 +985,7 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m cou
 			Name: m.Name(),
 			Labels: map[string]string{
 				operator_constants.LabelApp:      "couchbase",
+				operator_constants.LabelServer:   "true",
 				operator_constants.LabelCluster:  cl.Name,
 				operator_constants.LabelNode:     m.Name(),
 				operator_constants.LabelNodeConf: m.Config(),

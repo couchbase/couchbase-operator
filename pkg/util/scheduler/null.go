@@ -6,6 +6,8 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -20,7 +22,7 @@ type nullSchedulerImpl struct {
 }
 
 // NewNullScheduler returns a new null scheduler.
-func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
+func NewNullScheduler(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
 	// Add existing servers to the server list, we need this for scheduling
 	// pod removal
 	sched := &nullSchedulerImpl{
@@ -31,7 +33,7 @@ func NewNullScheduler(podGetter PodGetter, cluster *couchbasev2.CouchbaseCluster
 		sched.serverClasses[class.Name] = &serverList{}
 	}
 
-	for _, pod := range podGetter.Get() {
+	for _, pod := range pods {
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
 			return nil, fmt.Errorf("%s: pod %s does not have server class label: %w", stripeErrorHeader, pod.Name, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))

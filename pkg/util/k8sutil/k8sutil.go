@@ -158,6 +158,13 @@ func getNodeServiceSelectors(cluster *couchbasev2.CouchbaseCluster, nodeName str
 	return selectors
 }
 
+func selectorForClusterResource(cluster *couchbasev2.CouchbaseCluster) map[string]string {
+	labels := LabelsForCluster(cluster)
+	labels[constants.LabelServer] = "true"
+
+	return labels
+}
+
 func selectorForDataService(cluster *couchbasev2.CouchbaseCluster) map[string]string {
 	labels := LabelsForCluster(cluster)
 	labels["couchbase_service_data"] = "enabled"

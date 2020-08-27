@@ -101,9 +101,9 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	for i, bucket := range buckets {
+	for _, bucket := range buckets {
 		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, names[:i+1], 2*time.Minute)
+		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 	}
 
@@ -147,7 +147,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	for _, bucket := range buckets {
 		name := bucket.GetName()
 		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{name}, 2*time.Minute)
+		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 		e2eutil.MustDeleteBucket(t, targetKube, bucket)
 		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, name, 2*time.Minute)
@@ -190,7 +190,7 @@ func TestEditBucket(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Create a direct connection to a couchbase node.
 	// When healthy change the memory quota, replicas, whether flushes are allowed and the compression mode.
@@ -255,7 +255,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, constants.Size1)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
 	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
@@ -301,7 +301,7 @@ func TestBucketUnmanaged(t *testing.T) {
 	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
 
 	// Ensure the bucket doesn't get created.
-	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{bucket.GetName()}, time.Minute); err == nil {
+	if err := e2eutil.WaitUntilBucketExists(targetKube, couchbase, bucket, time.Minute); err == nil {
 		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
 	}
 
@@ -345,7 +345,7 @@ func TestBucketSelection(t *testing.T) {
 	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
 
 	// Ensure the unlabelled bucket doesn't get created.
-	if err := e2eutil.WaitUntilBucketsExists(targetKube, couchbase, []string{e2espec.DefaultBucket().Name}, time.Minute); err == nil {
+	if err := e2eutil.WaitUntilBucketExists(targetKube, couchbase, e2espec.DefaultBucket(), time.Minute); err == nil {
 		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
 	}
 
@@ -382,7 +382,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExists(t, targetKube, testCouchbase, []string{bucket.GetName()}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, bucket.GetName(), 10)
 
 	// Pause the operator, failover the victim, then create a new bucket and populate it.
@@ -433,7 +433,7 @@ func TestBucketWithExplicitName(t *testing.T) {
 	bucketTyped.Spec.Name = bucketName
 	e2eutil.MustNewBucket(t, kubernetes, bucketTyped)
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucketName}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucketTyped, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -472,7 +472,9 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketTyped1.Labels = labels1
 	bucketTyped1.Spec.Name = bucketName
 
-	e2eutil.MustNewBucket(t, kubernetes, bucketTyped1)
+	var bucketUntyped1 metav1.Object = bucketTyped1
+
+	bucketUntyped1 = e2eutil.MustNewBucket(t, kubernetes, bucketUntyped1)
 
 	cluster1 := e2espec.NewBasicCluster(clusterSize)
 	cluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
@@ -480,7 +482,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	}
 	cluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster1)
 
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster1, []string{bucketName}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster1, bucketUntyped1, time.Minute)
 
 	// Create the second cluster with an ephemeral bucket.
 	bucketTyped2 := e2espec.DefaultEphemeralBucket()
@@ -489,7 +491,9 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketTyped2.Labels = labels2
 	bucketTyped2.Spec.Name = bucketName
 
-	e2eutil.MustNewBucket(t, kubernetes, bucketTyped2)
+	var bucketUntyped2 metav1.Object = bucketTyped2
+
+	bucketUntyped2 = e2eutil.MustNewBucket(t, kubernetes, bucketUntyped2)
 
 	cluster2 := e2espec.NewBasicCluster(clusterSize)
 	cluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
@@ -497,7 +501,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	}
 	cluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster2)
 
-	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster2, []string{bucketName}, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster2, bucketUntyped2, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

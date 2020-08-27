@@ -50,6 +50,18 @@ func (c *Cluster) reconcile() error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
 	defer log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
 
+	pods := c.getClusterPods()
+
+	// Initialize the scheduler each time around, this saves us having to update
+	// internal state in all the cases when a pod fails to be created, deleted,
+	// or disappears.
+	scheduler, err := scheduler.New(pods, c.cluster)
+	if err != nil {
+		return err
+	}
+
+	c.scheduler = scheduler
+
 	// Hibernation trumps all.
 	if c.cluster.Spec.Hibernate {
 		if err := c.hibernate(); err != nil {
@@ -76,6 +88,16 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
+	// Pod recovery has precedence over cluster creation.  If cluster creation happened
+	// first, there would actually be a pod, but the initial condition would be none
+	// and weird could happen.
+	if len(pods) == 0 {
+		err := c.recoverClusterDown()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Create/recreate the cluster.
 	if c.members.Empty() {
 		if err := c.create(); err != nil {
@@ -97,21 +119,6 @@ func (c *Cluster) reconcile() error {
 	// the API.
 	if err := c.reconcileAdminPassword(); err != nil {
 		return err
-	}
-
-	// Initialize the scheduler each time around, this saves us having to update
-	// internal state in all the cases when a pod fails to be created, deleted,
-	// or disappears
-	var err error
-	if c.scheduler, err = scheduler.New(c.k8s, c.cluster); err != nil {
-		return err
-	}
-
-	if len(c.k8s.Pods.List()) == 0 {
-		err := c.recoverClusterDown()
-		if err != nil {
-			return err
-		}
 	}
 
 	if err := c.reconcileClusterSettings(); err != nil {
@@ -2230,10 +2237,14 @@ func (c *Cluster) reconcileBackupRestore() error {
 	// loop over the current existing jobs
 Outerloop:
 	for _, job := range jobs {
+		if _, ok := job.Labels[constants.LabelBackupRestore]; !ok {
+			continue
+		}
+
 		// check if the job has an "owner" restore
 		for _, currentRestore := range currentRestores {
 			if job.Name == currentRestore.Name {
-				break Outerloop
+				continue Outerloop
 			}
 		}
 
@@ -2506,7 +2517,7 @@ func (c *Cluster) getNodeNetworkConfiguration(m couchbaseutil.Member, s *couchba
 // comes backup after a lights-out and the pod restart policy denies reuse of the pod from
 // disk.  Which does beg the question, should we allow this?
 func (c *Cluster) reconcileCompletedPods() error {
-	for _, pod := range c.k8s.Pods.List() {
+	for _, pod := range c.getClusterPods() {
 		// Succeeded and failed means the pod has terminated, kill it!
 		// Things to note: members are only considered so if they are Running or
 		// Pending, so we need to do no book keeping.  Also persistent recovery
