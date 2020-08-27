@@ -8,13 +8,13 @@ import (
 )
 
 // DumpYAML takes a tagged struct and dumps it to standard out as YAML.
-func DumpYAML(conf *Config, name string, object interface{}) error {
+func DumpYAML(toFile bool, name string, object interface{}) error {
 	data, err := yaml.Marshal(object)
 	if err != nil {
 		return err
 	}
 
-	if conf.File {
+	if toFile {
 		file, err := os.Create(name + ".yaml")
 		if err != nil {
 			return err

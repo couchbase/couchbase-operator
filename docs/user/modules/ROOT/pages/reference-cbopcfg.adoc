@@ -80,31 +80,30 @@ $ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 --
 ====
 
-=== Options
+== Commands
 
-component::
-This positional parameter must be specified and maust be one of `operator`, `admission` or `backup`.
-This specifies the specific component to install.
+=== cbopcfg generate admission
 
---namespace <string>::
+This command generates YAML to the console that is necessary to create the dynamic admission controller.
+By default this is installed at the cluster scope.
+
+The following options are provided:
+
+-n, --namespace <string>::
 If specified, this will override the default namespace `default`.
-Specifying the namespace is especially important when installing the dynamic admission controller as this flag affects TLS certificate generation.
 
---operator-image <string>::
-If specified, this will override the default operator image `couchbase/operator:{operator-version}`.
-
---dynamic-admission-controller-image <string>::
+-i, --image <string>::
 If specified, this will override the default admission controller image `couchbase/admission-controller:{operator-version}`.
 
---image-pull-secret <string>::
+-p, --image-pull-secret <string>::
 If specified, this will add the image pull secret name to all deployments.
 This is required when pulling images from private container repositories such as the Red Hat container registry.
 
---file::
-If specified, individual YAML files are created rather than all output going to the console.
-
---cluster::
-If specified, this will configure the DAC/Operator to run at the cluster scope (as opposed to namespace scope) meaning only one instance is required per Kubernetes cluster.
+-s, --scope <string>::
+If specified, this will override the default scope `cluster`.
+When using the `namespace` scope, then the dynamic admission controller will be deployed with a Kubernetes `Role`.
+This limits the ability of the admission controller for security reasons, while maintaining full functionality.
+When deployed with the `namespace` scope, you must also specify the `--namepsace-selector` option.
 
 --namespace-selector <string>::
 If specified, this configures admission webhooks to select a DAC instance in a specific namespace.
@@ -125,8 +124,45 @@ Then finally reference it in your DAC configuration:
 +
 [source,console]
 ----
-$ cbopcfg admission -namespace-selector namespace-name=foo
+$ cbopcfg generate admission --scope namespace --namespace-selector namespace-name=foo
 ----
+
+--file::
+If specified, individual YAML files are created rather than all output going to the console.
+
+=== cbopcfg generate operator
+
+This command generates YAML that is necessary to deploy the Operator.
+By default this is installed at the namespace scope.
+
+The following options are provided:
+
+-n, --namespace <string>::
+If specified, this will override the default namespace `default`.
+
+-i, --image <string>::
+If specified, this will override the default operator image `couchbase/operator:{operator-version}`.
+
+-p, --image-pull-secret <string>::
+If specified, this will add the image pull secret name to all deployments.
+This is required when pulling images from private container repositories such as the Red Hat container registry.
+
+-s, --scope <string>::
+If specified, this will override the default scope `namespace`.
+By default the Operator will run in a namespace and will not be able to see resources in another namespace.
+This option may be set to `cluster` that will allow a single Operator instance to control Couchbase clusters in all namespace in the Kubernetes cluster.
+
+--file::
+If specified, individual YAML files are created rather than all output going to the console.
+
+=== cbopcfg generate backup
+
+This command generates YAML that is required by backup jobs for status reporting.
+
+The following options are provided:
+
+-n, --namespace <string>::
+If specified, this will override the default namespace `default`.
 
 == Examples
 

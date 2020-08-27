@@ -11,6 +11,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -18,33 +20,86 @@ const (
 	OperatorResourceName = "couchbase-operator"
 )
 
-// DumpOperatorYAML dumps all operator resources to standard out.
-func DumpOperatorYAML(conf *Config) error {
+// generateOperatorOptions defines the options for creating the operator.
+type generateOperatorOptions struct {
+	// namespace is the namespace into which the resources should be generated.
+	namespace string
+
+	// image is the operator image name.
+	image string
+
+	// scope is the scope with which to generate the operator.
+	scope string
+
+	// imagePullSecret is the name of an image pull secret for authenticating image pulls.
+	imagePullSecret string
+
+	// file defines whether or not to output to a file.
+	file bool
+}
+
+// getGenerateOperatorCommand creates YAML capable of creating the Operator.
+func getGenerateOperatorCommand() *cobra.Command {
+	o := &generateOperatorOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "operator",
+		Short: "Generates YAML for the operator",
+		Long:  "Generates YAML for the operator",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := o.validate(); err != nil {
+				return err
+			}
+
+			return o.generate()
+		},
+	}
+
+	cmd.Flags().StringVarP(&o.scope, "scope", "s", "namespace", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+	cmd.Flags().StringVarP(&o.namespace, "namespace", "n", "default", "Namespace to generate resources in.")
+	cmd.Flags().StringVarP(&o.image, "image", "i", operatorImageDefault, "Operator image to use")
+	cmd.Flags().StringVarP(&o.imagePullSecret, "image-pull-secret", "p", "", "Image pull secret to allow access to the operator image")
+	cmd.Flags().BoolVar(&o.file, "file", false, "Generate files rather than printing to the console")
+
+	return cmd
+}
+
+// validate performs any validation that cobra doesn't on options.
+func (o *generateOperatorOptions) validate() error {
+	if err := validateScope(o.scope); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// generate dumps all operator resources to standard out.
+func (o *generateOperatorOptions) generate() error {
 	var imagePullSecrets []string
 
-	if conf.ImagePullSecret != "" {
+	if o.imagePullSecret != "" {
 		imagePullSecrets = []string{
-			conf.ImagePullSecret,
+			o.imagePullSecret,
 		}
 	}
 
-	if err := DumpYAML(conf, "operator-service-account", GetOperatorServiceAccount(conf.Namespace)); err != nil {
+	if err := DumpYAML(o.file, "operator-service-account", GetOperatorServiceAccount(o.namespace)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-role", GetOperatorRole(conf.Namespace, conf.Cluster)); err != nil {
+	if err := DumpYAML(o.file, "operator-role", GetOperatorRole(o.namespace, o.scope == scopeCluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-role-binding", GetOperatorRoleBinding(conf.Namespace, conf.Cluster)); err != nil {
+	if err := DumpYAML(o.file, "operator-role-binding", GetOperatorRoleBinding(o.namespace, o.scope == scopeCluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.Namespace, conf.OperatorImage, imagePullSecrets, conf.Cluster, 10*time.Minute)); err != nil {
+	if err := DumpYAML(o.file, "operator-deployment", GetOperatorDeployment(o.namespace, o.image, imagePullSecrets, o.scope == scopeCluster, 10*time.Minute)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-service", GenerateOperatorService(conf.Namespace)); err != nil {
+	if err := DumpYAML(o.file, "operator-service", GenerateOperatorService(o.namespace)); err != nil {
 		return err
 	}
 

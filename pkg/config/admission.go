@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -14,6 +15,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -21,8 +24,70 @@ const (
 	AdmissionResourceName = "couchbase-operator-admission"
 )
 
-// DumpAdmissionYAML dumps all admission controller resources to standard out.
-func DumpAdmissionYAML(conf *Config) error {
+// generateAdmissionOptions defines options for creating the admission controller.
+type generateAdmissionOptions struct {
+	// namespace is the namespace into which the resources should be generated.
+	namespace string
+
+	// image is the admission controller image name.
+	image string
+
+	// scope is the scope with which to generate the admission controller.
+	scope string
+
+	// imagePullSecret is the name of an image pull secret for authenticating image pulls.
+	imagePullSecret string
+
+	// namespaceSelector defines the namespace selector to apply API webhooks to when
+	// using the admission controller in namespace scope.
+	namespaceSelector LabelSelectorVar
+
+	// file defines whether or not to output to a file.
+	file bool
+}
+
+// getGenerateAdmissionCommand creates YAML capable of creating the dynamic admission controller.
+func getGenerateAdmissionCommand() *cobra.Command {
+	o := &generateAdmissionOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "admission",
+		Short: "Generates YAML for the dynamic admission controller",
+		Long:  "Generates YAML for the dynamic admission controller",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := o.validate(); err != nil {
+				return err
+			}
+
+			return o.generate()
+		},
+	}
+
+	cmd.Flags().StringVarP(&o.scope, "scope", "s", "cluster", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+	cmd.Flags().StringVarP(&o.namespace, "namespace", "n", "default", "Namespace to generate resources in.")
+	cmd.Flags().StringVarP(&o.image, "image", "i", admissionImageDefault, "Operator image to use")
+	cmd.Flags().StringVarP(&o.imagePullSecret, "image-pull-secret", "p", "", "Image pull secret to allow access to the operator image")
+	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
+	cmd.Flags().BoolVar(&o.file, "file", false, "Generate files rather than printing to the console")
+
+	return cmd
+}
+
+// validate performs any validation that cobra doesn't on options.
+func (o *generateAdmissionOptions) validate() error {
+	if err := validateScope(o.scope); err != nil {
+		return err
+	}
+
+	if o.scope == scopeNamespace && o.namespaceSelector.LabelSelector == nil {
+		return fmt.Errorf("dynamic admission controller with namespace scope requires the --namespace-selector flag")
+	}
+
+	return nil
+}
+
+// generate dumps all admission controller resources to standard out.
+func (o *generateAdmissionOptions) generate() error {
 	// Generate TLS configuration for the dynamic admission controller.
 	validFrom := time.Now()
 	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)
@@ -37,7 +102,7 @@ func DumpAdmissionYAML(conf *Config) error {
 				CommonName: AdmissionResourceName,
 			},
 			DNSNames: []string{
-				AdmissionResourceName + "." + conf.Namespace + ".svc",
+				AdmissionResourceName + "." + o.namespace + ".svc",
 			},
 		},
 	}
@@ -45,42 +110,42 @@ func DumpAdmissionYAML(conf *Config) error {
 
 	var imagePullSecrets []string
 
-	if conf.ImagePullSecret != "" {
+	if o.imagePullSecret != "" {
 		imagePullSecrets = []string{
-			conf.ImagePullSecret,
+			o.imagePullSecret,
 		}
 	}
 
 	// Create resources.
-	if err := DumpYAML(conf, "admission-service-account", GetAdmissionServiceAccount(conf.Namespace)); err != nil {
+	if err := DumpYAML(o.file, "admission-service-account", GetAdmissionServiceAccount(o.namespace)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-cluster-role", GetAdmissionRole(conf.Namespace, conf.Cluster)); err != nil {
+	if err := DumpYAML(o.file, "admission-cluster-role", GetAdmissionRole(o.namespace, o.scope == scopeCluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-cluster-role-binding", GetAdmissionRoleBinding(conf.Namespace, conf.Cluster)); err != nil {
+	if err := DumpYAML(o.file, "admission-cluster-role-binding", GetAdmissionRoleBinding(o.namespace, o.scope == scopeCluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-secret", GetAdmissionSecret(conf.Namespace, key, cert)); err != nil {
+	if err := DumpYAML(o.file, "admission-secret", GetAdmissionSecret(o.namespace, key, cert)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-deployment", GetAdmissionDeployment(conf.Namespace, conf.AdmissionImage, imagePullSecrets)); err != nil {
+	if err := DumpYAML(o.file, "admission-deployment", GetAdmissionDeployment(o.namespace, o.image, imagePullSecrets)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-service", GetAdmissionService(conf.Namespace)); err != nil {
+	if err := DumpYAML(o.file, "admission-service", GetAdmissionService(o.namespace)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-mutating-webhook", GetAdmissionMutatingWebhook(conf.Namespace, ca.Certificate, conf.Cluster, conf.NamespaceSelector.LabelSelector)); err != nil {
+	if err := DumpYAML(o.file, "admission-mutating-webhook", GetAdmissionMutatingWebhook(o.namespace, ca.Certificate, o.scope == scopeCluster, o.namespaceSelector.LabelSelector)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(conf, "admission-validating-webhook", GetAdmissionValidatingWebhook(conf.Namespace, ca.Certificate, conf.Cluster, conf.NamespaceSelector.LabelSelector)); err != nil {
+	if err := DumpYAML(o.file, "admission-validating-webhook", GetAdmissionValidatingWebhook(o.namespace, ca.Certificate, o.scope == scopeCluster, o.namespaceSelector.LabelSelector)); err != nil {
 		return err
 	}
 

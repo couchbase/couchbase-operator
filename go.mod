@@ -29,6 +29,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/securego/gosec v0.0.0-20200316084457-7da9f46445fd // indirect
 	github.com/sirupsen/logrus v1.5.0
+	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
 	go.uber.org/zap v1.14.1
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
