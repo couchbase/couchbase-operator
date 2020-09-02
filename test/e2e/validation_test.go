@@ -816,7 +816,7 @@ func TestNegValidationCreate(t *testing.T) {
 			name:           "TestValidateMonitoringInvalidImage",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/monitoring/prometheus/image", "mr-tickle")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.monitoring.prometheus.image in body should match '^[\w_\.\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$'`},
+			expectedErrors: []string{`spec.monitoring.prometheus.image in body should match '^(.*?(:\d+)?/)?.*?/.*?(:.*?\d+\.\d+\.\d+.*|@sha256:[0-9a-f]{64})$''`},
 		},
 		{
 			name:           "TestValidateDataServiceMemoryQuotaUnderflow",

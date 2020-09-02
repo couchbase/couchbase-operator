@@ -71,7 +71,7 @@ func createAdmissionController(k8s *types.Cluster) error {
 	var pullSecret string
 
 	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil {
-		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
+		pullSecret = k8s.PullSecrets[admissionNamespace][0]
 	}
 
 	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, pullSecret, "-v", "1")
