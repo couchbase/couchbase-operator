@@ -75,15 +75,7 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		return err
 	}
 
-	// This just picks the first, so ordering is important unless we sort out
-	// cbopcfg...
-	var pullSecret string
-
-	if pullSecrets != nil && len(k8s.PullSecrets) > 0 {
-		pullSecret = pullSecrets[0]
-	}
-
-	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, pullSecret, "-v", "1")
+	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, pullSecrets, "-v", "1")
 
 	if _, err := client.AppsV1().Deployments(admissionNamespace).Create(deployment); err != nil {
 		return err

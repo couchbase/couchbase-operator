@@ -189,6 +189,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 								FSGroup: c.cluster.Spec.SecurityContext.FSGroup,
 							},
 							ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
+							ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
 							Tolerations:        c.cluster.Spec.Backup.Tolerations,
 							Volumes: []corev1.Volume{
 								{
@@ -295,6 +296,7 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
+					ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
 					InitContainers:     nil,
 					Containers: []corev1.Container{
 						c.generateRestoreContainer(restore.Spec, start, end),

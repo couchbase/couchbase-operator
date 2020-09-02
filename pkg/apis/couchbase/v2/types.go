@@ -833,6 +833,9 @@ type Backup struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 	// Tolerations specifies all backup pod tolerations.
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+	// ImagePullSecrets allow you to use an image from private
+	// repos and non-dockerhub ones.
+	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=None;StartTLSExtension;TLS

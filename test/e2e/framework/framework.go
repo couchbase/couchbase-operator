@@ -280,15 +280,7 @@ func GetDuration(timeoutStr string) time.Duration {
 }
 
 func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
-	// This just picks the first, so ordering is important unless we sort out
-	// cbopcfg...
-	var pullSecret string
-
-	if k8s.PullSecrets != nil && len(k8s.PullSecrets) > 0 {
-		pullSecret = k8s.PullSecrets[0]
-	}
-
-	deployment := config.GetOperatorDeployment("", operatorImage, pullSecret, false, podCreateTimeout, "--zap-level", "debug")
+	deployment := config.GetOperatorDeployment("", operatorImage, k8s.PullSecrets, false, podCreateTimeout, "--zap-level", "debug")
 
 	return deployment
 }

@@ -20,6 +20,14 @@ const (
 
 // DumpOperatorYAML dumps all operator resources to standard out.
 func DumpOperatorYAML(conf *Config) error {
+	var imagePullSecrets []string
+
+	if conf.ImagePullSecret != "" {
+		imagePullSecrets = []string{
+			conf.ImagePullSecret,
+		}
+	}
+
 	if err := DumpYAML(conf, "operator-service-account", GetOperatorServiceAccount(conf.Namespace)); err != nil {
 		return err
 	}
@@ -32,7 +40,7 @@ func DumpOperatorYAML(conf *Config) error {
 		return err
 	}
 
-	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.Namespace, conf.OperatorImage, conf.ImagePullSecret, conf.Cluster, 10*time.Minute)); err != nil {
+	if err := DumpYAML(conf, "operator-deployment", GetOperatorDeployment(conf.Namespace, conf.OperatorImage, imagePullSecrets, conf.Cluster, 10*time.Minute)); err != nil {
 		return err
 	}
 
@@ -277,7 +285,7 @@ func GetOperatorRoleBinding(namespace string, cluster bool) metav1.Object {
 }
 
 // GetOperatorDeployment returns the canonical way to run the operator.
-func GetOperatorDeployment(namespace, image, imagePullSecret string, cluster bool, podCreateTimeout fmt.Stringer, extraArgs ...string) *appsv1.Deployment {
+func GetOperatorDeployment(namespace, image string, imagePullSecrets []string, cluster bool, podCreateTimeout fmt.Stringer, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
 
 	// IF we are running namespace scoped, then use the namespace metadata
@@ -366,12 +374,12 @@ func GetOperatorDeployment(namespace, image, imagePullSecret string, cluster boo
 		},
 	}
 
-	if imagePullSecret != "" {
-		deployment.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-			{
-				Name: imagePullSecret,
-			},
+	for _, secret := range imagePullSecrets {
+		reference := corev1.LocalObjectReference{
+			Name: secret,
 		}
+
+		deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, reference)
 	}
 
 	return deployment

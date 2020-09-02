@@ -291,6 +291,8 @@ func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster, imagePullSecret
 
 		cluster.Spec.Servers[i].Pod.Spec.ImagePullSecrets = references
 	}
+
+	cluster.Spec.Backup.ImagePullSecrets = references
 }
 
 // basic 3 node cluster.
