@@ -140,12 +140,10 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 	switch action {
 	case Incremental:
 		schedule = backup.Spec.Incremental.Schedule
-		container = c.generateBackupContainer("cbbackupmgr-incremental", strategy, false,
-			*backup.Spec.LogRetention, *backup.Spec.BackupRetention)
+		container = c.generateBackupContainer("cbbackupmgr-incremental", backup.Spec, strategy, false)
 	case Full:
 		schedule = backup.Spec.Full.Schedule
-		container = c.generateBackupContainer("cbbackupmgr-full", strategy, true,
-			*backup.Spec.LogRetention, *backup.Spec.BackupRetention)
+		container = c.generateBackupContainer("cbbackupmgr-full", backup.Spec, strategy, true)
 	}
 
 	if c.cluster.Spec.AntiAffinity {
@@ -224,21 +222,21 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 // with the correct image and executable command and arguments
 // config is a boolean that determines whether we take want to config a new repo
 // and then take a Full backup (true) or just an incremental backup (false).
-func (c *Cluster) generateBackupContainer(containerName string, strategy couchbasev2.Strategy, config bool, logRetention, backupRetention metav1.Duration) corev1.Container {
+func (c *Cluster) generateBackupContainer(containerName string, spec couchbasev2.CouchbaseBackupSpec, strategy couchbasev2.Strategy, config bool) corev1.Container {
 	var resources corev1.ResourceRequirements
 
 	if c.cluster.Spec.Backup.Resources != nil {
 		resources = *c.cluster.Spec.Backup.Resources
 	}
 
-	return corev1.Container{
+	container := corev1.Container{
 		Name:    containerName,
 		Image:   c.cluster.Spec.BackupImage(),
 		Command: []string{"backup_script"},
 		Args: []string{c.cluster.Name, "--strategy", string(strategy), "--config", strconv.FormatBool(config),
 			"--mode", "backup",
-			"--backup-ret", fmt.Sprintf("%.2f", backupRetention.Hours()),
-			"--log-ret", fmt.Sprintf("%.2f", logRetention.Hours()),
+			"--backup-ret", fmt.Sprintf("%.2f", spec.BackupRetention.Hours()),
+			"--log-ret", fmt.Sprintf("%.2f", spec.LogRetention.Hours()),
 			"-v", "INFO"},
 		WorkingDir: "/",
 		VolumeMounts: []corev1.VolumeMount{
@@ -255,6 +253,12 @@ func (c *Cluster) generateBackupContainer(containerName string, strategy couchba
 		},
 		Resources: resources,
 	}
+
+	if len(spec.S3Bucket) != 0 {
+		c.applyS3Configuration(&container, spec.S3Bucket)
+	}
+
+	return container
 }
 
 // generateRestoreJob returns a job that performs a cbbackupmgr restore command.
@@ -279,8 +283,9 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 		ObjectMeta: metav1.ObjectMeta{
 			Name: restore.Name,
 			Labels: map[string]string{
-				constants.LabelApp:     constants.App,
-				constants.LabelCluster: c.cluster.Name,
+				constants.LabelApp:           constants.App,
+				constants.LabelCluster:       c.cluster.Name,
+				constants.LabelBackupRestore: restore.Name,
 			},
 			OwnerReferences: []metav1.OwnerReference{
 				{
@@ -294,6 +299,11 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &restore.Spec.BackoffLimit,
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						constants.LabelBackupRestore: restore.Name,
+					},
+				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
 					ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
@@ -342,7 +352,7 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 		resources = *c.cluster.Spec.Backup.Resources
 	}
 
-	return corev1.Container{
+	container := corev1.Container{
 		Name:    "cbbackupmgr-restore",
 		Image:   c.cluster.Spec.BackupImage(),
 		Command: []string{"backup_script"},
@@ -364,21 +374,68 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 		},
 		Resources: resources,
 	}
+
+	if len(spec.S3Bucket) != 0 {
+		c.applyS3Configuration(&container, spec.S3Bucket)
+	}
+
+	return container
+}
+
+func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName string) {
+	container.Args = append(container.Args, "--s3bucket", s3BucketName)
+
+	container.Env = []corev1.EnvVar{
+		{
+			Name: "AWS_REGION",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.cluster.Spec.Backup.S3Secret,
+					},
+					Key: "region",
+				},
+			},
+		},
+		{
+			Name: "AWS_ACCESS_KEY_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.cluster.Spec.Backup.S3Secret,
+					},
+					Key: "access-key-id",
+				},
+			},
+		},
+		{
+			Name: "AWS_SECRET_ACCESS_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.cluster.Spec.Backup.S3Secret,
+					},
+					Key: "secret-access-key",
+				},
+			},
+		},
+	}
 }
 
 // get the Repo value from a Backup Object to use in a Restore object.
 func (c *Cluster) getBackupRepo(restore *couchbasev2.CouchbaseBackupRestore) error {
 	var backupFound bool
 
-	backupName := restore.Spec.Backup
+	backupNameFromRestore := restore.Spec.Backup
 	backups := c.k8s.CouchbaseBackups.List()
 
 	if len(backups) == 0 {
 		return fmt.Errorf("no CouchbaseBackups exist currently: %w", errors.NewStackTracedError(errors.ErrResourceRequired))
 	}
 
+	// check currently existing backups
 	for _, backup := range backups {
-		if backup.Name == backupName {
+		if backup.Name == backupNameFromRestore {
 			if len(backup.Status.Repo) != 0 {
 				restore.Spec.Repo = backup.Status.Repo
 				backupFound = true

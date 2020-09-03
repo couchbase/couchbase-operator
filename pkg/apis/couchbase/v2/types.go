@@ -165,6 +165,9 @@ type CouchbaseBackupSpec struct {
 
 	// Name of StorageClass to use
 	StorageClassName *string `json:"storageClassName,omitempty"`
+
+	// Name of S3 bucket to backup to. If non-empty this overrides local backup
+	S3Bucket string `json:"s3bucket,omitempty"`
 }
 
 type CouchbaseBackupStatus struct {
@@ -263,6 +266,8 @@ type CouchbaseBackupRestoreSpec struct {
 	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
 	// Number of times the restore job should try to execute.
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
+	// Name of S3 bucket to restore from. If non-empty this overrides local backup
+	S3Bucket string `json:"s3bucket,omitempty"`
 }
 
 // struct we use in CouchbaseBackupRestoreSpec to enforce type-safeness
@@ -839,6 +844,8 @@ type Backup struct {
 	// ImagePullSecrets allow you to use an image from private
 	// repos and non-dockerhub ones.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+	// S3Secret contains the region and credentials for operating backups in S3
+	S3Secret string `json:"s3Secret,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=None;StartTLSExtension;TLS
