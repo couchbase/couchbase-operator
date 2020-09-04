@@ -247,7 +247,7 @@ Kubernetes::
 --
 [source,console]
 ----
-$ kubectl get coucbasebackup my-backup -o yaml
+$ kubectl get couchbasebackup my-backup -o yaml
 ----
 --
 
