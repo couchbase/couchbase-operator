@@ -1723,6 +1723,12 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 		t.Skip("storage class unsupported")
 	}
 
+	version := strings.Split(f.CouchbaseServerImage, ":")
+
+	if version[1] == "6.5.0" && f.EnableIstio {
+		t.Skip("Analytics broken on 6.5.0 with Istio")
+	}
+
 	clusterSize := constants.Size3
 	pvcName := "couchbase"
 

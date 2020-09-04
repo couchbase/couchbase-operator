@@ -140,6 +140,12 @@ func SetPlatform(p couchbasev2.PlatformType) {
 	platform = p
 }
 
+var istioEnable bool
+
+func SetIstio(istio bool) {
+	istioEnable = istio
+}
+
 func GenerateValidBucketSettings(bucketTypes []string) []metav1.Object {
 	buckets := []metav1.Object{}
 
@@ -325,6 +331,11 @@ func NewBasicCluster(size int) *couchbasev2.CouchbaseCluster {
 		spec.Platform = platform
 	}
 
+	if istioEnable {
+		networkPlatform := couchbasev2.NetworkPlatformIstio
+		spec.Networking.NetworkPlatform = &networkPlatform
+	}
+
 	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
 
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
@@ -354,6 +365,11 @@ func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
 
 	if platform != "" {
 		spec.Platform = platform
+	}
+
+	if istioEnable {
+		networkPlatform := couchbasev2.NetworkPlatformIstio
+		spec.Networking.NetworkPlatform = &networkPlatform
 	}
 
 	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
@@ -427,6 +443,11 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 		spec.Platform = platform
 	}
 
+	if istioEnable {
+		networkPlatform := couchbasev2.NetworkPlatformIstio
+		spec.Networking.NetworkPlatform = &networkPlatform
+	}
+
 	return spec
 }
 
@@ -478,6 +499,11 @@ func NewBasicXdcrCluster(size int) *couchbasev2.CouchbaseCluster {
 
 	if platform != "" {
 		spec.Platform = platform
+	}
+
+	if istioEnable {
+		networkPlatform := couchbasev2.NetworkPlatformIstio
+		spec.Networking.NetworkPlatform = &networkPlatform
 	}
 
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)

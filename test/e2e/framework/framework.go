@@ -304,6 +304,7 @@ func Setup() (err error) {
 		CouchbaseBackupImage:          runtimeParams.CouchbaseBackupImage,
 		BucketType:                    runtimeParams.BucketType,
 		CompressionMode:               runtimeParams.CompressionMode,
+		EnableIstio:                   runtimeParams.EnableIstio,
 	}
 
 	if runtimeParams.StorageClassName != "" {
@@ -335,6 +336,7 @@ func Setup() (err error) {
 	e2espec.SetStorageClassName(Global.StorageClassName)
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
 	e2espec.SetPlatform(runtimeParams.Platform)
+	e2espec.SetIstio(runtimeParams.EnableIstio)
 
 	logrus.Info(util.PrettyHeading("Docker Registries"))
 

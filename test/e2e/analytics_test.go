@@ -38,6 +38,10 @@ func skipAnalytics(t *testing.T) {
 	if f.BucketType == "memcached" {
 		t.Skip("Bucket type not supported")
 	}
+
+	if version.Semver() == "6.5.0" && f.EnableIstio {
+		t.Skip("Analytics broken on 6.5.0 with Istio")
+	}
 }
 
 // Create cluster with Analytics service enabled

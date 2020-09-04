@@ -28,6 +28,7 @@ type Framework struct {
 	CouchbaseBackupImage          string
 	BucketType                    string
 	CompressionMode               string
+	EnableIstio                   bool
 
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
@@ -84,6 +85,7 @@ type TestRunParam struct {
 	SuiteToRun                    string `yaml:"suite"`
 	BucketType                    string `yaml:"bucket-type"`
 	CompressionMode               string `yaml:"compression-mode"`
+	EnableIstio                   bool   `yaml:"enable-istio"`
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`
