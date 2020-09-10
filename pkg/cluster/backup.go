@@ -181,11 +181,9 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 							Containers: []corev1.Container{
 								container,
 							},
-							NodeSelector:  c.cluster.Spec.Backup.NodeSelector,
-							RestartPolicy: corev1.RestartPolicyNever,
-							SecurityContext: &corev1.PodSecurityContext{
-								FSGroup: c.cluster.Spec.SecurityContext.FSGroup,
-							},
+							NodeSelector:       c.cluster.Spec.Backup.NodeSelector,
+							RestartPolicy:      corev1.RestartPolicyNever,
+							SecurityContext:    c.cluster.Spec.SecurityContext,
 							ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
 							ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
 							Tolerations:        c.cluster.Spec.Backup.Tolerations,
