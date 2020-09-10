@@ -399,17 +399,17 @@ func generateBackupPVCs(backups []couchbasev2.CouchbaseBackup, cluster *couchbas
 	var pvcs []*corev1.PersistentVolumeClaim
 
 	for _, backup := range backups {
-		pvcs = append(pvcs, generateBackupPVC(backup.Name, cluster, backup.Spec.Size))
+		pvcs = append(pvcs, generateBackupPVC(backup, cluster, backup.Spec.Size))
 	}
 
 	return pvcs
 }
 
 // generateBackupPVC returns the PVC that backups will be stored on.
-func generateBackupPVC(pvcName string, cluster *couchbasev2.CouchbaseCluster, storage *resource.Quantity) *corev1.PersistentVolumeClaim {
+func generateBackupPVC(backup couchbasev2.CouchbaseBackup, cluster *couchbasev2.CouchbaseCluster, storage *resource.Quantity) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   pvcName,
+			Name:   backup.Name,
 			Labels: k8sutil.LabelsForCluster(cluster),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -421,6 +421,7 @@ func generateBackupPVC(pvcName string, cluster *couchbasev2.CouchbaseCluster, st
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
+			StorageClassName: &backup.Spec.StorageClassName,
 		},
 	}
 }

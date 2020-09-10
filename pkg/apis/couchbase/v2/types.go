@@ -162,6 +162,9 @@ type CouchbaseBackupSpec struct {
 
 	// Size in GB of the associated PVC
 	Size *resource.Quantity `json:"size,omitempty"`
+
+	// Name of StorageClass to use
+	StorageClassName string `json:"storageClassName,omitempty"`
 }
 
 type CouchbaseBackupStatus struct {
