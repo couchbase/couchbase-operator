@@ -486,7 +486,7 @@ const (
 
 type CouchbaseUserSpec struct {
 	// (Optional) Full Name of Couchbase user
-	FullName string `json:"fullName"`
+	FullName string `json:"fullName,omitempty"`
 	// The domain which provides user auth
 	// +kubebuilder:validation:Enum=local;external
 	AuthDomain AuthDomain `json:"authDomain"`
