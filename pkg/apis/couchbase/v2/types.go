@@ -164,7 +164,7 @@ type CouchbaseBackupSpec struct {
 	Size *resource.Quantity `json:"size,omitempty"`
 
 	// Name of StorageClass to use
-	StorageClassName string `json:"storageClassName,omitempty"`
+	StorageClassName *string `json:"storageClassName,omitempty"`
 }
 
 type CouchbaseBackupStatus struct {

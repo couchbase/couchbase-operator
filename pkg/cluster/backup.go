@@ -421,7 +421,7 @@ func generateBackupPVC(backup couchbasev2.CouchbaseBackup, cluster *couchbasev2.
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
-			StorageClassName: &backup.Spec.StorageClassName,
+			StorageClassName: backup.Spec.StorageClassName,
 		},
 	}
 }
