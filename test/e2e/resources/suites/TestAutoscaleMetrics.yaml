@@ -1,0 +1,9 @@
+# tests must be run serially since
+# they require rootscoped resources
+---
+timeout: 4h
+testcases:
+- TestAutoscaleUp
+- TestAutoscaleDown
+- TestAutoscaleMultiConfigs
+- TestAutoscaleConflict

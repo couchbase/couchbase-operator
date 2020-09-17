@@ -2613,8 +2613,20 @@ func (c *Cluster) reconcileAutoscalers() error {
 	requestedAutoscalers := []string{}
 
 	for i, config := range c.cluster.Spec.Servers {
-		// Only allow autoscaling of desired configs
 		if config.AutoscaleEnabled {
+			// reject stateful configs if when not in preview mode
+			if !c.cluster.Spec.EnablePreviewScalingStateful {
+				if !config.IsStateless() {
+					continue
+				}
+
+				// And...all buckets must be ephemeral <* *>
+				numStatefulBuckets := len(c.k8s.CouchbaseBuckets.List()) + len(c.k8s.CouchbaseMemcachedBuckets.List())
+				if numStatefulBuckets > 0 {
+					continue
+				}
+			}
+
 			requestedAutoscalers = append(requestedAutoscalers, config.Name)
 
 			// Get associated Autoscaler CR

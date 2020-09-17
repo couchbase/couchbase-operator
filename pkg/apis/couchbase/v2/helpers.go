@@ -186,6 +186,24 @@ func (sc *ServerConfig) AutoscalerName(cluster string) string {
 	return name + "." + cluster
 }
 
+// Detect if cluster is stateless.
+func (sc *ServerConfig) IsStateless() bool {
+	for _, service := range sc.Services {
+		switch service {
+		case DataService:
+			return false
+		case IndexService:
+			return false
+		case AnalyticsService:
+			return false
+		case EventingService:
+			return false
+		}
+	}
+
+	return true
+}
+
 func (cs *ClusterSpec) Cleanup() {
 
 }

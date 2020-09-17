@@ -208,3 +208,13 @@ testcases:
 # Expiration tests
 - TestBucketTTL
 - TestBucketTTLUpdate
+
+# Autoscaling Tests
+- TestAutoscaleEnabled
+- TestAutoscaleDisabled
+- TestAutoscalerDeleted
+- TestAutoscaleSelectiveMDS
+- TestAutoScalingDisabledOnData
+- TestAutoScalingDisabledOnCouchbaseBucket
+- TestPreviewModeAllowsEphemeral
+- TestPreviewModeEnabledAllowsStateful

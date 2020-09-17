@@ -386,6 +386,10 @@ func Setup() (err error) {
 		if err = Global.SetupFramework(k8s); err != nil {
 			return err
 		}
+
+		if err := updateKubernetesClusterDynamicClient(k8s); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -428,6 +432,25 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 		KubeConfPath:    c.Config,
 		Context:         c.Context,
 	}, nil
+}
+
+// updateKubernetesCluster is called *after* the cluster has been initialized (e.g. after
+// CRDs have been installed initially using the typed clients).  This allows the dynamic
+// client to pickup the new custom resource types via the discocvery API.
+func updateKubernetesClusterDynamicClient(k8s *types.Cluster) error {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(k8s.Config)
+	if err != nil {
+		return err
+	}
+
+	groupresources, err := restmapper.GetAPIGroupResources(discoveryClient)
+	if err != nil {
+		return err
+	}
+
+	k8s.RESTMapper = restmapper.NewDiscoveryRESTMapper(groupresources)
+
+	return nil
 }
 
 func recreateCRDs(k8s *types.Cluster) error {

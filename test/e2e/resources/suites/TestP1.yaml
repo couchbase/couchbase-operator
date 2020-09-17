@@ -141,3 +141,9 @@ testcases:
 - TestRotateAdminPasswordDuringRestartTLS
 - TestRotateAdminPasswordDuringRestartMutualTLS
 - TestRotateAdminPasswordDuringRestartMandatoryMutualTLS
+
+# Autoscaling Tests
+- TestAutoscaleUp
+- TestAutoscaleDown
+- TestAutoscaleMultiConfigs
+#- TestAutoscaleConflict

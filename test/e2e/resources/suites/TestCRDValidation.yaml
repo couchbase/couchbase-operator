@@ -13,3 +13,4 @@ testcases:
 - TestNegValidationImmutableApply
 - TestRBACValidationCreate
 - TestRBACValidationLDAP
+- TestAutoscalerValidation

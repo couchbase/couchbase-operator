@@ -14,15 +14,16 @@ import (
 
 // NewAutoscaleCluster creates a new Autoscale enabled
 // basic cluster, retrying if an error is encountered.
-func NewAutoscaleCluster(t *testing.T, k8s *types.Cluster, size int, autoscaleServers []string) (*couchbasev2.CouchbaseCluster, error) {
+func NewAutoscaleCluster(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Spec.Servers[0].AutoscaleEnabled = true
+	clusterSpec.Spec.EnablePreviewScalingStateful = true
 
 	return newClusterFromSpec(t, k8s, clusterSpec)
 }
 
-func MustNewAutoscaleCluster(t *testing.T, k8s *types.Cluster, size int, autoscaleServers []string) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewAutoscaleCluster(t, k8s, size, autoscaleServers)
+func MustNewAutoscaleCluster(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewAutoscaleCluster(t, k8s, size)
 	if err != nil {
 		Die(t, err)
 	}

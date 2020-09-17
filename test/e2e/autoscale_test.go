@@ -1,14 +1,19 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -44,7 +49,7 @@ func TestAutoscaleEnabled(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterSize, []string{})
+	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterSize)
 
 	// Check autoscaler was created
 	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
@@ -76,7 +81,7 @@ func TestAutoscaleDisabled(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterSize, []string{})
+	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterSize)
 
 	// Check autoscaler was created
 	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
@@ -111,7 +116,7 @@ func TestAutoscalerDeleted(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterSize, []string{})
+	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterSize)
 
 	// Check autoscaler was created
 	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
@@ -176,7 +181,7 @@ func TestAutoscaleUp(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -220,7 +225,7 @@ func TestAutoscaleDown(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -264,7 +269,7 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -274,6 +279,7 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	// Create the cluster with autoscaling
 	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
 	// explicitly enabling autoscaling for data config
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScalingStateful", true), time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
 
 	// Expect 2 autoscalers are created
@@ -318,7 +324,7 @@ func TestAutoscaleConflict(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -367,4 +373,182 @@ func TestAutoscaleConflict(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestAutoScalingDisabledOnData tests that autoscaling resources
+// are not created for configs with data services.
+func TestAutoScalingDisabledOnData(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 2
+	sizePerConfig := clusterSize / 2
+
+	// Create the cluster
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+
+	// Expect query config(1) to be created
+	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+
+	// Data config(0) should not be created
+	autoscalerName = testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
+	err := e2eutil.WaitUntilCouchbaseAutoscalerExists(targetKube, testCouchbase, autoscalerName, 20*time.Second)
+
+	if err == nil {
+		e2eutil.Die(t, fmt.Errorf("unexpected data config found for autoscaler cr"))
+	}
+}
+
+// TestAutoScalingDisabledOnData tests that autoscaling resources
+// are not created when cluster has data bucket.
+// Even if services are ephemeral.
+func TestAutoScalingDisabledOnCouchbaseBucket(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 2
+	sizePerConfig := clusterSize / 2
+
+	// Create bucket resource
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "data-bucket",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        e2espec.NewResourceQuantityMi(256),
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: true,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+		},
+	}
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+
+	// Set autoscale enable on data config even though it should not be able to scale
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
+
+	// Query config(1) should not be created
+	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
+	err := e2eutil.WaitUntilCouchbaseAutoscalerExists(targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+
+	if err == nil {
+		e2eutil.Die(t, fmt.Errorf("unexpected query config found for autoscaler cr"))
+	}
+
+	// Data config(0) should not be created
+	autoscalerName = testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
+	err = e2eutil.WaitUntilCouchbaseAutoscalerExists(targetKube, testCouchbase, autoscalerName, 20*time.Second)
+
+	if err == nil {
+		e2eutil.Die(t, fmt.Errorf("unexpected data config found for autoscaler cr"))
+	}
+}
+
+// TestPreviewModeAllowsEphemeral tests that autoscaling is enabled
+// when buckets are ephemeral but only for ephemeral configs.
+func TestPreviewModeAllowsEphemeral(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 2
+	sizePerConfig := clusterSize / 2
+
+	bucket := &couchbasev2.CouchbaseEphemeralBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ephemeral-bucket",
+		},
+		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+			MemoryQuota:        e2espec.NewResourceQuantityMi(101),
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+		},
+	}
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
+	// Create the cluster
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+	// Set autoscale enable on data config even though it should not be able to scale
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
+
+	// Expect query config(1) to be created
+	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+
+	// Data config(0) should not be created
+	autoscalerName = testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
+	err := e2eutil.WaitUntilCouchbaseAutoscalerExists(targetKube, testCouchbase, autoscalerName, 20*time.Second)
+
+	if err == nil {
+		e2eutil.Die(t, fmt.Errorf("unexpected data config found for autoscaler cr"))
+	}
+}
+
+// TestPreviewModeAllowsEphemeral tests that autoscaling is enabled
+// for stateless config even when using data buckets and stateful configs.
+func TestPreviewModeEnabledAllowsStateful(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 2
+	sizePerConfig := clusterSize / 2
+
+	// Create bucket resource
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "data-bucket",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        e2espec.NewResourceQuantityMi(256),
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: true,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+		},
+	}
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
+	// Create the cluster.
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+	// Set autoscale enable on data config
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
+	// Enable preview scaling.
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScalingStateful", true), time.Minute)
+
+	// Query config(1) must be created
+	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 2*time.Minute)
+
+	// Data config(0) must be created
+	autoscalerName = testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
 }

@@ -861,6 +861,9 @@ type ClusterSpec struct {
 
 	// Backup specific settings
 	Backup Backup `json:"backup,omitempty"`
+
+	// EnablePreviewScalingStateful enables autoscaling for stateful services and buckets
+	EnablePreviewScalingStateful bool `json:"enablePreviewScalingStateful,omitempty"`
 }
 
 type Backup struct {

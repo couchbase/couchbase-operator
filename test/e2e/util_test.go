@@ -180,15 +180,19 @@ var (
 		"TestLDAPDeleteBinding":   TestLDAPDeleteBinding,
 
 		// Autoscaler cases
-		"TestAutoscalerValidation":  TestAutoscalerValidation,
-		"TestAutoscaleEnabled":      TestAutoscaleEnabled,
-		"TestAutoscaleDisabled":     TestAutoscaleDisabled,
-		"TestAutoscalerDeleted":     TestAutoscalerDeleted,
-		"TestAutoscaleSelectiveMDS": TestAutoscaleSelectiveMDS,
-		"TestAutoscaleUp":           TestAutoscaleUp,
-		"TestAutoscaleDown":         TestAutoscaleDown,
-		"TestAutoscaleMultiConfigs": TestAutoscaleMultiConfigs,
-		"TestAutoscaleConflict":     TestAutoscaleConflict,
+		"TestAutoscalerValidation":                 TestAutoscalerValidation,
+		"TestAutoscaleEnabled":                     TestAutoscaleEnabled,
+		"TestAutoscaleDisabled":                    TestAutoscaleDisabled,
+		"TestAutoscalerDeleted":                    TestAutoscalerDeleted,
+		"TestAutoscaleSelectiveMDS":                TestAutoscaleSelectiveMDS,
+		"TestAutoscaleUp":                          TestAutoscaleUp,
+		"TestAutoscaleDown":                        TestAutoscaleDown,
+		"TestAutoscaleMultiConfigs":                TestAutoscaleMultiConfigs,
+		"TestAutoscaleConflict":                    TestAutoscaleConflict,
+		"TestAutoScalingDisabledOnData":            TestAutoScalingDisabledOnData,
+		"TestAutoScalingDisabledOnCouchbaseBucket": TestAutoScalingDisabledOnCouchbaseBucket,
+		"TestPreviewModeAllowsEphemeral":           TestPreviewModeAllowsEphemeral,
+		"TestPreviewModeEnabledAllowsStateful":     TestPreviewModeEnabledAllowsStateful,
 
 		// Server groups / RZA cases
 		"TestRzaCreateClusterWithStaticConfig":     TestRzaCreateClusterWithStaticConfig,

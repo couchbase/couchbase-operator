@@ -6,7 +6,7 @@ testcases:
 - TestAutoscaleDisabled
 - TestAutoscalerDeleted
 - TestAutoscaleSelectiveMDS
-- TestAutoscaleUp
-- TestAutoscaleDown
-- TestAutoscaleMultiConfigs
-- TestAutoscaleConflict
+- TestAutoScalingDisabledOnData
+- TestAutoScalingDisabledOnCouchbaseBucket
+- TestPreviewModeAllowsEphemeral
+- TestPreviewModeEnabledAllowsStateful
