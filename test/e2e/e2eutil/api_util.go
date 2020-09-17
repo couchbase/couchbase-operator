@@ -15,6 +15,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -36,7 +37,13 @@ func UpdateCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.Couchb
 
 // Gets events for a CouchbaseCluster and returns them sorted by time (oldest to newest).
 func GetCouchbaseEvents(kubeCli kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (EventList, error) {
-	list, err := kubeCli.CoreV1().Events(couchbase.Namespace).List(metav1.ListOptions{FieldSelector: "involvedObject.name=" + couchbase.Name})
+	selector := map[string]string{
+		"involvedObject.apiVersion": "couchbase.com/v2",
+		"involvedObject.kind":       "CouchbaseCluster",
+		"involvedObject.name":       couchbase.Name,
+	}
+
+	list, err := kubeCli.CoreV1().Events(couchbase.Namespace).List(metav1.ListOptions{FieldSelector: labels.FormatLabels(selector)})
 	if err != nil {
 		return nil, err
 	}
@@ -44,15 +51,6 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, couchbase *couchbasev2.Cou
 	events := EventList{}
 
 	for _, item := range list.Items {
-		// Filter out events we have no control over
-		if item.Reason == "FailedToUpdateEndpoint" {
-			continue
-		}
-
-		if item.Reason == "FailedToUpdateEndpointSlices" {
-			continue
-		}
-
 		events = append(events, item)
 	}
 
