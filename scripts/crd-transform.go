@@ -93,6 +93,17 @@ func main() {
 			os.Exit(1)
 		}
 
+		// Remove the status, crdgen shouldn't be omitting this anyway.
+		topLevel, ok := raw.(map[string]interface{})
+		if !ok {
+			fmt.Println("object incorrectly formatted")
+			os.Exit(1)
+		}
+
+		delete(topLevel, "status")
+
+		// Recusively do a DFS through the tree removing any bad things that
+		// cause failure (e.g. bugs in Kubernetes types that haven't been fixed).
 		pruned, err := prune(raw)
 		if err != nil {
 			fmt.Println(err)
