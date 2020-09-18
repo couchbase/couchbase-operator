@@ -575,6 +575,11 @@ func (in *CouchbaseBackupSpec) DeepCopyInto(out *CouchbaseBackupSpec) {
 		x := (*in).DeepCopy()
 		*out = &x
 	}
+	if in.StorageClassName != nil {
+		in, out := &in.StorageClassName, &out.StorageClassName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
@@ -700,6 +705,11 @@ func (in *CouchbaseBucketSpec) DeepCopyInto(out *CouchbaseBucketSpec) {
 		in, out := &in.MemoryQuota, &out.MemoryQuota
 		x := (*in).DeepCopy()
 		*out = &x
+	}
+	if in.MaxTTL != nil {
+		in, out := &in.MaxTTL, &out.MaxTTL
+		*out = new(v1.Duration)
+		**out = **in
 	}
 	return
 }
@@ -1017,6 +1027,11 @@ func (in *CouchbaseEphemeralBucketSpec) DeepCopyInto(out *CouchbaseEphemeralBuck
 		in, out := &in.MemoryQuota, &out.MemoryQuota
 		x := (*in).DeepCopy()
 		*out = &x
+	}
+	if in.MaxTTL != nil {
+		in, out := &in.MaxTTL, &out.MaxTTL
+		*out = new(v1.Duration)
+		**out = **in
 	}
 	return
 }

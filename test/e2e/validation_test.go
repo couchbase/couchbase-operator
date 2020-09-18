@@ -1070,6 +1070,18 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.minimumDurability`},
 		},
+		{
+			name:           "TestValidateBucketMaxTTLUnderflow",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/maxTTL", "-1s")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.maxTTL`},
+		},
+		{
+			name:           "TestValidateBucketMaxTTLOverflow",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/maxTTL", "2147483648s")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.maxTTL`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]

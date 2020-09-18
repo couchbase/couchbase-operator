@@ -19,6 +19,7 @@ spec:
   enableIndexReplica: false
   compressionMode: passive
   minimumDurability: none
+  maxTTL: 60s
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBucket

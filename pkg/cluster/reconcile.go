@@ -443,6 +443,10 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			b.DurabilityMinLevel = couchbaseutil.Durability(bucket.GetMinimumDurability())
 		}
 
+		if bucket.Spec.MaxTTL != nil {
+			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
+		}
+
 		buckets = append(buckets, b)
 	}
 
@@ -471,6 +475,10 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 		if durable {
 			b.DurabilityMinLevel = couchbaseutil.Durability(bucket.GetMinimumDurability())
+		}
+
+		if bucket.Spec.MaxTTL != nil {
+			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
 		}
 
 		buckets = append(buckets, b)

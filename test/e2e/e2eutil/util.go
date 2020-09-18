@@ -1594,3 +1594,18 @@ func SkipVersionsBefore(t *testing.T, image, version string) {
 		t.Skip("test cannot run with image version")
 	}
 }
+
+func MustSetBucketTTL(t *testing.T, bucket metav1.Object, duration time.Duration) {
+	d := metav1.Duration{
+		Duration: duration,
+	}
+
+	switch b := bucket.(type) {
+	case *couchbasev2.CouchbaseBucket:
+		b.Spec.MaxTTL = &d
+	case *couchbasev2.CouchbaseEphemeralBucket:
+		b.Spec.MaxTTL = &d
+	default:
+		Die(t, fmt.Errorf("bucket of incorrect type"))
+	}
+}

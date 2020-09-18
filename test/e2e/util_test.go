@@ -354,6 +354,10 @@ var (
 		"TestCreateDurableBucket": TestCreateDurableBucket,
 		"TestEditDurableBucket":   TestEditDurableBucket,
 		"TestLoadDurableBucket":   TestLoadDurableBucket,
+
+		// Expiry tests
+		"TestBucketTTL":       TestBucketTTL,
+		"TestBucketTTLUpdate": TestBucketTTLUpdate,
 	}
 )
 

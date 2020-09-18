@@ -343,6 +343,7 @@ type CouchbaseBucketSpec struct {
 	EnableIndexReplica bool                              `json:"enableIndexReplica,omitempty"`
 	CompressionMode    CouchbaseBucketCompressionMode    `json:"compressionMode,omitempty"`
 	MinimumDurability  CouchbaseBucketMinimumDurability  `json:"minimumDurability,omitempty"`
+	MaxTTL             *metav1.Duration                  `json:"maxTTL,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -382,6 +383,7 @@ type CouchbaseEphemeralBucketSpec struct {
 	EnableFlush        bool                                      `json:"enableFlush,omitempty"`
 	CompressionMode    CouchbaseBucketCompressionMode            `json:"compressionMode,omitempty"`
 	MinimumDurability  CouchbaseEphemeralBucketMinimumDurability `json:"minimumDurability,omitempty"`
+	MaxTTL             *metav1.Duration                          `json:"maxTTL,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

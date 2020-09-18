@@ -39,6 +39,7 @@ const (
 	defaultBackupImage                            = "couchbase/operator-backup:6.5.0"
 	redhatBackupImage                             = "registry.connect.redhat.com/couchbase/operator-backup:6.5.0-5"
 	defaultBackupServiceAccount                   = "couchbase-backup"
+	bucketTTLMax                                  = (1 << 31) - 1 // Puny 32 bit signed integers
 )
 
 var (
@@ -865,6 +866,18 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		}
 	}
 
+	if bucket.Spec.MaxTTL != nil {
+		timeout := int(bucket.Spec.MaxTTL.Duration.Seconds())
+
+		if timeout < 0 {
+			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false))
+		}
+
+		if timeout > bucketTTLMax {
+			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false))
+		}
+	}
+
 	if err := validateMemoryConstraints(v, bucket); err != nil {
 		errs = append(errs, err)
 	}
@@ -882,6 +895,18 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
+		}
+	}
+
+	if bucket.Spec.MaxTTL != nil {
+		timeout := int(bucket.Spec.MaxTTL.Duration.Seconds())
+
+		if timeout < 0 {
+			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false))
+		}
+
+		if timeout > bucketTTLMax {
+			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false))
 		}
 	}
 

@@ -203,3 +203,7 @@ testcases:
 - TestCreateDurableBucket
 - TestEditDurableBucket
 - TestLoadDurableBucket
+
+# Expiration tests
+- TestBucketTTL
+- TestBucketTTLUpdate

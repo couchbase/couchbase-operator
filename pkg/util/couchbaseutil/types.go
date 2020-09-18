@@ -381,6 +381,7 @@ type Bucket struct {
 	BucketPassword     string          `json:"password"`
 	CompressionMode    CompressionMode `json:"compressionMode"`
 	DurabilityMinLevel Durability      `json:"durabilityMinLevel"`
+	MaxTTL             int             `json:"maxTTL"`
 }
 
 type BucketList []Bucket
@@ -425,6 +426,7 @@ type BucketStatus struct {
 	VBServerMap            VBucketServerMap      `json:"vBucketServerMap"`
 	CompressionMode        CompressionMode       `json:"compressionMode"`
 	DurabilityMinLevel     Durability            `json:"durabilityMinLevel"`
+	MaxTTL                 int                   `json:"maxTTL"`
 	BasicStats             BucketBasicStats      `json:"basicStats"`
 }
 
@@ -623,6 +625,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.CompressionMode = status.CompressionMode
 	b.IoPriority = status.GetIoPriority()
 	b.DurabilityMinLevel = status.DurabilityMinLevel
+	b.MaxTTL = status.MaxTTL
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -642,6 +645,7 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 	if b.BucketType != "memcached" {
 		data.Set("replicaNumber", strconv.Itoa(b.BucketReplicas))
+		data.Set("maxTTL", strconv.Itoa(b.MaxTTL))
 	}
 
 	data.Set("authType", "sasl")

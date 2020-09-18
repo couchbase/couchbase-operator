@@ -337,6 +337,45 @@ func MustInsertJSONDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
+func CompactBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket metav1.Object) error {
+	urlBase, cleanup, err := GetHostURL(k8s, cluster, couchbasev2.AdminService)
+	if err != nil {
+		return err
+	}
+
+	defer cleanup()
+
+	url := fmt.Sprintf("http://%s/pools/default/buckets/%s/controller/compactBucket", urlBase, bucket.GetName())
+
+	request, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return err
+	}
+
+	request.SetBasicAuth("Administrator", "password")
+
+	client := http.Client{Timeout: time.Minute}
+
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code %v", response.Status)
+	}
+
+	return nil
+}
+
+func MustCompactBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket metav1.Object) {
+	if err := CompactBucket(k8s, cluster, bucket); err != nil {
+		Die(t, err)
+	}
+}
+
 // Add a node to the cluster.
 func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member couchbaseutil.Member) error {
 	username, password, err := GetClusterAuth(k8s.KubeClient, couchbase.Namespace, k8s.DefaultSecret.Name)
