@@ -443,9 +443,6 @@ const (
 
 	// CompressionTypeAuto automatically applies compression based on internal heuristics.
 	CompressionTypeAuto CompressionType = "Auto"
-
-	// CompressionTypeSnappy applies snappy compression to all documents.
-	CompressionTypeSnappy CompressionType = "Snappy"
 )
 
 type CouchbaseReplicationSpec struct {
@@ -461,7 +458,7 @@ type CouchbaseReplicationSpec struct {
 	RemoteBucket string `json:"remoteBucket,omitempty"`
 
 	// CompressionType is the type of compression to apply to the replication.
-	// +kubebuilder:validation:Enum=None;Auto;Snappy
+	// +kubebuilder:validation:Enum=None;Auto
 	CompressionType CompressionType `json:"compressionType,omitempty"`
 
 	// FilterExpression allows certain documents to be filtered out of the replication.

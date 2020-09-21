@@ -20,7 +20,7 @@ metadata:
 spec:
   bucket: local-bucket-name
   remoteBucket: remote-bucket-name
-  compressionType: Snappy
+  compressionType: Auto
   filterExpression: ""
   paused: false
 ----
@@ -86,7 +86,7 @@ The following are parameters that may be set on the replication:
 spec:
   bucket: local-bucket-name
   remoteBucket: remote-bucket-name
-  compressionType: Snappy
+  compressionType: Auto
   filterExpression: ""
   paused: false
 ----
@@ -117,7 +117,7 @@ This field specifies the compression type to use when replicating data.
 This field will default to `Auto` if not specified.
 
 ____
-_Field rules:_ This field is optional and must be either `None`, `Auto` or `Snappy`.
+_Field rules:_ This field is optional and must be either `None` or `Auto`.
 ____
 
 === spec.filterExpression
