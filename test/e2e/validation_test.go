@@ -1082,6 +1082,12 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.maxTTL`},
 		},
+		{
+			name:           "TestValidateXDCRSourceNamePrecedence",
+			mutations:      patchMap{"replication1": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket1")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.bucket`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]

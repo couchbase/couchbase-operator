@@ -451,9 +451,13 @@ const (
 type CouchbaseReplicationSpec struct {
 	// Bucket is the source bucket to replicate from.  This must be defined and
 	// selected by the cluster.
+	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
+	// +kubebuilder:validation:MaxLength=100
 	Bucket string `json:"bucket,omitempty"`
 
 	// RemoteBucket is the remote bucket name to synchronize to.
+	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
+	// +kubebuilder:validation:MaxLength=100
 	RemoteBucket string `json:"remoteBucket,omitempty"`
 
 	// CompressionType is the type of compression to apply to the replication.

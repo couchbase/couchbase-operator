@@ -1308,14 +1308,26 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 	}
 
 	for _, bucket := range buckets.Items {
-		if bucket.Name == name {
-			return nil
+		if bucket.Spec.Name != "" {
+			if bucket.Spec.Name == name {
+				return nil
+			}
+		} else {
+			if bucket.Name == name {
+				return nil
+			}
 		}
 	}
 
 	for _, bucket := range ephemeralBuckets.Items {
-		if bucket.Name == name {
-			return nil
+		if bucket.Spec.Name != "" {
+			if bucket.Spec.Name == name {
+				return nil
+			}
+		} else {
+			if bucket.Name == name {
+				return nil
+			}
 		}
 	}
 
@@ -1325,8 +1337,14 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 	}
 
 	for _, bucket := range memcachedBuckets.Items {
-		if bucket.Name == name {
-			return fmt.Errorf("memcached bucket %s cannot be replicated", name)
+		if bucket.Spec.Name != "" {
+			if bucket.Spec.Name == name {
+				return fmt.Errorf("memcached bucket %s cannot be replicated", name)
+			}
+		} else {
+			if bucket.Name == name {
+				return fmt.Errorf("memcached bucket %s cannot be replicated", name)
+			}
 		}
 	}
 

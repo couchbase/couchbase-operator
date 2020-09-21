@@ -95,6 +95,7 @@ spec:
 
 This field specifies the local bucket to replicate from.
 A `CouchbaseBucket` or `CouchbaseEphemeralBucket` resource of the same name must exist on a related `CouchbaseCluster` instance.
+This field refers to the Couchbase bucket name, defined -- by default -- with the bucket's `metadata.name`, and optionally overridden by `spec.name`.
 
 ____
 _Field rules:_ This field is required and must be a bucket name string.
@@ -104,6 +105,7 @@ ____
 
 This field specifies the remote bucket to replicate to.
 A `CouchbaseBucket` or `CouchbaseEphemeralBucket` resource of the same name must exist on a related `CouchbaseCluster` instance.
+This field refers to the Couchbase bucket name, defined -- by default -- with the bucket's `metadata.name`, and optionally overridden by `spec.name`.
 
 ____
 _Field rules:_ This field is required and must be a bucket name string.

@@ -26,6 +26,7 @@ kind: CouchbaseBucket
 metadata:
   name: bucket1
 spec:
+  name: explicit-name
   memoryQuota: 100Mi
   replicas: 0
   ioPriority: high
@@ -76,6 +77,14 @@ metadata:
   name: replication0
 spec:
   bucket: bucket0
+  remoteBucket: bucket0
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replication1
+spec:
+  bucket: explicit-name # refers to explicit name, not implicit name
   remoteBucket: bucket0
 ---
 apiVersion: v1
