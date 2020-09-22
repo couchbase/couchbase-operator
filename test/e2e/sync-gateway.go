@@ -50,7 +50,7 @@ func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	e2eutil.MustCreateSyncGateway(t, kubernetes1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), nil, dns, tls, time.Minute)
 
 	// Ensure meta-data documents appear in the Couchbase cluster.
-	e2eutil.MustVerifyDocCountInBucketNonZero(t, kubernetes2, cluster, bucket.GetName(), time.Minute)
+	e2eutil.MustVerifyDocCountInBucketNonZero(t, kubernetes2, cluster, bucket.GetName(), 5*time.Minute)
 }
 
 // TestSyncGatewayCreateLocal tests connectivity within the same Kubernetes cluster.
@@ -228,5 +228,5 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	e2eutil.MustCreateSyncGateway(t, k8s1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), secret, nil, nil, time.Minute)
 
 	// Ensure meta-data documents appear in the Couchbase cluster.
-	e2eutil.MustVerifyDocCountInBucketNonZero(t, k8s1, cluster, bucket.GetName(), time.Minute)
+	e2eutil.MustVerifyDocCountInBucketNonZero(t, k8s1, cluster, bucket.GetName(), 5*time.Minute)
 }
