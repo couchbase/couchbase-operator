@@ -383,7 +383,7 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 }
 
 func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName string) {
-	container.Args = append(container.Args, "--s3bucket", s3BucketName)
+	container.Args = append(container.Args, "--s3-bucket", s3BucketName)
 
 	container.Env = []corev1.EnvVar{
 		{
