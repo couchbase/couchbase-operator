@@ -83,3 +83,35 @@ func TestEditDurableBucket(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestLoadDurableBucket(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	e2eutil.SkipVersionsBefore(t, framework.Global.CouchbaseServerImage, "6.6.0")
+	skipEditBucket(t)
+
+	// Static configuration.
+	clusterSize := 3
+	numOfDocs := 500
+
+	// Create the cluster.
+	bucket := e2eutil.GetDurableBucket(f.BucketType, f.CompressionMode, couchbasev2.CouchbaseBucketMinimumDurabilityMajority)
+
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 1, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

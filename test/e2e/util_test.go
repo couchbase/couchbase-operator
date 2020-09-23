@@ -260,6 +260,7 @@ var (
 		"TestUpgradeToMandatoryMutualTLS":                   TestUpgradeToMandatoryMutualTLS,
 		"TestUpgradePVC":                                    TestUpgradePVC,
 		"TestUpgradeImmediate":                              TestUpgradeImmediate,
+		"TestUpgradeBucketDurability":                       TestUpgradeBucketDurability,
 
 		// Networking tests
 		"TestExposedFeatureIP":                   TestExposedFeatureIP,
@@ -352,6 +353,7 @@ var (
 		// Durability tests
 		"TestCreateDurableBucket": TestCreateDurableBucket,
 		"TestEditDurableBucket":   TestEditDurableBucket,
+		"TestLoadDurableBucket":   TestLoadDurableBucket,
 	}
 )
 

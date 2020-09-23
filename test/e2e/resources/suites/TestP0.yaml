@@ -125,6 +125,7 @@ testcases:
 - TestUpgradeSupportableKillStatefulPodOnCreate
 - TestUpgradeSupportableKillStatefulPodOnRebalance
 - TestUpgradeImmediate
+- TestUpgradeBucketDurability
 
 # Networking Tests
 - TestExposedFeatureIP
@@ -201,3 +202,4 @@ testcases:
 # Durability tests
 - TestCreateDurableBucket
 - TestEditDurableBucket
+- TestLoadDurableBucket

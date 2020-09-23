@@ -941,3 +941,55 @@ func TestUpgradeImmediate(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestUpgradeBucketDurability(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Skip if not correctly configured
+	skipUpgrade(t)
+	e2eutil.SkipVersionsBefore(t, framework.Global.CouchbaseServerImageUpgrade, "6.6.0")
+
+	// Static Config
+	clusterSize := 3
+	numOfDocs := 500
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
+
+	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+
+	e2eutil.MustWaitUntilBucketsExists(t, kubernetes, cluster, []string{bucket.GetName()}, time.Minute)
+
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 1, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+
+	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
+	// then the cluster to become healthy after upgrade has completed.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Image", f.CouchbaseServerImageUpgrade), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/Spec/MinimumDurability", couchbasev2.CouchbaseBucketMinimumDurabilityMajority), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityMinLevel", couchbaseutil.DurabilityMajority), time.Minute)
+
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs+1, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 2*numOfDocs, 2*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
