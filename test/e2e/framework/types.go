@@ -29,6 +29,10 @@ type Framework struct {
 	BucketType                    string
 	CompressionMode               string
 	EnableIstio                   bool
+	S3Bucket                      string
+	S3Region                      string
+	S3AccessKey                   string
+	S3SecretID                    string
 
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
@@ -86,6 +90,10 @@ type TestRunParam struct {
 	BucketType                    string `yaml:"bucket-type"`
 	CompressionMode               string `yaml:"compression-mode"`
 	EnableIstio                   bool   `yaml:"enable-istio"`
+	S3Bucket                      string `yaml:"s3-bucket"`
+	S3Region                      string `yaml:"s3-region"`
+	S3AccessKey                   string `yaml:"s3-access-key"`
+	S3SecretID                    string `yaml:"s3-secret-id"`
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`

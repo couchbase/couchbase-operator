@@ -42,6 +42,8 @@ pipeline {
     string(name: 'storage_class', defaultValue: 'default')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
+    string(name: 's3_bucket', defaultValue: '')
+    string(name: 's3_region', defaultValue: 'us-west-2')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
     booleanParam(name: 'p0', defaultValue: true)
@@ -56,6 +58,8 @@ pipeline {
     PATH = "${env.WORKSPACE}/go/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
+    S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
+    S3_SECRET_ID = credentials('cbqe-s3-secret-id')
     AZURE_CREDENTIALS = credentials('couchbaseqe-azure')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
   }
@@ -120,7 +124,7 @@ pipeline {
 
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCRDValidation -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCRDValidation -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -s3-bucket ${params.s3_bucket} -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -146,7 +150,7 @@ pipeline {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestSanity -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestSanity -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -s3-bucket ${params.s3_bucket} -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -172,7 +176,7 @@ pipeline {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP0 -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP0 -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -s3-bucket ${params.s3_bucket} -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -198,7 +202,7 @@ pipeline {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP1 -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP1 -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -s3-bucket ${params.s3_bucket} -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -250,7 +254,7 @@ pipeline {
         sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCustom -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 4 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCustom -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -s3-bucket ${params.s3_bucket} -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'

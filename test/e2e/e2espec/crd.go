@@ -455,10 +455,14 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 	return spec
 }
 
-func NewBackupCluster(size int, imageName string) *couchbasev2.CouchbaseCluster {
+func NewBackupCluster(size int, imageName string, s3ecret *v1.Secret) *couchbasev2.CouchbaseCluster {
 	spec := NewBasicClusterSpec(size)
 	spec.Spec.Backup.Managed = true
 	spec.Spec.Backup.ServiceAccount = config.BackupResourceName
+
+	if s3ecret != nil {
+		spec.Spec.Backup.S3Secret = s3ecret.Name
+	}
 
 	if imageName = strings.TrimSpace(imageName); imageName != "" {
 		spec.Spec.Backup.Image = imageName

@@ -341,13 +341,13 @@ func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, size int) *couc
 	return cluster
 }
 
-func NewBackupCluster(t *testing.T, k8s *types.Cluster, size int, imageName string) (*couchbasev2.CouchbaseCluster, error) {
-	spec := e2espec.NewBackupCluster(size, imageName)
+func NewBackupCluster(t *testing.T, k8s *types.Cluster, size int, imageName string, secret *v1.Secret) (*couchbasev2.CouchbaseCluster, error) {
+	spec := e2espec.NewBackupCluster(size, imageName, secret)
 	return newClusterFromSpec(t, k8s, spec)
 }
 
-func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, size int, imageName string) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewBackupCluster(t, k8s, size, imageName)
+func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, size int, imageName string, secret *v1.Secret) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewBackupCluster(t, k8s, size, imageName, secret)
 	if err != nil {
 		Die(t, err)
 	}

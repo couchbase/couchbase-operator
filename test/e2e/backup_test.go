@@ -8,6 +8,7 @@ import (
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -15,11 +16,13 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule string) *v2.CouchbaseBackup {
+func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule string, s3 bool) *v2.CouchbaseBackup {
 	backup := &v2.CouchbaseBackup{
 		ObjectMeta: v1.ObjectMeta{
 			Name: strings.Replace(string(strategy), "_", "-", -1),
@@ -36,6 +39,10 @@ func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule st
 		},
 	}
 
+	if s3 {
+		backup.Spec.S3Bucket = framework.Global.S3Bucket
+	}
+
 	return backup
 }
 
@@ -47,36 +54,103 @@ func cronScheduleOnceIn(duration time.Duration) string {
 	return fmt.Sprintf("%d * * * *", when.Minute())
 }
 
-func TestFullIncremental(t *testing.T) {
+func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool) *corev1.Secret {
+	if !s3 {
+		return nil
+	}
+
+	f := framework.Global
+
+	var s3secret string = "s3-secret"
+
+	secret := &corev1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name: s3secret,
+		},
+		Data: map[string][]byte{
+			"region":            []byte(f.S3Region),
+			"access-key-id":     []byte(f.S3AccessKey),
+			"secret-access-key": []byte(f.S3SecretID),
+		},
+	}
+
+	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(secret); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	return secret
+}
+
+func skipBackup(t *testing.T, s3 bool) {
+	f := framework.Global
+
+	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	version, err := couchbaseutil.NewVersion(versionStr)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if version.Semver() != "6.6.0" && s3 {
+		t.Skip("Backup to S3 is a 6.6.0 feature")
+	}
+
+	versionStr, err = k8sutil.CouchbaseVersion(f.CouchbaseBackupImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	version, err = couchbaseutil.NewVersion(versionStr)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if version.Major() >= 6 && version.Minor() <= 5 && s3 {
+		t.Skip("S3 supported with 6.6.0 images only")
+	}
+
+	if (f.S3Bucket == "" || f.S3AccessKey == "" || f.S3SecretID == "") && s3 {
+		t.Skip("Either of S3 Bucket/AccessKey/SecretId missing")
+	}
+}
+
+func testFullIncremental(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	skipBackup(t, s3)
+
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := 100
 
+	s3secret := createS3Secret(t, targetKube, s3)
+
 	// Create a normal cluster.
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 3*time.Minute)
 
 	// Create a Backup object.
-	backup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
+	backup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
 	backup = e2eutil.MustNewBackup(t, targetKube, backup)
 	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
 
 	// Expect the full backup to complete, followed by the the incremental.
 	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupStartedEvent(testCouchbase, backup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupStartedEvent(testCouchbase, backup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -91,18 +165,30 @@ func TestFullIncremental(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestFullOnly(t *testing.T) {
+func TestFullIncremental(t *testing.T) {
+	testFullIncremental(t, false)
+}
+
+func TestFullIncrementalS3(t *testing.T) {
+	testFullIncremental(t, true)
+}
+
+func testFullOnly(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	skipBackup(t, s3)
+
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := 100
 
+	s3secret := createS3Secret(t, targetKube, s3)
+
 	// Create a normal cluster.
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -112,13 +198,13 @@ func TestFullOnly(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
+	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
 	backup = e2eutil.MustNewBackup(t, targetKube, backup)
 	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
 
 	// Expect the full backup to complete.
 	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupStartedEvent(testCouchbase, backup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -133,24 +219,41 @@ func TestFullOnly(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+func TestFullOnly(t *testing.T) {
+	testFullOnly(t, false)
+}
+
+func TestFullOnlyS3(t *testing.T) {
+	testFullOnly(t, true)
+}
+
 // Cluster goes down during a backup (all pods go down)
 // Tests --purge behaviour is working as expected - this should allow us to ignore the previous backup and start anew.
-func TestFailedBackupBehaviour(t *testing.T) {
+func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipBackup(t, s3)
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 
+	s3secret := createS3Secret(t, targetKube, s3)
+
 	// Create cluster.
 	numOfDocs := 100
 	testCouchbase := e2espec.NewSupportableCluster(mdsGroupSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Backup.Managed = true
+
+	if s3secret != nil {
+		testCouchbase.Spec.Backup.S3Secret = s3secret.Name
+	}
+
 	testCouchbase.Spec.Backup.Image = f.CouchbaseBackupImage
 
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
@@ -164,7 +267,7 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create this backup to run every 2 minutes so we can test the backup still runs successfully after a failure.
-	fullBackup := createTestBackup(v2.FullOnly, "*/2 * * * *", "")
+	fullBackup := createTestBackup(v2.FullOnly, "*/2 * * * *", "", s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -182,7 +285,7 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupFailedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 
 	// check backup and cronjob are still up
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, time.Minute)
+	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
 	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
 
 	// Expect the full backup to now complete.
@@ -205,20 +308,33 @@ func TestFailedBackupBehaviour(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+func TestFailedBackupBehaviour(t *testing.T) {
+	testFailedBackupBehaviour(t, false)
+}
+
+func TestFailedBackupBehaviourS3(t *testing.T) {
+	testFailedBackupBehaviour(t, true)
+}
+
 // Make sure a new Backup PVC comes up if the Backup PVC is deleted (stupidly)
 // N.B. Obviously all old data on the old PVC is gone forever and cannot be recovered.
-func TestBackupPVCReconcile(t *testing.T) {
+func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipBackup(t, s3)
 
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create cluster.
 	numOfDocs := 100
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage)
+
+	s3secret := createS3Secret(t, targetKube, s3)
+
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -229,7 +345,7 @@ func TestBackupPVCReconcile(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "")
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "", s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -255,7 +371,6 @@ func TestBackupPVCReconcile(t *testing.T) {
 	e2eutil.MustWaitForPVC(t, targetKube, fullBackup.Name, 5*time.Minute)
 
 	// Expect backup to complete
-	//e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
 
 	// Check the events match what we expect:
@@ -274,24 +389,37 @@ func TestBackupPVCReconcile(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+func TestBackupPVCReconcile(t *testing.T) {
+	testBackupPVCReconcile(t, false)
+}
+
+func TestBackupPVCReconcileS3(t *testing.T) {
+	testBackupPVCReconcile(t, true)
+}
+
 // check that replacing a CouchbaseBackup works as expected
 // delete CouchbaseBackup which should then delete Cronjobs and Jobs
 // create new full-only CouchbaseBackup
 // wait for backup to perform
 // delete backup
 // create new full/incremental CouchbaseBackup.
-func TestReplaceFullOnlyBackup(t *testing.T) {
+func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipBackup(t, s3)
 
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create a normal cluster.
 	numOfDocs := 100
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage)
+
+	s3secret := createS3Secret(t, targetKube, s3)
+
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -301,7 +429,7 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create initial backup
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -309,7 +437,7 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 
 	// wait for backup to complete
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 
 	// DELET THIS
 	e2eutil.MustDeleteBackup(t, targetKube, fullBackup)
@@ -317,15 +445,15 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	e2eutil.MustWaitForBackupDeletion(t, targetKube, 2*time.Minute)
 
 	// create new backup
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
+	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
 	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
 
 	// wait for backups to complete
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 10*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -346,24 +474,37 @@ func TestReplaceFullOnlyBackup(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+func TestReplaceFullOnlyBackup(t *testing.T) {
+	testReplaceFullOnlyBackup(t, false)
+}
+
+func TestReplaceFullOnlyBackupS3(t *testing.T) {
+	testReplaceFullOnlyBackup(t, true)
+}
+
 // check that replacing a CouchbaseBackup works as expected
 // delete CouchbaseBackup which should then delete Cronjobs and Jobs
 // create new full/incremental CouchbaseBackup
 // wait for backup to perform
 // delete backup
 // create new full-only CouchbaseBackup.
-func TestReplaceFullIncrementalBackup(t *testing.T) {
+func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipBackup(t, s3)
 
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create a normal cluster.
 	numOfDocs := 100
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage)
+
+	s3secret := createS3Secret(t, targetKube, s3)
+
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -373,7 +514,7 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create initial backup
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
+	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
 	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// wait for backup
@@ -391,13 +532,13 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	e2eutil.MustWaitForBackupDeletion(t, targetKube, 2*time.Minute)
 
 	// create new backup
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
 
 	// wait for backup to complete
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -418,11 +559,21 @@ func TestReplaceFullIncrementalBackup(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestBackupAndRestore(t *testing.T) {
+func TestReplaceFullIncrementalBackup(t *testing.T) {
+	testReplaceFullIncrementalBackup(t, false)
+}
+
+func TestReplaceFullIncrementalBackupS3(t *testing.T) {
+	testReplaceFullIncrementalBackup(t, true)
+}
+
+func testBackupAndRestore(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipBackup(t, s3)
 
 	fullFreq := 2
 
@@ -430,17 +581,20 @@ func TestBackupAndRestore(t *testing.T) {
 	clusterSize := constants.Size3
 
 	numOfDocs := 100
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage)
+
+	s3secret := createS3Secret(t, targetKube, s3)
+
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
 
 	// insert docs to backup
 	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "")
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -449,7 +603,7 @@ func TestBackupAndRestore(t *testing.T) {
 	// wait for backup to start
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 	// wait for backup status update
 	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
 
@@ -468,6 +622,10 @@ func TestBackupAndRestore(t *testing.T) {
 		},
 	}
 
+	if f.S3Bucket != "" && s3 {
+		restore.Spec.S3Bucket = f.S3Bucket
+	}
+
 	// delete bucket
 	e2eutil.MustDeleteBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
@@ -481,7 +639,7 @@ func TestBackupAndRestore(t *testing.T) {
 	e2eutil.MustNewBackupRestore(t, targetKube, restore)
 
 	// restore job is too fast, just validate bucket item count
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -502,20 +660,33 @@ func TestBackupAndRestore(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+func TestBackupAndRestore(t *testing.T) {
+	testBackupAndRestore(t, false)
+}
+
+func TestBackupAndRestoreS3(t *testing.T) {
+	testBackupAndRestore(t, true)
+}
+
 // Test that CouchbaseBackup Status fields update when the initial backup job is created
 // Archive, Repo, RepoList, LastRun, Running will be updated once the job is started
 // LastSuccess, RepoList and Duration fields will be updated once the job is finished.
-func TestUpdateBackupStatus(t *testing.T) {
+func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	skipBackup(t, s3)
+
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
 	numOfDocs := 100
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage)
+
+	s3secret := createS3Secret(t, targetKube, s3)
+
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -525,7 +696,7 @@ func TestUpdateBackupStatus(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -558,16 +729,29 @@ func TestUpdateBackupStatus(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestMultipleBackups(t *testing.T) {
+func TestUpdateBackupStatus(t *testing.T) {
+	testUpdateBackupStatus(t, false)
+}
+
+func TestUpdateBackupStatusS3(t *testing.T) {
+	testUpdateBackupStatus(t, true)
+}
+
+func testMultipleBackups(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	skipBackup(t, s3)
+
 	clusterSize := constants.Size3
 	// Create a normal cluster.
 	numOfDocs := 100
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage)
+
+	s3secret := createS3Secret(t, targetKube, s3)
+
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -577,11 +761,11 @@ func TestMultipleBackups(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create Backup object 1.
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
+	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
 	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// Create Backup object 2.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "")
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "", s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backups
@@ -590,12 +774,12 @@ func TestMultipleBackups(t *testing.T) {
 
 	// wait for backups to complete
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
 
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 8*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -613,11 +797,21 @@ func TestMultipleBackups(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestFullIncrementalOverTLS(t *testing.T) {
+func TestMultipleBackups(t *testing.T) {
+	testMultipleBackups(t, false)
+}
+
+func TestMultipleBackupsS3(t *testing.T) {
+	testMultipleBackups(t, true)
+}
+
+func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipBackup(t, s3)
 
 	clusterSize := constants.Size3
 	// Create the cluster.
@@ -626,7 +820,9 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
-	testCouchbase := e2espec.NewBackupCluster(clusterSize, f.CouchbaseBackupImage)
+	s3secret := createS3Secret(t, targetKube, s3)
+
+	testCouchbase := e2espec.NewBackupCluster(clusterSize, f.CouchbaseBackupImage, s3secret)
 	testCouchbase.Name = ctx.ClusterName
 	testCouchbase.Spec.Networking.TLS = &v2.TLSPolicy{
 		Static: &v2.StaticTLS{
@@ -645,7 +841,7 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute))
+	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
 	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// wait for backup
@@ -653,9 +849,9 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 
 	// wait for backups to complete
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -670,11 +866,21 @@ func TestFullIncrementalOverTLS(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestFullOnlyOverTLS(t *testing.T) {
+func TestFullIncrementalOverTLS(t *testing.T) {
+	testFullIncrementalOverTLS(t, false)
+}
+
+func TestFullIncrementalOverTLSS3(t *testing.T) {
+	testFullIncrementalOverTLS(t, true)
+}
+
+func testFullOnlyOverTLS(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipBackup(t, s3)
 
 	// Create the cluster.
 	clusterSize := constants.Size3
@@ -683,7 +889,9 @@ func TestFullOnlyOverTLS(t *testing.T) {
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
-	testCouchbase := e2espec.NewBackupCluster(clusterSize, f.CouchbaseBackupImage)
+	s3secret := createS3Secret(t, targetKube, s3)
+
+	testCouchbase := e2espec.NewBackupCluster(clusterSize, f.CouchbaseBackupImage, s3secret)
 	testCouchbase.Name = ctx.ClusterName
 	testCouchbase.Spec.Networking.TLS = &v2.TLSPolicy{
 		Static: &v2.StaticTLS{
@@ -702,7 +910,7 @@ func TestFullOnlyOverTLS(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -710,7 +918,7 @@ func TestFullOnlyOverTLS(t *testing.T) {
 
 	// wait for backup to complete
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -725,12 +933,22 @@ func TestFullOnlyOverTLS(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestBackupRetention(t *testing.T) {
+func TestFullOnlyOverTLS(t *testing.T) {
+	testFullOnlyOverTLS(t, false)
+}
+
+func TestFullOnlyOverTLSS3(t *testing.T) {
+	testFullOnlyOverTLS(t, true)
+}
+
+func testBackupRetention(t *testing.T, s3 bool) {
 	// Platform configuration.
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipBackup(t, s3)
 
 	// Static configuration.
 	clusterSize := 3
@@ -739,21 +957,31 @@ func TestBackupRetention(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewBackupCluster(t, kubernetes, clusterSize, f.CouchbaseBackupImage)
+	s3secret := createS3Secret(t, kubernetes, s3)
+
+	cluster := e2eutil.MustNewBackupCluster(t, kubernetes, clusterSize, f.CouchbaseBackupImage, s3secret)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// Trigger a full backup.
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "")
+	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(5*time.Minute), "", s3)
 	backup.Spec.BackupRetention = e2espec.NewDurationS(60)
 	backup = e2eutil.MustNewBackup(t, kubernetes, backup)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// Trigger another full backup, the old one should be discarded because it is
 	// too old.
 	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/Spec/Full/Schedule", cronScheduleOnceIn(2*time.Minute)), time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// And one more time to make sure the discard didn't do anything stupid...
 	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/Spec/Full/Schedule", cronScheduleOnceIn(2*time.Minute)), time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
+}
+
+func TestBackupRetention(t *testing.T) {
+	testBackupRetention(t, false)
+}
+
+func TestBackupRetentionS3(t *testing.T) {
+	testBackupRetention(t, true)
 }

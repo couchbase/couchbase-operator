@@ -124,10 +124,15 @@ testcases:
 
 # Automated Backup Tests
 - TestFailedBackupBehaviour
+- TestFailedBackupBehaviourS3
 - TestBackupPVCReconcile
+- TestBackupPVCReconcileS3
 - TestReplaceFullOnlyBackup
+- TestReplaceFullOnlyBackupS3
 - TestReplaceFullIncrementalBackup
+- TestReplaceFullIncrementalBackupS3
 - TestUpdateBackupStatus
+- TestUpdateBackupStatusS3
 
 # Kubernetes Upgrade Tests
 - TestKubernetesRollingUpgrade

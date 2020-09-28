@@ -50,6 +50,7 @@ testcases:
 
 # BackupTests
 - TestFullIncremental
+- TestFullIncrementalS3
 
 # RBACTests
 - TestRBACCreateAdminUser

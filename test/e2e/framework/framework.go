@@ -186,6 +186,10 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
 	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
+	flag.StringVar(&params.S3Bucket, "s3-bucket", "", "S3 Bucket to use")
+	flag.StringVar(&params.S3Region, "s3-region", "us-west-2", "S3 Region to use")
+	flag.StringVar(&params.S3AccessKey, "s3-access-key", "", "S3 Access Key")
+	flag.StringVar(&params.S3SecretID, "s3-secret-id", "", "S3 Secret ID")
 	flag.StringVar(&suiteSuffix, "suite-suffix", "", "Suffix to apply to suite name in JUnit results, useful when running multiple versions of the same suite in parallel")
 	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
 	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs", false, "Whether to collect logs on failure")
@@ -388,6 +392,10 @@ func Setup() (err error) {
 		BucketType:                    runtimeParams.BucketType,
 		CompressionMode:               runtimeParams.CompressionMode,
 		EnableIstio:                   runtimeParams.EnableIstio,
+		S3Bucket:                      runtimeParams.S3Bucket,
+		S3Region:                      runtimeParams.S3Region,
+		S3AccessKey:                   runtimeParams.S3AccessKey,
+		S3SecretID:                    runtimeParams.S3SecretID,
 	}
 
 	if runtimeParams.StorageClassName != "" {
@@ -441,6 +449,7 @@ func Setup() (err error) {
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
 	logrus.Info(" →  Bucket Type: " + runtimeParams.BucketType)
 	logrus.Info(" →  Compression Mode: " + runtimeParams.CompressionMode)
+	logrus.Info(" →  S3 Bucket: " + runtimeParams.S3Bucket)
 
 	logrus.Info(util.PrettyHeading("Clusters"))
 

@@ -151,12 +151,19 @@ testcases:
 
 # Automated Backup Tests
 - TestFullIncremental
+- TestFullIncrementalS3
 - TestFullOnly
+- TestFullOnlyS3
 - TestBackupAndRestore
+- TestBackupAndRestoreS3
 - TestFullIncrementalOverTLS
+- TestFullIncrementalOverTLSS3
 - TestFullOnlyOverTLS
+- TestFullOnlyOverTLSS3
 - TestMultipleBackups
+- TestMultipleBackupsS3
 - TestBackupRetention
+- TestBackupRetentionS3
 
 # Monitoring Tests
 - TestPrometheusMetrics
