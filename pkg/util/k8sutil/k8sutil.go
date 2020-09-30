@@ -208,10 +208,6 @@ func CascadeDeleteOptions(gracePeriodSeconds int64) *metav1.DeleteOptions {
 
 // mergeLables merges l2 into l1. Conflicting label will be skipped.
 func mergeLabels(l1, l2 map[string]string) map[string]string {
-	if l1 == nil {
-		return l2
-	}
-
 	m := map[string]string{}
 
 	for k, v := range l1 {
