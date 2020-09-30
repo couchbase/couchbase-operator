@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -720,6 +721,9 @@ func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (
 	for service := range serviceSet {
 		serviceList = append(serviceList, service)
 	}
+
+	// Make the port ordering deterministic.
+	sort.Sort(serviceList)
 
 	return serviceList, nil
 }
