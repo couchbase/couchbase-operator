@@ -20,6 +20,7 @@ For the latest platform support information, refer to xref:prerequisite-and-setu
 
 This release adds support for the following platforms/versions:
 
+* Open Source Kubernetes 1.16 (Certified), 1.17 (Certified)
 * Red Hat OpenShift Container Platform 4.3
 
 ==== Removed Platform Support

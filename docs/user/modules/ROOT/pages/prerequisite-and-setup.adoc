@@ -35,7 +35,7 @@ _Unless otherwise stated, maintenance/patch releases (x.x**.x**) inherit the sam
 | Platform | Version
 
 | Open Source Kubernetes
-| Certified 1.14, 1.15
+| Certified 1.14, 1.15, 1.16footnote:202-requirement[Requires Couchbase Autonomous Operator 2.0.2 or later], 1.17footnote:202-requirement[]
 
 | Red Hat OpenShift Container Platform
 | Certified 4.3
