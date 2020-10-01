@@ -174,6 +174,10 @@ build-test: $(GENERATED_FILES) $(SOURCE)
 lint: $(GENERATED_FILES)
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint run ./pkg/... ./cmd/... ./test/...
 
+# Lint python scripts for dodgy code.
+lint-python:
+	scripts/pylinter
+
 # NOTE: This target is only for local development. While we use this Dockerfile
 # (for now), the actual "docker build" command is located in the Jenkins job
 # "couchbase-operator-docker". We could make use of this Makefile there as

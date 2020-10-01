@@ -25,6 +25,13 @@ pipeline {
         sh 'make lint'
       }
     }
+    stage('Python Lint') {
+      steps {
+        sh 'python3 -m venv venv'
+        sh '. venv/bin/activate && pip3 install pylint'
+        sh '. venv/bin/activate && make lint-python'
+      }
+    }
     stage('Build All') {
       steps {
         sh 'make'

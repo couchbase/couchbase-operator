@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e 
+
+for f in $(grep -re '^#!.*python' --exclude-dir venv | cut -d : -f 1); do
+  echo "Linting: $f"
+  pylint $f
+done
