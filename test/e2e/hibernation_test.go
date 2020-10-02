@@ -77,12 +77,12 @@ func TestHibernateSupportableImmediate(t *testing.T) {
 
 	// Hibernate the cluster, wait for the hibernating status then allow recovery.
 	patchset := jsonpatch.NewPatchSet().Add("/Spec/Hibernate", true)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionHibernating, v1.ConditionTrue, cluster, time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, 3*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionHibernating, v1.ConditionTrue, cluster, 3*time.Minute)
 
 	patchset = jsonpatch.NewPatchSet().Remove("/Spec/Hibernate")
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

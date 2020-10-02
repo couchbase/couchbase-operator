@@ -353,7 +353,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
@@ -371,8 +371,8 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, false)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 2, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 1), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 1), 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
 
 	// Check the results are as expected:
 	// * Cluster created
@@ -395,6 +395,8 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	skipServerGroupTest(t, targetKube)
+
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
 	}
@@ -411,7 +413,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
@@ -469,6 +471,8 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipServerGroupTest(t, targetKube)
 
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
@@ -541,6 +545,8 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	skipServerGroupTest(t, targetKube)
+
 	if !supportsMultipleVolumeClaims(t, targetKube) {
 		t.Skip("storage class unsupported")
 	}
@@ -555,7 +561,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	testCouchbase := e2espec.NewBasicCluster(clusterSize)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
 	testCouchbase.Spec.ServerGroups = availableServerGroups

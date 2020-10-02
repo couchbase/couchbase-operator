@@ -25,9 +25,8 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	defer cleanup()
 
 	availableServerGroupList := getAvailabilityZones(t, targetKube)
-	if len(availableServerGroupList) < 3 {
-		t.Skip("couchbase server requires 3 or more availability zones")
-	}
+
+	skipServerGroupTestWithFewerThan(t, targetKube, 3)
 
 	// Create cluster spec for RZA feature.  Ensure that data is correctly
 	// balanced by rounding down the largest multiple of number of AZs that

@@ -112,6 +112,20 @@ func chooseServerGroups(groups []string, seed string, max int) []string {
 	return output
 }
 
+// skipServerGroupTestWithFewerThan skips the test should there be less than n
+// availability zones.
+func skipServerGroupTestWithFewerThan(t *testing.T, k8s *types.Cluster, n int) {
+	if len(getAvailabilityZones(t, k8s)) < n {
+		t.Skipf("test requires at least %d availability zones", n)
+	}
+}
+
+// skipServerGroupTest skips the test should there be less than 2 availability
+// zones.
+func skipServerGroupTest(t *testing.T, k8s *types.Cluster) {
+	skipServerGroupTestWithFewerThan(t, k8s, 2)
+}
+
 // Define Static ServersGroups in the CRD.
 // Deploy the cluster through operator and verify the server groups are balanced.
 func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
@@ -119,6 +133,8 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipServerGroupTest(t, targetKube)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -150,6 +166,8 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	skipServerGroupTest(t, targetKube)
 
 	serverGroups := getAvailabilityZones(t, targetKube)
 
@@ -223,6 +241,8 @@ func TestRzaResizeCluster(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	skipServerGroupTest(t, targetKube)
+
 	// Create cluster spec for RZA feature
 	clusterSize := 3
 	availableServerGroups := getAvailabilityZones(t, targetKube)
@@ -273,6 +293,8 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	skipServerGroupTest(t, targetKube)
+
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 	// WARNING: this assumes all AZs have the same number of nodes
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
@@ -312,6 +334,8 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipServerGroupTest(t, targetKube)
 
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 	// WARNING: this assumes all AZs have the same number of nodes

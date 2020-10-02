@@ -2,6 +2,7 @@
 
 # you must be signed into azure before using this script
 # az login -u USERNAME -p PASSWORD
+# operations will be performed on your default azure subscription
 
 # example usage
 
@@ -15,13 +16,14 @@ function print_usage() {
   echo "$(basename "$0") - Create AKS Clusters for testing the Autonomous Operator
 Usage: $(basename "$0") [options...]
 Options:
-  --action=STRING               Action to take: create or delete
-  --type=STRING                 The resource type to take the action against: single-cluster, test-clusters
-  --resource-group=STRING       Azure resource group to use
-  --nodes-per-cluster=INT       Number of nodes to spin up per cluster
-  --location=STRING             Azure location to use: westus, eastus, etc.
-  --service-principal-id=STRING Azure service principal account id
-  --service-principal-secret=STRING Azure service principal account secret
+  --action=STRING                     Action to take: create or delete
+  --type=STRING                       The resource type to take the action against: single-cluster, test-clusters
+  --resource-group=STRING             Azure resource group to use
+  --nodes-per-cluster=INT             Number of nodes to spin up per cluster
+  --location=STRING                   Azure location to use: westus, eastus, etc.
+  --kubernetes-version=X.X.X          Kubernetes version (Major.Minor.Patch): view available versions with 'az aks get-versions'
+  --service-principal-id=STRING       Azure service principal account id
+  --service-principal-secret=STRING   Azure service principal account secret
 " >&2
 }
 
@@ -64,13 +66,15 @@ function createCluster(){
                   --no-ssh-key \
                   --enable-addons http_application_routing \
                   --node-count $3 \
+                  --zones 1 2 3 \
                   --node-osdisk-size 30 \
                   --node-vm-size ${10} \
+                  --network-plugin azure \
                   --service-cidr $8 \
                   --vnet-subnet-id /subscriptions/$4/resourceGroups/$1/providers/Microsoft.Network/virtualNetworks/$5/subnets/$6 \
                   --subscription $4 \
-                  --service-principal $12 \
-                  --client-secret $13
+                  --service-principal ${12} \
+                  --client-secret ${13}
     exitOnError $? "Fail: error creating aks cluster: cluster-1"
 }
 
@@ -95,7 +99,8 @@ function openInboundTraffic(){
 function openOutboundTraffic(){
     az network nsg rule create --name ALLOW_ALL_OUTBOUND \
                                --nsg-name $3 \
-                               --priority 105 --resource-group $1 \
+                               --priority 105 \
+                               --resource-group $1 \
                                --access Allow \
                                --description "Allow all outbound" \
                                --destination-address-prefixes '*' \
@@ -129,8 +134,9 @@ function createPeering(){
 
 
 # setting defaults for optional parameters
-LOCATION=${LOCATION:-westus}
+LOCATION=${LOCATION:-westus2}
 NODESPERCLUSTER=${NODESPERCLUSTER:-4}
+
 VNETNAME1=${VNETNAME1:-vnet-1}
 VNETSUBNETNAME1=${VNETSUBNETNAME1:-vnet-1-subnet}
 ADDRESSPREFIX1=${ADDRESSPREFIX1:-10.0.0.0/12}
@@ -140,7 +146,6 @@ ADDRESSCIDR1=${ADDRESSCIDR1:-10.0.0.0/16}
 CLUSTERNAME1=${CLUSTERNAME1:-cluster-1}
 KUBECONFIGPATH1=${KUBECONFIGPATH1:-'~/.kube/config_aks_cluster_1'}
 VMSIZE1=${VMSIZE1:-Standard_D8s_v3}
-K8VERSION1=${K8VERSION1:-1.11.5}
 
 VNETNAME2=${VNETNAME2:-vnet-2}
 VNETSUBNETNAME2=${VNETSUBNETNAME2:-vnet-2-subnet}
@@ -151,7 +156,9 @@ ADDRESSCIDR2=${ADDRESSCIDR2:-10.16.0.0/16}
 CLUSTERNAME2=${CLUSTERNAME2:-cluster-2}
 KUBECONFIGPATH2=${KUBECONFIGPATH2:-'~/.kube/config_aks_cluster_2'}
 VMSIZE2=${VMSIZE2:-Standard_D8s_v3}
-K8VERSION2=${K8VERSION2:-1.11.5}
+
+
+K8VERSION=${K8VERSION:-1.17.11}
 
 PEERINGNAME1=${PEERINGNAME1:-vnet-1-to-vnet-2}
 PEERINGNAME2=${PEERINGNAME2:-vnet-2-to-vnet-1}
@@ -194,11 +201,8 @@ case $i in
     --vm-size2=*)
     VMSIZE2="${i#*=}"
     ;;
-    --kubernetes-version1=*)
-    K8VERSION1="${i#*=}"
-    ;;
-    --kubernetes-version2=*)
-    K8VERSION2="${i#*=}"
+    --kubernetes-version=*)
+    K8VERSION="${i#*=}"
     ;;
     -h|--help)
       print_usage
@@ -244,7 +248,7 @@ case "$ACTION" in
             "single-cluster")
                 echo "ACTION=$ACTION : TYPE=$TYPE - creating kubernetes cluster..."
                 # grabbing subscription id
-                SUBSCRIPTIONID=$(az account list | jq '.[0].id' | tr -d '"')
+                SUBSCRIPTIONID=$(az account list --query "[?isDefault].id" -o tsv)
                 exitOnError $? "Fail: error grabbing subscription id, maybe you are not signed in to azure"
 
                 # create resource group
@@ -262,19 +266,19 @@ case "$ACTION" in
 
                 # create cluster 1
                 echo "creating aks cluster: $CLUSTERNAME1"
-                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME1 $VNETSUBNETNAME1 $DNSSERVICEIP1 $ADDRESSCIDR1 $CLUSTERNAME1 $VMSIZE1 $K8VERSION1 $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRET
+                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME1 $VNETSUBNETNAME1 $DNSSERVICEIP1 $ADDRESSCIDR1 $CLUSTERNAME1 $VMSIZE1 $K8VERSION $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRET
                 echo "Success: created aks cluster: $CLUSTERNAME1"
 
                 # open inbound traffic to cluster 1
                 echo "creating inbound traffic rule for $CLUSTERNAME1"
                 MANAGEDRESOURCEGROUP1=MC_${RESOURCEGROUP}_${CLUSTERNAME1}_${LOCATION}
-                NSG1=$(az network nsg list --resource-group $MANAGEDRESOURCEGROUP1 | jq '.[0].name' | tr -d '"')
+                NSG1=$(az network nsg list --resource-group $MANAGEDRESOURCEGROUP1 --query "[0].name" -o tsv)
                 openInboundTraffic $MANAGEDRESOURCEGROUP1 $SUBSCRIPTIONID $NSG1
                 echo "Success: created inbound traffic rule for $CLUSTERNAME1"
 
                 # open outbound traffic from cluster 1
                 echo "creating outbound traffic rule for $CLUSTERNAME1"
-                openOutboundTraffic $MANAGEDRESOURCEGROUP $SUBSCRIPTIONID $NSG1
+                openOutboundTraffic $MANAGEDRESOURCEGROUP1 $SUBSCRIPTIONID $NSG1
                 echo "Success: created outbound traffic rule for $CLUSTERNAME1"
 
                 # get kubeconfig for cluster 1
@@ -286,7 +290,7 @@ case "$ACTION" in
             "test-clusters")
                 echo "ACTION=$ACTION : TYPE=$TYPE - creating kubernetes clusters..."
                 # grabbing subscription id
-                SUBSCRIPTIONID=$(az account list | jq '.[0].id' | tr -d '"')
+                SUBSCRIPTIONID=$(az account list --query "[?isDefault].id" -o tsv)
                 exitOnError $? "Fail: error grabbing subscription id, maybe you are not signed in to azure"
 
                 # create resource group
@@ -309,13 +313,13 @@ case "$ACTION" in
 
                 # create cluster 1
                 echo "creating aks cluster: $CLUSTERNAME1"
-                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME1 $VNETSUBNETNAME1 $DNSSERVICEIP1 $ADDRESSCIDR1 $CLUSTERNAME1 $VMSIZE1 $K8VERSION1 $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRE
+                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME1 $VNETSUBNETNAME1 $DNSSERVICEIP1 $ADDRESSCIDR1 $CLUSTERNAME1 $VMSIZE1 $K8VERSION $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRET
                 exitOnError $? "Fail: error creating aks cluster: $CLUSTERNAME1"
                 echo "Success: created aks cluster: $CLUSTERNAME1"
 
                 # create cluster 2
                 echo "creating aks cluster: $CLUSTERNAME2"
-                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME2 $VNETSUBNETNAME2 $DNSSERVICEIP2 $ADDRESSCIDR2 $CLUSTERNAME2 $VMSIZE2 $K8VERSION2 $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRE
+                createCluster $RESOURCEGROUP $LOCATION $NODESPERCLUSTER $SUBSCRIPTIONID $VNETNAME2 $VNETSUBNETNAME2 $DNSSERVICEIP2 $ADDRESSCIDR2 $CLUSTERNAME2 $VMSIZE2 $K8VERSION $SERVICEPRINCIPALID $SERVICEPRINCIPALSECRET
                 echo "Success: created aks cluster: $CLUSTERNAME2"
 
                 # peer vnet 1 to vnet 2
@@ -331,7 +335,7 @@ case "$ACTION" in
                 # open inbound traffic to cluster 1
                 echo "creating inbound traffic rule for $CLUSTERNAME1"
                 MANAGEDRESOURCEGROUP1=MC_${RESOURCEGROUP}_${CLUSTERNAME1}_${LOCATION}
-                NSG1=$(az network nsg list --resource-group $MANAGEDRESOURCEGROUP1 | jq '.[0].name' | tr -d '"')
+                NSG1=$(az network nsg list --resource-group $MANAGEDRESOURCEGROUP1 --query "[0].name" -o tsv)
                 openInboundTraffic $MANAGEDRESOURCEGROUP1 $SUBSCRIPTIONID $NSG1
                 echo "Success: created inbound traffic rule for $CLUSTERNAME1"
 
@@ -343,7 +347,7 @@ case "$ACTION" in
                 # open inbound traffic to cluster 2
                 echo "creating inbound traffic rule for $CLUSTERNAME2"
                 MANAGEDRESOURCEGROUP2=MC_${RESOURCEGROUP}_${CLUSTERNAME2}_${LOCATION}
-                NSG2=$(az network nsg list --resource-group $MANAGEDRESOURCEGROUP2 | jq '.[0].name' | tr -d '"')
+                NSG2=$(az network nsg list --resource-group $MANAGEDRESOURCEGROUP2 --query "[0].name" -o tsv)
                 openInboundTraffic $MANAGEDRESOURCEGROUP2 $SUBSCRIPTIONID $NSG2
                 echo "Success: created inbound traffic rule for $CLUSTERNAME2"
 

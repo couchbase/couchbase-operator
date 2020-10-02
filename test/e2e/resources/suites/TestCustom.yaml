@@ -1,4 +1,7 @@
 ---
 timeout: 4h
 testcases:
-- TestBackupAndRestore
+- TestHibernateSupportableImmediate
+- TestPersistentVolumeKillAllPodsAndOperator
+- TestPersistentVolumeRzaNodesKilled
+- TestPersistentVolumeRzaFailover
