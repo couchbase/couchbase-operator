@@ -14,6 +14,8 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // Create couchbase cluster over TLS certificates
@@ -1149,14 +1151,6 @@ func skipN2NCheck(t *testing.T) {
 	}
 }
 
-func getEncryptionLevel(encryptionType couchbasev2.NodeToNodeEncryptionType) string {
-	if encryptionType == "ControlPlaneOnly" {
-		return "control"
-	}
-
-	return "all"
-}
-
 // testCreateClusterWithTLSAndNodeToNode creates a cluster with N2N initially enabled.
 func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
 	// Platform configuration.
@@ -1183,11 +1177,8 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	//get the encyptionLevel
-	encryptionLevel := getEncryptionLevel(encryptionType)
-
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1204,6 +1195,71 @@ func TestCreateClusterWithTLSAndControlPlaneNodeToNode(t *testing.T) {
 
 func TestCreateClusterWithTLSAndFullNodeToNode(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNode(t, couchbasev2.NodeToNodeAll)
+}
+
+// testCreateClusterWithTLSAndNodeToNodeAndRotateCA creates a cluster with N2N initially enabled,
+// the CA is rotated, which is a pain as N2N is required to be off before the CA can be reloaded.
+func testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase.Name = ctx.ClusterName
+	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			ServerSecret:   ctx.ClusterSecretName,
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+		NodeToNodeEncryption: &encryptionType,
+	}
+	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	// Check the state is as we expect.
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Node to node dactivated
+	// * TLS rotated
+	// * Node to node reactivated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
+		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified},
+		},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func TestCreateClusterWithTLSAndControlPlaneNodeToNodeAndRotateCA(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t, couchbasev2.NodeToNodeControlPlaneOnly)
+}
+
+func TestCreateClusterWithTLSAndFullNodeToNodeAndRotateCA(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t, couchbasev2.NodeToNodeAll)
 }
 
 // testCreateClusterWithTLSAndNodeToNodeThenScale creates a cluster with N2N initially enabled
@@ -1234,13 +1290,10 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	//get the encyptionLevel
-	encryptionLevel := getEncryptionLevel(encryptionType)
-
 	// Check the state is as we expect, then scale, and repeat the check.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 	testCouchbase = e2eutil.MustResizeCluster(t, 0, clusterSize+scaleUp, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1289,15 +1342,12 @@ func testCreateClusterWithTLSAndNodeToNodeThenKillPod(t *testing.T, encryptionTy
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	//get the encyptionLevel
-	encryptionLevel := getEncryptionLevel(encryptionType)
-
 	// Check the state is as we expect, kill a pod, let it recover and recheck N2N.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1337,13 +1387,10 @@ func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType c
 
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, clusterSize, ctx)
 
-	//get the encyptionLevel
-	encryptionLevel := getEncryptionLevel(encryptionType)
-
 	// Enable N2N encryption and check the state is as we expect.
 	patchset := jsonpatch.NewPatchSet().Add("/Spec/Networking/TLS/NodeToNodeEncryption", &encryptionType)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1367,6 +1414,71 @@ func TestCreateClusterWithTLSThenEnableControlPlaneNodeToNode(t *testing.T) {
 
 func TestCreateClusterWithTLSThenEnableFullNodeToNode(t *testing.T) {
 	testCreateClusterWithTLSThenEnableNodeToNode(t, couchbasev2.NodeToNodeAll)
+}
+
+// testCreateClusterThenEnableNodeToNode tests enabling N2N at the same time as TLS which
+// causes all kinds of ordering misery.
+func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipN2NCheck(t)
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create the cluster without TLS.
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
+
+	// When ready create the required TLS secrets and patch them into the running
+	// cluster.
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{ClusterName: testCouchbase.Name})
+	tls := &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			ServerSecret:   ctx.ClusterSecretName,
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+		NodeToNodeEncryption: &encryptionType,
+	}
+
+	// Enable N2N encryption and check the state is as we expect.
+	patchset := jsonpatch.NewPatchSet().Add("/Spec/Networking/TLS", tls)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Client updated
+	// * TLS enabled (cluster upgraded)
+	// * N2N enabled
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
+	}
+
+	// Control plane only is the default, anything else will trigger a mode change.
+	if encryptionType != couchbasev2.NodeToNodeControlPlaneOnly {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified})
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func TestCreateClusterThenEnableControlPlaneNodeToNode(t *testing.T) {
+	testCreateClusterThenEnableNodeToNode(t, couchbasev2.NodeToNodeControlPlaneOnly)
+}
+
+func TestCreateClusterThenEnableFullNodeToNode(t *testing.T) {
+	testCreateClusterThenEnableNodeToNode(t, couchbasev2.NodeToNodeAll)
 }
 
 // testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode tests disabling node to node
@@ -1397,16 +1509,13 @@ func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, en
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	//get the encyptionLevel
-	encryptionLevel := getEncryptionLevel(encryptionType)
-
 	// Disable N2N then check state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
 	patchset := jsonpatch.NewPatchSet().Remove("/Spec/Networking/TLS/NodeToNodeEncryption")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 
-	e2eutil.MustCheckN2NDisabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NDisabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1460,11 +1569,8 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	//get the encyptionLevel
-	encryptionLevel := getEncryptionLevel(encryptionType)
-
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
 	patchset := jsonpatch.NewPatchSet().Replace("/Spec/Networking/TLS/NodeToNodeEncryption", &newEncryptionType)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
@@ -1513,22 +1619,23 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	//get the encyptionLevel
-	encryptionLevel := getEncryptionLevel(encryptionType)
-
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionLevel, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 	e2eutil.MustRotateServerCertificate(t, ctx, []string{})
 	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
+	// * N2N disabled
 	// * TLS update event occurred
+	// * N2N enabled
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
+		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
 		eventschema.Repeat{
 			Times:     clusterSize,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 		},
+		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -37,6 +38,12 @@ func (c *Cluster) reloadCA(member couchbaseutil.Member, cacert []byte) error {
 
 	if !reflect.DeepEqual(cacert, oldcacert) {
 		log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name())
+
+		// If node to node is enabled, then server will refuse to rotate TLS, for good reason,
+		// so force disable it when performing TLS updates.
+		if err := c.disableNodeToNode(); err != nil {
+			return err
+		}
 
 		if err := couchbaseutil.SetClusterCACert(cacert).On(c.api, member); err != nil {
 			return err
@@ -629,6 +636,170 @@ func (c *Cluster) disableMutualTLS() error {
 	return nil
 }
 
+// disableNodeToNode forces node-to-node encryption to off.
+func (c *Cluster) disableNodeToNode() error {
+	return c.reconcileNodeToNode(false)
+}
+
+// updateNodeToNode modifies node-to-node encryption as per the specification.
+func (c *Cluster) updateNodeToNode() error {
+	return c.reconcileNodeToNode(c.nodeToNodeEnabled())
+}
+
+// reconcileNodeToNode turns node-to-node encryption on/off.
+func (c *Cluster) reconcileNodeToNode(requestedEncryption bool) error {
+	if !c.supportsNodeToNode() {
+		return nil
+	}
+
+	// See if any nodes are in the wrong state.
+	updatableMembers := couchbaseutil.NewMemberSet()
+
+	for name, m := range c.members {
+		s := &couchbaseutil.NodeNetworkConfiguration{}
+		if err := c.getNodeNetworkConfiguration(m, s); err != nil {
+			// As the message says, this is "fine"
+			log.Info("failed to get node network configuration", "cluster", c.namespacedName(), "pod", name, "error", err)
+			return nil
+		}
+
+		if (s.NodeEncryption == couchbaseutil.On) != requestedEncryption {
+			updatableMembers.Add(m)
+		}
+	}
+
+	// If we are disabling encryption then we need to set the mode to control plane only first...
+	if !requestedEncryption {
+		securitySettings := &couchbaseutil.SecuritySettings{}
+		if err := couchbaseutil.GetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		// Only update if the current setting is not null (which defaults to..) or not control plane.
+		if securitySettings.ClusterEncryptionLevel != "" && securitySettings.ClusterEncryptionLevel != couchbaseutil.ClusterEncryptionControl {
+			requestedSecuritySettings := *securitySettings
+			requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionControl
+
+			if err := couchbaseutil.SetSecuritySettings(&requestedSecuritySettings).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
+
+			c.raiseEvent(k8sutil.SecuritySettingsUpdatedEvent(c.cluster, k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified))
+		}
+	}
+
+	// Modify encryption settings for each node.
+	if !updatableMembers.Empty() {
+		// For some reasons you need to disable failover because server is
+		// incapable of doing this itself...
+		failoverSettings := &couchbaseutil.AutoFailoverSettings{}
+		if err := couchbaseutil.GetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		failoverWasEnabled := failoverSettings.Enabled
+
+		if failoverWasEnabled {
+			failoverSettings.Enabled = false
+
+			if err := couchbaseutil.SetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
+		}
+
+		// Booleans obviously don't exist in serverland...
+		encryptionEnabledString := couchbaseutil.Off
+		encryptionDisabledString := couchbaseutil.On
+
+		if requestedEncryption {
+			encryptionEnabledString = couchbaseutil.On
+			encryptionDisabledString = couchbaseutil.Off
+		}
+
+		networkSettings := &couchbaseutil.NodeNetworkConfiguration{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV4,
+			NodeEncryption: encryptionEnabledString,
+		}
+
+		antiNetworkSettings := &couchbaseutil.NodeNetworkConfiguration{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV4,
+			NodeEncryption: encryptionDisabledString,
+		}
+
+		// Update one API per node...
+		for _, m := range updatableMembers {
+			// The auto-failover settings may take a while to take effect, so retry
+			// this call a few times.
+			if err := couchbaseutil.EnableExternalListener(networkSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
+				return err
+			}
+		}
+
+		// Update another API per node, with exactly the same configuration...
+		for _, m := range updatableMembers {
+			if err := couchbaseutil.SetNodeNetworkConfiguration(networkSettings).On(c.api, m); err != nil {
+				return err
+			}
+		}
+
+		// And another API per node...
+		// The prior command does seem to trigger a network restart and may cause the
+		// following calls to fail, so retry.
+		for i := range updatableMembers {
+			m := updatableMembers[i]
+
+			if err := couchbaseutil.DisableExternalListener(antiNetworkSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
+				return err
+			}
+		}
+
+		// Reenable auto failover
+		if failoverWasEnabled {
+			failoverSettings.Enabled = true
+
+			if err := couchbaseutil.SetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
+		}
+
+		c.raiseEvent(k8sutil.SecuritySettingsUpdatedEvent(c.cluster, k8sutil.SecuritySettingUpdatedN2NEncryptionModified))
+	}
+
+	// Encryption is not enabled, ignore any further settings.
+	if !requestedEncryption {
+		return nil
+	}
+
+	securitySettings := &couchbaseutil.SecuritySettings{}
+	if err := couchbaseutil.GetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requestedSecuritySettings := *securitySettings
+
+	switch *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption {
+	case couchbasev2.NodeToNodeControlPlaneOnly:
+		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionControl
+	case couchbasev2.NodeToNodeAll:
+		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionAll
+	default:
+		return fmt.Errorf("%w: illegal cluster encryption level '%s'", errors.NewStackTracedError(errors.ErrConfigurationInvalid), *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption)
+	}
+
+	// Nothing has changed, ignore.
+	if reflect.DeepEqual(securitySettings, &requestedSecuritySettings) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetSecuritySettings(&requestedSecuritySettings).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.raiseEvent(k8sutil.SecuritySettingsUpdatedEvent(c.cluster, k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified))
+
+	return nil
+}
+
 // reconcileTLSPreTopology handles TLS reconciliation before the topology changes.
 func (c *Cluster) reconcileTLSPreTopologyChange() error {
 	// If the cluster is upgrading, then don't interfere with TLS until the process
@@ -694,6 +865,12 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 	// rotation so we load client certs before making any further API calls.  Do this after
 	// rotation as it will not spot client updates otherwise and fail reconciling the settings.
 	if err := c.enableMutualTLS(); err != nil {
+		return err
+	}
+
+	// If node-to-node encryption is enabled, only turn it on once the cluster is fully
+	// TLS enabled, server will refuse to upload a new CA when enabled.
+	if err := c.updateNodeToNode(); err != nil {
 		return err
 	}
 

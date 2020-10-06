@@ -1189,7 +1189,7 @@ func MustCheckLDAPStatus(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.
 }
 
 // CheckN2N checks that all nodes are in the requested encryption state.
-func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled bool, encryptionLevel string, timeout time.Duration) error {
+func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled bool, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) error {
 	callback := func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
@@ -1218,8 +1218,14 @@ func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled
 					return fmt.Errorf("node to node encryption unexpectedly disabled")
 				}
 
-				if encryptionLevel != string(securityInfo.ClusterEncryptionLevel) {
-					return fmt.Errorf("node to node encryption unexpectedly in the wrong mode, expected %v, got %v", encryptionLevel, securityInfo.ClusterEncryptionLevel)
+				apiLevel := couchbaseutil.ClusterEncryptionAll
+
+				if encryptionLevel == couchbasev2.NodeToNodeControlPlaneOnly {
+					apiLevel = couchbaseutil.ClusterEncryptionControl
+				}
+
+				if apiLevel != securityInfo.ClusterEncryptionLevel {
+					return fmt.Errorf("node to node encryption unexpectedly in the wrong mode, expected %v, got %v", apiLevel, securityInfo.ClusterEncryptionLevel)
 				}
 			}
 		}
@@ -1233,13 +1239,13 @@ func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled
 	return retryutil.RetryOnErr(ctx, 5*time.Second, callback)
 }
 
-func MustCheckN2NEnabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel string, timeout time.Duration) {
+func MustCheckN2NEnabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) {
 	if err := CheckN2N(k8s, cluster, true, encryptionLevel, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func MustCheckN2NDisabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel string, timeout time.Duration) {
+func MustCheckN2NDisabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) {
 	if err := CheckN2N(k8s, cluster, false, encryptionLevel, timeout); err != nil {
 		Die(t, err)
 	}

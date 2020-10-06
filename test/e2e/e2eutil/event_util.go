@@ -195,17 +195,18 @@ func ClusterCreateSequenceWithN2N(size int, encryptionType couchbasev2.NodeToNod
 	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated},
 		},
-	}
-
-	// Control Plane Only is the default, anything else will change the mode.
-	if encryptionType != couchbasev2.NodeToNodeControlPlaneOnly {
-		schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
 	}
 
 	if size > 1 {
 		schema.Validators = append(schema.Validators, ClusterScaleUpSequence(size-1))
+	}
+
+	schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
+
+	// Control Plane Only is the default, anything else will change the mode.
+	if encryptionType != couchbasev2.NodeToNodeControlPlaneOnly {
+		schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
 	}
 
 	return schema

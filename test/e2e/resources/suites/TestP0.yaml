@@ -185,6 +185,10 @@ testcases:
 - TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode
 - TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode
 - TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate
+- TestCreateClusterWithTLSAndControlPlaneNodeToNodeAndRotateCA
+- TestCreateClusterWithTLSAndFullNodeToNodeAndRotateCA
+- TestCreateClusterThenEnableControlPlaneNodeToNode
+- TestCreateClusterThenEnableFullNodeToNode
 
 # Security tests
 - TestRotateAdminPasswordAndRestart
