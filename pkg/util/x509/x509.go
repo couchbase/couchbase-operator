@@ -5,26 +5,79 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
+	"regexp"
+	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
+// rootDomain is a lazy cache.
+var rootDomain string
+
+// getRootDomain determines the root domain for the cluster, typically cluster.local.
+// however as it can be changed, people will change it, so we need to support this.
+func getRootDomain() string {
+	// If the cache is populated, use that, this cannot change.
+	if rootDomain != "" {
+		return rootDomain
+	}
+
+	// Set a sane default in the event of an error.
+	rootDomain = "cluster.local"
+
+	// Parse /etc/resolv.conf as this will be filled in by kubelet for every
+	// pod and features the cluster root domain.  The DNS server doesn't respond
+	// to PTR lookups, so we just hack it.
+	resolv, err := ioutil.ReadFile("/etc/resolv.conf")
+	if err != nil {
+		return rootDomain
+	}
+
+	// The line looks something like:
+	//
+	//   search default.svc.cluster.local svc.cluster.local cluster.local Home
+	//
+	// As something like svc.svc.cluster.local can occur, and give the wrong result
+	// then we need to pick the last match, hoping that precedence yields the right
+	// result.  Even more unlikely is something like svc.svc.com, which is going to
+	// break still...
+	for _, line := range strings.Split(string(resolv), "\n") {
+		if !strings.HasPrefix(line, "search") {
+			continue
+		}
+
+		domains := regexp.MustCompile(`\s+`).Split(line, -1)
+
+		for _, domain := range domains[1:] {
+			matches := regexp.MustCompile(`svc\.(.*)`).FindStringSubmatch(domain)
+			if len(matches) == 2 {
+				rootDomain = matches[1]
+			}
+		}
+	}
+
+	return rootDomain
+}
+
 // MandatorySANs returns the list of SANs that all server certificates must implement.
 func MandatorySANs(clusterName, namespace string) []string {
+	root := getRootDomain()
+
 	return []string{
 		fmt.Sprintf("*.%s", clusterName),
 		fmt.Sprintf("*.%s.%s", clusterName, namespace),
 		// Used by the Operator for node connections.
 		fmt.Sprintf("*.%s.%s.svc", clusterName, namespace),
 		// Used for GCCCP SRV connectons.
-		fmt.Sprintf("*.%s.%s.svc.cluster.local", clusterName, namespace),
+		fmt.Sprintf("*.%s.%s.svc.%s", clusterName, namespace, root),
 		// Used by clients for connection in the same namespace.
 		fmt.Sprintf("%s-srv", clusterName),
 		// Used by clients for connection in a different/remote namespace.
 		fmt.Sprintf("%s-srv.%s", clusterName, namespace),
 		fmt.Sprintf("%s-srv.%s.svc", clusterName, namespace),
 		// Used for CCCP SRV connectons.
-		fmt.Sprintf("*.%s-srv.%s.svc.cluster.local", clusterName, namespace),
+		fmt.Sprintf("*.%s-srv.%s.svc.%s", clusterName, namespace, root),
 		// Used for prometheus side-car and UI access.
 		"localhost",
 	}
