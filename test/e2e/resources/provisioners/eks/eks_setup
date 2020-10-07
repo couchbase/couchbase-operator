@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python -u
 
 """
 Description:
@@ -15,12 +15,12 @@ Options:
                                         K8S control plane to manage AWS resources.
 
     -n name                             Optional. Sets the name of the EKS Clusters.
-                                        Defaults will be - EKS Clusters: cluster1 and cluster2
+                                        Defaults will be - EKS Clusters: qe-cluster1 and qe-cluster2
                                         If name is set the EKS clusters will be named
                                         by appending a number.
                                         E.g. if name is "x" then: x1, x2
-                                        VPCs will always be named controlplane1, controlplane2,
-                                        workernodes1, workernodes2.
+                                        VPCs will always be named qe-controlplane1,
+                                        qe-controlplane2, qe-workernodes1, qe-workernodes2.
 
     -c --cidr-block                     Optional. Accepts either 1 or 2 CIDR blocks as a list.
                                         Sets the VPC block network(s).
@@ -34,6 +34,10 @@ Options:
                                         Options are either True or False (case-insensitive).
                                         Alternatively 1 or 0 can be used.
                                         Default is False.
+
+    -k --kubernetes-version             Optional. Sets the Kubernetes version of the cluster.
+                                        Format is MAJOR.MINOR - Check available EKS versions first!
+                                        Default is 1.17.
 """
 
 from __future__ import print_function
@@ -43,6 +47,7 @@ import sys
 import time
 import json
 import ipaddress
+import os
 
 CONTROLPLANE_TEMPLATE = \
     "https://amazon-eks.s3-us-west-2.amazonaws.com/" \
@@ -56,10 +61,11 @@ AWS_AUTH_CM_YAML = \
 
 CAPABILITY_IAM = "CAPABILITY_IAM"
 
-NAME = "cluster"
-CONTROLPLANE_NAME = "controlplane"
-WORKERNODES_NAME = "workernodes"
+NAME = "qe-cluster"
+CONTROLPLANE_NAME = "qe-controlplane"
+WORKERNODES_NAME = "qe-workernodes"
 CIDR_BLOCK = ["192.168.0.0/16", "172.16.0.0/16"]
+KUBERNETES_VERSION = "1.17"
 
 NODEGROUP_NAME = "nodeGroup"
 NODE_AMIS = {"eu-west-1": "ami-01e08d22b9439c15a",
@@ -119,11 +125,12 @@ def create_controlplane_vpc(control_plane_vpc, cidr_block, subnets):
               ))
 
 
-def create_eks_cluster(eks_name, eks_service_role, vpc_config_string):
+def create_eks_cluster(eks_name, eks_service_role, vpc_config_string, kubernetes_version):
     """Creates the actual EKS cluster."""
     return aws("eks", "create-cluster", "--name", eks_name,
                "--role-arn", eks_service_role,
-               "--resources-vpc-config", vpc_config_string)
+               "--resources-vpc-config", vpc_config_string,
+               "--kubernetes-version", kubernetes_version)
 
 
 def get_vpc_id(vpc_name):
@@ -330,7 +337,8 @@ def setup_eks_cluster(args, eks_name, vpc_config_string):
     """Sets up the EKS Cluster itself and updates kubeconfig"""
     print("=======Creating EKS Cluster '" + eks_name + "'========")
     print("Creation started at " + str(time.asctime(time.localtime(time.time()))))
-    print(create_eks_cluster(eks_name, args.eks_service_role, vpc_config_string))
+    print(create_eks_cluster(eks_name, args.eks_service_role,
+        vpc_config_string, args.kubernetes_version))
     print("Wait at least 10-15 minutes until EKS cluster is ready "
           "before proceeding to the next step")
     eks_creation_time = poll_eks_cluster(eks_name, "create")
@@ -363,9 +371,10 @@ def setup_worker_nodes(args, number, security_group_id, subnets_string, worker_n
     aws_yaml = str.replace(aws_yaml, "<ARN of instance role (not instance profile)>", arn)
     file_to_write = open("aws-auth-cm.yaml", "w")
     file_to_write.write(aws_yaml)
+    yaml_path = os.path.abspath(file_to_write.name)
     file_to_write.close()
     # apply config map to find worker nodes
-    kubectl("apply", "-f", "aws-auth-cm.yaml")
+    kubectl("apply", "-f", yaml_path)
     if poll_worker_nodes():
         print(kubectl("get", "nodes", "-o", "wide"))
         print("EKS Cluster and relevant VPCs setup, now ready to deploy onto.")
@@ -421,17 +430,17 @@ def xdcr_setup(args):
 
     # create the new rules in both
     aws("ec2", "authorize-security-group-ingress", "--group-id", security_group_id1,
-        "--protocol", "tcp", "--port", "30000-32767", "--cidr", args.cidr_block[1])
+        "--protocol", "all", "--cidr", args.cidr_block[1])
     aws("ec2", "authorize-security-group-ingress", "--group-id", security_group_id2,
-        "--protocol", "tcp", "--port", "30000-32767", "--cidr", args.cidr_block[0])
+        "--protocol", "all", "--cidr", args.cidr_block[0])
 
 
 def get_peering_connection(args, vpc_id_1):
     """Return the correct Peering Connection linking the two specified VPCs"""
     return json.loads(aws("ec2", "describe-vpc-peering-connections", "--output", "json",
                           "--filters", "Name=requester-vpc-info.cidr-block,Values="
-                          + args.cidr_block[0] + ",Name=requester-vpc-info.vpc-id,Values="
-                          + vpc_id_1))
+                          + args.cidr_block[0], "--filters",
+                          "Name=requester-vpc-info.vpc-id,Values=" + vpc_id_1))
 
 
 def get_peering_connection_id(args):
@@ -517,6 +526,9 @@ def main():
     parser.add_argument("-t", "--two", default=False,
                         help="Enable the creation of a second cluster for XDCR purposes. "
                              "Default is False.")
+    parser.add_argument("-k", "--kubernetes-version", default=KUBERNETES_VERSION,
+                        help="Optional. Sets the Kubernetes version of the cluster."
+                             "Default is 1.17. Check available EKS versions first!")
 
     args = parser.parse_args()
     if not args.cidr_block:
