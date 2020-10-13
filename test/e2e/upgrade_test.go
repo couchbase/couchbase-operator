@@ -16,7 +16,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -724,9 +723,9 @@ func TestUpgradeToSupportable(t *testing.T) {
 	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
 
 	// Once up and running add in PV support.
-	templates := []v1.PersistentVolumeClaim{
+	templates := []couchbasev2.PersistentVolumeClaimTemplate{
 		{
-			ObjectMeta: metav1.ObjectMeta{
+			ObjectMeta: couchbasev2.NamedObjectMeta{
 				Name:        "couchbase",
 				Annotations: map[string]string{},
 			},

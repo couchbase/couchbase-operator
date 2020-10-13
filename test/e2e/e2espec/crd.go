@@ -425,9 +425,9 @@ func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
 				},
 			},
 		},
-		VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+		VolumeClaimTemplates: []couchbasev2.PersistentVolumeClaimTemplate{
 			{
-				ObjectMeta: metav1.ObjectMeta{
+				ObjectMeta: couchbasev2.NamedObjectMeta{
 					Name:        "couchbase",
 					Annotations: map[string]string{},
 				},
@@ -537,8 +537,8 @@ func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 	}
 
 	resources := CreateResources(v1.ResourceStorage, 1, 1, "Gi")
-	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
+	claim := couchbasev2.PersistentVolumeClaimTemplate{
+		ObjectMeta: couchbasev2.NamedObjectMeta{
 			Name: "couchbase",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -548,7 +548,7 @@ func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 		},
 	}
 
-	crd.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{claim}
+	crd.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{claim}
 
 	return crd
 }

@@ -956,7 +956,7 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 	defer cancel()
 
 	return retryutil.Retry(ctx, 1*time.Second, func() (bool, error) {
-		if _, err := cs.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crdName, metav1.GetOptions{}); err != nil {
+		if _, err := cs.ApiextensionsV1().CustomResourceDefinitions().Get(crdName, metav1.GetOptions{}); err != nil {
 			if k8sutil.IsKubernetesResourceNotFoundError(err) {
 				// api reported crd deleted ok
 				return true, nil

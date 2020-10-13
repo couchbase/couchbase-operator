@@ -28,7 +28,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -368,7 +367,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 		e2eutil.Die(t, err)
 	}
 
-	crds, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	crds, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -1746,7 +1745,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 			pvcName,
 		},
 	}
-	cbCluster.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+	cbCluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	e2eutil.MustNewClusterFromSpec(t, targetKube, cbCluster)

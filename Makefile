@@ -156,7 +156,7 @@ crd: $(CRD_FILE)
 
 # Build the CRDs from the binary when the binary updates.
 $(CRD_FILE): $(APISRC_V2)
-	go run sigs.k8s.io/controller-tools/cmd/controller-gen crd paths=./pkg/apis/couchbase/v2 output:dir=example
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen crd:crdVersions=v1 paths=./pkg/apis/couchbase/v2 output:dir=example
 	@cat example/couchbase.com_*.yaml > $@
 	go run scripts/crd-transform.go -in $@ -out $@
 	@rm example/couchbase.com_*.yaml

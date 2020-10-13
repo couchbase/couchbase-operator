@@ -12,8 +12,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 // skipAnalytics doesn't run analytics tests on Couchbase 5.x.x as the feature is
@@ -299,7 +297,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)

@@ -15,7 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/validator"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -107,8 +107,8 @@ func (c *Config) AddFlags() {
 }
 
 // errorResponse takes an error and creates an admission response.
-func errorResponse(err error) *admissionv1beta1.AdmissionResponse {
-	return &admissionv1beta1.AdmissionResponse{
+func errorResponse(err error) *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
 		Allowed: false,
 		Result: &metav1.Status{
 			Message: err.Error(),
@@ -118,7 +118,7 @@ func errorResponse(err error) *admissionv1beta1.AdmissionResponse {
 
 // decodeObject decodes a cluster from an admission review and returns a versioned
 // structure.
-func decodeObject(ar admissionv1beta1.AdmissionReview, raw runtime.RawExtension) (runtime.Object, error) {
+func decodeObject(ar admissionv1.AdmissionReview, raw runtime.RawExtension) (runtime.Object, error) {
 	gvk := schema.GroupVersionKind{
 		Group:   ar.Request.Kind.Group,
 		Version: ar.Request.Kind.Version,
@@ -142,7 +142,7 @@ func decodeObject(ar admissionv1beta1.AdmissionReview, raw runtime.RawExtension)
 
 // couchbaseClustersValidate validates a CouchbaseCluster object will work with the
 // operator.  This is for things which cannot be achieved with JSON schema v3 only.
-func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
+func couchbaseClustersValidate(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	glog.Infof("Validating resource: %v %v %v/%v",
 		ar.Request.Operation,
 		ar.Request.Kind,
@@ -158,12 +158,12 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 	}
 
 	// Build the response object
-	reviewResponse := admissionv1beta1.AdmissionResponse{
+	reviewResponse := admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 
 	// Check that the CouchbaseCluster is correctly configured with respect to an existing resource
-	if ar.Request.Operation == admissionv1beta1.Update {
+	if ar.Request.Operation == admissionv1.Update {
 		// Ignore errors here as we could be upgrading from v1 to v2.  In this scenario
 		// all CRDs served by the API will appear as v2 regardless of what's actually
 		// on disk.
@@ -189,7 +189,7 @@ func couchbaseClustersValidate(ar admissionv1beta1.AdmissionReview) *admissionv1
 
 // couchbaseClustersMutate mutates a CouchbaseCluster object before validation.  This allows
 // us to set sensible default values for various properties.
-func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse {
+func couchbaseClustersMutate(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	glog.Infof("Mutating resource: %v %v %v/%v",
 		ar.Request.Operation,
 		ar.Request.Kind,
@@ -206,10 +206,9 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 	}
 
 	// Build the response object
-	pt := admissionv1beta1.PatchTypeJSONPatch
-	reviewResponse := admissionv1beta1.AdmissionResponse{
-		Allowed:   true,
-		PatchType: &pt,
+	pt := admissionv1.PatchTypeJSONPatch
+	reviewResponse := admissionv1.AdmissionResponse{
+		Allowed: true,
 	}
 
 	patch := validator.ApplyDefaults(validator.New(getClient(), getCouchbaseClient()), object)
@@ -221,6 +220,8 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 		}
 
 		glog.V(1).Infof("Applying patch: %v", string(data))
+
+		reviewResponse.PatchType = &pt
 		reviewResponse.Patch = data
 	}
 
@@ -228,7 +229,7 @@ func couchbaseClustersMutate(ar admissionv1beta1.AdmissionReview) *admissionv1be
 }
 
 // admitFunc defines a callback function which accepts an admission review and returns a response.
-type admitFunc func(admissionv1beta1.AdmissionReview) *admissionv1beta1.AdmissionResponse
+type admitFunc func(admissionv1.AdmissionReview) *admissionv1.AdmissionResponse
 
 // serve is the top level handler for all admission requests.  It decodes an admission review
 // from the raw JSON and dispatches it to a specific handler.  The handler returns a response
@@ -253,9 +254,9 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	}
 
 	// Decode the admission review object and dispatch to the correct handler
-	var response *admissionv1beta1.AdmissionResponse
+	var response *admissionv1.AdmissionResponse
 
-	ar := admissionv1beta1.AdmissionReview{}
+	ar := admissionv1.AdmissionReview{}
 
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
@@ -268,7 +269,11 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	// Create the admission review response
 	response.UID = ar.Request.UID
 
-	review := admissionv1beta1.AdmissionReview{
+	review := admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "admission.k8s.io/v1",
+			Kind:       "AdmissionReview",
+		},
 		Response: response,
 	}
 

@@ -37,12 +37,12 @@ _Unless otherwise stated, maintenance/patch releases (x.x**.X**) inherit the sam
 | Open Source Kubernetes
 | Certified 1.17, 1.18
 
-Supported 1.15, 1.16, 1.19
+Supported 1.19
 
 | Red Hat OpenShift Container Platform
 | Certified 4.4
 
-Supported 4.3, 4.5, 4.6
+Supported 4.5, 4.6
 |===
 
 === Public Kubernetes Service Compatibility

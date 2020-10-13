@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-openapi/errors"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,19 +26,13 @@ import (
 )
 
 const (
-	defaultIndexStorageSetting                    = "memory_optimized"
-	defaultAutoFailoverTimeout                    = "120s"
-	defaultAutoFailoverMaxCount                   = 3
-	defaultAutoFailoverOnDataDiskIssuesTimePeriod = "120s"
-	defaultServiceMemQuota                        = "256Mi"
-	defaultAnalyticsServiceMemQuota               = "1Gi"
-	defaultFSGroup                                = 1000
-	defaultMetricsImage                           = "couchbase/exporter:1.0.3"
-	redhatMetricsImage                            = "registry.connect.redhat.com/couchbase/exporter:1.0.3-1"
-	defaultBackupImage                            = "couchbase/operator-backup:6.5.0"
-	redhatBackupImage                             = "registry.connect.redhat.com/couchbase/operator-backup:6.5.0-5"
-	defaultBackupServiceAccount                   = "couchbase-backup"
-	bucketTTLMax                                  = (1 << 31) - 1 // Puny 32 bit signed integers
+	defaultFSGroup              = 1000
+	defaultMetricsImage         = "couchbase/exporter:1.0.3"
+	redhatMetricsImage          = "registry.connect.redhat.com/couchbase/exporter:1.0.3-1"
+	defaultBackupImage          = "couchbase/operator-backup:6.5.0"
+	redhatBackupImage           = "registry.connect.redhat.com/couchbase/operator-backup:6.5.0-5"
+	defaultBackupServiceAccount = "couchbase-backup"
+	bucketTTLMax                = (1 << 31) - 1 // Puny 32 bit signed integers
 )
 
 var (
@@ -53,106 +46,12 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster", Value: emptyObject})
 	}
 
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "dataServiceMemoryQuota"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/dataServiceMemoryQuota", Value: defaultServiceMemQuota})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexServiceMemoryQuota"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexServiceMemoryQuota", Value: defaultServiceMemQuota})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "searchServiceMemoryQuota"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/searchServiceMemoryQuota", Value: defaultServiceMemQuota})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "eventingServiceMemoryQuota"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/eventingServiceMemoryQuota", Value: defaultServiceMemQuota})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "analyticsServiceMemoryQuota"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/analyticsServiceMemoryQuota", Value: defaultAnalyticsServiceMemQuota})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexStorageSetting"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexStorageSetting", Value: defaultIndexStorageSetting})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverTimeout"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverTimeout", Value: defaultAutoFailoverTimeout})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverMaxCount"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverMaxCount", Value: defaultAutoFailoverMaxCount})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoFailoverOnDataDiskIssuesTimePeriod"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", Value: defaultAutoFailoverOnDataDiskIssuesTimePeriod})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction", Value: emptyObject})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "databaseFragmentationThreshold"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/databaseFragmentationThreshold", Value: emptyObject})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "databaseFragmentationThreshold", "percent"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", Value: 30})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "viewFragmentationThreshold"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/viewFragmentationThreshold", Value: emptyObject})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "viewFragmentationThreshold", "percent"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/viewFragmentationThreshold/percent", Value: 30})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "autoCompaction", "tombstonePurgeInterval"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/tombstonePurgeInterval", Value: "72h"})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer"); found {
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "logLevel"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/logLevel", Value: "info"})
-		}
-
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "maxRollbackPoints"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/maxRollbackPoints", Value: 2})
-		}
-
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "memorySnapshotInterval"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/memorySnapshotInterval", Value: "200ms"})
-		}
-
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "stableSnapshotInterval"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/stableSnapshotInterval", Value: "5s"})
-		}
-
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "storageMode"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/storageMode", Value: "memory_optimized"})
-		}
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
+		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
 	}
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking", Value: emptyObject})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "adminConsoleServiceType"); !found {
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "adminConsoleServiceTemplate", "spec", "type"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking/adminConsoleServiceType", Value: corev1.ServiceTypeNodePort})
-		}
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "exposedFeatureServiceType"); !found {
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking", "adminConsoleServiceTemplate", "spec", "type"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking/exposedFeatureServiceType", Value: corev1.ServiceTypeNodePort})
-		}
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
 	}
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
@@ -229,11 +128,6 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 	}
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "security", "ldap"); found {
-		// enable authentication if not specified but ldap settings exist
-		if _, found, _ := unstructured.NestedBool(object.Object, "spec", "security", "ldap", "authenticationEnabled"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/authenticationEnabled", Value: true})
-		}
-
 		// enable authorization if not specified but groupsQuery also exists.
 		// otherwise this can remain false since authorization can still be
 		// done for external users with names that already exist in the cluster
@@ -254,98 +148,6 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 			// encryption is disabled by default
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/encryption", Value: couchbasev2.LDAPEncryptionNone})
 		}
-	}
-
-	return patch
-}
-
-func ApplyBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	var patch jsonpatch.PatchList
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "replicas"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/replicas", Value: 1})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "ioPriority"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/ioPriority", Value: couchbasev2.CouchbaseBucketIOPriorityLow})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "evictionPolicy"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/evictionPolicy", Value: couchbasev2.CouchbaseBucketEvictionPolicyValueOnly})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "conflictResolution"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/conflictResolution", Value: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: couchbaseutil.CompressionModePassive})
-	}
-
-	return patch
-}
-
-func ApplyEphemeralBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	var patch jsonpatch.PatchList
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "replicas"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/replicas", Value: 1})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "ioPriority"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/ioPriority", Value: couchbasev2.CouchbaseBucketIOPriorityLow})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "evictionPolicy"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/evictionPolicy", Value: couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "conflictResolution"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/conflictResolution", Value: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionMode"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionMode", Value: couchbaseutil.CompressionModePassive})
-	}
-
-	return patch
-}
-
-func ApplyMemcachedBucketDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	var patch jsonpatch.PatchList
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec", Value: emptyObject})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "memoryQuota"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/memoryQuota", Value: "100Mi"})
-	}
-
-	return patch
-}
-
-func ApplyReplicationDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	var patch jsonpatch.PatchList
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "compressionType"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/compressionType", Value: couchbasev2.CompressionTypeAuto})
 	}
 
 	return patch
@@ -372,40 +174,6 @@ func ApplyGroupDefaults(v *types.Validator, object *unstructured.Unstructured) j
 	return patch
 }
 
-func ApplyBackupDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
-	var patch jsonpatch.PatchList
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "strategy"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/strategy", Value: couchbasev2.FullIncremental})
-	}
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "successfulJobsHistoryLimit"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/successfulJobsHistoryLimit", Value: 3})
-	}
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "failedJobsHistoryLimit"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/failedJobsHistoryLimit", Value: 5})
-	}
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "backoffLimit"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backoffLimit", Value: 2})
-	}
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "backupRetention"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backupRetention", Value: "720h"})
-	}
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "logRetention"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/logRetention", Value: "168h"})
-	}
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "size"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/size", Value: "20Gi"})
-	}
-
-	return patch
-}
-
 func ApplyBackupRestoreDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
@@ -413,14 +181,6 @@ func ApplyBackupRestoreDefaults(object *unstructured.Unstructured) jsonpatch.Pat
 		if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "end"); !found {
 			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/end", Value: start})
 		}
-	}
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "logRetention"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/logRetention", Value: "168h"})
-	}
-
-	if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "backoffLimit"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backoffLimit", Value: 2})
 	}
 
 	return patch

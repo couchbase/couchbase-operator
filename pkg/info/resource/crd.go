@@ -9,7 +9,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -17,7 +17,7 @@ import (
 type crdResource struct {
 	context *context.Context
 	// crds is the raw output from listing crds
-	crds []v1beta1.CustomResourceDefinition
+	crds []apiextensionsv1.CustomResourceDefinition
 }
 
 // NewCustomResourceDefinitionResource initializes a new crd resource.
@@ -34,13 +34,13 @@ func (r *crdResource) Kind() string {
 // Fetch collects all crds as defined by the configuration.
 func (r *crdResource) Fetch() error {
 	// Fetch all CRDs in the system
-	crds, err := r.context.KubeExtClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	crds, err := r.context.KubeExtClient.ApiextensionsV1().CustomResourceDefinitions().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	// Filter out only ones defined by couchbase
-	r.crds = []v1beta1.CustomResourceDefinition{}
+	r.crds = []apiextensionsv1.CustomResourceDefinition{}
 
 	for _, crd := range crds.Items {
 		if strings.HasSuffix(crd.Name, ".couchbase.com") {

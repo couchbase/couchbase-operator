@@ -31,7 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -56,7 +56,7 @@ func Init() error {
 		return err
 	}
 
-	if err := apiextensionsv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
+	if err := apiextensionsv1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
 		return err
 	}
 
@@ -553,14 +553,14 @@ func recreateCRDs(k8s *types.Cluster) error {
 		return fmt.Errorf("failed to create clientset object: %v", err)
 	}
 
-	crds, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	crds, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().List(metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list CRDs: %v", err)
 	}
 
 	for _, crd := range crds.Items {
 		if crd.Spec.Group == "couchbase.com" {
-			if err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(crd.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Delete(crd.Name, metav1.NewDeleteOptions(0)); err != nil {
 				return fmt.Errorf("failed to delete CRD: %v", err)
 			}
 
@@ -583,18 +583,18 @@ func recreateCRDs(k8s *types.Cluster) error {
 			continue
 		}
 
-		crd := &apiextensionsv1beta1.CustomResourceDefinition{}
+		crd := &apiextensionsv1.CustomResourceDefinition{}
 		if err := yaml.Unmarshal([]byte(crdYAML), crd); err != nil {
 			return err
 		}
 
-		if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
+		if _, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Create(crd); err != nil {
 			return err
 		}
 
 		// Ensure CRDs are installed and working before proceeding.
 		callback := func() error {
-			crd, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+			crd, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -606,20 +606,20 @@ func recreateCRDs(k8s *types.Cluster) error {
 			// Catch conditions that are set to the incorrect values.
 			for _, condition := range crd.Status.Conditions {
 				switch condition.Type {
-				case apiextensionsv1beta1.Established:
-					if condition.Status != apiextensionsv1beta1.ConditionTrue {
+				case apiextensionsv1.Established:
+					if condition.Status != apiextensionsv1.ConditionTrue {
 						return fmt.Errorf("CRD %s not established: %s %s", crd.Name, condition.Reason, condition.Message)
 					}
 
 					established = true
-				case apiextensionsv1beta1.NamesAccepted:
-					if condition.Status != apiextensionsv1beta1.ConditionTrue {
+				case apiextensionsv1.NamesAccepted:
+					if condition.Status != apiextensionsv1.ConditionTrue {
 						return fmt.Errorf("CRD %s names not accepted: %s %s", crd.Name, condition.Reason, condition.Message)
 					}
 
 					namesAccepted = true
-				case apiextensionsv1beta1.NonStructuralSchema:
-					if condition.Status != apiextensionsv1beta1.ConditionFalse {
+				case apiextensionsv1.NonStructuralSchema:
+					if condition.Status != apiextensionsv1.ConditionFalse {
 						return fmt.Errorf("CRD %s non structural: %s %s", crd.Name, condition.Reason, condition.Message)
 					}
 				}

@@ -291,7 +291,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 					couchbasev2.FeatureXDCR,
 				},
 			},
-			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+			VolumeClaimTemplates: []couchbasev2.PersistentVolumeClaimTemplate{
 				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 1),
 				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName+"-data", 4),
 				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName+"-index", 4),

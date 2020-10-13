@@ -217,11 +217,24 @@ func (cs *ClusterSpec) TotalSize() int {
 	return size
 }
 
+func (o NamedObjectMeta) ToObjectMeta() metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:        o.Name,
+		Labels:      o.Labels,
+		Annotations: o.Annotations,
+	}
+}
+
 // Get the volumeClaimTemplate with specified name.
 func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeClaim {
 	for _, claim := range cs.VolumeClaimTemplates {
-		if name == claim.Name {
-			return claim.DeepCopy()
+		if name == claim.ObjectMeta.Name {
+			pvc := &v1.PersistentVolumeClaim{
+				ObjectMeta: claim.ObjectMeta.ToObjectMeta(),
+				Spec:       *claim.Spec.DeepCopy(),
+			}
+
+			return pvc
 		}
 	}
 
@@ -233,7 +246,7 @@ func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
 	names := []string{}
 
 	for _, template := range cs.VolumeClaimTemplates {
-		names = append(names, template.Name)
+		names = append(names, template.ObjectMeta.Name)
 	}
 
 	return names

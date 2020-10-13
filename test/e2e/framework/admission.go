@@ -87,12 +87,12 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 	}
 
 	mutatingWebhook := config.GetAdmissionMutatingWebhook(admissionNamespace, ca.Certificate, true, nil)
-	if _, err := k8s.KubeClient.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(mutatingWebhook); err != nil {
+	if _, err := k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(mutatingWebhook); err != nil {
 		return err
 	}
 
 	validatingWebhook := config.GetAdmissionValidatingWebhook(admissionNamespace, ca.Certificate, true, nil)
-	if _, err := k8s.KubeClient.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(validatingWebhook); err != nil {
+	if _, err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(validatingWebhook); err != nil {
 		return err
 	}
 
@@ -131,11 +131,11 @@ func deleteAdmissionController(k8s *types.Cluster) error {
 		return err
 	}
 
-	if err := k8s.KubeClient.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	if err := k8s.KubeClient.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 

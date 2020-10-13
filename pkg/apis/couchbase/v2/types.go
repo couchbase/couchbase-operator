@@ -132,6 +132,7 @@ type CouchbaseBackup struct {
 
 type CouchbaseBackupSpec struct {
 	// CB backup strategy - Full/Incremental, Full only. Default: Full/Incremental
+	// +kubebuilder:default="full_incremental"
 	Strategy Strategy `json:"strategy"`
 
 	// Incremental is the schedule on when to take incremental backups.
@@ -143,24 +144,30 @@ type CouchbaseBackupSpec struct {
 	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
 
 	// Amount of successful jobs to keep
+	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=0
 	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit,omitempty"`
 
 	// Amount of failed jobs to keep
+	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=0
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
 	// Number of times a backup job should try to execute.
 	// Once it hits the BackoffLimit it will not run until the next scheduled job
+	// +kubebuilder:default=2
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 
 	// Number of hours to hold backups for, everything older will be deleted
+	// +kubebuilder:default="720h"
 	BackupRetention *metav1.Duration `json:"backupRetention,omitempty"`
 
 	// Number of hours to hold script logs for, everything older will be deleted
+	// +kubebuilder:default="168h"
 	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
 
 	// Size in GB of the associated PVC
+	// +kubebuilder:default="20Gi"
 	Size *resource.Quantity `json:"size,omitempty"`
 
 	// Name of StorageClass to use
@@ -263,8 +270,10 @@ type CouchbaseBackupRestoreSpec struct {
 	Start *StrOrInt `json:"start"`
 	End   *StrOrInt `json:"end,omitempty"`
 	// Number of hours to hold restore script logs for, everything older will be deleted
+	// +kubebuilder:default="168h"
 	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
 	// Number of times the restore job should try to execute.
+	// +kubebuilder:default=2
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 	// Name of S3 bucket to restore from. If non-empty this overrides local backup
 	S3Bucket string `json:"s3bucket,omitempty"`
@@ -325,25 +334,33 @@ type CouchbaseBackupRestoreList struct {
 type CouchbaseBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              CouchbaseBucketSpec `json:"spec"`
+	// +optional
+	// +kubebuilder:default="x-couchbase-object"
+	Spec CouchbaseBucketSpec `json:"spec"`
 }
 
 type CouchbaseBucketSpec struct {
 	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
 	// +kubebuilder:validation:MaxLength=100
-	Name        string             `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
+	// +kubebuilder:default="100Mi"
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
+	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=3
-	Replicas           int                               `json:"replicas,omitempty"`
-	IoPriority         CouchbaseBucketIOPriority         `json:"ioPriority,omitempty"`
-	EvictionPolicy     CouchbaseBucketEvictionPolicy     `json:"evictionPolicy,omitempty"`
+	Replicas int `json:"replicas,omitempty"`
+	// +kubebuilder:default="low"
+	IoPriority CouchbaseBucketIOPriority `json:"ioPriority,omitempty"`
+	// +kubebuilder:default="valueOnly"
+	EvictionPolicy CouchbaseBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
+	// +kubebuilder:default="seqno"
 	ConflictResolution CouchbaseBucketConflictResolution `json:"conflictResolution,omitempty"`
 	EnableFlush        bool                              `json:"enableFlush,omitempty"`
 	EnableIndexReplica bool                              `json:"enableIndexReplica,omitempty"`
-	CompressionMode    CouchbaseBucketCompressionMode    `json:"compressionMode,omitempty"`
-	MinimumDurability  CouchbaseBucketMinimumDurability  `json:"minimumDurability,omitempty"`
-	MaxTTL             *metav1.Duration                  `json:"maxTTL,omitempty"`
+	// +kubebuilder:default="passive"
+	CompressionMode   CouchbaseBucketCompressionMode   `json:"compressionMode,omitempty"`
+	MinimumDurability CouchbaseBucketMinimumDurability `json:"minimumDurability,omitempty"`
+	MaxTTL            *metav1.Duration                 `json:"maxTTL,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -366,24 +383,32 @@ type CouchbaseBucketList struct {
 type CouchbaseEphemeralBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              CouchbaseEphemeralBucketSpec `json:"spec"`
+	// +optional
+	// +kubebuilder:default="x-couchbase-object"
+	Spec CouchbaseEphemeralBucketSpec `json:"spec"`
 }
 
 type CouchbaseEphemeralBucketSpec struct {
 	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
 	// +kubebuilder:validation:MaxLength=100
-	Name        string             `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
+	// +kubebuilder:default="100Mi"
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
+	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=3
-	Replicas           int                                       `json:"replicas,omitempty"`
-	IoPriority         CouchbaseBucketIOPriority                 `json:"ioPriority,omitempty"`
-	EvictionPolicy     CouchbaseEphemeralBucketEvictionPolicy    `json:"evictionPolicy,omitempty"`
-	ConflictResolution CouchbaseBucketConflictResolution         `json:"conflictResolution,omitempty"`
-	EnableFlush        bool                                      `json:"enableFlush,omitempty"`
-	CompressionMode    CouchbaseBucketCompressionMode            `json:"compressionMode,omitempty"`
-	MinimumDurability  CouchbaseEphemeralBucketMinimumDurability `json:"minimumDurability,omitempty"`
-	MaxTTL             *metav1.Duration                          `json:"maxTTL,omitempty"`
+	Replicas int `json:"replicas,omitempty"`
+	// +kubebuilder:default="low"
+	IoPriority CouchbaseBucketIOPriority `json:"ioPriority,omitempty"`
+	// +kubebuilder:default="noEviction"
+	EvictionPolicy CouchbaseEphemeralBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
+	// +kubebuilder:default="seqno"
+	ConflictResolution CouchbaseBucketConflictResolution `json:"conflictResolution,omitempty"`
+	EnableFlush        bool                              `json:"enableFlush,omitempty"`
+	// +kubebuilder:default="passive"
+	CompressionMode   CouchbaseBucketCompressionMode            `json:"compressionMode,omitempty"`
+	MinimumDurability CouchbaseEphemeralBucketMinimumDurability `json:"minimumDurability,omitempty"`
+	MaxTTL            *metav1.Duration                          `json:"maxTTL,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -402,13 +427,16 @@ type CouchbaseEphemeralBucketList struct {
 type CouchbaseMemcachedBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              CouchbaseMemcachedBucketSpec `json:"spec"`
+	// +optional
+	// +kubebuilder:default="x-couchbase-object"
+	Spec CouchbaseMemcachedBucketSpec `json:"spec"`
 }
 
 type CouchbaseMemcachedBucketSpec struct {
 	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
 	// +kubebuilder:validation:MaxLength=100
-	Name        string             `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
+	// +kubebuilder:default="100Mi"
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
 	EnableFlush bool               `json:"enableFlush,omitempty"`
 }
@@ -458,6 +486,7 @@ type CouchbaseReplicationSpec struct {
 	RemoteBucket string `json:"remoteBucket,omitempty"`
 
 	// CompressionType is the type of compression to apply to the replication.
+	// +kubebuilder:default="Auto"
 	// +kubebuilder:validation:Enum=None;Auto
 	CompressionType CompressionType `json:"compressionType,omitempty"`
 
@@ -808,7 +837,9 @@ type ClusterSpec struct {
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
 	// Cluster specific settings
-	ClusterSettings ClusterConfig `json:"cluster,omitempty"`
+	// +optional
+	// +kubebuilder:default="x-couchbase-object"
+	ClusterSettings ClusterConfig `json:"cluster"`
 
 	// Enables software update notifications in the UI
 	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications,omitempty"`
@@ -817,7 +848,7 @@ type ClusterSpec struct {
 	// that can be requested/claimed by a pod.
 	// When specified, each claim should map to the name of a volumeMount
 	// defined in a PodPolicy
-	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
+	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
 	// ServerGroups define the set of availability zones we want to distribute
 	// pods over.  This allows the Kubernetes cluster administrator to label all
@@ -858,6 +889,11 @@ type ClusterSpec struct {
 
 	// EnablePreviewScaling enables autoscaling for stateful services and buckets
 	EnablePreviewScaling bool `json:"enablePreviewScaling,omitempty"`
+}
+
+type PersistentVolumeClaimTemplate struct {
+	ObjectMeta NamedObjectMeta              `json:"metadata"`
+	Spec       v1.PersistentVolumeClaimSpec `json:"spec"`
 }
 
 type Backup struct {
@@ -906,6 +942,7 @@ type CouchbaseClusterLDAPSpec struct {
 	TLSSecret string `json:"tlsSecret,omitempty"`
 
 	// Enables using LDAP to authenticate users.
+	// +kubebuilder:default=true
 	AuthenticationEnabled bool `json:"authenticationEnabled,omitempty"`
 
 	// Enables use of LDAP groups for authorization.
@@ -975,6 +1012,13 @@ type ObjectMeta struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+// NamedObjectMeta is used to define object metadata requiring a name.
+type NamedObjectMeta struct {
+	Name        string            `json:"name"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
 // ServiceTemplateSpec is a sanitized version of a service that exposes
 // what we allow a user to modify.
 type ServiceTemplateSpec struct {
@@ -1006,6 +1050,7 @@ type CouchbaseClusterNetworkingSpec struct {
 
 	// DEPRECATED this will be removed in a later release.
 	// AdminConsoleServiceType defines whether to create a NodePort or LoadBalancer service.
+	// +kubebuilder:default="NodePort"
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
 
@@ -1020,6 +1065,7 @@ type CouchbaseClusterNetworkingSpec struct {
 
 	// DEPRECATED this will be removed in a later release.
 	// ExposedFeatureServiceType defines whether to create a NodePort or LoadBalancer service.
+	// +kubebuilder:default="NodePort"
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	ExposedFeatureServiceType v1.ServiceType `json:"exposedFeatureServiceType,omitempty"`
 
@@ -1085,21 +1131,27 @@ type ClusterConfig struct {
 	ClusterName string `json:"clusterName,omitempty"`
 
 	// The amount of memory that should be allocated to the data service
+	// +kubebuilder:default="256Mi"
 	DataServiceMemQuota *resource.Quantity `json:"dataServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the index service
+	// +kubebuilder:default="256Mi"
 	IndexServiceMemQuota *resource.Quantity `json:"indexServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the search service
+	// +kubebuilder:default="256Mi"
 	SearchServiceMemQuota *resource.Quantity `json:"searchServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the eventing service
+	// +kubebuilder:default="256Mi"
 	EventingServiceMemQuota *resource.Quantity `json:"eventingServiceMemoryQuota,omitempty"`
 
 	// The amount of memory that should be allocated to the analytics service
+	// +kubebuilder:default="1Gi"
 	AnalyticsServiceMemQuota *resource.Quantity `json:"analyticsServiceMemoryQuota,omitempty"`
 
 	// The index storage mode to use for secondary indexing (DEPRECATED)
+	// +kubebuilder:default="memory_optimized"
 	IndexStorageSetting CouchbaseClusterIndexStorageSetting `json:"indexStorageSetting,omitempty"`
 
 	// Indexer allows the small number of index variables to be tuned.
@@ -1107,21 +1159,25 @@ type ClusterConfig struct {
 	Indexer *CouchbaseClusterIndexerSettings `json:"indexer,omitempty"`
 
 	// Timeout that expires to trigger the auto failover.
+	// +kubebuilder:default="120s"
 	AutoFailoverTimeout *metav1.Duration `json:"autoFailoverTimeout,omitempty"`
 
 	// The number of failover events we can tolerate
+	// +kubebuilder:default=3
 	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount,omitempty"`
 
 	// Whether to auto failover if disk issues are detected
 	AutoFailoverOnDataDiskIssues bool `json:"autoFailoverOnDataDiskIssues,omitempty"`
 
 	// How long to wait for transient errors before failing over a faulty disk
+	// +kubebuilder:default="120s"
 	AutoFailoverOnDataDiskIssuesTimePeriod *metav1.Duration `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
 
 	// Whether to enable failing over a server group
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
 
 	// Auto-compaction settings
+	// +kubebuilder:default="x-couchbase-object"
 	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty"`
 }
 
@@ -1150,30 +1206,36 @@ type CouchbaseClusterIndexerSettings struct {
 	Threads int `json:"threads,omitempty"`
 
 	// LogLevel controls the verbosity of indexer logs.
+	// +kubebuilder:default="info"
 	LogLevel IndexerLogLevel `json:"logLevel,omitempty"`
 
 	// MaxRollbackPoints controls the number of checkpoints that can be rolled
 	// back to.  The default is 2, with a minimum of 1.
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=2
 	MaxRollbackPoints int `json:"maxRollbackPoints,omitempty"`
 
 	// MemorySnapshotInterval controls when memory indexes should be snapshotted.
 	// This defaults to 200ms, and must be greater than or eqaul to 1ms.
+	// +kubebuilder:default="200ms"
 	MemorySnapshotInterval *metav1.Duration `json:"memorySnapshotInterval,omitempty"`
 
 	// StableSnapshotInterval controls when disk indexes should be snapshotted.
 	// This defaults to 5s, and must be greater than or equal to 1ms.
+	// +kubebuilder:default="5s"
 	StableSnapshotInterval *metav1.Duration `json:"stableSnapshotInterval,omitempty"`
 
 	// StorageMode controls the underlying storage engine for indexes.  Once set
 	// it can only be modified if there are no nodes in the cluster running the
 	// index service.
+	// +kubebuilder:default="memory_optimized"
 	StorageMode CouchbaseClusterIndexStorageSetting `json:"storageMode,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.
 type DatabaseFragmentationThreshold struct {
 	// Percent is the percentage of disk fragmentation (2-100).
+	// +kubebuilder:default=30
 	// +kubebuilder:validation:Minimum=2
 	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
@@ -1185,6 +1247,7 @@ type DatabaseFragmentationThreshold struct {
 // ViewFragmentationThreshold lists triggers for when view compaction should start.
 type ViewFragmentationThreshold struct {
 	// Percent is the percentage of disk fragmentation (2-100).
+	// +kubebuilder:default=30
 	// +kubebuilder:validation:Minimum=2
 	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
@@ -1211,9 +1274,13 @@ type TimeWindow struct {
 // AutoCompaction define auto compaction settings.
 type AutoCompaction struct {
 	// DatabaseFragmentationThreshold lists triggers for when database compaction should start.
+	// +optional
+	// +kubebuilder:default="x-couchbase-object"
 	DatabaseFragmentationThreshold DatabaseFragmentationThreshold `json:"databaseFragmentationThreshold,omitempty"`
 
 	// ViewFragmentationThreshold lists triggers for when view compaction should start.
+	// +optional
+	// +kubebuilder:default="x-couchbase-object"
 	ViewFragmentationThreshold ViewFragmentationThreshold `json:"viewFragmentationThreshold,omitempty"`
 
 	// ParallelCompaction controls whether database and view compactions can happen
@@ -1224,6 +1291,7 @@ type AutoCompaction struct {
 	TimeWindow TimeWindow `json:"timeWindow,omitempty"`
 
 	// TombstonePurgeInterval controls how long to wait before purging tombstones.
+	// +kubebuilder:default="72h"
 	TombstonePurgeInterval *metav1.Duration `json:"tombstonePurgeInterval,omitempty"`
 }
 

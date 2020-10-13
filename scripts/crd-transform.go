@@ -25,15 +25,19 @@ type pathMatch struct {
 	// path ts the json path to match e.g. ".spec.foo".  This may be prefixed with
 	// an asterix to perform a suffix match.
 	path string
+	// mutate is used to do modify attributes.
+	mutate func(value interface{}) interface{}
 }
 
 // pathMatcher is an abstraction to see if a particular JSON path matches something we
 // care about.
 type pathMatcher []pathMatch
 
-// contains determines whether there a path match for the resource type.
-func (p pathMatcher) contains(group, kind, path string) bool {
-	for _, pm := range p {
+// get looks up the first path match.
+func (p pathMatcher) get(group, kind, path string) *pathMatch {
+	for i := range p {
+		pm := &p[i]
+
 		if pm.group != "" && pm.group != group {
 			continue
 		}
@@ -52,17 +56,24 @@ func (p pathMatcher) contains(group, kind, path string) bool {
 			}
 		}
 
-		return true
+		return pm
 	}
 
-	return false
+	return nil
+}
+
+// contains determines whether there a path match for the resource type.
+func (p pathMatcher) contains(group, kind, path string) bool {
+	glog.V(2).Infof("Examining path %s %s %s", group, kind, path)
+
+	return p.get(group, kind, path) != nil
 }
 
 // retain is a set of paths we should always keep that would be otherwise pruned.
 var retain = pathMatcher{
 	// This needs to be an empty object in order to work, not be pruned.
 	{
-		path: ".spec.subresources.status",
+		path: ".spec.versions.subresources.status",
 	},
 }
 
@@ -82,21 +93,49 @@ var discard = pathMatcher{
 		path: "*.x-kubernetes-list-type",
 	},
 	// In operator 2.0 (1.13) this was not marked as omitempty, as a result
-	// when upgrading to operator 2.1 (1.17), the "null" fails validation because
+	// when upgrading to operator 2.1+ (1.17+), the "null" fails validation because
 	// it's not an object.  To support concurrent operation, we just ignore this
 	// attribute as it's unimportant.
 	{
 		group: "couchbase.com",
 		kind:  "CouchbaseCluster",
-		path:  ".spec.validation.openAPIV3Schema.properties.spec.properties.volumeClaimTemplates.items.properties.spec.properties.dataSource",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.volumeClaimTemplates.items.properties.spec.properties.dataSource",
 	},
 	// Validation is "broken" for pod templates, in that they require at least
-	// one container, so remove this restriction.
+	// one container, so remove this restriction.  The removal of required is
+	// somewhat imprecise and may need fixing in the future, it's a hard problem
+	// as we cannot remove array elements by value with JSON paths.
 	{
 		group: "couchbase.com",
 		kind:  "CouchbaseCluster",
-		path:  ".spec.validation.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.containers",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.containers",
 	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.required",
+	},
+}
+
+// mutators allow the modification of attributes.  The only reason this is necessary is
+// because controller-tools is broken.
+var mutators = pathMatcher{
+	// Kubebuilder has no way of creating an empty object as a default, so we
+	// need to explicitly mark this and mutate it to a valid CRD default.
+	{
+		path:   "*.default",
+		mutate: mutateEmptyObjectDefault,
+	},
+}
+
+// mutateEmptyObjectDefault catches our empty object marker and replaces it with an
+// empty object.
+func mutateEmptyObjectDefault(v interface{}) interface{} {
+	if value, ok := v.(string); ok && value == "x-couchbase-object" {
+		return struct{}{}
+	}
+
+	return v
 }
 
 func prune(in interface{}, group, kind, path string) (interface{}, error) {
@@ -104,6 +143,12 @@ func prune(in interface{}, group, kind, path string) (interface{}, error) {
 	if discard.contains(group, kind, path) {
 		glog.V(1).Infof("Discarding %s %s %s", group, kind, path)
 		return nil, nil
+	}
+
+	// Mutate any attributes that we've injected markers to do so.
+	if pm := mutators.get(group, kind, path); pm != nil {
+		glog.V(1).Infof("Mutating %s %s %s", group, kind, path)
+		return pm.mutate(in), nil
 	}
 
 	// Keep anything we are forced to.

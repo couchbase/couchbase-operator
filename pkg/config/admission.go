@@ -9,7 +9,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -437,7 +437,7 @@ func GetAdmissionService(namespace string) *corev1.Service {
 }
 
 // GetAdmissionMutatingWebhook creates a mutating webhook for the admission controller.
-func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, namespaceSelector *metav1.LabelSelector) *admissionregistrationv1beta1.MutatingWebhookConfiguration {
+func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, namespaceSelector *metav1.LabelSelector) *admissionregistrationv1.MutatingWebhookConfiguration {
 	// You need a webhook per controller when running in namespaced mode.
 	// IF we resued the same one each time, we'd need to aggregate the webhooks
 	// and act as a client doing read/modify/write.  This is complex so instead
@@ -450,23 +450,23 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 
 	admissionControllerMutatePath := "/couchbaseclusters/mutate"
 
-	failurePolicy := admissionregistrationv1beta1.Fail
-	sideEffectClass := admissionregistrationv1beta1.SideEffectClassNone
+	failurePolicy := admissionregistrationv1.Fail
+	sideEffectClass := admissionregistrationv1.SideEffectClassNone
 
-	webhook := &admissionregistrationv1beta1.MutatingWebhookConfiguration{
+	webhook := &admissionregistrationv1.MutatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "admissionregistration.k8s.io/v1beta1",
+			APIVersion: "admissionregistration.k8s.io/v1",
 			Kind:       "MutatingWebhookConfiguration",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Webhooks: []admissionregistrationv1beta1.MutatingWebhook{
+		Webhooks: []admissionregistrationv1.MutatingWebhook{
 			{
 				Name: AdmissionResourceName + "." + namespace + ".svc",
-				Rules: []admissionregistrationv1beta1.RuleWithOperations{
+				Rules: []admissionregistrationv1.RuleWithOperations{
 					{
-						Rule: admissionregistrationv1beta1.Rule{
+						Rule: admissionregistrationv1.Rule{
 							APIGroups: []string{
 								couchbasev2.GroupName,
 							},
@@ -488,14 +488,14 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 								"v2",
 							},
 						},
-						Operations: []admissionregistrationv1beta1.OperationType{
-							admissionregistrationv1beta1.Create,
-							admissionregistrationv1beta1.Update,
+						Operations: []admissionregistrationv1.OperationType{
+							admissionregistrationv1.Create,
+							admissionregistrationv1.Update,
 						},
 					},
 				},
-				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
-					Service: &admissionregistrationv1beta1.ServiceReference{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
+					Service: &admissionregistrationv1.ServiceReference{
 						Namespace: namespace,
 						Name:      AdmissionResourceName,
 						Path:      &admissionControllerMutatePath,
@@ -504,6 +504,9 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 				},
 				FailurePolicy: &failurePolicy,
 				SideEffects:   &sideEffectClass,
+				AdmissionReviewVersions: []string{
+					"v1",
+				},
 			},
 		},
 	}
@@ -518,7 +521,7 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 }
 
 // GetAdmissionValidatingWebhook creates a validating webhook for the admission controller.
-func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, namespaceSelector *metav1.LabelSelector) *admissionregistrationv1beta1.ValidatingWebhookConfiguration {
+func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, namespaceSelector *metav1.LabelSelector) *admissionregistrationv1.ValidatingWebhookConfiguration {
 	// You need a webhook per controller when running in namespaced mode.
 	// IF we resued the same one each time, we'd need to aggregate the webhooks
 	// and act as a client doing read/modify/write.  This is complex so instead
@@ -531,23 +534,23 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, na
 
 	admissionControllerValidatePath := "/couchbaseclusters/validate"
 
-	failurePolicy := admissionregistrationv1beta1.Fail
-	sideEffectClass := admissionregistrationv1beta1.SideEffectClassNone
+	failurePolicy := admissionregistrationv1.Fail
+	sideEffectClass := admissionregistrationv1.SideEffectClassNone
 
-	webhook := &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
+	webhook := &admissionregistrationv1.ValidatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "admissionregistration.k8s.io/v1beta1",
+			APIVersion: "admissionregistration.k8s.io/v1",
 			Kind:       "ValidatingWebhookConfiguration",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Webhooks: []admissionregistrationv1beta1.ValidatingWebhook{
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{
 			{
 				Name: AdmissionResourceName + "." + namespace + ".svc",
-				Rules: []admissionregistrationv1beta1.RuleWithOperations{
+				Rules: []admissionregistrationv1.RuleWithOperations{
 					{
-						Rule: admissionregistrationv1beta1.Rule{
+						Rule: admissionregistrationv1.Rule{
 							APIGroups: []string{
 								couchbasev2.GroupName,
 							},
@@ -569,14 +572,14 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, na
 								"v2",
 							},
 						},
-						Operations: []admissionregistrationv1beta1.OperationType{
-							admissionregistrationv1beta1.Create,
-							admissionregistrationv1beta1.Update,
+						Operations: []admissionregistrationv1.OperationType{
+							admissionregistrationv1.Create,
+							admissionregistrationv1.Update,
 						},
 					},
 				},
-				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
-					Service: &admissionregistrationv1beta1.ServiceReference{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
+					Service: &admissionregistrationv1.ServiceReference{
 						Namespace: namespace,
 						Name:      AdmissionResourceName,
 						Path:      &admissionControllerValidatePath,
@@ -585,6 +588,9 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, na
 				},
 				FailurePolicy: &failurePolicy,
 				SideEffects:   &sideEffectClass,
+				AdmissionReviewVersions: []string{
+					"v1",
+				},
 			},
 		},
 	}

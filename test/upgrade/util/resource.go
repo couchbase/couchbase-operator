@@ -123,7 +123,7 @@ func ReplaceResource(c *Clients, resource *unstructured.Unstructured) error {
 	}
 
 	for field, value := range resource.Object {
-		if field == "apiVersion" || field == "kind" || field == "metadata" || field == "status" {
+		if field == "metadata" || field == "status" {
 			continue
 		}
 

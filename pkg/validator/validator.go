@@ -21,16 +21,6 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 		switch object.GetKind() {
 		case couchbasev2.ClusterCRDResourceKind:
 			return validationv2.ApplyDefaults(v, object)
-		case couchbasev2.BucketCRDResourceKind:
-			return validationv2.ApplyBucketDefaults(v, object)
-		case couchbasev2.EphemeralBucketCRDResourceKind:
-			return validationv2.ApplyEphemeralBucketDefaults(v, object)
-		case couchbasev2.MemcachedBucketCRDResourceKind:
-			return validationv2.ApplyMemcachedBucketDefaults(v, object)
-		case couchbasev2.ReplicationCRDResourceKind:
-			return validationv2.ApplyReplicationDefaults(v, object)
-		case couchbasev2.BackupCRDResourceKind:
-			return validationv2.ApplyBackupDefaults(object)
 		case couchbasev2.BackupRestoreCRDResourceKind:
 			return validationv2.ApplyBackupRestoreDefaults(object)
 		case couchbasev2.GroupCRDResourceKind:
