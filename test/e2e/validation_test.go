@@ -936,11 +936,10 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedErrors: []string{`spec.servers[1].volumeMounts.analytics`},
 		},
 		{
-			name:       "TestValidateBackupInvalidCronSchedule",
-			mutations:  patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/full/schedule", "*7 * * * *")},
-			shouldFail: true,
-			// Please fix this...
-			expectedErrors: []string{`failed to parse int from *7: strconv.Atoi: parsing "*7": invalid syntax`},
+			name:           "TestValidateBackupInvalidCronSchedule",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/full/schedule", "*7 * * * *")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.full.schedule`},
 		},
 		{
 			name:           "TestValidateBackupInvalidStrategy",
@@ -949,18 +948,22 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedErrors: []string{`spec.strategy`},
 		},
 		{
-			name:       "TestValidateBackupSizeZero",
-			mutations:  patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", "0")},
-			shouldFail: true,
-			// Please fix this...
-			expectedErrors: []string{`size: 0 must be greater than 0`},
+			name:           "TestValidateBackupSizeZero",
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", "0")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.size`},
 		},
 		{
-			name:       "TestValidateBackupSizeNegative",
-			mutations:  patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", "-2")},
-			shouldFail: true,
-			// Please fix this...
-			expectedErrors: []string{`size: -2 must be greater than 0`},
+			name:           "TestValidateBackupSizeNegative",
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", "-2")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.size`},
+		},
+		{
+			name:           "TestValidateBackupS3Bucket",
+			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/s3bucket", "hellobeans")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.s3bucket`},
 		},
 		{
 			name:           "TestValidateBackupRestoreMissingBackupField",

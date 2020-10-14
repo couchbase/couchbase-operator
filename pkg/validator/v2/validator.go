@@ -1003,7 +1003,11 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 	}
 
 	if backup.Spec.Size.Value() <= 0 {
-		errs = append(errs, fmt.Errorf("size: %d must be greater than 0", backup.Spec.Size.Value()))
+		errs = append(errs, fmt.Errorf("spec.size %d must be greater than 0", backup.Spec.Size.Value()))
+	}
+
+	if len(backup.Spec.S3Bucket) != 0 && !strings.HasPrefix(backup.Spec.S3Bucket, "s3://") {
+		errs = append(errs, fmt.Errorf("spec.s3bucket %s is not a valid S3 bucket URI format", backup.Spec.S3Bucket))
 	}
 
 	if len(errs) > 0 {
@@ -1375,8 +1379,8 @@ func validateBackupCronSchedules(backup *couchbasev2.CouchbaseBackup) []error {
 			errs = append(errs, err)
 		}
 	default:
-		errs = append(errs, fmt.Errorf("specified strategy not valid, must be one of %s | %s",
-			couchbasev2.FullIncremental, couchbasev2.FullOnly))
+		errs = append(errs, fmt.Errorf("spec.strategy %s not valid, must be one of %s | %s",
+			backup.Spec.Strategy, couchbasev2.FullIncremental, couchbasev2.FullOnly))
 	}
 
 	return errs
@@ -1384,12 +1388,12 @@ func validateBackupCronSchedules(backup *couchbasev2.CouchbaseBackup) []error {
 
 func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name string) error {
 	if schedule == nil || len(schedule.Schedule) == 0 {
-		return fmt.Errorf("cronjob schedule %s cannot be empty", name)
+		return fmt.Errorf("%s.schedule : cronjob schedule %s cannot be empty", name, name)
 	}
 
 	p := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 	if _, err := p.Parse(schedule.Schedule); err != nil {
-		return err
+		return fmt.Errorf("%s.schedule : %s", name, err)
 	}
 
 	return nil
