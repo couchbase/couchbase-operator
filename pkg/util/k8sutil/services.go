@@ -803,8 +803,25 @@ func memberServices(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.
 		return nil, fmt.Errorf("%w: sever class %s missing for member %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), member.Config(), member.Name())
 	}
 
-	// Append the admin service, this is not explicitly enabled
-	return append(class.Services, couchbasev2.AdminService), nil
+	// Always allow the admin service, this is not explicitly enabled
+	// per server class. Likewise always allow the data service irrespective
+	// of class as it's used for GCCCP client boot-strapping.
+	services := couchbasev2.ServiceList{
+		couchbasev2.AdminService,
+		couchbasev2.DataService,
+	}
+
+	// Build up the node services based on enabled services, but don't duplicate,
+	// it's probably harmless...
+	for _, service := range class.Services {
+		if services.Contains(service) {
+			continue
+		}
+
+		services = append(services, service)
+	}
+
+	return services, nil
 }
 
 // UpdateExposedFeatureStatus is used to communicate to clients which services have been
