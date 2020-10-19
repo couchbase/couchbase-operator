@@ -652,6 +652,8 @@ func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod
 			// add the TLS server flags to the couchbase-exporter binary
 			container.Args = append(container.Args,
 				"--ca", operatorSecretMountPath+"/ca.crt")
+
+			container.ReadinessProbe.Handler.HTTPGet.Scheme = v1.URISchemeHTTPS
 		}
 
 		if cs.Networking.TLS.ClientCertificatePolicy != nil {
@@ -814,11 +816,13 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 		},
 		ReadinessProbe: &v1.Probe{
 			Handler: v1.Handler{
-				TCPSocket: &v1.TCPSocketAction{
+				HTTPGet: &v1.HTTPGetAction{
+					Path: "/metrics",
 					Port: intstr.IntOrString{
 						Type:   intstr.Int,
 						IntVal: prometheusPort,
 					},
+					Scheme: v1.URISchemeHTTP,
 				},
 			},
 			InitialDelaySeconds: 10,
