@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
@@ -15,9 +16,14 @@ import (
 // rootDomain is a lazy cache.
 var rootDomain string
 
+var rootDomainLock sync.Mutex
+
 // getRootDomain determines the root domain for the cluster, typically cluster.local.
 // however as it can be changed, people will change it, so we need to support this.
 func getRootDomain() string {
+	rootDomainLock.Lock()
+	defer rootDomainLock.Unlock()
+
 	// If the cache is populated, use that, this cannot change.
 	if rootDomain != "" {
 		return rootDomain
