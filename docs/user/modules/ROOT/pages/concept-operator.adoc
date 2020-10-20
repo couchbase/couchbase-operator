@@ -34,12 +34,17 @@ The DAC is a standalone service and processes Couchbase cluster resources for th
 .Dynamic Admission Controller Security Models
 [TIP]
 ====
-The recommended deployment model is to run a single instance of the DAC per Kubernetes cluster.
-This allows it access to resources at a cluster scope, such as namespace and storage classes.
-Granted access to cluster scoped resources allows a richer and more reliable experience: the DAC can alert when resources referred to in the custom resource are not present.
-A DAC may be run per-namespace to alleviate security concerns, however its functionality is reduced.
+The recommended -- and default -- deployment model is to run a single instance of the DAC per Kubernetes cluster.
+The DAC is backward compatible with all previous CRD versions, therefore you only need to deploy the most recent version, regardless of the Operator versions running on the platform.
 
+The DAC may also be deployed at the namespace scope for more security conscious environments.
+This limits the DAC so that it is only able to see Kubernetes resources within the namespace in which it is deployed, for example secrets.
+With this security model, one instance of the DAC is required per namespace in which the Operator is deployed.
 In the following <<dynamic-admission-controller-architecture,DAC architecture section>>, when running the DAC namespaced, `ClusterRoles` and `ClusterRoleBindings` are replaced with `Roles` and `RoleBindings` respectively.
+
+Regardless of chosen security model, the DAC will require cluster administrator privileges to deploy.
+The roles and role bindings require privilege escalation.
+Additionally the mutating and validating webhooks affect the Kubernetes API, so must be installed by an administrator.
 ====
 
 .Dynamic Admission Controller Security Rules
@@ -121,8 +126,9 @@ The Operator does not require any elevated privileges and may be run as any user
 ====
 The recommended deployment method for the Operator is a single instance per-namespace.
 This allows staged upgrades of the Operator, only affecting a subset of Couchbase clusters at any one time.
-The Operator may be deployed at the cluster scope, where a single Operator controls all Couchbase clusters on the platform.
 
+The Operator may be deployed at the cluster scope, where a single Operator controls all Couchbase clusters on the platform.
+While requiring less operational overhead, and upgrade of the Operator will affect all Couchbase clusters running on the platform, so use this deployment method with caution.
 In the following <<operator-resources,operator resources section>>, `Roles` and `RoleBindings` are replaced with `ClusterRoles` and `ClusterRoleBindings` respectively.
 ====
 
