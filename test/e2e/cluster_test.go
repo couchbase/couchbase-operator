@@ -17,6 +17,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test scaling a cluster with no buckets up and down
@@ -142,6 +143,48 @@ func TestEditClusterSettings(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: 5, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestIndexerSettings changes the indexer settings and sees what happens.
+func TestIndexerSettings(t *testing.T) {
+	// Platform configuration.
+	targetKube, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the cluster.  Use an empty inderer settings to get the DAC to fill in
+	// the defaults for us.  Also remove the index service, the storage mode cannot be
+	// modified if any nodes are running the index service (lol really?)
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase.Spec.ClusterSettings.Indexer = &couchbasev2.CouchbaseClusterIndexerSettings{}
+	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
+		couchbasev2.DataService,
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	// Edit the index settings so they aren't the defaults.
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/Threads", 8), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Threads", 8), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/LogLevel", couchbasev2.IndexerLogLevelDebug), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/LogLevel", couchbaseutil.IndexLogLevelDebug), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/MaxRollbackPoints", 8), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/MaxRollbackPoints", 8), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/MemorySnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/MemSnapInterval", 1000), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/StableSnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/StableSnapInterval", 1000), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/StorageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/StorageMode", couchbaseutil.IndexStoragePlasma), time.Minute)
+
+	// Check that the user can see the cluster being edited.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 6, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

@@ -1192,7 +1192,7 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
-	if err := c.reconcileIndexStorageSettings(); err != nil {
+	if err := c.reconcileIndexSettings(); err != nil {
 		return err
 	}
 
@@ -1333,28 +1333,44 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 }
 
 // Compare cluster index settings with spec, reconcile if necessary.
-func (c *Cluster) reconcileIndexStorageSettings() error {
-	settings := &couchbaseutil.IndexSettings{}
-	if err := couchbaseutil.GetIndexSettings(settings).On(c.api, c.readyMembers()); err != nil {
+func (c *Cluster) reconcileIndexSettings() error {
+	current := couchbaseutil.IndexSettings{}
+	if err := couchbaseutil.GetIndexSettings(&current).On(c.api, c.readyMembers()); err != nil {
 		log.Error(err, "Index storage settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
 
-	storageMode := couchbaseutil.IndexStorageMode(c.cluster.Spec.ClusterSettings.IndexStorageSetting)
-	if storageMode != settings.StorageMode {
-		settings.StorageMode = storageMode
+	// By default (the old way), just patch the storage mode on top of the
+	// current configuration.
+	requested := current
+	requested.StorageMode = couchbaseutil.IndexStorageMode(c.cluster.Spec.ClusterSettings.IndexStorageSetting)
 
-		if err := couchbaseutil.SetIndexSettings(settings).On(c.api, c.readyMembers()); err != nil {
-			log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
-			message := fmt.Sprintf("Unable set index storage mode to [%s]: %v", storageMode, err.Error())
-			c.cluster.Status.SetConfigRejectedCondition(message)
-
-			return err
+	// However, if specified, give the user full control.
+	apiSettings := c.cluster.Spec.ClusterSettings.Indexer
+	if apiSettings != nil {
+		requested = couchbaseutil.IndexSettings{
+			Threads:            apiSettings.Threads,
+			LogLevel:           couchbaseutil.IndexLogLevel(apiSettings.LogLevel),
+			MaxRollbackPoints:  apiSettings.MaxRollbackPoints,
+			MemSnapInterval:    int(apiSettings.MemorySnapshotInterval.Milliseconds()),
+			StableSnapInterval: int(apiSettings.StableSnapshotInterval.Milliseconds()),
+			StorageMode:        couchbaseutil.IndexStorageMode(apiSettings.StorageMode),
 		}
-
-		log.Info("Index storage settings updated", "cluster", c.namespacedName())
-		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
 	}
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetIndexSettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
+		c.cluster.Status.SetConfigRejectedCondition(fmt.Sprintf("Unable set index settings: %v", err.Error()))
+
+		return err
+	}
+
+	log.Info("Index storage settings updated", "cluster", c.namespacedName())
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
 
 	return nil
 }

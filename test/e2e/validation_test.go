@@ -29,6 +29,7 @@ import (
 var (
 	unavailableStorageClass       = "unavailableStorageClass"
 	defaultFSGroup          int64 = 1000
+	emptyObject                   = struct{}{}
 )
 
 // Resources are stored in a list in order to maintain ordering.  Do not try to use a map
@@ -918,6 +919,42 @@ func TestNegValidationCreate(t *testing.T) {
 			expectedErrors: []string{`spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod`},
 		},
 		{
+			name:           "TestValidateIndexerThreadsUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/threads", "-1")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.threads`},
+		},
+		{
+			name:           "TestValidateIndexerLogLevelInvalid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/logLevel", "scots-pine")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.logLevel`},
+		},
+		{
+			name:           "TestValidateIndexerMaxRollbackPointsUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/maxRollbackPoints", "0")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.maxRollbackPoints`},
+		},
+		{
+			name:           "TestValidateIndexerMemorySnapshotIntervalUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/memorySnapshotInterval", "999us")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.memorySnapshotInterval`},
+		},
+		{
+			name:           "TestValidateIndexerStableSnapshotIntervalUndeflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/stableSnapshotInterval", "999us")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.stableSnapshotInterval`},
+		},
+		{
+			name:           "TestValidateIndexerStorageModeInvalid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", "ntfs")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.storageMode`},
+		},
+		{
 			name:           "TestValidateServerServiceRequiredForVolumeMountData",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/0")},
 			shouldFail:     true,
@@ -1171,6 +1208,17 @@ func TestValidationDefaultCreate(t *testing.T) {
 				Test("/spec/cluster/autoFailoverTimeout", "120s").
 				Test("/spec/cluster/autoFailoverMaxCount", 3).
 				Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "120s"),
+			},
+		},
+		{
+			name:      "TestValidateIndexerDefault",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer", emptyObject)},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Test("/spec/cluster/indexer/logLevel", "info").
+				Test("/spec/cluster/indexer/maxRollbackPoints", 2).
+				Test("/spec/cluster/indexer/memorySnapshotInterval", "200ms").
+				Test("/spec/cluster/indexer/stableSnapshotInterval", "5s").
+				Test("/spec/cluster/indexer/storageMode", "memory_optimized"),
 			},
 		},
 		{
@@ -1503,9 +1551,9 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		},
 		{
 			name:           "TestValidateApplyIndexStorageSettingsImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingStandard)},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.cluster.indexStorageSetting"},
+			expectedErrors: []string{"spec.cluster.indexer.storageMode"},
 		},
 		// Server groups updates
 		{

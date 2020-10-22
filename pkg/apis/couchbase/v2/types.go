@@ -1074,6 +1074,7 @@ type DNS struct {
 
 // CouchbaseClusterIndexStorageSetting describes the allowed storage engines for
 // databsae indexes.
+// +kubebuilder:validation:Enum=memory_optimized;plasma
 type CouchbaseClusterIndexStorageSetting string
 
 const (
@@ -1103,8 +1104,12 @@ type ClusterConfig struct {
 	// The amount of memory that should be allocated to the analytics service
 	AnalyticsServiceMemQuota *resource.Quantity `json:"analyticsServiceMemoryQuota,omitempty"`
 
-	// The index storage mode to use for secondary indexing
+	// The index storage mode to use for secondary indexing (DEPRECATED)
 	IndexStorageSetting CouchbaseClusterIndexStorageSetting `json:"indexStorageSetting,omitempty"`
+
+	// Indexer allows the small number of index variables to be tuned.
+	// If specified this attribute overrides `indexStorageSetting`.
+	Indexer *CouchbaseClusterIndexerSettings `json:"indexer,omitempty"`
 
 	// Timeout that expires to trigger the auto failover.
 	AutoFailoverTimeout *metav1.Duration `json:"autoFailoverTimeout,omitempty"`
@@ -1123,6 +1128,52 @@ type ClusterConfig struct {
 
 	// Auto-compaction settings
 	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty"`
+}
+
+// IndexerLogLevel controls the verbosity of indexer logs.
+// +kubebuilder:validation:Enum=slient;fatal;error;warn;info;verbose;timing;debug;trace
+type IndexerLogLevel string
+
+const (
+	IndexerLogLevelSilent  IndexerLogLevel = "silent"
+	IndexerLogLevelFatal   IndexerLogLevel = "fatal"
+	IndexerLogLevelError   IndexerLogLevel = "error"
+	IndexerLogLevelWarn    IndexerLogLevel = "warn"
+	IndexerLogLevelInfo    IndexerLogLevel = "info"
+	IndexerLogLevelVerbose IndexerLogLevel = "verbose"
+	IndexerLogLevelTiming  IndexerLogLevel = "timing"
+	IndexerLogLevelDebug   IndexerLogLevel = "debug"
+	IndexerLogLevelTrace   IndexerLogLevel = "trace"
+)
+
+// CouchbaseClusterIndexerSettings allow the indexer to be configured.
+type CouchbaseClusterIndexerSettings struct {
+	// Threads controls the number of processor threads to use for indexing.
+	// A value of 0 means 1 per CPU (default).  This attribute must be greater
+	// than or equal to 0.
+	// +kubebuilder:validation:Minimum=0
+	Threads int `json:"threads,omitempty"`
+
+	// LogLevel controls the verbosity of indexer logs.
+	LogLevel IndexerLogLevel `json:"logLevel,omitempty"`
+
+	// MaxRollbackPoints controls the number of checkpoints that can be rolled
+	// back to.  The default is 2, with a minimum of 1.
+	// +kubebuilder:validation:Minimum=1
+	MaxRollbackPoints int `json:"maxRollbackPoints,omitempty"`
+
+	// MemorySnapshotInterval controls when memory indexes should be snapshotted.
+	// This defaults to 200ms, and must be greater than or eqaul to 1ms.
+	MemorySnapshotInterval *metav1.Duration `json:"memorySnapshotInterval,omitempty"`
+
+	// StableSnapshotInterval controls when disk indexes should be snapshotted.
+	// This defaults to 5s, and must be greater than or equal to 1ms.
+	StableSnapshotInterval *metav1.Duration `json:"stableSnapshotInterval,omitempty"`
+
+	// StorageMode controls the underlying storage engine for indexes.  Once set
+	// it can only be modified if there are no nodes in the cluster running the
+	// index service.
+	StorageMode CouchbaseClusterIndexStorageSetting `json:"storageMode,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

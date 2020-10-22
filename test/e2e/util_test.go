@@ -29,6 +29,7 @@ var (
 		"TestDeltaRecoveryImpossible":                         TestDeltaRecoveryImpossible,
 		"TestResizeCluster":                                   TestResizeCluster,
 		"TestEditClusterSettings":                             TestEditClusterSettings,
+		"TestIndexerSettings":                                 TestIndexerSettings,
 		"TestRecoveryAfterOnePodFailureNoBucket":              TestRecoveryAfterOnePodFailureNoBucket,
 		"TestAntiAffinityOn":                                  TestAntiAffinityOn,
 		"TestPodResourcesBasic":                               TestPodResourcesBasic,

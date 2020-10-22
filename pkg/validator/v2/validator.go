@@ -114,6 +114,28 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/autoCompaction/tombstonePurgeInterval", Value: "72h"})
 	}
 
+	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer"); found {
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "logLevel"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/logLevel", Value: "info"})
+		}
+
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "maxRollbackPoints"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/maxRollbackPoints", Value: 2})
+		}
+
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "memorySnapshotInterval"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/memorySnapshotInterval", Value: "200ms"})
+		}
+
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "stableSnapshotInterval"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/stableSnapshotInterval", Value: "5s"})
+		}
+
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster", "indexer", "storageMode"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster/indexer/storageMode", Value: "memory_optimized"})
+		}
+	}
+
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking", Value: emptyObject})
 	}
@@ -503,6 +525,16 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 		if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() > 3600.0 {
 			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h"))
+		}
+	}
+
+	if customResource.Spec.ClusterSettings.Indexer != nil {
+		if int(customResource.Spec.ClusterSettings.Indexer.MemorySnapshotInterval.Milliseconds()) < 1 {
+			errs = append(errs, fmt.Errorf("spec.cluster.indexer.memorySnapshotInterval in body must be greater than or equal to 1ms"))
+		}
+
+		if int(customResource.Spec.ClusterSettings.Indexer.StableSnapshotInterval.Milliseconds()) < 1 {
+			errs = append(errs, fmt.Errorf("spec.cluster.indexer.stableSnapshotInterval in body must be greater than or equal to 1ms"))
 		}
 	}
 
@@ -1450,9 +1482,22 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 		}
 	}
 
-	if hasIndexSvc && updated.Spec.ClusterSettings.IndexStorageSetting != current.Spec.ClusterSettings.IndexStorageSetting {
-		err := util.NewUpdateError("spec.cluster.indexStorageSetting", "body")
-		errs = append(errs, err)
+	if hasIndexSvc {
+		prev := current.Spec.ClusterSettings.IndexStorageSetting
+
+		if current.Spec.ClusterSettings.Indexer != nil {
+			prev = current.Spec.ClusterSettings.Indexer.StorageMode
+		}
+
+		curr := updated.Spec.ClusterSettings.IndexStorageSetting
+
+		if updated.Spec.ClusterSettings.Indexer != nil {
+			curr = updated.Spec.ClusterSettings.Indexer.StorageMode
+		}
+
+		if prev != curr {
+			errs = append(errs, fmt.Errorf("spec.cluster.indexStorageSetting/spec.cluster.indexer.storageMode in body cannot be modified if there are any nodes in the cluster running the index service"))
+		}
 	}
 
 	// Upgrade validation

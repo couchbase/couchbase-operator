@@ -250,6 +250,13 @@ spec:
         end: 07:30
         abortCompactionOutsideWindow: true
       tombstonePurgeInterval: 24h
+    indexer:
+      threads: 0
+      logLevel: info
+      maxRollbackPoints: 2
+      memorySnapshotInterval: 200ms
+      stableSnapshotInterval: 5s
+      storageMode: memory_optimized
   buckets:
     managed: true
   xdcr:

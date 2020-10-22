@@ -5,6 +5,7 @@ testcases:
 - TestInvalidBaseImage
 - TestInvalidVersion
 - TestManageMultipleClusters
+- TestIndexerSettings
 
 # Node Tests
 - TestNodeUnschedulable
