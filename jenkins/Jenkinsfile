@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label 'ubuntu-1604 && master'
+    label 'ubuntu-18.04 && master'
   }
 
   environment {
