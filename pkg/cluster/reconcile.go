@@ -92,9 +92,17 @@ func (c *Cluster) reconcile() error {
 	// first, there would actually be a pod, but the initial condition would be none
 	// and weird could happen.
 	if len(pods) == 0 {
-		err := c.recoverClusterDown()
+		// Always return, this allows the member and callable member set to be
+		// correctly populated, whereas if we continued here, then the member
+		// set wouldn't know about any ephemeral pods in the cluster, that
+		// information comes from Couchbase Server.
+		recovered, err := c.recoverClusterDown()
 		if err != nil {
 			return err
+		}
+
+		if recovered {
+			return nil
 		}
 	}
 

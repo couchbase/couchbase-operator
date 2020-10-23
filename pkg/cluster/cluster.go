@@ -511,12 +511,15 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
 	defer cancel()
 
-	err = c.createPod(ctx, m, *config)
-	if err != nil {
+	if err := c.createPod(ctx, m, *config); err != nil {
 		return err
 	}
 
-	return c.waitForCreatePod(ctx, m)
+	if err := c.waitForCreatePod(ctx, m); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // wait with context.
@@ -554,23 +557,23 @@ func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
 }
 
 // Selects any member that can be recovered and attempts to restart it.
-func (c *Cluster) recoverClusterDown() error {
+func (c *Cluster) recoverClusterDown() (bool, error) {
 	// Use Names() as that returns a deterministic/sorted list for testing.
 	for _, name := range c.members.Names() {
 		m := c.members[name]
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
-				return fmt.Errorf("node %s could not be recovered: %w", m.Name(), err)
+				return false, fmt.Errorf("node %s could not be recovered: %w", m.Name(), err)
 			}
 
 			log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name())
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name(), c.cluster))
 
-			break
+			return true, nil
 		}
 	}
 
-	return nil
+	return false, nil
 }
 
 // filterClusterPods returns a filtered list of pods that belong to this Couchbase cluster
