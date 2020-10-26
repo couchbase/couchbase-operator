@@ -140,6 +140,20 @@ func (v *TestConfigValue) String() string {
 	return ""
 }
 
+// SuiteConfigValue represents an explcit set of suites to run.
+type SuiteConfigValue struct {
+	values []string
+}
+
+func (v *SuiteConfigValue) Set(value string) error {
+	v.values = append(v.values, value)
+	return nil
+}
+
+func (v *SuiteConfigValue) String() string {
+	return ""
+}
+
 func readYamlData() (err error) {
 	// Provide some sane defaults.
 	params := TestRunParam{
@@ -154,6 +168,8 @@ func readYamlData() (err error) {
 
 	var tests TestConfigValue
 
+	var suites SuiteConfigValue
+
 	// CLI based configuration (CI/computer friendly)
 	flag.StringVar(&params.KubeType, "platform-type", "kubernetes", "Either kubernetes or openshift")
 	flag.StringVar(&platform, "platform-vendor", "", "Either aws, gce or azure")
@@ -165,7 +181,6 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.0", "Docker image to use for the couchbase exporter")
 	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.2", "Docker image to use for couchbase exporter upgrades")
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:6.5.1-111", "Docker image to use for couchbase backup")
-	flag.StringVar(&params.SuiteToRun, "suite", "", "Test suite to run")
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
 	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
@@ -173,7 +188,8 @@ func readYamlData() (err error) {
 	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs", false, "Whether to collect logs on failure")
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
-	flag.Var(&tests, "test", "Individual test to run, overrides -suite if specified")
+	flag.Var(&suites, "suite", "Test suites to run")
+	flag.Var(&tests, "test", "Individual test to run")
 	flag.BoolVar(&util.UseANSIColor, "color", false, "Prettify output")
 
 	// File based configuration (meat-space friendly)
@@ -189,8 +205,7 @@ func readYamlData() (err error) {
 	params.RegistryConfigs = registries.values
 
 	// We are using the CLI to configure if the suite or tests are explcitly stated.
-	withExplicitTests := len(tests.values) > 0
-	useCLI := params.SuiteToRun != "" || withExplicitTests
+	useCLI := len(suites.values) > 0 || len(tests.values) > 0
 
 	// Use either the CLI parameters, or the YAML file.  I suspect the YAML
 	// method will suffer a quick death...
@@ -227,13 +242,49 @@ func readYamlData() (err error) {
 
 	// When using an explcit list of tests, fake a suite... otherwise load one
 	// up from disk.
-	if withExplicitTests {
-		SuiteName = "custom"
-		suiteData = SuiteData{
-			// Timeout is pointless, expect users to specify -test.timeout instead.
-			Timeout:  "24h",
-			TestCase: tests.values,
+	if useCLI {
+		// These values are way more friendly for CI, so it doesn't need to know
+		// about internal file names.
+		mapping := map[string]string{
+			"validation": "TestCRDValidation",
+			"sanity":     "TestSanity",
+			"p0":         "TestP0",
+			"p1":         "TestP1",
 		}
+
+		SuiteName = "custom"
+
+		// For every suite that has been defined, buffer it up and add it
+		// to our list.
+		for _, suite := range suites.values {
+			// For backwards compatibility, QE have hard coded file names
+			// so default to this.  If this isn't one of those names, then
+			// implicitly do the filename conversion.
+			// TODO: There is literally no reason for this to be a file,
+			// you may as well just make it a slice in code...
+			suiteName := suite
+
+			if !strings.HasPrefix(suite, "Test") {
+				if _, ok := mapping[suite]; !ok {
+					return fmt.Errorf("unable to find suite %s", suite)
+				}
+
+				suiteName = mapping[suite]
+			}
+
+			suiteFilePath := fmt.Sprintf("./resources/suites/%s.yaml", suiteName)
+
+			data, err := getSuiteDataFromYml(suiteFilePath)
+			if err != nil {
+				return err
+			}
+
+			suiteData.TestCase = append(suiteData.TestCase, data.TestCase...)
+		}
+
+		// For every test that has been defined, buffer it up and add it
+		// to our list.
+		suiteData.TestCase = append(suiteData.TestCase, tests.values...)
 	} else {
 		suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
 

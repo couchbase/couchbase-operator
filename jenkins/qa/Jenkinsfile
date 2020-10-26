@@ -1,71 +1,69 @@
 /**
  * One pipeline to rule them all...
- * Reegardless of the platform all run the same, the test framework accepts
- * configuration for two clusters, and it runs the tests against them.  This
- * should not be run by itself as it provides no locking around the use of
- * configuration.
+ * Warning, this belongs to development and must be fast and stable, do not modify without
+ * good reason!
  */
 pipeline {
-  agent {
-    label 'k8'
-  }
+  agent any
 
   options {
     timestamps()
 
-    // Don't use all the disk, these servers aren't monitored with Nagios or anything.
+    // Discard any stale builds so we don't fill up the disk.
     buildDiscarder(
       logRotator(
-        artifactDaysToKeepStr: '7',
-        artifactNumToKeepStr: '10',
-        daysToKeepStr: '7',
-        numToKeepStr: '10',
+        artifactDaysToKeepStr: '30',
+        artifactNumToKeepStr: '50',
+        daysToKeepStr: '30',
+        numToKeepStr: '50',
       )
     )
 
-    // We only have a single cluster for now.
-    disableConcurrentBuilds()
+    // We only have a single cluster for now, control concurrency with other runs of this
+    // job, or another job with a reservation on a global lockable resource.
+    lock resource: 'gke-cluster-couchbase-operator'
   }
 
   parameters {
-    string(name: 'refspec', defaultValue: 'refs/heads/master')
-    string(name: 'server_image', defaultValue: 'couchbase/server:6.5.1')
-    string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.0')
-    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:6.5.1-111')
-    string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.0')
-    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.2')
-    string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.0-enterprise')
-    string(name: 'platform', defaultValue: 'kubernetes')
-    string(name: 'storage_class', defaultValue: 'dynamic-bound')
-    string(name: 'bucket_type', defaultValue: 'couchbase')
-    string(name: 'compression_mode', defaultValue: 'passive')
-    booleanParam(name: 'validation', defaultValue: true)
-    booleanParam(name: 'sanity', defaultValue: true)
-    booleanParam(name: 'p0', defaultValue: false)
-    booleanParam(name: 'p1', defaultValue: false)
-    booleanParam(name: 'custom', defaultValue: false)
+    string(name: 'refspec', defaultValue: 'refs/heads/master', description: 'Gerrit ref spec of your source tree')
+    string(name: 'server_image', defaultValue: 'couchbase/server:6.5.1', , description: 'Version of Couchbase to test')
+    string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.0', description: 'Version of Couchbase to upgrade to')
+    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:6.5.1-111', description: 'Version of the Couchbase backup image to test')
+    string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.0', description: 'Version of the Prometheus exporter to test')
+    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.2', description: 'Version of the Prometheus exporter to upgrade to')
+    string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.0-enterprise', description: 'Version of Sync-Gateway to test')
+    choice(name: 'bucket_type', choices: ['couchbase', 'ephemeral', 'memcached'], description: 'Bucket type to test with, for tests where bucket type is dynamic')
+    choice(name: 'compression_mode', choices: ['passive', 'active', 'off'], description: 'Bucket compression to test with, for tests where compression is dynamic')
+    choice(name: 'suites', choices: ['validation sanity', 'validation sanity p0', 'validation sanity p0 p1', ''], description: 'Any suites to run, at least Validation and Sanity must be run for merge')
+    string(name: 'tests', defaultValue: '', description: 'Any custom tests to run, this is a space delimited list of tests names e.g. "TestCreateCluster TestCreateBucketCluster"')
   }
 
   environment {
     GOVERSION = '1.13.3'
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:$PATH"
-    DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
-    GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
-    GCLOUD_SERVICE_TOKEN = credentials('gcloud-service-token-operator-dev')
-    LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
+    DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
+    GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
   }
 
   stages {
-    stage('Go Install') {
+    stage('Build Name') {
+      steps {
+        // The build name must be unique, or the JUnit trend will crap out.
+        buildName "#${BUILD_NUMBER} ${sh(script: 'git log --oneline --format=%B HEAD | head -n 1', returnStdout: true)}"
+        buildDescription "Patchset: ${params.refspec.split('/').last()}"
+      }
+    }
+
+    stage('Install Go') {
       steps {
         sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
       }
     }
 
-    stage('Google Cloud Install') {
+    stage('Install Google Cloud SDK') {
       steps {
-        sh 'wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-230.0.0-linux-x86_64.tar.gz | tar xz'
+        sh 'wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-315.0.0-linux-x86_64.tar.gz | tar xz'
         sh './google-cloud-sdk/bin/gcloud components install kubectl'
         sh "./google-cloud-sdk/bin/gcloud auth activate-service-account couchbase-operator@couchbase-engineering.iam.gserviceaccount.com --project couchbase-engineering --key-file ${env.GCLOUD_SERVICE_TOKEN}"
         sh 'KUBECONFIG=config1 ./google-cloud-sdk/bin/gcloud container clusters get-credentials couchbase-operator-ci --region us-east1'
@@ -73,159 +71,35 @@ pipeline {
       }
     }
 
-    stage('Post Checkout') {
+    stage('Build Binaries') {
       steps {
-        sh 'make touch-generated'
+        sh 'make touch-generated && make'
       }
     }
 
-    stage('Build') {
-      steps {
-        sh 'make'
-      }
-    }
-
-    stage('Build Docker') {
+    stage('Build Container Images') {
       steps {
         sh "docker login -u ${env.DOCKER_CREDENTIALS_USR} -p ${env.DOCKER_CREDENTIALS_PSW}"
         sh "make container-public -e DOCKER_USER=${env.DOCKER_CREDENTIALS_USR} DOCKER_TAG=`git rev-parse FETCH_HEAD`"
       }
     }
 
-    // All of these test stages are exactly the same.  With a matrix build
-    // iterating over a list of suites, you only need to define it once.
-    // Appears to need the declarative pipeline plugin version >= 1.5.
-
-    stage('Test Validation') {
-      when {
-        expression {
-          params.validation
-        }
-      }
+    stage('Acceptance Test') {
       steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-
-        // Newer versions can use the warnError closure, which can flag
-        // individual stages as broken, not the whole build.  That said
-        // none of this would be necessary if tests were stable...
-
-        script {
-          try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCRDValidation -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
-          }
-          catch (e) {
-            currentBuild.result = 'UNSTABLE'
-          }
+        // Warn if something went wrong, but don't fail, it's probably just an unstable test/platform.
+        warnError('Suite failed') {
+          sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} -platform-type kubernetes -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -storage-class dynamic-bound -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -collect-logs"
         }
       }
+
       post {
         always {
+          // Save JUnit results, this is what we will review.
           junit 'test/e2e/*.xml'
-          sh 'tar czf validation.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
-          archiveArtifacts artifacts: 'validation.tar.gz', fingerprint: true
-        }
-      }
-    }
 
-    stage('Test Sanity') {
-      when {
-        expression {
-          params.sanity
-        }
-      }
-      steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        script {
-          try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestSanity -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
-          }
-          catch (e) {
-            currentBuild.result = 'UNSTABLE'
-          }
-        }
-      }
-      post {
-        always {
-          junit 'test/e2e/*.xml'
-          sh 'tar czf sanity.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
-          archiveArtifacts artifacts: 'sanity.tar.gz', fingerprint: true
-        }
-      }
-    }
-
-    stage('Test P0') {
-      when {
-        expression {
-          params.p0
-        }
-      }
-      steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        script {
-          try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP0 -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
-          }
-          catch (e) {
-            currentBuild.result = 'UNSTABLE'
-          }
-        }
-      }
-      post {
-        always {
-          junit 'test/e2e/*.xml'
-          sh 'tar czf p0.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
-          archiveArtifacts artifacts: 'p0.tar.gz', fingerprint: true
-        }
-      }
-    }
-
-    stage('Test P1') {
-      when {
-        expression {
-          params.p1
-        }
-      }
-      steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        script {
-          try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestP1 -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
-          }
-          catch (e) {
-            currentBuild.result = 'UNSTABLE'
-          }
-        }
-      }
-      post {
-        always {
-          junit 'test/e2e/*.xml'
-          sh 'tar czf p1.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
-          archiveArtifacts artifacts: 'p1.tar.gz', fingerprint: true
-        }
-      }
-    }
-
-    stage('Test Custom') {
-      when {
-        expression {
-          params.custom
-        }
-      }
-      steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-        script {
-          try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -platform-type ${params.platform} -operator-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator:`git rev-parse FETCH_HEAD` -admission-image ${env.DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:`git rev-parse FETCH_HEAD` -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -suite TestCustom -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -compression-mode ${params.compression_mode} -cluster ${env.WORKSPACE}/config1 -cluster ${env.WORKSPACE}/config2 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
-          }
-          catch (e) {
-            currentBuild.result = 'UNSTABLE'
-          }
-        }
-      }
-      post {
-        always {
-          sh 'tar czf custom.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
-          archiveArtifacts artifacts: 'custom.tar.gz', fingerprint: true
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf logs.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
+          archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
         }
       }
     }
