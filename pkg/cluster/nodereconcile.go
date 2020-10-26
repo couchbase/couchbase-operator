@@ -461,7 +461,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 
 		// Ephemeral clusters are handled either automatically by server or
 		// manually by the user.
-		if !c.isPodRecoverable(m) && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritzeDataIntegrity {
+		if !c.isPodRecoverable(m) && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeDataIntegrity {
 			return fmt.Errorf("%w: pod down, waiting for auto-failover on cluster: %s, pod: %s", errors.NewStackTracedError(ErrReconcileInhibited), c.namespacedName(), m.Name())
 		}
 
@@ -520,7 +520,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 	// * Nothing to do
 	// * Stuff that server thinks cannot be failed over e.g. a bunch of query nodes.
 	// Give the system a helping hand...
-	if len(r.couchbase.DownNodes) > 0 && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritzeUptime {
+	if len(r.couchbase.DownNodes) > 0 && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeUptime {
 		log.Info("Forcing failover of unrecoverable nodes", "cluster", c.namespacedName())
 
 		otpNodes := couchbaseutil.OTPNodeList{}

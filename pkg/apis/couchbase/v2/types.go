@@ -737,20 +737,20 @@ const (
 )
 
 // This controls how aggressive we are when recovering cluster topology.
-// +kubebuilder:valudation:Enum=PrioritzeDataIntegrity;PrioritzeUptime
+// +kubebuilder:valudation:Enum=PrioritizeDataIntegrity;PrioritizeUptime
 type RecoveryPolicy string
 
 const (
-	// PrioritzeDataIntegrity listens to Couchbase Server, assuming it knows
+	// PrioritizeDataIntegrity listens to Couchbase Server, assuming it knows
 	// best what it is safe to do.  This is the default value.
-	PrioritzeDataIntegrity RecoveryPolicy = "PrioritzeDataIntegrity"
+	PrioritizeDataIntegrity RecoveryPolicy = "PrioritizeDataIntegrity"
 
-	// PrioritzeUptime ignores Couchbase server after the auto-failover time
+	// PrioritizeUptime ignores Couchbase server after the auto-failover time
 	// period and may result in data loss.  This is perfect for in-memory caches
 	// as they can tolerate such behaviour.  It also handles things like ephemeral
 	// pods in a supported cluster e.g. losing all of your query nodes it not a
 	// big problem.
-	PrioritzeUptime RecoveryPolicy = "PrioritzeUptime"
+	PrioritizeUptime RecoveryPolicy = "PrioritizeUptime"
 )
 
 // This controls how aggressive to be with upgrades.

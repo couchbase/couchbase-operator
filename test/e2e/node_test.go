@@ -848,7 +848,7 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	clusterSize := 5
 	victimIndex1 := 0
 	victimIndex2 := 1
-	recoveryPolicy := couchbasev2.PrioritzeUptime
+	recoveryPolicy := couchbasev2.PrioritizeUptime
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)

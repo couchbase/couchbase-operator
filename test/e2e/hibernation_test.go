@@ -67,7 +67,7 @@ func TestHibernateSupportableImmediate(t *testing.T) {
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
 	hibernationStrategy := couchbasev2.ImmediateHibernation
-	recoveryStrategy := couchbasev2.PrioritzeUptime
+	recoveryStrategy := couchbasev2.PrioritizeUptime
 
 	// Create the cluster.
 	cluster := e2espec.NewSupportableCluster(mdsGroupSize)

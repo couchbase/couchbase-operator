@@ -57,7 +57,7 @@ func TestLightsOutPersistent(t *testing.T) {
 	// Static configuration.
 	mdsGroupSize := 3
 	clusterSize := mdsGroupSize * 2
-	recoveryPolicy := couchbasev2.PrioritzeUptime
+	recoveryPolicy := couchbasev2.PrioritizeUptime
 
 	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
 	// Set an aggressive recovery policy so that the two failed query nodes get

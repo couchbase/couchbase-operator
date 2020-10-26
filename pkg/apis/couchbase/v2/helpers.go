@@ -645,7 +645,7 @@ func (c *CouchbaseCluster) NamespacedName() string {
 // none is specified.
 func (c *CouchbaseCluster) GetRecoveryPolicy() RecoveryPolicy {
 	if c.Spec.RecoveryPolicy == nil {
-		return PrioritzeDataIntegrity
+		return PrioritizeDataIntegrity
 	}
 
 	return *c.Spec.RecoveryPolicy
