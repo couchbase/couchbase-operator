@@ -665,7 +665,7 @@ func (c *CouchbaseCluster) GetUpgradeStrategy() UpgradeStrategy {
 // default if none specified.
 func (c *CouchbaseCluster) GetHibernationStrategy() HibernationStrategy {
 	if c.Spec.HibernationStrategy == nil {
-		return DrainWriteQueueHibernation
+		return ImmediateHibernation
 	}
 
 	return *c.Spec.HibernationStrategy

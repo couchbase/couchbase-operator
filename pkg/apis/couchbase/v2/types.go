@@ -772,7 +772,7 @@ const (
 )
 
 // HibernationStrategy defines how aggressive to be when putting a cluster to sleep.
-// +kubebuilder:validation:Enum=Immediate;DrainWriteQueues
+// +kubebuilder:validation:Enum=Immediate
 type HibernationStrategy string
 
 const (
@@ -780,12 +780,6 @@ const (
 	// pods.  This can be used in cases where clients are keeping the cluster
 	// awake by committing write traffic.
 	ImmediateHibernation HibernationStrategy = "Immediate"
-
-	// DrainWriteQueueHibernation is the safe method of hibernating as cluster.
-	// This assumes you have full control of clients and can stop them.  The
-	// cluster will eventually persist writes to disk and all transactions can
-	// be persisted across the hibernation.
-	DrainWriteQueueHibernation HibernationStrategy = "DrainWriteQueues"
 )
 
 type ClusterSpec struct {
