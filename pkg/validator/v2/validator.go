@@ -845,8 +845,13 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 		// If authentication enabled then require username mapping
 		if ldap.AuthenticationEnabled {
-			if ldap.UserDNMapping.Template == "" {
+			// Both mapping options cannot be empty
+			if (ldap.UserDNMapping.Template == "") && (ldap.UserDNMapping.Query == "") {
 				errs = append(errs, errors.Required("spec.security.ldap.userDNMapping", "body"))
+			}
+			// Only 1 mapping option allowed
+			if (ldap.UserDNMapping.Template != "") && (ldap.UserDNMapping.Query != "") {
+				errs = append(errs, fmt.Errorf("ldap.userDNMapping must contain either query or template"))
 			}
 		}
 

@@ -1709,6 +1709,27 @@ func TestRBACValidationLDAP(t *testing.T) {
 			expectedErrors: []string{"encryption must be one of TLS | StartTLSExtension, when serverCertValidation is enabled"},
 			shouldFail:     true,
 		},
+		{
+			name: "TestUserDNQuery",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/security/ldap/userDNMapping/query", "users=%u,dc=example,dc=com").
+				Remove("/spec/security/ldap/userDNMapping/template")},
+			shouldFail: false,
+		},
+		{
+			name: "TestUserDNQueryAndTemplate",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/security/ldap/userDNMapping/query", "users=%u,dc=example,dc=com")},
+			expectedErrors: []string{"ldap.userDNMapping must contain either query or template"},
+			shouldFail:     true,
+		},
+		{
+			name: "TestUserDNQueryWithoutMapping",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Remove("/spec/security/ldap/userDNMapping/template")},
+			expectedErrors: []string{"spec.security.ldap.userDNMapping in body is required"},
+			shouldFail:     true,
+		},
 	}
 
 	runValidationTest(t, testDefs, "create")

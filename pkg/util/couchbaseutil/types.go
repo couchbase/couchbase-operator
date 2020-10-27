@@ -508,7 +508,8 @@ type LDAPSettings struct {
 }
 
 type LDAPUserDNMapping struct {
-	Template string `json:"template"`
+	Template string `json:"template,omitempty"`
+	Query    string `json:"query,omitempty"`
 }
 
 type LDAPStatusResult string
