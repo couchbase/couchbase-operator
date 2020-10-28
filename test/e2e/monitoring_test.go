@@ -66,7 +66,7 @@ func testPrometheusMetrics(t *testing.T, targetKube *types.Cluster, tls *e2eutil
 	}
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
-	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 5*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, tls)
 
 	// Check the events match what we expect:
@@ -301,7 +301,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 		token = authSecret.Data["token"]
 	}
 
-	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 5*time.Minute)
 	e2eutil.MustCheckPrometheusWithAuthSecret(t, targetKube, testCouchbase, nil, token)
 
 	// Check the events match what we expect:
@@ -340,7 +340,7 @@ func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
-	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 5*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
 
 	// Upgrade the cluster with new exporter image and check again if the monitoring is enabled.
@@ -349,7 +349,7 @@ func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
-	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 5*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
 
 	// Check the events match what we expect:
