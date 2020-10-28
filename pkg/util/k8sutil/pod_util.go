@@ -190,19 +190,23 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 			return nil, fmt.Errorf("%w: claim (%s) does not map to any claimTemplates", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), claimName)
 		}
 
-		// Label and Annotate so that volumes
-		// can be easily targeted when recovering pods
-		required.Labels = map[string]string{
+		labels := map[string]string{
 			constants.LabelApp:        constants.App,
 			constants.LabelNode:       memberName,
 			constants.LabelCluster:    cluster.Name,
 			constants.LabelVolumeName: claimName,
 		}
-		required.SetAnnotations(map[string]string{
+
+		annotations := map[string]string{
 			constants.AnnotationVolumeMountPath:     mountPath,
 			constants.AnnotationVolumeNodeConf:      config.Name,
 			constants.CouchbaseVersionAnnotationKey: version,
-		})
+		}
+
+		// Merge our labels/annotations on top of any user defined ones.  We take
+		// precedence.
+		required.Labels = mergeLabels(required.Labels, labels)
+		required.Annotations = mergeLabels(required.Annotations, annotations)
 
 		ApplyBaseAnnotations(required)
 

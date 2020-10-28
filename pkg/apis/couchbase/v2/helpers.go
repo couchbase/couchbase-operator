@@ -221,7 +221,7 @@ func (cs *ClusterSpec) TotalSize() int {
 func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeClaim {
 	for _, claim := range cs.VolumeClaimTemplates {
 		if name == claim.Name {
-			return &claim
+			return claim.DeepCopy()
 		}
 	}
 
