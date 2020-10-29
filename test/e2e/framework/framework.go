@@ -280,11 +280,21 @@ func readYamlData() (err error) {
 			}
 
 			suiteData.TestCase = append(suiteData.TestCase, data.TestCase...)
+
+			// Register tests with a suite in the analyzer.
+			for _, test := range data.TestCase {
+				analyzer.RegisterTest(suite, test)
+			}
 		}
 
 		// For every test that has been defined, buffer it up and add it
 		// to our list.
 		suiteData.TestCase = append(suiteData.TestCase, tests.values...)
+
+		// Register tests with a suite in the analyzer.
+		for _, test := range tests.values {
+			analyzer.RegisterTest("custom", test)
+		}
 	} else {
 		suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
 

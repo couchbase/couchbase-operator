@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -64,11 +65,69 @@ type JUnitTestSuite struct {
 	TestCases []JUnitTestCase `xml:",omitempty"`
 }
 
+// JUnitTestSuites is a group of test suites.
+// See https://llg.cubic.org/docs/junit/.
+type JUnitTestSuites struct {
+	XMLName    xml.Name         `xml:"testsuites"`
+	Tests      string           `xml:"tests,attr"`
+	Errors     string           `xml:"errors,attr,omitempty"`
+	Failures   string           `xml:"failures,attr,omitempty"`
+	Time       string           `xml:"time,attr,omitempty"`
+	TestSuites []JUnitTestSuite `xml:",omitempty"`
+}
+
+// testSuite is an ordered list test cases so that we can control the output
+// formatting.
+type testSuite struct {
+	name      string
+	testCases []string
+}
+
+// testSuiteList is an ordered list of test suites so that we can control the
+// output formatting.
+type testSuiteList []*testSuite
+
+// Find iterates over a test suite list and returns a matching suite if one
+// exists.
+func (l testSuiteList) Find(suite string) *testSuite {
+	for _, s := range l {
+		if s.name == suite {
+			return s
+		}
+	}
+
+	return nil
+}
+
+// Get gets an existing test suite from the list, or creates a new one.
+func (l *testSuiteList) Get(suite string) *testSuite {
+	if s := l.Find(suite); s != nil {
+		return s
+	}
+
+	s := &testSuite{
+		name: suite,
+	}
+
+	*l = append(*l, s)
+
+	return s
+}
+
+// testSuites is an ordered list of suites we have run.
+var testSuites testSuiteList
+
+// RegisterTest maps a test to a specific suite.
+func RegisterTest(suite, test string) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	s := testSuites.Get(suite)
+	s.testCases = append(s.testCases, test)
+}
+
 // result is a type for caching information about a test run.
 type result struct {
-	// name is the name of the test.
-	name string
-
 	// runtime is the length of time a test ran for,
 	runtime time.Duration
 
@@ -82,9 +141,8 @@ type result struct {
 	stack string
 }
 
-// results is the global list of results.  This is ordered by the completion
-// time of the test.
-var results []result
+// results is the global map of test name to results.
+var results = map[string]result{}
 
 // errorMessage is passed from the exception mechanism to cache the error.
 type errorMessage struct {
@@ -96,16 +154,12 @@ type errorMessage struct {
 }
 
 // errorMessages is a map from test name to error message/stack trace.
-var errorMessages map[string]errorMessage
+var errorMessages = map[string]errorMessage{}
 
 // RecordFailureMessage is used by Die to pass failure messages to the junit output.
 func RecordFailureMessage(t *testing.T, m, s string) {
 	lock.Lock()
 	defer lock.Unlock()
-
-	if errorMessages == nil {
-		errorMessages = map[string]errorMessage{}
-	}
 
 	errorMessages[t.Name()] = errorMessage{
 		message: m,
@@ -144,7 +198,6 @@ func (a *analyzerImpl) Report(t *testing.T) {
 	defer lock.Unlock()
 
 	r := result{
-		name:    t.Name(),
 		runtime: time.Since(a.start),
 	}
 
@@ -181,100 +234,181 @@ func (a *analyzerImpl) Report(t *testing.T) {
 
 	logrus.Infof("%s %s", t.Name(), util.PrettyResult(r.result))
 
-	results = append(results, r)
+	// The test name will be fully qualified e.g. TestA/TestB/TestC whereas we expect
+	// a test to be mapped to one, and only one suite, and we don't know how it will
+	// be invoked.  Therefore we only want to key this on the last test name element,
+	// i.e. TestC
+	names := strings.Split(t.Name(), "/")
+	results[names[len(names)-1]] = r
+}
+
+// accounting is a container for statistics about a collection of tests.
+type accounting struct {
+	name     string
+	tests    int
+	passes   int
+	failures int
+	errors   int
+	skips    int
+	time     time.Duration
+}
+
+func (a *accounting) passed(in time.Duration) {
+	a.tests++
+	a.passes++
+	a.time += in
+}
+
+func (a *accounting) failed(in time.Duration) {
+	a.tests++
+	a.failures++
+	a.time += in
+}
+
+func (a *accounting) errored(in time.Duration) {
+	a.tests++
+	a.errors++
+	a.time += in
+}
+
+func (a *accounting) skipped(in time.Duration) {
+	a.tests++
+	a.skips++
+	a.time += in
+}
+
+// report prints the summary of a suite's accounting information.
+func (a accounting) report() {
+	logrus.Info(util.PrettyHeading(fmt.Sprintf("Suite Summary (%s)", a.name)))
+
+	if a.passes > 0 {
+		passRate := (float64(a.passes) / float64(a.tests)) * 100.0
+		logrus.Infof(" %s Passes: %d (%0.2f%%)", util.PrettyResult(types.ResultTypePass), a.passes, passRate)
+	}
+
+	if a.failures > 0 {
+		failRate := (float64(a.failures) / float64(a.tests)) * 100.0
+		logrus.Infof(" %s Failures: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeFail), a.failures, failRate)
+	}
+
+	if a.errors > 0 {
+		errorRate := (float64(a.errors) / float64(a.tests)) * 100.0
+		logrus.Infof(" %s Errors: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeErr), a.errors, errorRate)
+	}
+
+	if a.skips > 0 {
+		skipRate := (float64(a.skips) / float64(a.tests)) * 100.0
+		logrus.Infof(" %s Skipped: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeSkip), a.skips, skipRate)
+	}
 }
 
 // Report is called on termination of the full test run to perform global anaysis.
 func Report(suiteName string) {
-	totalResults := len(results)
-
-	if totalResults == 0 {
+	if len(results) == 0 {
+		logrus.Warn("no test results collected")
 		return
 	}
 
-	var passes int
-
-	var failures int
-
-	var errors int
-
-	var skipped int
-
-	var totalTime time.Duration
-
+	// Print out the individual test results as we iterate through the suites and tests.
 	logrus.Info(util.PrettyHeading("Test Summary"))
 
-	cases := make([]JUnitTestCase, totalResults)
+	var testNumber int
 
-	for i, r := range results {
-		logrus.Infof("%4d: %s %s", i+1, r.name, util.PrettyResult(r.result))
+	// Keep statistics of overall passes/fails as well as per-suite accounts, these
+	// will be summarized at the veny end after all the per test output has been
+	// emitted to the logs.
+	globalAccounting := accounting{
+		name: "overall",
+	}
 
-		totalTime += r.runtime
+	suiteAccounts := []accounting{}
 
-		testCase := JUnitTestCase{
-			Name: r.name,
-			Time: strconv.Itoa(int(r.runtime.Seconds())),
+	suites := []JUnitTestSuite{}
+
+	for _, testSuite := range testSuites {
+		suiteAccounting := accounting{
+			name: testSuite.name,
 		}
 
-		switch r.result {
-		case types.ResultTypeErr:
-			errors++
+		cases := []JUnitTestCase{}
 
-			testCase.Error = &JUnitError{
-				Message:     r.message,
-				Description: r.stack,
+		for _, testCase := range testSuite.testCases {
+			r, ok := results[testCase]
+			if !ok {
+				logrus.Warnf("unable to locate result for %s/%s", testSuite.name, testCase)
+				continue
 			}
-		case types.ResultTypeFail:
-			failures++
 
-			testCase.Failure = &JUnitFailure{
-				Message:     r.message,
-				Description: r.stack,
+			logrus.Infof("%4d: %s %s", testNumber+1, testCase, util.PrettyResult(r.result))
+			testNumber++
+
+			junitTestCase := JUnitTestCase{
+				Name: testCase,
+				Time: strconv.Itoa(int(r.runtime.Seconds())),
 			}
-		case types.ResultTypeSkip:
-			skipped++
 
-			testCase.Skipped = &JUnitSkipped{}
-		default:
-			passes++
+			switch r.result {
+			case types.ResultTypeErr:
+				globalAccounting.errored(r.runtime)
+				suiteAccounting.errored(r.runtime)
+
+				junitTestCase.Error = &JUnitError{
+					Message:     r.message,
+					Description: r.stack,
+				}
+			case types.ResultTypeFail:
+				globalAccounting.failed(r.runtime)
+				suiteAccounting.failed(r.runtime)
+
+				junitTestCase.Failure = &JUnitFailure{
+					Message:     r.message,
+					Description: r.stack,
+				}
+			case types.ResultTypeSkip:
+				globalAccounting.skipped(r.runtime)
+				suiteAccounting.skipped(r.runtime)
+
+				junitTestCase.Skipped = &JUnitSkipped{}
+			default:
+				globalAccounting.passed(r.runtime)
+				suiteAccounting.passed(r.runtime)
+			}
+
+			cases = append(cases, junitTestCase)
 		}
 
-		cases[i] = testCase
+		junitTestSuite := JUnitTestSuite{
+			Name:      testSuite.name,
+			Tests:     strconv.Itoa(suiteAccounting.tests),
+			Errors:    strconv.Itoa(suiteAccounting.errors),
+			Failures:  strconv.Itoa(suiteAccounting.failures),
+			Skipped:   strconv.Itoa(suiteAccounting.skips),
+			Time:      strconv.Itoa(int(suiteAccounting.time.Seconds())),
+			TestCases: cases,
+		}
+
+		suites = append(suites, junitTestSuite)
+
+		suiteAccounts = append(suiteAccounts, suiteAccounting)
 	}
 
-	logrus.Info(util.PrettyHeading("Suite Summary"))
-
-	if passes > 0 {
-		passRate := (float64(passes) / float64(totalResults)) * 100.0
-		logrus.Infof(" %s Passes: %d (%0.2f%%)", util.PrettyResult(types.ResultTypePass), passes, passRate)
+	if len(suiteAccounts) > 1 {
+		globalAccounting.report()
 	}
 
-	if failures > 0 {
-		failRate := (float64(failures) / float64(totalResults)) * 100.0
-		logrus.Infof(" %s Failures: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeFail), failures, failRate)
+	for _, accounting := range suiteAccounts {
+		accounting.report()
 	}
 
-	if errors > 0 {
-		errorRate := (float64(errors) / float64(totalResults)) * 100.0
-		logrus.Infof(" %s Errors: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeErr), errors, errorRate)
+	testSuites := &JUnitTestSuites{
+		Tests:      strconv.Itoa(globalAccounting.tests),
+		Errors:     strconv.Itoa(globalAccounting.errors),
+		Failures:   strconv.Itoa(globalAccounting.failures),
+		Time:       strconv.Itoa(int(globalAccounting.time.Seconds())),
+		TestSuites: suites,
 	}
 
-	if skipped > 0 {
-		skipRate := (float64(skipped) / float64(totalResults)) * 100.0
-		logrus.Infof(" %s Skipped: %d (%0.2f%%)", util.PrettyResult(types.ResultTypeSkip), skipped, skipRate)
-	}
-
-	testSuite := &JUnitTestSuite{
-		Name:      suiteName,
-		Tests:     strconv.Itoa(totalResults),
-		Errors:    strconv.Itoa(errors),
-		Failures:  strconv.Itoa(failures),
-		Skipped:   strconv.Itoa(skipped),
-		Time:      strconv.Itoa(int(totalTime.Seconds())),
-		TestCases: cases,
-	}
-
-	data, err := xml.MarshalIndent(testSuite, "", "    ")
+	data, err := xml.MarshalIndent(testSuites, "", "    ")
 	if err != nil {
 		logrus.Warn("unable to marshal junit xml", err)
 		return
