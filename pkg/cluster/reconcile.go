@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -638,10 +639,15 @@ func (c *Cluster) reconcileBuckets() error {
 		c.raiseEvent(k8sutil.BucketDeleteEvent(bucket.BucketName, c.cluster))
 	}
 
-	c.cluster.Status.Buckets = []couchbasev2.BucketStatus{}
+	// To avoid API updates, we record the name of each bucket on the system (this will
+	// be lexically sorted), and we add buckets to the status in a deterministic order.
+	names := make([]string, len(requested))
+	statuses := map[string]couchbasev2.BucketStatus{}
 
-	for _, bucket := range requested {
-		bucketStatus := couchbasev2.BucketStatus{
+	for i, bucket := range requested {
+		names[i] = bucket.BucketName
+
+		statuses[bucket.BucketName] = couchbasev2.BucketStatus{
 			BucketName:         bucket.BucketName,
 			BucketType:         bucket.BucketType,
 			BucketMemoryQuota:  bucket.BucketMemoryQuota,
@@ -653,8 +659,14 @@ func (c *Cluster) reconcileBuckets() error {
 			EnableIndexReplica: bucket.EnableIndexReplica,
 			CompressionMode:    string(bucket.CompressionMode),
 		}
+	}
 
-		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, bucketStatus)
+	sort.Strings(names)
+
+	c.cluster.Status.Buckets = []couchbasev2.BucketStatus{}
+
+	for _, name := range names {
+		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, statuses[name])
 	}
 
 	return nil
