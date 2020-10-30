@@ -15,6 +15,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
@@ -131,7 +133,18 @@ func main() {
 	// Check basic connectivity via the discovery API.  This is plain text
 	// TODO: Use the resource list to filter the resources we gather
 	if _, _, err := context.KubeClient.Discovery().ServerGroupsAndResources(); err != nil {
-		fmt.Println("unable to discover cluster resources:", err)
+		fmt.Println("unable to connect to kubernetes cluster:", err)
+		os.Exit(1)
+	}
+
+	// Check the namespace exists.
+	if _, err := context.KubeClient.CoreV1().Namespaces().Get(context.Namespace(), metav1.GetOptions{}); err != nil {
+		if errors.IsNotFound(err) {
+			fmt.Println("namespace", context.Namespace(), "does not exist")
+			os.Exit(1)
+		}
+
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
