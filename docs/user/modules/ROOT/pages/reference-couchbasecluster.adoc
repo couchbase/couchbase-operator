@@ -21,6 +21,7 @@ spec:
   paused: false
   antiAffinity: true
   softwareUpdateNotifications: true
+  upgradeStrategy: RollingUpgrade
   serverGroups:
   - us-east-1a
   - us-east-1b
@@ -266,6 +267,7 @@ spec:
   paused: false
   antiAffinity: true
   softwareUpdateNotifications: true
+  upgradeStrategy: RollingUpgrade
   serverGroups:
   - us-east-1a
   - us-east-1b
@@ -317,6 +319,20 @@ This field specifies whether or not software update notifications are displayed 
 
 ____
 _Field rules:_ The `softwareUpdateNotifications` field is optional and defaults to false if not specified.  This setting can be modified at any point in the cluster life-cycle.
+____
+
+=== `spec.upgradeStrategy`
+
+This field controls how the Operator performs upgrades/modifications to pods when required.
+
+The default value if not specified, `RollingUpgrade`, upgrades one pod at a time.
+Rolling upgrades are safer in that they limit the scope of an upgrade, and can be rolled back, however will take longer to complete.
+
+The value `ImmediateUpgrade` can be used to upgrade all pods at the same time.
+Immediate upgrades are much faster than rolling upgrades.
+
+____
+_Field rules:_ The `upgradeStrategy` field is optional and must be one of `RollingUpgrade` or `ImmediateUpgrade`.
 ____
 
 === `spec.serverGroups`

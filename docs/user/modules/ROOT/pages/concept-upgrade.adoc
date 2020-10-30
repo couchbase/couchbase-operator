@@ -7,16 +7,24 @@ This includes upgrading the Couchbase Server version and also related Kubernetes
 == Upgrading Couchbase Server
 
 The Couchbase Server version can be xref:howto-couchbase-upgrade.adoc[upgraded] by the Operator.
-The Operator performs a rolling upgrade of a Couchbase cluster one node at a time.
+
+Upgrades may be performed using one of a number of different strategies as specified by xref:reference-couchbasecluster.adoc#spec-upgradestrategy[`spec.upgradeStrategy`] in the `CouchbaseCluster` resource:
+
+* Rolling upgrades upgrade one pod at a time
+* Immediate upgrades upgrade all pods at the same time
+
 This process is as follows:
 
-* A candidate pod is selected
-* A new pod created with the same Couchbase configuration as the existing one
-* Data is rebalanced from the old pod to the new one
-* The candidate pod is deleted
+* One or more candidate pods are selected
+* New pods are created for each of the candidates with the same Couchbase configuration as the existing ones
+* Data is rebalanced from the old pods to the new ones
+* The candidate pods are deleted
 
-This ensures that there are always enough pods to handle client load.
-Furthermore by performing the operation one pod at a time, risk is limited in the event of an issue.
+When using rolling upgrades, performing the operation one pod at a time, risk is limited in the event of an issue, and can be rolled back.
+A rolling upgrade requires the least network and compute overhead, so will affect client operation less.
+
+When using immediate upgrades, there is a greater risk, and requires greater resource during the upgrade, however the operation itself is significantly faster.
+Immediate upgrades may have an undesired affect on client performance as all pods in the cluster are undergoing upgrade at the same time.
 
 [IMPORTANT]
 ====
