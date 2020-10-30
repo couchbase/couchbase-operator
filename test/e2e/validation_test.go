@@ -1128,6 +1128,24 @@ func TestNegValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.bucket`},
 		},
+		{
+			name:           "TestValidateRecoveryPolicyIllegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/recoveryPolicy", "fryUp")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.recoveryPolicy`},
+		},
+		{
+			name:           "TestValidateUpgradeStrategyIllegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeStrategy", "bigBang")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.upgradeStrategy`},
+		},
+		{
+			name:           "TestValidateHibernationStrategyIllegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/hibernationStrategy", "chloroform")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.hibernationStrategy`},
+		},
 	}
 
 	// Cases to validate with invalidClaim name given in Pod.VolumeMounts.[Claims]

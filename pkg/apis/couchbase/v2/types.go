@@ -737,7 +737,7 @@ const (
 )
 
 // This controls how aggressive we are when recovering cluster topology.
-// +kubebuilder:valudation:Enum=PrioritizeDataIntegrity;PrioritizeUptime
+// +kubebuilder:validation:Enum=PrioritizeDataIntegrity;PrioritizeUptime
 type RecoveryPolicy string
 
 const (
