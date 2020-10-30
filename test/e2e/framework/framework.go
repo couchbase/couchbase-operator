@@ -780,9 +780,29 @@ func (f *Framework) deallocate(index int) {
 	allocations[index]--
 }
 
+// TestOption allows individual tests to perform/inhibit certain actions explicitly.
+type TestOption int
+
+// NoOperator tells the framework not to provision an operator, validation tests don't
+// need one for example.
+const (
+	NoOperator TestOption = 1 << iota
+)
+
+// optionSet determines whether an option is defined or not.
+func optionSet(options []TestOption, option TestOption) bool {
+	for _, o := range options {
+		if o == option {
+			return true
+		}
+	}
+
+	return false
+}
+
 // SetupTest is called by parallelizable tests that require a single cluster
 // to run in.
-func (f *Framework) SetupTest(t *testing.T) (*types.Cluster, func()) {
+func (f *Framework) SetupTest(t *testing.T, o ...TestOption) (*types.Cluster, func()) {
 	// This will stop execution of the test here, it will allow the underlying
 	// go testing framework to release jobs based on the requested parallelism.
 	t.Parallel()
@@ -790,7 +810,7 @@ func (f *Framework) SetupTest(t *testing.T) (*types.Cluster, func()) {
 	// Schedule a cluster to run on.
 	index1 := f.allocate()
 
-	cluster1, cleanup1 := f.setupCluster(t, index1)
+	cluster1, cleanup1 := f.setupCluster(t, index1, o)
 
 	// Start the test.
 	reporter := analyzer.New()
@@ -807,11 +827,11 @@ func (f *Framework) SetupTest(t *testing.T) (*types.Cluster, func()) {
 
 // SetupTestExclusive is called by non-parallelizable tests that require a single cluster
 // to run in.
-func (f *Framework) SetupTestExclusive(t *testing.T) (*types.Cluster, func()) {
+func (f *Framework) SetupTestExclusive(t *testing.T, o ...TestOption) (*types.Cluster, func()) {
 	// Schedule a cluster to run on.
 	index1 := f.allocate()
 
-	cluster1, cleanup1 := f.setupCluster(t, index1)
+	cluster1, cleanup1 := f.setupCluster(t, index1, o)
 
 	// Start the test.
 	reporter := analyzer.New()
@@ -828,7 +848,7 @@ func (f *Framework) SetupTestExclusive(t *testing.T) (*types.Cluster, func()) {
 
 // SetupTestRemote is called by parallelizable tests that require a local and a
 // remote cluster to run in.
-func (f *Framework) SetupTestRemote(t *testing.T) (*types.Cluster, *types.Cluster, func()) {
+func (f *Framework) SetupTestRemote(t *testing.T, o ...TestOption) (*types.Cluster, *types.Cluster, func()) {
 	// This will stop execution of the test here, it will allow the underlying
 	// go testing framework to release jobs based on the requested parallelism.
 	t.Parallel()
@@ -837,8 +857,8 @@ func (f *Framework) SetupTestRemote(t *testing.T) (*types.Cluster, *types.Cluste
 	index1 := f.allocate()
 	index2 := f.allocate(index1)
 
-	cluster1, cleanup1 := f.setupCluster(t, index1)
-	cluster2, cleanup2 := f.setupCluster(t, index2)
+	cluster1, cleanup1 := f.setupCluster(t, index1, o)
+	cluster2, cleanup2 := f.setupCluster(t, index2, o)
 
 	// Start the test.
 	reporter := analyzer.New()
@@ -858,7 +878,7 @@ func (f *Framework) SetupTestRemote(t *testing.T) (*types.Cluster, *types.Cluste
 // unique namespace to run in, it then configures and starts the operator.
 // It returns a test-ready cluster and a clean up function to perform logging
 // and namespace deletion.
-func (f *Framework) setupCluster(t *testing.T, index int) (*types.Cluster, func()) {
+func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*types.Cluster, func()) {
 	cluster := f.ClusterSpec[index].Copy()
 
 	// Create a namespace.
@@ -889,22 +909,24 @@ func (f *Framework) setupCluster(t *testing.T, index int) (*types.Cluster, func(
 	cluster.PullSecrets = secrets
 
 	// Create the operator.
-	cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout)
+	if !optionSet(o, NoOperator) {
+		cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout)
 
-	if err := RecreateServiceAccount(cluster, cluster.OperatorDeployment.Name); err != nil {
-		e2eutil.Die(t, err)
-	}
+		if err := RecreateServiceAccount(cluster, cluster.OperatorDeployment.Name); err != nil {
+			e2eutil.Die(t, err)
+		}
 
-	if err := recreateRoles(cluster, cluster.OperatorDeployment.Name); err != nil {
-		e2eutil.Die(t, err)
-	}
+		if err := recreateRoles(cluster, cluster.OperatorDeployment.Name); err != nil {
+			e2eutil.Die(t, err)
+		}
 
-	if err := recreateRoleBindings(cluster); err != nil {
-		e2eutil.Die(t, err)
-	}
+		if err := recreateRoleBindings(cluster); err != nil {
+			e2eutil.Die(t, err)
+		}
 
-	if err := f.SetupCouchbaseOperator(cluster); err != nil {
-		e2eutil.Die(t, err)
+		if err := f.SetupCouchbaseOperator(cluster); err != nil {
+			e2eutil.Die(t, err)
+		}
 	}
 
 	// Create anything that's static across all tests (bad).

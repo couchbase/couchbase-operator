@@ -2,7 +2,21 @@
 timeout: 6h
 testcases:
 - TestValidationCreate
-- TestNegValidationCreate
+- TestNegValidationCreateCouchbaseCluster
+- TestNegValidationCreateCouchbaseClusterNetworking
+- TestNegValidationCreateCouchbaseClusterServers
+- TestNegValidationCreateCouchbaseClusterPersistentVolumes
+- TestNegValidationCreateCouchbaseClusterLogging
+- TestNegValidationCreateCouchbaseClusterSettings
+- TestNegValidationCreateCouchbaseClusterSecurity
+- TestNegValidationCreateCouchbaseClusterXDCR
+- TestNegValidationCreateCouchbaseClusterMonitoring
+- TestNegValidationCreateCouchbaseBucket
+- TestNegValidationCreateCouchbaseEphemeralBucket
+- TestNegValidationCreateCouchbaseMemcachedBucket
+- TestNegValidationCreateCouchbaseReplication
+- TestNegValidationCreateCouchbaseBackup
+- TestNegValidationCreateCouchbaseBackupRestore
 - TestValidationDefaultCreate
 - TestNegValidationDefaultCreate
 - TestNegValidationConstraintsCreate

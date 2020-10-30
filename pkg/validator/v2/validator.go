@@ -808,11 +808,11 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// Require that publically visible service ports have DNS information available.
 	if customResource.Spec.IsExposedFeatureServiceTypePublic() || customResource.Spec.IsAdminConsoleServiceTypePublic() {
 		if customResource.Spec.Networking.TLS == nil {
-			errs = append(errs, errors.Required("spec.tls", "body"))
+			errs = append(errs, errors.Required("spec.networking.tls", "body"))
 		}
 
 		if customResource.Spec.Networking.DNS == nil {
-			errs = append(errs, errors.Required("spec.dns", "body"))
+			errs = append(errs, errors.Required("spec.networking.dns", "body"))
 		}
 	}
 
