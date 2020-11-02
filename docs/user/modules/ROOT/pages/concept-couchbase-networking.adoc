@@ -149,7 +149,7 @@ NOTE: When not using the embedded `libcouchbase` and choosing to build with an e
 | 1.6.1+
 
 | Couchbase Sync Gateway
-| 2.7.0+
+| 2.7.0+footnote:[A known issue exists (https://issues.couchbase.com/browse/K8S-1585[K8S-1585^]) where lookup may fail when using DNS SRV over TLS to connect to a Couchbase Cluster in the same Kubernetes cluster. In such cases, the workaround is to add wildcard matches to the Subject Alternate Names (SANs) as discussed in the xref:tutorial-tls.adoc#creating-a-couchbase-cluster-server-certificate[Creating TLS Certificates\] tutorial.]
 
 | Couchbase Elasticsearch Connector
 | 4.1.0+

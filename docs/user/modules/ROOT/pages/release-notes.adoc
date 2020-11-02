@@ -6,6 +6,98 @@ The changes in this release enable several advancements in how you can manage, m
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
+[#release-v202]
+== Release 2.0.2
+
+Couchbase Autonomous Operator 2.0.2 was released in August 2020.
+
+[#supported-platforms-v202]
+=== Platform Support
+
+For the latest platform support information, refer to xref:prerequisite-and-setup.adoc[].
+
+==== New Platform Support
+
+This release adds support for the following platforms/versions:
+
+* Couchbase Server Enterprise Edition 6.6 (Certified)
+* Open Source Kubernetes 1.16 (Certified), 1.17 (Certified), 1.18 (Certified)
+* Red Hat OpenShift Container Platform 4.3 (Certified)
+
+==== Removed Platform Support
+
+This release drops support for the following platforms/versions:
+
+* Open Source Kubernetes 1.13
+
+[#fixed-issues-v202]
+=== Fixed Issues
+
+[#table-fixed-issues-v202,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-1600[K8S-1600^]
+a| *Summary:* An issue can occur where the Autonomous Operator incorrectly populates the Prometheus sidecar's container specification.
+This only applies to configurations using TLS, and causes the Prometheus exporter to be unable to start.
+
+a| https://issues.couchbase.com/browse/K8S-1492[K8S-1492^]
+a| *Summary:* A memory leak in a 3rd party library dependency causes the Autonomous Operator to continually allocate memory until the host system detects memory exhaustion and terminates the Autonomous Operator process.
+In some circumstances, this can lead to the Autonomous Operator being unable to restart due to lock contention.
+|===
+
+[#known-issues-v202]
+=== Known Issues
+
+[#table-known-issues-v202,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-1585[K8S-1585^]
+a| *Summary:* When running applications (such as Sync Gateway) that are using DNS SRV over TLS to connect to a Couchbase Cluster in the same Kubernetes cluster, lookup may fail hostname validation checks.
+
+*Workaround:* Add wildcard matches to the Subject Alternate Names (SANs) in the certificate for the Kubernetes-based host names. Specifically, add `DNS:*.$\{cluster}.$\{namespace}.svc` and `DNS:$\{cluster}-srv.$\{namespace}.svc` as discussed in the xref:tutorial-tls.adoc#creating-a-couchbase-cluster-server-certificate[Creating TLS Certificates] tutorial.
+
+a| https://issues.couchbase.com/browse/K8S-1532[K8S-1532^]
+a| *Summary:* When using the Autonomous Operator to upgrade Couchbase Server from version 6.5.0 to 6.5.1, the resulting deployment may still show 6.5.0 as the version, even though the individual nodes in the pods are in fact running version 6.5.1.
+////
+Include the following statement in the description of this issue when it is moved to the fixed issues table in the 2.1 RN.
+It was possible that when using the Autonomous Operator to upgrade Couchbase Server from version 6.5.0 to 6.5.1, the resulting deployment would still show 6.5.0 as the version, even though the individual nodes in the pods are in fact running version 6.5.1.
+Now, when an upgrade of Couchbase Server completes, the correct upgraded version is shown.
+////
+a| https://issues.couchbase.com/browse/K8S-1483[K8S-1483^]
+a| *Summary:* Logging is provided by a 3rd party library.
+This library adds in a sampler that can cause an array out of bounds panic due to non-standard log levels, and is generally not compatible with Couchbase support processes.
+
+This library will be removed or replaced in a future release of the Autonomous Operator.
+////
+Include the following statement in the description of this issue when it is moved to the fixed issues table in the 2.1 RN.
+Prior to Autonomous Operator 2.1, logging was provided by a 3rd party library that is no longer used.
+It provided additional logging functionality that was neither advertised in the reference guide, supported, nor compatible with Couchbase support processes.
+As a result, this functionality has been removed.
+////
+a| https://issues.couchbase.com/browse/K8S-1168[K8S-1168^]
+a| *Summary:* Pod readiness is performed with an exec-based probe that looks for the presence of an operator-created file.
+This requires the "pods/exec" privilege, and is a security concern in some environments.
+
+A new readiness method will be implemented in a future release of the Autonomous Operator.
+////
+Include the following statement in the description of this issue when it is moved to the fixed issues table in the 2.1 RN.
+Autonomous Operator 2.1 implements a new method that uses pod readiness gates, updating Kubernetes resources directly, and using existing required permissions.
+When upgrading to this release from an earlier one, existing Couchbase clusters must undergo an upgrade to begin using this new readiness method.
+Additionally, Kubernetes clusters must be of version 1.14 or higher before upgrading the Autonomous Operator to version 2.1.
+////
+a| https://issues.couchbase.com/browse/K8S-968[K8S-968^]
+a| *Summary:* CRDs are now generated directly from source using upstream tooling.
+As a result, some attributes in the CRD may not be compatible with older versions of Kubernetes.
+An error containing the following message can be ignored, and you can feel free to follow the instructions in the message.
+
+[source,console]
+----
+unknown field "x-kubernetes-list-type" in io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps]; if you choose to ignore these errors, turn validation off with --validate=false` is 
+----
+|===
+
 [#release-v201]
 == Release 2.0.1
 
@@ -80,9 +172,9 @@ Couchbase Autonomous Operator 2.0.0 was released in April 2020.
 [#install-upgrade-v200]
 === Installation and Upgrade
 
-For installation instructions, see xref:install-kubernetes.adoc[Installing on Kubernetes] and xref:install-openshift.adoc[Installing on OpenShift].
+For installation instructions, refer to xref:install-kubernetes.adoc[] and xref:install-openshift.adoc[].
 
-For upgrade instructions, see xref:howto-operator-upgrade.adoc[Upgrading the Operator].
+For upgrade instructions, refer to xref:howto-operator-upgrade.adoc[].
 
 ////
 CAUTION: The Autonomous Operator 2.0.0 Beta is not production-ready software, and therefore upgrading from the Beta to the final GA version will not be supported.
@@ -92,7 +184,7 @@ You should only install the Beta software in development environments for testin
 [#supported-platforms-v200]
 === Platform Support
 
-For the latest platform support information, see xref:prerequisite-and-setup.adoc[Prerequisites].
+For the latest platform support information, refer to xref:prerequisite-and-setup.adoc[].
 
 ==== New Platform Support
 
@@ -101,7 +193,7 @@ This release adds support for the following platforms:
 * Open Source Kubernetes 1.15
 * Red Hat OpenShift 4.2
 
-==== Removed Platform Support:
+==== Removed Platform Support
 
 This release drops support for the following platforms:
 

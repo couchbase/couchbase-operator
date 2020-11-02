@@ -36,7 +36,7 @@ Where this Pod is scheduled can have implications on backup performance, and can
 +
 You should schedule backup Pods onto Kubernetes nodes that have enough resources to successfully fulfill your backup schedule.
 It is also recommended that you do not schedule backup Pods onto Kubernetes nodes that host Couchbase cluster Pods, since your Couchbase cluster would be competing for resources with the backup utility.
-Refer to the <<pod-scheduling,Pod Scheduling>> section on this page for further details.
+Refer to the <<pod-scheduling>> section below for further details.
 
 * Backup Pods require access permissions that necessitate the creation of `ServiceAccount`, `Role`, and `RoleBinding` resources.
 This is covered in the <<grant-backup-permissions,Grant Access Permissions>> section on this page.
@@ -111,7 +111,7 @@ In this example a full backup would be performed at 3:00AM on a Sunday and then 
 So if a PVC called "my-backup" does not yet exist in this case, one will be created.
 This would also happen if for some reason the PVC was deleted.
 
-Once you have created a `CouchbaseBackup`, we can check that for the expected behaviour by viewing the Operator logs.
+Once you have created a `CouchbaseBackup`, we can check that for the expected behavior by viewing the Operator logs.
 
 [{tabs}]
 ====
@@ -247,7 +247,7 @@ Kubernetes::
 --
 [source,console]
 ----
-$ kubectl get coucbasebackup my-backup -o yaml
+$ kubectl get couchbasebackup my-backup -o yaml
 ----
 --
 
@@ -470,7 +470,7 @@ The first two folders correspond to any logs run under the relevant `CouchbaseBa
 
 === Backup Scheduling
 
-As backups are performed on separate pods you will need to consider careful node scheduling when it comes to these pods in order to avoid performance issues and noisy neighbour problems.
+As backups are performed on separate pods you will need to consider careful node scheduling when it comes to these pods in order to avoid performance issues and noisy neighbor problems.
 The following YAML example builds upon the initial YAML in xref:howto-backup.adoc#enable-automated-backup[Enable Automated Backup].
 
 [source,yaml,subs="attributes,verbatim"]
@@ -518,3 +518,11 @@ For more overall information please see xref:concept-scheduling[Couchbase Schedu
 When deciding on the Cron schedules for the Full/Incremental strategy, you should take care that the schedules are not defined in a way for a potential clash between Full and Incremental backups.
 For the example given in this documentation and the `cbbackupmgr` documentation, this is obviously very unlikely but in a scenario where a backup is not given enough of a time window to complete, this could cause problems.
 This particularly common in situations where backups have been scheduled too frequently.
+
+[#pod-scheduling]
+=== Pod Scheduling
+
+Scheduling of backup and restore jobs is exactly the same as the mechanism used for Couchbase Server pods.
+The affinity and anti-affinity mechanisms are described in xref:concept-scheduling.adoc[].
+
+Backup and restore job affinity can be set, per `CouchbaseCluster`, with the xref:reference-couchbasecluster.adoc#spec-backup-nodeselector[`spec.backup.nodeSelector`] attribute, and toleration of anti-affinity rules can be set with the xref:reference-couchbasecluster.adoc#spec-backup-tolerations[`spec.backup.tolerations`] attribute.

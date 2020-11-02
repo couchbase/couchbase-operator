@@ -184,6 +184,12 @@ spec:
     selector:
       matchLabels:
         cluster: cb-example
+    nodeSelector:
+      class: couchbase-backup
+    tolerations:
+    - key: couchbase-backup
+      operator: Exists
+      effect: NoSchedule
   monitoring:
     prometheus:
       enabled: true
@@ -1655,6 +1661,12 @@ spec:
     selector:
       matchLabels:
         cluster: cb-example
+    nodeSelector:
+      class: couchbase-backup
+    tolerations:
+    - key: couchbase-backup
+      operator: Exists
+      effect: NoSchedule
 ----
 
 === spec.backup.managed
@@ -1710,6 +1722,29 @@ For additional information, see the xref:concept-label-selection.adoc[Couchbase 
 
 ____
 _Field rules:_ This field is optional and must be a Kubernetes https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[label selector^].
+____
+
+=== spec.backup.nodeSelector
+
+This field defines affinity rules for the scheduling of xref:reference-couchbasebackup.adoc[`CouchbaseBackup`] and xref:reference-couchbasebackuprestore.adoc[`CouchbaseBackupRestore`] resources.
+
+This field is formatted as per the https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector[Kubernetes node selectors^] documentation.
+A node selector is a set of key/value pairs that a Kubernetes `Node` must be labeled with in order for backup and restore jobs to be scheduled onto.
+
+____
+_Field rules:_ This field is optional and must be a https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector[Kubernetes node selector^].
+____
+
+=== spec.backup.tolerations
+
+This field defines toleration of anti-affinity for the scheduling of xref:reference-couchbasebackup.adoc[`CouchbaseBackup`] and xref:reference-couchbasebackuprestore.adoc[`CouchbaseBackupRestore`] resources.
+
+This field is formatted as per the https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[Kubernetes taints and tolerations^] documentation.
+Taints provide anti-affinity rules, forcing all pods to be unschedulable on nodes with that taint.
+Tolerations allow backup and restore jobs to tolerate taints and be scheduled on these nodes that are now guaranteed to not have other pods running there.
+
+____
+_Field rules:_ This field is optional and must be a list of https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[Kubernetes tolerations^].
 ____
 
 [#spec-monitoring]
