@@ -238,6 +238,7 @@ var (
 		"TestPersistentVolumeAutoFailover":             TestPersistentVolumeAutoFailover,
 		"TestPersistentVolumeAutoRecovery":             TestPersistentVolumeAutoRecovery,
 		"TestPersistentVolumeKillAllPods":              TestPersistentVolumeKillAllPods,
+		"TestPersistentVolumeKillAllPodsTLS":           TestPersistentVolumeKillAllPodsTLS,
 		"TestPersistentVolumeKillPodAndOperator":       TestPersistentVolumeKillPodAndOperator,
 		"TestPersistentVolumeKillAllPodsAndOperator":   TestPersistentVolumeKillAllPodsAndOperator,
 		"TestPersistentVolumeRzaNodesKilled":           TestPersistentVolumeRzaNodesKilled,
