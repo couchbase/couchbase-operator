@@ -139,7 +139,7 @@ func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPo
 	// cbopcfg...
 	var pullSecret string
 
-	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil {
+	if k8s.PullSecrets != nil && k8s.PullSecrets[k8s.Namespace] != nil && len(k8s.PullSecrets[k8s.Namespace]) > 0 {
 		pullSecret = k8s.PullSecrets[k8s.Namespace][0]
 	}
 

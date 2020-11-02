@@ -140,6 +140,7 @@ tcGroups:
     testcases:
       - name: TestPersistentVolumeAutoFailover
       - name: TestPersistentVolumeAutoRecovery
+      - name: TestPersistentVolumeKillAllPodsTLS
 
   - name: FailoverTests
     clusters:
