@@ -782,6 +782,9 @@ func TestLogCollectValidateArguments(t *testing.T) {
 
 // Negative test scenarios with command argument.
 func TestNegLogCollectValidateArgs(t *testing.T) {
+	_, cleanup := framework.Global.SetupTest(t, framework.NoOperator)
+	defer cleanup()
+
 	// Invent a kubernetes configuration, using an address from TEST-NET-1 will
 	// ensure it's always going to be unreachable.
 	config := &clientcmdapiv1.Config{
@@ -844,7 +847,7 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 			Arg:         "--kubeconfig",
 			ArgValue:    kubeconfig.Name(),
 			WillFail:    true,
-			ExpectedErr: "unable to discover cluster resources",
+			ExpectedErr: "unable to connect to kubernetes cluster",
 		},
 		{
 			Name:        "Validating invalid '-kubeconfig' file missing",
