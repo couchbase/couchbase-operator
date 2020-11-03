@@ -6,6 +6,22 @@ The changes in this release enable several advancements in how you can manage, m
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
+[#release-v203]
+== Release 2.0.3
+
+Couchbase Autonomous Operator 2.0.3 was released in November 2020.
+
+[#fixed-issues-v203]
+=== Fixed Issues
+
+[#table-fixed-issues-v202,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-1736[K8S-1736^]
+a| *Summary:* When running a Couchbase cluster with persistent volume storage and TLS, the Operator is unable to recover the cluster in the event of a total loss of all Couchbase Server pods.
+|===
+
 [#release-v202]
 == Release 2.0.2
 
