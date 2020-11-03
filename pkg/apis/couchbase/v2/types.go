@@ -1491,6 +1491,9 @@ type ClusterStatus struct {
 	// CurrentVersion is the current cluster version
 	CurrentVersion string `json:"currentVersion,omitempty"`
 
+	// Allocations shows memory allocations within server classes.
+	Allocations []ServerClassStatus `json:"allocations,omitempty"`
+
 	// Name of buckets active within cluster
 	Buckets []BucketStatus `json:"buckets,omitempty"`
 
@@ -1502,6 +1505,50 @@ type ClusterStatus struct {
 
 	// Name of active autoscaler resources
 	Autoscalers []string `json:"autoscalers,omitempty"`
+}
+
+// ServerClassStatus summarizes memory allocations to make configuration easier.
+type ServerClassStatus struct {
+	// Name is the name of the server class defined in spec.servers
+	Name string `json:"name"`
+
+	// RequestedMemory, if set, defines the Kubernetes resource request for the server class.
+	RequestedMemory *resource.Quantity `json:"requestedMemory,omitempty"`
+
+	// AllocatedMemory defines the total memory allocated for constrained Couchbase services.
+	AllocatedMemory *resource.Quantity `json:"allocatedMemory,omitempty"`
+
+	// AllocatedMemoryPercent is set when memory resources are requested and define how much of
+	// the requested memory is allocated to constrained Couchbase services.
+	AllocatedMemoryPercent int `json:"allocatedMemoryPercent,omitempty"`
+
+	// UnusedMemory is set when memory resources are requested and is the difference between
+	// the requestedMemory and allocatedMemory.
+	UnusedMemory *resource.Quantity `json:"unusedMemory,omitempty"`
+
+	// UnusedMemoryPercent is set when memory resources are requested and defines how much
+	// requested memory is not allocated.  Couchbase server expects at least a 20% overhead.
+	UnusedMemoryPercent int `json:"unusedMemoryPercent,omitempty"`
+
+	// DataServiceAllocation is set when the data service is enabled for this class and
+	// defines how much memory this service consumes per pod.
+	DataServiceAllocation *resource.Quantity `json:"dataServiceAllocation,omitempty"`
+
+	// IndexServiceAllocation is set when the index service is enabled for this class and
+	// defines how much memory this service consumes per pod.
+	IndexServiceAllocation *resource.Quantity `json:"indexServiceAllocation,omitempty"`
+
+	// SearchServiceAllocation is set when the search service is enabled for this class and
+	// defines how much memory this service consumes per pod.
+	SearchServiceAllocation *resource.Quantity `json:"searchServiceAllocation,omitempty"`
+
+	// EventingServiceAllocation is set when the eventing service is enabled for this class and
+	// defines how much memory this service consumes per pod.
+	EventingServiceAllocation *resource.Quantity `json:"eventingServiceAllocation,omitempty"`
+
+	// AnalyticsServiceAllocation is set when the analytics service is enabled for this class and
+	// defines how much memory this service consumes per pod.
+	AnalyticsServiceAllocation *resource.Quantity `json:"analyticsServiceAllocation,omitempty"`
 }
 
 type BucketStatus struct {

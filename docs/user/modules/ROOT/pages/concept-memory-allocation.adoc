@@ -173,3 +173,119 @@ However, instead of using resource requests/limits to ensure server Pods have en
 ====
 Even when running a Couchbase Server Pod on a dedicated Kubernetes node, it's important to remember that Kubernetes does not allow swap storage for containers, and thus a singular Pod must still remain within the bounds of the node's https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable[allocatable^] memory, or else risk being evicted.
 ====
+
+== Interactive Memory Allocation
+
+The Operator provides memory allocation status information in your `CouchbaseCluster` resources with the xref:reference-couchbasecluster-status.adoc#status-allocations[`status.allocations`] attribute.
+This provides direct feedback about your memory configuration, and makes applying the rules--previously discussed--more intuitive to understand and apply.
+
+Consider the following server specification:
+
+[source,yaml]
+----
+spec:
+  cluster:
+    dataServiceMemoryQuota: 256Mi
+    indexServiceMemoryQuota: 256Mi
+    searchServiceMemoryQuota: 256Mi
+    eventingServiceMemoryQuota: 256Mi
+    analyticsServiceMemoryQuota: 1Gi
+  servers:
+  - name: data
+    resources:
+      requests:
+        memory: 512Mi
+    services:
+    - data
+    size: 2
+  - name: index
+    resources:
+      requests:
+        memory: 512Mi
+    services:
+    - index
+    size: 1
+  - name: query_and_search
+    resources:
+      requests:
+        memory: 1Gi
+    services:
+    - query
+    - search
+    size: 1
+  - name: eventing_and_analytics
+    resources:
+      requests:
+        memory: 1Gi
+    services:
+    - eventing
+    - analytics
+    size: 1
+----
+
+When processed by the Operator, it would populate the status like the following:
+
+[source,yaml]
+----
+status:
+  allocations:
+  - name: data # <.>
+    requestedMemory: 512Mi # <.>
+    allocatedMemory: 256Mi # <.>
+    allocatedMemoryPercent: 50 # <.>
+    unusedMemory: 256Mi # <.>
+    unusedMemoryPercent: 50 # <.>
+    dataServiceAllocation: 256Mi # <.>
+  - name: index
+    requestedMemory: 512Mi
+    allocatedMemory: 256Mi
+    allocatedMemoryPercent: 50
+    unusedMemory: 256Mi
+    unusedMemoryPercent: 50
+    indexServiceAllocation: 256Mi
+  - name: query_and_search
+    requestedMemory: 1Gi
+    allocatedMemory: 256Mi
+    allocatedMemoryPercent: 25
+    unusedMemory: 768Mi
+    unusedMemoryPercent: 75
+    searchServiceAllocation: 256Mi
+  - name: eventing_and_analytics
+    requestedMemory: 1Gi # <.>
+    allocatedMemory: 1280Mi # <.>
+    allocatedMemoryPercent: 125
+    unusedMemory: -256Mi # <.>
+    unusedMemoryPercent: -25
+    analyticsServiceAllocation: 1Gi
+    eventingServiceAllocation: 256Mi
+----
+
+The status is interpreted as follows:
+
+<.> The `name` of an allocation maps directly to a server class name as defined in the specification.
+
+<.> The `requestedMemory` is populated only when a server class's memory resource requests are specified.
+It is a direct copy of that value.
+
+<.> The `allocatedMemory` is the sum total of the memory allocations for all services running on a particular server class.
+
+<.> The `allocatedMemoryPercent` is the amount of memory allocated from the amount of memory requested.
+This is only populated if the server class's memory resource requests are specified.
+
+<.> The `unusedMemory` is the amount of memory left from the server class's memory resource requests after `allocatedMemory` has been removed from it.
+This is only populated if the server class's memory resource requests are specified.
+
+<.> The `unusedMemoryPercent` is the amount of memory left from the server class's memory resource requests after `allocatedMemory` has been removed from it
+This is only populated if the server class's memory resource requests are specified.
+Ideally, as described above, this value should be greater than 20%.
+
+<.> The `dataServiceAllocation` is the per-service memory allocation for this service class.
+Each Couchbase service that is enabled for a server class will be displayed here.
+It is a direct copy of the allocation specified in the cluster memory configuration.
+
+<.> In this example, the server class has requested 1GiB of memory.
+
+<.> The same server class has allocated 1280Mi (1.25Gi) or memory.
+This is greater that the requested memory, and therefore is over-committed.
+
+<.> This is immediately obvious when looking at the unused memory, as that value is negative.

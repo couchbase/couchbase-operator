@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -73,6 +74,10 @@ func (c *Cluster) reconcile() error {
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)
+
+	if err := c.reconcileStatus(); err != nil {
+		return err
+	}
 
 	if err := c.reconcileCompletedPods(); err != nil {
 		return err
@@ -2605,6 +2610,57 @@ func (c *Cluster) reconcileAutoscalers() error {
 	}
 
 	c.cluster.Status.Autoscalers = actualAutoscalers
+
+	return nil
+}
+
+// reconcileStatus generates any status attributes that can be statically derrived.
+func (c *Cluster) reconcileStatus() error {
+	statuses := []couchbasev2.ServerClassStatus{}
+
+	for _, class := range c.cluster.Spec.Servers {
+		status := couchbasev2.ServerClassStatus{
+			Name:            class.Name,
+			AllocatedMemory: &resource.Quantity{},
+		}
+
+		if value, ok := class.Resources.Requests["memory"]; ok {
+			status.RequestedMemory = &value
+		}
+
+		for _, service := range class.Services {
+			switch service {
+			case couchbasev2.DataService:
+				status.AllocatedMemory.Add(*c.cluster.Spec.ClusterSettings.DataServiceMemQuota)
+				status.DataServiceAllocation = c.cluster.Spec.ClusterSettings.DataServiceMemQuota
+			case couchbasev2.IndexService:
+				status.AllocatedMemory.Add(*c.cluster.Spec.ClusterSettings.IndexServiceMemQuota)
+				status.IndexServiceAllocation = c.cluster.Spec.ClusterSettings.IndexServiceMemQuota
+			case couchbasev2.SearchService:
+				status.AllocatedMemory.Add(*c.cluster.Spec.ClusterSettings.SearchServiceMemQuota)
+				status.SearchServiceAllocation = c.cluster.Spec.ClusterSettings.SearchServiceMemQuota
+			case couchbasev2.EventingService:
+				status.AllocatedMemory.Add(*c.cluster.Spec.ClusterSettings.EventingServiceMemQuota)
+				status.EventingServiceAllocation = c.cluster.Spec.ClusterSettings.EventingServiceMemQuota
+			case couchbasev2.AnalyticsService:
+				status.AllocatedMemory.Add(*c.cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota)
+				status.AnalyticsServiceAllocation = c.cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota
+			}
+		}
+
+		if status.RequestedMemory != nil {
+			unused := status.RequestedMemory.DeepCopy()
+			unused.Sub(*status.AllocatedMemory)
+			status.UnusedMemory = &unused
+
+			status.AllocatedMemoryPercent = int((status.AllocatedMemory.Value() * 100) / status.RequestedMemory.Value())
+			status.UnusedMemoryPercent = int((status.UnusedMemory.Value() * 100) / status.RequestedMemory.Value())
+		}
+
+		statuses = append(statuses, status)
+	}
+
+	c.cluster.Status.Allocations = statuses
 
 	return nil
 }

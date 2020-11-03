@@ -40,6 +40,17 @@ status:
     - my-cluster-0001
     - my-cluster-0002
   currentVersion: {couchbase-version}
+  allocations:
+  - name: data
+    allocatedMemory: 3Gi
+    allocatedMemoryPercent: 66
+    unusedMemory: 1Gi
+    unusedMemoryPercent: 33
+    dataServiceAllocation: 256Mi
+    indexServiceAllocation: 256Mi
+    searchServiceAllocation: 256Mi
+    eventingServiceAllocation: 256Mi
+    analyticsServiceAllocation: 1Gi
   buckets:
     - compressionMode: passive
       conflictResolution: seqno
@@ -247,6 +258,105 @@ When a cluster is upgraded it will remain at the initial cluster version until a
 
 ____
 _Field rules:_ This field will be a string.
+____
+
+=== status.allocations[]
+
+This field displays memory allocation summaries for each class of server defined in xref:reference-couchbasecluster.adoc#spec-servers[`spec.servers`].
+
+____
+_Field rules:_ This field will be an array of objects.
+____
+
+=== status.allocations[].name
+
+This field refers to the server class name as defined by xref:reference-couchbasecluster.adoc#spec-servers-name[`spec.servers\[\].name`].
+
+____
+_Field rules:_  This field will be a string.
+____
+
+=== status.allocations[].allocatedMemory
+
+This field is the total memory allocated for the Couchbase services enabled for this service class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
+
+____
+_Field rules:_ This field will be Kubernetes quantity formatted as a string.
+____
+
+=== status.allocations[].allocatedMemoryPercent
+
+This field is optional and is only set when the server class memory request is explicitly defined by xref:reference-couchbasecluster.adoc#spec-servers-resources[`spec.servers\[\].resources`].
+It is the percentage of memory allocated against the memory requested.
+
+____
+_Field rules:_ This field will be an integer.
+____
+
+=== status.allocations[].unusedMemory
+
+This field is optional and is only set when the server class memory request is explicitly defined by xref:reference-couchbasecluster.adoc#spec-servers-resources[`spec.servers\[\].resources`].
+It is the difference between the memory requested and the memory allocated.
+If this field is negative, then the server class is over-committed and my lead to memory contention and out-of-memory situations.
+
+____
+_Field rules:_ This field will be Kubernetes quantity formatted as a string.
+____
+
+=== status.allocations[].unusedMemoryPercent
+
+This field is optional and is only set when the server class memory request is explicitly defined by xref:reference-couchbasecluster.adoc#spec-servers-resources[`spec.servers\[\].resources`].
+It is the difference between the memory requested and the memory allocated against the memory requested.
+If this field is negative, then the server class is over-committed and my lead to memory contention and out-of-memory situations.
+Couchbase Server requires an overhead, above what is reserved for individual services to function correctly, this value should ideally be at least 25%.
+
+____
+_Field rules:_ This field will be an integer.
+____
+
+=== status.allocations[].dataServiceAllocation
+
+This field is optional and is only set when the data service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
+It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-dataservicememoryquota[`spec.cluster.dataServiceMemoryQuota`].
+
+____
+_Field rules:_ This field will be Kubernetes quantity formatted as a string.
+____
+
+=== status.allocations[].indexServiceAllocation
+
+This field is optional and is only set when the index service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
+It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-indexervicememoryquota[`spec.cluster.indexServiceMemoryQuota`].
+
+____
+_Field rules:_ This field will be Kubernetes quantity formatted as a string.
+____
+
+=== status.allocations[].searchServiceAllocation
+
+This field is optional and is only set when the full-text search service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
+It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-searchservicememoryquota[`spec.cluster.searchServiceMemoryQuota`].
+
+____
+_Field rules:_ This field will be Kubernetes quantity formatted as a string.
+____
+
+=== status.allocations[].eventingServiceAllocation
+
+This field is optional and is only set when the eventing service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
+It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-eventingservicememoryquota[`spec.cluster.eventingServiceMemoryQuota`].
+
+____
+_Field rules:_ This field will be Kubernetes quantity formatted as a string.
+____
+
+=== status.allocations[].analyticsServiceAllocation
+
+This field is optional and is only set when the analytics service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
+It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-analyticsservicememoryquota[`spec.cluster.analyticsServiceMemoryQuota`].
+
+____
+_Field rules:_ This field will be Kubernetes quantity formatted as a string.
 ____
 
 === status.buckets[]
