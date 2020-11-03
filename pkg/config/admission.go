@@ -450,6 +450,9 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 
 	admissionControllerMutatePath := "/couchbaseclusters/mutate"
 
+	failurePolicy := admissionregistrationv1beta1.Fail
+	sideEffectClass := admissionregistrationv1beta1.SideEffectClassNone
+
 	webhook := &admissionregistrationv1beta1.MutatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "admissionregistration.k8s.io/v1beta1",
@@ -499,6 +502,8 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 					},
 					CABundle: ca,
 				},
+				FailurePolicy: &failurePolicy,
+				SideEffects:   &sideEffectClass,
 			},
 		},
 	}
@@ -525,6 +530,9 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, na
 	}
 
 	admissionControllerValidatePath := "/couchbaseclusters/validate"
+
+	failurePolicy := admissionregistrationv1beta1.Fail
+	sideEffectClass := admissionregistrationv1beta1.SideEffectClassNone
 
 	webhook := &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
@@ -575,6 +583,8 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, na
 					},
 					CABundle: ca,
 				},
+				FailurePolicy: &failurePolicy,
+				SideEffects:   &sideEffectClass,
 			},
 		},
 	}

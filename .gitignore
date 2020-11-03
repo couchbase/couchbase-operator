@@ -12,7 +12,7 @@
 /test/e2e/resources/*.yaml
 /test/e2e/resources/suites/TestCustom.yaml
 example/crd.yaml
-test/e2e/results.xml
+test/e2e/*.xml
 test/e2e/*.zip
 test/e2e/*.tar.gz
 e2e.test

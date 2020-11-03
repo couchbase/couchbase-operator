@@ -1825,14 +1825,14 @@ func TestRBACValidationLDAP(t *testing.T) {
 			name: "TestUserDNQueryAndTemplate",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/security/ldap/userDNMapping/query", "users=%u,dc=example,dc=com")},
-			expectedErrors: []string{"ldap.userDNMapping must contain either query or template"},
+			expectedErrors: []string{"ldap.userDNMapping"},
 			shouldFail:     true,
 		},
 		{
 			name: "TestUserDNQueryWithoutMapping",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Remove("/spec/security/ldap/userDNMapping/template")},
-			expectedErrors: []string{"spec.security.ldap.userDNMapping in body is required"},
+			expectedErrors: []string{"spec.security.ldap.userDNMapping"},
 			shouldFail:     true,
 		},
 	}
@@ -1850,13 +1850,13 @@ func TestAutoscalerValidation(t *testing.T) {
 		{
 			name:           "TestAutoscalerMissingServers",
 			mutations:      patchMap{"scaler": jsonpatch.NewPatchSet().Remove("/spec/servers")},
-			expectedErrors: []string{"CouchbaseAutoscaler.couchbase.com \"scaler\" is invalid: spec.servers: Required value"},
+			expectedErrors: []string{"spec.servers"},
 			shouldFail:     true,
 		},
 		{
 			name:           "TestAutoscalerMissingSize",
 			mutations:      patchMap{"scaler": jsonpatch.NewPatchSet().Remove("/spec/size")},
-			expectedErrors: []string{"CouchbaseAutoscaler.couchbase.com \"scaler\" is invalid: spec.size: Required value"},
+			expectedErrors: []string{"spec.size"},
 			shouldFail:     true,
 		},
 	}

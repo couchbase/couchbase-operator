@@ -170,6 +170,8 @@ func readYamlData() (err error) {
 
 	var suites SuiteConfigValue
 
+	var suiteSuffix string
+
 	// CLI based configuration (CI/computer friendly)
 	flag.StringVar(&params.KubeType, "platform-type", "kubernetes", "Either kubernetes or openshift")
 	flag.StringVar(&platform, "platform-vendor", "", "Either aws, gce or azure")
@@ -184,6 +186,7 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
 	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
+	flag.StringVar(&suiteSuffix, "suite-suffix", "", "Suffix to apply to suite name in JUnit results, useful when running multiple versions of the same suite in parallel")
 	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
 	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs", false, "Whether to collect logs on failure")
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
@@ -281,9 +284,15 @@ func readYamlData() (err error) {
 
 			suiteData.TestCase = append(suiteData.TestCase, data.TestCase...)
 
+			analyzerSuiteName := suite
+
+			if suiteSuffix != "" {
+				analyzerSuiteName += "-" + suiteSuffix
+			}
+
 			// Register tests with a suite in the analyzer.
 			for _, test := range data.TestCase {
-				analyzer.RegisterTest(suite, test)
+				analyzer.RegisterTest(analyzerSuiteName, test)
 			}
 		}
 
@@ -291,9 +300,15 @@ func readYamlData() (err error) {
 		// to our list.
 		suiteData.TestCase = append(suiteData.TestCase, tests.values...)
 
+		analyzerSuiteName := "custom"
+
+		if suiteSuffix != "" {
+			analyzerSuiteName += "-" + suiteSuffix
+		}
+
 		// Register tests with a suite in the analyzer.
 		for _, test := range tests.values {
-			analyzer.RegisterTest("custom", test)
+			analyzer.RegisterTest(analyzerSuiteName, test)
 		}
 	} else {
 		suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
@@ -304,6 +319,11 @@ func readYamlData() (err error) {
 		suiteData, err = getSuiteDataFromYml(suiteFilePath)
 		if err != nil {
 			return err
+		}
+
+		// Register tests with a suite in the analyzer.
+		for _, test := range suiteData.TestCase {
+			analyzer.RegisterTest(runtimeParams.SuiteToRun, test)
 		}
 	}
 
@@ -558,6 +578,58 @@ func recreateCRDs(k8s *types.Cluster) error {
 		if _, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
 			return err
 		}
+
+		// Ensure CRDs are installed and working before proceeding.
+		callback := func() error {
+			crd, err := clientSet.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			var established bool
+
+			var namesAccepted bool
+
+			// Catch conditions that are set to the incorrect values.
+			for _, condition := range crd.Status.Conditions {
+				switch condition.Type {
+				case apiextensionsv1beta1.Established:
+					if condition.Status != apiextensionsv1beta1.ConditionTrue {
+						return fmt.Errorf("CRD %s not established: %s %s", crd.Name, condition.Reason, condition.Message)
+					}
+
+					established = true
+				case apiextensionsv1beta1.NamesAccepted:
+					if condition.Status != apiextensionsv1beta1.ConditionTrue {
+						return fmt.Errorf("CRD %s names not accepted: %s %s", crd.Name, condition.Reason, condition.Message)
+					}
+
+					namesAccepted = true
+				case apiextensionsv1beta1.NonStructuralSchema:
+					if condition.Status != apiextensionsv1beta1.ConditionFalse {
+						return fmt.Errorf("CRD %s non structural: %s %s", crd.Name, condition.Reason, condition.Message)
+					}
+				}
+			}
+
+			// Catch conditions that were unexpectedly not set.
+			if !established {
+				return fmt.Errorf("CRD %s has no established condition", crd.Name)
+			}
+
+			if !namesAccepted {
+				return fmt.Errorf("CRD %s has no names accepted condition", crd.Name)
+			}
+
+			return nil
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+
+		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -629,7 +701,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	// delete DAC
 	logrus.Infof("Deleting admission controller")
 
-	if err := deleteAdmissionController(k8s.KubeClient); err != nil {
+	if err := deleteAdmissionController(k8s); err != nil {
 		return err
 	}
 

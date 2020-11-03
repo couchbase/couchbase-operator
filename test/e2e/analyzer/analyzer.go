@@ -416,7 +416,9 @@ func Report(suiteName string) {
 
 	data = []byte(xml.Header + string(data))
 
-	if err := ioutil.WriteFile("results.xml", data, 0660); err != nil {
+	// TODO: There is a chance here that the timestamps will collide, work out how to make this
+	// totally unique when running in parallel.
+	if err := ioutil.WriteFile(fmt.Sprintf("results-%s.xml", time.Now().Format(time.RFC3339Nano)), data, 0660); err != nil {
 		logrus.Warn("unable to write junit xml", err)
 		return
 	}
