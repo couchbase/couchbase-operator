@@ -52,7 +52,7 @@ CONTAINER_GOENV = $(GOENV) GOOS=linux GOARCH=amd64
 # that a binary came from.
 LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(version) -X github.com/couchbase/couchbase-operator/pkg/version.Revision=$(revision) -X github.com/couchbase/couchbase-operator/pkg/version.RevisionRedHat=$(revisionRedHat) -X github.com/couchbase/couchbase-operator/pkg/version.BuildNumber=$(bldNum) -X github.com/couchbase/couchbase-operator/pkg/revision.gitRevision=$(GIT_REVISION)"
 
-.PHONY: all generated binaries crd build-test lint container container-public dist test test-indv
+.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv
 
 all: binaries crd
 
@@ -187,6 +187,11 @@ lint-python:
 container: $(OPERATOR_BINARY) $(ADMISSION_BINARY) crd
 	docker build -f Dockerfile -t ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG} .
 	docker build -f Dockerfile.admission -t ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG} .
+
+# Clean up any images for this build, useful for CI jobs.
+container-clean:
+	docker rmi -f ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG}
+	docker rmi -f ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG}
 
 # This target pushes the containers to a public repository.
 # A typical one liner to deploy to the cloud would be:

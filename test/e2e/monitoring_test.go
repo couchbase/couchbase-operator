@@ -6,6 +6,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -315,12 +316,46 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+func skipPrometheusUpgrade(t *testing.T) {
+	f := framework.Global
+
+	if f.CouchbaseExporterImageUpgrade == "" {
+		t.Skip("Upgrade exporter image not specified")
+	}
+
+	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseExporterImage)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	upgradeStr, err := k8sutil.CouchbaseVersion(f.CouchbaseExporterImageUpgrade)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	version, err := couchbaseutil.NewVersion(versionStr)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	upgrade, err := couchbaseutil.NewVersion(upgradeStr)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if version.GreaterEqual(upgrade) {
+		t.Skip("Exporter base version greater than or equal to upgrade version")
+	}
+}
+
 func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipPrometheusUpgrade(t)
 
 	// Static configuration.
 	clusterSize := 3
