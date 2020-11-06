@@ -312,7 +312,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 	}
 
 	// Convert requested ldap spec
-	specLDAPSettings := couchbaseutil.LDAPSettings{
+	specLDAPSettings := &couchbaseutil.LDAPSettings{
 		AuthenticationEnabled: ldap.AuthenticationEnabled,
 		AuthorizationEnabled:  ldap.AuthorizationEnabled,
 		Hosts:                 ldap.Hosts,
@@ -345,7 +345,13 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		}
 	}
 
-	if !reflect.DeepEqual(*apiLDAPSettings, specLDAPSettings) {
+	// API will do some whack things that need fixing:
+	// * Fills in the password with junk
+	apiLDAPSettings.BindPass = ""
+
+	if !reflect.DeepEqual(apiLDAPSettings, specLDAPSettings) {
+		c.logUpdate(apiLDAPSettings, specLDAPSettings)
+
 		// reconcile and set bind password if provided
 		bindSecretName := c.cluster.Spec.Security.LDAP.BindSecret
 		if bindSecretName != "" {
@@ -363,7 +369,7 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		}
 
 		// Update ldap settings according requested spec
-		return couchbaseutil.SetLDAPSettings(&specLDAPSettings).On(c.api, c.readyMembers())
+		return couchbaseutil.SetLDAPSettings(specLDAPSettings).On(c.api, c.readyMembers())
 	}
 
 	return nil

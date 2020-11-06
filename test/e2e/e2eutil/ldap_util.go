@@ -129,7 +129,10 @@ func MustCheckLDAPServer(t *testing.T, k8s *types.Cluster, pod string, tls *TLSC
 
 		defer cleanup()
 
-		if err := netutil.WaitForHostPort(ctx, "localhost:"+port); err != nil {
+		innerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cancel()
+
+		if err := netutil.WaitForHostPort(innerCtx, "localhost:"+port); err != nil {
 			return err
 		}
 
@@ -148,7 +151,10 @@ func MustCheckLDAPServer(t *testing.T, k8s *types.Cluster, pod string, tls *TLSC
 
 		defer cleanup()
 
-		if err := netutil.WaitForHostPortTLS(ctx, "localhost:"+port, tls.CA.Certificate); err != nil {
+		innerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cancel()
+
+		if err := netutil.WaitForHostPortTLS(innerCtx, "localhost:"+port, tls.CA.Certificate); err != nil {
 			return err
 		}
 

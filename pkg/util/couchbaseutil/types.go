@@ -917,34 +917,28 @@ func RolesToStr(userRoles []UserRole) []string {
 
 // Normal unmarshlling doesn't work because LDAP DN Mapping returns a string when unset.
 func (s *LDAPSettings) UnmarshalJSON(data []byte) error {
-	var jsonData map[string]interface{}
+	type ls LDAPSettings
 
-	err := json.Unmarshal(data, &jsonData)
-	if err != nil {
-		return errors.NewStackTracedError(err)
+	var t struct {
+		ls
+		UserDNMapping interface{} `json:"userDNMapping"`
 	}
 
-	// Remove dnMapping if it cannot be properly cast
-	if dnMap, ok := jsonData["userDNMapping"]; ok {
-		if _, ok := dnMap.(LDAPUserDNMapping); !ok {
-			delete(jsonData, "userDNMapping")
+	if err := json.Unmarshal(data, &t); err != nil {
+		return err
+	}
 
-			data, err = json.Marshal(jsonData)
-			if err != nil {
-				return errors.NewStackTracedError(err)
-			}
+	*s = LDAPSettings(t.ls)
+
+	// This is either "None" or an object #fml.
+	// When not a string, allow a full unmarshalling of the data.
+	if _, ok := t.UserDNMapping.(string); !ok {
+		if err := json.Unmarshal(data, &t.ls); err != nil {
+			return err
 		}
+
+		*s = LDAPSettings(t.ls)
 	}
-
-	type LDAPSettingsAlias LDAPSettings
-
-	settings := LDAPSettingsAlias{}
-
-	if err := json.Unmarshal(data, &settings); err != nil {
-		return errors.NewStackTracedError(err)
-	}
-
-	*s = LDAPSettings(settings)
 
 	return nil
 }
