@@ -149,6 +149,15 @@ func CreateDeploymentObject(k8s *types.Cluster, operatorImage string, operatorPo
 	if operatorPort != 0 {
 		listerAddrArg := "--listen-addr=0.0.0.0:" + strconv.Itoa(operatorPort)
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, listerAddrArg)
+
+		//Direct readiness probe to listening address
+		for i, containerPort := range deployment.Spec.Template.Spec.Containers[0].Ports {
+			if containerPort.Name != "http" {
+				continue
+			}
+			deployment.Spec.Template.Spec.Containers[0].Ports[i].ContainerPort = int32(operatorPort)
+		}
+
 	}
 
 	return deployment

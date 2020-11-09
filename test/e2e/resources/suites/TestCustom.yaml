@@ -2,11 +2,25 @@
 suite: TestSanity
 timeout: 4h
 tcGroups:
-  - name: PersistentVolumeTests
+  - name: FailureReruns
     clusters:
-      - NewCluster1
+      - BasicCluster
     testcases:
-      #- name: TestPersistentVolumeKillAllPods
-      #- name: TestPersistentVolumeKillPodAndOperator
-      #- name: TestPersistentVolumeKillAllPodsAndOperator
-      - name: TestPersistentVolumeRzaNodesKilled
+      - name: TestNegValidationCreate
+      - name: TestExtendedDebugWithNonDefaultValues
+      - name: TestFailedBackupBehaviour
+      - name: TestBackupAndRestore
+
+  - name: BackupTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestFullIncremental
+      - name: TestFullOnly
+      - name: TestFullIncrementalOverTLS
+      - name: TestFullOnlyOverTLS
+      - name: TestMultipleBackups
+      - name: TestBackupPVCReconcile
+      - name: TestReplaceFullOnlyBackup
+      - name: TestReplaceFullIncrementalBackup
+      - name: TestUpdateBackupStatus
