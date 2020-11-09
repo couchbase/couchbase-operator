@@ -17,8 +17,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	"github.com/go-openapi/errors"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -1143,39 +1141,37 @@ func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, retryInterval, func() (bool, error) {
+	return retryutil.RetryOnErr(ctx, retryInterval, func() error {
 		listOptions := &metav1.ListOptions{
 			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 		}
 
 		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(*listOptions)
 		if err != nil {
-			return false, err
+			return err
 		}
-
-		ready := map[string]bool{}
 
 		for _, pod := range pods.Items {
+			found := false
+
 			for _, status := range pod.Status.ContainerStatuses {
-				if status.Name == k8sutil.MetricsContainerName && status.Image == couchbase.Spec.Monitoring.Prometheus.Image {
-					ready[pod.Name] = status.Ready
+				if status.Name != k8sutil.MetricsContainerName {
+					continue
 				}
+
+				if !status.Ready {
+					return fmt.Errorf("prometheus not ready on pod %s", pod.Name)
+				}
+
+				found = true
+			}
+
+			if !found {
+				return fmt.Errorf("unable to find prometheus container status in pod %s", pod.Name)
 			}
 		}
 
-		errs := []error{}
-
-		for s, b := range ready {
-			if !b {
-				errs = append(errs, fmt.Errorf("prometheus container belonging to pod %s is not ready", s))
-			}
-		}
-
-		if len(errs) > 0 {
-			return false, errors.CompositeValidationError(errs...)
-		}
-
-		return true, nil
+		return nil
 	})
 }
 

@@ -391,6 +391,7 @@ func NewPrometheusTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, tl
 		clusterSpec.Spec.Monitoring = &couchbasev2.CouchbaseClusterMonitoringSpec{
 			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
 				Enabled: true,
+				Image:   constants.CouchbaseExporterImage,
 			},
 		}
 	}

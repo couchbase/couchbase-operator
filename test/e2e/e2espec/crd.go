@@ -128,6 +128,10 @@ func SetCouchbaseServerImage(imageName string) {
 	}
 }
 
+func SetCouchbaseExporterImage(imageName string) {
+	e2e_constants.CouchbaseExporterImage = imageName
+}
+
 var storageClassName *string
 
 func SetStorageClassName(storageClassNameIn *string) {

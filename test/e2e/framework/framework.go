@@ -418,6 +418,7 @@ func Setup() (err error) {
 	// Setting required spec values from test_config yaml
 	e2espec.SetStorageClassName(Global.StorageClassName)
 	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
+	e2espec.SetCouchbaseExporterImage(runtimeParams.CouchbaseExporterImage)
 	e2espec.SetPlatform(runtimeParams.Platform)
 	e2espec.SetIstio(runtimeParams.EnableIstio)
 
