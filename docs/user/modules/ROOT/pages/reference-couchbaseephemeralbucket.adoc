@@ -30,6 +30,7 @@ spec:
   conflictResolution: lww
   enableFlush: false
   compressionMode: passive
+  maxTTL: 720h
 ----
 
 toc::[]
@@ -201,4 +202,18 @@ This parameter defaults to `passive` if not specified.
 ____
 _Field rules:_ This field is optional and must be either `"off"`, `passive` or `active`.
 Note that Kubernetes uses the https://yaml.org/type/bool.html[YAML 1.1^] specification, so `off` _must_ be in quotes (`"off"`) in order to be interpreted as a string, not a Boolean.
+____
+
+=== `spec.maxTTL`
+
+This field sets the default time to live for documents contained within the bucket.
+When unset, or set to zero, documents will persist forever, or until deleted.
+This is the default behavior.
+
+When set to a value greater than zero, documents will be purged when they have not been used for this duration.
+
+For additional information on document expiration, please consult the Couchbase Server documentation.
+
+____
+_Field rules:_ This field is optional and must be a valid https://golang.org/pkg/time/#ParseDuration[duration^] string in the range 0-2147483648s.
 ____
