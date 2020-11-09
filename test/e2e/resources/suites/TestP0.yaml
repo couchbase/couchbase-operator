@@ -229,4 +229,11 @@ testcases:
 - TestAutoScalingDisabledOnData
 - TestAutoScalingDisabledOnCouchbaseBucket
 - TestPreviewModeAllowsEphemeral
+- TestPreviewModeAllowsEphemeralTLS
+- TestPreviewModeAllowsEphemeralMutualTLS
+- TestPreviewModeAllowsEphemeralMandatoryMutualTLS
 - TestPreviewModeEnabledAllowsStateful
+- TestPreviewModeEnabledAllowsStatefulTLS
+- TestPreviewModeEnabledAllowsStatefulMutualTLS
+- TestPreviewModeEnabledAllowsStatefulMandatoryMutualTLS
+

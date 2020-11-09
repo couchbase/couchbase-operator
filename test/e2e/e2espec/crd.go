@@ -64,10 +64,15 @@ var (
 
 	defaultEphemeralBucket = &couchbasev2.CouchbaseEphemeralBucket{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: e2e_constants.DefaultBucket,
+			Name: e2e_constants.DefaultEphemeralBucket,
 		},
 		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
-			MemoryQuota: NewResourceQuantityMi(256),
+			MemoryQuota:        NewResourceQuantityMi(256),
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
 		},
 	}
 

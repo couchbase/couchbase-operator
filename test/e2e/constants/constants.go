@@ -74,7 +74,8 @@ const (
 
 //DefaultBucket naming.
 const (
-	DefaultBucket = "default"
+	DefaultBucket          = "default"
+	DefaultEphemeralBucket = "ephemeral-bucket"
 )
 
 //DefaultReplication naming.

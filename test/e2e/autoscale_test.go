@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -154,7 +155,7 @@ func TestAutoscaleSelectiveMDS(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName, nil, nil)
 
 	// Check autoscaler was created only for query config
 	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
@@ -167,6 +168,62 @@ func TestAutoscaleSelectiveMDS(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
 	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func testAutoscale(t *testing.T, targetKube *types.Cluster, metricName string, metricValue int64, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
+	// Static configuration.
+	clusterSize := 4
+	sizePerConfig := clusterSize / 2
+
+	// Create the cluster with autoscaling with desired value of tls and it's policy
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName, tls, policy)
+
+	if tls != nil {
+		// When the cluster is healthy, check the TLS is correctly configured.
+		e2eutil.MustCheckClusterTLS(t, targetKube, tls, 5*time.Minute)
+	}
+
+	// Check autoscaler was created only for query config
+	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+
+	// Start custom metric server
+	cleanupMetrics := e2eutil.MustCreateCustomMetricServer(t, targetKube, testCouchbase.Namespace, testCouchbase.Name)
+	defer cleanupMetrics()
+
+	// Set HPA to scale when incrementing stat passes unit value of 80
+	// cluster should scale up once and drop average value desirable range
+	_ = e2eutil.MustCreateAverageValueHPA(t, targetKube, testCouchbase.Namespace, autoscalerName, 1, 6, metricName, metricValue)
+
+	// Allow cluster to finish rebalancing
+	//e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
+
+	// expected events for scaling up with autoscaler
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
+		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
+		eventschema.Optional{
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventAutoscaleUp},
+					e2eutil.ClusterScaleUpSequence(1),
+				},
+			},
+		},
+		eventschema.Optional{
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventAutoscaleDown},
+					e2eutil.ClusterScaleDownSequence(1),
+				},
+			},
+		},
+	}
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
@@ -184,38 +241,47 @@ func TestAutoscaleUp(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	// Static configuration.
-	clusterSize := 2
-	sizePerConfig := clusterSize / 2
+	testAutoscale(t, targetKube, testMetricIncrement, 80, nil, nil)
+}
 
-	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+func TestAutoscaleUpTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
 
-	// Check autoscaler was created only for query config
-	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
-	// Start custom metric server
-	cleanupMetrics := e2eutil.MustCreateCustomMetricServer(t, targetKube, testCouchbase.Namespace, testCouchbase.Name)
-	defer cleanupMetrics()
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
-	// Set HPA to scale when incrementing stat passes unit value of 80
-	// cluster should scale up once and drop average value desirable range
-	_ = e2eutil.MustCreateAverageValueHPA(t, targetKube, testCouchbase.Namespace, autoscalerName, 1, 6, testMetricIncrement, 80)
+	testAutoscale(t, targetKube, testMetricIncrement, 80, tls, nil)
+}
 
-	// Allow cluster to finish rebalancing
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
+func TestAutoscaleUpMutualTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
 
-	// Verify events
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
-		eventschema.Event{Reason: k8sutil.EventAutoscaleUp},
-		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	policy := couchbasev2.ClientCertificatePolicyEnable
+
+	testAutoscale(t, targetKube, testMetricIncrement, 80, tls, &policy)
+}
+
+func TestAutoscaleUpMandatoryMutualTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	testAutoscale(t, targetKube, testMetricIncrement, 80, tls, &policy)
 }
 
 // TestAutoscaleDown tests that operator reacts to downscale requests from HPA.
@@ -228,38 +294,47 @@ func TestAutoscaleDown(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	// Static configuration.
-	clusterSize := 4
-	sizePerConfig := clusterSize / 2
+	testAutoscale(t, targetKube, testMetricDecrement, 100, nil, nil)
+}
 
-	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+func TestAutoscaleDownTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
 
-	// Check autoscaler was created only for query config
-	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
-	// Start custom metric server
-	cleanupMetrics := e2eutil.MustCreateCustomMetricServer(t, targetKube, testCouchbase.Namespace, testCouchbase.Name)
-	defer cleanupMetrics()
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
-	// Set HPA to scale when decrement metric drops below value of 100
-	// cluster should scale down once and drop average value desirable range
-	_ = e2eutil.MustCreateAverageValueHPA(t, targetKube, testCouchbase.Namespace, autoscalerName, 1, 6, testMetricDecrement, 100)
+	testAutoscale(t, targetKube, testMetricDecrement, 100, tls, nil)
+}
 
-	// Allow cluster to finish rebalancing
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 20*time.Minute)
+func TestAutoscaleDownMutualTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
 
-	// Verify events
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
-		eventschema.Event{Reason: k8sutil.EventAutoscaleDown},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	policy := couchbasev2.ClientCertificatePolicyEnable
+
+	testAutoscale(t, targetKube, testMetricDecrement, 100, tls, &policy)
+}
+
+func TestAutoscaleDownMandatoryMutualTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	testAutoscale(t, targetKube, testMetricDecrement, 100, tls, &policy)
 }
 
 // TestAutoscaleMultiConfigs tests that different configs can be scaled in different directions.
@@ -277,7 +352,7 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName, nil, nil)
 	// explicitly enabling autoscaling for data config
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScalingStateful", true), time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
@@ -332,7 +407,7 @@ func TestAutoscaleConflict(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName, nil, nil)
 
 	// Check autoscaler was created only for query config
 	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
@@ -389,7 +464,7 @@ func TestAutoScalingDisabledOnData(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName, nil, nil)
 
 	// Expect query config(1) to be created
 	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
@@ -437,7 +512,7 @@ func TestAutoScalingDisabledOnCouchbaseBucket(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName, nil, nil)
 
 	// Set autoscale enable on data config even though it should not be able to scale
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
@@ -461,37 +536,31 @@ func TestAutoScalingDisabledOnCouchbaseBucket(t *testing.T) {
 
 // TestPreviewModeAllowsEphemeral tests that autoscaling is enabled
 // when buckets are ephemeral but only for ephemeral configs.
-func TestPreviewModeAllowsEphemeral(t *testing.T) {
-	// Plaform configuration.
-	f := framework.Global
-
-	targetKube, cleanup := f.SetupTest(t)
-	defer cleanup()
-
+func testPreviewMode(t *testing.T, targetKube *types.Cluster, stateful bool, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	// Static configuration.
 	clusterSize := 2
 	sizePerConfig := clusterSize / 2
 
-	bucket := &couchbasev2.CouchbaseEphemeralBucket{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "ephemeral-bucket",
-		},
-		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
-			MemoryQuota:        e2espec.NewResourceQuantityMi(101),
-			Replicas:           1,
-			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
-			EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction,
-			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
-			EnableFlush:        true,
-			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
-		},
+	// create required buckets
+	if stateful {
+		bucket := e2espec.DefaultBucket()
+		bucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(256)
+		bucket.Spec.EnableIndexReplica = true
+		e2eutil.MustNewBucket(t, targetKube, bucket)
+	} else {
+		bucket := e2espec.DefaultEphemeralBucket()
+		bucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(101)
+		bucket.Spec.CompressionMode = e2eutil.GetCompressionMode("passive")
+		e2eutil.MustNewBucket(t, targetKube, bucket)
 	}
-	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	// Create the cluster
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName, tls, policy)
 	// Set autoscale enable on data config even though it should not be able to scale
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
+
+	// Enable or Disable preview scaling.
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScalingStateful", stateful), time.Minute)
 
 	// Expect query config(1) to be created
 	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
@@ -501,9 +570,59 @@ func TestPreviewModeAllowsEphemeral(t *testing.T) {
 	autoscalerName = testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
 	err := e2eutil.WaitUntilCouchbaseAutoscalerExists(targetKube, testCouchbase, autoscalerName, 20*time.Second)
 
-	if err == nil {
+	if err == nil && !stateful {
 		e2eutil.Die(t, fmt.Errorf("unexpected data config found for autoscaler cr"))
 	}
+}
+
+func TestPreviewModeAllowsEphemeral(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testPreviewMode(t, targetKube, false, nil, nil)
+}
+
+func TestPreviewModeAllowsEphemeralTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	testPreviewMode(t, targetKube, false, tls, nil)
+}
+
+func TestPreviewModeAllowsEphemeralMutualTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	policy := couchbasev2.ClientCertificatePolicyEnable
+
+	testPreviewMode(t, targetKube, false, tls, &policy)
+}
+
+func TestPreviewModeAllowsEphemeralMandatoryMutualTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	testPreviewMode(t, targetKube, false, tls, &policy)
 }
 
 // TestPreviewModeAllowsEphemeral tests that autoscaling is enabled
@@ -515,40 +634,45 @@ func TestPreviewModeEnabledAllowsStateful(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Static configuration.
-	clusterSize := 2
-	sizePerConfig := clusterSize / 2
+	testPreviewMode(t, targetKube, true, nil, nil)
+}
 
-	// Create bucket resource
-	bucket := &couchbasev2.CouchbaseBucket{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "data-bucket",
-		},
-		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        e2espec.NewResourceQuantityMi(256),
-			Replicas:           1,
-			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
-			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
-			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
-			EnableFlush:        true,
-			EnableIndexReplica: true,
-			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
-		},
-	}
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+func TestPreviewModeEnabledAllowsStatefulTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
 
-	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName)
-	// Set autoscale enable on data config
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
-	// Enable preview scaling.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScalingStateful", true), time.Minute)
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
-	// Query config(1) must be created
-	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 2*time.Minute)
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
-	// Data config(0) must be created
-	autoscalerName = testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	testPreviewMode(t, targetKube, true, tls, nil)
+}
+
+func TestPreviewModeEnabledAllowsStatefulMutualTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	policy := couchbasev2.ClientCertificatePolicyEnable
+
+	testPreviewMode(t, targetKube, true, tls, &policy)
+}
+
+func TestPreviewModeEnabledAllowsStatefulMandatoryMutualTLS(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	testPreviewMode(t, targetKube, true, tls, &policy)
 }

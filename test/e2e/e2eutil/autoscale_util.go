@@ -31,11 +31,31 @@ func MustNewAutoscaleCluster(t *testing.T, k8s *types.Cluster, size int) *couchb
 	return cluster
 }
 
-// NewAutoscaleMDSCluster creates new Autoscale enabled
+// NewAutoscaleClusterMDS creates new Autoscale enabled
 // cluster with scaling enabled for specific servers.
-func NewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, configName string) (*couchbasev2.CouchbaseCluster, error) {
+func NewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, configName string, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
 	// select only query config for autoscaling
 	cluster := e2espec.NewBasicCluster(size)
+
+	// If TLS is explcitly stated, then add it to the pod configuration.
+	if tls != nil {
+		cluster.Name = tls.ClusterName
+		cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+			Static: &couchbasev2.StaticTLS{
+				ServerSecret:   tls.ClusterSecretName,
+				OperatorSecret: tls.OperatorSecretName,
+			},
+		}
+
+		if policy != nil {
+			cluster.Spec.Networking.TLS.ClientCertificatePolicy = policy
+			cluster.Spec.Networking.TLS.ClientCertificatePaths = []couchbasev2.ClientCertificatePath{
+				{
+					Path: "subject.cn",
+				},
+			}
+		}
+	}
 
 	// add query only config with autoscale enabled
 	queryConfig := couchbasev2.ServerConfig{
@@ -49,8 +69,8 @@ func NewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, configNa
 	return newClusterFromSpec(t, k8s, cluster)
 }
 
-func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, configName string) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewAutoscaleClusterMDS(t, k8s, size, configName)
+func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, configName string, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+	cluster, err := NewAutoscaleClusterMDS(t, k8s, size, configName, tls, policy)
 	if err != nil {
 		Die(t, err)
 	}
@@ -90,7 +110,7 @@ func MustDisableCouchbaseAutoscaling(t *testing.T, k8s *types.Cluster, cluster *
 	return cluster
 }
 
-// MustNewAverageValueHPA requires successful creation of hpa resource.
+// MustCreateAverageValueHPA requires successful creation of hpa resource.
 func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, minSize int32, maxSize int32, metricName string, value int64) *autoscalingv2beta2.HorizontalPodAutoscaler {
 	hpa := e2espec.NewAverageValueHPA(name, minSize, maxSize, metricName, value)
 	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(hpa)

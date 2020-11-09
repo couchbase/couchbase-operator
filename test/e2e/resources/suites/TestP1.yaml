@@ -150,6 +150,12 @@ testcases:
 
 # Autoscaling Tests
 - TestAutoscaleUp
+- TestAutoscaleUpTLS
+- TestAutoscaleUpMutualTLS
+- TestAutoscaleUpMandatoryMutualTLS
 - TestAutoscaleDown
+- TestAutoscaleDownTLS
+- TestAutoscaleDownMutualTLS
+- TestAutoscaleDownMandatoryMutualTLS
 - TestAutoscaleMultiConfigs
 #- TestAutoscaleConflict
