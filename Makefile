@@ -203,6 +203,7 @@ container-public: container
 # can't be here anyway.
 container-rhel: binaries crd
 	docker build -f Dockerfile.rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-rhel:v1 .
+	docker build -f Dockerfile.admission-rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-admission-rhel:v1 .
 
 tools-kubernetes: PLATFORM=kubernetes
 tools-kubernetes: tools-platform-specific
