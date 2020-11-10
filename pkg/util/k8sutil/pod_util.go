@@ -563,7 +563,11 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil {
 		if cluster.Spec.Monitoring.Prometheus.Enabled {
 			metricsContainer := createMetricsContainer(cluster.Spec)
-			applyMetricsPodSecurity(cluster.Spec, &metricsContainer, pod)
+
+			if err := applyMetricsPodSecurity(client, cluster.Spec, &metricsContainer, pod); err != nil {
+				return nil, err
+			}
+
 			applyMetricsPodTLS(cluster.Spec, &metricsContainer, pod)
 			pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
 		}
@@ -665,7 +669,7 @@ func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod
 	}
 }
 
-func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) {
+func applyMetricsPodSecurity(client *client.Client, cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) error {
 	// if bearer token is enabled for authorization, mount token as volume
 	if cs.Monitoring.Prometheus.AuthorizationSecret != nil {
 		volume := v1.Volume{
@@ -687,7 +691,26 @@ func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 		container.Args = append(container.Args, "--token", metricsTokenMountPath+"/token")
+
+		secret, ok := client.Secrets.Get(*cs.Monitoring.Prometheus.AuthorizationSecret)
+		if !ok {
+			return errors.NewStackTracedError(fmt.Errorf("%w: unable to read monitoring token", errors.ErrResourceRequired))
+		}
+
+		token, ok := secret.Data["token"]
+		if !ok {
+			return errors.NewStackTracedError(fmt.Errorf("%w: monitoring token missing in secret", errors.ErrResourceAttributeRequired))
+		}
+
+		container.ReadinessProbe.Handler.HTTPGet.HTTPHeaders = []v1.HTTPHeader{
+			{
+				Name:  "Authorization",
+				Value: "Bearer " + string(token),
+			},
+		}
 	}
+
+	return nil
 }
 
 func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.ServerConfig) map[string]string {
