@@ -76,6 +76,30 @@ couchbase-operator-admission   1/1     1            1           8s
 
 The Operator is ready to deploy `CouchbaseCluster` resources when both the DAC and Operator deployments are fully ready and available.
 
+== Verifying the Dynamic Admission Controller
+
+In the latest versions of Kubernetes (`kubectl` 1.18 or higher), you can perform a dry run create command to validate the DAC is functioning correctly:
+
+[source,console]
+----
+$ kubectl create --dry-run=server -f - <<EOF
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: test
+EOF
+couchbasebucket.couchbase.com/test created (server dry run)
+----
+
+The previous command depends on the DAC to provide defaulting for resource attributes, this in turn allows the resource to pass schema validation.
+
+If the DAC is not installed or not functioning, you can expect an error such as:
+
+[source,console]
+----
+The CouchbaseBucket "test" is invalid: spec: Required value
+----
+
 == Uninstalling the Operator
 
 Uninstalling the DAC and Operator is the reverse of the installation process:

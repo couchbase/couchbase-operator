@@ -15,10 +15,11 @@ Actual cluster creation in EKS can take some time (around 10-15 minutes per clus
 
 === Configure `kubectl`
 
-[INFO]
+[NOTE]
 ====
 The following section applies only to when using the AWS Management Console method in the Amazon EKS setup documentation.
 ====
+
 When configuring `kubectl` via the https://docs.aws.amazon.com/eks/latest/userguide/getting-started-console.html[AWS Management Console^], pay particular attention to the following command:
 
 [source,console]
