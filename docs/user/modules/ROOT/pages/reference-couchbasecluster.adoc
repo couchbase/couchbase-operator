@@ -24,6 +24,7 @@ spec:
   upgradeStrategy: RollingUpgrade
   hibernate: false
   hibernationStrategy: Immediate
+  recoveryPolicy: PrioritizeDataIntegrity
   serverGroups:
   - us-east-1a
   - us-east-1b
@@ -292,6 +293,7 @@ spec:
   upgradeStrategy: RollingUpgrade
   hibernate: false
   hibernationStrategy: Immediate
+  recoveryPolicy: PrioritizeDataIntegrity
   serverGroups:
   - us-east-1a
   - us-east-1b
@@ -383,6 +385,23 @@ For more information, read the xref:concept-hibernation.adoc[hibernation concept
 
 ____
 _Field rules:_ This field is optional and must be `Immediate`
+____
+
+=== `spec.recoveryPolicy`
+
+This field defines how the Operator should attempt to recover the cluster in the event of any pods failing, or when waking-up a hibernating cluster.
+
+When `PrioritizeDataIntegrity`, the default, is set the Operator will take a cautious approach to recovery.
+When a pod is reported as down with this policy, the Operator will fully delegate responsibility for failing over Couchbase server instances to Couchbase server.
+If Couchbase server deems auto-failover dangerous, or resulting in data loss, then the Operator will loop continually until the affected pods become either active again or failed.
+This may require manual intervention.
+
+When `PrioritizeUptime` is set, the Operator will wait for a period beyond the requested auto-failover timeout before taking action.
+If Couchbase server does not automatically failover pods within this time limit, the Operator will forcefully failover the pods, at which point the Operator is unblocked and becomes able to recover the cluster.
+This policy may cause data loss, however is useful for recovery of ephemeral clusters -- where no persistent volumes exist and data is lost anyway -- and xref:concept-hibernation.adoc[hibernation] where Couchbase server refuses to failover ephemeral pods.
+
+____
+_Field rules:_ This field is optional and must be one of `PrioritizeDataIntegrity` or `PrioritizeUptime`.
 ____
 
 === `spec.serverGroups`
