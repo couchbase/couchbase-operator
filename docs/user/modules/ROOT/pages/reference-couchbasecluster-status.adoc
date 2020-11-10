@@ -176,6 +176,9 @@ This condition exists when a cluster is xref:howto-couchbase-scale.adoc[scaling 
 Upgrading::
 This condition exists when a cluster is xref:concept-upgrade.adoc[upgrading].
 
+Hibernating::
+This condition exists when a cluster is xref:concept-hibernation.adoc[hibernating].
+
 ____
 _Field rules:_ This field will be a string.
 ____

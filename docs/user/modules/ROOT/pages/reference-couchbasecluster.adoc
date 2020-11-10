@@ -22,6 +22,8 @@ spec:
   antiAffinity: true
   softwareUpdateNotifications: true
   upgradeStrategy: RollingUpgrade
+  hibernate: false
+  hibernationStrategy: Immediate
   serverGroups:
   - us-east-1a
   - us-east-1b
@@ -279,6 +281,8 @@ spec:
   antiAffinity: true
   softwareUpdateNotifications: true
   upgradeStrategy: RollingUpgrade
+  hibernate: false
+  hibernationStrategy: Immediate
   serverGroups:
   - us-east-1a
   - us-east-1b
@@ -344,6 +348,31 @@ Immediate upgrades are much faster than rolling upgrades.
 
 ____
 _Field rules:_ The `upgradeStrategy` field is optional and must be one of `RollingUpgrade` or `ImmediateUpgrade`.
+____
+
+=== `spec.hibernate`
+
+This field defines whether the cluster is hibernating or not.
+
+When set to false, the default, the cluster operates as usual or is woken up from hibernation.
+When set to true, as defined by <<spec-hibernationstrategy, `spec.hibernationStrategy`>>, the cluster is deprovisioned.
+
+For more information, read the xref:concept-hibernation.adoc[hibernation concept page].
+
+____
+_Field rules:_ This field is optional and must be a boolean.
+____
+
+=== `spec.hibernationStrategy`
+
+This field defines how the Operator should hibernate the cluster when requested.
+
+When `Immediate`, the default, the Operator will terminate all pods associated with the Couchbase cluster immediately.
+
+For more information, read the xref:concept-hibernation.adoc[hibernation concept page].
+
+____
+_Field rules:_ This field is optional and must be `Immediate`
 ____
 
 === `spec.serverGroups`

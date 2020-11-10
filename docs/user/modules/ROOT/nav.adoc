@@ -29,6 +29,7 @@
  ** xref:concept-tls.adoc[Couchbase TLS]
  ** xref:concept-server-groups.adoc[Couchbase Server Groups]
  ** xref:concept-upgrade.adoc[Couchbase Upgrades]
+ ** xref:concept-hibernation.adoc[Couchbase Cluster Hibernation]
 
 .Manage
 * Operator
