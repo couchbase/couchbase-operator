@@ -145,7 +145,7 @@ metadata:
   name: bucket-role-binding
 spec:
   roleRef:
-    kind: CouchbaseRole
+    kind: CouchbaseGroup
     name: data-group
   subjects:
   - kind: CouchbaseUser

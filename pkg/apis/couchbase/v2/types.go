@@ -589,7 +589,7 @@ type CouchbaseRoleBinding struct {
 type CouchbaseRoleBindingSpec struct {
 	//  List of users to bind a role to
 	Subjects []CouchbaseRoleBindingSubject `json:"subjects"`
-	// CouchbaseRole being bound to subjects
+	// CouchbaseGroup being bound to subjects
 	RoleRef CouchbaseRoleBindingRef `json:"roleRef"`
 }
 

@@ -39,7 +39,7 @@ They are also responsible for XDCR remote clusters (this requires a secret, so b
 
 | *User Administrator*
 | Responsible for creating users, Couchbase roles, and binding the user/role to a bucket.
-| `CouchbaseUser`, `CouchbaseRole`, `CouchbaseRoleBinding`
+| `CouchbaseUser`, `CouchbaseGroup`, `CouchbaseRoleBinding`
 
 | *XDCR Administrator*
 | Responsible for the management of XDCR replications.

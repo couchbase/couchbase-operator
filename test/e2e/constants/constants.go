@@ -95,7 +95,6 @@ const (
 	BucketAdminRole  = "bucket_admin"
 
 	// Binding
-	CouchbaseRoleRefKind      = "CouchbaseRole"
 	CouchbaseSubjectUserKind  = "CouchbaseUser"
 	CouchbaseSubjectGroupKind = "CouchbaseGroup"
 )
