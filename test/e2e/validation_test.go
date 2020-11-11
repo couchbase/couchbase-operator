@@ -1387,6 +1387,17 @@ func TestValidationDefaultCreate(t *testing.T) {
 			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/securityContext/fsGroup", &defaultFSGroup)},
 		},
 		{
+			name:       "TestValidateSecurityContextfsgroup",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/securityContext/fsGroup")},
+			shouldFail: false,
+		},
+		{
+			name:        "TestValidatefsgroup",
+			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/securityContext/fsGroup", 1234)},
+			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/securityContext/fsGroup", 1234)},
+			shouldFail:  false,
+		},
+		{
 			name:      "TestAutoCompactionDefault",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/autoCompaction")},
 			validations: patchMap{"cluster": jsonpatch.NewPatchSet().
