@@ -62,6 +62,8 @@ The Operator supports all possible rotation types:
 * Replacing a client certificate/key
 * Replacing the entire PKI
 
+For details on certificate rotation read the xref:howto-tls-rotation.adoc[TLS certificate rotation how-to].
+
 [NOTE]
 ====
 Couchbase Server does not support CA pools.
