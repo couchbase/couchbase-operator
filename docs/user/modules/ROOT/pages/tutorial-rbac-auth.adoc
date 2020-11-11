@@ -224,7 +224,7 @@ OpenLDAP has been installed. You can access the server from within the k8s clust
 ----
 
 The Couchbase service will also need to authenticate with OpenLDAP in order to query for user records and groups.
-Therefore, a kubernetes secret will need to be created with the `adminPassword` which has been set to `ldappassword`:
+Therefore, a Kubernetes secret will need to be created with the `adminPassword` which has been set to `ldappassword`:
 
 [source,console]
 ----

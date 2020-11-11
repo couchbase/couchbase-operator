@@ -48,15 +48,15 @@ metadata:
     cluster: my-cluster
 ----
 
-=== apiVersion
+=== `apiVersion`
 
-The apiVersion defines which version of the resource this configuration refers to.
+The API version defines which version of the resource this configuration refers to.
 
 ____
 _Field rules:_ This field is required and must be set to `couchbase.com/v2`
 ____
 
-=== kind
+=== `kind`
 
 The kind defines the type of resource this configuration refers to.
 
@@ -65,7 +65,7 @@ _Field rules:_ This field is required and must be set to `CouchbaseEphemeralBuck
 ____
 
 [#metadata-name]
-=== metadata.name
+=== `metadata.name`
 
 The metadata name defines the name of the resource, and is used as the bucket name by default.
 The name must be unique for the kind defined.
@@ -80,7 +80,7 @@ ____
 _Field rules:_ This field is required and must be unique as described above.
 ____
 
-=== metadata.labels
+=== `metadata.labels`
 
 The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
@@ -89,7 +89,7 @@ ____
 _Field rules:_ This field is optional and must be a map of string key/value pairs.
 ____
 
-== spec
+== `spec`
 
 The following are parameters that may be set on the bucket:
 
@@ -107,7 +107,7 @@ spec:
 ----
 
 [#spec-name]
-=== spec.name
+=== `spec.name`
 
 This field allows the name of a bucket to be overridden.
 By default, the bucket name will be that which is specified as the resource name in <<metadata-name,`metadata.name`>>.
@@ -120,7 +120,7 @@ ____
 _Field rules_: This field is optional and must be a string containing a maximum of 100 of the following characters `a-zA-Z0-9-_%.`.
 ____
 
-=== spec.memoryQuota
+=== `spec.memoryQuota`
 
 This field specifies the amount of memory to allocate to this bucket per-node.
 It is deducted from the per-node `spec.cluster.dataServiceMemoryQuota` parameter in a related `CouchbaseCluster` resource.
@@ -132,7 +132,7 @@ ____
 _Field rules:_ This field is optional and must be a Kubernetes resource quantity greater than or equal to 100Mi.
 ____
 
-=== spec.replicas
+=== `spec.replicas`
 
 This field specifies the number of replicas that should be created for this bucket.
 This value may be set between 0 and 3 inclusive.
@@ -143,7 +143,7 @@ ____
 _Field rules:_ This field is optional and must be an integer between 0 and 3.
 ____
 
-=== spec.ioPriority
+=== `spec.ioPriority`
 
 This field sets the IO priority of background threads for this bucket.
 If not specified this field will default to `low`.
@@ -152,7 +152,7 @@ ____
 _Field rules:_ This field is optional and must be either `low` or `high`.
 ____
 
-=== spec.evictionPolicy
+=== `spec.evictionPolicy`
 
 This field sets the in-memory cache eviction policy for this bucket.
 Ephemeral buckets support either `noEviction` or `nruEviction`.
@@ -167,7 +167,7 @@ ____
 _Field rules:_ This field is optional and must be either `noEviction` or `nruEviction`.
 ____
 
-=== spec.conflictResolution
+=== `spec.conflictResolution`
 
 This field specifies the bucket's conflict resolution mechanism which is to be used if a conflict occurs during cross data center replication (XDCR).
 There are two supported mechanisms: sequence-based and timestamp-based.
@@ -184,7 +184,7 @@ ____
 _Field rules:_ This field is optional and must be either `seqno` or `lww`.
 ____
 
-=== spec.enableFlush
+=== `spec.enableFlush`
 
 This field specifies whether or not to enable the flush command on this bucket.
 This parameter defaults to `false` if it is not specified.
@@ -193,7 +193,7 @@ ____
 _Field rules:_ This field is optional and must be a boolean.
 ____
 
-=== spec.compressionMode
+=== `spec.compressionMode`
 
 This field sets the compression mode for the specified bucket.
 This parameter defaults to `passive` if not specified.

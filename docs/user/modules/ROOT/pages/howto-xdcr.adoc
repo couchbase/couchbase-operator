@@ -223,7 +223,7 @@ xref:reference-couchbasecluster.adoc#spec-xdcr-remoteclusters-tls-secret[`spec.x
 
 == IP Based Addressing
 
-In this discouraged scenario, there is no shared DNS between two kubernetes clusters - we must use IP based addressing.
+In this discouraged scenario, there is no shared DNS between two Kubernetes clusters - we must use IP based addressing.
 Pods are exposed by using Kubernetes `NodePort` type services.
 As there is no DNS, TLS is not supported, so security must be maintained between the two clusters using a VPN.
 

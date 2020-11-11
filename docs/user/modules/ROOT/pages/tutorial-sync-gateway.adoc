@@ -17,9 +17,9 @@ While it is _recommended_, note that it is _not required_ that Couchbase Server 
 It is possible to deploy Sync Gateway on Kubernetes and connect it to Couchbase Server cluster that is not on Kubernetes.
 The instructions herein assume that Couchbase Server is deployed using the operator.
 * This step is optional and only required if the environment is not setup DNS.
-If the Couchbase Server cluster is configured to use link:https://docs.couchbase.com/operator/1.2/couchbase-cluster-config.html#exposedfeatures[exposedFeatures] then the value of "client" must be included in the `exposedFeatures` list.
+If the Couchbase Server cluster is configured to use link:https://docs.couchbase.com/operator/1.2/couchbase-cluster-config.html#exposedfeatures[exposed features] then the value of "client" must be included in the `exposedFeatures` list.
 This is required for Sync Gateway to be able to connect to the server.
-Alternatively, remove the exposedFeatures section altogether in the server configuration if it is not needed.
+Alternatively, remove the `exposedFeatures` section altogether in the server configuration if it is not needed.
 
 == Configuring a Sync Gateway
 
@@ -88,7 +88,7 @@ stringData:
 
 <.> `databases.cb-example.password` defines the user password that will be used to connect to the cluster.
 
-Deploy the secret using the following command. If the config file is `sgw-config.yaml`, the command would be as follows
+Deploy the secret using the following command. If the configuration file is `sgw-config.yaml`, the command would be as follows
 
 [source,console]
 ----
@@ -153,7 +153,7 @@ Certificates have been truncated for brevity.
 <.> **Mutual TLS Only:** The `key.pem` secret is the client key.
     The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync Gateway configuration.
 
-Deploy the secret using the following command. If the config file is `sgw-config.yaml`, the command would be as follows
+Deploy the secret using the following command. If the configuration file is `sgw-config.yaml`, the command would be as follows
 
 [source,console]
 ----
@@ -203,7 +203,7 @@ data:
 
 Deploy the secret using the following command.
 This creates a sync gateway user with specified password.
-If the config file is `sync-gateway-rbac-user.yaml`, the command would be as follows
+If the configuration file is `sync-gateway-rbac-user.yaml`, the command would be as follows
 
 [source,console]
 ----
@@ -259,7 +259,7 @@ spec:
     By default this would be set to `*` granting access to all buckets.
 
 Deploy the Sync Gateway RBAC user using the following command.
-If the config file is `sync-gateway-user-rolebinding.yaml`, the command would be as follows
+If the configuration file is `sync-gateway-user-rolebinding.yaml`, the command would be as follows
 
 [source,console]
 ----
@@ -293,7 +293,7 @@ stringData:
 <.> The `databases.cb-example.password` attribute must match the plain-text password associated with the `CouchbaseUser`.
 
 Deploy the secret using the following command.
-If the config file is `sgw-config.yaml`, the command would be as follows
+If the configuration file is `sgw-config.yaml`, the command would be as follows
 
 [source,console]
 ----

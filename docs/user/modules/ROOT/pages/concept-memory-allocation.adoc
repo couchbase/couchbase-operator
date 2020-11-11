@@ -285,7 +285,7 @@ It is a direct copy of the allocation specified in the cluster memory configurat
 
 <.> In this example, the server class has requested 1GiB of memory.
 
-<.> The same server class has allocated 1280Mi (1.25Gi) or memory.
+<.> The same server class has allocated 1280MiB (1.25GiB) or memory.
 This is greater that the requested memory, and therefore is over-committed.
 
 <.> This is immediately obvious when looking at the unused memory, as that value is negative.

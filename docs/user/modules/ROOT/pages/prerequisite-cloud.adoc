@@ -44,7 +44,7 @@ $ kubectl create clusterrolebinding \
 ----
 
 <.> The `ClusterRoleBinding` name can be anything you wish.
-<.> The `--clusterorle` name refers to a pre-installed role provided by GKE.
+<.> The `--clusterorle` name refers to a preinstalled role provided by GKE.
 <.> The `--user` parameter is the same as your Google Cloud account name used to login to the system.
 
 === Firewalling

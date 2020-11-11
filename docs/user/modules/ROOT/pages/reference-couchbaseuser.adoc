@@ -41,15 +41,15 @@ metadata:
     cluster: my-cluster
 ----
 
-=== apiVersion
+=== `apiVersion`
 
-The apiVersion defines which version of the resource this configuration refers to.
+The API version defines which version of the resource this configuration refers to.
 
 ____
 _Field rules:_ This field is required and must be set to `couchbase.com/v2`
 ____
 
-=== kind
+=== `kind`
 
 The kind defines the type of resource this configuration refers to.
 
@@ -57,7 +57,7 @@ ____
 _Field rules:_ This field is required and must be set to `CouchbaseUser`
 ____
 
-=== metadata.name
+=== `metadata.name`
 
 The metadata name defines the name of the resource.
 The name must be unique for the kind defined.
@@ -66,7 +66,7 @@ ____
 _Field rules:_ This field is required and must be unique as described above.
 ____
 
-=== metadata.labels
+=== `metadata.labels`
 
 The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
@@ -75,7 +75,7 @@ ____
 _Field rules:_ This field is optional and must be a map of string key/value pairs.
 ____
 
-== spec
+== `spec`
 
 The following are parameters that may be set on the user:
 
@@ -87,7 +87,7 @@ spec:
   authSecret: my-password-secret
 ----
 
-=== spec.fullName
+=== `spec.fullName`
 
 This field defines the full name of the user.
 The internal user ID is derived from the `metadata.name` field.
@@ -96,7 +96,7 @@ ____
 _Field rules:_ This field is required and must be a string.
 ____
 
-=== spec.authDomain
+=== `spec.authDomain`
 
 This field defines how to authenticate the user.
 If set to `local` the user will be authenticated against a local password.
@@ -107,7 +107,7 @@ ____
 _Field rules:_ This field is required and must be either `local` or `exteternal`.
 ____
 
-=== spec.authSecret
+=== `spec.authSecret`
 
 This field defines the password of the user.
 It is only relevant when using `local` authentication.

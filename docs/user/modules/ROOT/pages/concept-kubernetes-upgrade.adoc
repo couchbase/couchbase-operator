@@ -42,7 +42,7 @@ Before beginning an upgrade to your Kubernetes cluster, review the following con
 
 * Because an eviction deletes a pod, ensure that the Couchbase cluster is scaled correctly so that it can handle the increased load of having a pod down while a new pod is balanced into the cluster.
 
-* To minimize disruption, ensure that a short failover period is configured with the xref:reference-couchbasecluster.adoc#spec-cluster-autofailovertimeout[autoFailoverTimeout parameter] to reduce down time before another node takes over the load.
+* To minimize disruption, ensure that a short failover period is configured with the xref:reference-couchbasecluster.adoc#spec-cluster-autofailovertimeout[`autoFailoverTimeout` parameter] to reduce down time before another node takes over the load.
 
 * Ensure that there is xref:concept-sizing.adoc[capacity] in your Kubernetes cluster to handle the scheduling of replacement Couchbase pods.
 For example, if a Couchbase cluster were running on Kubernetes nodes marked exclusively for use by Couchbase, and anti-affinity were enabled as per the deployment xref:best-practices.adoc[best practices], the Kubernetes cluster would require at least one other node capable of scheduling and running your Couchbase workload.

@@ -59,7 +59,7 @@ $ az network vnet create -g myResourceGroup -n myAKSVnet  --address-prefix 10.0.
 
 Create an AKS cluster within the allocated resource group on the subnet created in the previous step.
 Note monitoring is enabled and ssh-keys are being auto-generated.
-Also, the default virtual machine type is 'Standard_DS2_v2' which supports a maximum of 4 disks per VM.
+Also, the default virtual machine type is `Standard_DS2_v2` which supports a maximum of 4 disks per VM.
 (See <<best-practices,Best Practices>> for recommended VM size based on the requirements of your deployment.)
 
 [source,console]

@@ -37,7 +37,7 @@ It uses the DNS service offered by the remote Kubernetes cluster to provide addr
 
 A local DNS server is used by Couchbase Server and clients to forward DNS requests for a remote namespace to a remote Kubernetes cluster.
 Requests that do not fall into this DNS zone are forwarded to the local DNS service.
-Any DNS server that supports forwarding of zones to remote DNS servers can be used, but we recommend https://coredns.io[CoreDNS^] as the defacto cloud native standard.
+Any DNS server that supports forwarding of zones to remote DNS servers can be used, but we recommend https://coredns.io[CoreDNS^] as the de facto cloud native standard.
 
 This method of communication can only be used if clients in one cluster can communicate with pods in another -- it uses xref:concept-kubernetes-networking.adoc#routed-networking[routed networking].
 For example:
@@ -56,7 +56,7 @@ TLS can be used to secure communications.
 * xref:howto-ui.adoc#port-forwarding[How-to connect to the UI]
 * xref:howto-client-sdks.adoc#dns-based-addressing[How-to connect a client SDK]
 * xref:howto-xdcr.adoc#dns-based-addressing[How-to configure XDCR]
-* xref:tutorial-remote-dns.adoc[Inter-kubernetes networking with forwarded DNS tutorial]
+* xref:tutorial-remote-dns.adoc[Inter-Kubernetes networking with forwarded DNS tutorial]
 
 == Public Networking with External DNS
 

@@ -1,0 +1,58 @@
+#!/bin/bash
+
+set -eu -o pipefail
+shopt -s inherit_errexit
+
+# FILTER allows us to pre-process the source and discard irrelevant parts.
+FILTER="sed"
+# Ignore source code blocks (contain arbitrary non-English configuration).
+FILTER="${FILTER} -e /^----$/,/^----$/d"
+# Ignore asciidoc ifdef blocks (contain arbitrary non-English configuration).
+FILTER="${FILTER} -e /^ifdef/,/^endif/d"
+# Ignore inline literals and attributes (contain arbitrary non-English configuration).
+FILTER="${FILTER} -e s/\`[^\`]*\`//g"
+FILTER="${FILTER} -e s/{[^}]*}//g"
+# Ignore defintiion lists (contain arbitrary non-English configuration).
+FILTER="${FILTER} -e s/^.*::$//g"
+# Ignore hyperlinks (not our problem).
+FILTER="${FILTER} -e s/http:[[^\[]//g"
+FILTER="${FILTER} -e s/https:[[^\[]//g"
+# Ignore cross-reference file names (not user-visisble, however this may affect SEO).
+FILTER="${FILTER} -e s/xref:[^\[]*//g"
+# Ignore image file names (not user-visisble, however this may affect SEO).
+FILTER="${FILTER} -e s/image:[^\[]*//g"
+# Ignore asciidoc directives.
+FILTER="${FILTER} -e s/^:.*$//g"
+# Ignore links anchors.
+FILTER="${FILTER} -e s/<<[^,]*//g"
+# Ignore includes.
+FILTER="${FILTER} -e s/^include::.*$//g"
+# Ignore toc commands.
+FILTER="${FILTER} -e s/^toc::.*$//g"
+# Ignore anchors formatting directives etc.
+FILTER="${FILTER} -e s/^\[.*$//g"
+# Ignore inline ui-macros.
+FILTER="${FILTER} -e s/btn:\[[^\]*\]//g"
+FILTER="${FILTER} -e s/kbd:\[[^\]*\]//g"
+
+# CHECK_ARGS is the spell checking command to run.
+CHECK_ARGS="-l en_US --home-dir=."
+
+# For each asciidoc we find in the documentation, filter out the
+# stuff that isn't real text and spell check the remainder.
+FAIL=""
+for DOCUMENT in $(find docs/user -type f -name *.adoc); do
+  MISTAKES=$(cat ${DOCUMENT} | ${FILTER} | aspell list ${CHECK_ARGS} | sort | uniq)
+  if [[ ${MISTAKES} != "" ]]; then
+    echo "Spell check for file ${DOCUMENT} failed:"
+    echo "${MISTAKES}" | sed 's/^/    /g'
+    FAIL="yes"
+  fi
+done
+
+# Any failures need to be fixed up, and we need to report and error for CI.
+if [[ ${FAIL} != "" ]]; then
+  echo "Documentation contains errors"
+  echo "    run 'aspell check ${CHECK_ARGS}' to fix typos or add to .aspell.en.pws"
+  exit 1
+fi

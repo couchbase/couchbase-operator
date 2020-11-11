@@ -8,7 +8,7 @@ include::partial$tutorial.adoc[]
 
 This guide is meant to supplement the regular Amazon EKS https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html[setup documentation^], and provides recommendations up to setting up worker nodes.
 
-== Create the Cluster and Configure kubectl
+== Create the Cluster and Configure `kubectl`
 
 Create the EKS cluster(s) according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-create-cluster[documentation^], with either `eksctl` or via the AWS Management Console.
 Actual cluster creation in EKS can take some time (around 10-15 minutes per cluster).
@@ -32,7 +32,7 @@ Optionally, you can add `--region regionName` to specify a cluster in a region t
 
 === Validate `kubectl` Configuration
 
-Once you have followed the setup instructions for either method, view the config at `~/.kube/config` to ensure that all variables look correct:
+Once you have followed the setup instructions for either method, view the configuration at `~/.kube/config` to ensure that all variables look correct:
 
 [source,console]
 ----
@@ -116,7 +116,7 @@ If you wish to take advantage of XDCR capabilities using the Operator, there are
 Follow the Amazon https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html[documentation^] to create a peering connection between two VPCs in the availability zones of your choosing.
 Bear in mind that each cluster needs to have different CIDR ranges, in the private ranges of 192.168.0.0/16, 172.16.0.0/12, or 10.0.0.0/8 as per RFC 1918.
 
-You will need to then accept the connection request in the region of the _Accepter_ VPC to establish the connection.
+You will need to then accept the connection request in the region of the accepting VPC to establish the connection.
 
 === Configure Route Tables and Security Groups
 

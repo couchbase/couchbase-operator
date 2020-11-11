@@ -52,7 +52,7 @@ helm install <my-release> couchbase/couchbase-operator
 OpenShift::
 +
 --
-. Create an imagePullSecret for retrieving images from the Red Hat Container Catalog:
+. Create an image pull secret for retrieving images from the Red Hat Container Catalog:
 +
 [source,console]
 ----
@@ -141,7 +141,7 @@ Any values in `values.yaml` that weren't overridden will keep their defaults.
 --set::
 +
 --
-If you only need to make minor customizations, you can specify them on the command line by using the `--set` option.
+If you only need to make minor customization, you can specify them on the command line by using the `--set` option.
 For example:
 
 [source,console]
@@ -183,7 +183,7 @@ install:
 ----
 
 For example, if you wanted to have a Helm release that exclusively managed the Autonomous Operator and Admission Controller, then you would override the value for `couchbaseCluster` with a value of `false`, leaving only `couchbaseOperator: true` and `admissionController: true`, and all others `false`.
-Likewise, if you already had the Autonomous Operator and Admission Controller deployed in your environnement, and you just wanted to deploy a Couchbase cluster, then you would override the values for `couchbaseOperator` and `admissionController` with a value of `false`, leaving only `couchbaseCluster: true`, and all others `false`.
+Likewise, if you already had the Autonomous Operator and Admission Controller deployed in your environment, and you just wanted to deploy a Couchbase cluster, then you would override the values for `couchbaseOperator` and `admissionController` with a value of `false`, leaving only `couchbaseCluster: true`, and all others `false`.
 
 Even though the Couchbase Helm Chart has full configuration parameters for each component, if a component is disabled in the `install` section, then that component's configuration parameters are ignored.
 
@@ -280,7 +280,7 @@ https://hub.helm.sh/charts/couchbase/couchbase-...	2.0.0        	2.0.0      	A H
 
 Here, the `CHART VERSION` is *2.0.0*, and the `APP VERSION` (the Autonomous Operator version) is *2.0.0*.
 
-To install a specific version of the Couchbase Hel Chart chart, include the `--version` argument during installation:
+To install a specific version of the Couchbase Helm Chart chart, include the `--version` argument during installation:
 
 [source,console]
 ----

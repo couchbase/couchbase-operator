@@ -43,15 +43,15 @@ metadata:
     cluster: my-cluster
 ----
 
-=== apiVersion
+=== `apiVersion`
 
-The apiVersion defines which version of the resource this configuration refers to.
+The API version defines which version of the resource this configuration refers to.
 
 ____
 _Field rules:_ This field is required and must be set to `couchbase.com/v2`
 ____
 
-=== kind
+=== `kind`
 
 The kind defines the type of resource this configuration refers to.
 
@@ -59,7 +59,7 @@ ____
 _Field rules:_ This field is required and must be set to `CouchbaseGroup`
 ____
 
-=== metadata.name
+=== `metadata.name`
 
 The metadata name defines the name of the resource.
 The name must be unique for the kind defined.
@@ -68,7 +68,7 @@ ____
 _Field rules:_ This field is required and must be unique as described above.
 ____
 
-=== metadata.labels
+=== `metadata.labels`
 
 The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources] and xref:concept-user-rbac.adoc[RBAC page].
@@ -77,7 +77,7 @@ ____
 _Field rules:_ This field is optional and must be a map of string key/value pairs.
 ____
 
-== spec
+== `spec`
 
 The following are parameters that may be set on the role:
 
@@ -89,11 +89,11 @@ spec:
     bucket: my-bucket
 ----
 
-=== spec.roles[]
+=== `spec.roles[]`
 
 This field is a list of roles to be associated with a user or group of users.
 
-=== spec.roles[].name
+=== `spec.roles[].name`
 
 This field defines a Couchbase role to grant to a user.
 
@@ -101,7 +101,7 @@ ____
 _Field rules:_ This field is required and must be either `admin`, `cluster_admin`, `security_admin`, `ro_admin`, `replication_admin`, `query_external_access`, `query_system_catalog`, `analytics_reader`, `bucket_admin`, `views_admin`, `fts_admin`, `bucket_full_access`, `data_reader`, `data_writer`, `data_dcp_reader`, `data_backup`, `data_monitoring`, `replication_target`, `analytics_manager`, `views_reader`, `fts_searcher`, `query_select`, `query_update`, `query_insert`, `query_delete` or `query_manage_index`.
 ____
 
-=== spec.roles[].bucket
+=== `spec.roles[].bucket`
 
 This field defines the scope to which a role applies.
 Non-cluster roles may be limited to a specific bucket.
@@ -112,9 +112,9 @@ _Field rules:_ This field is required and must be a bucket name string.
 This field is only relevant when used with the roles `bucket_admin`, `views_admin`, `fts_admin`, `bucket_full_access`, `data_reader`, `data_writer`, `data_dcp_reader`, `data_backup`, `data_monitoring`, `replication_target`, `analytics_manager`, `views_reader`, `fts_searcher`, `query_select`, `query_update`, `query_insert`, `query_delete` or `query_manage_index`.
 ____
 
-=== specldapGroupRef.
+=== `spec.ldapGroupRef`
 
-This field defines the distinguished name (DN) of an external ldap group to use for authentication.
+This field defines the distinguished name (DN) of an external LDAP group to use for authentication.
 
 ____
 _Field rules:_ This field is optional and must be a string. If set, the roles of this group will be applied to users within the referenced LDAP group.

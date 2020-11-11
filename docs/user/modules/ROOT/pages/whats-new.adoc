@@ -12,7 +12,7 @@ This release introduces a new model for deploying and managing Couchbase custom 
 Previously, you would deploy a cluster using a single, monolithic `CouchbaseCluster` resource configuration that defined everything about a cluster (e.g. nodes, buckets, XDCR, etc).
 Starting with Autonomous Operator {operator-version-minor}, parts of the `CouchbaseCluster` resource have been separated into their own custom resource types, which the Autonomous Operator aggregates together using xref:concept-label-selection.adoc[label selection].
 
-Moving to this new model is crucial for the Autonomous Operator to be able to support continued evolutions in the Kubernetes and Couchbase platforms.
+Moving to this new model is crucial for the Autonomous Operator to be able to support continued evolution in the Kubernetes and Couchbase platforms.
 However, you'll find that these changes also provide immediate advantages in terms of manageability.
 One of the most practical benefits is that you can achieve fine grained access control over different parts of a Couchbase deployment with the use of xref:concept-rbac.adoc[custom resource RBAC].
 
@@ -24,7 +24,7 @@ Read more about how to xref:howto-operator-upgrade.adoc[Upgrade the Operator].
 
 == Automated Backup and Restore
 
-Autonomous Operator {operator-version-minor} provides automated backup and restore capabilities through a native integration with the Couchbase Server tool xref:server:backup-restore:enterprise-backup-restore.adoc[cbbackupmgr].
+Autonomous Operator {operator-version-minor} provides automated backup and restore capabilities through a native integration with the Couchbase Server tool xref:server:backup-restore:enterprise-backup-restore.adoc[`cbbackupmgr`].
 Backups can be scheduled using the new xref:reference-couchbasebackup.adoc[`CouchbaseBackup` resource], which allows the functionality of `cbbackupmgr` to be configured in a similar way to any other resource managed by the Operator.
 
 Read more about how to xref:howto-backup.adoc[Configure Backup & Restore].

@@ -4,7 +4,7 @@
 
 Once you have allowed the Autonomous Operator to manage and perform Automated Backup, you will need to create a CouchbaseBackup object to specify the timings and details of the backups.
 
-A `CouchbaseBackup` object will spawn either 1 or 2 cronjobs that belong to that resource, and those cronjobs in turn will create the Kubernetes jobs which perform the backup jobs themselves.
+A `CouchbaseBackup` object will spawn either 1 or 2 cron jobs that belong to that resource, and those cron jobs in turn will create the Kubernetes jobs which perform the backup jobs themselves.
 
 The following YAML shows all possible fields that may be configured for a `CouchbaseBackup`.
 In this case the following YAML is completely valid.
@@ -48,15 +48,15 @@ metadata:
     cluster: my-cluster
 ----
 
-=== apiVersion
+=== `apiVersion`
 
-The apiVersion defines which version of the resource this configuration refers to.
+The API version defines which version of the resource this configuration refers to.
 
 ____
 _Field rules:_ This field is required and must be set to `couchbase.com/v2`
 ____
 
-=== kind
+=== `kind`
 
 The kind defines the type of resource this configuration refers to.
 
@@ -64,7 +64,7 @@ ____
 _Field rules:_ This field is required and must be set to `CouchbaseBackup`
 ____
 
-=== metadata.name
+=== `metadata.name`
 
 The metadata name defines the name of the resource.
 The name must be unique for the kind defined.
@@ -73,7 +73,7 @@ ____
 _Field rules:_ This field is required and must be unique as described above.
 ____
 
-=== metadata.labels
+=== `metadata.labels`
 
 The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
@@ -82,7 +82,7 @@ ____
 _Field rules:_ This field is optional and must be a map of string key/value pairs.
 ____
 
-== spec
+== `spec`
 
 The following are parameters that may be set on the CouchbaseBackup:
 
@@ -102,7 +102,7 @@ spec:
   size: 5Gi
 ----
 
-=== spec.strategy
+=== `spec.strategy`
 
 This field defines which backup strategy to use for Automated Backup.
 Currently we only support Full Only and Full/Incremental backup strategies.
@@ -112,7 +112,7 @@ ____
 _Field rules:_ This field is required and must be either `full_only` or `full_incremental`.
 ____
 
-=== spec.full.schedule
+=== `spec.full.schedule`
 
 This field defines the schedule a user wants the Operator to perform a full backup of the cluster.
 
@@ -120,7 +120,7 @@ ____
 _Field rules:_ This field is required for both strategies and must be a valid Cron schedule.
 ____
 
-=== spec.incremental.schedule
+=== `spec.incremental.schedule`
 
 This field defines the schedule a user wants the Operator to perform an incremental backup of the cluster.
 
@@ -128,7 +128,7 @@ ____
 _Field rules:_ This field is only required for a `full_incremental` strategy and must be a valid Cron schedule.
 ____
 
-=== spec.successfulJobsHistoryLimit
+=== `spec.successfulJobsHistoryLimit`
 
 This field defines the amount of successful jobs to keep before Kubernetes starts deleting older ones.
 
@@ -136,7 +136,7 @@ ____
 _Field rules:_ This field is optional and must be any non-negative integer. The default value is 3.
 ____
 
-=== spec.failedJobsHistoryLimit
+=== `spec.failedJobsHistoryLimit`
 
 This field defines the amount of failed jobs to keep before Kubernetes starts deleting older ones.
 
@@ -144,16 +144,16 @@ ____
 _Field rules:_ This field is optional and must be any non-negative integer. The default value is 5.
 ____
 
-=== spec.backOffLimit
+=== `spec.backOffLimit`
 
 This field defines the amount of times one backup job will try to perform a backup.
-Once it has reached the backOffLimit the job will no longer run and the next attempted backup will occur at the next run of the cronjob.
+Once it has reached the back off limit the job will no longer run and the next attempted backup will occur at the next run of the cron job.
 
 ____
 _Field rules:_ This field is optional and must be any non-negative integer. The default value is 2.
 ____
 
-=== spec.backupRetention
+=== `spec.backupRetention`
 
 This field defines the time period in which to retain existing backups.
 On each run of a backup job older backups outside this time frame are deleted.
@@ -162,7 +162,7 @@ ____
 _Field rules:_ This field is optional and defaults to `720h` (30 days). If specified it must contain a decimal number and a unit suffix such as `s`, `m` or `h`.  The decimal number cannot be negative.
 ____
 
-=== spec.logRetention
+=== `spec.logRetention`
 
 This field defines the time period in which to retain backup logs. Older logs outside this time frame are deleted.
 On each run of a backup job logging takes place which is stored on the Persistent Volume of the same name as the `CouchbaseBackup` object.
@@ -171,7 +171,7 @@ ____
 _Field rules:_ This field is optional and defaults to `168h` (7 days). If specified it must contain a decimal number and a unit suffix such as `s`, `m` or `h`.  The decimal number cannot be negative.
 ____
 
-=== spec.size
+=== `spec.size`
 
 This field defines the size of the Persistent Volume to store backups and logs on.
 

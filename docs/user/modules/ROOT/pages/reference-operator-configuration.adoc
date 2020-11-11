@@ -106,7 +106,7 @@ If not specified this flag defaults to `1`.
 The Operator allows the timeout of pod creation to be manually configured.
 It is primarily intended for use on cloud platforms where the deployment of multiple volumes and pulling of a Couchbase Server container image may take a longer time than the default timeout period.
 +
-Valid values are any string that can be parsed with the https://golang.org/pkg/time/#ParseDuration[golang ParseDuration^] function.
+Valid values are any string that is a https://golang.org/pkg/time/#ParseDuration[golang duration^].
 This flag defaults to `5m`.
 
 --listen-addr <integer>::

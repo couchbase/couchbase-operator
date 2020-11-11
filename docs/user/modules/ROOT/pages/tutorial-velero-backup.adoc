@@ -163,12 +163,12 @@ $ velero backup create \
 <.> We specify exactly what resources to backup.
     We want to backup all Couchbase resources -- for brevity I've used only what is in use.
     Backing up persistent volumes will create snapshots.
-    Backing up persistent volume claims and config maps will save all the persistent metadata required by the Operator for recovery.
+    Backing up persistent volume claims and `ConfigMap` resources will save all the persistent metadata required by the Operator for recovery.
     Backing up secrets will protect the admin username and password.
     Finally deployments, roles, role bindings and service accounts will allow the Operator to restart.
 
 You may have noticed that neither pods nor services were backed up.
-This is because the Operator will be able to recreate them from the cluster config map, metadata attached to the persistent volume claims, and the `CouchbaseCluster` resource itself.
+This is because the Operator will be able to recreate them from the cluster `ConfigMap`, metadata attached to the persistent volume claims, and the `CouchbaseCluster` resource itself.
 Likewise the deployment will be able to recreate the Operator pod.
 
 Once the backup is complete it will look like the following:
@@ -215,7 +215,7 @@ Persistent Volumes:  3 of 3 snapshots completed successfully (specify --details 
 ----
 
 <.> The backup has completed successfully
-<.> The backup has registered and snapshotted our persistent volumes.
+<.> The backup has registered and has take a snapshot of our persistent volumes.
 
 == Disaster Strikes!
 
@@ -257,7 +257,7 @@ $ kubectl -n test logs -f deployment/couchbase-operator
 ----
 
 However, as you will see, the Operator's leader election hangs.
-This is because we backed the config map that is used to determine leadership.
+This is because we backed the `ConfigMap` that is used to determine leadership.
 But this is actually a good thing.
 
 It is worthwhile taking a moment and checking that things are as you expect before continuing.

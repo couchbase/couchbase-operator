@@ -134,11 +134,11 @@ DURATION::
 RUNNING::
 <<status-running, `status.running`>>
 
-== status
+== `status`
 
 This section defines and describes individual status fields for both `CouchbaseBackup` and `CouchbaseBackupRestore` status objects, unless otherwise stated.
 
-=== status.archive
+=== `status.archive`
 
 This is the absolute path of where all backups and logs are stored. Persistent Volume Claims are mounted onto pods at the path `/data`.
 This absolute path cannot be changed currently so this field really exists for validation.
@@ -147,16 +147,16 @@ ____
 _Field rules:_ This field will be a string and should always be `{backup-archive}` after the first backup is run.
 ____
 
-=== status.backups
+=== `status.backups`
 
-`backups` is a list of all the repos that exist in the backup archive `{backup-archive}`, which should aid in selecting one to create a `CouchbaseBackupRestore`.
-Each entry will require a singular entry for `name` and `full`, where `full` is the first backup taken inside a repo.
+`backups` is a list of all the repositories that exist in the backup archive `{backup-archive}`, which should aid in selecting one to create a `CouchbaseBackupRestore`.
+Each entry will require a singular entry for `name` and `full`, where `full` is the first backup taken inside a repository.
 `incremental` is a list of strings that corresponds to the incremental backups taken after the full backup.
 ____
 _Field rules:_ This field will be a list of strings.
 ____
 
-=== status.capacityUsed
+=== `status.capacityUsed`
 
 The used capacity of the mounted Persistent Volume Claim.
 
@@ -164,15 +164,15 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.cronjob
+=== `status.cronjob`
 
-This field is only applicable to `CouchbaseBackup` objects and tells us the name of the most recent or currently running Cronjob.
+This field is only applicable to `CouchbaseBackup` objects and tells us the name of the most recent or currently running cron job.
 
 ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.duration
+=== `status.duration`
 
 This field tells us how long in seconds the last job took to complete.
 
@@ -180,7 +180,7 @@ ____
 _Field rules:_ This field will be a duration.
 ____
 
-=== status.failed
+=== `status.failed`
 
 This field tells us whether the most recent job failed.
 
@@ -188,7 +188,7 @@ ____
 _Field rules:_ This field will be a boolean.
 ____
 
-=== status.job
+=== `status.job`
 
 The name of the most recent or currently running job.
 
@@ -196,7 +196,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.lastFailure
+=== `status.lastFailure`
 
 A timestamp telling us when the last failed job occurred.
 
@@ -204,7 +204,7 @@ ____
 _Field rules:_ This field will be a string and conform to https://tools.ietf.org/html/rfc3339[RFC-3339^]
 ____
 
-=== status.lastRun
+=== `status.lastRun`
 
 A timestamp telling us when the last job was executed.
 
@@ -212,7 +212,7 @@ ____
 _Field rules:_ This field will be a string and conform to https://tools.ietf.org/html/rfc3339[RFC-3339^]
 ____
 
-=== status.lastSuccess
+=== `status.lastSuccess`
 
 A timestamp telling us when the last successful job occurred.
 
@@ -220,7 +220,7 @@ ____
 _Field rules:_ This field will be a string and conform to https://tools.ietf.org/html/rfc3339[RFC-3339^]
 ____
 
-=== status.output
+=== `status.output`
 
 Output passes through the output of the most recent `cbbackupmgr` execution.
 
@@ -228,7 +228,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.pod
+=== `status.pod`
 
 The name of the most recent or currently running pod that runs `cbbackupmgr`.
 
@@ -236,7 +236,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.repo
+=== `status.repo`
 
 The name of the folder that we are currently working in or most recently performed operations in.
 
@@ -244,7 +244,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.running
+=== `status.running`
 
 Whether the condition is `True` or `False`.
 

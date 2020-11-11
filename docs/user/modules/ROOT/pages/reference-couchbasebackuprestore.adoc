@@ -47,15 +47,15 @@ metadata:
     cluster: my-cluster
 ----
 
-=== apiVersion
+=== `apiVersion`
 
-The apiVersion defines which version of the resource this configuration refers to.
+The API version defines which version of the resource this configuration refers to.
 
 ____
 _Field rules:_ This field is required and must be set to `couchbase.com/v2`
 ____
 
-=== kind
+=== `kind`
 
 The kind defines the type of resource this configuration refers to.
 
@@ -63,7 +63,7 @@ ____
 _Field rules:_ This field is required and must be set to `CouchbaseBackupRestore`
 ____
 
-=== metadata.name
+=== `metadata.name`
 
 The metadata name defines the name of the resource.
 The name must be unique for the kind defined.
@@ -72,7 +72,7 @@ ____
 _Field rules:_ This field is required and must be unique as described above.
 ____
 
-=== metadata.labels
+=== `metadata.labels`
 
 The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
@@ -81,7 +81,7 @@ ____
 _Field rules:_ This field is optional and must be a map of string key/value pairs.
 ____
 
-== spec
+== `spec`
 
 The following are parameters that may be set on the CouchbaseBackup:
 
@@ -100,7 +100,7 @@ spec:
   logRetention: 24h
 ----
 
-=== spec.backup
+=== `spec.backup`
 
 This field defines where we will be restoring from. When the operator sees a `CouchbaseBackup` object, it creates a corresponding Persistent Volume Claim of the same name.
 As long as this Persistent Volume Claim of the same value as `spec.backup` exists, a restore should be performed.
@@ -110,9 +110,9 @@ ____
 _Field rules:_ This field is required and must be the name of an existing Persistent Volume Claim.
 ____
 
-=== spec.repo
+=== `spec.repo`
 
-This field defines the repo name where the backup we which to restore is located.
+This field defines the repository name where the backup we which to restore is located.
 If this field is empty the Operator will attempt to look for the existing `CouchbaseBackup` object defined by the value in `spec.backup`, and retrieve the value from `status.repo` of that `CouchbaseBackup` object.
 If the Operator cannot find that `CouchbaseBackup` object or `status.repo` does not exist, the `CouchbaseBackupRestore` will be rejected.
 
@@ -120,7 +120,7 @@ ____
 _Field rules:_ This field is optional only when the `CouchbaseBackup` object defined by the field `spec.backup` exists and has performed at least one backup since its creation.
 ____
 
-=== spec.start
+=== `spec.start`
 
 This field defines the sole backup to restore or the first backup to take in a range of backups to restore.
 `spec.start` requires exactly one argument of either `int` or `str`.
@@ -130,34 +130,34 @@ This field defines the sole backup to restore or the first backup to take in a r
 These arguments are passed straight through to `cbbackupmgr`. See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-restore.html[cbbackupmgr restore^] for further details.
 
 ____
-_Field rules:_ This field is required and a valid value in either int or str is required, but not both.
+_Field rules:_ This field is required and a valid value in either `int` or `str` is required, but not both.
 ____
 
-=== spec.end
+=== `spec.end`
 
 This field defines the last backup to take in a range of backups. `spec.end` requires exactly one argument of either `int` or `str`.
 `spec.end.int` accepts an integer defining the index of the first backup with 1 being the oldest backup.
 `spec.end.str` accepts the keywords "oldest", "latest" or the specific filename of the backup.
 
 If this field is not specified then we only restore the one backup that is represented in `spec.start`.
-Alternatively if it is specified and it is the same value as `spec.start` the expected behaviour of taking a "range" of a singular backup is performed.
+Alternatively if it is specified and it is the same value as `spec.start` the expected behavior of taking a "range" of a singular backup is performed.
 
 These arguments are passed straight through to `cbbackupmgr`. See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-restore.html[cbbackupmgr restore^] for further details.
 
 ____
-_Field rules:_ This field is optional and a valid value in either int or str is required, but not both.
+_Field rules:_ This field is optional and a valid value in either `int` or `str` is required, but not both.
 ____
 
-=== spec.backOffLimit
+=== `spec.backOffLimit`
 
 This field defines the amount of times the restore job will try to perform a restore.
-Once it has reached the backOffLimit the job will no longer run and a new `CouchbaseBackupRestore` object will have to be created.
+Once it has reached the back off limit the job will no longer run and a new `CouchbaseBackupRestore` object will have to be created.
 
 ____
 _Field rules:_ This field is optional and must be any non-negative integer.
 ____
 
-=== spec.logRetention
+=== `spec.logRetention`
 
 This field defines the time period in which to retain backup logs. Older logs outside this time frame are deleted.
 On each run of a restore job logging takes place which is stored on the Persistent Volume of the same name as the `CouchbaseBackup` object defined by `spec.backup`.

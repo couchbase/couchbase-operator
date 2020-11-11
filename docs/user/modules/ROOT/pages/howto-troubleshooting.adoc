@@ -15,7 +15,7 @@ The following topics are also helpful to understand when troubleshooting the Ope
 
 == Full Deployment Logs
 
-The Operator is distributed with a support tool which can automatically collect resources, logs and events from the Kubernetes cluster for use in support cases.  It is also capable of collecting logs from Couchbase server instances via _cbcollect_info_. Please see the xref:reference-cbopinfo.adoc[documentation].
+The Operator is distributed with a support tool which can automatically collect resources, logs and events from the Kubernetes cluster for use in support cases.  It is also capable of collecting logs from Couchbase server instances via `cbcollect_info`. Please see the xref:reference-cbopinfo.adoc[documentation].
 
 == Operator Logs
 
@@ -95,14 +95,14 @@ Watch for the following messages which indicate that the Operator is unable to r
 
 == Profiling the operator
 
-The Couchbase operator serves profiling data on it's default listenAddress `localhost:8080`.  You can access this endpoint by running a remote shell or forwarding the port to your local system.
+The Couchbase operator serves profiling data on it's default listen address `localhost:8080`.  You can access this endpoint by running a remote shell or forwarding the port to your local system.
 
 [{tabs}]
 ====
 Kubernetes::
 +
 --
-Access Go routine stack backtraces via a shell:
+Access Go routine stack traces via a shell:
 [source,console]
 ----
 $ kubectl exec -it couchbase-operator-599bcf47f-8wswh sh
@@ -121,7 +121,7 @@ $ go tool pprof localhost:8080/debug/pprof/heap
 OpenShift::
 +
 --
-Access Go routine stack backtraces via a shell:
+Access Go routine stack traces via a shell:
 [source,console]
 ----
 $ oc exec -it couchbase-operator-599bcf47f-8wswh sh
@@ -151,7 +151,7 @@ The general log collection process is as follows:
 . Run the `cbcollect_info` command
 . Download the logs from the pod
 . Delete the temporary pod
-. Unpause the Operator by unsetting `spec.paused`
+. Resume the Operator by removing `spec.paused` or setting it to `false`
 
 === Creating a Temporary Pod
 
@@ -223,7 +223,7 @@ Please see the documentation for `cbcollect_info`, however a typical command to 
 $ kubectl exec -ti pod/cb-example-0005 /opt/couchbase/bin/cbcollect_info /tmp/cbinfo-default-cb-example-0005-$(date +%y%m%dT%H%M%S%z)
 ----
 
-The `pod` name refers to the name given to the pod in the template.  The convention for logs is _cbinfo_, _namespace_, _pod name_, _timestamp_.
+The `pod` name refers to the name given to the pod in the template.  The convention for logs is `cbinfo`, _namespace_, _pod name_, _timestamp_.
 
 Once complete the logs can be downloaded to the local host.
 

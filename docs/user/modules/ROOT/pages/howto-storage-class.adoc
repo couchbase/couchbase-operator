@@ -6,7 +6,7 @@ This guide describes how to configure one.
 
 == Listing Storage Classes On Your Platform
 
-The first step we need to take is to list any pre-existing storage classes available on the platform:
+The first step we need to take is to list any preexisting storage classes available on the platform:
 
 [source,console]
 ----

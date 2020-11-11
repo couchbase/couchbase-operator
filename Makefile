@@ -52,7 +52,7 @@ CONTAINER_GOENV = $(GOENV) GOOS=linux GOARCH=amd64
 # that a binary came from.
 LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(version) -X github.com/couchbase/couchbase-operator/pkg/version.Revision=$(revision) -X github.com/couchbase/couchbase-operator/pkg/version.RevisionRedHat=$(revisionRedHat) -X github.com/couchbase/couchbase-operator/pkg/version.BuildNumber=$(bldNum) -X github.com/couchbase/couchbase-operator/pkg/revision.gitRevision=$(GIT_REVISION)"
 
-.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv
+.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs
 
 all: binaries crd
 
@@ -281,3 +281,6 @@ test-unit:
 
 test-helm:
 	ct install --charts helm/test-resources/ --namespace ci-testnamespace
+
+docs:
+	scripts/asciidoc-lint

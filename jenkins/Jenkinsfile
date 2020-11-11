@@ -47,6 +47,11 @@ pipeline {
         sh 'make test-unit'
       }
     }
+    stage('Documentation') {
+      steps {
+        sh 'make docs'
+      }
+    }
   }
 
   post {

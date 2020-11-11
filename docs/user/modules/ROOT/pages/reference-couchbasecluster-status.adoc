@@ -93,11 +93,11 @@ STATUS::
 UUID::
 <<status-clusterid,`status.clusterId`>>
 
-== status
+== `status`
 
 This section defines and describes individual status fields.
 
-=== status.phase
+=== `status.phase`
 
 The phase of cluster life-cycle the Operator is in.
 
@@ -115,7 +115,7 @@ ____
 _Field rules:_ This field will be a string, and either `Creating`, `Running` or `Failed`.
 ____
 
-=== status.reason
+=== `status.reason`
 
 The reason for a cluster creation failure.
 
@@ -126,7 +126,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.controlPaused
+=== `status.controlPaused`
 
 Whether the Operator has acknowledged the cluster is paused.
 
@@ -139,7 +139,7 @@ ____
 _Field rules:_ This field will be a boolean.
 ____
 
-=== status.conditions[]
+=== `status.conditions[]`
 
 Conditions are arbitrary domain-specific statuses that can be used to synchronize external processes.
 
@@ -153,7 +153,7 @@ $ kubectl wait --for=condition=Available couchbasecluster/my-cluster
 
 You can wait for the presence of any condition defined in <<status-conditions-type,`status.conditions[].type`>>.
 
-=== status.conditions[].type
+=== `status.conditions[].type`
 
 What type of condition this relates to.
 
@@ -180,7 +180,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.conditions[].status
+=== `status.conditions[].status`
 
 Whether the condition is `True` or `False`.
 
@@ -188,7 +188,7 @@ ____
 _Field rules:_ This field will be a string, and either `True` or `False`.
 ____
 
-=== status.conditions[].reason
+=== `status.conditions[].reason`
 
 A detailed reason for the condition.
 
@@ -196,7 +196,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.conditions[].lastUpdateTime
+=== `status.conditions[].lastUpdateTime`
 
 When the condition was last updated.
 
@@ -204,7 +204,7 @@ ____
 _Field rules:_ This field will be a string and conform to https://tools.ietf.org/html/rfc3339[RFC-3339^]
 ____
 
-=== status.conditions[].lastTransitionTime
+=== `status.conditions[].lastTransitionTime`
 
 When the condition last transitioned from one <<status-conditions-status,`status.conditions[].status`>> to another.
 
@@ -212,7 +212,7 @@ ____
 _Field rules:_ This field will be a string and conform to https://tools.ietf.org/html/rfc3339[RFC-3339^]
 ____
 
-=== status.clusterId
+=== `status.clusterId`
 
 The Couchbase cluster ID.
 
@@ -223,7 +223,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.size
+=== `status.size`
 
 The current size of the cluster.
 
@@ -233,7 +233,7 @@ ____
 _Field rules:_ This field will be an integer.
 ____
 
-=== status.members.ready[]
+=== `status.members.ready[]`
 
 The set of pods that are managed by the Operator and serving client traffic.
 
@@ -241,7 +241,7 @@ ____
 _Field rules:_ This field will be a list of strings.
 ____
 
-=== status.members.unready[]
+=== `status.members.unready[]`
 
 The set of pods that are managed by the Operator and not serving client traffic.
 
@@ -249,7 +249,7 @@ ____
 _Field rules:_ This field will be a list of strings.
 ____
 
-=== status.currentVersion
+=== `status.currentVersion`
 
 The current version of Couchbase server being run.
 
@@ -260,7 +260,7 @@ ____
 _Field rules:_ This field will be a string.
 ____
 
-=== status.allocations[]
+=== `status.allocations[]`
 
 This field displays memory allocation summaries for each class of server defined in xref:reference-couchbasecluster.adoc#spec-servers[`spec.servers`].
 
@@ -268,7 +268,7 @@ ____
 _Field rules:_ This field will be an array of objects.
 ____
 
-=== status.allocations[].name
+=== `status.allocations[].name`
 
 This field refers to the server class name as defined by xref:reference-couchbasecluster.adoc#spec-servers-name[`spec.servers\[\].name`].
 
@@ -276,7 +276,7 @@ ____
 _Field rules:_  This field will be a string.
 ____
 
-=== status.allocations[].allocatedMemory
+=== `status.allocations[].allocatedMemory`
 
 This field is the total memory allocated for the Couchbase services enabled for this service class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
 
@@ -284,7 +284,7 @@ ____
 _Field rules:_ This field will be Kubernetes quantity formatted as a string.
 ____
 
-=== status.allocations[].allocatedMemoryPercent
+=== `status.allocations[].allocatedMemoryPercent`
 
 This field is optional and is only set when the server class memory request is explicitly defined by xref:reference-couchbasecluster.adoc#spec-servers-resources[`spec.servers\[\].resources`].
 It is the percentage of memory allocated against the memory requested.
@@ -293,7 +293,7 @@ ____
 _Field rules:_ This field will be an integer.
 ____
 
-=== status.allocations[].unusedMemory
+=== `status.allocations[].unusedMemory`
 
 This field is optional and is only set when the server class memory request is explicitly defined by xref:reference-couchbasecluster.adoc#spec-servers-resources[`spec.servers\[\].resources`].
 It is the difference between the memory requested and the memory allocated.
@@ -303,7 +303,7 @@ ____
 _Field rules:_ This field will be Kubernetes quantity formatted as a string.
 ____
 
-=== status.allocations[].unusedMemoryPercent
+=== `status.allocations[].unusedMemoryPercent`
 
 This field is optional and is only set when the server class memory request is explicitly defined by xref:reference-couchbasecluster.adoc#spec-servers-resources[`spec.servers\[\].resources`].
 It is the difference between the memory requested and the memory allocated against the memory requested.
@@ -314,7 +314,7 @@ ____
 _Field rules:_ This field will be an integer.
 ____
 
-=== status.allocations[].dataServiceAllocation
+=== `status.allocations[].dataServiceAllocation`
 
 This field is optional and is only set when the data service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
 It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-dataservicememoryquota[`spec.cluster.dataServiceMemoryQuota`].
@@ -323,7 +323,7 @@ ____
 _Field rules:_ This field will be Kubernetes quantity formatted as a string.
 ____
 
-=== status.allocations[].indexServiceAllocation
+=== `status.allocations[].indexServiceAllocation`
 
 This field is optional and is only set when the index service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
 It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-indexervicememoryquota[`spec.cluster.indexServiceMemoryQuota`].
@@ -332,7 +332,7 @@ ____
 _Field rules:_ This field will be Kubernetes quantity formatted as a string.
 ____
 
-=== status.allocations[].searchServiceAllocation
+=== `status.allocations[].searchServiceAllocation`
 
 This field is optional and is only set when the full-text search service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
 It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-searchservicememoryquota[`spec.cluster.searchServiceMemoryQuota`].
@@ -341,7 +341,7 @@ ____
 _Field rules:_ This field will be Kubernetes quantity formatted as a string.
 ____
 
-=== status.allocations[].eventingServiceAllocation
+=== `status.allocations[].eventingServiceAllocation`
 
 This field is optional and is only set when the eventing service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
 It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-eventingservicememoryquota[`spec.cluster.eventingServiceMemoryQuota`].
@@ -350,7 +350,7 @@ ____
 _Field rules:_ This field will be Kubernetes quantity formatted as a string.
 ____
 
-=== status.allocations[].analyticsServiceAllocation
+=== `status.allocations[].analyticsServiceAllocation`
 
 This field is optional and is only set when the analytics service is enabled for this server class as defined by xref:reference-couchbasecluster.adoc#spec-servers-services[`spec.servers\[\].services`].
 It will be the same as the value defined by xref:reference-couchbasecluster.adoc#spec-cluster-analyticsservicememoryquota[`spec.cluster.analyticsServiceMemoryQuota`].
@@ -359,7 +359,7 @@ ____
 _Field rules:_ This field will be Kubernetes quantity formatted as a string.
 ____
 
-=== status.buckets[]
+=== `status.buckets[]`
 
 The set of buckets currently managed on the cluster.
 
@@ -367,7 +367,7 @@ ____
 _Field rules:_ This field will be a list of objects describing Couchbase buckets.
 ____
 
-=== status.users[]
+=== `status.users[]`
 
 The set of users currently managed on the cluster.
 
@@ -375,7 +375,7 @@ ____
 _Field rules:_ This field will be a list of strings.
 ____
 
-=== status.groups[]
+=== `status.groups[]`
 
 The set of groups currently managed on the cluster.
 

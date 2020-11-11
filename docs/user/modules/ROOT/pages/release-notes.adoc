@@ -235,7 +235,7 @@ Read more about the xref:reference-cbopcfg.adoc[`cbopcfg` tool], as well as xref
 
 [NOTE]
 ====
-If the `cbopcfg` tool doesn't suit your environment, you can still manually install the Dynamic Admission Controller and Autonomous Operator using YAML configs:
+If the `cbopcfg` tool doesn't suit your environment, you can still manually install the Dynamic Admission Controller and Autonomous Operator using YAML configuration:
 
 * xref:reference-admission-rbac.adoc[Dynamic Admission Controller spec]
 * xref:reference-operator-configuration.adoc[Autonomous Operator spec]
@@ -273,7 +273,7 @@ Starting in 2.0.0, the Autonomous Operator will remove server classes correctly 
 
 a| https://issues.couchbase.com/browse/K8S-1189[K8S-1189^]
 a| *Summary:* Helm no longer merges Exposed Feature Sets when editing.
-In releases prior to 2.0.0, editing the Exposed Features, such as "client" and "admin", would be merged to "clientadmin" incorrectly.
+In releases prior to 2.0.0, editing the Exposed Features, such as `client` and `admin`, would be merged to `clientadmin` incorrectly.
 This is no longer the case with Helm Charts for 2.0 and later.
 
 a| https://issues.couchbase.com/browse/K8S-1169[K8S-1169^]

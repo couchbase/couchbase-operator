@@ -106,7 +106,7 @@ During the lifetime of the Couchbase cluster the Operator continually compares t
 The Operator is also Couchbase Server aware, so can detect and fix faults that would not otherwise be visible to Kubernetes.
 
 Polling the Kubernetes API continually to check for resource statuses is a costly operation.
-Etcd is commonly shown to be a bottleneck.
+etcd is commonly shown to be a bottleneck.
 To prevent the Operator from causing unnecessary API traffic and database accesses it uses local caching of every resource type it manages.
 Subsequently it needs list and watch permissions on all managed resources.
 After the initial list operation, the API only informs the Operator of changes that have happened, reducing API traffic to the absolute minimum.

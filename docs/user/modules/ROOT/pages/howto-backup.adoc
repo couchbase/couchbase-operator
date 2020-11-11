@@ -7,19 +7,19 @@ You can configure the Autonomous Operator to take periodic, automated backups of
 
 == Overview
 
-The Autonomous Operator provides automated backup and restore capabilities through a native integration with the Couchbase Server tool xref:server:backup-restore:enterprise-backup-restore.adoc[cbbackupmgr].
+The Autonomous Operator provides automated backup and restore capabilities through a native integration with the Couchbase Server tool xref:server:backup-restore:enterprise-backup-restore.adoc[`cbbackupmgr`].
 
 Automated backup is enabled in the xref:reference-couchbasecluster.adoc#spec-backup[`CouchbaseCluster` resource].
 The configuration allows you to specify a Couchbase-provided container image that contains the `cbbackupmgr` tool.
 
 Once automated backup is enabled, individual backup policies can be configured using xref:reference-couchbasebackup.adoc[`CouchbaseBackup` resources], which define things like schedule and backup strategy.
-Each `CouchbaseBackup` resource creates one or two Kubernetes https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/[CronJobs^] that will spawn backup jobs according to the given Cron schedule(s).
+Each `CouchbaseBackup` resource creates one or two Kubernetes https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/[`CronJob` resources^] that will spawn backup jobs according to the given Cron schedule(s).
 These backup jobs execute a helper script which performs logging and cleanup, and utilizes `cbbackupmgr` to perform backup and restore.
 
 TIP: Because backup policies are configured with a separate resource, you can use xref:concept-rbac.adoc[custom resource RBAC] to allow individuals who may not have access to `CouchbaseCluster` resources to still perform backup administration.
 
 The Autonomous Operator supports two of the backup strategies available in `cbbackupmgr`: _Full Only_ and _Full/Incremental_.
-Complete descriptions and explanations of these strategies can be found in the xref:server:backup-restore:cbbackupmgr-strategies.adoc[cbbackupmgr documentation].
+Complete descriptions and explanations of these strategies can be found in the xref:server:backup-restore:cbbackupmgr-strategies.adoc[`cbbackupmgr` documentation].
 The examples on this page assume a backup schedule based on the Full/Incremental strategy for both creating backups and performing restores.
 
 == Important Considerations
@@ -65,7 +65,7 @@ spec:
 The default image for open source Kubernetes comes from https://hub.docker.com/r/couchbase/operator-backup[Docker Hub^], and the default image for OpenShift comes from the https://access.redhat.com/containers/#/vendor/couchbase[Red Hat Container Catalog^].
 +
 If pulling directly from the the Red Hat Container Catalog, then the path will be something similar to `registry.connect.redhat.com/couchbase/operator-backup:{backup-version-redhat}` (you can refer to the catalog for the most recent images).
-If ImagePullSecrets are required to access the image, they are inherited from the Couchbase Server Pod and can be set explicitly with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-imagepullsecrets[`spec.servers[\].pod.spec.imagePullSecrets`] field or implicitly with a service account specified with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-serviceaccountname[`spec.servers[\].pod.spec.serviceAccountName`] field.
+If image pull secrets are required to access the image, they are inherited from the Couchbase Server Pod and can be set explicitly with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-imagepullsecrets[`spec.servers[\].pod.spec.imagePullSecrets`] field or implicitly with a service account specified with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-serviceaccountname[`spec.servers[\].pod.spec.serviceAccountName`] field.
 
 <.> If left unspecified, xref:reference-couchbasecluster.adoc#spec-backup-serviceAccountName[`spec.backup.serviceAccountName`] will default to the value of `couchbase-backup`.
 These Kubernetes resources *must* exist, otherwise backup jobs will not have the required permissions to complete successfully.
@@ -73,7 +73,7 @@ This will be covered in the next xref:howto-backup.adoc#grant-backup-permissions
 
 === Grant Backup Permissions
 
-Backup Pods need read-only access to Kubernetes resources such as Pods, Cronjobs, and Jobs.
+Backup Pods need read-only access to Kubernetes resources such as `Pods`, `CronJobs`, and `Jobs`.
 They also need write access to Events and the `CouchbaseBackup`/`CouchbaseBackupRestore` custom resources.
 
 To grant these permissions, you can use `cbopcfg` to generate the required resources by running the following command:
@@ -104,7 +104,7 @@ spec:
   size: 20Gi # <2>
 ----
 
-<1> On detection of the `CouchbaseBackup` resource, the Autonomous Operator creates the correct CronJobs for the `spec.full.schedule` and the `spec.incremental.schedule`.
+<1> On detection of the `CouchbaseBackup` resource, the Autonomous Operator creates the correct cron jobs for the `spec.full.schedule` and the `spec.incremental.schedule`.
 In this example a full backup would be performed at 3:00AM on a Sunday and then an incremental backup on every other day of the week at 3:00AM.
 
 <2> The Autonomous Operator will also create a Persistent Volume Claim to store the backups and logs with the same name that is specified in `metadata.name`.
@@ -134,7 +134,7 @@ $ oc logs deployments/couchbase-operator
 --
 ====
 
-You should observe that a Persistent Volume Claim and the correct number of CronJobs have been created along with the `CouchbaseBackup` itself. The output should be similar to:
+You should observe that a Persistent Volume Claim and the correct number of cron jobs have been created along with the `CouchbaseBackup` itself. The output should be similar to:
 
 [source,console]
 ----
@@ -188,7 +188,7 @@ my-backup   Bound    pvc-0c3c717f-e10b-423e-9279-a99edf81019b   5Gi        RWO  
 Deleting Persistent Volume Claims or Persistent Volumes will delete the backup data and backup log data permanently.
 ====
 
-Once the first Job has been spawned by a backup CronJob, the status fields of a `CouchbaseBackup` resource will update, and you can start <<monitor-and-manage-backups,monitoring backup progress>>.
+Once the first Job has been spawned by a backup cron job, the status fields of a `CouchbaseBackup` resource will update, and you can start <<monitor-and-manage-backups,monitoring backup progress>>.
 
 == Restoring From a Backup
 
@@ -209,12 +209,12 @@ spec:
 
 A `CouchbaseBackupRestore` resource behaves differently from a `CouchbaseBackup` resource in that it spawns just a singular, one-time job which attempts to restore the requested backup or range of backups.
 
-In the example above, the `CouchbaseBackupRestore` resource configuration is restoring the first backup in the repo `"cb-example-2020-02-12T19_00_03"`.
-The first backup in any repo will be a full backup since the Autonomous Operator performs a full backup of the cluster after the creation of each backup repo.
+In the example above, the `CouchbaseBackupRestore` resource configuration is restoring the first backup in the repository `"cb-example-2020-02-12T19_00_03"`.
+The first backup in any repository will be a full backup since the Autonomous Operator performs a full backup of the cluster after the creation of each backup repository.
 
-If you don't know the name of the backup repo that you want to restore from, you can find the name without having to explore the contents of a Persistent Volume Claim by simply referring to the xref:reference-couchbasebackup-status.adoc[status object] of the existing `CouchbaseBackup` resource.
+If you don't know the name of the backup repository that you want to restore from, you can find the name without having to explore the contents of a Persistent Volume Claim by simply referring to the xref:reference-couchbasebackup-status.adoc[status object] of the existing `CouchbaseBackup` resource.
 
-You also have the option to restore a range of backups from the latest backup repo.
+You also have the option to restore a range of backups from the latest backup repository.
 
 [source,yaml]
 ----
@@ -230,8 +230,8 @@ spec:
     str: latest
 ----
 
-In this example above, the Autonomous Operator would restore a range of backups from the latest backup repo.
-The omission of the `spec.repo` field means that the Autonomous Operator will look for the most recent backup repo either from the `CouchbaseBackup` object defined by `spec.backup` or from the PVC of the same name.
+In this example above, the Autonomous Operator would restore a range of backups from the latest backup repository.
+The omission of the `spec.repo` field means that the Autonomous Operator will look for the most recent backup repository either from the `CouchbaseBackup` object defined by `spec.backup` or from the PVC of the same name.
 If the `spec.repo` field is unable to be populated by the Autonomous Operator, then the resource will be rejected and no restore job will be created.
 
 == Monitor and Manage Backups
@@ -263,9 +263,9 @@ $ oc get couchbasebackup my-backup -o yaml
 
 [TIP]
 ====
-The shortnames `cbbackup` and `cbrestore` are available for `CouchbaseBackup` and `CouchbaseBackupRestore` respectively.
+The short names `cbbackup` and `cbrestore` are available for `CouchbaseBackup` and `CouchbaseBackupRestore` respectively.
 So instead of executing `kubectl get couchbasebackup` you can instead write `kubectl get cbbackup`.
-To find out if any other of your current Kubernetes resources support a shortname, run `kubectl api-resources`.
+To find out if any other of your current Kubernetes resources support a short name, run `kubectl api-resources`.
 ====
 
 The command output should show the given `CouchbaseBackup` specification and also a xref:reference-couchbasebackup-status.adoc[status section] containing useful information similar to the following output.
@@ -302,7 +302,7 @@ status:
   running: false
 ----
 
-Furthermore you can check that the Cronjobs have updated and their status fields look correct.
+Furthermore you can check that the cron jobs have updated and their status fields look correct.
 
 [{tabs}]
 ====

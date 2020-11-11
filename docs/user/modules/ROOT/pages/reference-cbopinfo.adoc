@@ -15,7 +15,7 @@ The output is a compressed archive of resource YAML manifests organized by names
 
 The `cbopinfo` command can also collect and download Couchbase server logs from running pods and orphaned persistent log volumes.
 
-IMPORTANT: The `cbopinfo` command requires permission to read resources related to the cluster in order to function correctly e.g. deployments, pods, couchbaseclusters, etc.  When running this command ensure it is run by a user with sufficient permission to collect the required resources.  If permission is denied to access a particular resource type the command will notify the user and continue with the collection on a best attempt basis.  In general the required permissions are similar to those xref:reference-operator-rbac.adoc[required by the operator] but read-only.
+IMPORTANT: The `cbopinfo` command requires permission to read resources related to the cluster in order to function correctly e.g. deployments, pods, Couchbase clusters, etc.  When running this command ensure it is run by a user with sufficient permission to collect the required resources.  If permission is denied to access a particular resource type the command will notify the user and continue with the collection on a best attempt basis.  In general the required permissions are similar to those xref:reference-operator-rbac.adoc[required by the operator] but read-only.
 
 == Installation
 
@@ -91,7 +91,7 @@ $ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 
 [TIP]
 ====
-The `cbopinfo` command conforms to Kubernetes cli-runtime specification and may be renamed to `kubernetes-couchbase-logs` and installed in your $PATH.
+The `cbopinfo` command conforms to Kubernetes `cli-runtime` specification and may be renamed to `kubernetes-couchbase-logs` and installed in your $PATH.
 It can then be invoked as a `kubectl` plugin with `kubectl couchbase logs`.
 This tightly integrates it with your normal workflow.
 ====
@@ -108,7 +108,7 @@ The logs will be downloaded to the current working directory once collection is 
 +
 For log volumes that were previously attached to ephemeral pods, `cbopinfo` will create a temporary pod (as defined by the `--server-image` option), run `cbcollect_info` and download the logs before finally deleting the temporary pod.
 +
-.Example Output of --collectinfo
+.Example Output of `--collectinfo`
 [source,console]
 ----
 $ ./build/bin/cbopinfo --collectinfo
@@ -183,10 +183,10 @@ all           # Collect all available logs
 If specified with the `--collectinfo` option, this will indicate that only redacted logs should be collected and downloaded.
 
 --operator-image <image>::
-If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of runtime information.  If not set it will default to `couchbase/operator:{operator-version}`.
+If specified this sets the Operator image name.  It is used to match containers running the Operator for collection of run time information.  If not set it will default to `couchbase/operator:{operator-version}`.
 
 --operator-rest-port <port>::
-If specified this sets the Operator REST API port.  It is used for collection of runtime information.  If not set it will default to _8080_.
+If specified this sets the Operator REST API port.  It is used for collection of run time information.  If not set it will default to _8080_.
 
 --server-image <image>::
 If specified this defines the Couchbase Server image to use when collecting logs from detached log volumes.  If not set, it will default to `couchbase/server:enterprise-{couchbase-version}`

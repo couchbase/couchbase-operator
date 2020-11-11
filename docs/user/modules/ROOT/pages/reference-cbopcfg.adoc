@@ -180,7 +180,7 @@ To create a configuration file:
 $ cbopcfg operator > operator.yaml
 ----
 
-To create configuration to run on Red Hat Openshift:
+To create configuration to run on Red Hat OpenShift:
 
 [source,console]
 ----

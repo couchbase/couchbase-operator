@@ -5,7 +5,7 @@ When creating a Couchbase cluster the Operator is responsible for creating servi
 
 The service names are based on the cluster name.  For the purposes of demonstration we will use the cluster name `couchbase` throughout this document.
 
-== couchbase
+== `couchbase`
 
 The first service that is created, it creates endpoints for every Couchbase node in the cluster on administration ports 8091 and 18091.  It is a headless service so doesn't create a virtual IP or offer any load balancing.
 
@@ -15,7 +15,7 @@ DNS addresses are in the form `couchbase-0000.couchbase.default.srv.cluster.loca
 
 TIP: Pods will be created with the `cluster.local` suffix in the search path, so you may use the short form `couchbase-0000.couchbase.default.srv` to reference individual pods.
 
-== couchbase-srv
+== `couchbase-srv`
 
 This service is similar to the previous in that it creates endpoints for the admin ports and is headless.  The key difference however is that this service is restricted to only the Couchbase nodes with the data service enabled.
 
@@ -25,7 +25,7 @@ The SRV record used in a Couchbase client is in the form `_couchbase._tcp.couchb
 
 NOTE: For further information on connecting clients please refer to the xref:howto-client-sdks.adoc[full documentation].
 
-== couchbase-ui
+== `couchbase-ui`
 
 This service again references the admin ports to offer access to the admin UI.  This is a node service which allows access from the Kubernetes node network allowing access from without the pod overlay network on a randomly chosen port in the 30000+ range.  It is also load balanced to allow access even if a Couchbase node is down; simply refresh your browser session to connect to a new node.
 
@@ -33,7 +33,7 @@ This service is optional and is enabled with the `spec.exposeAdminConsole` prope
 
 NOTE: For further information on configuring the admin console please refer to the xref:howto-ui.adoc[full documentation].
 
-== couchbase-0000
+== `couchbase-0000`
 
 This service is created on a per-Couchbase node basis.  It maps from a node port to an individual instance.  The traffic policy is also set to only allow access on the host Kubernetes node to avoid re-routing network traffic and affecting network latency.
 
