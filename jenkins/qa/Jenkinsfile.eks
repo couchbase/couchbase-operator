@@ -59,7 +59,6 @@ pipeline {
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
     AWS_CREDENTIALS = credentials('couchbaseqe-aws')
-    AWS_PROFILE = "couchbaseqe"
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
     NAME = "qe-eks-test-${env.BUILD_NUMBER}-"
   }
@@ -86,8 +85,8 @@ pipeline {
 
     stage('AWS Setup') {
       steps {
-        sh "aws configure set couchbaseqe.aws_access_key_id ${env.AWS_CREDENTIALS_USR}"
-        sh "aws configure set couchbaseqe.aws_secret_access_key ${env.AWS_CREDENTIALS_PSW}"
+        sh "aws configure set aws_access_key_id ${env.AWS_CREDENTIALS_USR}"
+        sh "aws configure set aws_secret_access_key ${env.AWS_CREDENTIALS_PSW}"
         sh "aws configure set default.region us-west-2"
         sh "aws configure set default.output json"
       }
