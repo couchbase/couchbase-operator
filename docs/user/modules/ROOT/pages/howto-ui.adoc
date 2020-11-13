@@ -73,8 +73,52 @@ The connection string is determined by the xref:reference-couchbasecluster.adoc#
 The connection string is in the form `\https://console.$\{dns-domain}`.
 Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `\https://console.my-cluster.acme.org:18091`.
 
-[NOTE]
+== Configuring an Ingress
+
+A https://kubernetes.io/docs/concepts/services-networking/ingress/[Kubernetes ingress^] can be used to expose the Couchbase administrative console to a network external to the Kubernetes cluster.
+Ingresses are not managed by the Operator because the required configuration is not generic, however the configuration for your specific provider can be summarized as:
+
+* Enable cookie based client session affinity.
+
+Couchbase administrative console cookies are valid only for the pod you authenticated against.
+Client affinity ensures the ingress routes all requests for a session to the same pod each time.
+
+An illustrative example for NGINX would look like:
+
+[source,console]
+----
+apiVersion: networking.k8s.io
+kind: Ingress
+metadata:
+  name: my-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: cookie # <.>
+    nginx.ingress.kubernetes.io/affinity-mode: persistent
+  spec:
+    rules:
+    - http: # <.>
+        paths:
+        - path: / # <.>
+          pathType: Prefix
+          backend:
+            service:
+              name: my-cluster # <.>
+              port:
+                number: 8091 # <.>
+----
+
+<.> The ingress is annotated with `affinity` -- this enables client affinity -- and `affinity-mode` -- this ensures each client session is routed to the same backend pod.
+<.> A rule is created for all virtual hosts using the HTTP service.
+<.> A path of `/` and a type of `Prefix` means that any HTTP path will match this rule.
+<.> The service name references a service within the namespace the ingress is created in.
+The Operator will create a headless service by default for every cluster -- in order to create DNS entries -- and can be used as the backend service for the ingress.
+The service will be named the same as a Couchbase cluster resource.
+<.> The port is the backend port to connect to.
+In this instance the ingress is plain text HTTP, so 8091.
+
+[TIP]
 ====
-The UI is available as a result of providing service discovery for Couchbase clients.
-It does not handle multi-dimensional scaling groups, so should only be used on homogeneous clusters.
+Use TLS to secure your ingresses on the public internet, otherwise your login credentials will be visible in plain text and can be snooped by an attacker.
+Your ingress provider may support backend TLS encryption, providing end-to-end security -- use port 18091 on the backend.
+When using ingresses to access Couchbase, you cannot use client certificate authentication -- use a load balancer service to expose the console instead.
 ====

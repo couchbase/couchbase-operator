@@ -102,6 +102,7 @@ CloudFormation
 SQLite
 Elasticsearch
 Istio
+NGINX
 macOS
 CouchbaseCluster
 CouchbaseBucket
