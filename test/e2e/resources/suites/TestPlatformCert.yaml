@@ -146,3 +146,33 @@ testcases:
 
 # AutomatedBackupTests
 - TestReplaceFullOnlyBackup
+
+# N2N Encryption Tests
+- TestCreateClusterWithTLSAndControlPlaneNodeToNode
+- TestCreateClusterThenEnableFullNodeToNode
+
+# Password Rotation Tests
+- TestRotateAdminPasswordAndRestart
+- TestRotateAdminPasswordDuringRestartTLS
+
+# Autoscaling Tests
+- TestAutoscaleEnabled
+- TestPreviewModeAllowsEphemeral
+- TestAutoscaleUp
+
+# Hibernation Tests
+- TestHibernateSupportableImmediate
+
+# Durability Tests
+- TestCreateDurableBucket
+
+# S3 Backup Tests
+- TestFullIncrementalS3
+- TestBackupRetentionS3
+- TestBackupAndRestoreS3
+
+# Expiration Tests
+- TestBucketTTL
+
+# Indexer Configuration Tests
+- TestIndexerSettings
