@@ -19,10 +19,14 @@ kind: CouchbaseCluster
 spec:
   networking:
     exposeAdminConsole: true # <.>
-    adminConsoleServiceType: LoadBalancer # <.>
+    adminConsoleServiceTemplate:
+      spec:
+        type: LoadBalancer # <.>
     exposedFeatures: # <.>
     - client
-    exposedFeatureServiceType: LoadBalancer # <.>
+    exposedFeatureServiceTemplate:
+      spec:
+        type: LoadBalancer # <.>
     dns:
       domain: my-cluster.example.com # <.>
     tls:
@@ -33,13 +37,13 @@ spec:
 
 <.> xref:reference-couchbasecluster.adoc#spec-networking-exposeadminconsole[`spec.networking.exposeAdminConsole`] is enabled to allow the creation of a service pointing to the Couchbase admin port.
 
-<.> xref:reference-couchbasecluster.adoc#spec-networking-adminconsoleservicetype[`spec.networking.adminConsoleServiceType`] is set to `LoadBalancer` causing the admin console service to use a load balancer.
+<.> xref:reference-couchbasecluster.adoc#spec-networking-adminconsoleservicetemplate[`spec.networking.adminConsoleServiceTemplate`] type is set to `LoadBalancer` causing the admin console service to use a load balancer.
 Combining the two attributes means a client can connect to a stable and highly-available public DNS endpoint that is load balanced across the entire cluster.
 
 <.> xref:reference-couchbasecluster.adoc#spec-networking-exposedfeatures[`spec.networking.exposedFeatures`] defines the `client` feature set, meaning all enabled services are exposed.
 This also causes a per-pod service to be created allowing direct access by a client to each pod as required.
 
-<.> xref:reference-couchbasecluster.adoc#spec-networking-exposedfeatureservicetype[`spec.networking.exposedFeautureServiceType`] is set to `LoadBalanacer` meaning each per-pod service is created with a load balancer and allocated a public IP address.
+<.> xref:reference-couchbasecluster.adoc#spec-networking-exposedfeatureservicetemplate[`spec.networking.exposedFeatureServiceTemplate`] type is set to `LoadBalanacer` meaning each per-pod service is created with a load balancer and allocated a public IP address.
 
 <.> xref:reference-couchbasecluster.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] defines the domain DDNS entries will be created under.
 A separate https://github.com/kubernetes-sigs/external-dns[External DNS^] service needs to be created to actually replicate DNS names and IP addresses into a public DDNS server.

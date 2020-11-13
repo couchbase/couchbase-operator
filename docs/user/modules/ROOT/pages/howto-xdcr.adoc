@@ -142,9 +142,14 @@ spec:
     dns: # <.>
       domain: my-remote-cluster.example.com
     exposeAdminConsole: true # <.>
+    adminConsoleServiceTemplate:
+      spec:
+        type: LoadBalancer # <.>
     exposedFeatures: # <.>
     - xdcr
-    exposedFeatureServiceType: LoadBalancer # <.>
+    exposedFeatureServiceTemplate:
+      spec:
+        type: LoadBalancer # <.>
 ----
 
 <.> TLS configuration is required and `spec.networking.tls` is configured as per the xref:tutorial-tls.adoc[TLS configuration guide].
@@ -157,10 +162,12 @@ A 3rd party solution is required to synchronize these DNS name annotations with 
 <.> By specifying `spec.networking.exposeAdminConsole` as true this creates a service for `console.my-remote-cluster.example.com`.
 This admin console service is a stable DNS name and can be used to perform service discovery -- it does not change as the cluster topology does.
 
+<.> `spec.networking.adminConsoleServiceTemplate` type is set to `LoadBalancer` which creates a stable public IP for clients to connect to.
+
 <.> `spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster.
 In this instance the `xdcr` feature set exposes the admin, data and index ports required for XDCR replication.
 
-<.> `spec.networking.exposedFeatureServiceType` is set to `LoadBalancer` and causes the Operator to create a load balancer per-pod.
+<.> `spec.networking.exposedFeatureServiceTemplate` type is set to `LoadBalancer` and causes the Operator to create a load balancer per-pod.
 Each load-balancer has a unique IP address -- unlike a `NodePort` -- so that standard port number can be used.
 
 === Local Cluster
@@ -240,17 +247,24 @@ metadata:
 spec:
   networking:
     exposeAdminConsole: true # <.>
+    adminConsoleServiceTemplate:
+      spec:
+        type: NodePort #<.>
     exposedFeatures: # <.>
     - xdcr
-    exposedFeatureServiceType: NodePort # <.>
+    exposedFeatureServiceTemplate:
+      spec:
+        type: NodePort # <.>
 ----
 
 <.> `spec.networking.exposeAdminConsole` creates a load balanced service used to connect to the remote cluster.
 
+<.> `spec.networking.adminConsoleServiceTemplate` type is set to `NodePort` surfacing the administrative console service on the Kubernetes node network.
+
 <.> `spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster.
 In this instance the `xdcr` feature set exposes the admin, data and index ports required for XDCR replication.
 
-<.> `spec.networking.exposedFeatureServiceType` is set to `NodePort` (this is the default set by the dynamic admission controller) which surfaces the exposed feature sets, per-pod, on the Kubernetes node network.
+<.> `spec.networking.exposedFeatureServiceTemplate` type is set to `NodePort` which surfaces the exposed feature sets, per-pod, on the Kubernetes node network.
 This allows the cluster to escape the confines of any overlay network and be seen by the local cluster.
 
 === Local Cluster

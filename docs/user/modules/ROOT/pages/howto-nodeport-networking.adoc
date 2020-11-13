@@ -16,8 +16,14 @@ kind: CouchbaseCluster
 spec:
   networking:
     exposeAdminConsole: true # <.>
+    adminConsoleServiceTemplate:
+      spec:
+        type: NodePort
     exposedFeatures: # <.>
     - client
+    exposedFeatureServiceTemplate:
+      spec:
+        type: NodePort
 ----
 
 <.> xref:reference-couchbasecluster.adoc#spec-networking-exposeadminconsole[`spec.networking.exposeAdminConsole`] is enabled to allow the creation of a service pointing to the Couchbase admin port.

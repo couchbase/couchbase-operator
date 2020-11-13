@@ -176,11 +176,15 @@ spec:
     adminSecret: my-admin-secret
   networking:
     exposeAdminConsole: true
-    adminConsoleServiceType: LoadBalancer
+    adminConsoleServiceTemplate:
+      spec:
+        type: LoadBalancer
     exposedFeatures:
     - xdcr
     - client
-    exposedFeatureServiceType: LoadBalancer
+    exposedFeatureServiceTemplate:
+      spec:
+        type: LoadBalancer
     dns:
       domain: gandalf.rockstar-wizard.com
     tls:

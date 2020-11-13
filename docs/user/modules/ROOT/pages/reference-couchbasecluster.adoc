@@ -73,13 +73,28 @@ spec:
         template: "uid=%s,ou=People,dc=example,dc=com"
   networking:
     exposeAdminConsole: true
-    adminConsoleServices:
+    adminConsoleServiceTemplate:
+      metadata:
+        labels:
+          key: value
+      spec:
+        type: LoadBalancer
+    adminConsoleServices: # DEPRECATED
     - data
-    adminConsoleServiceType: LoadBalancer
-    exposedFeatures:
-    - xdcr
-    exposedFeatureServiceType: LoadBalancer
-    exposedFeatureTrafficPolicy: Local
+    adminConsoleServiceType: LoadBalancer # DEPRECATED
+    exposedFeatureServiceTemplate:
+      metadata:
+        labels:
+          key: value
+      spec:
+        type: LoadBalancer
+    exposedFeatureServiceType: LoadBalancer # DEPRECATED
+    exposedFeatureTrafficPolicy: Local # DEPRECATED
+    serviceAnnotations: # DEPRECATED
+      my-annotation: my-value
+    loadBalancerSourceRanges: # DEPRECATED
+    - "10.0.0.0/8"
+    networkPlatform: Istio
     tls:
       static:
         serverSecret: couchbase-server-tls
@@ -92,10 +107,6 @@ spec:
       nodeToNodeEncryption: All
     dns:
       domain: couchbase-0.us-east-1.example.com
-    serviceAnnotations:
-      my-annotation: my-value
-    loadBalancerSourceRanges:
-    - "10.0.0.0/8"
   logging:
     logRetentionTime: 604800s
     logRetentionCount: 20
@@ -822,19 +833,30 @@ These options allow you to connect to Couchbase from outside the Kubernetes clus
 spec:
   networking:
     exposeAdminConsole: true
-    adminConsoleServices:
+    adminConsoleServiceTemplate:
+      metadata:
+        labels:
+          key: value
+      spec:
+        type: LoadBalancer
+    adminConsoleServices: # DEPRECATED
     - data
-    adminConsoleServiceType: LoadBalancer
-    exposedFeatures:
-    - xdcr
-    exposedFeatureServiceType: LoadBalancer
-    exposedFeatureTrafficPolicy: Local
+    adminConsoleServiceType: LoadBalancer # DEPRECATED
+    exposedFeatureServiceTemplate:
+      metadata:
+        labels:
+          key: value
+      spec:
+        type: LoadBalancer
+    exposedFeatureServiceType: LoadBalancer # DEPRECATED
+    exposedFeatureTrafficPolicy: Local # DEPRECATED
+    serviceAnnotations: # DEPRECATED
+      my-annotation: my-value
+    loadBalancerSourceRanges: # DEPRECATED
+    - "10.0.0.0/8"
+    networkPlatform: Istio
     dns:
       domain: couchbase-0.us-east-1.example.com
-    serviceAnnotations:
-      my-annotation: my-value
-    loadBalancerSourceRanges:
-    - "10.0.0.0/8"
     tls:
       static:
         serverSecret: couchbase-server-tls
@@ -855,7 +877,25 @@ ____
 _Field rules:_ The `exposeAdminConsole` field is optional and defaults to `false` if not specified.  If set to `true` the specification must also have the <<spec-networking-adminconsoleservices,`spec.networking.adminConsoleServices`>> property defined.
 ____
 
+=== `spec.networking.adminConsoleServiceTemplate`
+
+When the <<spec-networking-exposeadminconsole>> property is set, the Operator will generate a service that exposes the administrator console.
+This field allows the definition of a base https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#service-v1-core[`Service` resource^].
+The Operator will merge any configuration it controls on top of this template.
+
+This field allows the definition of annotations and labels in the template metadata, and the service type in the specification for example.
+
+____
+_Field rules:_ The `adminConsoleServiceTemplate` field is optional and must be a Kubernetes https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#service-v1-core[`Service` resource^].
+____
+
 === `spec.networking.adminConsoleServices`
+
+[WARNING]
+====
+This field is deprecated and will be removed in a later release.
+The functionality is now redundant with Couchbase server 6.5.0 or greater.
+====
 
 When the Couchbase Server Web Console is exposed with the <<spec-networking-exposeadminconsole,`spec.networking.exposeAdminConsole`>> property, by default, opening a browser session to the Web Console will be automatically load balanced across all pods in the cluster to provide high availability. However, the Web Console will display different features based on the services that are running on the particular pod that it's connected to.
 
@@ -868,6 +908,12 @@ _Field rules:_ The `adminConsoleServices` list is optional and defaults to an em
 ____
 
 === `spec.networking.adminConsoleServiceType`
+
+[WARNING]
+====
+This field is deprecated and will be removed in a later release.
+The functionality is now provided by the <<spec-networking-adminconsoleservicetemplate>> property.
+====
 
 This field defines how the admin console service is exposed.  By default it will use a `NodePort` which exposes the console on a random port on all nodes in the cluster.  It is accessible only within the cluster or via an IP tunnel into the Kubernetes underlay network.  If set to `LoadBalancer` it will expose the default admin console port to the public internet via a load balancer on platforms which support this service type.  Only the TLS enabled port (18091) will be exposed to public networks.
 
@@ -893,7 +939,25 @@ ____
 _Field rules:_ The `exposedFeatures` list is optional, no feature sets are exposed to the cluster network if unset.
 ____
 
+=== `spec.networking.exposedFeatureServiceTemplate`
+
+When the <<spec-networking-exposedfeatures>> property is set, the Operator will generate a service that exposes Couchbase services per-pod.
+This field allows the definition of a base https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#service-v1-core[`Service` resource].
+The Operator will merge any configuration it controls on top of this template.
+
+This field allows the definition of annotations and labels in the template metadata, and the service type in the specification for example.
+
+____
+_Field rules:_ The `exposedFeatureServiceTemplate` field is optional and must be a Kubernetes https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#service-v1-core[`Service` resource^].
+____
+
 === `spec.networking.exposedFeatureServiceType`
+
+[WARNING]
+====
+This field is deprecated and will be removed in a later release.
+The functionality is now provided by the <<spec-networking-exposedfeatureservicetemplate>> property.
+====
 
 This field defines how the per Couchbase node ports are exposed.  By default it will use a `NodePort` which exposes the `exposedFeatures` on random ports per service on the Kubernetes nodes running the cluster.  They are accessible only within the cluster or via an IP tunnel into the Kubernetes underlay network.  If set to `LoadBalancer` it will expose the default exposed service ports on the public internet via a load balancer on platforms which support this service type.  Only the TLS enabled ports will be exposed to public networks.
 
@@ -902,6 +966,12 @@ _Field rules:_ The `exposedFeatureServiceType` field is optional and defaults to
 ____
 
 === `spec.networking.exposedFeatureTrafficPolicy`
+
+[WARNING]
+==== 
+This field is deprecated and will be removed in a later release.
+The functionality is now provided by the <<spec-networking-exposedfeatureservicetemplate>> property.
+====
 
 This field defines how traffic ingressing into Kubernetes is handled.
 By default this is set to `Local` meaning that traffic from a public load balancer must be routed directly to the node upon which the destination `Pod` is resident.
@@ -915,10 +985,43 @@ ____
 
 === `spec.networking.serviceAnnotations`
 
+[WARNING]
+==== 
+This field is deprecated and will be removed in a later release.
+The functionality is now provided by the <<spec-networking-adminconsoleservicetemplate>> and <<spec-networking-exposedfeatureservicetemplate>> properties.
+====
+
 This field defines any custom annotations to be added to console and per-pod (exposed feature) services.
 
 ____
 _Field rules:_ The `serviceAnnotations` field is optional.  If specified it must be a map of key/value pairs conforming to Kubernetes annotation rules.
+____
+
+=== `spec.networking.loadBalancerSourceRanges`
+
+[WARNING]
+==== 
+This field is deprecated and will be removed in a later release.
+The functionality is now provided by the <<spec-networking-adminconsoleservicetemplate>> and <<spec-networking-exposedfeatureservicetemplate>> properties.
+====
+
+This field defines any IPv4 prefixes that should be added to any load balancer services managed by the Operator.
+This is a list of address ranges that are allowed to connect to the service.
+
+____
+_Field rules:_ The `loadBalancerSourceRanges` field is optional and must be a list of IPv4 address prefixes e.g. `10.0.0.0/8`.
+____
+
+=== `spec.networking.networkPlatform`
+
+This field defines the underlying network platform in use.
+Typically, this field does not need to be defined.
+
+When `Istio`, this enables DNS host aliases in Couchbase server pods.
+Without this support, Couchbase server may connect to local services over the pod IP address, not `localhost`, and will be dropped by Istio when running in mTLS mode.
+
+____
+_Field rules:_ The `networkPlatform` field is optional and must be `Istio`.
 ____
 
 == `spec.networking.dns`

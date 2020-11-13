@@ -69,6 +69,7 @@ OLM
 DAC
 AWS
 PHP
+IPv
 YAML
 yaml
 CVE
@@ -97,6 +98,7 @@ Memcached
 CloudFormation
 SQLite
 Elasticsearch
+Istio
 macOS
 CouchbaseCluster
 CouchbaseBucket
