@@ -16,54 +16,76 @@ import (
 )
 
 const (
-	EventReasonMemberCreationFailed    = "MemberCreationFailed"
-	EventReasonNewMemberAdded          = "NewMemberAdded"
-	EventReasonMemberRemoved           = "MemberRemoved"
-	EventReasonMemberDown              = "MemberDown"
-	EventReasonMemberRecovered         = "MemberRecovered"
-	EventReasonMemberFailedOver        = "MemberFailedOver"
-	EventReasonRebalanceStarted        = "RebalanceStarted"
-	EventReasonRebalanceIncomplete     = "RebalanceIncomplete"
-	EventReasonRebalanceCompleted      = "RebalanceCompleted"
-	EventReasonFailedAddNode           = "FailedAddNode"
-	EventReasonFailedAddBackNode       = "FailedAddBackNode"
-	EventReasonBucketCreated           = "BucketCreated"
-	EventReasonBucketDeleted           = "BucketDeleted"
-	EventReasonBucketEdited            = "BucketEdited"
-	EventReasonUserCreated             = "UserCreated"
-	EventReasonUserDeleted             = "UserDeleted"
-	EventReasonUserEdited              = "UserEdited"
-	EventReasonGroupCreated            = "GroupCreated"
-	EventReasonGroupDeleted            = "GroupDeleted"
-	EventReasonGroupEdited             = "GroupEdited"
-	EventReasonServiceCreated          = "ServiceCreated"
-	EventReasonServiceDeleted          = "ServiceDeleted"
-	EventReasonUpgradeStarted          = "UpgradeStarted"
-	EventReasonUpgradeFinished         = "UpgradeFinished"
-	EventReasonClusterSettingsEdited   = "ClusterSettingsEdited"
-	EventReasonTLSUpdated              = "TLSUpdated"
-	EventReasonTLSInvalid              = "TLSInvalid"
-	EventReasonTLSUpdateFailed         = "TLSUpdateFailed"
-	EventReasonClientTLSUpdated        = "ClientTLSUpdated"
-	EventReasonClientTLSInvalid        = "ClientTLSInvalid"
-	EventReasonRemoteClusterAdded      = "RemoteClusterAdded"
-	EventReasonRemoteClusterRemoved    = "RemoteClusterRemoved"
-	EventReasonReplicationAdded        = "ReplicationAdded"
-	EventReasonReplicationRemoved      = "ReplicationRemoved"
-	EventReasonBackupCreated           = "BackupCreated"
-	EventReasonBackupUpdated           = "BackupUpdated"
-	EventReasonBackupDeleted           = "BackupDeleted"
-	EventReasonBackupStarted           = "BackupStarted"
-	EventReasonBackupCompleted         = "BackupCompleted"
-	EventReasonBackupFailed            = "BackupFailed"
-	EventReasonBackupRestoreCreated    = "BackupRestoreCreated"
-	EventReasonBackupRestoreDeleted    = "BackupRestoreDeleted"
+	// Member lifecycle.
+	EventReasonMemberCreationFailed = "MemberCreationFailed"
+	EventReasonNewMemberAdded       = "NewMemberAdded"
+	EventReasonFailedAddNode        = "FailedAddNode"
+	EventReasonFailedAddBackNode    = "FailedAddBackNode"
+	EventReasonMemberRemoved        = "MemberRemoved"
+	EventReasonMemberDown           = "MemberDown"
+	EventReasonMemberRecovered      = "MemberRecovered"
+	EventReasonMemberFailedOver     = "MemberFailedOver"
+	EventReasonRebalanceStarted     = "RebalanceStarted"
+	EventReasonRebalanceIncomplete  = "RebalanceIncomplete"
+	EventReasonRebalanceCompleted   = "RebalanceCompleted"
+
+	// Bucket lifecycle.
+	EventReasonBucketCreated = "BucketCreated"
+	EventReasonBucketDeleted = "BucketDeleted"
+	EventReasonBucketEdited  = "BucketEdited"
+
+	// RBAC lifecycle.
+	EventReasonUserCreated  = "UserCreated"
+	EventReasonUserDeleted  = "UserDeleted"
+	EventReasonUserEdited   = "UserEdited"
+	EventReasonGroupCreated = "GroupCreated"
+	EventReasonGroupDeleted = "GroupDeleted"
+	EventReasonGroupEdited  = "GroupEdited"
+
+	// Service lifecycle.
+	EventReasonServiceCreated = "ServiceCreated"
+	EventReasonServiceDeleted = "ServiceDeleted"
+
+	// Upgrade lifecycle.
+	EventReasonUpgradeStarted  = "UpgradeStarted"
+	EventReasonUpgradeFinished = "UpgradeFinished"
+
+	// Cluster lifecycle.
+	EventReasonClusterSettingsEdited = "ClusterSettingsEdited"
+
+	// TLS lifecycle.
+	EventReasonTLSUpdated       = "TLSUpdated"
+	EventReasonTLSInvalid       = "TLSInvalid"
+	EventReasonClientTLSUpdated = "ClientTLSUpdated"
+	EventReasonClientTLSInvalid = "ClientTLSInvalid"
+
+	// XDCR lifecycle.
+	EventReasonRemoteClusterAdded   = "RemoteClusterAdded"
+	EventReasonRemoteClusterRemoved = "RemoteClusterRemoved"
+	EventReasonReplicationAdded     = "ReplicationAdded"
+	EventReasonReplicationRemoved   = "ReplicationRemoved"
+
+	// Backup lifecycle.
+	EventReasonBackupCreated = "BackupCreated"
+	EventReasonBackupUpdated = "BackupUpdated"
+	EventReasonBackupDeleted = "BackupDeleted"
+	// These are raised by the jobs themselves and are not part of the
+	// CouchbaseCluster documentation.
+	EventReasonBackupStarted        = "BackupStarted"
+	EventReasonBackupCompleted      = "BackupCompleted"
+	EventReasonBackupFailed         = "BackupFailed"
+	EventReasonBackupRestoreCreated = "BackupRestoreCreated"
+	EventReasonBackupRestoreDeleted = "BackupRestoreDeleted"
+
+	// Security lifecycle.
 	EventReasonSecuritySettingsUpdated = "SecuritySettingsUpdated"
 	EventReasonAdminPasswordChanged    = "AdminPasswordChanged"
-	EventAutoscalerCreated             = "EventAutoscalerCreated"
-	EventAutoscalerDeleted             = "EventAutoscalerDeleted"
-	EventAutoscaleUp                   = "EventAutoscaleUp"
-	EventAutoscaleDown                 = "EventAutoscaleDown"
+
+	// Autoscaler lifecycle.
+	EventAutoscalerCreated = "EventAutoscalerCreated"
+	EventAutoscalerDeleted = "EventAutoscalerDeleted"
+	EventAutoscaleUp       = "EventAutoscaleUp"
+	EventAutoscaleDown     = "EventAutoscaleDown"
 
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 )

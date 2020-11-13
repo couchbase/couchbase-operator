@@ -41,10 +41,6 @@ UpgradeStarted::
 An upgrade operation has started.
 UpgradeFinished::
 An upgrade operation has successfully completed.
-RollbackStarted::
-A rollback operation during a partial upgrade has started.
-RollbackFinished::
-A rollback operation during a partial upgrade has successfully completed.
 
 [NOTE]
 Upgrade events are raised in relation to an upgrade of the entire cluster and not individual nodes.
@@ -86,6 +82,13 @@ A cluster service was deleted.
 ClusterSettingsEdited::
 The cluster specification was modified.
 
+== Security Lifecycle
+
+SecuritySettingsUpdated::
+Security related settings e.g. TLS mode were updated.
+AdminPasswordChanged::
+The administrator password was updated.
+
 == TLS Lifecycle
 
 TLSUpdated::
@@ -112,16 +115,24 @@ A replication was deleted and disassociated from a remote cluster.
 
 BackupCreated::
 A periodic backup job was created.
-
-BackupEdited::
-A periodic backup job was edited.
-
+BackupUpdated::
+A periodic backup job was updated.
 BackupDeleted::
 A periodic backup job was deleted.
-
+BackupStarted::
+Backup
 BackupRestoreCreated::
 A restore job was created.
-
 BackupRestoreDeleted::
 A restore job was deleted.  This condition indicates successful completion.
 
+== Autoscaling Lifecycle
+
+EventAutoscalerCreated::
+An autoscaling resource was created for a server class.
+EventAutoscalerDeleted::
+An autoscaling resource was deleted for a server class.
+EventAutoscaleUp::
+An autoscaler requested a server class to be scaled up.
+EventAutoscaleDown::
+An autoscaler requested a server class to be scaled down.
