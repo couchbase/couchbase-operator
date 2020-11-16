@@ -189,12 +189,12 @@ var (
 		"TestRBACSelection":             TestRBACSelection,
 
 		// LDAP cases
-		"TestLDAPCreateAdminUser": TestLDAPCreateAdminUser,
-		"TestLDAPCDeleteUser":     TestLDAPCDeleteUser,
-		"TestLDAPDeleteRole":      TestLDAPDeleteRole,
-		"TestLDAPUpdateRole":      TestLDAPUpdateRole,
-		"TestLDAPRemoveUserFrom":  TestLDAPRemoveUserFromBinding,
-		"TestLDAPDeleteBinding":   TestLDAPDeleteBinding,
+		"TestLDAPCreateAdminUser":       TestLDAPCreateAdminUser,
+		"TestLDAPCDeleteUser":           TestLDAPCDeleteUser,
+		"TestLDAPDeleteRole":            TestLDAPDeleteRole,
+		"TestLDAPUpdateRole":            TestLDAPUpdateRole,
+		"TestLDAPRemoveUserFromBinding": TestLDAPRemoveUserFromBinding,
+		"TestLDAPDeleteBinding":         TestLDAPDeleteBinding,
 
 		// Autoscaler cases
 		"TestAutoscalerValidation":                 TestAutoscalerValidation,
