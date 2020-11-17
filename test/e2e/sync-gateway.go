@@ -31,7 +31,7 @@ func skipRBAC(t *testing.T) {
 
 	threshold, _ := couchbaseutil.NewVersion("6.5.0")
 	if version.Less(threshold) {
-		t.Skip("unsupported couchbase version")
+		t.Skip("Unsupported couchbase version: RBAC requires >6.5.0")
 	}
 }
 
