@@ -374,6 +374,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	clusterSize := 3
 	victim := 1
 	foreignBucketName := "foreign"
+	numOfDocs := f.DocsCount
 
 	// Create the cluster
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -383,7 +384,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
-	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, bucket.GetName(), 10)
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs)
 
 	// Pause the operator, failover the victim, then create a new bucket and populate it.
 	// The operator - when restarted - should flag the node for delta recovery, but Server
@@ -394,7 +395,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	e2eutil.MustCreateBucket(t, targetKube, testCouchbase, foreignBucketName, time.Minute)
 	// Wait for the active nodes to warm up. Operator behaves differently if this hasn't happened
 	time.Sleep(10 * time.Second)
-	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, foreignBucketName, 10)
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, foreignBucketName, numOfDocs)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)

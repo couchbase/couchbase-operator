@@ -114,6 +114,7 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 	// Static configuration.
 	clusterSize := constants.Size3
 	scaleDownSize := constants.Size1
+	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
@@ -127,8 +128,8 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	// ...choose the correct victim cluster...
 	var targetKubernetes *types.Cluster
@@ -157,8 +158,8 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 	}
 
 	// ...before finally creating more documents and verifying replication still works.
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 20, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -192,6 +193,7 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	// Static configuration.
 	clusterSize := constants.Size3
+	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	// The k8s1 cluster optionally uses a custom DNS service to address the k8s2 cluster.
@@ -208,8 +210,8 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 
 	e2eutil.MustEstablishXDCRReplication(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication, tls)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -330,6 +332,7 @@ func TestXdcrCreateCluster(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
+	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
@@ -344,8 +347,8 @@ func TestXdcrCreateCluster(t *testing.T) {
 
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -377,6 +380,7 @@ func TestXDCRPauseReplication(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
+	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
@@ -393,15 +397,15 @@ func TestXDCRPauseReplication(t *testing.T) {
 
 	replication = e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
 	replication = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
 	time.Sleep(time.Minute)
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
 	time.Sleep(time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
 	_ = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 20, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -439,6 +443,7 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	xdcrCluster1Size := constants.Size5
 	xdcrCluster2Size := constants.Size2
 	nodeToKill := 1
+	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
@@ -454,12 +459,12 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 	e2eutil.MustKillPodForMember(t, k8s1, xdcrCluster1, nodeToKill, true)
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
 	e2eutil.MustWaitClusterStatusHealthy(t, k8s1, xdcrCluster1, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 20, 10*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -495,6 +500,7 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 	// Static configuration.
 	clusterSize := constants.Size1
 	clusterScaledSize := constants.Size3
+	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
@@ -510,11 +516,11 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 	xdcrCluster1 = e2eutil.MustResizeCluster(t, 0, constants.Size3, k8s1, xdcrCluster1, 5*time.Minute)
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 20, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -549,6 +555,7 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size1
+	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
@@ -565,11 +572,11 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 	e2eutil.MustDeletePodServices(t, k8s2, xdcrCluster2)
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 20, 10*time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -660,6 +667,7 @@ func TestXDCRDeleteReplication(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
+	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
@@ -674,8 +682,8 @@ func TestXDCRDeleteReplication(t *testing.T) {
 
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, time.Minute)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Now we delete the replication, add some documents in the source bucket and
 	// verify that the doc count of destination bucket is same as its old value
@@ -683,10 +691,10 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, k8s1, xdcrCluster1, e2eutil.ReplicationRemovedEvent(xdcrCluster1, "remote", replication.Spec.Bucket, replication.Spec.RemoteBucket), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, k8s1, xdcrCluster1, 2*time.Minute)
 
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
 	time.Sleep(time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 20, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 2*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -723,6 +731,7 @@ func TestXDCRFilterExp(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
+	numOfDocs := f.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
@@ -757,16 +766,16 @@ func TestXDCRFilterExp(t *testing.T) {
 
 	// MustPopulateBucket inserts documents with DocId following the template: "random%d"
 	// which won't be matched by the filter and will not get replicated.
-	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 10)
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 0, time.Minute)
 
 	// MustInsertJSONDocsIntoBucket inserts documents with DocId following the template: "`doc`%d"
-	e2eutil.MustInsertJSONDocsIntoBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 0, 10)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 0, numOfDocs)
 
 	// Now we check that the new documents inserted in the source bucket is replicated
 	// since the filter expression applied allows documents with document id starting with `doc` to get replicated.
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 10, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 20, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 2*numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created

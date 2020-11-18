@@ -284,8 +284,8 @@ func getBucket(client *CouchbaseClient, bucketName string) (*couchbaseutil.Bucke
 	return bucket, nil
 }
 
-// Inserts Json docs into couchbase bucket.
-func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
+// InsertJSONDocIntoBucket inserts a JSON doc into a Couchbase bucket.
+func InsertJSONDocIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docIndex int) error {
 	urlBase, cleanup, err := GetHostURL(k8s, cluster, couchbasev2.AdminService)
 	if err != nil {
 		return err
@@ -293,43 +293,52 @@ func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.Couchbase
 
 	defer cleanup()
 
+	docKey := "doc" + strconv.Itoa(docIndex)
+	docMap := map[string]string{}
+	docMap["key1"] = "dummyVal 1"
+	docMap["key2"] = "dummyVal 2"
+	docMap["key3"] = "dummyVal 3"
+	docMap["key4"] = "dummyVal 4"
+
+	// Convert map data to byte array
+	docData, err := json.Marshal(docMap)
+	if err != nil {
+		return err
+	}
+
+	body := "value=" + string(docData)
+	url := "http://" + urlBase + "/pools/default/buckets/" + bucketName + "/docs/" + docKey
+
+	request, err := http.NewRequest("POST", url, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+
+	request.SetBasicAuth("Administrator", "password")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := http.Client{Timeout: time.Minute}
+
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %v", response.StatusCode)
+	}
+
+	return nil
+}
+
+// Inserts Json docs into couchbase bucket.
+func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
 	numOfDocs += docStartIndex
 	for docIndex := docStartIndex; docIndex < numOfDocs; docIndex++ {
-		docKey := "doc" + strconv.Itoa(docIndex)
-		docMap := map[string]string{}
-		docMap["key1"] = "dummyVal 1"
-		docMap["key2"] = "dummyVal 2"
-		docMap["key3"] = "dummyVal 3"
-		docMap["key4"] = "dummyVal 4"
-
-		// Convert map data to byte array
-		docData, err := json.Marshal(docMap)
-		if err != nil {
+		if err := InsertJSONDocIntoBucket(k8s, cluster, bucketName, docIndex); err != nil {
 			return err
-		}
-
-		body := "value=" + string(docData)
-		url := "http://" + urlBase + "/pools/default/buckets/" + bucketName + "/docs/" + docKey
-
-		request, err := http.NewRequest("POST", url, strings.NewReader(body))
-		if err != nil {
-			return err
-		}
-
-		request.SetBasicAuth("Administrator", "password")
-		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		client := http.Client{Timeout: time.Minute}
-
-		response, err := client.Do(request)
-		if err != nil {
-			return err
-		}
-
-		defer response.Body.Close()
-
-		if response.StatusCode != http.StatusOK {
-			return fmt.Errorf("unexpected status code %v", response.Status)
 		}
 	}
 

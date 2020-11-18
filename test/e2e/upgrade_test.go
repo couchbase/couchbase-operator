@@ -955,7 +955,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 
 	// Static Config
 	clusterSize := 3
-	numOfDocs := 500
+	numOfDocs := f.DocsCount
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
 
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)

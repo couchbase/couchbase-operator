@@ -33,6 +33,7 @@ type Framework struct {
 	S3Region                      string
 	S3AccessKey                   string
 	S3SecretID                    string
+	DocsCount                     int
 
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
@@ -94,6 +95,7 @@ type TestRunParam struct {
 	S3Region                      string `yaml:"s3-region"`
 	S3AccessKey                   string `yaml:"s3-access-key"`
 	S3SecretID                    string `yaml:"s3-secret-id"`
+	DocsCount                     int    `yaml:"docs-count"`
 
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`

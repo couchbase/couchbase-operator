@@ -57,7 +57,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
-	numOfDocs := 50
+	numOfDocs := f.DocsCount
 	analyticsDataset := "testDataset1"
 	queries := []string{
 		"CREATE DATASET " + analyticsDataset + " ON `default`",

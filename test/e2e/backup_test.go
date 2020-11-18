@@ -127,7 +127,7 @@ func testFullIncremental(t *testing.T, s3 bool) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -183,7 +183,7 @@ func testFullOnly(t *testing.T, s3 bool) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -245,7 +245,7 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	s3secret := createS3Secret(t, targetKube, s3)
 
 	// Create cluster.
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 	testCouchbase := e2espec.NewSupportableCluster(mdsGroupSize)
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Backup.Managed = true
@@ -330,7 +330,7 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 
 	// Create cluster.
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -415,7 +415,7 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 
 	// Create a normal cluster.
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -500,7 +500,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 
 	// Create a normal cluster.
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -580,7 +580,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -682,7 +682,7 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -747,7 +747,7 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 
 	clusterSize := constants.Size3
 	// Create a normal cluster.
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -815,7 +815,7 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 
 	clusterSize := constants.Size3
 	// Create the cluster.
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
@@ -884,7 +884,7 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool) {
 
 	// Create the cluster.
 	clusterSize := constants.Size3
-	numOfDocs := 100
+	numOfDocs := f.DocsCount
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})

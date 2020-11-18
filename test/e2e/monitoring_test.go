@@ -198,7 +198,7 @@ func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
 
 			// Static configuration.
 			clusterSize := 3
-			numOfDocs := 200
+			numOfDocs := f.DocsCount
 
 			// Create the cluster.
 			testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)

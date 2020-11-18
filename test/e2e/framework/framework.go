@@ -198,6 +198,7 @@ func readYamlData() (err error) {
 	flag.Var(&suites, "suite", "Test suites to run")
 	flag.Var(&tests, "test", "Individual test to run")
 	flag.BoolVar(&util.UseANSIColor, "color", false, "Prettify output")
+	flag.IntVar(&params.DocsCount, "docs", 10, "The amount of Documents created during tests")
 
 	// File based configuration (meat-space friendly)
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
@@ -396,6 +397,7 @@ func Setup() (err error) {
 		S3Region:                      runtimeParams.S3Region,
 		S3AccessKey:                   runtimeParams.S3AccessKey,
 		S3SecretID:                    runtimeParams.S3SecretID,
+		DocsCount:                     runtimeParams.DocsCount,
 	}
 
 	if runtimeParams.StorageClassName != "" {
@@ -450,6 +452,7 @@ func Setup() (err error) {
 	logrus.Info(" →  Bucket Type: " + runtimeParams.BucketType)
 	logrus.Info(" →  Compression Mode: " + runtimeParams.CompressionMode)
 	logrus.Info(" →  S3 Bucket: " + runtimeParams.S3Bucket)
+	logrus.Info(" →  Documents: " + strconv.Itoa(runtimeParams.DocsCount))
 
 	logrus.Info(util.PrettyHeading("Clusters"))
 

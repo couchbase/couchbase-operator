@@ -96,7 +96,7 @@ func TestLoadDurableBucket(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
-	numOfDocs := 500
+	numOfDocs := f.DocsCount
 
 	// Create the cluster.
 	bucket := e2eutil.GetDurableBucket(f.BucketType, f.CompressionMode, couchbasev2.CouchbaseBucketMinimumDurabilityMajority)

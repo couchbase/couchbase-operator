@@ -1,8 +1,33 @@
 ---
 timeout: 4h
 testcases:
-- TestHibernateSupportableImmediate
-- TestPersistentVolumeKillAllPodsAndOperator
-- TestPersistentVolumeRzaNodesKilled
-- TestPersistentVolumeRzaFailover
-
+- TestAnalyticsCreateDataSet
+- TestFullIncremental
+- TestFullOnly
+- TestFailedBackupBehaviour
+- TestBackupPVCReconcile
+- TestReplaceFullOnlyBackup
+- TestBackupAndRestore
+- TestUpdateBackupStatus
+- TestMultipleBackups
+- TestFullIncrementalOverTLS
+- TestFullOnlyOverTLS
+- TestDeltaRecoveryImpossible
+- TestLoadDurableBucket
+- TestEventingCreateEventingCluster
+- TestBucketTTL
+- TestPrometheusMetricsEnableAndPerformOps
+- TestUpgradeBucketDurability
+- TestXdcrRebalanceOutSourceClusterNodes
+- TestXdcrRebalanceOutTargetClusterNodes
+- TestXdcrRemoveSourceClusterNodes
+- TestXdcrRemoveTargetClusterNodes
+- TestXdcrResizedOutSourceClusterNodes
+- TestXdcrResizedOutTargetClusterNodes
+- TestXdcrCreateCluster
+- TestXDCRPauseReplication
+- TestXdcrSourceNodeDown
+- TestXdcrSourceNodeAdd
+- TestXdcrTargetNodeServiceDelete
+- TestXDCRDeleteReplication
+- TestXDCRFilterExp

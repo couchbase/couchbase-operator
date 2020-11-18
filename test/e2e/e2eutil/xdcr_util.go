@@ -24,11 +24,7 @@ import (
 )
 
 func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string, reqParams io.Reader) ([]byte, error) {
-	var request *http.Request
-
-	var err error
-
-	request, err = http.NewRequest(requestType, hostURL, reqParams)
+	request, err := http.NewRequest(requestType, hostURL, reqParams)
 	if err != nil {
 		return nil, err
 	}
@@ -43,14 +39,49 @@ func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string
 
 	defer response.Body.Close()
 
-	responseBody := response.Body
-	responseData, _ := ioutil.ReadAll(responseBody)
+	responseData, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("remote call failed with response: %s %s", response.Status, string(responseData))
 	}
 
 	return responseData, nil
+}
+
+// insertAtMostDocuments creates as many documents as it can over a single connection and
+// bails on an error.  Any retry logic needs to be handled at a higher level.
+func insertAtMostDocuments(ctx context.Context, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket, prefix string, items, offset int) (int, error) {
+	host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
+	if err != nil {
+		return 0, err
+	}
+
+	defer cleanup()
+
+	for i := 0; i < items; i++ {
+		documentID := prefix + strconv.Itoa(offset+i)
+
+		uri := "http://" + host + "/pools/default/buckets/" + bucket + "/docs/" + documentID
+		values := url.Values{}
+		values.Add(`flags`, `24`)
+		values.Add(`value`, `{"key":"value"}`)
+
+		if _, err := GenerateHTTPRequest("POST", uri, "Administrator", "password", strings.NewReader(values.Encode())); err != nil {
+			return i, err
+		}
+
+		// Check to see if the timer has blown, respect the timeout and abort from the loop.
+		select {
+		case <-ctx.Done():
+			return i, ctx.Err()
+		default:
+		}
+	}
+
+	return items, nil
 }
 
 // PopulateBucket selects a random pod from the cluster and then uses the API
@@ -60,38 +91,39 @@ func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string
 func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int) error {
 	document := RandomSuffix()
 
-	for i := 0; i < items; i++ {
-		index := i
+	// This method of inserting buckets is p*** poor, and IRL you get something like
+	// "inserted 435 documents in 1m0.105061306s".  Locally, this is pretty fast, but
+	// over the internet it sucks (we MUST start testing in Kubernetes with SDKs...).
+	// We need to scale any timeouts by the number of documents, so lets pick a
+	// conservative estimate of way less than this, server may hang for a bit....  So if you
+	// decide to run with 1,000,000 documents, don't be shocked if the test suddently takes
+	// 3 days to run!
+	timeout := (time.Duration(items) * time.Minute) / 250
 
-		callback := func() (bool, error) {
-			host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
-			if err != nil {
-				return false, retryutil.RetryOkError(err)
-			}
+	// This is a fudge for server blocking, say due to failover...
+	timeout += 5 * time.Minute
 
-			defer cleanup()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
-			// Note: I tried using cbworkloadgen, however it does die half way through, so say you
-			// want to add 10 docs, and it does 7, if you retry you end up with 17, which is not
-			// what we want from a test stability perspective!
-			uri := "http://" + host + "/pools/default/buckets/" + bucket + "/docs/" + document + strconv.Itoa(index)
-			values := url.Values{}
-			values.Add(`flags`, `24`)
-			values.Add(`value`, `{"key":"value"}`)
+	inserted := 0
 
-			if _, err := GenerateHTTPRequest("POST", uri, "Administrator", "password", strings.NewReader(values.Encode())); err != nil {
-				return false, retryutil.RetryOkError(err)
-			}
+	callback := func() error {
+		i, err := insertAtMostDocuments(ctx, k8s, cluster, bucket, document, items-inserted, inserted)
 
-			return true, nil
-		}
+		inserted += i
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
+		return err
+	}
 
-		if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
-			return err
-		}
+	start := time.Now()
+
+	defer func() {
+		t.Logf("inserted %d documents in %v", inserted, time.Since(start))
+	}()
+
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		return err
 	}
 
 	return nil

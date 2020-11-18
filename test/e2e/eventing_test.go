@@ -94,7 +94,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
-	numOfDocs := 10
+	numOfDocs := f.DocsCount
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, sourceBucket)

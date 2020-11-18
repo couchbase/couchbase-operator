@@ -25,6 +25,7 @@ func TestBucketTTL(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
+	numOfDocs := f.DocsCount
 
 	// Create the cluster
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
@@ -36,8 +37,8 @@ func TestBucketTTL(t *testing.T) {
 
 	// Insert some docs into the bucket and verify, then expect them to be deleted
 	// in a minute.
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, 100)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 100, time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// In order to expire a document it must be read, compacted, or expired.  It's easiest to
 	// just compact the bucket manually.
