@@ -221,7 +221,7 @@ def poll_eks_cluster(eks_cluster_name, mode):
     time_start = time.time()
     if mode == "create":
         while get_eks_cluster_status(eks_cluster_name, mode) != "ACTIVE":
-            if time.time() - time_start > 900:
+            if time.time() - time_start > 1200:
                 print("15 minutes is longer than expected for creation of EKS Cluster."
                       "Please investigate. Abort.")
                 sys.exit(1)
@@ -293,7 +293,7 @@ def poll_vpc(vpc_name, target_status):
         time.sleep(20)
         time_passed = time.time() - time_start
         if time_passed > 600:
-            print("VPCs creation timeout.")
+            print("VPCs timeout: " + target_status)
             sys.exit(1)
 
 
