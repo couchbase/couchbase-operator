@@ -2507,7 +2507,7 @@ func (c *Cluster) reconcileAutoscalers() error {
 	for i, config := range c.cluster.Spec.Servers {
 		if config.AutoscaleEnabled {
 			// reject stateful configs if when not in preview mode
-			if !c.cluster.Spec.EnablePreviewScalingStateful {
+			if !c.cluster.Spec.EnablePreviewScaling {
 				if !config.IsStateless() {
 					continue
 				}

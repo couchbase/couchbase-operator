@@ -354,7 +354,7 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	// Create the cluster with autoscaling
 	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, sizePerConfig, queryConfigName, nil, nil)
 	// explicitly enabling autoscaling for data config
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScalingStateful", true), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScaling", true), time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
 
 	// Expect 2 autoscalers are created
@@ -560,7 +560,7 @@ func testPreviewMode(t *testing.T, targetKube *types.Cluster, stateful bool, tls
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/AutoscaleEnabled", true), time.Minute)
 
 	// Enable or Disable preview scaling.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScalingStateful", stateful), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/EnablePreviewScaling", stateful), time.Minute)
 
 	// Expect query config(1) to be created
 	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)

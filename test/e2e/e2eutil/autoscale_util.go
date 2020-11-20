@@ -17,7 +17,7 @@ import (
 func NewAutoscaleCluster(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Spec.Servers[0].AutoscaleEnabled = true
-	clusterSpec.Spec.EnablePreviewScalingStateful = true
+	clusterSpec.Spec.EnablePreviewScaling = true
 
 	return newClusterFromSpec(t, k8s, clusterSpec)
 }
