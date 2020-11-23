@@ -24,13 +24,6 @@ The examples on this page assume a backup schedule based on the Full/Incremental
 
 == Important Considerations
 
-* Only the official Autonomous Operator Backup image provided by Couchbase is supported.
-Note that this image is designed to only ever be pulled and run by the Autonomous Operator -- it should not be used in any other context.
-+
-In addition, you should ensure that your image source is trusted.
-The backup image requires access to the Couchbase cluster administrative credentials in order to login and perform collection.
-Granting these credentials to arbitrary code is potentially harmful.
-
 * The Autonomous Operator runs the backup utility in a separate Pod.
 Where this Pod is scheduled can have implications on backup performance, and can affect whether backup jobs are able to complete within the desired time window.
 +
@@ -43,6 +36,26 @@ This is covered in the <<grant-backup-permissions,Grant Access Permissions>> sec
 
 * You can enable and disable automated backup at any time in the `CouchbaseCluster` configuration.
 Disabling automated backup does not delete `CouchbaseBackup` resources. When you re-enabled automated backup, any applicable `CouchbaseBackup` resources will continue to be used.
+
+* Only official Autonomous Operator Backup images provided by Couchbase are supported.
+Note that these images are designed to only ever be pulled and run by the Autonomous Operator -- they should not be used in any other context.
++
+In addition, you should ensure that your image source is trusted.
+The backup image requires access to the Couchbase cluster administrative credentials in order to login and perform collection.
+Granting these credentials to arbitrary code is potentially harmful.
+
+=== Version Compatibility
+* Supported Autonomous Operator Backup images correspond to the version of `cbbackupmgr` it runs.
+Due to version compatibility between `cbbackupmgr` versions and versions of Couchbase Server, only certain Backup images will be compatible with certain versions of Couchbase Server.
++
+For example, backup and restore operations on a cluster running Couchbase Server 6.6.x must use backup image of the same tag, so in this case, `couchbase/operator-backup:6.6.0`.
+Data from a 6.6.x cluster cannot be restored on a cluster running Couchbase Server 6.5.x.
++
+Further information on compatibility can be found over in the `cbbackupmgr` https://docs.couchbase.com/server/current/backup-restore/enterprise-backup-restore.html#version-compatibility[documentation].
+
+* Only 6.6.x Autonomous Operator Backup images will be able to utilize AWS S3 backup and restore operations, as it runs `cbbackupmgr` version 6.6.
+Only `cbbackupmgr` version 6.6 supports this feature, as mentioned https://docs.couchbase.com/server/current/backup-restore/enterprise-backup-restore.html#66-and-aws-s3[here].
+
 
 == Enable Automated Backup
 
@@ -526,3 +539,72 @@ Scheduling of backup and restore jobs is exactly the same as the mechanism used 
 The affinity and anti-affinity mechanisms are described in xref:concept-scheduling.adoc[].
 
 Backup and restore job affinity can be set, per `CouchbaseCluster`, with the xref:reference-couchbasecluster.adoc#spec-backup-nodeselector[`spec.backup.nodeSelector`] attribute, and toleration of anti-affinity rules can be set with the xref:reference-couchbasecluster.adoc#spec-backup-tolerations[`spec.backup.tolerations`] attribute.
+
+== Backup and Restore to S3
+
+If you are running a cluster version 6.6.x and running the corresponding `operator-backup` image of tag 6.6.x, the ability to backup and restore to and from AWS S3 buckets is available.
+This option requires some extra configuration related to your AWS credentials and the name of the S3 bucket to perform operations on.
+
+First of all, a separate `Secret` must be created that holds the AWS region name, access key ID, and secret access key.
+
+[source,yaml,subs="attributes,verabitm"]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-secret
+type: Opaque
+data:
+  region: aGV5IG1h...
+  access-key-id: bXVzaHJvb20ga2l...
+  secret-access-key: cm9zY29lJ3Mgd2V0IHN...
+----
+
+In your `CouchbaseCluster` object, you will need to reference this secret so the Operator knows where to extract the credentials from.
+
+[source,yaml,subs="attributes,verbatim"]
+----
+apiVersion: couchbase/v2
+kind: CouchbaseCluster
+spec:
+  backup:
+    managed: true
+    image: couchbase/operator-backup:{backup-version}
+    serviceAccountName: couchbase-backup
+    s3Secret: s3-secret
+----
+
+And finally, the S3 bucket that we wish to hold backups needs to be specified in the desired `CouchbaseBackup` and `CouchbaseBackupRestore` CRDs.
+
+[source,yaml,subs="attributes,verbatim"]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: my-backup
+spec:
+  strategy: full_incremental
+  full:
+    schedule: "0 3 * * 0"
+  incremental:
+    schedule: "0 3 * * 1-6"
+  size: 20Gi
+  s3bucket: my-backup-bucket
+----
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+metadata:
+  name: my-restore
+spec:
+  backup: my-backup
+  start:
+    str: oldest
+  end:
+    str: latest
+  s3bucket: my-backup-bucket
+----
+
+Please note that operations involving S3 take more time to complete in comparison to regular backup to PVCs so please bear this in mind when configuring your automated backup schedules.

@@ -30,6 +30,8 @@ spec:
   backupRetention: 24h
   logRetention: 24h
   size: 5Gi
+  s3bucket: my-backup-bucket
+  storageClassName: standard
 ----
 
 toc::[]
@@ -100,6 +102,8 @@ spec:
   backupRetention: 24h
   logRetention: 24h
   size: 5Gi
+  s3bucket: my-backup-bucket
+  storageClassName: standard
 ----
 
 === `spec.strategy`
@@ -179,3 +183,19 @@ ____
 _Field rules:_ This field is optional and defaults to `20Gi`. If specified the field must be a Kubernetes https://godoc.org/k8s.io/apimachinery/pkg/api/resource#Quantity[resource quantity^].
 ____
 
+=== `spec.s3bucket`
+
+This field defines the name of the AWS S3 bucket to perform backup and restore operations on.
+For further information see xref:howto-backup.adoc#backup-and-restore-to-s3[Backup and Restore to S3].
+
+____
+_Field rules:_ This field is optional and must be a valid S3 bucket.
+____
+
+=== `spec.storageClassName`
+
+This field defines the Storage Class of the Persistent Volume to store backups and logs on.
+
+____
+_Field rules:_ This field is optional and must be a valid Storage Class.
+____

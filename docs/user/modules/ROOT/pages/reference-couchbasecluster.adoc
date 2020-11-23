@@ -201,6 +201,7 @@ spec:
     managed: true
     image: couchbase/operator-backup:{backup-version}
     serviceAccountName: couchbase-backup
+    s3Secret: s3-secret
     resources:
       requests:
         cpu: 100m
@@ -1933,6 +1934,7 @@ spec:
     managed: true
     image: couchbase/operator-backup:{backup-version}
     serviceAccountName: couchbase-backup
+    s3Secret: s3-secret
     resources:
       requests:
         cpu: 100m
@@ -1978,6 +1980,16 @@ If left unspecified, the dynamic admission controller will automatically default
 
 ____
 _Field rules:_ This field is optional and must be the name of a valid Kubernetes Service Account.
+____
+
+=== `spec.backup.s3Secret`
+
+This field specifies the name of a Kubernetes `Secret` that gives the backup and restore Pods the necessary credentials to query buckets in AWS S3.
+
+If left unspecified, `CouchbaseBackup` and `CouchbaseBackupRestore` objects that reference a S3 bucket in their specification will fail due to missing credentials.
+
+____
+_Field rules:_ This field is optional and must be the name of a valid Kubernetes `Secret`.
 ____
 
 === `spec.backup.resources`
@@ -2066,10 +2078,10 @@ ____
 
 === `spec.monitoring.prometheus.authorizationSecret`
 
-This field specifies the name of a Kubernetes Secret that should contain a bearer token value that clients use to gain access to the Prometheus metrics.
+This field specifies the name of a Kubernetes `Secret` that should contain a bearer token value that clients use to gain access to the Prometheus metrics.
 
 ____
-_Field rules:_ This field is optional and must be the name of a valid Kubernetes secret, with a key of "token".
+_Field rules:_ This field is optional and must be the name of a valid Kubernetes `Secret`, with a key of "token".
 ____
 
 === `spec.monitoring.prometheus.resources`

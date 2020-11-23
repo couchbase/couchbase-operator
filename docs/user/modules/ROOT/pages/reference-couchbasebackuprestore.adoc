@@ -29,6 +29,7 @@ spec:
     str: latest
   backOffLimit: 2
   logRetention: 24h
+  s3bucket: my-backup-bucket
 ----
 
 toc::[]
@@ -98,6 +99,7 @@ spec:
     str: latest
   backOffLimit: 2
   logRetention: 24h
+  s3bucket: my-backup-bucket
 ----
 
 === `spec.backup`
@@ -164,4 +166,13 @@ On each run of a restore job logging takes place which is stored on the Persiste
 
 ____
 _Field rules:_ This field is optional and defaults to `168h` (7 days). If specified it must contain a decimal number and a unit suffix such as `s`, `m` or `h`.  The decimal number cannot be negative.
+____
+
+=== spec.s3bucket
+
+This field defines the name of the AWS S3 bucket to perform backup and restore operations on.
+For further information see xref:howto-backup.adoc#backup-and-restore-to-s3[Backup and Restore to S3].
+
+____
+_Field rules:_ This field is optional and must be a valid S3 bucket.
 ____
