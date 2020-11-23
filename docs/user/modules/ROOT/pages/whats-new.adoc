@@ -1,63 +1,91 @@
 = What's New?
 include::partial$constants.adoc[]
 
-Couchbase Autonomous Operator {operator-version-minor} is a landmark release that's built to take advantage of the latest Kubernetes improvements in the areas of security and custom resources.
+Couchbase Autonomous Operator {operator-version-minor} is an incremental release that adds new features to the Operator 2.0 series.
 The changes in this release enable several advancements in how you can manage, monitor, and deploy Couchbase clusters.
 
 Take a look at the xref:release-notes.adoc[release notes] for a more complete list of changes in this release, including known and fixed issues.
 
-== New Couchbase Custom Resource Model
+== Cluster Autoscaling
 
-This release introduces a new model for deploying and managing Couchbase custom resources.
-Previously, you would deploy a cluster using a single, monolithic `CouchbaseCluster` resource configuration that defined everything about a cluster (e.g. nodes, buckets, XDCR, etc).
-Starting with Autonomous Operator {operator-version-minor}, parts of the `CouchbaseCluster` resource have been separated into their own custom resource types, which the Autonomous Operator aggregates together using xref:concept-label-selection.adoc[label selection].
+The main new feature of this release is cluster autoscaling.
 
-Moving to this new model is crucial for the Autonomous Operator to be able to support continued evolution in the Kubernetes and Couchbase platforms.
-However, you'll find that these changes also provide immediate advantages in terms of manageability.
-One of the most practical benefits is that you can achieve fine grained access control over different parts of a Couchbase deployment with the use of xref:concept-rbac.adoc[custom resource RBAC].
+It was decided at an early stage that having the Operator control scaling of the cluster would be both restrictive and inflexible.
+Instead, the Operator creates custom resources -- on demand -- that implement the scale API.
 
-Autonomous Operator {operator-version-minor} requires that all Couchbase custom resources use the new format.
-Couchbase custom resources -- such as `CouchbaseCluster` -- are not backwards compatible between Autonomous Operator versions 1 and 2.
-If you're upgrading from Autonomous Operator 1.x, a tool (`cbopconv`) has been provided to convert your existing `CouchbaseCluster` resources to version 2.
+The scale API is relatively simple.
+It defines where an external controller can look within a resource to determine the current size of a resource (in our case the cluster as a whole or a multi-dimensional scaling group), and where to modify the requested size.
+By using the scale API, Couchbase clusters are directly compatible with the Kubernetes horizontal pod autoscaler (HPA).
 
-Read more about how to xref:howto-operator-upgrade.adoc[Upgrade the Operator].
+The Operator can now delegate scaling responsibilities to the HPA.
+The HPA allows high-level functionality such as allowing scaling to be driven by Prometheus metrics, and scaling decisions to be constrained, for example introducing delays to even out load spikes.
 
-== Automated Backup and Restore
+While this feature is generic, and will work for any server class, it has been inhibited to only work with server classes comprised of stateless services (e.g. query, search and eventing), and only when all buckets are ephemeral, by default.
+This restriction can be removed with the xref:reference-couchbasecluster.adoc#spec-enablepreviewscaling[`spec.enablePreviewScaling`] configuration switch, allowing -- for example -- the data service to be scaled when using standard Couchbase buckets.
 
-Autonomous Operator {operator-version-minor} provides automated backup and restore capabilities through a native integration with the Couchbase Server tool xref:server:backup-restore:enterprise-backup-restore.adoc[`cbbackupmgr`].
-Backups can be scheduled using the new xref:reference-couchbasebackup.adoc[`CouchbaseBackup` resource], which allows the functionality of `cbbackupmgr` to be configured in a similar way to any other resource managed by the Operator.
+== Administrator Password Rotation
 
-Read more about how to xref:howto-backup.adoc[Configure Backup & Restore].
+The Operator's persistence and caching layer has been upgraded in version {operator-version-minor}.
+This now enables fault-tolerant things like password and TLS rotation.
 
-== Couchbase XDCR Management
+Cluster Administrator passwords can now be rotated by xref:howto-admin-password-rotation[modifying the administrative authentication secret].
 
-The Autonomous Operator can now directly manage Cross Data Center Replication (XDCR) using the new xref:reference-couchbasereplication.adoc[CouchbaseReplication] resource.
+== Cluster Hibernation
 
-Read more about how to xref:howto-xdcr.adoc[Configure XDCR].
+There may be situations where a Couchbase cluster need not be running, for example when not needed in a development environment.
+By allowing a Couchbase cluster to be xref:concept-hibernation.adoc[hibernated], the Operator frees up unneeded compute resources required by cluster pods, and can lead to cost savings when used in conjunction with the Kubernetes cluster autoscaler.
 
-== Couchbase RBAC Management
+== Bulk Upgrades
 
-The Autonomous Operator can now directly manage the creation and authorization of Couchbase users (both local and LDAP).
-When combined with xref:concept-label-selection.adoc[label selection], the new xref:reference-couchbaseuser.adoc[CouchbaseUser], xref:reference-couchbasegroup.adoc[CouchbaseGroup], and xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding] resources allow a great deal of flexibility in how the Autonomous Operator can manage users in multi-cluster deployments.
+When performing upgrades, the Operator takes the safe approach -- upgrading one pod at a time.
+The major drawback to this approach is that it takes a long time, scaling linearly with the cluster size.
 
-Read more about managing xref:concept-user-rbac.adoc[Couchbase User RBAC].
+Operator version {operator-version-minor} introduces upgrade policies that can control upgrades.
+While the default policy is the same as before, you may set it to upgrade xref:concept-upgrade.adoc#upgrading-couchbase-server[all pods at once].
+This will reduce the time required for an upgrade substantially, at the expense of a more resource intensive operation.
 
-NOTE: Support for LDAP and RBAC requires Couchbase Server 6.5.
+== Amazon S3 Backup
 
-== Prometheus Metrics Collection
+The Couchbase cluster and Couchbase backup resources have been extended to allow use of new cloud backup features released in Couchbase Server 6.6.
 
-Autonomous Operator {operator-version-minor} provides native integration with the Couchbase Prometheus Exporter for collecting and exposing Couchbase Server metrics.
-These exported metrics can be scraped by Prometheus and then visualized in tools like Grafana.
+The global backup configuration for a cluster now accepts a secret containing Amazon AWS credentials that permit access to S3 object storage.
+Each backup resource may also be configured with an S3 bucket.
+By using an S3 bucket, backups are stored to the cloud instead of a Kubernetes persistent volume.
+This provides true off-site backups, decoupled from the underlying Kubernetes cluster.
 
-Read more about how to xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection].
+== Configuration Enhancements
 
-== Mutual TLS Support
+Operator version {operator-version-minor} includes added ability to modify Couchbase cluster configuration.
+This includes xref:reference-couchbasecluster.adoc#spec-cluster-indexer-threads[full control over the indexer], and xref:reference-couchbasebucket.adoc#spec-maxttl[bucket-level document expiration].
 
-Mutual TLS (mTLS) authentication between Couchbase Server and clients is now fully supported by the Autonomous Operator.
-With this mode of operation, not only do clients verify that they are talking to a trusted entity, but the Couchbase Server instance can also establish trust in the client.
+== Networking Enhancements
 
-Read more about xref:concept-tls.adoc#tls-client-authentication[TLS Client Authentication].
+With the coming of Couchbase Server 6.5, comes the ability to xref:howto-ui.adoc#configuring-an-ingress[use Kubernetes ingresses] to expose the administrative UI outside of the Kubernetes cluster.
 
-== Global Auto-Compaction Management
+Full support for Istio service mesh is now provided, and may be enabled in the xref:reference-couchbasecluster.adoc#spec-networking-networkplatform[Couchbase cluster networking configuration].
+This supports both basic and mTLS modes of operation.
 
-Global Auto-Compaction settings can now be managed directly from the xref:reference-couchbasecluster.adoc#spec-cluster-autocompaction[CouchbaseCluster] resource.
+== Upgrading to Operator 2.1
+
+Upgrading a previous release to Operator {operator-version-minor} follows the xref:howto-operator-upgrade.adoc[usual process], however there are some things you should be aware of.
+
+=== Before Upgrading
+
+The technical lower limit of the Operator is Kubernetes 1.14.
+Ensure your Kubernetes cluster is running this version or newer before upgrading.
+
+The TLS requirements have been modified.
+In order to ease the migration from legacy client bootstrap (CCCP) to the newest version (GCCCP), the Operator requires Couchbase cluster subject alternative names (SANs) to be updated.
+Consult the xref:tutorial-tls.adoc[TLS documentation] for a full list of all the required SANs and the xref:howto-tls-rotation.adoc[TLS rotation how-to] in order to prepare for upgrade.
+Failure to perform this step will result in errors from the dynamic admission controller (DAC) once upgraded.
+
+=== During Upgrade
+
+When upgrading Couchbase clusters from an earlier version of the Operator (prior to version {operator-version-minor}), the cluster will undergo a mandatory upgrade cycle.
+
+Pod readiness were previously driven by an `exec` based readiness probe.
+This was a security concern as it granted the Operator `pods/exec` privileges, and may be unacceptable in highly regulated environments.
+As of Operator version {operator-version-minor} this will now be performed using readiness gates, that use the Kubernetes API exclusively.
+
+You may use the <<bulk-upgrades>> feature to speed up this upgrade.
+To enable during the Operator upgrade, stop the old Operator, replace the CRDs, edit the Couchbase cluster resource to enable bulk upgrades before restarting the new Operator.

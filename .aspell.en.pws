@@ -73,6 +73,9 @@ IPv
 YAML
 yaml
 CVE
+HPA
+CCCP
+GCCCP
 Couchbase
 Kubernetes
 OpenSSL
