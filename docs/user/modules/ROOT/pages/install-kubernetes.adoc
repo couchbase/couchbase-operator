@@ -104,6 +104,12 @@ The CouchbaseBucket "test" is invalid: spec: Required value
 
 Uninstalling the DAC and Operator is the reverse of the installation process:
 
+[IMPORTANT]
+====
+If you are performing an uninstall in order to upgrade the Operator to a newer version, do not delete the CRDs as this is only relevant for a full uninstall.
+Failure to do so will result in the deletion of all Couchbase clusters.
+====
+
 [source,console]
 ----
 $ bin/cbopcfg generate operator | kubectl delete -f -
