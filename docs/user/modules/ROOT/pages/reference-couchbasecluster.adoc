@@ -40,7 +40,14 @@ spec:
     searchServiceMemoryQuota: 256Mi
     eventingServiceMemoryQuota: 256Mi
     analyticsServiceMemoryQuota: 1Gi
-    indexStorageSetting: memory_optimized
+    indexStorageSetting: memory_optimized # DEPRECATED
+    indexer:
+      threads: 1
+      logLevel: info
+      maxRollbackPoints: 2
+      memorySnapshotInterval: 200ms
+      stableSnapshotInterval: 5s
+      storageMode: memory_optimized
     autoFailoverTimeout: 120s
     autoFailoverMaxCount: 3
     autoFailoverOnDataDiskIssues: true
@@ -427,7 +434,14 @@ spec:
     searchServiceMemoryQuota: 256Mi
     eventingServiceMemoryQuota: 256Mi
     analyticsServiceMemoryQuota: 1Gi
-    indexStorageSetting: memory_optimized
+    indexStorageSetting: memory_optimized # DEPRECATED
+    indexer:
+      threads: 1
+      logLevel: info
+      maxRollbackPoints: 2
+      memorySnapshotInterval: 200ms
+      stableSnapshotInterval: 5s
+      storageMode: memory_optimized
     autoFailoverTimeout: 120s
     autoFailoverMaxCount: 3
     autoFailoverOnDataDiskIssues: true
@@ -505,10 +519,70 @@ ____
 
 === `spec.cluster.indexStorageSetting`
 
+[WARNING]
+====
+This field is deprecated and will be removed in a later release.
+This functionality is now provided by the <<spec-cluster-indexer-storagemode>> property.
+====
+
 Specifies the backend storage type to use for the index service. If the cluster already contains a Couchbase Server instance running the index service, then this parameter cannot be changed until all Couchbase instances running the index service are removed.
 
 ____
 _Field rules:_ The `indexStorageSetting` is optional and defaults to `memory_optimized`. Values allowed are `plasma` or `memory_optimized`. After the Couchbase cluster is deployed, the value of this field can only be changed if there are no Index nodes in the cluster.
+____
+
+=== `spec.cluster.indexer.threads`
+
+This field controls the number of threads allocated to the indexer.
+When 0, a thread will be created for each CPU.
+This defaults to `0`.
+
+____
+_Field rules:_ This field is optional and must be an integer greater than or equal to `0`.
+____
+
+=== `spec.cluster.indexer.logLevel`
+
+This field controls indexer logging.
+Defaults to `info`.
+
+____
+_Field rules:_ This field is optional and must be one of `silent`, `fatal`, `error`, `warn`, `info`, `verbose`, `timing`, `debug` or `trace`.
+____
+
+=== `spec.cluster.indexer.maxRollbackPoints`
+
+This field controls how many index rollback points to maintain.
+This defaults to `2`.
+____
+_Field rules:_ This field is optional and must be an integer greater than or equal to `1`.
+____
+
+=== `spec.cluster.indexer.memorySnapshotInterval`
+
+This field controls how frequently in-memory indexes should be snapshotted.
+This defaults to `200ms`.
+
+____
+_Field rules:_ This field is optional and must be a valid https://golang.org/pkg/time/#ParseDuration[duration^] greater than or equal to `1ms`.
+____
+
+=== `spec.cluster.indexer.stableSnapshotInterval`
+
+This field controls how frequently on-disk indexes should be snapshotted.
+This defaults to `5s`.
+
+____
+_Field rules:_ This field is optional and must be a valid https://golang.org/pkg/time/#ParseDuration[duration^] greater than or equal to `1ms`.
+____
+
+=== `spec.cluster.indexer.storageMode`
+
+This field controls the storage mode the indexer uses.
+The storage mode can only be modified when no server classes exist that contain the `index` service.
+
+____
+_Field rules:_ This field is optional and must be one of `memory_optimized` or `plasma`.
 ____
 
 === `spec.cluster.autoFailoverTimeout`
