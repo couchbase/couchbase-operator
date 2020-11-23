@@ -274,7 +274,7 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
 
 	// wait for the backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
 
 	// kill the cluster
 	for i := 0; i < mdsGroupSize; i++ {
@@ -290,7 +290,7 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 
 	// Expect the full backup to now complete.
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 15*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
