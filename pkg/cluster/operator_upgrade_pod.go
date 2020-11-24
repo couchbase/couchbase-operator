@@ -36,6 +36,7 @@ func newPodUpgradableResource(c *Cluster) upgradableResource {
 		actions: podUpgradeActionList{
 			{upgradeRange: upgradeRange{"0.0.0", "1.2.0"}, action: upgradePodFrom000000To010200},
 			{upgradeRange: upgradeRange{"1.2.0", "2.0.0"}, action: upgradePodFrom010200To020000},
+			{upgradeRange: upgradeRange{"2.0.0", "2.1.0"}, action: upgradePodFrom020000To020100},
 		},
 	}
 }
@@ -131,6 +132,15 @@ func upgradePodFrom010200To020000(cluster *Cluster, pod *corev1.Pod) error {
 			break
 		}
 	}
+
+	return nil
+}
+
+// upgradePodFrom020000To020100 performs pod upgrades to 2.1.0 from 2.0.0.
+// * The couchbase_server label was added and needs to be present on upgrade for the peer service.
+func upgradePodFrom020000To020100(cluster *Cluster, pod *corev1.Pod) error {
+	// Don't bother with updating the version, it will all be upgraded as it is...
+	pod.Labels[constants.LabelServer] = "true"
 
 	return nil
 }

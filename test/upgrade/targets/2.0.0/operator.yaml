@@ -1,0 +1,183 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  creationTimestamp: null
+  name: couchbase-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: couchbase-operator
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  - cronjobs
+  verbs:
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - couchbase.com
+  resources:
+  - couchbaseclusters
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - couchbase.com
+  resources:
+  - couchbasebuckets
+  - couchbaseephemeralbuckets
+  - couchbasememcachedbuckets
+  - couchbasereplications
+  - couchbaseusers
+  - couchbasegroups
+  - couchbaserolebindings
+  - couchbasebackups
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - couchbase.com
+  resources:
+  - couchbasebackuprestores
+  verbs:
+  - list
+  - watch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - create
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - list
+  - create
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - create
+  - delete
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  creationTimestamp: null
+  name: couchbase-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: couchbase-operator
+subjects:
+- kind: ServiceAccount
+  name: couchbase-operator
+  namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  name: couchbase-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: couchbase-operator
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: couchbase-operator
+    spec:
+      containers:
+      - args:
+        - --pod-create-timeout=10m0s
+        command:
+        - couchbase-operator
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        image: couchbase/operator:2.0.0
+        name: couchbase-operator
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8383
+          name: prometheus
+        resources: {}
+      serviceAccountName: couchbase-operator
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  name: couchbase-operator
+spec:
+  ports:
+  - name: http-pprof
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  - name: http-prometheus
+    port: 8383
+    protocol: TCP
+    targetPort: 8383
+  selector:
+    app: couchbase-operator
+status:
+  loadBalancer: {}
