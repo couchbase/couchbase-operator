@@ -1,10 +1,91 @@
 = Release Notes for Couchbase Autonomous Operator {operator-version-minor}
 include::partial$constants.adoc[]
 
-Couchbase Autonomous Operator {operator-version-minor} is a landmark release that's built to take advantage of the latest Kubernetes improvements in the areas of security and custom resources.
-The changes in this release enable several advancements in how you can manage, monitor, and deploy Couchbase clusters.
+Couchbase Autonomous Operator {operator-version-minor} is an incremental release that improves general behavior and security.
+It also extends functionality to allow automatic scaling of your Couchbase cluster resources, and provides additional configuration options.
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
+
+[#release-v210]
+== Release 2.1.0
+
+Couchbase Autonomous Operator 2.1.0 was released in December 2020.
+
+[#supported-platforms-v210]
+=== Platform Support
+
+For the latest platform support information, refer to xref:prerequisite-and-setup.adoc[].
+
+==== New Platform Support
+
+This release adds support for the following platforms:
+
+* Open Source Kubernetes 1.19
+* Red Hat OpenShift Container Platform 4.4, 4.5, 4.6
+
+==== Removed Platform Support
+
+This release drops support for the following platforms:
+
+* Couchbase Server 6.0
+* Open Source Kubernetes 1.14
+* Red Hat OpenShift Container Platform 4.1, 4.2
+
+[#changes-in-behavior-v210]
+=== Major Behavior Changes and Enhancements
+
+==== Improved Pod Readiness Checks
+
+Prior to this release, pod readiness was preformed with an exec based probe that looked for the presence of an operator created file.
+This required the "pods/exec" privilege, and is a security concern in some environments.
+
+The new method uses pod readiness gates, updating Kubernetes resources directly, and using existing required permissions.
+When upgrading to this release from an earlier one, existing Couchbase Clusters must undergo an upgrade to begin using this new readiness method.
+
+Additionally, Kubernetes clusters must be of version 1.14 or higher before upgrading the Operator.
+
+==== Improved Support for Ephemeral Clusters
+
+Ephemeral, in-memory caching has been a highly requested feature.
+With this release, we make ephemeral clusters more automated and highly-available.
+
+Ephemeral clusters will now recover from a total outage -- where all pods are deleted or enter into an error state.
+They can also enable forced failover -- where Couchbase Server inhibits auto-failover due to potential data loss, however being ephemeral, the data is lost regardless.
+
+These improvements will ease platform adoption as the Operator will constantly retry to create clusters, rather than entering into a failed state.
+
+[#fixed-issues-v210]
+=== Fixed Issues
+
+[#table-fixed-issues-v202,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-1676[K8S-1676^]
+a| *Summary:* The `Snappy` compression type was removed from the XDCR API from Couchbase Server 6.5.1 onward.
+As the Operator now supports 6.5.0+, this compression type has also been removed from the `CouchbaseReplication` Kubernetes configuration API.
+This is a backwards incompatible change.
+Modify all replications to use either `None` or `Auto` before upgrading existing clusters to Operator 2.1.0.
+
+a| https://issues.couchbase.com/browse/K8S-1675[K8S-1675^]
+a| *Summary:* A bucket -- by default -- is named after the Kubernetes resource, but may also be named explicitly in the bucket specification.
+The dynamic admission controller performed validation on replications, ensuring a corresponding named source bucket existed.
+This validation only looked at the Kubernetes resource name, and not the explicit name.
+The DAC now respect the explicit name overriding the resource name when validating.
+
+a| https://issues.couchbase.com/browse/K8S-1532[K8S-1532^]
+a| *Summary:* The cluster upgrade mechanism used to rely on the `CouchbaseCluster` status for stateful operations.
+The status shouldn't be relied upon for state, as it is not always preserved.
+This may in certain cases result in the Couchbase Server version as reported by the status being incorrect.
+
+a| https://issues.couchbase.com/browse/K8S-1471[K8S-1471^]
+a| *Summary:* IP address ranges on Couchbase Server pod services could not be updated.
+
+a| https://issues.couchbase.com/browse/K8S-1415[K8S-1415^]
+a| *Summary:* The `Available` condition on `CouchbaseCluster` status was set to `true` once the initial pod was created for a cluster.
+This behavior has been modified to only set the condition once the cluster is fully scaled to the initial size.
+`Available` now correctly reflects that the cluster is available and ready for use.
+|===
 
 [#release-v203]
 == Release 2.0.3
