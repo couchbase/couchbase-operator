@@ -23,7 +23,7 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| Certified 6.0.4, 6.5, 6.6footnote:202-requirement[Requires Couchbase Autonomous Operator 2.0.2 or later]
+| Certified 6.5, 6.6
 
 _Unless otherwise stated, maintenance/patch releases (x.x**.X**) inherit the same support level._
 |===
@@ -35,12 +35,14 @@ _Unless otherwise stated, maintenance/patch releases (x.x**.X**) inherit the sam
 | Platform | Version
 
 | Open Source Kubernetes
-| Certified 1.14, 1.15, 1.16footnote:202-requirement[], 1.17footnote:202-requirement[], 1.18footnote:202-requirement[]
+| Certified 1.17, 1.18
+
+Supported 1.15, 1.16, 1.19
 
 | Red Hat OpenShift Container Platform
-| Certified 4.3
+| Certified 4.4
 
-Supported 4.1, 4.2
+Supported 4.3, 4.5, 4.6
 |===
 
 === Public Kubernetes Service Compatibility
