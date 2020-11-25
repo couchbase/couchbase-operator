@@ -12,7 +12,7 @@ pipeline {
   stages {
     stage('Go Install') {
       steps {
-        sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
+        sh 'wget -q -O- https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz | tar xz'
       }
     }
     stage('Post Checkout') {
