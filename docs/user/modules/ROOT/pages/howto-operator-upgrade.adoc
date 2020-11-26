@@ -4,16 +4,18 @@
 
 [IMPORTANT]
 ====
-Users upgrading from Operator version 1.x.x must fully read and understand the <<update-resources,resource update>> step before continuing.
+There is no direct upgrade path from versions prior it 2.0.x.
+To upgrade from a version 1.x.x release, first upgrade to 2.0.x paying particular attention to supported Kubernetes platforms and Couchbase server versions.
 ====
 
 Upgrading the Couchbase Autonomous Operator is a four-step process:
 
 - <<download-operator, Step 1: Download the New Operator Package>>
-- <<uninstall-operator, Step 2: Uninstall the Old Operator>>
+- <<uninstall-operator, Step 2: Uninstall the Old DAC and Operator>>
 - <<update-crd, Step 3: Update the CRDs>>
-- <<update-resources, Step 4: (Optional) Update the Resources>>
-- <<install-operator, Step 5: Install the New Operator>>
+- <<install-operator, Step 4: Install the New Operator>>
+
+Additional steps may be required on a per-release basis, consult the xref:whats-new.adoc[what's new?] and xref:release-notes.adoc[release notes] for details.
 
 [#download-operator]
 == Step 1: Download the New Operator Package
@@ -26,13 +28,13 @@ IMPORTANT: After you unpack the download, the resulting directory will be titled
 
 
 [#uninstall-operator]
-== Step 2: Uninstall the Old Operator
+== Step 2: Uninstall the Old DAC and Operator
 
 What needs to be uninstalled is dependent on the release you are upgrading from.
 For example, in releases prior to 1.2.0, the Operator used `ClusterRole` resources for simplicity of configuration.
 From 1.2.0 onward, the operator uses `Role` resources to increase security.
 
-In general, you'll need to undo the installation steps in reverse order for the specific version of the Operator you are upgrading from.
+In general, you'll need to undo the installation steps in reverse order for the specific version of the Operator you are upgrading from, e.g. uninstall the operator, then uninstall the DAC.
 
 [WARNING]
 ====
@@ -80,62 +82,8 @@ $ oc create -f crd.yaml
 --
 ====
 
-[#update-resources]
-== Step 4: (Optional) Update the Resources
-
-If you are *not* upgrading from Operator 1.x, skip to the <<install-operator,next step>>.
-
-Couchbase custom resources -- such as xref:reference-couchbasecluster.adoc[`CouchbaseCluster`] -- changed in a way that is not backwards compatible between Operator versions 1 and 2.
-There is no Kubernetes-native upgrade path, so we provide a tool to perform this step for you.
-
-[IMPORTANT]
-====
-* The following process cannot be undone; ensure your data is fully backed up before continuing.
-* The supported Kubernetes versions are unable run different custom resource versions at the same time.
-  Ensure all instances of the Operator in different namespaces are shut down before continuing.
-* All `CouchbaseCluster` resources in a namespace must be upgraded before restarting the Operator in that namespace.
-* Upon Operator restart, the cluster will undergo a mandatory rolling upgrade to generate required metadata.
-  Ensure your Kubernetes cluster has the required xref:concept-sizing.adoc[capacity] to support this operation.
-====
-
-The `cbopconv` tool takes a version 1 `CouchbaseCluster` and converts it to version 2.
-Beginning with Operator version 2, data buckets are defined as separate resources, so `cbopconv` will automatically create these for you.
-Clusters and buckets will be automatically populated with explicit xref:concept-label-selection.adoc[label selection].
-The Operator now persists cluster related data in a `ConfigMap` and `cbopconv` will create this for you.
-
-The resources that `cbopconv` creates will be a like for like replacement.
-No new features will be enabled (e.g. managed XDCR or RBAC), with the exception of auto-compaction settings.
-Be aware that auto-compaction settings will be set to Couchbase server defaults and you may wish to edit them before restarting the Operator in <<install-operator,step 5>>.
-
-The `cbopcfg` command is interactive and will check that resources are valid before continuing, display the intended upgraded and new resources, and finally prompt for permission to continue.
-The user may take this opportunity to review the proposed changes before committing them, or abort the process.
-
-The `cbopconv` command is distributed in the Operator package downloaded in <<download-operator,step 1>>.
-To run the upgrade, in each required namespace, run the following.
-
-[source,console]
-----
-$ ./cbopconv --namespace default
-----
-
-[IMPORTANT]
-====
-The requirements for TLS certificates have changed from Operator version 2.0.0 onward.
-TLS certificates should be upgraded before starting the resource upgrade procedure.
-Please consult the xref:tutorial-tls.adoc#creating-a-couchbase-cluster-server-certificate[TLS tutorial] for certificate requirements, in particular the mandatory X.509 subject alternative names.
-The `cbopconv` tool will refuse to upgrade clusters until this step has been performed.
-The Operator will handle certificate rotation upon restart in the next step, however it can be performed before the entire upgrade procedure is started.
-====
-
-[NOTE]
-====
-You can safely install the Dynamic Admission Controller -- on its own -- before running this update step.
-This will provide additional safety by validating updated and new resources for correctness.
-Separate installation instructions are documented for xref:install-kubernetes.adoc#custom-installation[Kubernetes] and xref:install-openshift.adoc#custom-installation[OpenShift].
-====
-
 [#install-operator]
-== Step 5: Install the New Operator
+== Step 4: Install the New Operator
 
 After all the previous steps, you can move on to upgrading the Operator itself.
 Upgrading the Operator is exactly the same as the initial installation, except that you don't re-install the CRD.

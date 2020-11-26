@@ -4,7 +4,6 @@ OPERATOR_BINARY = build/bin/couchbase-operator
 ADMISSION_BINARY = build/bin/couchbase-operator-admission
 CBOPCFG_BINARY = build/bin/cbopcfg
 CBOPINFO_BINARY = build/bin/cbopinfo
-CBOPCONV_BINARY = build/bin/cbopconv
 ARTIFACTS = build/artifacts
 OPERATOR_ARTIFACTS = $(ARTIFACTS)/couchbase-operator
 ADMISSION_ARTIFACTS = $(ARTIFACTS)/couchbase-admission-controller
@@ -134,7 +133,7 @@ pkg/generated/informers: pkg/generated/clientset pkg/generated/listers
 	go run k8s.io/code-generator/cmd/informer-gen --input-dirs $(API_PACKAGE_V1),$(API_PACKAGE_V2) --versioned-clientset-package $(CLIENTSET_PACKAGE)/$(CLIENTSET_NAME) --listers-package $(LISTERS_PACKAGE) --output-package $(INFORMERS_PACKAGE) $(CODEGEN_ARGS)
 
 # Make the main binaries
-binaries: $(OPERATOR_BINARY) $(ADMISSION_BINARY) $(CBOPCFG_BINARY) $(CBOPINFO_BINARY) $(CBOPCONV_BINARY)
+binaries: $(OPERATOR_BINARY) $(ADMISSION_BINARY) $(CBOPCFG_BINARY) $(CBOPINFO_BINARY)
 
 # Operator binary build target.
 $(OPERATOR_BINARY): $(GENERATED_FILES) $(SOURCE)
@@ -151,10 +150,6 @@ $(CBOPCFG_BINARY): $(GENERATED_FILES) $(SOURCE)
 # cbopinfo binary build target.
 $(CBOPINFO_BINARY): $(GENERATED_FILES) $(SOURCE)
 	$(GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/cbopinfo
-
-# cbopconv binary build target.
-$(CBOPCONV_BINARY): $(GENERATED_FILES) $(SOURCE)
-	$(GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/cbopconv
 
 # Build target for the CRD files.
 crd: $(CRD_FILE)
@@ -222,9 +217,6 @@ tools: generated
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopinfo.exe -ldflags $(LDFLAGS) ./cmd/cbopinfo/
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopconv -ldflags $(LDFLAGS) ./cmd/cbopconv
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopconv -ldflags $(LDFLAGS) ./cmd/cbopconv
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopconv.exe -ldflags $(LDFLAGS) ./cmd/cbopconv
 
 tools-platform-specific:
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/

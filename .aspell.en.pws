@@ -144,7 +144,6 @@ latencies
 scalable
 cbopcfg
 cbopinfo
-cbopconv
 ulimit
 ulimits
 cron
