@@ -44,7 +44,6 @@ const (
 
 var (
 	emptyObject = struct{}{}
-	emptyArray  = []struct{}{}
 )
 
 func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
@@ -154,30 +153,6 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
-	}
-
-	// Due to recursive auto-CRD generation, pod templates need to have a containers attribute.
-	// I'd argue having these 3rd party things finally checked is worth it for the hoops we have
-	// to jump through to avoid validation errors.
-	if classes, found, _ := unstructured.NestedSlice(object.Object, "spec", "servers"); found {
-		for index := range classes {
-			obj, ok := classes[index].(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			if _, found, _ := unstructured.NestedFieldNoCopy(obj, "pod"); !found {
-				continue
-			}
-
-			if _, found, _ := unstructured.NestedFieldNoCopy(obj, "pod", "spec"); !found {
-				continue
-			}
-
-			if v, found, _ := unstructured.NestedFieldNoCopy(obj, "pod", "spec", "containers"); !found || v == nil {
-				patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: fmt.Sprintf("/spec/servers/%d/pod/spec/containers", index), Value: emptyArray})
-			}
-		}
 	}
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {

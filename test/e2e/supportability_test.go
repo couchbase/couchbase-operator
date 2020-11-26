@@ -1024,8 +1024,6 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	defer func() { _ = framework.RemoveServiceAccount(targetKube, cluster.Name) }()
-
 	// Create a kubernetes configuration file.
 	sa, err := targetKube.KubeClient.CoreV1().ServiceAccounts(targetKube.Namespace).Get(cluster.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1106,8 +1104,8 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		e2eutil.Die(t, fmt.Errorf("Able to read resource without valid rbac permissions"))
 	}
 
-	if !strings.Contains(execOutStr, "unable to poll CouchbaseCluster resources") {
-		e2eutil.Die(t, fmt.Errorf("Invalid error message"))
+	if !strings.Contains(execOutStr, "is forbidden") {
+		e2eutil.Die(t, fmt.Errorf("Invalid error message: %v", execOutStr))
 	}
 }
 

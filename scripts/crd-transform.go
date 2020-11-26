@@ -90,18 +90,25 @@ var discard = pathMatcher{
 		kind:  "CouchbaseCluster",
 		path:  ".spec.validation.openAPIV3Schema.properties.spec.properties.volumeClaimTemplates.items.properties.spec.properties.dataSource",
 	},
+	// Validation is "broken" for pod templates, in that they require at least
+	// one container, so remove this restriction.
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.validation.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.containers",
+	},
 }
 
 func prune(in interface{}, group, kind, path string) (interface{}, error) {
 	// Discard anything we are forced to.
 	if discard.contains(group, kind, path) {
-		glog.V(1).Info("Discarding", group, kind, path)
+		glog.V(1).Infof("Discarding %s %s %s", group, kind, path)
 		return nil, nil
 	}
 
 	// Keep anything we are forced to.
 	if retain.contains(group, kind, path) {
-		glog.V(1).Info("Retaining", group, kind, path)
+		glog.V(1).Infof("Retaining %s %s %s", group, kind, path)
 		return in, nil
 	}
 
