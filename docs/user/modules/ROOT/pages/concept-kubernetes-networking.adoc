@@ -44,6 +44,7 @@ It has a routing entry saying that to get to subnet `10.0.1.0/24`, send it to th
 In order to establish a connection between two node networks, all you need to do is establish a VPN connection between the two routers.
 Remote network prefixes can be defined either statically or dynamically via a protocol such as Border Gateway Protocol (BGP).
 
+.Routed Network Architecture
 image:NetworkDocsRouted-Routed.png["Routed network architecture"]
 
 TIP: Some CNI plugins may use BGP peering between nodes to learn pod network prefixes.
@@ -69,4 +70,35 @@ However, the encapsulation and decapsulation process is not without cost, and wi
 When establishing a tunnel between two Kubernetes clusters that are running overlay networks, by default, the pods from one cluster will not be able to talk to the pods in another.
 While it is possible, it is not easy relying on a node receiving traffic from the remote cluster, performing SNAT to avoid asymmetric routing, and then encapsulating it an putting it into the overlay.
 
+.Overlay Network Architecture
 image:NetworkDocsRouted-Overlay.png["Overlay network architecture"]
+
+== Inter-Kubernetes Networking
+
+Regardless of the network technology you deploy there are a number of rules to be aware of when forming connections between Kubernetes clusters.
+
+Networking is complex, if in _any_ doubt, ask an expert about IP address management (IPAM).
+
+=== IP Address Ranges
+
+Any addressable entity within the network must be unique.
+If more than one entity shared the same address, there would be ambiguity and network traffic may not end up being sent to the correct recipient.
+
+For routed networking this means that for each Kubernetes cluster, the address range for the pod subnet and the node subnet must be different from every other pod and node subnet within the same network.
+
+For overlay networking, only the node subnets must be unique as pods are not directly addressable from outside of a Kubernetes cluster.
+
+=== VIP Address Ranges and Black Holes
+
+Less intuitively, the IP address ranges chosen for Kubernetes services must also not alias with any addressable entity.
+These virtual IP (VIP) address ranges, can, however, be reused within different Kubernetes clusters as they are virtual within the Kubernetes cluster, and not visible to within the outside network.
+
+.Routing Black Holes
+image:BlackHoles.png["Routing black holes"]
+
+In the previous diagram, we illustrate what happens when a VIP address range aliases with another addressable entity on the network.
+A client, is able to directly connect to a pod from outside of the Kubernetes cluster.
+The client's address in the packet is 10.32.0.7.
+
+When the pod tries to respond to the client, there is a problem in that the Kubernetes cluster's VIP range aliases with that of the client.
+Instead of routing the reply back to the client, a service that aliases with the client's IP address intercepts the reply, and the reply is most likely dropped entirely.

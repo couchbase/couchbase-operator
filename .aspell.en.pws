@@ -76,6 +76,7 @@ CVE
 HPA
 CCCP
 GCCCP
+IPAM
 Couchbase
 Kubernetes
 OpenSSL
