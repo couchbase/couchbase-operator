@@ -8,6 +8,8 @@
 package fake
 
 import (
+	"context"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -28,7 +30,7 @@ var couchbaseusersResource = schema.GroupVersionResource{Group: "couchbase.com",
 var couchbaseusersKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseUser"}
 
 // Get takes name of the couchbaseUser, and returns the corresponding couchbaseUser object, and an error if there is any.
-func (c *FakeCouchbaseUsers) Get(name string, options v1.GetOptions) (result *v2.CouchbaseUser, err error) {
+func (c *FakeCouchbaseUsers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseUser, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(couchbaseusersResource, c.ns, name), &v2.CouchbaseUser{})
 
@@ -39,7 +41,7 @@ func (c *FakeCouchbaseUsers) Get(name string, options v1.GetOptions) (result *v2
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseUsers that match those selectors.
-func (c *FakeCouchbaseUsers) List(opts v1.ListOptions) (result *v2.CouchbaseUserList, err error) {
+func (c *FakeCouchbaseUsers) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseUserList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(couchbaseusersResource, couchbaseusersKind, c.ns, opts), &v2.CouchbaseUserList{})
 
@@ -61,14 +63,14 @@ func (c *FakeCouchbaseUsers) List(opts v1.ListOptions) (result *v2.CouchbaseUser
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseUsers.
-func (c *FakeCouchbaseUsers) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCouchbaseUsers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(couchbaseusersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a couchbaseUser and creates it.  Returns the server's representation of the couchbaseUser, and an error, if there is any.
-func (c *FakeCouchbaseUsers) Create(couchbaseUser *v2.CouchbaseUser) (result *v2.CouchbaseUser, err error) {
+func (c *FakeCouchbaseUsers) Create(ctx context.Context, couchbaseUser *v2.CouchbaseUser, opts v1.CreateOptions) (result *v2.CouchbaseUser, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(couchbaseusersResource, c.ns, couchbaseUser), &v2.CouchbaseUser{})
 
@@ -79,7 +81,7 @@ func (c *FakeCouchbaseUsers) Create(couchbaseUser *v2.CouchbaseUser) (result *v2
 }
 
 // Update takes the representation of a couchbaseUser and updates it. Returns the server's representation of the couchbaseUser, and an error, if there is any.
-func (c *FakeCouchbaseUsers) Update(couchbaseUser *v2.CouchbaseUser) (result *v2.CouchbaseUser, err error) {
+func (c *FakeCouchbaseUsers) Update(ctx context.Context, couchbaseUser *v2.CouchbaseUser, opts v1.UpdateOptions) (result *v2.CouchbaseUser, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(couchbaseusersResource, c.ns, couchbaseUser), &v2.CouchbaseUser{})
 
@@ -90,7 +92,7 @@ func (c *FakeCouchbaseUsers) Update(couchbaseUser *v2.CouchbaseUser) (result *v2
 }
 
 // Delete takes name of the couchbaseUser and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseUsers) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCouchbaseUsers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(couchbaseusersResource, c.ns, name), &v2.CouchbaseUser{})
 
@@ -98,15 +100,15 @@ func (c *FakeCouchbaseUsers) Delete(name string, options *v1.DeleteOptions) erro
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseUsers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbaseusersResource, c.ns, listOptions)
+func (c *FakeCouchbaseUsers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(couchbaseusersResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2.CouchbaseUserList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched couchbaseUser.
-func (c *FakeCouchbaseUsers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseUser, err error) {
+func (c *FakeCouchbaseUsers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseUser, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(couchbaseusersResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseUser{})
 

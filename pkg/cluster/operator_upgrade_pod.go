@@ -1,9 +1,12 @@
 package cluster
 
 import (
+	"context"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // podUpgradeFunc is a function that applies an upgrade to a pod resource.
@@ -89,7 +92,7 @@ func (r *podUpgradableResource) perform(item, action int) error {
 
 func (r *podUpgradableResource) commit(item int) error {
 	pod := r.pods[item]
-	if _, err := r.cluster.k8s.KubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(pod); err != nil {
+	if _, err := r.cluster.k8s.KubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
 		return err
 	}
 

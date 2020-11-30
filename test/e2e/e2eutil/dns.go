@@ -1,6 +1,7 @@
 package e2eutil
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -49,7 +50,7 @@ func getSearchDomains(local *types.Cluster) []string {
 
 func findDNSService(k8s *types.Cluster) (string, string, error) {
 	for namespace, service := range dnsServices {
-		if _, err := k8s.KubeClient.CoreV1().Services(namespace).Get(service, metav1.GetOptions{}); err == nil {
+		if _, err := k8s.KubeClient.CoreV1().Services(namespace).Get(context.Background(), service, metav1.GetOptions{}); err == nil {
 			return namespace, service, nil
 		}
 	}
@@ -61,39 +62,39 @@ func findDNSService(k8s *types.Cluster) (string, string, error) {
 // namespace to the remote cluster's authoratative DNS server, and everything else
 // to the local cluster's authoratative DNS server.  It returns the DNS service and
 // a cleanup callback.
-func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), error) {
+func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, error) {
 	namespace, service, err := findDNSService(remote)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// Get a remote DNS endpoint.
-	endpoints, err := remote.KubeClient.CoreV1().Endpoints(namespace).Get(service, metav1.GetOptions{})
+	endpoints, err := remote.KubeClient.CoreV1().Endpoints(namespace).Get(context.Background(), service, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if len(endpoints.Subsets) != 1 {
-		return nil, nil, fmt.Errorf("dns endpoints object contains unexpected number of subsets: %d", len(endpoints.Subsets))
+		return nil, fmt.Errorf("dns endpoints object contains unexpected number of subsets: %d", len(endpoints.Subsets))
 	}
 
 	if len(endpoints.Subsets[0].Addresses) == 0 {
-		return nil, nil, fmt.Errorf("dns endpoints object contains no addresses")
+		return nil, fmt.Errorf("dns endpoints object contains no addresses")
 	}
 
 	remoteAddress := endpoints.Subsets[0].Addresses[0].IP
 	if remoteAddress == "" {
-		return nil, nil, fmt.Errorf("dns endpoint address is empty")
+		return nil, fmt.Errorf("dns endpoint address is empty")
 	}
 
 	// Get the local DNS endpoint.
-	localDNSService, err := local.KubeClient.CoreV1().Services(namespace).Get(service, metav1.GetOptions{})
+	localDNSService, err := local.KubeClient.CoreV1().Services(namespace).Get(context.Background(), service, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	localAddress := localDNSService.Spec.ClusterIP
 	if localAddress == "" {
-		return nil, nil, fmt.Errorf("dns service cluster IP is empty")
+		return nil, fmt.Errorf("dns service cluster IP is empty")
 	}
 
 	// Create the resources.
@@ -106,10 +107,8 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 		},
 	}
 
-	_ = local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
-
-	if _, err := local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Create(configMap); err != nil {
-		return nil, nil, err
+	if _, err := local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Create(context.Background(), configMap, metav1.CreateOptions{}); err != nil {
+		return nil, err
 	}
 
 	replicas := int32(1)
@@ -170,10 +169,9 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 			},
 		},
 	}
-	_ = local.KubeClient.AppsV1().Deployments(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
 
-	if _, err := local.KubeClient.AppsV1().Deployments(local.Namespace).Create(deployment); err != nil {
-		return nil, nil, err
+	if _, err := local.KubeClient.AppsV1().Deployments(local.Namespace).Create(context.Background(), deployment, metav1.CreateOptions{}); err != nil {
+		return nil, err
 	}
 
 	coreService := &corev1.Service{
@@ -201,31 +199,23 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, func(), er
 		},
 	}
 
-	_ = local.KubeClient.CoreV1().Services(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
-
-	svc, err := local.KubeClient.CoreV1().Services(local.Namespace).Create(coreService)
+	svc, err := local.KubeClient.CoreV1().Services(local.Namespace).Create(context.Background(), coreService, metav1.CreateOptions{})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	cleanup := func() {
-		_ = local.KubeClient.CoreV1().Services(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
-		_ = local.KubeClient.AppsV1().Deployments(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
-		_ = local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Delete(resourceName, metav1.NewDeleteOptions(0))
-	}
-
-	return svc, cleanup, nil
+	return svc, nil
 }
 
 // MustProvisionCoreDNS reates a CoreDNS instance that forwards requests to the remote
 // namespace to the remote cluster's authoratative DNS server, and everything else
 // to the local cluster's authoratative DNS server.  It returns the DNS service and
 // a cleanup callback.
-func MustProvisionCoreDNS(t *testing.T, local, remote *types.Cluster) (*corev1.Service, func()) {
-	svc, cleanup, err := provisionCoreDNS(local, remote)
+func MustProvisionCoreDNS(t *testing.T, local, remote *types.Cluster) *corev1.Service {
+	svc, err := provisionCoreDNS(local, remote)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return svc, cleanup
+	return svc
 }

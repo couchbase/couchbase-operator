@@ -2,6 +2,7 @@
 package clustercapabilities
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -47,7 +48,7 @@ type Capabilities struct {
 // NewCapabilities returns a new populated Capabilities struct.
 func NewCapabilities(client kubernetes.Interface) (*Capabilities, error) {
 	// List all nodes in the cluster (requires admin privileges on OpenShift)
-	nodes, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

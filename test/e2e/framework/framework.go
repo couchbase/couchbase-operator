@@ -553,14 +553,14 @@ func recreateCRDs(k8s *types.Cluster) error {
 		return fmt.Errorf("failed to create clientset object: %v", err)
 	}
 
-	crds, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	crds, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list CRDs: %v", err)
 	}
 
 	for _, crd := range crds.Items {
 		if crd.Spec.Group == "couchbase.com" {
-			if err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Delete(crd.Name, metav1.NewDeleteOptions(0)); err != nil {
+			if err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Delete(context.Background(), crd.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				return fmt.Errorf("failed to delete CRD: %v", err)
 			}
 
@@ -588,13 +588,13 @@ func recreateCRDs(k8s *types.Cluster) error {
 			return err
 		}
 
-		if _, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Create(crd); err != nil {
+		if _, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Create(context.Background(), crd, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 
 		// Ensure CRDs are installed and working before proceeding.
 		callback := func() error {
-			crd, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+			crd, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crd.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -657,7 +657,7 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		nodeTaintList := []v1.Taint{}
 
-		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get node list: %v", err)
 		}
@@ -685,7 +685,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 	logrus.Info("Cleaning-Up Namespaces")
 
-	namespaces, err := k8s.KubeClient.CoreV1().Namespaces().List(metav1.ListOptions{})
+	namespaces, err := k8s.KubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -699,7 +699,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 			continue
 		}
 
-		if err := k8s.KubeClient.CoreV1().Namespaces().Delete(namespace.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := k8s.KubeClient.CoreV1().Namespaces().Delete(context.Background(), namespace.Name, *metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
@@ -737,7 +737,7 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 }
 
 func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(k8s.OperatorDeployment); err != nil {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(context.Background(), k8s.OperatorDeployment, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
@@ -756,7 +756,7 @@ func (f *Framework) GetOperatorRestartCount(k8s *types.Cluster) (int32, error) {
 	var operatorPod *v1.Pod
 
 	err = retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
-		operatorPod, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(operatorPodName, metav1.GetOptions{})
+		operatorPod, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), operatorPodName, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -781,7 +781,7 @@ func DeleteOperatorCompletely(k8s *types.Cluster, deploymentName string) error {
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
 	return retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
-		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(deploymentName, metav1.GetOptions{})
+		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
 		if err == nil {
 			return false, err
 		}
@@ -800,7 +800,7 @@ func deleteOperator(k8s *types.Cluster, deploymentName string) error {
 	deleteOpts := metav1.NewDeleteOptions(0)
 	deleteOpts.PropagationPolicy = &deletePropagation
 
-	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(deploymentName, deleteOpts); err != nil {
+	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(context.Background(), deploymentName, *deleteOpts); err != nil {
 		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}
@@ -978,7 +978,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 
 	var err error
 
-	namespace, err = cluster.KubeClient.CoreV1().Namespaces().Create(namespace)
+	namespace, err = cluster.KubeClient.CoreV1().Namespaces().Create(context.Background(), namespace, metav1.CreateOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -1037,7 +1037,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 		}
 
 		// Cleanup, which is now trivial.
-		if err := cluster.KubeClient.CoreV1().Namespaces().Delete(cluster.Namespace, metav1.NewDeleteOptions(0)); err != nil {
+		if err := cluster.KubeClient.CoreV1().Namespaces().Delete(context.Background(), cluster.Namespace, *metav1.NewDeleteOptions(0)); err != nil {
 			logrus.Warnf("failed to delete namespace %s", cluster.Namespace)
 		}
 

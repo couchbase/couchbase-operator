@@ -1,6 +1,8 @@
 package types
 
 import (
+	"context"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
@@ -53,7 +55,7 @@ type kubeAbstractionImpl struct {
 // secretExists checks whether the named secret exists in the specified namespace.
 func (ab *kubeAbstractionImpl) GetSecret(namespace, name string) (*corev1.Secret, error) {
 	// Warning, this returns a valid pointer on error
-	secret, err := ab.client.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	secret, err := ab.client.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -68,7 +70,7 @@ func (ab *kubeAbstractionImpl) GetSecret(namespace, name string) (*corev1.Secret
 // storageClassExists checks whether the named stoage class exists.
 func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageClass, error) {
 	// Warning, this returns a valid pointer on error
-	storageClass, err := ab.client.StorageV1().StorageClasses().Get(name, metav1.GetOptions{})
+	storageClass, err := ab.client.StorageV1().StorageClasses().Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -82,12 +84,12 @@ func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageC
 
 // GetNamespace returns the requested namespace.
 func (ab *kubeAbstractionImpl) GetNamespace(name string) (*corev1.Namespace, error) {
-	return ab.client.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
+	return ab.client.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{})
 }
 
 // GetCouchbaseClusters returns all clusters in the specified namespace.
 func (ab *kubeAbstractionImpl) GetCouchbaseClusters(namespace string) (*couchbasev2.CouchbaseClusterList, error) {
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseClusters(namespace).List(context.Background(), metav1.ListOptions{})
 }
 
 // GetCouchbaseBuckets returns all couchbase buckets for a specified selector.
@@ -98,7 +100,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBuckets(namespace string, selector *m
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseBuckets(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseBuckets(namespace).List(context.Background(), listOpts)
 }
 
 // GetCouchbaseEphemeralBuckets returns all ephemeral buckets for a specified selector.
@@ -109,7 +111,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseEphemeralBuckets(namespace string, se
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(context.Background(), listOpts)
 }
 
 // GetCouchbaseMemcachedBuckets returns all memcached buckets for a specified selector.
@@ -120,7 +122,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseMemcachedBuckets(namespace string, se
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(context.Background(), listOpts)
 }
 
 // GetCouchbaseReplications returns all replications for a specified selector.
@@ -131,7 +133,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseReplications(namespace string, select
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseReplications(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseReplications(namespace).List(context.Background(), listOpts)
 }
 
 // GetCouchbaseUsers returns all users for a specified selector.
@@ -142,7 +144,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseUsers(namespace string, selector *met
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseUsers(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseUsers(namespace).List(context.Background(), listOpts)
 }
 
 // GetCouchbaseGroups returns all users for a specified selector.
@@ -153,7 +155,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseGroups(namespace string, selector *me
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseGroups(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseGroups(namespace).List(context.Background(), listOpts)
 }
 
 // GetCouchbaseRoleBindings returns all user role bindings for a specified selector.
@@ -164,7 +166,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseRoleBindings(namespace string, select
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseRoleBindings(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseRoleBindings(namespace).List(context.Background(), listOpts)
 }
 
 func (ab *kubeAbstractionImpl) GetCouchbaseBackups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupList, error) {
@@ -174,7 +176,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBackups(namespace string, selector *m
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackups(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackups(namespace).List(context.Background(), listOpts)
 }
 
 func (ab *kubeAbstractionImpl) GetCouchbaseBackupRestores(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupRestoreList, error) {
@@ -184,7 +186,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBackupRestores(namespace string, sele
 		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackupRestores(namespace).List(listOpts)
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackupRestores(namespace).List(context.Background(), listOpts)
 }
 
 // Validator is an abstraction layer for communicating with kubernetes

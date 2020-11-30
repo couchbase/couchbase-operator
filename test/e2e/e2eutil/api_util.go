@@ -20,19 +20,19 @@ import (
 )
 
 func GetCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
-	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Get(context.Background(), cl.Name, metav1.GetOptions{})
 }
 
 func CreateCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
-	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Create(cl)
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Create(context.Background(), cl, metav1.CreateOptions{})
 }
 
 func DeleteCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) error {
-	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Delete(cl.Name, nil)
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Delete(context.Background(), cl.Name, metav1.DeleteOptions{})
 }
 
 func UpdateCouchbaseCluster(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
-	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Update(cl)
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Update(context.Background(), cl, metav1.UpdateOptions{})
 }
 
 // Gets events for a CouchbaseCluster and returns them sorted by time (oldest to newest).
@@ -43,7 +43,7 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, couchbase *couchbasev2.Cou
 		"involvedObject.name":       couchbase.Name,
 	}
 
-	list, err := kubeCli.CoreV1().Events(couchbase.Namespace).List(metav1.ListOptions{FieldSelector: labels.FormatLabels(selector)})
+	list, err := kubeCli.CoreV1().Events(couchbase.Namespace).List(context.Background(), metav1.ListOptions{FieldSelector: labels.FormatLabels(selector)})
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, couchbase *couchbasev2.Cou
 // Updates K8S nodes with given Unschedulable and Taint values.
 func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnschedulable bool, podTaintList []v1.Taint, nodeIndex int) (err error) {
 	for retryCount := 0; retryCount < 3; retryCount++ {
-		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			continue
 		}
@@ -71,7 +71,7 @@ func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnsch
 		nodeToTaint.Spec.Unschedulable = isUnschedulable
 		nodeToTaint.Spec.Taints = podTaintList
 
-		if _, err = kubeClient.CoreV1().Nodes().Update(&nodeToTaint); err == nil {
+		if _, err = kubeClient.CoreV1().Nodes().Update(context.Background(), &nodeToTaint, metav1.UpdateOptions{}); err == nil {
 			break
 		}
 	}
@@ -84,14 +84,14 @@ func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		Die(t, err)
 	}
 
 	for _, n := range nodes.Items {
 		// Kick everything off the node immediately.
-		node, err := k8s.KubeClient.CoreV1().Nodes().Get(n.Name, metav1.GetOptions{})
+		node, err := k8s.KubeClient.CoreV1().Nodes().Get(context.Background(), n.Name, metav1.GetOptions{})
 		if err != nil {
 			Die(t, err)
 		}
@@ -104,7 +104,7 @@ func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration)
 			},
 		}
 
-		if _, err = k8s.KubeClient.CoreV1().Nodes().Update(node); err != nil {
+		if _, err = k8s.KubeClient.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{}); err != nil {
 			Die(t, err)
 		}
 
@@ -113,7 +113,7 @@ func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration)
 
 		// Wait for PDBs to allow eviction before scheduling the next death.
 		callback := func() error {
-			pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(k8s.Namespace).List(metav1.ListOptions{})
+			pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -132,14 +132,14 @@ func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration)
 		}
 
 		// Untaint the node.
-		node, err = k8s.KubeClient.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+		node, err = k8s.KubeClient.CoreV1().Nodes().Get(context.Background(), node.Name, metav1.GetOptions{})
 		if err != nil {
 			Die(t, err)
 		}
 
 		node.Spec.Taints = nil
 
-		if _, err := k8s.KubeClient.CoreV1().Nodes().Update(node); err != nil {
+		if _, err := k8s.KubeClient.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{}); err != nil {
 			Die(t, err)
 		}
 	}
@@ -153,7 +153,7 @@ func MustValidatePodReadiness(t *testing.T, k8s *types.Cluster, cluster *couchba
 	name := couchbaseutil.CreateMemberName(cluster.Name, index)
 
 	callback := func() error {
-		pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(name, metav1.GetOptions{})
+		pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -180,12 +180,12 @@ func MustValidatePodReadiness(t *testing.T, k8s *types.Cluster, cluster *couchba
 
 // GetNodeForPod returns a reference to the node a pod runs on.
 func GetNodeForPod(k8s *types.Cluster, name string) (*v1.Node, error) {
-	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(name, metav1.GetOptions{})
+	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

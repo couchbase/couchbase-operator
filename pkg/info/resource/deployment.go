@@ -1,6 +1,7 @@
 package resource
 
 import (
+	ctx "context"
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
@@ -33,7 +34,7 @@ func (r *deploymentResource) Kind() string {
 
 // Fetch collects all deployments as defined by the configuration.
 func (r *deploymentResource) Fetch() error {
-	deployments, err := r.context.KubeClient.AppsV1().Deployments(r.context.Namespace()).List(metav1.ListOptions{})
+	deployments, err := r.context.KubeClient.AppsV1().Deployments(r.context.Namespace()).List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

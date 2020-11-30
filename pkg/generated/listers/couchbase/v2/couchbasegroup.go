@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseGroupLister helps list CouchbaseGroups.
+// All objects returned here must be treated as read-only.
 type CouchbaseGroupLister interface {
 	// List lists all CouchbaseGroups in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseGroup, err error)
 	// CouchbaseGroups returns an object that can list and get CouchbaseGroups.
 	CouchbaseGroups(namespace string) CouchbaseGroupNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseGroupLister) CouchbaseGroups(namespace string) CouchbaseGroupN
 }
 
 // CouchbaseGroupNamespaceLister helps list and get CouchbaseGroups.
+// All objects returned here must be treated as read-only.
 type CouchbaseGroupNamespaceLister interface {
 	// List lists all CouchbaseGroups in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseGroup, err error)
 	// Get retrieves the CouchbaseGroup from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v2.CouchbaseGroup, error)
 	CouchbaseGroupNamespaceListerExpansion
 }

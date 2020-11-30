@@ -1,6 +1,8 @@
 package resource
 
 import (
+	ctx "context"
+
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -33,7 +35,7 @@ func (r *RoleResource) Kind() string {
 func (r *RoleResource) Fetch() error {
 	var err error
 
-	r.Roles, err = r.context.KubeClient.RbacV1().Roles(r.context.Namespace()).List(metav1.ListOptions{})
+	r.Roles, err = r.context.KubeClient.RbacV1().Roles(r.context.Namespace()).List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

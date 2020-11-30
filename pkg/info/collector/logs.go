@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bytes"
+	ctx "context"
 	"io"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
@@ -55,7 +56,7 @@ func (r *logCollector) Fetch(resource resource.Reference) error {
 
 		req := r.context.KubeClient.CoreV1().Pods(r.context.Namespace()).GetLogs(pod.Name, logOptions)
 
-		readCloser, err := req.Stream()
+		readCloser, err := req.Stream(ctx.Background())
 		if err != nil {
 			return err
 		}

@@ -16,7 +16,7 @@ import (
 
 // NewUser creates a new couchbase user.
 func NewUser(k8s *types.Cluster, user *couchbasev2.CouchbaseUser) (*couchbasev2.CouchbaseUser, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).Create(user)
+	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).Create(context.Background(), user, metav1.CreateOptions{})
 }
 
 func MustNewUser(t *testing.T, k8s *types.Cluster, user *couchbasev2.CouchbaseUser) *couchbasev2.CouchbaseUser {
@@ -29,7 +29,7 @@ func MustNewUser(t *testing.T, k8s *types.Cluster, user *couchbasev2.CouchbaseUs
 }
 
 func DeleteUser(k8s *types.Cluster, user *couchbasev2.CouchbaseUser) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).Delete(user.Name, metav1.NewDeleteOptions(0))
+	return k8s.CRClient.CouchbaseV2().CouchbaseUsers(k8s.Namespace).Delete(context.Background(), user.Name, *metav1.NewDeleteOptions(0))
 }
 
 func MustDeleteUser(t *testing.T, k8s *types.Cluster, user *couchbasev2.CouchbaseUser) {
@@ -40,7 +40,7 @@ func MustDeleteUser(t *testing.T, k8s *types.Cluster, user *couchbasev2.Couchbas
 
 // NewRole creates a new couchbase group.
 func NewGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) (*couchbasev2.CouchbaseGroup, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).Create(group)
+	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).Create(context.Background(), group, metav1.CreateOptions{})
 }
 
 func MustNewGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) *couchbasev2.CouchbaseGroup {
@@ -53,7 +53,7 @@ func MustNewGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.Couchbase
 }
 
 func DeleteGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).Delete(group.Name, metav1.NewDeleteOptions(0))
+	return k8s.CRClient.CouchbaseV2().CouchbaseGroups(k8s.Namespace).Delete(context.Background(), group.Name, *metav1.NewDeleteOptions(0))
 }
 
 func MustDeleteGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.CouchbaseGroup) {
@@ -64,7 +64,7 @@ func MustDeleteGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.Couchb
 
 // NewRoleBinding creates a new couchbase role binding.
 func NewRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) (*couchbasev2.CouchbaseRoleBinding, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).Create(binding)
+	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).Create(context.Background(), binding, metav1.CreateOptions{})
 }
 
 func MustNewRoleBinding(t *testing.T, k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) *couchbasev2.CouchbaseRoleBinding {
@@ -77,7 +77,7 @@ func MustNewRoleBinding(t *testing.T, k8s *types.Cluster, binding *couchbasev2.C
 }
 
 func DeleteRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).Delete(binding.Name, metav1.NewDeleteOptions(0))
+	return k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(k8s.Namespace).Delete(context.Background(), binding.Name, *metav1.NewDeleteOptions(0))
 }
 
 func MustDeleteRoleBinding(t *testing.T, k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding) {
@@ -93,7 +93,7 @@ func PatchGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup, patches j
 
 	return group, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		// get the group
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Get(group.Name, metav1.GetOptions{})
+		before, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Get(context.Background(), group.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -110,7 +110,7 @@ func PatchGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup, patches j
 		}
 
 		// Attempt to post the update, updating the group
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Update(after)
+		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -138,7 +138,7 @@ func PatchRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBind
 
 	return binding, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		// get the binding
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(binding.Namespace).Get(binding.Name, metav1.GetOptions{})
+		before, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(binding.Namespace).Get(context.Background(), binding.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -155,7 +155,7 @@ func PatchRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBind
 		}
 
 		// Attempt to post the update, updating the binding
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(binding.Namespace).Update(after)
+		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(binding.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}

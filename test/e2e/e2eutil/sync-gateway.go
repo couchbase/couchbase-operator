@@ -28,7 +28,7 @@ func waitSyncGatewayAvailable(k8s *types.Cluster, timeout time.Duration) error {
 	defer cancel()
 
 	callback := func() error {
-		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(syncGatewayResourceName, metav1.GetOptions{})
+		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), syncGatewayResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,7 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 		secret.Data["client.key"] = tls.ClientKey
 	}
 
-	if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(secret); err != nil {
+	if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
@@ -201,7 +201,7 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 		},
 	}
 
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(context.Background(), deployment, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
@@ -216,10 +216,4 @@ func MustCreateSyncGateway(t *testing.T, k8s *types.Cluster, cluster *couchbasev
 	if err := createSyncGateway(k8s, cluster, image, bucket, auth, dns, tls, timeout); err != nil {
 		Die(t, err)
 	}
-}
-
-// DeleteSyncGateway performs any cleanups related to sync gateway.
-func DeleteSyncGateway(k8s *types.Cluster) {
-	_ = k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(syncGatewayResourceName, metav1.NewDeleteOptions(0))
-	_ = k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(syncGatewayResourceName, metav1.NewDeleteOptions(0))
 }

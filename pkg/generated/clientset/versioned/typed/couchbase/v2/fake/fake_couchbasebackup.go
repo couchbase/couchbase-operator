@@ -8,6 +8,8 @@
 package fake
 
 import (
+	"context"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -28,7 +30,7 @@ var couchbasebackupsResource = schema.GroupVersionResource{Group: "couchbase.com
 var couchbasebackupsKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseBackup"}
 
 // Get takes name of the couchbaseBackup, and returns the corresponding couchbaseBackup object, and an error if there is any.
-func (c *FakeCouchbaseBackups) Get(name string, options v1.GetOptions) (result *v2.CouchbaseBackup, err error) {
+func (c *FakeCouchbaseBackups) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseBackup, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(couchbasebackupsResource, c.ns, name), &v2.CouchbaseBackup{})
 
@@ -39,7 +41,7 @@ func (c *FakeCouchbaseBackups) Get(name string, options v1.GetOptions) (result *
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseBackups that match those selectors.
-func (c *FakeCouchbaseBackups) List(opts v1.ListOptions) (result *v2.CouchbaseBackupList, err error) {
+func (c *FakeCouchbaseBackups) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseBackupList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(couchbasebackupsResource, couchbasebackupsKind, c.ns, opts), &v2.CouchbaseBackupList{})
 
@@ -61,14 +63,14 @@ func (c *FakeCouchbaseBackups) List(opts v1.ListOptions) (result *v2.CouchbaseBa
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseBackups.
-func (c *FakeCouchbaseBackups) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCouchbaseBackups) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(couchbasebackupsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a couchbaseBackup and creates it.  Returns the server's representation of the couchbaseBackup, and an error, if there is any.
-func (c *FakeCouchbaseBackups) Create(couchbaseBackup *v2.CouchbaseBackup) (result *v2.CouchbaseBackup, err error) {
+func (c *FakeCouchbaseBackups) Create(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.CreateOptions) (result *v2.CouchbaseBackup, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(couchbasebackupsResource, c.ns, couchbaseBackup), &v2.CouchbaseBackup{})
 
@@ -79,7 +81,7 @@ func (c *FakeCouchbaseBackups) Create(couchbaseBackup *v2.CouchbaseBackup) (resu
 }
 
 // Update takes the representation of a couchbaseBackup and updates it. Returns the server's representation of the couchbaseBackup, and an error, if there is any.
-func (c *FakeCouchbaseBackups) Update(couchbaseBackup *v2.CouchbaseBackup) (result *v2.CouchbaseBackup, err error) {
+func (c *FakeCouchbaseBackups) Update(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.UpdateOptions) (result *v2.CouchbaseBackup, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(couchbasebackupsResource, c.ns, couchbaseBackup), &v2.CouchbaseBackup{})
 
@@ -91,7 +93,7 @@ func (c *FakeCouchbaseBackups) Update(couchbaseBackup *v2.CouchbaseBackup) (resu
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCouchbaseBackups) UpdateStatus(couchbaseBackup *v2.CouchbaseBackup) (*v2.CouchbaseBackup, error) {
+func (c *FakeCouchbaseBackups) UpdateStatus(ctx context.Context, couchbaseBackup *v2.CouchbaseBackup, opts v1.UpdateOptions) (*v2.CouchbaseBackup, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(couchbasebackupsResource, "status", c.ns, couchbaseBackup), &v2.CouchbaseBackup{})
 
@@ -102,7 +104,7 @@ func (c *FakeCouchbaseBackups) UpdateStatus(couchbaseBackup *v2.CouchbaseBackup)
 }
 
 // Delete takes name of the couchbaseBackup and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseBackups) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCouchbaseBackups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(couchbasebackupsResource, c.ns, name), &v2.CouchbaseBackup{})
 
@@ -110,15 +112,15 @@ func (c *FakeCouchbaseBackups) Delete(name string, options *v1.DeleteOptions) er
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseBackups) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbasebackupsResource, c.ns, listOptions)
+func (c *FakeCouchbaseBackups) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(couchbasebackupsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2.CouchbaseBackupList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched couchbaseBackup.
-func (c *FakeCouchbaseBackups) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseBackup, err error) {
+func (c *FakeCouchbaseBackups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseBackup, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(couchbasebackupsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseBackup{})
 

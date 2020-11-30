@@ -431,11 +431,11 @@ func MustNewPrometheusTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int
 func NewBucket(k8s *types.Cluster, bucket metav1.Object) (metav1.Object, error) {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Create(t)
+		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Create(context.Background(), t, metav1.CreateOptions{})
 	case *couchbasev2.CouchbaseEphemeralBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).Create(t)
+		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).Create(context.Background(), t, metav1.CreateOptions{})
 	case *couchbasev2.CouchbaseMemcachedBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).Create(t)
+		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).Create(context.Background(), t, metav1.CreateOptions{})
 	default:
 		return nil, fmt.Errorf("unsupported bucket type")
 	}
@@ -507,7 +507,7 @@ func MustGetBucket(t *testing.T, bucketType, compressionMode string) metav1.Obje
 }
 
 func NewBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseBackup, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Create(backup)
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
 }
 
 func MustNewBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) *couchbasev2.CouchbaseBackup {
@@ -520,7 +520,7 @@ func MustNewBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.Couchba
 }
 
 func NewBackupRestore(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackupRestore) (*couchbasev2.CouchbaseBackupRestore, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(k8s.Namespace).Create(backup)
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(k8s.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
 }
 
 func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) *couchbasev2.CouchbaseBackupRestore {
@@ -533,7 +533,7 @@ func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbasev2
 }
 
 func DeleteBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Delete(backup.Name, metav1.NewDeleteOptions(0))
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Delete(context.Background(), backup.Name, *metav1.NewDeleteOptions(0))
 }
 
 func MustDeleteBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) {
@@ -543,7 +543,7 @@ func MustDeleteBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.Couc
 }
 
 func DeleteBackupRestore(k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) error {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(restore.Namespace).Delete(restore.Name, metav1.NewDeleteOptions(0))
+	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(restore.Namespace).Delete(context.Background(), restore.Name, *metav1.NewDeleteOptions(0))
 }
 
 func MustDeleteBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) {
@@ -555,11 +555,11 @@ func MustDeleteBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbas
 func DeleteBucket(k8s *types.Cluster, bucket metav1.Object) error {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
+		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Delete(context.Background(), t.Name, *metav1.NewDeleteOptions(0))
 	case *couchbasev2.CouchbaseEphemeralBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
+		return k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(k8s.Namespace).Delete(context.Background(), t.Name, *metav1.NewDeleteOptions(0))
 	case *couchbasev2.CouchbaseMemcachedBucket:
-		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).Delete(t.Name, metav1.NewDeleteOptions(0))
+		return k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(k8s.Namespace).Delete(context.Background(), t.Name, *metav1.NewDeleteOptions(0))
 	default:
 		return fmt.Errorf("unsupported bucket type")
 	}
@@ -638,7 +638,7 @@ func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, pat
 
 	return cluster, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		// Get the current cluster resource
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		before, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -655,7 +655,7 @@ func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, pat
 		}
 
 		// Attempt to post the update, updating the cluster
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Update(after)
+		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -690,7 +690,7 @@ func PatchBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, patche
 
 	return backup, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
 		// Get the current backup resource
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Get(backup.Name, metav1.GetOptions{})
+		before, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -707,7 +707,7 @@ func PatchBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, patche
 		}
 
 		// Attempt to post the update, updating the backup
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Update(after)
+		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -736,7 +736,7 @@ func PatchBucket(k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.Pat
 		// Get the current bucket resource
 		switch t := bucket.(type) {
 		case *couchbasev2.CouchbaseBucket:
-			before, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(t.Namespace).Get(t.Name, metav1.GetOptions{})
+			before, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(t.Namespace).Get(context.Background(), t.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
@@ -753,14 +753,14 @@ func PatchBucket(k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.Pat
 			}
 
 			// Attempt to post the update, updating the bucket
-			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(t.Namespace).Update(after)
+			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(t.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 			if err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
 
 			bucket = updated
 		case *couchbasev2.CouchbaseEphemeralBucket:
-			before, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Get(t.Name, metav1.GetOptions{})
+			before, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Get(context.Background(), t.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
@@ -777,7 +777,7 @@ func PatchBucket(k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.Pat
 			}
 
 			// Attempt to post the update, updating the bucket
-			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Update(after)
+			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 			if err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
@@ -806,7 +806,7 @@ func PatchReplication(k8s *types.Cluster, replication *couchbasev2.CouchbaseRepl
 	defer cancel()
 
 	return replication, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Get(replication.Name, metav1.GetOptions{})
+		before, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Get(context.Background(), replication.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -823,7 +823,7 @@ func PatchReplication(k8s *types.Cluster, replication *couchbasev2.CouchbaseRepl
 		}
 
 		// Attempt to post the update
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Update(after)
+		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -856,12 +856,12 @@ func KillMembers(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseClu
 
 // Kill member deletes Pod and optionally checks for any associated Volume to delete.
 func KillMember(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster, name string, removeVolumes bool) error {
-	if err := kubecli.CoreV1().Pods(cluster.Namespace).Delete(name, metav1.NewDeleteOptions(0)); err != nil {
+	if err := kubecli.CoreV1().Pods(cluster.Namespace).Delete(context.Background(), name, *metav1.NewDeleteOptions(0)); err != nil {
 		return err
 	}
 
 	if removeVolumes {
-		if err := kubecli.CoreV1().PersistentVolumeClaims(cluster.Namespace).DeleteCollection(metav1.NewDeleteOptions(0), NodeListOpt(cluster, name)); err != nil {
+		if err := kubecli.CoreV1().PersistentVolumeClaims(cluster.Namespace).DeleteCollection(context.Background(), *metav1.NewDeleteOptions(0), NodeListOpt(cluster, name)); err != nil {
 			return err
 		}
 	}
@@ -876,7 +876,7 @@ func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 
 	options := metav1.ListOptions{LabelSelector: constants.CouchbaseOperatorLabel}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(options)
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), options)
 	if err != nil {
 		return err
 	}
@@ -885,7 +885,7 @@ func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 		logOpts := &v1.PodLogOptions{}
 		req := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).GetLogs(pod.Name, logOpts)
 
-		data, err := req.DoRaw()
+		data, err := req.DoRaw(context.Background())
 		if err != nil {
 			return err
 		}
@@ -940,7 +940,7 @@ func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cl
 }
 
 func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, numToKill int) {
-	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(ClusterListOpt(cl))
+	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(context.Background(), ClusterListOpt(cl))
 	if err != nil {
 		Die(t, err)
 	}
@@ -1006,7 +1006,7 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m cou
 
 	for _, config := range cl.Spec.Servers {
 		if config.Name == m.Config() {
-			p, err := k8s.KubeClient.CoreV1().Pods(cl.Namespace).Create(pod)
+			p, err := k8s.KubeClient.CoreV1().Pods(cl.Namespace).Create(context.Background(), pod, metav1.CreateOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -1032,7 +1032,7 @@ func deleteCouchbaseOperator(k8s *types.Cluster) error {
 		return err
 	}
 
-	return k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(name, metav1.NewDeleteOptions(0))
+	return k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), name, *metav1.NewDeleteOptions(0))
 }
 
 func MustDeleteCouchbaseOperator(t *testing.T, k8s *types.Cluster) {
@@ -1064,12 +1064,12 @@ func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster) {
 // while the operator is not running and see what happens on a restart without introducing race
 // conditions.
 func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, timeout time.Duration) {
-	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(k8s.OperatorDeployment.Name, metav1.NewDeleteOptions(0)); err != nil {
+	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(context.Background(), k8s.OperatorDeployment.Name, *metav1.NewDeleteOptions(0)); err != nil {
 		Die(t, err)
 	}
 
 	callback := func() error {
-		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(k8s.OperatorDeployment.Name, metav1.GetOptions{})
+		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), k8s.OperatorDeployment.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil
@@ -1095,7 +1095,7 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, timeout time
 	}
 
 	callback = func() error {
-		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return err
 		}
@@ -1115,7 +1115,7 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, timeout time
 // MustCreateOperatorDeployment is the partner of MustDeleteOperatorDeployment which is used to
 // restart the operator synchronously, potentially after modifying resources.
 func MustCreateOperatorDeployment(t *testing.T, k8s *types.Cluster) {
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(k8s.OperatorDeployment); err != nil {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(context.Background(), k8s.OperatorDeployment, metav1.CreateOptions{}); err != nil {
 		Die(t, err)
 	}
 }
@@ -1131,7 +1131,7 @@ func GetOperatorName(k8s *types.Cluster) (string, error) {
 	outerErr := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
 		var err error
 
-		pods, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pods, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -1161,7 +1161,7 @@ func GetOperatorName(k8s *types.Cluster) (string, error) {
 
 // getSchedulableNodes returns a list of all nodes that can be scheduled onto.
 func getSchedulableNodes(k8s *types.Cluster) ([]*v1.Node, error) {
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -1189,7 +1189,7 @@ func getSchedulableNodes(k8s *types.Cluster) ([]*v1.Node, error) {
 // MustNumNodesAbsolute returns the number of nodes in the cluster
 // irrespective of scheduling constraints.
 func MustNumNodesAbsolute(t *testing.T, k8s *types.Cluster) int {
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		Die(t, err)
 	}
@@ -1222,7 +1222,7 @@ func getNodeAllocatableMemory(t *testing.T, k8s *types.Cluster) map[string]float
 		Die(t, err)
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods("").List(metav1.ListOptions{})
+	pods, err := k8s.KubeClient.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		Die(t, err)
 	}
@@ -1298,7 +1298,7 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 }
 
 func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext, timeout time.Duration) error {
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
 	if err != nil {
 		return fmt.Errorf("unable to get couchbase pods: %v", err)
 	}
@@ -1339,7 +1339,7 @@ func deletePod(t *testing.T, k8s *types.Cluster, podName string) error {
 	defer cancel()
 
 	err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
-		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(podName, metav1.NewDeleteOptions(0)); err != nil {
+		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), podName, *metav1.NewDeleteOptions(0)); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -1377,7 +1377,7 @@ func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, member, kubernet
 func MustDeletePodServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
 	selector := constants.CouchbaseServerPodLabelStr + couchbase.Name
 
-	services, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+	services, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		Die(t, err)
 	}
@@ -1432,12 +1432,12 @@ func GenerateWorkload(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 		},
 	}
 
-	if _, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Create(pod); err != nil {
+	if _, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Create(context.Background(), pod, metav1.CreateOptions{}); err != nil {
 		return nil, err
 	}
 
 	cleanup := func() {
-		_ = k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Delete(podName, metav1.NewDeleteOptions(0))
+		_ = k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).Delete(context.Background(), podName, *metav1.NewDeleteOptions(0))
 	}
 
 	return cleanup, nil
@@ -1460,7 +1460,7 @@ func GetUUID(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeou
 	defer cancel()
 
 	callback := func() error {
-		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -1495,7 +1495,7 @@ func MustGetUUID(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 func MustTerminateAllPods(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
 	selector := labels.SelectorFromSet(labels.Set(k8sutil.LabelsForCluster(cluster)))
 
-	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		Die(t, err)
 	}

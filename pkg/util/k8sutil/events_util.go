@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -572,7 +573,7 @@ func newClusterEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 
 // GetEventsForResource returns a time ordered list of events for a specific resource.
 func GetEventsForResource(client kubernetes.Interface, namespace, kind, name string) ([]v1.Event, error) {
-	events, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
+	events, err := client.CoreV1().Events(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.NewStackTracedError(err)
 	}

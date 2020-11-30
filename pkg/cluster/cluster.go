@@ -449,7 +449,7 @@ func (c *Cluster) updateCRStatus() error {
 	// hence what's in etcd need not reflect what's locally cached and the k8s
 	// server will reject any updates that fail the CAS test.  We only pick up
 	// these updates between reconcile executions (see handleUpdateEvent).
-	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
+	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(context.Background(), c.cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -473,7 +473,7 @@ func (c *Cluster) updateCRStatus() error {
 	// Copy the updated status to our cluster object and try update it
 	cluster.Status = c.cluster.Status
 
-	newCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
+	newCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), cluster, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -496,7 +496,7 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 func (c *Cluster) removePod(name string, removeVolumes bool) error {
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
 
-	err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, opts, removeVolumes)
+	err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, *opts, removeVolumes)
 	if err != nil {
 		log.Error(err, "Pod deletion failed", "cluster", c.namespacedName())
 		return err
@@ -517,7 +517,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 
 	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
 
-	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name(), opts); err != nil {
+	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name(), *opts); err != nil {
 		return err
 	}
 
@@ -913,7 +913,7 @@ func (c *Cluster) raiseEvent(event *v1.Event) *v1.Event {
 	}
 
 	// Post the event to kubernetes
-	event, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Create(event)
+	event, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Create(context.Background(), event, metav1.CreateOptions{})
 	if err != nil {
 		log.Error(err, "Event creation failed", "cluster", c.namespacedName(), "event", event.Reason)
 		return nil
@@ -937,7 +937,7 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 			e.Count++
 			e.LastTimestamp = metav1.Now()
 
-			e, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Update(e)
+			e, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Update(context.Background(), e, metav1.UpdateOptions{})
 			if err != nil {
 				log.Error(err, "Event update failed", "cluster", c.namespacedName(), "event", event.Reason)
 			}

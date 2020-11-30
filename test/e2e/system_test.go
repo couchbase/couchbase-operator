@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -167,7 +168,7 @@ func MonitorJob(jobName string, namespace string, kubeClient kubernetes.Interfac
 		default:
 			fmt.Printf("default %v\n", jobName)
 
-			checkJob, err := kubeClient.BatchV1().Jobs(namespace).Get(jobName, metav1.GetOptions{})
+			checkJob, err := kubeClient.BatchV1().Jobs(namespace).Get(context.Background(), jobName, metav1.GetOptions{})
 			if err != nil {
 				jobInfo["status"] = "error: failed to get job status: " + err.Error()
 				results <- jobInfo
@@ -207,25 +208,25 @@ func DeleteJob(t *testing.T, f *framework.Framework, jobName string) {
 
 	fmt.Printf("deleting %v\n", jobName)
 
-	err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Delete(jobName, metav1.NewDeleteOptions(0))
+	err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Delete(context.Background(), jobName, *metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Fatalf("failed to delete job %v \n", err)
 	}
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(metav1.ListOptions{LabelSelector: "job=" + jobName})
+	pods, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "job=" + jobName})
 	if err != nil {
 		t.Fatalf("failed to list pods for cluster: " + err.Error())
 	}
 
 	for _, pod := range pods.Items {
-		_ = targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		_ = targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0))
 	}
 }
 
 func CreateJob(t *testing.T, f *framework.Framework, jobSpec *batchv1.Job) *batchv1.Job {
 	targetKube := f.ClusterSpec[0]
 
-	job, err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Create(jobSpec)
+	job, err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Create(context.Background(), jobSpec, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create job %v", err)
 	}

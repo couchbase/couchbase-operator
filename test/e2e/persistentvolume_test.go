@@ -48,7 +48,7 @@ func createPersistentVolumeClaimSpec(storageClass *string, pvcName string, resou
 func verifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, expectedPvcMap map[string]int) (errToReturn error) {
 	pvcMappingVerify := func() error {
 		for memberName, pvcCount := range expectedPvcMap {
-			pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
+			pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
 			if err != nil {
 				return err
 			} else if len(pvcList.Items) != pvcCount {
@@ -717,7 +717,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 			expectedPvcMap[memberName] = 0
 		}
 
-		podList, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + testCouchbase.Name})
+		podList, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + testCouchbase.Name})
 		if err != nil {
 			e2eutil.Die(t, fmt.Errorf("Failed to fetch pod list: %v", err))
 		}

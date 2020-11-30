@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -52,7 +53,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolu
 
 // LogPVCUpdate updates the specified PVC.
 func (j *janitorAbstractionInterfaceImpl) LogPVCUpdate(pvc *corev1.PersistentVolumeClaim) error {
-	if _, err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(pvc); err != nil {
+	if _, err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
 		return err
 	}
 
@@ -61,7 +62,7 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCUpdate(pvc *corev1.PersistentVol
 
 // LogPVCDelete deleted the specified PVC.
 func (j *janitorAbstractionInterfaceImpl) LogPVCDelete(name string) error {
-	if err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(name, &metav1.DeleteOptions{}); err != nil {
+	if err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 

@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseBucketLister helps list CouchbaseBuckets.
+// All objects returned here must be treated as read-only.
 type CouchbaseBucketLister interface {
 	// List lists all CouchbaseBuckets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseBucket, err error)
 	// CouchbaseBuckets returns an object that can list and get CouchbaseBuckets.
 	CouchbaseBuckets(namespace string) CouchbaseBucketNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseBucketLister) CouchbaseBuckets(namespace string) CouchbaseBuck
 }
 
 // CouchbaseBucketNamespaceLister helps list and get CouchbaseBuckets.
+// All objects returned here must be treated as read-only.
 type CouchbaseBucketNamespaceLister interface {
 	// List lists all CouchbaseBuckets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseBucket, err error)
 	// Get retrieves the CouchbaseBucket from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v2.CouchbaseBucket, error)
 	CouchbaseBucketNamespaceListerExpansion
 }

@@ -17,7 +17,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -44,7 +43,7 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 	key, cert, _ := req.Generate(ca, validFrom, validTo)
 
 	serviceAccount := config.GetAdmissionServiceAccount(admissionNamespace)
-	if _, err := k8s.KubeClient.CoreV1().ServiceAccounts(admissionNamespace).Create(serviceAccount); err != nil {
+	if _, err := k8s.KubeClient.CoreV1().ServiceAccounts(admissionNamespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
@@ -55,7 +54,7 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		return fmt.Errorf("DAC role is not cluster scoped")
 	}
 
-	if _, err := k8s.KubeClient.RbacV1().ClusterRoles().Create(clusterRole); err != nil {
+	if _, err := k8s.KubeClient.RbacV1().ClusterRoles().Create(context.Background(), clusterRole, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
@@ -66,33 +65,33 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		return fmt.Errorf("DAC role binding is not cluster scoped")
 	}
 
-	if _, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().Create(clusterRoleBinding); err != nil {
+	if _, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().Create(context.Background(), clusterRoleBinding, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
 	secret := config.GetAdmissionSecret(admissionNamespace, key, cert)
-	if _, err := k8s.KubeClient.CoreV1().Secrets(admissionNamespace).Create(secret); err != nil {
+	if _, err := k8s.KubeClient.CoreV1().Secrets(admissionNamespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
 	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, pullSecrets, "-v", "1")
 
-	if _, err := k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Create(deployment); err != nil {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Create(context.Background(), deployment, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
 	service := config.GetAdmissionService(admissionNamespace)
-	if _, err := k8s.KubeClient.CoreV1().Services(admissionNamespace).Create(service); err != nil {
+	if _, err := k8s.KubeClient.CoreV1().Services(admissionNamespace).Create(context.Background(), service, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
 	mutatingWebhook := config.GetAdmissionMutatingWebhook(admissionNamespace, ca.Certificate, true, nil)
-	if _, err := k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(mutatingWebhook); err != nil {
+	if _, err := k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.Background(), mutatingWebhook, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
 	validatingWebhook := config.GetAdmissionValidatingWebhook(admissionNamespace, ca.Certificate, true, nil)
-	if _, err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(validatingWebhook); err != nil {
+	if _, err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.Background(), validatingWebhook, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
@@ -107,35 +106,35 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 // this unconditionally rather than having to check whether it exists or not which is a lot
 // of boiler plate zzz.
 func deleteAdmissionController(k8s *types.Cluster) error {
-	if err := k8s.KubeClient.CoreV1().ServiceAccounts(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.CoreV1().ServiceAccounts(admissionNamespace).Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	if err := k8s.KubeClient.RbacV1().ClusterRoles().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.RbacV1().ClusterRoles().Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	if err := k8s.KubeClient.RbacV1().ClusterRoleBindings().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.RbacV1().ClusterRoleBindings().Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	if err := k8s.KubeClient.CoreV1().Secrets(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.CoreV1().Secrets(admissionNamespace).Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	if err := k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	if err := k8s.KubeClient.CoreV1().Services(admissionNamespace).Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.CoreV1().Services(admissionNamespace).Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	if err := k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	if err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(config.AdmissionResourceName, nil); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -150,7 +149,7 @@ func waitAdmissionController(k8s *types.Cluster) error {
 	callback := func() error {
 		var err error
 
-		deployment, err = k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Get(config.AdmissionResourceName, metav1.GetOptions{})
+		deployment, err = k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Get(context.Background(), config.AdmissionResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -177,23 +176,13 @@ func waitAdmissionController(k8s *types.Cluster) error {
 			},
 		}
 
-		// TODO: Upgrade to 1.18 and this will be available by default.
-		newBucket := &couchbasev2.CouchbaseBucket{}
-		createOptions := &metav1.CreateOptions{
+		createOptions := metav1.CreateOptions{
 			DryRun: []string{
 				"All",
 			},
 		}
 
-		err := k8s.CRClient.CouchbaseV2().RESTClient().
-			Post().
-			Namespace(admissionNamespace).
-			Resource("couchbasebuckets").
-			VersionedParams(createOptions, scheme.ParameterCodec).
-			Body(bucket).
-			Do().
-			Into(newBucket)
-
+		newBucket, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(admissionNamespace).Create(context.Background(), bucket, createOptions)
 		if err != nil {
 			return err
 		}

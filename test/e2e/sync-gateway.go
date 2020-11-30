@@ -98,7 +98,7 @@ func TestSyncGatewayCreateRemote(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	testSyncGatewayCreate(t, k8s1, k8s2, dns, nil, nil)
 }
@@ -108,7 +108,7 @@ func TestSyncGatewayCreateRemoteTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -120,7 +120,7 @@ func TestSyncGatewayCreateRemoteMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -133,7 +133,7 @@ func TestSyncGatewayCreateRemoteMandatoryMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -209,10 +209,6 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	}
 	// Create the RBAC primitives and Couchbase cluster.
 	e2eutil.MustCreateSecret(t, k8s1, secret)
-
-	defer func() {
-		_ = e2eutil.DeleteSecret(k8s1, secretName, nil)
-	}()
 
 	e2eutil.MustNewUser(t, k8s1, user)
 	e2eutil.MustNewGroup(t, k8s1, group)

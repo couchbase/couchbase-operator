@@ -8,6 +8,7 @@
 package v2
 
 import (
+	"context"
 	time "time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -50,13 +51,13 @@ func NewFilteredCouchbaseClusterInformer(client versioned.Interface, namespace s
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CouchbaseV2().CouchbaseClusters(namespace).List(options)
+				return client.CouchbaseV2().CouchbaseClusters(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CouchbaseV2().CouchbaseClusters(namespace).Watch(options)
+				return client.CouchbaseV2().CouchbaseClusters(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&couchbasev2.CouchbaseCluster{},

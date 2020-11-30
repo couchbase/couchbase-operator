@@ -1,9 +1,12 @@
 package cluster
 
 import (
+	"context"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // pvcUpgradeFunc is a function that applies an upgrade to a pvc resource.
@@ -87,7 +90,7 @@ func (r *pvcUpgradableResource) perform(item, action int) error {
 
 func (r *pvcUpgradableResource) commit(item int) error {
 	pvc := r.pvcs[item]
-	if _, err := r.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(pvc); err != nil {
+	if _, err := r.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
 		return err
 	}
 

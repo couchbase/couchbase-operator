@@ -8,6 +8,8 @@
 package fake
 
 import (
+	"context"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -28,7 +30,7 @@ var couchbaseephemeralbucketsResource = schema.GroupVersionResource{Group: "couc
 var couchbaseephemeralbucketsKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseEphemeralBucket"}
 
 // Get takes name of the couchbaseEphemeralBucket, and returns the corresponding couchbaseEphemeralBucket object, and an error if there is any.
-func (c *FakeCouchbaseEphemeralBuckets) Get(name string, options v1.GetOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
+func (c *FakeCouchbaseEphemeralBuckets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(couchbaseephemeralbucketsResource, c.ns, name), &v2.CouchbaseEphemeralBucket{})
 
@@ -39,7 +41,7 @@ func (c *FakeCouchbaseEphemeralBuckets) Get(name string, options v1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseEphemeralBuckets that match those selectors.
-func (c *FakeCouchbaseEphemeralBuckets) List(opts v1.ListOptions) (result *v2.CouchbaseEphemeralBucketList, err error) {
+func (c *FakeCouchbaseEphemeralBuckets) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseEphemeralBucketList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(couchbaseephemeralbucketsResource, couchbaseephemeralbucketsKind, c.ns, opts), &v2.CouchbaseEphemeralBucketList{})
 
@@ -61,14 +63,14 @@ func (c *FakeCouchbaseEphemeralBuckets) List(opts v1.ListOptions) (result *v2.Co
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseEphemeralBuckets.
-func (c *FakeCouchbaseEphemeralBuckets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCouchbaseEphemeralBuckets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(couchbaseephemeralbucketsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a couchbaseEphemeralBucket and creates it.  Returns the server's representation of the couchbaseEphemeralBucket, and an error, if there is any.
-func (c *FakeCouchbaseEphemeralBuckets) Create(couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket) (result *v2.CouchbaseEphemeralBucket, err error) {
+func (c *FakeCouchbaseEphemeralBuckets) Create(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.CreateOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(couchbaseephemeralbucketsResource, c.ns, couchbaseEphemeralBucket), &v2.CouchbaseEphemeralBucket{})
 
@@ -79,7 +81,7 @@ func (c *FakeCouchbaseEphemeralBuckets) Create(couchbaseEphemeralBucket *v2.Couc
 }
 
 // Update takes the representation of a couchbaseEphemeralBucket and updates it. Returns the server's representation of the couchbaseEphemeralBucket, and an error, if there is any.
-func (c *FakeCouchbaseEphemeralBuckets) Update(couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket) (result *v2.CouchbaseEphemeralBucket, err error) {
+func (c *FakeCouchbaseEphemeralBuckets) Update(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(couchbaseephemeralbucketsResource, c.ns, couchbaseEphemeralBucket), &v2.CouchbaseEphemeralBucket{})
 
@@ -90,7 +92,7 @@ func (c *FakeCouchbaseEphemeralBuckets) Update(couchbaseEphemeralBucket *v2.Couc
 }
 
 // Delete takes name of the couchbaseEphemeralBucket and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseEphemeralBuckets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCouchbaseEphemeralBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(couchbaseephemeralbucketsResource, c.ns, name), &v2.CouchbaseEphemeralBucket{})
 
@@ -98,15 +100,15 @@ func (c *FakeCouchbaseEphemeralBuckets) Delete(name string, options *v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseEphemeralBuckets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbaseephemeralbucketsResource, c.ns, listOptions)
+func (c *FakeCouchbaseEphemeralBuckets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(couchbaseephemeralbucketsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2.CouchbaseEphemeralBucketList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched couchbaseEphemeralBucket.
-func (c *FakeCouchbaseEphemeralBuckets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseEphemeralBucket, err error) {
+func (c *FakeCouchbaseEphemeralBuckets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseEphemeralBucket, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(couchbaseephemeralbucketsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseEphemeralBucket{})
 

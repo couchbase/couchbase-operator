@@ -215,7 +215,7 @@ func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseClus
 	var uuid string
 
 	callback := func() error {
-		cluster, err := kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		cluster, err := kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -243,7 +243,7 @@ func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseClus
 // Used for generic XDCR testing.
 func getRemoteUUIDAndHostGeneric(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, string, error) {
 	// List the pods on the remote cluster and pick one
-	svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(cluster.Name+"-ui", metav1.GetOptions{})
+	svc, err := kubernetes.KubeClient.CoreV1().Services(cluster.Namespace).Get(context.Background(), cluster.Name+"-ui", metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
@@ -261,7 +261,7 @@ func getRemoteUUIDAndHostGeneric(kubernetes *types.Cluster, cluster *couchbasev2
 		return "", "", fmt.Errorf("admin service port not exposed")
 	}
 
-	nodes, err := kubernetes.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := kubernetes.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return "", "", err
 	}
@@ -292,7 +292,7 @@ func getRemoteUUIDAndHostGeneric(kubernetes *types.Cluster, cluster *couchbasev2
 func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext) (string, string, error) {
 	var err error
 
-	cluster, err = kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+	cluster, err = kubernetes.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
@@ -327,11 +327,11 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 		Data: dstK8s.DefaultSecret.Data,
 	}
 
-	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
+	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 		return
 	}
 
-	if replicationSpec, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
+	if replicationSpec, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(context.Background(), replication, metav1.CreateOptions{}); err != nil {
 		return
 	}
 
@@ -386,7 +386,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 		Data: dstK8s.DefaultSecret.Data,
 	}
 
-	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
+	if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 		return
 	}
 
@@ -409,12 +409,12 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 			secret.Data[couchbasev2.RemoteClusterTLSKey] = tls.ClientKey
 		}
 
-		if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(secret); err != nil {
+		if _, err = srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 			return
 		}
 	}
 
-	if _, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(replication); err != nil {
+	if _, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(context.Background(), replication, metav1.CreateOptions{}); err != nil {
 		return
 	}
 
@@ -473,7 +473,7 @@ func DeleteXDCRReplication(k8s *types.Cluster, source *couchbasev2.CouchbaseClus
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Delete(replication.Name, &metav1.DeleteOptions{}); err != nil {
+		if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Delete(context.Background(), replication.Name, metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 

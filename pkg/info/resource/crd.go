@@ -1,6 +1,7 @@
 package resource
 
 import (
+	ctx "context"
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
@@ -34,7 +35,7 @@ func (r *crdResource) Kind() string {
 // Fetch collects all crds as defined by the configuration.
 func (r *crdResource) Fetch() error {
 	// Fetch all CRDs in the system
-	crds, err := r.context.KubeExtClient.ApiextensionsV1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	crds, err := r.context.KubeExtClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

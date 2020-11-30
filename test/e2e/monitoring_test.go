@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -260,7 +261,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	clusterSize := 3
 
 	// deleting monitoring secret.
-	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(monitoringAuthSecret, nil); err != nil && !errors.IsNotFound(err) {
+	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(context.Background(), monitoringAuthSecret, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		e2eutil.Die(t, err)
 	}
 
@@ -281,7 +282,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 		},
 	}
 
-	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(secret); err != nil {
+	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 		e2eutil.Die(t, err)
 	}
 
@@ -296,7 +297,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
 	var token []byte
 
-	if authSecret, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Get(monitoringAuthSecret, metav1.GetOptions{}); err != nil {
+	if authSecret, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Get(context.Background(), monitoringAuthSecret, metav1.GetOptions{}); err != nil {
 		e2eutil.Die(t, err)
 	} else {
 		token = authSecret.Data["token"]

@@ -1,6 +1,7 @@
 package e2eutil
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 )
 
 func CreateSecret(k8s *types.Cluster, secretSpec *v1.Secret) (*v1.Secret, error) {
-	return k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(secretSpec)
+	return k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(context.Background(), secretSpec, metav1.CreateOptions{})
 }
 
 func MustCreateSecret(t *testing.T, k8s *types.Cluster, secret *v1.Secret) *v1.Secret {
@@ -35,18 +36,18 @@ func MustRecreateSecret(t *testing.T, k8s *types.Cluster, secret *v1.Secret) *v1
 	return MustCreateSecret(t, k8s, secret)
 }
 
-func DeleteSecret(k8s *types.Cluster, secretName string, options *metav1.DeleteOptions) error {
-	return k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(secretName, options)
+func DeleteSecret(k8s *types.Cluster, secretName string, options metav1.DeleteOptions) error {
+	return k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(context.Background(), secretName, options)
 }
 
 func MustDeleteSecret(t *testing.T, k8s *types.Cluster, secretName string) {
-	if err := DeleteSecret(k8s, secretName, nil); err != nil {
+	if err := DeleteSecret(k8s, secretName, metav1.DeleteOptions{}); err != nil {
 		Die(t, err)
 	}
 }
 
 func GetSecret(kubeClient kubernetes.Interface, namespace string, secretName string) (*v1.Secret, error) {
-	return kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	return kubeClient.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 }
 
 func MustGetSecret(t *testing.T, k8s *types.Cluster, secretName string) *v1.Secret {
@@ -59,7 +60,7 @@ func MustGetSecret(t *testing.T, k8s *types.Cluster, secretName string) *v1.Secr
 }
 
 func UpdateSecret(kubeClient kubernetes.Interface, namespace string, secret *v1.Secret) error {
-	_, err := kubeClient.CoreV1().Secrets(namespace).Update(secret)
+	_, err := kubeClient.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
 	return err
 }
 

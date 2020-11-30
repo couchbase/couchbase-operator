@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -155,7 +156,7 @@ func createResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Create(object, metav1.CreateOptions{})
+		res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Create(context.Background(), object, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -188,7 +189,7 @@ func updateResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Update(object, metav1.UpdateOptions{})
+		res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Update(context.Background(), object, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -221,7 +222,7 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		if _, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Get(object.GetName(), metav1.GetOptions{}); err != nil {
+		if _, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Get(context.Background(), object.GetName(), metav1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
 				continue
 			}
@@ -229,7 +230,7 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 			return err
 		}
 
-		if err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Delete(object.GetName(), metav1.NewDeleteOptions(0)); err != nil {
+		if err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Delete(context.Background(), object.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
@@ -282,7 +283,7 @@ func getStorageClass(t *testing.T, cluster *types.Cluster) string {
 		return *f.StorageClassName
 	}
 
-	scs, err := cluster.KubeClient.StorageV1().StorageClasses().List(metav1.ListOptions{})
+	scs, err := cluster.KubeClient.StorageV1().StorageClasses().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -313,12 +314,6 @@ func runValidationTest(t *testing.T, testDefs []testDef, command string) {
 	// This is slow (entropy and modular exponetiation) so cache where possible,
 	// this will make tests 4x faster!
 	tlsCache := map[string]*e2eutil.TLSContext{}
-
-	defer func() {
-		for _, ctx := range tlsCache {
-			ctx.Close(targetKube)
-		}
-	}()
 
 	for i := range testDefs {
 		test := testDefs[i]

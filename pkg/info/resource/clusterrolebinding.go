@@ -1,6 +1,8 @@
 package resource
 
 import (
+	ctx "context"
+
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -33,7 +35,7 @@ func (r *clusterRoleBindingResource) Kind() string {
 func (r *clusterRoleBindingResource) Fetch() error {
 	var err error
 
-	r.clusterRoleBindings, err = r.context.KubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
+	r.clusterRoleBindings, err = r.context.KubeClient.RbacV1().ClusterRoleBindings().List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

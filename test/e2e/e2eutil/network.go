@@ -121,7 +121,7 @@ func getKubernetesNodeServices(k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	selector := labels.NewSelector()
 	selector = selector.Add(*appreq, *clusterreq, *nodereq)
 
-	return k8s.KubeClient.CoreV1().Services(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	return k8s.KubeClient.CoreV1().Services(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 }
 
 // CheckForIPAlternateAddresses gets external addressability configuration from the Couchbase API
@@ -262,7 +262,7 @@ func CheckForDNSAdminAnnotation(k8s *types.Cluster, couchbase *couchbasev2.Couch
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
+		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -292,7 +292,7 @@ func CheckForConsoleServiceType(k8s *types.Cluster, couchbase *couchbasev2.Couch
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
+		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -317,7 +317,7 @@ func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
+		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -353,7 +353,7 @@ func CheckConsoleServiceLoadBalancerSourceRanges(k8s *types.Cluster, couchbase *
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
-		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(couchbase.Name+"-ui", metav1.GetOptions{})
+		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

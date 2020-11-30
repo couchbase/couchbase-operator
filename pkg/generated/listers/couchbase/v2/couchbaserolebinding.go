@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseRoleBindingLister helps list CouchbaseRoleBindings.
+// All objects returned here must be treated as read-only.
 type CouchbaseRoleBindingLister interface {
 	// List lists all CouchbaseRoleBindings in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseRoleBinding, err error)
 	// CouchbaseRoleBindings returns an object that can list and get CouchbaseRoleBindings.
 	CouchbaseRoleBindings(namespace string) CouchbaseRoleBindingNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseRoleBindingLister) CouchbaseRoleBindings(namespace string) Cou
 }
 
 // CouchbaseRoleBindingNamespaceLister helps list and get CouchbaseRoleBindings.
+// All objects returned here must be treated as read-only.
 type CouchbaseRoleBindingNamespaceLister interface {
 	// List lists all CouchbaseRoleBindings in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseRoleBinding, err error)
 	// Get retrieves the CouchbaseRoleBinding from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v2.CouchbaseRoleBinding, error)
 	CouchbaseRoleBindingNamespaceListerExpansion
 }

@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseMemcachedBucketLister helps list CouchbaseMemcachedBuckets.
+// All objects returned here must be treated as read-only.
 type CouchbaseMemcachedBucketLister interface {
 	// List lists all CouchbaseMemcachedBuckets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseMemcachedBucket, err error)
 	// CouchbaseMemcachedBuckets returns an object that can list and get CouchbaseMemcachedBuckets.
 	CouchbaseMemcachedBuckets(namespace string) CouchbaseMemcachedBucketNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseMemcachedBucketLister) CouchbaseMemcachedBuckets(namespace str
 }
 
 // CouchbaseMemcachedBucketNamespaceLister helps list and get CouchbaseMemcachedBuckets.
+// All objects returned here must be treated as read-only.
 type CouchbaseMemcachedBucketNamespaceLister interface {
 	// List lists all CouchbaseMemcachedBuckets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseMemcachedBucket, err error)
 	// Get retrieves the CouchbaseMemcachedBucket from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v2.CouchbaseMemcachedBucket, error)
 	CouchbaseMemcachedBucketNamespaceListerExpansion
 }

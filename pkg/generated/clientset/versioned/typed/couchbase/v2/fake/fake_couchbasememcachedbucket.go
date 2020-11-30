@@ -8,6 +8,8 @@
 package fake
 
 import (
+	"context"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -28,7 +30,7 @@ var couchbasememcachedbucketsResource = schema.GroupVersionResource{Group: "couc
 var couchbasememcachedbucketsKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseMemcachedBucket"}
 
 // Get takes name of the couchbaseMemcachedBucket, and returns the corresponding couchbaseMemcachedBucket object, and an error if there is any.
-func (c *FakeCouchbaseMemcachedBuckets) Get(name string, options v1.GetOptions) (result *v2.CouchbaseMemcachedBucket, err error) {
+func (c *FakeCouchbaseMemcachedBuckets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseMemcachedBucket, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(couchbasememcachedbucketsResource, c.ns, name), &v2.CouchbaseMemcachedBucket{})
 
@@ -39,7 +41,7 @@ func (c *FakeCouchbaseMemcachedBuckets) Get(name string, options v1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseMemcachedBuckets that match those selectors.
-func (c *FakeCouchbaseMemcachedBuckets) List(opts v1.ListOptions) (result *v2.CouchbaseMemcachedBucketList, err error) {
+func (c *FakeCouchbaseMemcachedBuckets) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseMemcachedBucketList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(couchbasememcachedbucketsResource, couchbasememcachedbucketsKind, c.ns, opts), &v2.CouchbaseMemcachedBucketList{})
 
@@ -61,14 +63,14 @@ func (c *FakeCouchbaseMemcachedBuckets) List(opts v1.ListOptions) (result *v2.Co
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseMemcachedBuckets.
-func (c *FakeCouchbaseMemcachedBuckets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCouchbaseMemcachedBuckets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(couchbasememcachedbucketsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a couchbaseMemcachedBucket and creates it.  Returns the server's representation of the couchbaseMemcachedBucket, and an error, if there is any.
-func (c *FakeCouchbaseMemcachedBuckets) Create(couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket) (result *v2.CouchbaseMemcachedBucket, err error) {
+func (c *FakeCouchbaseMemcachedBuckets) Create(ctx context.Context, couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket, opts v1.CreateOptions) (result *v2.CouchbaseMemcachedBucket, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(couchbasememcachedbucketsResource, c.ns, couchbaseMemcachedBucket), &v2.CouchbaseMemcachedBucket{})
 
@@ -79,7 +81,7 @@ func (c *FakeCouchbaseMemcachedBuckets) Create(couchbaseMemcachedBucket *v2.Couc
 }
 
 // Update takes the representation of a couchbaseMemcachedBucket and updates it. Returns the server's representation of the couchbaseMemcachedBucket, and an error, if there is any.
-func (c *FakeCouchbaseMemcachedBuckets) Update(couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket) (result *v2.CouchbaseMemcachedBucket, err error) {
+func (c *FakeCouchbaseMemcachedBuckets) Update(ctx context.Context, couchbaseMemcachedBucket *v2.CouchbaseMemcachedBucket, opts v1.UpdateOptions) (result *v2.CouchbaseMemcachedBucket, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(couchbasememcachedbucketsResource, c.ns, couchbaseMemcachedBucket), &v2.CouchbaseMemcachedBucket{})
 
@@ -90,7 +92,7 @@ func (c *FakeCouchbaseMemcachedBuckets) Update(couchbaseMemcachedBucket *v2.Couc
 }
 
 // Delete takes name of the couchbaseMemcachedBucket and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseMemcachedBuckets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCouchbaseMemcachedBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(couchbasememcachedbucketsResource, c.ns, name), &v2.CouchbaseMemcachedBucket{})
 
@@ -98,15 +100,15 @@ func (c *FakeCouchbaseMemcachedBuckets) Delete(name string, options *v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseMemcachedBuckets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbasememcachedbucketsResource, c.ns, listOptions)
+func (c *FakeCouchbaseMemcachedBuckets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(couchbasememcachedbucketsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2.CouchbaseMemcachedBucketList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched couchbaseMemcachedBucket.
-func (c *FakeCouchbaseMemcachedBuckets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseMemcachedBucket, err error) {
+func (c *FakeCouchbaseMemcachedBuckets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseMemcachedBucket, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(couchbasememcachedbucketsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseMemcachedBucket{})
 

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -72,7 +73,7 @@ type upgradableResource interface {
 // complete it will commit upgraded items back to Kubernetes to persist the upgrades.
 func (c *Cluster) operatorUpgrade() error {
 	// Get the most up to date version, we may have updated something since starting...
-	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
+	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(context.Background(), c.cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func (c *Cluster) operatorUpgrade() error {
 			return err
 		}
 
-		if cluster, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
+		if cluster, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), cluster, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 

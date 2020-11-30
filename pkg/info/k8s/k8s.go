@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	ctx "context"
 	"fmt"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -60,11 +61,11 @@ func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod,
 	// Inspect the resource kind and perform type specific processing
 	switch resource.Kind() {
 	case "Pod":
-		return context.KubeClient.CoreV1().Pods(context.Namespace()).Get(resource.Name(), metav1.GetOptions{})
+		return context.KubeClient.CoreV1().Pods(context.Namespace()).Get(ctx.Background(), resource.Name(), metav1.GetOptions{})
 
 	case "Deployment":
 		// Grab the deployment
-		deployment, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).Get(resource.Name(), metav1.GetOptions{})
+		deployment, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).Get(ctx.Background(), resource.Name(), metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +76,7 @@ func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod,
 			return nil, err
 		}
 
-		pods, err := context.KubeClient.CoreV1().Pods(context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pods, err := context.KubeClient.CoreV1().Pods(context.Namespace()).List(ctx.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +94,7 @@ func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod,
 
 // GetDeployments returns all Deployments in the namespace.
 func GetDeployments(context *context.Context) (*appsv1.DeploymentList, error) {
-	deployments, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).List(metav1.ListOptions{})
+	deployments, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("%w: unable to poll Deployment resources", err)
 	}
@@ -121,7 +122,7 @@ func GetOperatorDeployment(context *context.Context) (*appsv1.Deployment, error)
 
 // GetCouchbaseClusters returns all Couchbase Clusters in the namespace.
 func GetCouchbaseClusters(context *context.Context) (*couchbasev2.CouchbaseClusterList, error) {
-	clusters, err := context.CouchbaseClient.CouchbaseV2().CouchbaseClusters(context.Namespace()).List(metav1.ListOptions{})
+	clusters, err := context.CouchbaseClient.CouchbaseV2().CouchbaseClusters(context.Namespace()).List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("%w: unable to poll CouchbaseCluster resources", err)
 	}

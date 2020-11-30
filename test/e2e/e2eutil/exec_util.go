@@ -18,6 +18,7 @@ package e2eutil
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"strings"
 	"testing"
@@ -109,7 +110,7 @@ func ExecCommandInContainer(k8s *types.Cluster, podName, containerName string, c
 
 // ExecCommandInPod executes a command in the specified pod, selecting the first container.
 func ExecCommandInPod(k8s *types.Cluster, name string, cmd ...string) (string, string, error) {
-	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(name, metav1.GetOptions{})
+	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}

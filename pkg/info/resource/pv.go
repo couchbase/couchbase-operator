@@ -1,6 +1,8 @@
 package resource
 
 import (
+	ctx "context"
+
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -33,7 +35,7 @@ func (r *persistentVolumeResource) Kind() string {
 func (r *persistentVolumeResource) Fetch() error {
 	var err error
 
-	r.persistentVolumes, err = r.context.KubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	r.persistentVolumes, err = r.context.KubeClient.CoreV1().PersistentVolumes().List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

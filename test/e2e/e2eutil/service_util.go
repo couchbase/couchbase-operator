@@ -1,6 +1,7 @@
 package e2eutil
 
 import (
+	"context"
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -10,7 +11,7 @@ import (
 )
 
 func CreateService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error) {
-	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Create(service)
+	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Create(context.Background(), service, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +20,7 @@ func CreateService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error)
 }
 
 func UpdateService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error) {
-	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Update(service)
+	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Update(context.Background(), service, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -28,11 +29,11 @@ func UpdateService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error)
 }
 
 func DeleteService(k8s *types.Cluster, serviceName string, options *metav1.DeleteOptions) error {
-	return k8s.KubeClient.CoreV1().Services(k8s.Namespace).Delete(serviceName, options)
+	return k8s.KubeClient.CoreV1().Services(k8s.Namespace).Delete(context.Background(), serviceName, *options)
 }
 
 func GetService(k8s *types.Cluster, serviceName string) (*v1.Service, error) {
-	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Get(serviceName, metav1.GetOptions{})
+	service, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func GetService(k8s *types.Cluster, serviceName string) (*v1.Service, error) {
 }
 
 func GetServices(k8s *types.Cluster) ([]v1.Service, error) {
-	serviceList, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).List(metav1.ListOptions{})
+	serviceList, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

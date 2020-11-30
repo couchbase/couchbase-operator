@@ -1,6 +1,8 @@
 package resource
 
 import (
+	ctx "context"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
@@ -31,7 +33,7 @@ func (r *couchbaseMemcachedBucketResource) Kind() string {
 
 // Fetch collects all buckets as defined in the namespace.
 func (r *couchbaseMemcachedBucketResource) Fetch() error {
-	couchbaseMemcachedBuckets, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(r.context.Namespace()).List(metav1.ListOptions{})
+	couchbaseMemcachedBuckets, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(r.context.Namespace()).List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

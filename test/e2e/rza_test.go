@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -49,7 +50,7 @@ func (expected rzaMap) accumulateRzaServerClass(groupSize int, serverGroups []st
 
 // mustValidateRzaMap accepts an expected scheduling and compares against reality.
 func (expected rzaMap) mustValidateRzaMap(t *testing.T, cluster *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
-	pods, err := cluster.KubeClient.CoreV1().Pods(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+	pods, err := cluster.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}

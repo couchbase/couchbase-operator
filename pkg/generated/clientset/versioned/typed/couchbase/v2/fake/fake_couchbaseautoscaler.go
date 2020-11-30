@@ -8,6 +8,8 @@
 package fake
 
 import (
+	"context"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +31,7 @@ var couchbaseautoscalersResource = schema.GroupVersionResource{Group: "couchbase
 var couchbaseautoscalersKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseAutoscaler"}
 
 // Get takes name of the couchbaseAutoscaler, and returns the corresponding couchbaseAutoscaler object, and an error if there is any.
-func (c *FakeCouchbaseAutoscalers) Get(name string, options v1.GetOptions) (result *v2.CouchbaseAutoscaler, err error) {
+func (c *FakeCouchbaseAutoscalers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(couchbaseautoscalersResource, c.ns, name), &v2.CouchbaseAutoscaler{})
 
@@ -40,7 +42,7 @@ func (c *FakeCouchbaseAutoscalers) Get(name string, options v1.GetOptions) (resu
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseAutoscalers that match those selectors.
-func (c *FakeCouchbaseAutoscalers) List(opts v1.ListOptions) (result *v2.CouchbaseAutoscalerList, err error) {
+func (c *FakeCouchbaseAutoscalers) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseAutoscalerList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(couchbaseautoscalersResource, couchbaseautoscalersKind, c.ns, opts), &v2.CouchbaseAutoscalerList{})
 
@@ -62,14 +64,14 @@ func (c *FakeCouchbaseAutoscalers) List(opts v1.ListOptions) (result *v2.Couchba
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseAutoscalers.
-func (c *FakeCouchbaseAutoscalers) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCouchbaseAutoscalers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(couchbaseautoscalersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a couchbaseAutoscaler and creates it.  Returns the server's representation of the couchbaseAutoscaler, and an error, if there is any.
-func (c *FakeCouchbaseAutoscalers) Create(couchbaseAutoscaler *v2.CouchbaseAutoscaler) (result *v2.CouchbaseAutoscaler, err error) {
+func (c *FakeCouchbaseAutoscalers) Create(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.CreateOptions) (result *v2.CouchbaseAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(couchbaseautoscalersResource, c.ns, couchbaseAutoscaler), &v2.CouchbaseAutoscaler{})
 
@@ -80,7 +82,7 @@ func (c *FakeCouchbaseAutoscalers) Create(couchbaseAutoscaler *v2.CouchbaseAutos
 }
 
 // Update takes the representation of a couchbaseAutoscaler and updates it. Returns the server's representation of the couchbaseAutoscaler, and an error, if there is any.
-func (c *FakeCouchbaseAutoscalers) Update(couchbaseAutoscaler *v2.CouchbaseAutoscaler) (result *v2.CouchbaseAutoscaler, err error) {
+func (c *FakeCouchbaseAutoscalers) Update(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.UpdateOptions) (result *v2.CouchbaseAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(couchbaseautoscalersResource, c.ns, couchbaseAutoscaler), &v2.CouchbaseAutoscaler{})
 
@@ -92,7 +94,7 @@ func (c *FakeCouchbaseAutoscalers) Update(couchbaseAutoscaler *v2.CouchbaseAutos
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCouchbaseAutoscalers) UpdateStatus(couchbaseAutoscaler *v2.CouchbaseAutoscaler) (*v2.CouchbaseAutoscaler, error) {
+func (c *FakeCouchbaseAutoscalers) UpdateStatus(ctx context.Context, couchbaseAutoscaler *v2.CouchbaseAutoscaler, opts v1.UpdateOptions) (*v2.CouchbaseAutoscaler, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(couchbaseautoscalersResource, "status", c.ns, couchbaseAutoscaler), &v2.CouchbaseAutoscaler{})
 
@@ -103,7 +105,7 @@ func (c *FakeCouchbaseAutoscalers) UpdateStatus(couchbaseAutoscaler *v2.Couchbas
 }
 
 // Delete takes name of the couchbaseAutoscaler and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseAutoscalers) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCouchbaseAutoscalers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(couchbaseautoscalersResource, c.ns, name), &v2.CouchbaseAutoscaler{})
 
@@ -111,15 +113,15 @@ func (c *FakeCouchbaseAutoscalers) Delete(name string, options *v1.DeleteOptions
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseAutoscalers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbaseautoscalersResource, c.ns, listOptions)
+func (c *FakeCouchbaseAutoscalers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(couchbaseautoscalersResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2.CouchbaseAutoscalerList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched couchbaseAutoscaler.
-func (c *FakeCouchbaseAutoscalers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseAutoscaler, err error) {
+func (c *FakeCouchbaseAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(couchbaseautoscalersResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseAutoscaler{})
 
@@ -130,7 +132,7 @@ func (c *FakeCouchbaseAutoscalers) Patch(name string, pt types.PatchType, data [
 }
 
 // GetScale takes name of the couchbaseAutoscaler, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeCouchbaseAutoscalers) GetScale(couchbaseAutoscalerName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+func (c *FakeCouchbaseAutoscalers) GetScale(ctx context.Context, couchbaseAutoscalerName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetSubresourceAction(couchbaseautoscalersResource, c.ns, "scale", couchbaseAutoscalerName), &autoscalingv1.Scale{})
 
@@ -141,7 +143,7 @@ func (c *FakeCouchbaseAutoscalers) GetScale(couchbaseAutoscalerName string, opti
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeCouchbaseAutoscalers) UpdateScale(couchbaseAutoscalerName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+func (c *FakeCouchbaseAutoscalers) UpdateScale(ctx context.Context, couchbaseAutoscalerName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(couchbaseautoscalersResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
 

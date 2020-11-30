@@ -204,8 +204,8 @@ func IsKubernetesResourceNotFoundError(err error) bool {
 	return apierrors.IsNotFound(err)
 }
 
-func CascadeDeleteOptions(gracePeriodSeconds int64) *metav1.DeleteOptions {
-	return &metav1.DeleteOptions{
+func CascadeDeleteOptions(gracePeriodSeconds int64) metav1.DeleteOptions {
+	return metav1.DeleteOptions{
 		GracePeriodSeconds: func(t int64) *int64 { return &t }(gracePeriodSeconds),
 		PropagationPolicy: func() *metav1.DeletionPropagation {
 			foreground := metav1.DeletePropagationForeground
@@ -229,8 +229,8 @@ func mergeLabels(l1, l2 map[string]string) map[string]string {
 	return m
 }
 
-func DeletePod(client *client.Client, namespace, podName string, opts *metav1.DeleteOptions) error {
-	err := client.KubeClient.CoreV1().Pods(namespace).Delete(podName, opts)
+func DeletePod(client *client.Client, namespace, podName string, opts metav1.DeleteOptions) error {
+	err := client.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), podName, opts)
 	if err != nil {
 		if !IsKubernetesResourceNotFoundError(err) {
 			return errors.NewStackTracedError(err)
@@ -241,7 +241,7 @@ func DeletePod(client *client.Client, namespace, podName string, opts *metav1.De
 }
 
 func CreatePod(client *client.Client, namespace string, pod *v1.Pod) (*v1.Pod, error) {
-	pod, err := client.KubeClient.CoreV1().Pods(namespace).Create(pod)
+	pod, err := client.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.NewStackTracedError(err)
 	}
@@ -258,7 +258,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 	// short cut this, honour context the timeout!
 	callback := func() error {
 		// TODO: cache me, used my cbopinfo :/
-		pod, err := kubeCli.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
+		pod, err := kubeCli.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
 		if err != nil {
 			return errors.NewStackTracedError(err)
 		}
@@ -286,7 +286,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 }
 
 func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespace, podName string) error {
-	if _, err := kubeCli.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{}); err != nil {
+	if _, err := kubeCli.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{}); err != nil {
 		if IsKubernetesResourceNotFoundError(err) {
 			return nil
 		}
@@ -299,7 +299,7 @@ func WaitForDeletePod(ctx context.Context, kubeCli kubernetes.Interface, namespa
 		LabelSelector: "couchbase_node=" + podName,
 	}
 
-	watcher, err := kubeCli.CoreV1().Pods(namespace).Watch(opts)
+	watcher, err := kubeCli.CoreV1().Pods(namespace).Watch(context.Background(), opts)
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -402,7 +402,7 @@ func LogPod(client *client.Client, namespace, name string) (output string) {
 		for _, container := range pod.Spec.Containers {
 			logs := client.KubeClient.CoreV1().Pods(namespace).GetLogs(pod.Name, &v1.PodLogOptions{Container: container.Name})
 
-			readCloser, err := logs.Stream()
+			readCloser, err := logs.Stream(context.Background())
 			if err != nil {
 				continue
 			}
@@ -485,7 +485,7 @@ func CreateCouchbaseAutoscaler(client *client.Client, cl *couchbasev2.CouchbaseC
 	addOwnerRefToObject(autoscaler, cl.AsOwner())
 
 	// create autoscaler cr
-	autoscaler, err := client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(cl.Namespace).Create(autoscaler)
+	autoscaler, err := client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(cl.Namespace).Create(context.Background(), autoscaler, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +494,7 @@ func CreateCouchbaseAutoscaler(client *client.Client, cl *couchbasev2.CouchbaseC
 	autoscaler.Status.Size = config.Size
 	autoscaler.Status.LabelSelector = selector.String()
 
-	return client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(cl.Namespace).UpdateStatus(autoscaler)
+	return client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(cl.Namespace).UpdateStatus(context.Background(), autoscaler, metav1.UpdateOptions{})
 }
 
 // NewResourceQuantityMi accepts an integral value representing megabytes (2^20)

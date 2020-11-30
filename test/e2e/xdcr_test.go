@@ -279,7 +279,7 @@ func TestXdcrCreateClusterRemote(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, nil, nil)
 }
@@ -289,7 +289,7 @@ func TestXdcrCreateClusterRemoteTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -301,7 +301,7 @@ func TestXdcrCreateClusterRemoteMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 
@@ -314,7 +314,7 @@ func TestXdcrCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	dns, _ := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 

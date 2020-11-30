@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -529,7 +530,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 		requested.Annotations[constants.SVCSpecAnnotation] = string(requestedJSON)
 
 		// Create the service.
-		if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Create(requested); err != nil {
+		if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 
@@ -549,7 +550,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 
 		current.Annotations[constants.SVCSpecAnnotation] = string(requestedJSON)
 
-		if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Update(current); err != nil {
+		if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Update(context.Background(), current, metav1.UpdateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 
@@ -661,7 +662,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 
 	pruned.Annotations[constants.SVCSpecAnnotation] = string(requestedJSON)
 
-	if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Update(pruned); err != nil {
+	if _, err := c.KubeClient.CoreV1().Services(cluster.Namespace).Update(context.Background(), pruned, metav1.UpdateOptions{}); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 

@@ -168,7 +168,7 @@ func GetPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, services 
 		selector = selector.Add(*requirement)
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -1281,7 +1281,7 @@ func MustCheckStatusVersion(t *testing.T, k8s *types.Cluster, cluster *couchbase
 	defer cancel()
 
 	callback := func() error {
-		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -1305,7 +1305,7 @@ func MustCheckStatusVersionFor(t *testing.T, k8s *types.Cluster, cluster *couchb
 	defer cancel()
 
 	for {
-		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(cluster.Name, metav1.GetOptions{})
+		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			Die(t, err)
 		}

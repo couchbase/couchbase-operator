@@ -37,7 +37,7 @@ func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, time
 
 	callback := func() error {
 		// TODO: you can check more than presence, the schedule for example can allow you to wait for updates...
-		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(backup.Name+"-full", metav1.GetOptions{}); err != nil {
+		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-full", metav1.GetOptions{}); err != nil {
 			return err
 		}
 
@@ -46,7 +46,7 @@ func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, time
 		}
 
 		// TODO: you can check more than presence, the schedule for example can allow you to wait for updates...
-		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(backup.Name+"-incremental", metav1.GetOptions{}); err != nil {
+		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-incremental", metav1.GetOptions{}); err != nil {
 			return err
 		}
 
@@ -68,7 +68,7 @@ func WaitForCronjob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster,
 
 	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
 		listOptions := metav1.ListOptions{}
-		cronjobs, err := k8s.KubeClient.BatchV1beta1().CronJobs(couchbase.Namespace).List(listOptions)
+		cronjobs, err := k8s.KubeClient.BatchV1beta1().CronJobs(couchbase.Namespace).List(context.Background(), listOptions)
 		if err != nil {
 			return false, err
 		}
@@ -97,7 +97,7 @@ func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, tim
 	var statusFieldValue reflect.Value
 
 	return statusFieldValue, retryutil.RetryOnErr(ctx, retryInterval, func() (err error) {
-		backup, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(backupName, metav1.GetOptions{})
+		backup, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(context.Background(), backupName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -154,7 +154,7 @@ func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *couchbasev2.Couchbas
 	defer cancel()
 
 	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
-		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(ClusterListOpt(couchbase))
+		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), ClusterListOpt(couchbase))
 		if err != nil {
 			return false, err
 		}
@@ -185,7 +185,7 @@ func WaitUntilBucketsExist(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 
 	// First ensure the buckets are created according to the operator.
 	callback := func() error {
-		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -304,7 +304,7 @@ func WaitUntilBucketNotExists(k8s *types.Cluster, couchbase *couchbasev2.Couchba
 	defer cancel()
 
 	return retryutil.Retry(ctx, retryInterval, func() (done bool, err error) {
-		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -412,7 +412,7 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.L
 	defer cancel()
 
 	err := retryutil.Retry(ctx, retryInterval, func() (bool, error) {
-		podList, err := kubecli.CoreV1().Pods(namespace).List(lo)
+		podList, err := kubecli.CoreV1().Pods(namespace).List(context.Background(), lo)
 		if err != nil {
 			return false, err
 		}
@@ -446,7 +446,7 @@ func WaitUntilOperatorReady(k8s *types.Cluster, timeout time.Duration) error {
 	defer cancel()
 
 	callback := func() error {
-		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(k8s.OperatorDeployment.Name, metav1.GetOptions{})
+		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), k8s.OperatorDeployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -473,7 +473,7 @@ func WaitForClusterEvent(ctx context.Context, kubeClient kubernetes.Interface, c
 		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
 	}
 
-	watch, err := kubeClient.CoreV1().Events(cl.Namespace).Watch(opts)
+	watch, err := kubeClient.CoreV1().Events(cl.Namespace).Watch(context.Background(), opts)
 	if err != nil {
 		return err
 	}
@@ -538,7 +538,7 @@ func MustObserveClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbas
 	}
 
 	callback := func() error {
-		events, err := k8s.KubeClient.CoreV1().Events(cluster.Namespace).List(opts)
+		events, err := k8s.KubeClient.CoreV1().Events(cluster.Namespace).List(context.Background(), opts)
 		if err != nil {
 			return err
 		}
@@ -562,7 +562,7 @@ func WaitForBackupEvent(kubeClient kubernetes.Interface, b *couchbasev2.Couchbas
 		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.BackupCRDResourceKind},
 	}
 
-	watch, err := kubeClient.CoreV1().Events(b.Namespace).Watch(opts)
+	watch, err := kubeClient.CoreV1().Events(b.Namespace).Watch(context.Background(), opts)
 	if err != nil {
 		return err
 	}
@@ -655,7 +655,7 @@ func WaitForPVC(k8s *types.Cluster, name string, timeout time.Duration) error {
 	defer cancel()
 
 	callback := func() error {
-		_, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(name, metav1.GetOptions{})
+		_, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
 		return err
 	}
 
@@ -684,7 +684,7 @@ func WaitForPVCDeletion(ctx context.Context, k8s *types.Cluster) error {
 	selector = selector.Add(requirements...)
 
 	return retryutil.Retry(ctx, 10*time.Second, func() (bool, error) {
-		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -719,7 +719,7 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName string, timeo
 
 	// Retry deletion until success or the timeout context fires.
 	return retryutil.Retry(ctx, time.Second, func() (bool, error) {
-		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
@@ -736,7 +736,7 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName string, timeo
 
 			pvc.Finalizers = []string{}
 
-			if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Update(&pvc); err != nil {
+			if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Update(context.Background(), &pvc, metav1.UpdateOptions{}); err != nil {
 				return false, retryutil.RetryOkError(err)
 			}
 
@@ -749,7 +749,7 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName string, timeo
 			return true, nil
 		}
 
-		if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Delete(pvcName, metav1.NewDeleteOptions(0)); err != nil {
+		if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Delete(context.Background(), pvcName, *metav1.NewDeleteOptions(0)); err != nil {
 			return false, retryutil.RetryOkError(err)
 		}
 
@@ -824,7 +824,7 @@ func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *couchbasev2.
 	defer cancel()
 
 	return retryutil.Retry(ctx, retryInterval, func() (bool, error) {
-		pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+		pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 		if err != nil {
 			return false, err
 		}
@@ -869,7 +869,7 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 	defer cancel()
 
 	return retryutil.Retry(ctx, 10*time.Second, func() (bool, error) {
-		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -956,7 +956,7 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 	defer cancel()
 
 	return retryutil.Retry(ctx, 1*time.Second, func() (bool, error) {
-		if _, err := cs.ApiextensionsV1().CustomResourceDefinitions().Get(crdName, metav1.GetOptions{}); err != nil {
+		if _, err := cs.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crdName, metav1.GetOptions{}); err != nil {
 			if k8sutil.IsKubernetesResourceNotFoundError(err) {
 				// api reported crd deleted ok
 				return true, nil
@@ -976,7 +976,7 @@ func WaitUntilCouchbaseAutoscalerExists(k8s *types.Cluster, couchbase *couchbase
 	defer cancel()
 
 	return retryutil.Retry(ctx, 10*time.Second, func() (bool, error) {
-		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -988,7 +988,7 @@ func WaitUntilCouchbaseAutoscalerExists(k8s *types.Cluster, couchbase *couchbase
 		}
 
 		// get autoscaler from k8s
-		_, err = k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(couchbase.Namespace).Get(autoscalerName, metav1.GetOptions{})
+		_, err = k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(couchbase.Namespace).Get(context.Background(), autoscalerName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -1009,7 +1009,7 @@ func WaitForCouchbaseAutoscalerDeletion(k8s *types.Cluster, couchbase *couchbase
 	defer cancel()
 
 	return retryutil.Retry(ctx, 1*time.Second, func() (bool, error) {
-		_, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(couchbase.Namespace).Get(autoscalerName, metav1.GetOptions{})
+		_, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(couchbase.Namespace).Get(context.Background(), autoscalerName, metav1.GetOptions{})
 		if err != nil {
 			if k8sutil.IsKubernetesResourceNotFoundError(err) {
 				// cr deleted ok
@@ -1116,7 +1116,7 @@ func WaitForBackupDeletion(k8s *types.Cluster, timeout time.Duration) error {
 	defer cancel()
 
 	callback := func() error {
-		backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).List(metav1.ListOptions{})
+		backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -1142,11 +1142,11 @@ func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 	defer cancel()
 
 	return retryutil.RetryOnErr(ctx, retryInterval, func() error {
-		listOptions := &metav1.ListOptions{
+		listOptions := metav1.ListOptions{
 			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 		}
 
-		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(*listOptions)
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), listOptions)
 		if err != nil {
 			return err
 		}

@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -45,7 +46,7 @@ func lazyBoundStorageClass(t *testing.T, cluster *types.Cluster) bool {
 
 	// When explcitly stated, lookup the storage class.
 	if f.StorageClassName != nil {
-		sc, err := cluster.KubeClient.StorageV1().StorageClasses().Get(*f.StorageClassName, metav1.GetOptions{})
+		sc, err := cluster.KubeClient.StorageV1().StorageClasses().Get(context.Background(), *f.StorageClassName, metav1.GetOptions{})
 		if err != nil {
 			e2eutil.Die(t, err)
 		}
@@ -55,7 +56,7 @@ func lazyBoundStorageClass(t *testing.T, cluster *types.Cluster) bool {
 
 	// When implicit (default), then lookup the default storage class that will
 	// be used by Kubernetes.
-	scs, err := cluster.KubeClient.StorageV1().StorageClasses().List(metav1.ListOptions{})
+	scs, err := cluster.KubeClient.StorageV1().StorageClasses().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -266,7 +267,7 @@ func mustVerifyServerLogs(t *testing.T, k8s *types.Cluster, archive string, reda
 		e2eutil.Die(t, err)
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -326,7 +327,7 @@ func verifyLogRedaction(archive string) error {
 }
 
 func verifyLogCollectListJSON(k8s *types.Cluster, cbClusterName, collectInfoListJSON string, errMsgList *failureList) error {
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cbClusterName})
 	if err != nil {
 		return err
 	}
@@ -357,27 +358,27 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 
 	// Gather cluster scoped resources.
-	clusterRoles, err := k8s.KubeClient.RbacV1().ClusterRoles().List(metav1.ListOptions{})
+	clusterRoles, err := k8s.KubeClient.RbacV1().ClusterRoles().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	clusterRoleBindings, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().List(metav1.ListOptions{})
+	clusterRoleBindings, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	crds, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(metav1.ListOptions{})
+	crds, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	persistentVolumes, err := k8s.KubeClient.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
+	persistentVolumes, err := k8s.KubeClient.CoreV1().PersistentVolumes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -407,42 +408,42 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 
 	// Gather namespace scoped resources.
-	buckets, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(namespace).List(metav1.ListOptions{})
+	buckets, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	ephemeralBuckets, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(metav1.ListOptions{})
+	ephemeralBuckets, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	memcachedBuckets, err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(metav1.ListOptions{})
+	memcachedBuckets, err := k8s.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	replications, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).List(metav1.ListOptions{})
+	replications, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	roles, err := k8s.KubeClient.RbacV1().Roles(namespace).List(metav1.ListOptions{})
+	roles, err := k8s.KubeClient.RbacV1().Roles(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	rolebindings, err := k8s.KubeClient.RbacV1().RoleBindings(namespace).List(metav1.ListOptions{})
+	rolebindings, err := k8s.KubeClient.RbacV1().RoleBindings(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	secrets, err := k8s.KubeClient.CoreV1().Secrets(namespace).List(metav1.ListOptions{})
+	secrets, err := k8s.KubeClient.CoreV1().Secrets(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	serviceaccounts, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).List(metav1.ListOptions{})
+	serviceaccounts, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -481,7 +482,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 
 	// Deployments are special, we only collect them if the image matches the operator image.
 	// It also has a collector that will pull out pprof and metrics if they are reachable.
-	deployments, err := k8s.KubeClient.AppsV1().Deployments(namespace).List(metav1.ListOptions{})
+	deployments, err := k8s.KubeClient.AppsV1().Deployments(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -520,7 +521,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 
 	// CouchbaseClusters are filtered based on selection.
-	couchbaseClusters, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(namespace).List(metav1.ListOptions{})
+	couchbaseClusters, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -550,32 +551,32 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 		e2eutil.Die(t, err)
 	}
 
-	endpoints, err := k8s.KubeClient.CoreV1().Endpoints(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	endpoints, err := k8s.KubeClient.CoreV1().Endpoints(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	pods, err := k8s.KubeClient.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	services, err := k8s.KubeClient.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	services, err := k8s.KubeClient.CoreV1().Services(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	configMaps, err := k8s.KubeClient.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{LabelSelector: selector})
+	configMaps, err := k8s.KubeClient.CoreV1().ConfigMaps(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -1024,7 +1025,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	}
 
 	// Create a kubernetes configuration file.
-	sa, err := targetKube.KubeClient.CoreV1().ServiceAccounts(targetKube.Namespace).Get(cluster.Name, metav1.GetOptions{})
+	sa, err := targetKube.KubeClient.CoreV1().ServiceAccounts(targetKube.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -1033,7 +1034,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		t.Skip("Cluster does not permit service account tokens")
 	}
 
-	secret, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Get(sa.Secrets[0].Name, metav1.GetOptions{})
+	secret, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Get(context.Background(), sa.Secrets[0].Name, metav1.GetOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -1133,7 +1134,7 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
 
 	t.Logf("Deploying operator using image '%s' and port %d", imageName, port)
 
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(deployment); err != nil {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(context.Background(), deployment, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -74,7 +75,7 @@ func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool) *corev1.Se
 		},
 	}
 
-	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(secret); err != nil {
+	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(context.Background(), secret, v1.CreateOptions{}); err != nil {
 		e2eutil.Die(t, err)
 	}
 
@@ -352,7 +353,7 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, time.Minute)
 
 	// check pvc exists
-	pvc, err := targetKube.KubeClient.CoreV1().PersistentVolumeClaims(targetKube.Namespace).Get(fullBackup.Name, v1.GetOptions{})
+	pvc, err := targetKube.KubeClient.CoreV1().PersistentVolumeClaims(targetKube.Namespace).Get(context.Background(), fullBackup.Name, v1.GetOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}

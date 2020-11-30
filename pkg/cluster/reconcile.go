@@ -686,7 +686,7 @@ func (c *Cluster) reconcileAdminService() error {
 
 	// If the service exists, and it shouldn't delete it.
 	if ok && !c.cluster.Spec.Networking.ExposeAdminConsole {
-		if err := c.k8s.KubeClient.CoreV1().Services(c.cluster.Namespace).Delete(serviceName, metav1.NewDeleteOptions(0)); err != nil {
+		if err := c.k8s.KubeClient.CoreV1().Services(c.cluster.Namespace).Delete(context.Background(), serviceName, *metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 
@@ -751,7 +751,7 @@ func (c *Cluster) reconcilePodServices() error {
 			continue
 		}
 
-		if err := c.k8s.KubeClient.CoreV1().Services(service.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := c.k8s.KubeClient.CoreV1().Services(service.Namespace).Delete(context.Background(), service.Name, *metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 
@@ -2159,7 +2159,7 @@ func (c *Cluster) reconcileBackup() error {
 
 			if !reflect.DeepEqual(actualSpec, requestedSpec) {
 				// update
-				if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(cronjob); err != nil {
+				if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(context.Background(), cronjob, metav1.UpdateOptions{}); err != nil {
 					return err
 				}
 
@@ -2169,7 +2169,7 @@ func (c *Cluster) reconcileBackup() error {
 			}
 		} else {
 			// create new cronjob
-			if _, err = c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(cronjob); err != nil {
+			if _, err = c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(context.Background(), cronjob, metav1.CreateOptions{}); err != nil {
 				return err
 			}
 
@@ -2185,7 +2185,7 @@ func (c *Cluster) reconcileBackup() error {
 			existing[pvc.Name] = true
 		} else {
 			// create new PVC
-			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(pvc); err != nil {
+			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(context.Background(), pvc, metav1.CreateOptions{}); err != nil {
 				return err
 			}
 
@@ -2253,7 +2253,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 		if ok {
 			// update any existing requested specs
 			if currentjob.Annotations[constants.CronjobSpecAnnotation] != requested.Annotations[constants.CronjobSpecAnnotation] {
-				updatedRestore, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Update(&currentRestore)
+				updatedRestore, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Update(context.Background(), &currentRestore, metav1.UpdateOptions{})
 				if err != nil {
 					return err
 				}
@@ -2268,7 +2268,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 
 			// cleanup completed restores
 			if currentjob.Status.Succeeded == 1 {
-				if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(currentRestore.Name, metav1.NewDeleteOptions(0)); err != nil {
+				if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), currentRestore.Name, *metav1.NewDeleteOptions(0)); err != nil {
 					return err
 				}
 			}
@@ -2278,7 +2278,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 			c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
 
 			// else try to create the job as it does not exist
-			createdJob, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(requested)
+			createdJob, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{})
 			if err != nil {
 				return err
 			}
@@ -2303,7 +2303,7 @@ Outerloop:
 		}
 
 		// no "owner" restore, must have been deleted. cleanup
-		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(job.Name, &metav1.DeleteOptions{}); err != nil {
+		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 
@@ -2422,7 +2422,7 @@ func (c *Cluster) reconcileCompletedPods() error {
 			continue
 		}
 
-		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 
@@ -2480,7 +2480,7 @@ func (c *Cluster) hibernate() error {
 	for _, pod := range pods {
 		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", pod.Name)
 
-		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0)); err != nil {
+		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 	}
@@ -2549,7 +2549,7 @@ func (c *Cluster) reconcileAutoscalers() error {
 					// possible for cli or other custom implementations
 					// to trigger couchbase autoscaling
 					c.cluster.Spec.Servers[i].Size = autoscaler.Spec.Size
-					cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(c.cluster)
+					cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), c.cluster, metav1.UpdateOptions{})
 					if err != nil {
 						return fmt.Errorf("failed to update cluster size: %w", errors.NewStackTracedError(err))
 					}
@@ -2577,7 +2577,7 @@ func (c *Cluster) reconcileAutoscalers() error {
 
 			if configPods != autoscaler.Status.Size {
 				autoscaler.Status.Size = configPods
-				_, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).UpdateStatus(autoscaler)
+				_, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).UpdateStatus(context.Background(), autoscaler, metav1.UpdateOptions{})
 
 				if err != nil {
 					return fmt.Errorf("%w: failed to update autoscaler status: %s", errors.NewStackTracedError(err), autoscaler.Name)
@@ -2593,7 +2593,7 @@ func (c *Cluster) reconcileAutoscalers() error {
 		// delete autoscaler if it is not requested
 		configName := autoscaler.Spec.Servers
 		if _, found := couchbasev2.HasItem(configName, requestedAutoscalers); !found {
-			err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).Delete(autoscaler.Name, metav1.NewDeleteOptions(0))
+			err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).Delete(context.Background(), autoscaler.Name, *metav1.NewDeleteOptions(0))
 			if err != nil {
 				return err
 			}

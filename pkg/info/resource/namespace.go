@@ -1,6 +1,8 @@
 package resource
 
 import (
+	ctx "context"
+
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -33,7 +35,7 @@ func (r *namespaceResource) Kind() string {
 func (r *namespaceResource) Fetch() error {
 	var err error
 
-	if r.namespace, err = r.context.KubeClient.CoreV1().Namespaces().Get(r.context.Namespace(), metav1.GetOptions{}); err != nil {
+	if r.namespace, err = r.context.KubeClient.CoreV1().Namespaces().Get(ctx.Background(), r.context.Namespace(), metav1.GetOptions{}); err != nil {
 		return err
 	}
 

@@ -27,11 +27,11 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 	// storing the prometheus metrics
 	responseDataStr := ""
 
-	listOptions := &metav1.ListOptions{
+	listOptions := metav1.ListOptions{
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(*listOptions)
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
 	if err != nil {
 		return responseDataStr, err
 	}
@@ -152,11 +152,11 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 	// storing the prometheus metrics
 	responseDataStr := ""
 
-	listOptions := &metav1.ListOptions{
+	listOptions := metav1.ListOptions{
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(*listOptions)
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
 	if err != nil {
 		return responseDataStr, err
 	}

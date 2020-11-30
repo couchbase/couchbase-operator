@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os/exec"
@@ -72,14 +73,14 @@ func CreateResource(c *Clients, resource *unstructured.Unstructured) error {
 	}
 
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-		if _, err := c.dynamic.Resource(mapping.Resource).Create(resource, metav1.CreateOptions{}); err != nil {
+		if _, err := c.dynamic.Resource(mapping.Resource).Create(context.Background(), resource, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 
 		return nil
 	}
 
-	if _, err := c.dynamic.Resource(mapping.Resource).Namespace("default").Create(resource, metav1.CreateOptions{}); err != nil {
+	if _, err := c.dynamic.Resource(mapping.Resource).Namespace("default").Create(context.Background(), resource, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
@@ -113,11 +114,11 @@ func ReplaceResource(c *Clients, resource *unstructured.Unstructured) error {
 	var old *unstructured.Unstructured
 
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-		if old, err = c.dynamic.Resource(mapping.Resource).Get(resource.GetName(), metav1.GetOptions{}); err != nil {
+		if old, err = c.dynamic.Resource(mapping.Resource).Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
 			return err
 		}
 	} else {
-		if old, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(resource.GetName(), metav1.GetOptions{}); err != nil {
+		if old, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
 			return err
 		}
 	}
@@ -133,11 +134,11 @@ func ReplaceResource(c *Clients, resource *unstructured.Unstructured) error {
 	}
 
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-		if _, err := c.dynamic.Resource(mapping.Resource).Update(old, metav1.UpdateOptions{}); err != nil {
+		if _, err := c.dynamic.Resource(mapping.Resource).Update(context.Background(), old, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 	} else {
-		if _, err := c.dynamic.Resource(mapping.Resource).Namespace("default").Update(old, metav1.UpdateOptions{}); err != nil {
+		if _, err := c.dynamic.Resource(mapping.Resource).Namespace("default").Update(context.Background(), old, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 	}
@@ -165,7 +166,7 @@ func ReplaceOrCreateResource(c *Clients, resource *unstructured.Unstructured) er
 	}
 
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-		if _, err = c.dynamic.Resource(mapping.Resource).Get(resource.GetName(), metav1.GetOptions{}); err != nil {
+		if _, err = c.dynamic.Resource(mapping.Resource).Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
 				return CreateResource(c, resource)
 			}
@@ -173,7 +174,7 @@ func ReplaceOrCreateResource(c *Clients, resource *unstructured.Unstructured) er
 			return err
 		}
 	} else {
-		if _, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(resource.GetName(), metav1.GetOptions{}); err != nil {
+		if _, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
 				return CreateResource(c, resource)
 			}
@@ -207,14 +208,14 @@ func DeleteResource(c *Clients, resource *unstructured.Unstructured) error {
 	}
 
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-		if err := c.dynamic.Resource(mapping.Resource).Delete(resource.GetName(), metav1.NewDeleteOptions(0)); err != nil {
+		if err := c.dynamic.Resource(mapping.Resource).Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
 
 		return nil
 	}
 
-	if err := c.dynamic.Resource(mapping.Resource).Namespace("default").Delete(resource.GetName(), metav1.NewDeleteOptions(0)); err != nil {
+	if err := c.dynamic.Resource(mapping.Resource).Namespace("default").Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
 		return err
 	}
 
@@ -249,12 +250,12 @@ func ResourceCondition(c *Clients, group, version, kind, name, conditionType, co
 		var resource *unstructured.Unstructured
 
 		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			resource, err = c.dynamic.Resource(mapping.Resource).Get(name, metav1.GetOptions{})
+			resource, err = c.dynamic.Resource(mapping.Resource).Get(context.Background(), name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 		} else {
-			resource, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(name, metav1.GetOptions{})
+			resource, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(context.Background(), name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -306,7 +307,7 @@ func ResourceEvent(c *Clients, group, version, kind, name, reason string) WaitFu
 			"involvedObject.name":       name,
 		}
 
-		events, err := c.kubernetes.CoreV1().Events("default").List(metav1.ListOptions{FieldSelector: labels.FormatLabels(selector)})
+		events, err := c.kubernetes.CoreV1().Events("default").List(context.Background(), metav1.ListOptions{FieldSelector: labels.FormatLabels(selector)})
 		if err != nil {
 			return err
 		}

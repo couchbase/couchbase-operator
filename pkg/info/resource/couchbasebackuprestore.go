@@ -1,6 +1,8 @@
 package resource
 
 import (
+	ctx "context"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
@@ -28,7 +30,7 @@ func (r *couchbaseBackupRestoreResource) Kind() string {
 }
 
 func (r *couchbaseBackupRestoreResource) Fetch() error {
-	couchbaseBackupRestores, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(r.context.Namespace()).List(metav1.ListOptions{})
+	couchbaseBackupRestores, err := r.context.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(r.context.Namespace()).List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

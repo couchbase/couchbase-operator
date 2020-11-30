@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"context"
 	"reflect"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -36,7 +37,7 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 	// Get any existing budgets, creating one if it doesn't exist.
 	actual, found := client.PodDisruptionBudgets.Get(name)
 	if !found {
-		if _, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(required); err != nil {
+		if _, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(context.Background(), required, metav1.CreateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 
@@ -50,12 +51,11 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 	}
 
 	// Delete and recreate as the spec is immutable.
-	if err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Delete(name, nil); err != nil {
+	if err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
-	_, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(required)
-	if err != nil {
+	if _, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(context.Background(), required, metav1.CreateOptions{}); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 

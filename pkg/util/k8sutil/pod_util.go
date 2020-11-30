@@ -366,7 +366,7 @@ func createPersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolu
 
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 
-	pvc, err := client.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Create(claim)
+	pvc, err := client.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Create(context.Background(), claim, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.NewStackTracedError(err)
 	}
@@ -386,7 +386,7 @@ func podVolumeSpecForClaim(claimName string) v1.Volume {
 
 // Delete pod and any associated persisted volumes
 // when removeVolumes is 'true'.
-func DeleteCouchbasePod(client *client.Client, namespace, name string, opts *metav1.DeleteOptions, removeVolumes bool) error {
+func DeleteCouchbasePod(client *client.Client, namespace, name string, opts metav1.DeleteOptions, removeVolumes bool) error {
 	if err := DeletePod(client, namespace, name, opts); err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ func deletePodVolumes(client *client.Client, memberName string) error {
 	defer cancel()
 
 	for _, pvc := range listMemberPVCS(client, memberName) {
-		if err := client.KubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, CascadeDeleteOptions(0)); err != nil {
+		if err := client.KubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.Background(), pvc.Name, CascadeDeleteOptions(0)); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 
@@ -1114,7 +1114,7 @@ func FlagPodReady(client *client.Client, name string) error {
 	// Yes it's ugly, but efficient.
 	mergePatch = []byte(`{"status":{"conditions":[` + string(mergePatch) + `]}}`)
 
-	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(pod.Name, apitypes.StrategicMergePatchType, mergePatch, "status"); err != nil {
+	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(context.Background(), pod.Name, apitypes.StrategicMergePatchType, mergePatch, metav1.PatchOptions{}, "status"); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 

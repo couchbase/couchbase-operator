@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseEphemeralBucketLister helps list CouchbaseEphemeralBuckets.
+// All objects returned here must be treated as read-only.
 type CouchbaseEphemeralBucketLister interface {
 	// List lists all CouchbaseEphemeralBuckets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseEphemeralBucket, err error)
 	// CouchbaseEphemeralBuckets returns an object that can list and get CouchbaseEphemeralBuckets.
 	CouchbaseEphemeralBuckets(namespace string) CouchbaseEphemeralBucketNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseEphemeralBucketLister) CouchbaseEphemeralBuckets(namespace str
 }
 
 // CouchbaseEphemeralBucketNamespaceLister helps list and get CouchbaseEphemeralBuckets.
+// All objects returned here must be treated as read-only.
 type CouchbaseEphemeralBucketNamespaceLister interface {
 	// List lists all CouchbaseEphemeralBuckets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseEphemeralBucket, err error)
 	// Get retrieves the CouchbaseEphemeralBucket from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v2.CouchbaseEphemeralBucket, error)
 	CouchbaseEphemeralBucketNamespaceListerExpansion
 }

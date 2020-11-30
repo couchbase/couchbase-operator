@@ -8,6 +8,7 @@
 package v2
 
 import (
+	"context"
 	"time"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -26,14 +27,14 @@ type CouchbaseGroupsGetter interface {
 
 // CouchbaseGroupInterface has methods to work with CouchbaseGroup resources.
 type CouchbaseGroupInterface interface {
-	Create(*v2.CouchbaseGroup) (*v2.CouchbaseGroup, error)
-	Update(*v2.CouchbaseGroup) (*v2.CouchbaseGroup, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v2.CouchbaseGroup, error)
-	List(opts v1.ListOptions) (*v2.CouchbaseGroupList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseGroup, err error)
+	Create(ctx context.Context, couchbaseGroup *v2.CouchbaseGroup, opts v1.CreateOptions) (*v2.CouchbaseGroup, error)
+	Update(ctx context.Context, couchbaseGroup *v2.CouchbaseGroup, opts v1.UpdateOptions) (*v2.CouchbaseGroup, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseGroup, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v2.CouchbaseGroupList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseGroup, err error)
 	CouchbaseGroupExpansion
 }
 
@@ -52,20 +53,20 @@ func newCouchbaseGroups(c *CouchbaseV2Client, namespace string) *couchbaseGroups
 }
 
 // Get takes name of the couchbaseGroup, and returns the corresponding couchbaseGroup object, and an error if there is any.
-func (c *couchbaseGroups) Get(name string, options v1.GetOptions) (result *v2.CouchbaseGroup, err error) {
+func (c *couchbaseGroups) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseGroup, err error) {
 	result = &v2.CouchbaseGroup{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("couchbasegroups").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseGroups that match those selectors.
-func (c *couchbaseGroups) List(opts v1.ListOptions) (result *v2.CouchbaseGroupList, err error) {
+func (c *couchbaseGroups) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseGroupList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -76,13 +77,13 @@ func (c *couchbaseGroups) List(opts v1.ListOptions) (result *v2.CouchbaseGroupLi
 		Resource("couchbasegroups").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseGroups.
-func (c *couchbaseGroups) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *couchbaseGroups) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -93,71 +94,74 @@ func (c *couchbaseGroups) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("couchbasegroups").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a couchbaseGroup and creates it.  Returns the server's representation of the couchbaseGroup, and an error, if there is any.
-func (c *couchbaseGroups) Create(couchbaseGroup *v2.CouchbaseGroup) (result *v2.CouchbaseGroup, err error) {
+func (c *couchbaseGroups) Create(ctx context.Context, couchbaseGroup *v2.CouchbaseGroup, opts v1.CreateOptions) (result *v2.CouchbaseGroup, err error) {
 	result = &v2.CouchbaseGroup{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("couchbasegroups").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(couchbaseGroup).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a couchbaseGroup and updates it. Returns the server's representation of the couchbaseGroup, and an error, if there is any.
-func (c *couchbaseGroups) Update(couchbaseGroup *v2.CouchbaseGroup) (result *v2.CouchbaseGroup, err error) {
+func (c *couchbaseGroups) Update(ctx context.Context, couchbaseGroup *v2.CouchbaseGroup, opts v1.UpdateOptions) (result *v2.CouchbaseGroup, err error) {
 	result = &v2.CouchbaseGroup{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("couchbasegroups").
 		Name(couchbaseGroup.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(couchbaseGroup).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the couchbaseGroup and deletes it. Returns an error if one occurs.
-func (c *couchbaseGroups) Delete(name string, options *v1.DeleteOptions) error {
+func (c *couchbaseGroups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("couchbasegroups").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *couchbaseGroups) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *couchbaseGroups) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("couchbasegroups").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched couchbaseGroup.
-func (c *couchbaseGroups) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseGroup, err error) {
+func (c *couchbaseGroups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseGroup, err error) {
 	result = &v2.CouchbaseGroup{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("couchbasegroups").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

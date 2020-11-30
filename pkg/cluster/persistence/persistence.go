@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"context"
 	goerrors "errors"
 	"fmt"
 
@@ -73,7 +74,7 @@ type persistentStorageImpl struct {
 
 // upgrade spots old 2.0 and older config maps and makes them secrets.
 func upgrade(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) error {
-	configmap, err := client.CoreV1().ConfigMaps(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+	configmap, err := client.CoreV1().ConfigMaps(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -93,7 +94,7 @@ func upgrade(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluste
 		StringData: configmap.Data,
 	}
 
-	if _, err = client.CoreV1().Secrets(couchbase.Namespace).Create(secret); err != nil {
+	if _, err = client.CoreV1().Secrets(couchbase.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 		if apierrors.IsConflict(err) {
 			return fmt.Errorf("cluster persistent storage secret already exists: %w", err)
 		}
@@ -101,7 +102,7 @@ func upgrade(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluste
 		return errors.NewStackTracedError(err)
 	}
 
-	if err := client.CoreV1().ConfigMaps(couchbase.Namespace).Delete(couchbase.Name, metav1.NewDeleteOptions(0)); err != nil {
+	if err := client.CoreV1().ConfigMaps(couchbase.Namespace).Delete(context.Background(), couchbase.Name, *metav1.NewDeleteOptions(0)); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
@@ -115,7 +116,7 @@ func New(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (
 		return nil, err
 	}
 
-	secret, err := client.CoreV1().Secrets(couchbase.Namespace).Get(couchbase.Name, metav1.GetOptions{})
+	secret, err := client.CoreV1().Secrets(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return nil, errors.NewStackTracedError(err)
@@ -131,7 +132,7 @@ func New(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (
 			},
 		}
 
-		if secret, err = client.CoreV1().Secrets(couchbase.Namespace).Create(secret); err != nil {
+		if secret, err = client.CoreV1().Secrets(couchbase.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 			return nil, errors.NewStackTracedError(err)
 		}
 	}
@@ -159,7 +160,7 @@ func (p *persistentStorageImpl) flush() error {
 	// messing with the map.  First up, tell them off.  Second to recover simply restart
 	// the Operator.  If Kubernetes makes changes under the hood we may well need to do
 	// a read modify write.
-	secret, err := p.client.CoreV1().Secrets(p.secret.Namespace).Update(p.secret)
+	secret, err := p.client.CoreV1().Secrets(p.secret.Namespace).Update(context.Background(), p.secret, metav1.UpdateOptions{})
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}

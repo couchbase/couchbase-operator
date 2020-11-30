@@ -62,7 +62,7 @@ func listDetachedLogPVCs(context *context.Context) ([]*v1.PersistentVolumeClaim,
 		return nil, err
 	}
 
-	pvcs, err := context.KubeClient.CoreV1().PersistentVolumeClaims(context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pvcs, err := context.KubeClient.CoreV1().PersistentVolumeClaims(context.Namespace()).List(ctx.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func listRunningPods(context *context.Context) ([]*v1.Pod, error) {
 		return nil, err
 	}
 
-	pods, err := context.KubeClient.CoreV1().Pods(context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := context.KubeClient.CoreV1().Pods(context.Namespace()).List(ctx.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 
 	var err error
 
-	pod, err = context.KubeClient.CoreV1().Pods(pvc.Namespace).Create(pod)
+	pod, err = context.KubeClient.CoreV1().Pods(pvc.Namespace).Create(ctx.Background(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("ephemeral pod %s failed creation for log collection", podName)
 	}
@@ -293,13 +293,13 @@ func createEphemeralPod(context *context.Context, pvc *v1.PersistentVolumeClaim)
 	defer cancel()
 
 	if err := k8sutil.WaitForPod(c, context.KubeClient, pvc.Namespace, podName, ""); err != nil {
-		_ = context.KubeClient.CoreV1().Pods(pvc.Namespace).Delete(podName, nil)
+		_ = context.KubeClient.CoreV1().Pods(pvc.Namespace).Delete(ctx.Background(), podName, metav1.DeleteOptions{})
 		return nil, nil, fmt.Errorf("ephemeral pod %s failed to come up for log collection", podName)
 	}
 
 	// Return a clean up closure which can be deferred by the caller.
 	cleanup := func() {
-		_ = context.KubeClient.CoreV1().Pods(pvc.Namespace).Delete(podName, nil)
+		_ = context.KubeClient.CoreV1().Pods(pvc.Namespace).Delete(ctx.Background(), podName, metav1.DeleteOptions{})
 	}
 
 	return pod, cleanup, nil

@@ -1,6 +1,7 @@
 package e2eutil
 
 import (
+	"context"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -30,7 +31,7 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 }
 
 func getClusterCRD(crClient versioned.Interface, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
-	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Get(cl.Name, metav1.GetOptions{})
+	return crClient.CouchbaseV2().CouchbaseClusters(cl.Namespace).Get(context.Background(), cl.Name, metav1.GetOptions{})
 }
 
 // NameLabelSelector returns a label selector of the form name=<name>.

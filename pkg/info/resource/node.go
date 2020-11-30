@@ -1,6 +1,8 @@
 package resource
 
 import (
+	ctx "context"
+
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -33,7 +35,7 @@ func (r *nodeResource) Kind() string {
 func (r *nodeResource) Fetch() error {
 	var err error
 
-	r.nodes, err = r.context.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	r.nodes, err = r.context.KubeClient.CoreV1().Nodes().List(ctx.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

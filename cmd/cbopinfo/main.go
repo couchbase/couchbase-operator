@@ -1,6 +1,7 @@
 package main
 
 import (
+	ctx "context"
 	"fmt"
 	"os"
 	"strings"
@@ -138,7 +139,7 @@ func main() {
 	}
 
 	// Check the namespace exists.
-	if _, err := context.KubeClient.CoreV1().Namespaces().Get(context.Namespace(), metav1.GetOptions{}); err != nil {
+	if _, err := context.KubeClient.CoreV1().Namespaces().Get(ctx.Background(), context.Namespace(), metav1.GetOptions{}); err != nil {
 		if errors.IsNotFound(err) {
 			fmt.Println("namespace", context.Namespace(), "does not exist")
 			os.Exit(1)

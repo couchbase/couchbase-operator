@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseClusterLister helps list CouchbaseClusters.
+// All objects returned here must be treated as read-only.
 type CouchbaseClusterLister interface {
 	// List lists all CouchbaseClusters in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.CouchbaseCluster, err error)
 	// CouchbaseClusters returns an object that can list and get CouchbaseClusters.
 	CouchbaseClusters(namespace string) CouchbaseClusterNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseClusterLister) CouchbaseClusters(namespace string) CouchbaseCl
 }
 
 // CouchbaseClusterNamespaceLister helps list and get CouchbaseClusters.
+// All objects returned here must be treated as read-only.
 type CouchbaseClusterNamespaceLister interface {
 	// List lists all CouchbaseClusters in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.CouchbaseCluster, err error)
 	// Get retrieves the CouchbaseCluster from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.CouchbaseCluster, error)
 	CouchbaseClusterNamespaceListerExpansion
 }

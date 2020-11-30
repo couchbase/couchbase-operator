@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -50,7 +51,7 @@ func getSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 }
 
 func removeRole(k8s *types.Cluster, roleName string) error {
-	if err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Delete(roleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Delete(context.Background(), roleName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -58,14 +59,14 @@ func removeRole(k8s *types.Cluster, roleName string) error {
 }
 
 func RemoveServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
-	svcAccList, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).List(metav1.ListOptions{})
+	svcAccList, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	for _, svcAcc := range svcAccList.Items {
 		if svcAcc.GetName() == serviceAccountName {
-			if err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Delete(svcAcc.GetName(), &metav1.DeleteOptions{}); err != nil {
+			if err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Delete(context.Background(), svcAcc.GetName(), metav1.DeleteOptions{}); err != nil {
 				return err
 			}
 
@@ -86,7 +87,7 @@ func recreateDockerAuthSecret(k8s *types.Cluster, namespace string) ([]string, e
 	pullSecretValue := "qe-docker-pull-secret"
 
 	// Clean up the old authentication secrets if they exist.
-	if err := k8s.KubeClient.CoreV1().Secrets(namespace).DeleteCollection(metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", pullSecretLabel, pullSecretValue)}); err != nil {
+	if err := k8s.KubeClient.CoreV1().Secrets(namespace).DeleteCollection(context.Background(), *metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", pullSecretLabel, pullSecretValue)}); err != nil {
 		return nil, err
 	}
 
@@ -115,7 +116,7 @@ func recreateDockerAuthSecret(k8s *types.Cluster, namespace string) ([]string, e
 			},
 		}
 
-		newSecret, err := k8s.KubeClient.CoreV1().Secrets(namespace).Create(secret)
+		newSecret, err := k8s.KubeClient.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +151,7 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 
 	roleSpec.Name = roleName
 
-	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(roleSpec)
+	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(context.Background(), roleSpec, metav1.CreateOptions{})
 
 	return err
 }
@@ -176,7 +177,7 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 	serviceAccount := config.GetOperatorServiceAccount(k8s.Namespace)
 	serviceAccount.Name = serviceAccountName
 
-	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(serviceAccount)
+	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{})
 
 	return err
 }
@@ -201,13 +202,13 @@ func recreateRoleBindings(k8s *types.Cluster) error {
 		return fmt.Errorf("operator role binding is not namespace scoped")
 	}
 
-	_, err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Create(clusterRoleBindingSpec)
+	_, err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Create(context.Background(), clusterRoleBindingSpec, metav1.CreateOptions{})
 
 	return err
 }
 
 func removeRoleBinding(k8s *types.Cluster, roleBindingName string) error {
-	if err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Delete(roleBindingName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+	if err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Delete(context.Background(), roleBindingName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -224,7 +225,7 @@ func waitForServiceAccountDeleted(k8s *types.Cluster, serviceAccountName string,
 			return fmt.Errorf("timed out waiting for service account %s to be deleted", serviceAccountName)
 
 		case <-tickChan:
-			svcAccList, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).List(metav1.ListOptions{})
+			svcAccList, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
 				return err
 			}

@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseUserLister helps list CouchbaseUsers.
+// All objects returned here must be treated as read-only.
 type CouchbaseUserLister interface {
 	// List lists all CouchbaseUsers in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseUser, err error)
 	// CouchbaseUsers returns an object that can list and get CouchbaseUsers.
 	CouchbaseUsers(namespace string) CouchbaseUserNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseUserLister) CouchbaseUsers(namespace string) CouchbaseUserName
 }
 
 // CouchbaseUserNamespaceLister helps list and get CouchbaseUsers.
+// All objects returned here must be treated as read-only.
 type CouchbaseUserNamespaceLister interface {
 	// List lists all CouchbaseUsers in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseUser, err error)
 	// Get retrieves the CouchbaseUser from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v2.CouchbaseUser, error)
 	CouchbaseUserNamespaceListerExpansion
 }

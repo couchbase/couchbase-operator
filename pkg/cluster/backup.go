@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -496,7 +497,7 @@ func (c *Cluster) deleteBackups() error {
 
 		// no "owner" backup exists, must have been deleted. cleanup cronjobs which in turn deletes jobs + pods
 		if _, ok := c.k8s.CouchbaseBackups.Get(backupToDelete); !ok {
-			if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(cronjob.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), cronjob.Name, metav1.DeleteOptions{}); err != nil {
 				return errors.NewStackTracedError(err)
 			}
 

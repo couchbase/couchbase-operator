@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseBackupLister helps list CouchbaseBackups.
+// All objects returned here must be treated as read-only.
 type CouchbaseBackupLister interface {
 	// List lists all CouchbaseBackups in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseBackup, err error)
 	// CouchbaseBackups returns an object that can list and get CouchbaseBackups.
 	CouchbaseBackups(namespace string) CouchbaseBackupNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseBackupLister) CouchbaseBackups(namespace string) CouchbaseBack
 }
 
 // CouchbaseBackupNamespaceLister helps list and get CouchbaseBackups.
+// All objects returned here must be treated as read-only.
 type CouchbaseBackupNamespaceLister interface {
 	// List lists all CouchbaseBackups in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseBackup, err error)
 	// Get retrieves the CouchbaseBackup from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v2.CouchbaseBackup, error)
 	CouchbaseBackupNamespaceListerExpansion
 }

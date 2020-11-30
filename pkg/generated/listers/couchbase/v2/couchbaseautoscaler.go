@@ -15,8 +15,10 @@ import (
 )
 
 // CouchbaseAutoscalerLister helps list CouchbaseAutoscalers.
+// All objects returned here must be treated as read-only.
 type CouchbaseAutoscalerLister interface {
 	// List lists all CouchbaseAutoscalers in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseAutoscaler, err error)
 	// CouchbaseAutoscalers returns an object that can list and get CouchbaseAutoscalers.
 	CouchbaseAutoscalers(namespace string) CouchbaseAutoscalerNamespaceLister
@@ -47,10 +49,13 @@ func (s *couchbaseAutoscalerLister) CouchbaseAutoscalers(namespace string) Couch
 }
 
 // CouchbaseAutoscalerNamespaceLister helps list and get CouchbaseAutoscalers.
+// All objects returned here must be treated as read-only.
 type CouchbaseAutoscalerNamespaceLister interface {
 	// List lists all CouchbaseAutoscalers in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v2.CouchbaseAutoscaler, err error)
 	// Get retrieves the CouchbaseAutoscaler from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v2.CouchbaseAutoscaler, error)
 	CouchbaseAutoscalerNamespaceListerExpansion
 }

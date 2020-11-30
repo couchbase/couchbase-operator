@@ -8,6 +8,8 @@
 package fake
 
 import (
+	"context"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -28,7 +30,7 @@ var couchbasereplicationsResource = schema.GroupVersionResource{Group: "couchbas
 var couchbasereplicationsKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseReplication"}
 
 // Get takes name of the couchbaseReplication, and returns the corresponding couchbaseReplication object, and an error if there is any.
-func (c *FakeCouchbaseReplications) Get(name string, options v1.GetOptions) (result *v2.CouchbaseReplication, err error) {
+func (c *FakeCouchbaseReplications) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseReplication, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(couchbasereplicationsResource, c.ns, name), &v2.CouchbaseReplication{})
 
@@ -39,7 +41,7 @@ func (c *FakeCouchbaseReplications) Get(name string, options v1.GetOptions) (res
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseReplications that match those selectors.
-func (c *FakeCouchbaseReplications) List(opts v1.ListOptions) (result *v2.CouchbaseReplicationList, err error) {
+func (c *FakeCouchbaseReplications) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseReplicationList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(couchbasereplicationsResource, couchbasereplicationsKind, c.ns, opts), &v2.CouchbaseReplicationList{})
 
@@ -61,14 +63,14 @@ func (c *FakeCouchbaseReplications) List(opts v1.ListOptions) (result *v2.Couchb
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseReplications.
-func (c *FakeCouchbaseReplications) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCouchbaseReplications) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(couchbasereplicationsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a couchbaseReplication and creates it.  Returns the server's representation of the couchbaseReplication, and an error, if there is any.
-func (c *FakeCouchbaseReplications) Create(couchbaseReplication *v2.CouchbaseReplication) (result *v2.CouchbaseReplication, err error) {
+func (c *FakeCouchbaseReplications) Create(ctx context.Context, couchbaseReplication *v2.CouchbaseReplication, opts v1.CreateOptions) (result *v2.CouchbaseReplication, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(couchbasereplicationsResource, c.ns, couchbaseReplication), &v2.CouchbaseReplication{})
 
@@ -79,7 +81,7 @@ func (c *FakeCouchbaseReplications) Create(couchbaseReplication *v2.CouchbaseRep
 }
 
 // Update takes the representation of a couchbaseReplication and updates it. Returns the server's representation of the couchbaseReplication, and an error, if there is any.
-func (c *FakeCouchbaseReplications) Update(couchbaseReplication *v2.CouchbaseReplication) (result *v2.CouchbaseReplication, err error) {
+func (c *FakeCouchbaseReplications) Update(ctx context.Context, couchbaseReplication *v2.CouchbaseReplication, opts v1.UpdateOptions) (result *v2.CouchbaseReplication, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(couchbasereplicationsResource, c.ns, couchbaseReplication), &v2.CouchbaseReplication{})
 
@@ -90,7 +92,7 @@ func (c *FakeCouchbaseReplications) Update(couchbaseReplication *v2.CouchbaseRep
 }
 
 // Delete takes name of the couchbaseReplication and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseReplications) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCouchbaseReplications) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(couchbasereplicationsResource, c.ns, name), &v2.CouchbaseReplication{})
 
@@ -98,15 +100,15 @@ func (c *FakeCouchbaseReplications) Delete(name string, options *v1.DeleteOption
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseReplications) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbasereplicationsResource, c.ns, listOptions)
+func (c *FakeCouchbaseReplications) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(couchbasereplicationsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2.CouchbaseReplicationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched couchbaseReplication.
-func (c *FakeCouchbaseReplications) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseReplication, err error) {
+func (c *FakeCouchbaseReplications) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseReplication, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(couchbasereplicationsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseReplication{})
 

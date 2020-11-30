@@ -82,7 +82,7 @@ func createSDKJob(t *testing.T, local, remote *types.Cluster, cluster *couchbase
 			},
 		}
 
-		newSecret, err := local.KubeClient.CoreV1().Secrets(local.Namespace).Create(secret)
+		newSecret, err := local.KubeClient.CoreV1().Secrets(local.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +118,7 @@ func createSDKJob(t *testing.T, local, remote *types.Cluster, cluster *couchbase
 		}
 	}
 
-	newJob, err := local.KubeClient.BatchV1().Jobs(local.Namespace).Create(job)
+	newJob, err := local.KubeClient.BatchV1().Jobs(local.Namespace).Create(context.Background(), job, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func MustWaitForSDKJobCompletion(t *testing.T, local *types.Cluster, job *batchv
 	succeeded := false
 
 	callback := func() error {
-		j, err := local.KubeClient.BatchV1().Jobs(local.Namespace).Get(job.Name, metav1.GetOptions{})
+		j, err := local.KubeClient.BatchV1().Jobs(local.Namespace).Get(context.Background(), job.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -189,7 +189,7 @@ func getJobLogs(t *testing.T, local *types.Cluster, job *batchv1.Job) string {
 		return ""
 	}
 
-	pods, err := local.KubeClient.CoreV1().Pods(local.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := local.KubeClient.CoreV1().Pods(local.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		t.Logf("failed to list sdk job pods: %v", err)
 		return ""
@@ -202,7 +202,7 @@ func getJobLogs(t *testing.T, local *types.Cluster, job *batchv1.Job) string {
 
 	logs := local.KubeClient.CoreV1().Pods(local.Namespace).GetLogs(pods.Items[0].Name, &corev1.PodLogOptions{})
 
-	raw, err := logs.DoRaw()
+	raw, err := logs.DoRaw(context.Background())
 	if err != nil {
 		t.Logf("failed to get sdk job logs: %v", err)
 		return ""

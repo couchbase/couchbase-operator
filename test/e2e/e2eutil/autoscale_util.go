@@ -1,6 +1,7 @@
 package e2eutil
 
 import (
+	"context"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -80,7 +81,7 @@ func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, conf
 
 // MustDeleteCouchbaseAutoscaler requires successful deletion of autoscaler cr.
 func MustDeleteCouchbaseAutoscaler(t *testing.T, k8s *types.Cluster, namespace string, autoscalerName string) {
-	err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).Delete(autoscalerName, metav1.NewDeleteOptions(0))
+	err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).Delete(context.Background(), autoscalerName, *metav1.NewDeleteOptions(0))
 	if err != nil {
 		Die(t, err)
 	}
@@ -88,7 +89,7 @@ func MustDeleteCouchbaseAutoscaler(t *testing.T, k8s *types.Cluster, namespace s
 
 // MustGetCouchbaseAutoscaler requires successful deletion of autoscaler cr.
 func MustGetCouchbaseAutoscaler(t *testing.T, k8s *types.Cluster, namespace string, autoscalerName string) *couchbasev2.CouchbaseAutoscaler {
-	autoscaler, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).Get(autoscalerName, metav1.GetOptions{})
+	autoscaler, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).Get(context.Background(), autoscalerName, metav1.GetOptions{})
 	if err != nil {
 		Die(t, err)
 	}
@@ -102,7 +103,7 @@ func MustDisableCouchbaseAutoscaling(t *testing.T, k8s *types.Cluster, cluster *
 		cluster.Spec.Servers[i].AutoscaleEnabled = false
 	}
 
-	cluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Update(cluster)
+	cluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Update(context.Background(), cluster, metav1.UpdateOptions{})
 	if err != nil {
 		Die(t, err)
 	}
@@ -113,7 +114,7 @@ func MustDisableCouchbaseAutoscaling(t *testing.T, k8s *types.Cluster, cluster *
 // MustCreateAverageValueHPA requires successful creation of hpa resource.
 func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, minSize int32, maxSize int32, metricName string, value int64) *autoscalingv2beta2.HorizontalPodAutoscaler {
 	hpa := e2espec.NewAverageValueHPA(name, minSize, maxSize, metricName, value)
-	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(hpa)
+	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), hpa, metav1.CreateOptions{})
 
 	if err != nil {
 		Die(t, err)
@@ -139,42 +140,42 @@ func CreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string
 
 	// prepare to cleanup rootscoped resources
 	cleanup := func() {
-		_ = k8s.APIRegClient.APIServices().Delete(serviceMetric.Name, metav1.NewDeleteOptions(0))
-		_ = k8s.KubeClient.RbacV1().ClusterRoleBindings().Delete(authClusterRoleBinding.Name, metav1.NewDeleteOptions(0))
-		_ = k8s.KubeClient.RbacV1().RoleBindings("kube-system").Delete(extensionRoleBinding.Name, metav1.NewDeleteOptions(0))
+		_ = k8s.APIRegClient.APIServices().Delete(context.Background(), serviceMetric.Name, *metav1.NewDeleteOptions(0))
+		_ = k8s.KubeClient.RbacV1().ClusterRoleBindings().Delete(context.Background(), authClusterRoleBinding.Name, *metav1.NewDeleteOptions(0))
+		_ = k8s.KubeClient.RbacV1().RoleBindings("kube-system").Delete(context.Background(), extensionRoleBinding.Name, *metav1.NewDeleteOptions(0))
 	}
 
 	// create resources
-	if _, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).Create(serviceAccount); err != nil {
+	if _, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
 
-	if _, err := k8s.KubeClient.RbacV1().Roles(namespace).Create(deploymentRole); err != nil {
+	if _, err := k8s.KubeClient.RbacV1().Roles(namespace).Create(context.Background(), deploymentRole, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
 
-	if _, err := k8s.KubeClient.RbacV1().RoleBindings(namespace).Create(metricRoleBinding); err != nil {
+	if _, err := k8s.KubeClient.RbacV1().RoleBindings(namespace).Create(context.Background(), metricRoleBinding, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
 
 	// NOTE: see func comment about why this is being created in kube-system namespace
-	if _, err := k8s.KubeClient.RbacV1().RoleBindings("kube-system").Create(extensionRoleBinding); err != nil {
+	if _, err := k8s.KubeClient.RbacV1().RoleBindings("kube-system").Create(context.Background(), extensionRoleBinding, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
 
-	if _, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().Create(authClusterRoleBinding); err != nil {
+	if _, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().Create(context.Background(), authClusterRoleBinding, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
 
-	if _, err := k8s.KubeClient.AppsV1().Deployments(namespace).Create(deployment); err != nil {
+	if _, err := k8s.KubeClient.AppsV1().Deployments(namespace).Create(context.Background(), deployment, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
 
-	if _, err := k8s.KubeClient.CoreV1().Services(namespace).Create(deploymentService); err != nil {
+	if _, err := k8s.KubeClient.CoreV1().Services(namespace).Create(context.Background(), deploymentService, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
 
-	if _, err := k8s.APIRegClient.APIServices().Create(serviceMetric); err != nil {
+	if _, err := k8s.APIRegClient.APIServices().Create(context.Background(), serviceMetric, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
 
@@ -194,14 +195,14 @@ func MustCreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace st
 
 // UpdateScale changes scale of CouchbaseAutoscaler resource to requested size.
 func UpdateScale(t *testing.T, k8s *types.Cluster, namespace string, name string, size int32) (*autoscalingv1.Scale, error) {
-	scale, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).GetScale(name, metav1.GetOptions{})
+	scale, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).GetScale(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	scale.Spec.Replicas = size
 
-	return k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).UpdateScale(name, scale)
+	return k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).UpdateScale(context.Background(), name, scale, metav1.UpdateOptions{})
 }
 
 // MustUpdateScale requires successful scale update.

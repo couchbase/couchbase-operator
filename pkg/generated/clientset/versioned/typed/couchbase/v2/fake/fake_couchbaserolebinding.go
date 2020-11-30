@@ -8,6 +8,8 @@
 package fake
 
 import (
+	"context"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -28,7 +30,7 @@ var couchbaserolebindingsResource = schema.GroupVersionResource{Group: "couchbas
 var couchbaserolebindingsKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseRoleBinding"}
 
 // Get takes name of the couchbaseRoleBinding, and returns the corresponding couchbaseRoleBinding object, and an error if there is any.
-func (c *FakeCouchbaseRoleBindings) Get(name string, options v1.GetOptions) (result *v2.CouchbaseRoleBinding, err error) {
+func (c *FakeCouchbaseRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(couchbaserolebindingsResource, c.ns, name), &v2.CouchbaseRoleBinding{})
 
@@ -39,7 +41,7 @@ func (c *FakeCouchbaseRoleBindings) Get(name string, options v1.GetOptions) (res
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseRoleBindings that match those selectors.
-func (c *FakeCouchbaseRoleBindings) List(opts v1.ListOptions) (result *v2.CouchbaseRoleBindingList, err error) {
+func (c *FakeCouchbaseRoleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseRoleBindingList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(couchbaserolebindingsResource, couchbaserolebindingsKind, c.ns, opts), &v2.CouchbaseRoleBindingList{})
 
@@ -61,14 +63,14 @@ func (c *FakeCouchbaseRoleBindings) List(opts v1.ListOptions) (result *v2.Couchb
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseRoleBindings.
-func (c *FakeCouchbaseRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCouchbaseRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(couchbaserolebindingsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a couchbaseRoleBinding and creates it.  Returns the server's representation of the couchbaseRoleBinding, and an error, if there is any.
-func (c *FakeCouchbaseRoleBindings) Create(couchbaseRoleBinding *v2.CouchbaseRoleBinding) (result *v2.CouchbaseRoleBinding, err error) {
+func (c *FakeCouchbaseRoleBindings) Create(ctx context.Context, couchbaseRoleBinding *v2.CouchbaseRoleBinding, opts v1.CreateOptions) (result *v2.CouchbaseRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(couchbaserolebindingsResource, c.ns, couchbaseRoleBinding), &v2.CouchbaseRoleBinding{})
 
@@ -79,7 +81,7 @@ func (c *FakeCouchbaseRoleBindings) Create(couchbaseRoleBinding *v2.CouchbaseRol
 }
 
 // Update takes the representation of a couchbaseRoleBinding and updates it. Returns the server's representation of the couchbaseRoleBinding, and an error, if there is any.
-func (c *FakeCouchbaseRoleBindings) Update(couchbaseRoleBinding *v2.CouchbaseRoleBinding) (result *v2.CouchbaseRoleBinding, err error) {
+func (c *FakeCouchbaseRoleBindings) Update(ctx context.Context, couchbaseRoleBinding *v2.CouchbaseRoleBinding, opts v1.UpdateOptions) (result *v2.CouchbaseRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(couchbaserolebindingsResource, c.ns, couchbaseRoleBinding), &v2.CouchbaseRoleBinding{})
 
@@ -90,7 +92,7 @@ func (c *FakeCouchbaseRoleBindings) Update(couchbaseRoleBinding *v2.CouchbaseRol
 }
 
 // Delete takes name of the couchbaseRoleBinding and deletes it. Returns an error if one occurs.
-func (c *FakeCouchbaseRoleBindings) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCouchbaseRoleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(couchbaserolebindingsResource, c.ns, name), &v2.CouchbaseRoleBinding{})
 
@@ -98,15 +100,15 @@ func (c *FakeCouchbaseRoleBindings) Delete(name string, options *v1.DeleteOption
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCouchbaseRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(couchbaserolebindingsResource, c.ns, listOptions)
+func (c *FakeCouchbaseRoleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(couchbaserolebindingsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2.CouchbaseRoleBindingList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched couchbaseRoleBinding.
-func (c *FakeCouchbaseRoleBindings) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseRoleBinding, err error) {
+func (c *FakeCouchbaseRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(couchbaserolebindingsResource, c.ns, name, pt, data, subresources...), &v2.CouchbaseRoleBinding{})
 

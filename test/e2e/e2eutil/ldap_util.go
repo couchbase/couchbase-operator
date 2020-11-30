@@ -17,7 +17,7 @@ import (
 
 // NewLDAPServer creates a new LDAP server.
 func NewLDAPServer(k8s *types.Cluster, pod *v1.Pod) (*v1.Pod, error) {
-	return k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Create(pod)
+	return k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Create(context.Background(), pod, metav1.CreateOptions{})
 }
 
 // MustNewLDAPServer create LDAP server or dies trying.
@@ -32,7 +32,7 @@ func MustNewLDAPServer(t *testing.T, k8s *types.Cluster, pod *v1.Pod) *v1.Pod {
 
 // NewLDAPService creates headless service for accessing LDAP server.
 func NewLDAPService(k8s *types.Cluster, service *v1.Service) (*v1.Service, error) {
-	return k8s.KubeClient.CoreV1().Services(k8s.Namespace).Create(service)
+	return k8s.KubeClient.CoreV1().Services(k8s.Namespace).Create(context.Background(), service, metav1.CreateOptions{})
 }
 
 // MustNewLDAPService creates LDAP service or dies trying.
@@ -49,13 +49,13 @@ func MustNewLDAPService(t *testing.T, k8s *types.Cluster, service *v1.Service) *
 func DeleteLDAPService(k8s *types.Cluster) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
 
-	svcList, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).List(opts)
+	svcList, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).List(context.Background(), opts)
 	if err != nil {
 		return err
 	}
 
 	for _, service := range svcList.Items {
-		err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Delete(service.Name, metav1.NewDeleteOptions(0))
+		err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Delete(context.Background(), service.Name, *metav1.NewDeleteOptions(0))
 		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}
@@ -68,13 +68,13 @@ func DeleteLDAPService(k8s *types.Cluster) error {
 func DeleteLDAPServer(k8s *types.Cluster) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
 
-	podList, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(opts)
+	podList, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), opts)
 	if err != nil {
 		return err
 	}
 
 	for _, pod := range podList.Items {
-		err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+		err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0))
 		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}
@@ -87,13 +87,13 @@ func DeleteLDAPServer(k8s *types.Cluster) error {
 func DeleteLDAPSecret(k8s *types.Cluster) error {
 	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
 
-	secretList, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).List(opts)
+	secretList, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).List(context.Background(), opts)
 	if err != nil {
 		return err
 	}
 
 	for _, secret := range secretList.Items {
-		err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(secret.Name, metav1.NewDeleteOptions(0))
+		err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(context.Background(), secret.Name, *metav1.NewDeleteOptions(0))
 		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
 			return err
 		}

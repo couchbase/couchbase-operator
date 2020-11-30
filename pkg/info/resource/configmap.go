@@ -1,6 +1,8 @@
 package resource
 
 import (
+	ctx "context"
+
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
@@ -36,7 +38,7 @@ func (r *configMapResource) Fetch() error {
 		return err
 	}
 
-	r.configMaps, err = r.context.KubeClient.CoreV1().ConfigMaps(r.context.Namespace()).List(metav1.ListOptions{LabelSelector: selector.String()})
+	r.configMaps, err = r.context.KubeClient.CoreV1().ConfigMaps(r.context.Namespace()).List(ctx.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@
 package v2
 
 import (
+	"context"
 	"time"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -26,14 +27,14 @@ type CouchbaseBucketsGetter interface {
 
 // CouchbaseBucketInterface has methods to work with CouchbaseBucket resources.
 type CouchbaseBucketInterface interface {
-	Create(*v2.CouchbaseBucket) (*v2.CouchbaseBucket, error)
-	Update(*v2.CouchbaseBucket) (*v2.CouchbaseBucket, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v2.CouchbaseBucket, error)
-	List(opts v1.ListOptions) (*v2.CouchbaseBucketList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseBucket, err error)
+	Create(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.CreateOptions) (*v2.CouchbaseBucket, error)
+	Update(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.UpdateOptions) (*v2.CouchbaseBucket, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseBucket, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v2.CouchbaseBucketList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseBucket, err error)
 	CouchbaseBucketExpansion
 }
 
@@ -52,20 +53,20 @@ func newCouchbaseBuckets(c *CouchbaseV2Client, namespace string) *couchbaseBucke
 }
 
 // Get takes name of the couchbaseBucket, and returns the corresponding couchbaseBucket object, and an error if there is any.
-func (c *couchbaseBuckets) Get(name string, options v1.GetOptions) (result *v2.CouchbaseBucket, err error) {
+func (c *couchbaseBuckets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseBucket, err error) {
 	result = &v2.CouchbaseBucket{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("couchbasebuckets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of CouchbaseBuckets that match those selectors.
-func (c *couchbaseBuckets) List(opts v1.ListOptions) (result *v2.CouchbaseBucketList, err error) {
+func (c *couchbaseBuckets) List(ctx context.Context, opts v1.ListOptions) (result *v2.CouchbaseBucketList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -76,13 +77,13 @@ func (c *couchbaseBuckets) List(opts v1.ListOptions) (result *v2.CouchbaseBucket
 		Resource("couchbasebuckets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested couchbaseBuckets.
-func (c *couchbaseBuckets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *couchbaseBuckets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -93,71 +94,74 @@ func (c *couchbaseBuckets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("couchbasebuckets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a couchbaseBucket and creates it.  Returns the server's representation of the couchbaseBucket, and an error, if there is any.
-func (c *couchbaseBuckets) Create(couchbaseBucket *v2.CouchbaseBucket) (result *v2.CouchbaseBucket, err error) {
+func (c *couchbaseBuckets) Create(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.CreateOptions) (result *v2.CouchbaseBucket, err error) {
 	result = &v2.CouchbaseBucket{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("couchbasebuckets").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(couchbaseBucket).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a couchbaseBucket and updates it. Returns the server's representation of the couchbaseBucket, and an error, if there is any.
-func (c *couchbaseBuckets) Update(couchbaseBucket *v2.CouchbaseBucket) (result *v2.CouchbaseBucket, err error) {
+func (c *couchbaseBuckets) Update(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.UpdateOptions) (result *v2.CouchbaseBucket, err error) {
 	result = &v2.CouchbaseBucket{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("couchbasebuckets").
 		Name(couchbaseBucket.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(couchbaseBucket).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the couchbaseBucket and deletes it. Returns an error if one occurs.
-func (c *couchbaseBuckets) Delete(name string, options *v1.DeleteOptions) error {
+func (c *couchbaseBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("couchbasebuckets").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *couchbaseBuckets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *couchbaseBuckets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("couchbasebuckets").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched couchbaseBucket.
-func (c *couchbaseBuckets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v2.CouchbaseBucket, err error) {
+func (c *couchbaseBuckets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2.CouchbaseBucket, err error) {
 	result = &v2.CouchbaseBucket{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("couchbasebuckets").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
