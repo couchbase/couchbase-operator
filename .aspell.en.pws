@@ -191,6 +191,7 @@ rollout
 supportability
 hypervisor
 preinstalled
+autoscale
 autoscaler
 Autoscaler
 autoscaling

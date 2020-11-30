@@ -119,6 +119,7 @@ spec:
   logging:
     logRetentionTime: 604800s
     logRetentionCount: 20
+  enablePreviewScaling: false
   servers:
   - size: 1
     name: all_services
@@ -131,6 +132,7 @@ spec:
     - analytics
     serverGroups:
     - us-east-1a
+    autoscaleEnabled: false
     env:
     - name: ENV1
       value: value
@@ -299,6 +301,7 @@ spec:
     runAsNonRoot: true
     fsGroup: 1000
   platform: aws
+  enablePreviewScaling: false
 ----
 
 === `spec.image`
@@ -418,6 +421,28 @@ This field indicates which underlying cloud platform the Kubernetes cluster is r
 
 ____
 _Field rules:_ The `platform` field is optional.  The Value must be one of `aws`, `gce` or `azure`.
+____
+
+[#spec-enablePreviewScaling]
+=== `spec.enablePreviewScaling`
+
+This field enables autoscaling for stateful server configurations and buckets.
+A server configuration is considered stateful if it contains one of `data`, `index`, `search`, `eventing`, or `analytics`.
+A bucket is considered stateful if it is one of `CouchbaseBucket`, or `CouchbaseMemcachedBucket`.
+Server configurations with stateful services or stateful buckets are only permitted to autoscale when `enablePreviewScaling` is `true`.
+
+
+A server configuration is considered stateless if it contains only the `query` service.
+A bucket is considered stateless if is a `CouchbaseEphemeralBucket`.
+When `enablePreviewScaling` is `false` only stateless server configurations associated with stateless buckets are permitted to autoscale.
+
+[WARN]
+====
+Enabling preview autoscaling is unsupported and for experimental purposes only.
+====
+
+____
+_Field rules:_ The `enablePreviewScaling` field is an optional boolean.  The default value is `false`.
 ____
 
 == `spec.cluster`
@@ -1346,6 +1371,7 @@ spec:
     - analytics
     serverGroups:
     - us-east-1a
+    autoscaleEnabled: false
     env:
     - name: ENV1
       value: value
@@ -1421,7 +1447,19 @@ ____
 
 This controls the set of server groups to schedule pods in.  Functionality is identical to that defined in the top level specification, but overrides it and allows the end user to specify exactly where pods of individual server/service configuration are scheduled.  See the <<spec-servergroups,main documentation>> for details.
 
-=== `spec.servers[].env`
+=== `spec.servers[].autoscaleEnabled`
+
+This field defines whether Autoscale is permitted for this specific server configuration.
+When set to `true` a `CouchbaseAutoscale` resource is created by the operator with the name of the enabled server configuration along with the name of the cluster.
+For example, a server configuration named `default` will result in a `CouchbaseAutoscale` resource created named `default.cb-example`.
+This resource conforms to Kubernetes `HorizontalPodAutoscaler` API and can be specified as a `scaleTargetRef` according to the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#horizontalpodautoscalerspec-v2beta2-autoscaling[HorizontalPodAutoscalerSpec] resource specification.
+
+____
+_Field rules:_ This field is optional and must be a boolean.  The default value is `false`.
+____
+
+
+=== spec.servers[].env
 
 This field specifies the environment variables (as key-values pairs) that should be set when the pod is started. This section is optional.
 Specified environment variables will be available in Couchbase server containers only.
