@@ -19,6 +19,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -92,7 +93,7 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 		// the init command is idempotent.
 		for _, pvc := range pvcState.pvcs {
 			if pvc.Annotations[constants.AnnotationVolumeMountPath] == couchbaseVolumeDefaultConfigDir {
-				initContainer := couchbaseInitContainer(cluster.Spec.CouchbaseImage(), pvc.Name, config)
+				initContainer := couchbaseInitContainer(cluster, pvc.Name, config)
 				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 			}
 		}
@@ -478,7 +479,7 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
 func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
-	container := couchbaseContainer(cluster.Spec.CouchbaseImage(), &config)
+	container := couchbaseContainer(cluster, &config)
 	container.ReadinessProbe = &v1.Probe{
 		Handler: v1.Handler{
 			TCPSocket: &v1.TCPSocketAction{
@@ -731,7 +732,13 @@ func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.Ser
 }
 
 func CouchbaseContainer(image string) v1.Container {
-	return couchbaseContainer(image, nil)
+	cluster := &couchbasev2.CouchbaseCluster{
+		Spec: couchbasev2.ClusterSpec{
+			Image: image,
+		},
+	}
+
+	return couchbaseContainer(cluster, nil)
 }
 
 func couchbaseContainerPorts() ([]v1.ContainerPort, error) {
@@ -763,20 +770,56 @@ func couchbaseContainerPorts() ([]v1.ContainerPort, error) {
 	return ports, nil
 }
 
-func couchbaseContainer(image string, config *couchbasev2.ServerConfig) v1.Container {
+func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.ServerConfig) v1.Container {
 	ports, _ := couchbaseContainerPorts()
 
 	c := v1.Container{
 		Name:  constants.CouchbaseContainerName,
-		Image: image,
+		Image: cluster.Spec.CouchbaseImage(),
 		Ports: ports,
 	}
 
-	if config != nil {
-		c.Env = config.Env
-		c.EnvFrom = config.EnvFrom
-		c.Resources = config.Resources
+	if config == nil {
+		return c
 	}
+
+	c.Env = config.Env
+	c.EnvFrom = config.EnvFrom
+
+	// Automatically configure resource memory requests, mainly for lazy users,
+	// but also to prevent memory starvation and random OOM killings.
+	resources := config.Resources.DeepCopy()
+
+	if resources.Requests == nil {
+		resources.Requests = v1.ResourceList{}
+	}
+
+	if _, ok := resources.Requests[v1.ResourceMemory]; !ok {
+		memoryRequests := resource.Quantity{}
+
+		for _, service := range config.Services {
+			switch service {
+			case couchbasev2.DataService:
+				memoryRequests.Add(*cluster.Spec.ClusterSettings.DataServiceMemQuota)
+			case couchbasev2.IndexService:
+				memoryRequests.Add(*cluster.Spec.ClusterSettings.IndexServiceMemQuota)
+			case couchbasev2.SearchService:
+				memoryRequests.Add(*cluster.Spec.ClusterSettings.SearchServiceMemQuota)
+			case couchbasev2.EventingService:
+				memoryRequests.Add(*cluster.Spec.ClusterSettings.EventingServiceMemQuota)
+			case couchbasev2.AnalyticsService:
+				memoryRequests.Add(*cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota)
+			}
+		}
+
+		overhead := resource.NewQuantity(memoryRequests.Value()/4, resource.BinarySI)
+
+		memoryRequests.Add(*overhead)
+
+		resources.Requests[v1.ResourceMemory] = memoryRequests
+	}
+
+	c.Resources = *resources
 
 	return c
 }
@@ -784,8 +827,8 @@ func couchbaseContainer(image string, config *couchbasev2.ServerConfig) v1.Conta
 // Init container is same as runtime container except it used
 // to copy the etc dir into a persisted volume which will be
 // shared with with the Pod's main container.
-func couchbaseInitContainer(image, claimName string, config couchbasev2.ServerConfig) v1.Container {
-	initContainer := couchbaseContainer(image, &config)
+func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig) v1.Container {
+	initContainer := couchbaseContainer(cluster, &config)
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
 	initContainer.Args = []string{"bash", "-c", "if [[ ! -e /mnt/etc ]]; then cp -a /opt/couchbase/etc /mnt/; fi"}
 	initContainer.VolumeMounts = []v1.VolumeMount{

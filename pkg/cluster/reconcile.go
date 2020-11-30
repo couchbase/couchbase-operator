@@ -130,10 +130,6 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
-	if err := c.reconcileClusterSettings(); err != nil {
-		return err
-	}
-
 	fsm, err := c.newReconcileMachine()
 	if err != nil {
 		return err
@@ -173,6 +169,10 @@ func (c *Cluster) reconcile() error {
 	}
 
 	if err := c.reconcileTLSPostTopologyChange(); err != nil {
+		return err
+	}
+
+	if err := c.reconcileClusterSettings(); err != nil {
 		return err
 	}
 

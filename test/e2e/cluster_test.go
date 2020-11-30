@@ -117,32 +117,37 @@ func TestEditClusterSettings(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(constants.Size1)
-	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
-		couchbasev2.DataService, // No index service or we cannot update the index settings
-	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/DataServiceMemQuota", e2espec.NewResourceQuantityMi(257)), time.Minute)
-	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/DataMemoryQuotaMB", int64(257)), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexServiceMemQuota", e2espec.NewResourceQuantityMi(257)), time.Minute)
-	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/IndexMemoryQuotaMB", int64(257)), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/SearchServiceMemQuota", e2espec.NewResourceQuantityMi(257)), time.Minute)
-	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/SearchMemoryQuotaMB", int64(257)), time.Minute)
+	patches := jsonpatch.NewPatchSet().
+		Replace("/Spec/ClusterSettings/DataServiceMemQuota", e2espec.NewResourceQuantityMi(257)).
+		Replace("/Spec/ClusterSettings/IndexServiceMemQuota", e2espec.NewResourceQuantityMi(257)).
+		Replace("/Spec/ClusterSettings/SearchServiceMemQuota", e2espec.NewResourceQuantityMi(257))
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patches, time.Minute)
+
+	validationPatches := jsonpatch.NewPatchSet().
+		Test("/DataMemoryQuotaMB", int64(257)).
+		Test("/IndexMemoryQuotaMB", int64(257)).
+		Test("/SearchMemoryQuotaMB", int64(257))
+	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, validationPatches, time.Minute)
+
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoFailoverTimeout", e2espec.NewDurationS(31)), time.Minute)
 	e2eutil.MustPatchAutoFailoverInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Timeout", int64(31)), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/IndexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
-	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/StorageMode", couchbaseutil.IndexStoragePlasma), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
+	// * Upgraded due to new implicit memory requests
 	// * All cluster edits are reported
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{Times: 5, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		upgradeSequence,
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

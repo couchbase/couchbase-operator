@@ -174,7 +174,14 @@ However, instead of using resource requests/limits to ensure server Pods have en
 Even when running a Couchbase Server Pod on a dedicated Kubernetes node, it's important to remember that Kubernetes does not allow swap storage for containers, and thus a singular Pod must still remain within the bounds of the node's https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable[allocatable^] memory, or else risk being evicted.
 ====
 
-== Interactive Memory Allocation
+== Automatic Memory Reservation kbd:[operator 2.2]
+
+When not explicitly specified in a server class's pod template, the Operator will automatically populate the Couchbase server memory requests for that container.
+This is as defined by <<overheads-and-resource-scheduling>>, namely the total of all resource allocations per service enabled for that server class, plus a 25% overhead.
+
+Modification of memory allocation will cause an upgrade of the affected pods.
+
+== Interactive Memory Allocation kbd:[operator 2.1]
 
 The Operator provides memory allocation status information in your `CouchbaseCluster` resources with the xref:reference-couchbasecluster-status.adoc#status-allocations[`status.allocations`] attribute.
 This provides direct feedback about your memory configuration, and makes applying the rules--previously discussed--more intuitive to understand and apply.
