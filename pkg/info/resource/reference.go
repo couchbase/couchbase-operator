@@ -5,7 +5,7 @@ type referenceImpl struct {
 	name string
 }
 
-func newReference(kind, name string) Reference {
+func NewReference(kind, name string) Reference {
 	return &referenceImpl{
 		kind: kind,
 		name: name,

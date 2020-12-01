@@ -12,10 +12,13 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/restmapper"
 )
 
 // InitContext performs Kubernetes specific initialization operations on
@@ -26,31 +29,43 @@ func InitContext(context *context.Context) error {
 		return err
 	}
 
+	if err := apiextensionsv1.AddToScheme(scheme.Scheme); err != nil {
+		return err
+	}
+
 	context.KubeConfigLoader = context.Config.ConfigFlags.ToRawKubeConfigLoader()
 
 	var err error
 
-	context.KubeConfig, err = context.KubeConfigLoader.ClientConfig()
-	if err != nil {
+	if context.KubeConfig, err = context.KubeConfigLoader.ClientConfig(); err != nil {
 		return err
 	}
 
 	// Create Kubernetes clients
-	context.KubeClient, err = kubernetes.NewForConfig(context.KubeConfig)
-	if err != nil {
+	if context.KubeClient, err = kubernetes.NewForConfig(context.KubeConfig); err != nil {
 		return err
 	}
 
-	context.KubeExtClient, err = clientset.NewForConfig(context.KubeConfig)
-	if err != nil {
+	if context.KubeExtClient, err = clientset.NewForConfig(context.KubeConfig); err != nil {
 		return err
 	}
 
 	// Create a Couchbase client
-	context.CouchbaseClient, err = versioned.NewForConfig(context.KubeConfig)
+	if context.CouchbaseClient, err = versioned.NewForConfig(context.KubeConfig); err != nil {
+		return err
+	}
+
+	// Create a dynamic client.
+	if context.DynamicClient, err = dynamic.NewForConfig(context.KubeConfig); err != nil {
+		return err
+	}
+
+	groupResources, err := restmapper.GetAPIGroupResources(context.KubeClient.Discovery())
 	if err != nil {
 		return err
 	}
+
+	context.RESTMapper = restmapper.NewDiscoveryRESTMapper(groupResources)
 
 	return nil
 }

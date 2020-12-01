@@ -16,6 +16,13 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
@@ -25,32 +32,38 @@ import (
 )
 
 var (
-	// Define all of the resource types we can collect information for
-	resourceInitializers = []resource.Initializer{
-		resource.NewConfigMapResource,
-		resource.NewCouchbaseClusterResource,
-		resource.NewCouchbaseBackupResource,
-		resource.NewCouchbaseBackupRestoreResource,
-		resource.NewCouchbaseBucketResource,
-		resource.NewCouchbaseEphemeralBucketResource,
-		resource.NewCouchbaseMemcachedBucketResource,
-		resource.NewCouchbaseReplicationResource,
-		resource.NewCouchbaseUserResource,
-		resource.NewCouchbaseGroupResource,
-		resource.NewCouchbaseRoleBindingResource,
-		resource.NewDeploymentResource,
-		resource.NewEndpointResource,
-		resource.NewNamespaceResource,
-		resource.NewPersistentVolumeClaimResource,
-		resource.NewPodDisruptionBudgetResource,
-		resource.NewPodResource,
-		resource.NewRoleResource,
-		resource.NewRoleBindingResource,
-		resource.NewSecretResource,
-		resource.NewServiceResource,
-		resource.NewServiceAccountResource,
-		resource.NewJobResource,
-		resource.NewCronJobResource,
+	// Add a resource type here for it to be collected.
+	resources = []resource.Collector{
+		{Resource: &couchbasev2.CouchbaseCluster{}, Scope: resource.ScopeClusterName},
+		{Resource: &couchbasev2.CouchbaseBucket{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseEphemeralBucket{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseMemcachedBucket{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseReplication{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseUser{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseGroup{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseRoleBinding{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseBackup{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseBackupRestore{}, Scope: resource.ScopeAll},
+		{Resource: &couchbasev2.CouchbaseAutoscaler{}, Scope: resource.ScopeAll},
+		{Resource: &corev1.ConfigMap{}, Scope: resource.ScopeCluster},
+		{Resource: &corev1.Endpoints{}, Scope: resource.ScopeCluster},
+		{Resource: &corev1.Namespace{}, Scope: resource.ScopeNamespace},
+		{Resource: &corev1.Node{}, Scope: resource.ScopeAll},
+		{Resource: &corev1.PersistentVolume{}, Scope: resource.ScopeAll},
+		{Resource: &corev1.PersistentVolumeClaim{}, Scope: resource.ScopeCluster},
+		{Resource: &corev1.Pod{}, Scope: resource.ScopeCluster},
+		{Resource: &corev1.Secret{}, Scope: resource.ScopeAll},
+		{Resource: &corev1.Service{}, Scope: resource.ScopeCluster},
+		{Resource: &corev1.ServiceAccount{}, Scope: resource.ScopeAll},
+		{Resource: &appsv1.Deployment{}, Scope: resource.ScopeAll},
+		{Resource: &rbacv1.ClusterRole{}, Scope: resource.ScopeAll},
+		{Resource: &rbacv1.ClusterRoleBinding{}, Scope: resource.ScopeAll},
+		{Resource: &rbacv1.Role{}, Scope: resource.ScopeAll},
+		{Resource: &rbacv1.RoleBinding{}, Scope: resource.ScopeAll},
+		{Resource: &batchv1.Job{}, Scope: resource.ScopeAll},
+		{Resource: &batchv1beta1.CronJob{}, Scope: resource.ScopeAll},
+		{Resource: &apiextensionsv1.CustomResourceDefinition{}, Scope: resource.ScopeCouchbaseGroup},
+		{Resource: &policyv1beta1.PodDisruptionBudget{}, Scope: resource.ScopeCluster},
 	}
 
 	// Define all implied sub-resources we can collect information for
@@ -58,15 +71,6 @@ var (
 		collector.NewEventCollector,
 		collector.NewLogCollector,
 		collector.NewOperatorCollector,
-	}
-
-	// Define all cluster scoped resource types
-	clusterInitializers = []resource.Initializer{
-		resource.NewClusterRoleResource,
-		resource.NewClusterRoleBindingResource,
-		resource.NewCustomResourceDefinitionResource,
-		resource.NewNodeResource,
-		resource.NewPersistentVolumeResource,
 	}
 )
 
@@ -86,25 +90,6 @@ func harvestSub(context *context.Context, backend backend.Backend, references []
 				continue
 			}
 		}
-	}
-}
-
-// harvest collects all resources the context allows and writes to the backend.
-func harvest(context *context.Context, backend backend.Backend, initializers []resource.Initializer) {
-	// Main loop, create the resource handler, fetch and write to the backend
-	for _, initializer := range initializers {
-		resource := initializer(context)
-		if err := resource.Fetch(); err != nil {
-			fmt.Printf("unable to fetch resources for type %s: %v\n", resource.Kind(), err)
-			continue
-		}
-
-		if err := resource.Write(backend); err != nil {
-			fmt.Printf("unable to write resources for type %s: %v\n", resource.Kind(), err)
-			continue
-		}
-
-		harvestSub(context, backend, resource.References())
 	}
 }
 
@@ -217,11 +202,8 @@ func main() {
 		fmt.Println("failed to archive:", err)
 	}
 
-	// Harvest the content defined by the user context
-	harvest(context, backend, resourceInitializers)
-
-	// Harvest unscoped cluster content
-	harvest(context, backend, clusterInitializers)
+	references := resource.Collect(context, backend, resources)
+	harvestSub(context, backend, references)
 
 	// If system collections are allowed harvest from explicitly from that namespace
 	if context.Config.System {
@@ -230,7 +212,7 @@ func main() {
 		context.NamespaceOverride = "kube-system"
 		context.Config.All = true
 
-		// Harvest and restore
-		harvest(context, backend, resourceInitializers)
+		references := resource.Collect(context, backend, resources)
+		harvestSub(context, backend, references)
 	}
 }

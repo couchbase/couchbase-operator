@@ -449,35 +449,35 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 
 	for _, bucket := range buckets.Items {
-		files = append(files, fmt.Sprintf("%s/%s/couchbasebucket/%s/%s.yaml", base, namespace, bucket.Name, bucket.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasebucket/%s/%s.yaml", base, namespace, bucket.Name, bucket.Name))
 	}
 
 	for _, ephemeralBucket := range ephemeralBuckets.Items {
-		files = append(files, fmt.Sprintf("%s/%s/couchbaseephemeralbucket/%s/%s.yaml", base, namespace, ephemeralBucket.Name, ephemeralBucket.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbaseephemeralbucket/%s/%s.yaml", base, namespace, ephemeralBucket.Name, ephemeralBucket.Name))
 	}
 
 	for _, memcachedBucket := range memcachedBuckets.Items {
-		files = append(files, fmt.Sprintf("%s/%s/couchbasememcachedbucket/%s/%s.yaml", base, namespace, memcachedBucket.Name, memcachedBucket.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasememcachedbucket/%s/%s.yaml", base, namespace, memcachedBucket.Name, memcachedBucket.Name))
 	}
 
 	for _, replication := range replications.Items {
-		files = append(files, fmt.Sprintf("%s/%s/couchbasereplication/%s/%s.yaml", base, namespace, replication.Name, replication.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasereplication/%s/%s.yaml", base, namespace, replication.Name, replication.Name))
 	}
 
 	for _, role := range roles.Items {
-		files = append(files, fmt.Sprintf("%s/%s/role/%s/%s.yaml", base, namespace, role.Name, role.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/role/%s/%s.yaml", base, namespace, role.Name, role.Name))
 	}
 
 	for _, rolebinding := range rolebindings.Items {
-		files = append(files, fmt.Sprintf("%s/%s/rolebinding/%s/%s.yaml", base, namespace, rolebinding.Name, rolebinding.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/rolebinding/%s/%s.yaml", base, namespace, rolebinding.Name, rolebinding.Name))
 	}
 
 	for _, secret := range secrets.Items {
-		files = append(files, fmt.Sprintf("%s/%s/secret/%s/%s.yaml", base, namespace, secret.Name, secret.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/secret/%s/%s.yaml", base, namespace, secret.Name, secret.Name))
 	}
 
 	for _, serviceaccount := range serviceaccounts.Items {
-		files = append(files, fmt.Sprintf("%s/%s/serviceaccount/%s/%s.yaml", base, namespace, serviceaccount.Name, serviceaccount.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/serviceaccount/%s/%s.yaml", base, namespace, serviceaccount.Name, serviceaccount.Name))
 	}
 
 	// Deployments are special, we only collect them if the image matches the operator image.
@@ -493,7 +493,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 			continue
 		}
 
-		files = append(files, fmt.Sprintf("%s/%s/deployment/%s/%s.yaml", base, namespace, deployment.Name, deployment.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/deployment/%s/%s.yaml", base, namespace, deployment.Name, deployment.Name))
 
 		if operator {
 			if pprof {
@@ -505,7 +505,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 					"pprof.threadcreate",
 				}
 				for _, pprofFile := range pprofFiles {
-					files = append(files, fmt.Sprintf("%s/%s/deployment/%s/%s", base, namespace, deployment.Name, pprofFile))
+					files = append(files, fmt.Sprintf("%s/namespace/%s/deployment/%s/%s", base, namespace, deployment.Name, pprofFile))
 				}
 			}
 
@@ -514,7 +514,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 					"stats.cluster",
 				}
 				for _, metricsFile := range metricsFiles {
-					files = append(files, fmt.Sprintf("%s/%s/deployment/%s/%s", base, namespace, deployment.Name, metricsFile))
+					files = append(files, fmt.Sprintf("%s/namespace/%s/deployment/%s/%s", base, namespace, deployment.Name, metricsFile))
 				}
 			}
 		}
@@ -542,7 +542,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 			}
 		}
 
-		files = append(files, fmt.Sprintf("%s/%s/couchbasecluster/%s/%s.yaml", base, namespace, cluster.Name, cluster.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasecluster/%s/%s.yaml", base, namespace, cluster.Name, cluster.Name))
 	}
 
 	// Gather namespace and cluster scoped resources.
@@ -582,27 +582,27 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 
 	for _, endpoint := range endpoints.Items {
-		files = append(files, fmt.Sprintf("%s/%s/endpoints/%s/%s.yaml", base, namespace, endpoint.Name, endpoint.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/endpoints/%s/%s.yaml", base, namespace, endpoint.Name, endpoint.Name))
 	}
 
 	for _, pvc := range pvcs.Items {
-		files = append(files, fmt.Sprintf("%s/%s/persistentvolumeclaim/%s/%s.yaml", base, namespace, pvc.Name, pvc.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/persistentvolumeclaim/%s/%s.yaml", base, namespace, pvc.Name, pvc.Name))
 	}
 
 	for _, pod := range pods.Items {
-		files = append(files, fmt.Sprintf("%s/%s/pod/%s/%s.yaml", base, namespace, pod.Name, pod.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/pod/%s/%s.yaml", base, namespace, pod.Name, pod.Name))
 	}
 
 	for _, pdb := range pdbs.Items {
-		files = append(files, fmt.Sprintf("%s/%s/poddisruptionbudget/%s/%s.yaml", base, namespace, pdb.Name, pdb.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/poddisruptionbudget/%s/%s.yaml", base, namespace, pdb.Name, pdb.Name))
 	}
 
 	for _, service := range services.Items {
-		files = append(files, fmt.Sprintf("%s/%s/service/%s/%s.yaml", base, namespace, service.Name, service.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/service/%s/%s.yaml", base, namespace, service.Name, service.Name))
 	}
 
 	for _, configMap := range configMaps.Items {
-		files = append(files, fmt.Sprintf("%s/%s/configmap/%s/%s.yaml", base, namespace, configMap.Name, configMap.Name))
+		files = append(files, fmt.Sprintf("%s/namespace/%s/configmap/%s/%s.yaml", base, namespace, configMap.Name, configMap.Name))
 	}
 
 	return files
@@ -847,14 +847,14 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 			Arg:         "--kubeconfig",
 			ArgValue:    kubeconfig.Name(),
 			WillFail:    true,
-			ExpectedErr: "unable to connect to kubernetes cluster",
+			ExpectedErr: "unable to initialize context",
 		},
 		{
 			Name:        "Validating invalid '-kubeconfig' file missing",
 			Arg:         "--kubeconfig",
 			ArgValue:    "/tmp/fileNotFound",
 			WillFail:    true,
-			ExpectedErr: "unable to initialize context: stat /tmp/fileNotFound: no such file or directory",
+			ExpectedErr: "unable to initialize context",
 		},
 	}
 

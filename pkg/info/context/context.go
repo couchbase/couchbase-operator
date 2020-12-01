@@ -5,6 +5,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/config"
 
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -24,6 +26,10 @@ type Context struct {
 	KubeExtClient clientset.Interface
 	// CouchbaseClient is an initialized Kubernetes client for Couchbase CRDs
 	CouchbaseClient versioned.Interface
+	// DynamicClient is an initialized Kubernetes dynamic client.
+	DynamicClient dynamic.Interface
+	// RESTMapper is used to translate between types and API calls.
+	RESTMapper meta.RESTMapper
 	// NamespaceOverride allows you to ignore what kuebconfig or the CLI says
 	NamespaceOverride string
 }

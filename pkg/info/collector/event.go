@@ -1,15 +1,17 @@
 package collector
 
 import (
+	ctx "context"
+
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/ghodss/yaml"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // eventCollector represents a collection of events.
@@ -32,11 +34,24 @@ func (r *eventCollector) Kind() string {
 	return "Event"
 }
 
+var eventsCache *v1.EventList
+
 // Fetch collects all events as defined for the resource.
 func (r *eventCollector) Fetch(resource resource.Reference) error {
-	events, err := k8sutil.GetEventsForResource(r.context.KubeClient, r.context.Namespace(), resource.Kind(), resource.Name())
-	if err != nil {
-		return err
+	if eventsCache == nil {
+		var err error
+
+		if eventsCache, err = r.context.KubeClient.CoreV1().Events("").List(ctx.Background(), metav1.ListOptions{}); err != nil {
+			return err
+		}
+	}
+
+	events := []v1.Event{}
+
+	for _, event := range eventsCache.Items {
+		if event.InvolvedObject.Kind == resource.Kind() && event.InvolvedObject.Namespace == r.context.Namespace() && event.InvolvedObject.Name == resource.Name() {
+			events = append(events, event)
+		}
 	}
 
 	r.events = events

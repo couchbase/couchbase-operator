@@ -59,7 +59,7 @@ func ArchiveName() string {
 
 // ArchivePath returns the required path for an archive type.
 func ArchivePath(namespace, kind, name, filename string) string {
-	return ArchiveName() + "/" + namespace + "/" + strings.ToLower(kind) + "/" + name + "/" + filename
+	return ArchiveName() + "/namespace/" + namespace + "/" + strings.ToLower(kind) + "/" + name + "/" + filename
 }
 
 // ArchivePathUnscoped returns the required path for an archive type.
