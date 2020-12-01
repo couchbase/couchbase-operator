@@ -143,6 +143,7 @@ Supportability
 backend
 latencies
 scalable
+scalability
 cbopcfg
 cbopinfo
 ulimit
@@ -192,10 +193,12 @@ supportability
 hypervisor
 preinstalled
 autoscale
+autoscaled
 autoscaler
-Autoscaler
 autoscaling
-Autoscaling
+Autoscaler
+AutoScaling
+subresource
 reprovisioned
 snapshotted
 PVCs
