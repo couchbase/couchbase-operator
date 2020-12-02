@@ -165,7 +165,6 @@ NodeSelector defines which nodes to constrain the pods that run any backup opera
 ==== Description
 
 Resources is the resource requirements for the backup container.
-This field cannot be updated once the cluster is created.
 Will be populated by defaults if not specified.
 
 === couchbaseclusters.spec.backup.s3Secret
@@ -956,7 +955,6 @@ Image is the metrics image to be used to collect metrics.
 ==== Description
 
 Resources is the resource requirements for the metrics container.
-This field cannot be updated once the cluster is created.
 Will be populated by defaults if not specified.
 
 === couchbaseclusters.spec.networking

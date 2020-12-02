@@ -170,6 +170,7 @@ testcases:
 - TestMultipleBackupsS3
 - TestBackupRetention
 - TestBackupRetentionS3
+- TestBackupPVCResize
 
 # Monitoring Tests
 - TestPrometheusMetricsTLS

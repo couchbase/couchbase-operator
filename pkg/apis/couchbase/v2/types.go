@@ -1255,26 +1255,33 @@ type PersistentVolumeClaimTemplate struct {
 type Backup struct {
 	// Managed defines whether backups are managed by us or the clients.
 	Managed bool `json:"managed,omitempty"`
+
 	// The Backup Image to run on backup pods
 	Image string `json:"image,omitempty"`
+
 	// The Service Account to run backup (and restore) pods under.
 	// Without this backup pods will not be able to update status
 	ServiceAccount string `json:"serviceAccountName,omitempty"`
+
 	// NodeSelector defines which nodes to constrain the pods that
 	// run any backup operations to
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
 	// Resources is the resource requirements for the backup container.
-	// This field cannot be updated once the cluster is created.
 	// Will be populated by defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+
 	// Selector allows CouchbaseBackup and CouchbaseBackupRestore
 	// resources to be filtered based on labels.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
 	// Tolerations specifies all backup pod tolerations.
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+
 	// ImagePullSecrets allow you to use an image from private
 	// repositories and non-dockerhub ones.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+
 	// S3Secret contains the region and credentials for operating backups in S3
 	S3Secret string `json:"s3Secret,omitempty"`
 }
@@ -2347,13 +2354,15 @@ type CouchbaseClusterMonitoringSpec struct {
 type CouchbaseClusterMonitoringPrometheusSpec struct {
 	// Enabled is a boolean that enables/disables the metrics sidecar container.
 	Enabled bool `json:"enabled,omitempty"`
+
 	// Image is the metrics image to be used to collect metrics.
 	// +kubebuilder:validation:Pattern="^[\\w_\\.\\-/]+:([\\w\\d]+-)?\\d+\\.\\d+.\\d+(-[\\w\\d]+)?$"
 	Image string `json:"image,omitempty"`
+
 	// Resources is the resource requirements for the metrics container.
-	// This field cannot be updated once the cluster is created.
 	// Will be populated by defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+
 	// AuthorizationSecret is the name of a Kubernetes secret that contains a
 	// bearer token to authorize GET requests to the metrics endpoint
 	AuthorizationSecret *string `json:"authorizationSecret,omitempty"`

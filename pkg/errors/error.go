@@ -54,7 +54,7 @@ var (
 // Couchbase server specific errors.
 var (
 	// ErrCouchbaseServerError is raised when couchbase doesn't behave in the way that
-	// we expect, either by explicitly throwing an error or not doing something aynchronously.
+	// we expect, either by explicitly throwing an error or not doing something asynchronously.
 	ErrCouchbaseServerError = errors.New("unexpected couchbase server error")
 
 	// ErrInvalidVersion is raised when we detect a semantic version formatting error
@@ -69,7 +69,7 @@ var (
 	ErrNoVolumeMounts = errors.New("pod has no persistent storage")
 )
 
-// Operator specifc errors.
+// Operator specific errors.
 var (
 	// ErrInternalError is something that should never get raised.
 	ErrInternalError = errors.New("unexpected internal error")

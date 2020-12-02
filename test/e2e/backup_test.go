@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,7 +37,8 @@ func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule st
 			Full: &v2.CouchbaseBackupSchedule{
 				Schedule: fullSchedule,
 			},
-			Size: e2espec.NewResourceQuantityMi(2048),
+			Size:             e2espec.NewResourceQuantityMi(2048),
+			StorageClassName: framework.Global.StorageClassName,
 		},
 	}
 
@@ -82,6 +84,7 @@ func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool) *corev1.Se
 	return secret
 }
 
+// Check backup configuration is correct before running any backup tests.
 func skipBackup(t *testing.T, s3 bool) {
 	f := framework.Global
 
@@ -976,4 +979,75 @@ func TestBackupRetention(t *testing.T) {
 
 func TestBackupRetentionS3(t *testing.T) {
 	testBackupRetention(t, true)
+}
+
+// Manually editing the size of the PVC in a CouchbaseBackup should be reflected in the PVC and PV
+// N.B. Requires a SC with allowVolumeExpansion: true.
+func testBackupPVCResize(t *testing.T, s3 bool) {
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipBackup(t, s3)
+
+	// Static configuration.
+	clusterSize := 3
+	newBackupSize := resource.MustParse("5Gi")
+
+	// Create cluster.
+	numOfDocs := 100
+
+	s3secret := createS3Secret(t, targetKube, s3)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+
+	// Create a Backup object.
+	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(4*time.Minute), "", s3)
+	backup = e2eutil.MustNewBackup(t, targetKube, backup)
+
+	// wait for backup
+	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 10*time.Minute)
+
+	// edit CouchbaseBackup to trigger another backup which then triggers the PVC resize
+	patchset := jsonpatch.NewPatchSet().
+		Replace("/spec/full/schedule", cronScheduleOnceIn(4*time.Minute)).
+		Replace("/spec/size", newBackupSize)
+	e2eutil.MustPatchBackup(t, targetKube, backup, patchset, time.Minute)
+
+	// Expect backup to complete
+	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 10*time.Minute)
+
+	// check pvc has been resized
+	e2eutil.MustWaitForPVCSize(t, targetKube, backup.Name, &newBackupSize, 3*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * Backup updated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupUpdated, FuzzyMessage: string(cluster.Full)},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func TestBackupPVCResize(t *testing.T) {
+	testBackupPVCResize(t, false)
+}
+
+func TestBackupPVCResizeS3(t *testing.T) {
+	testBackupPVCResize(t, true)
 }

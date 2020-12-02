@@ -17,6 +17,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -26,7 +27,7 @@ import (
 
 var retryInterval = 10 * time.Second
 
-// resourceCheckFunc is a function type consumed by ResourceConstraints.
+// ResourceCheckFunc is a function type consumed by ResourceConstraints.
 type resourceCheckFunc func(*unstructured.Unstructured, error) error
 
 // resourceExists checks that a resource exists.
@@ -617,6 +618,37 @@ func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, backup *couchbasev
 // waits until the provided condition type with associated status.
 func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, cl, string(conditionType), string(status))); err != nil {
+		Die(t, err)
+	}
+}
+
+func fieldEqualQuantity(size *resource.Quantity, fields ...string) resourceCheckFunc {
+	return func(u *unstructured.Unstructured, lookupError error) error {
+		raw, ok, _ := unstructured.NestedString(u.Object, fields...)
+		if !ok {
+			return fmt.Errorf("no value found within resource")
+		}
+
+		quantity, err := resource.ParseQuantity(raw)
+		if err != nil {
+			return err
+		}
+
+		if quantity.Value() != size.Value() {
+			return fmt.Errorf("quantity does not match size")
+		}
+
+		return nil
+	}
+}
+
+func MustWaitForPVCSize(t *testing.T, k8s *types.Cluster, name string, size *resource.Quantity, timeout time.Duration) {
+	pvc, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	if err := retryutil.RetryFor(timeout, ResourceConstraints(k8s, pvc, fieldEqualQuantity(size, "status", "capacity", "storage"))); err != nil {
 		Die(t, err)
 	}
 }

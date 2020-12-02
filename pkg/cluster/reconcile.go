@@ -2438,17 +2438,31 @@ func (c *Cluster) reconcileBackup() error {
 	}
 
 	for _, pvc := range pvcs {
-		if _, ok := c.k8s.PersistentVolumeClaims.Get(pvc.Name); ok {
+		if existingPVC, ok := c.k8s.PersistentVolumeClaims.Get(pvc.Name); ok {
 			// PVC update for later k8s versions
 			existing[pvc.Name] = true
+
+			if reflect.DeepEqual(pvc.Spec.Resources, existingPVC.Spec.Resources) {
+				continue
+			}
+
+			updatedPVC := existingPVC.DeepCopy()
+			updatedPVC.Spec.Resources = pvc.Spec.Resources
+
+			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(context.Background(), updatedPVC, metav1.UpdateOptions{}); err != nil {
+				return fmt.Errorf("failed to update PVC: %w", errors.NewStackTracedError(err))
+			}
+
+			log.Info("Backup PVC resize pending", "cbbackup", pvc.Name, "new size", updatedPVC.Spec.Resources.Requests[v1.ResourceStorage])
+
+			mutated[pvc.Name] = true
 		} else {
 			// create new PVC
 			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(context.Background(), pvc, metav1.CreateOptions{}); err != nil {
-				return err
+				return fmt.Errorf("failed to create PVC: %w", errors.NewStackTracedError(err))
 			}
 
 			log.Info("Backup PVC created", "cbbackup", pvc.Name)
-
 			mutated[pvc.Name] = true
 		}
 	}

@@ -357,6 +357,8 @@ var (
 		"TestFailedBackupBehaviour":          TestFailedBackupBehaviour,
 		"TestFailedBackupBehaviourS3":        TestFailedBackupBehaviourS3,
 		"TestBackupPVCReconcile":             TestBackupPVCReconcile,
+		"TestBackupPVCResize":                TestBackupPVCResize,
+		"TestBackupPVCResizeS3":              TestBackupPVCResizeS3,
 		"TestBackupPVCReconcileS3":           TestBackupPVCReconcileS3,
 		"TestReplaceFullOnlyBackup":          TestReplaceFullOnlyBackup,
 		"TestReplaceFullOnlyBackupS3":        TestReplaceFullOnlyBackupS3,
