@@ -78,12 +78,12 @@ func setupLDAP(t *testing.T, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 }
 
 func TestLDAPCreateAdminUser(t *testing.T) {
-	skipLDAP(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipLDAP(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -105,12 +105,12 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 
 // TestRBACDeleteUser verifies basic user deletion.
 func TestLDAPCDeleteUser(t *testing.T) {
-	skipLDAP(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipLDAP(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -146,12 +146,12 @@ func TestLDAPCDeleteUser(t *testing.T) {
 
 // TestLDAPDeleteRole verifies that deleting a group results in deleting User.
 func TestLDAPDeleteRole(t *testing.T) {
-	skipLDAP(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipLDAP(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -189,12 +189,12 @@ func TestLDAPDeleteRole(t *testing.T) {
 // TestLDAPUpdateRole changes cluster role to a bucket role and verifies
 // reconciliation with couchbase.
 func TestLDAPUpdateRole(t *testing.T) {
-	skipLDAP(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipLDAP(t)
 
 	timeout := 2 * time.Minute
 
@@ -229,12 +229,12 @@ func TestLDAPUpdateRole(t *testing.T) {
 // removed from the binding and since it doesn't have a role
 // in any other binding the user is also deleted.
 func TestLDAPRemoveUserFromBinding(t *testing.T) {
-	skipLDAP(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipLDAP(t)
 
 	timeout := 2 * time.Minute
 
@@ -290,12 +290,12 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 // TestLDAPDeleteBinding tests that user is deleted when entire
 // rolebinding is deleted.
 func TestLDAPDeleteBinding(t *testing.T) {
-	skipLDAP(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipLDAP(t)
 
 	timeout := 2 * time.Minute
 

@@ -31,13 +31,13 @@ func mustCreateBoundUser(t *testing.T, k8s *types.Cluster) (*couchbasev2.Couchba
 
 // Create cluster with user and cluster admin binding.
 func TestRBACCreateAdminUser(t *testing.T) {
-	skipRBAC(t)
-
 	// Plaform configuration.
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipRBAC(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -62,12 +62,12 @@ func TestRBACCreateAdminUser(t *testing.T) {
 
 // TestRBACDeleteUser verifies basic user deletion.
 func TestRBACDeleteUser(t *testing.T) {
-	skipRBAC(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipRBAC(t)
 
 	timeout := 2 * time.Minute
 
@@ -104,12 +104,12 @@ func TestRBACDeleteUser(t *testing.T) {
 
 // TestRBACDeleteRole verifies that deleting a role results in deleting User.
 func TestRBACDeleteRole(t *testing.T) {
-	skipRBAC(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipRBAC(t)
 
 	timeout := 2 * time.Minute
 
@@ -148,12 +148,12 @@ func TestRBACDeleteRole(t *testing.T) {
 // TestRBACUpdateRole changes cluster role to a bucket role and verifies
 // reconciliation with couchbase.
 func TestRBACUpdateRole(t *testing.T) {
-	skipRBAC(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipRBAC(t)
 
 	timeout := 2 * time.Minute
 
@@ -188,12 +188,12 @@ func TestRBACUpdateRole(t *testing.T) {
 // removed from the binding and since it doesn't have a role
 // in any other binding the user is also deleted.
 func TestRBACRemoveUserFromBinding(t *testing.T) {
-	skipRBAC(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipRBAC(t)
 
 	timeout := 2 * time.Minute
 
@@ -249,12 +249,12 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 // TestRBACDeleteBinding tests that user is deleted when entire
 // rolebinding is deleted.
 func TestRBACDeleteBinding(t *testing.T) {
-	skipRBAC(t)
-
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipRBAC(t)
 
 	timeout := 2 * time.Minute
 
@@ -291,13 +291,13 @@ func TestRBACDeleteBinding(t *testing.T) {
 
 // Verify RBAC auth can be applied to LDAP users.
 func TestRBACWithLDAPAuth(t *testing.T) {
-	skipRBAC(t)
-
 	// Plaform configuration.
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipRBAC(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -334,13 +334,13 @@ func TestRBACWithLDAPAuth(t *testing.T) {
 // TestRBACSelection ensures the operator only creates users that match the
 // label selector.
 func TestRBACSelection(t *testing.T) {
-	skipRBAC(t)
-
 	// Plaform configuration.
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	skipRBAC(t)
 
 	// Static configuration.
 	clusterSize := 1
