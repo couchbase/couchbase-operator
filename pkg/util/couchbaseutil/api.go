@@ -228,14 +228,11 @@ func (r *Request) On(client *Client, target interface{}) error {
 	// amount of time.
 	if r.timeout != 0 {
 		retryCallMembers := func(c *Client, r *Request) error {
-			ctx, cancel := context.WithTimeout(client.ctx, r.timeout)
-			defer cancel()
-
 			callback := func() error {
 				return callMembers(c, r)
 			}
 
-			return retryutil.RetryOnErr(ctx, 5*time.Second, callback)
+			return retryutil.RetryFor(r.timeout, callback)
 		}
 
 		call = retryCallMembers

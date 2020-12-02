@@ -128,10 +128,7 @@ func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 }
 
 func ExposeMetric(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, tls *TLSContext, metric, value string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		responseDataStr, _ := CheckPrometheus(k8s, couchbase, tls)
 		if !strings.Contains(responseDataStr, fmt.Sprintf("%s %s", metric, value)) {
 			return fmt.Errorf("response data does not contain expected value of the metric")

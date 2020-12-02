@@ -427,7 +427,7 @@ func deletePodVolumes(client *client.Client, memberName string) error {
 			return fmt.Errorf("%w: pvc %s not deleted", errors.NewStackTracedError(errors.ErrResourceExists), name)
 		}
 
-		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 			return err
 		}
 	}

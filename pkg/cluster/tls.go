@@ -83,10 +83,7 @@ func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cacert, clie
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(c.ctx, extendedRetryPeriod)
-	defer cancel()
-
-	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(extendedRetryPeriod, callback); err != nil {
 		return err
 	}
 
@@ -279,10 +276,7 @@ func (c *Cluster) updateClientCertAuthSettings(settings *couchbaseutil.ClientCer
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(c.ctx, time.Minute)
-	defer cancel()
-
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
 		return err
 	}
 

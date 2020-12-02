@@ -60,10 +60,7 @@ func verifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, expectedPvcMap ma
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, pvcMappingVerify)
+	return retryutil.RetryFor(5*time.Minute, pvcMappingVerify)
 }
 
 func mustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, expectedPvcMap map[string]int) {

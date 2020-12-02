@@ -68,7 +68,7 @@ func newResourceCache(ctx context.Context, client cache.Getter, resource runtime
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, ready); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, ready); err != nil {
 		rc.stop()
 		return nil, err
 	}

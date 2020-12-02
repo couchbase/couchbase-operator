@@ -88,10 +88,7 @@ func MustDeleteRoleBinding(t *testing.T, k8s *types.Cluster, binding *couchbasev
 
 // Patch CouchbaseGroup.
 func PatchGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseGroup, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return group, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return group, retryutil.RetryFor(timeout, func() error {
 		// get the group
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Get(context.Background(), group.Name, metav1.GetOptions{})
 		if err != nil {
@@ -133,10 +130,7 @@ func MustPatchGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.Couchba
 
 // Patch CouchbaseRoleBinding.
 func PatchRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseRoleBinding, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return binding, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return binding, retryutil.RetryFor(timeout, func() error {
 		// get the binding
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(binding.Namespace).Get(context.Background(), binding.Name, metav1.GetOptions{})
 		if err != nil {

@@ -127,7 +127,7 @@ func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration)
 			return nil
 		}
 
-		if err := retryutil.RetryOnErr(ctx, 10*time.Second, callback); err != nil {
+		if err := retryutil.Retry(ctx, 10*time.Second, callback); err != nil {
 			Die(t, err)
 		}
 
@@ -147,9 +147,6 @@ func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration)
 
 // MustValidatePodReadiness checks a pod has the the correct readiness condition.
 func MustValidatePodReadiness(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, index int, status v1.ConditionStatus, timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	name := couchbaseutil.CreateMemberName(cluster.Name, index)
 
 	callback := func() error {
@@ -173,7 +170,7 @@ func MustValidatePodReadiness(t *testing.T, k8s *types.Cluster, cluster *couchba
 		return fmt.Errorf("ready status not set")
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		Die(t, err)
 	}
 }

@@ -6,12 +6,12 @@ import (
 	"time"
 )
 
-// RetryOnErr retries a callback until it doesn't return an error.
-func RetryOnErr(ctx context.Context, interval time.Duration, f func() error) error {
+// Retry retries a callback until it doesn't return an error.
+func Retry(ctx context.Context, interval time.Duration, callback func() error) error {
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 
-	for err := f(); err != nil; err = f() {
+	for err := callback(); err != nil; err = callback() {
 		select {
 		case <-tick.C:
 		case <-ctx.Done():
@@ -20,4 +20,12 @@ func RetryOnErr(ctx context.Context, interval time.Duration, f func() error) err
 	}
 
 	return nil
+}
+
+// RetryFor is a nice human readable version of Retry.
+func RetryFor(timeout time.Duration, callback func() error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return Retry(ctx, time.Second, callback)
 }

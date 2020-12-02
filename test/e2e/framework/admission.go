@@ -164,7 +164,7 @@ func waitAdmissionController(k8s *types.Cluster) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		return err
 	}
 
@@ -194,7 +194,7 @@ func waitAdmissionController(k8s *types.Cluster) error {
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		return err
 	}
 

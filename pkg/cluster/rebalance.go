@@ -308,10 +308,7 @@ func (c *Cluster) verifyRebalance(members couchbaseutil.MemberSet) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, time.Second, retryFunc)
+	return retryutil.RetryFor(10*time.Second, retryFunc)
 }
 
 // Check that cluster is actively rebalancing with status 'running'.

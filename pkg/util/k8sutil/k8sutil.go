@@ -270,7 +270,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		return err
 	}
 

@@ -140,9 +140,6 @@ func MustCreateSDKJob(t *testing.T, local, remote *types.Cluster, cluster *couch
 // die and report the error emitted in the logs, it should be useful enough to debug
 // what went wrong!
 func MustWaitForSDKJobCompletion(t *testing.T, local *types.Cluster, job *batchv1.Job, timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	// If we've failed, then we break out of the retry loop in order to
 	// fail fast, this flag then controls the handling.
 	succeeded := false
@@ -169,7 +166,7 @@ func MustWaitForSDKJobCompletion(t *testing.T, local *types.Cluster, job *batchv
 		return fmt.Errorf("unknown status")
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		Die(t, err)
 	}
 

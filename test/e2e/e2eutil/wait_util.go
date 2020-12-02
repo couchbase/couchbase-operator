@@ -32,9 +32,6 @@ type filterFunc func(*v1.Pod) bool
 
 // WaitForBackupCreation waits for a backup resources associated with a cluster to be created.
 func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		// TODO: you can check more than presence, the schedule for example can allow you to wait for updates...
 		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-full", metav1.GetOptions{}); err != nil {
@@ -53,7 +50,7 @@ func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, time
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, retryInterval, callback)
+	return retryutil.RetryFor(timeout, callback)
 }
 
 func MustWaitForBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) {
@@ -63,10 +60,7 @@ func MustWaitForBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.Cou
 }
 
 func WaitForCronjob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, retryInterval, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		listOptions := metav1.ListOptions{}
 		cronjobs, err := k8s.KubeClient.BatchV1beta1().CronJobs(couchbase.Namespace).List(context.Background(), listOptions)
 		if err != nil {
@@ -91,12 +85,9 @@ func MustWaitForCronjob(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 
 // this function waits until expected non-empty values appear in backup status fields.
 func WaitForStatusUpdate(k8s *types.Cluster, backupName, statusField string, timeout time.Duration) (reflect.Value, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	var statusFieldValue reflect.Value
 
-	return statusFieldValue, retryutil.RetryOnErr(ctx, retryInterval, func() (err error) {
+	return statusFieldValue, retryutil.RetryFor(timeout, func() (err error) {
 		backup, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Get(context.Background(), backupName, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -150,10 +141,7 @@ func MustWaitStatusUpdate(t *testing.T, k8s *types.Cluster, backupName, statusFi
 }
 
 func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, size int, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, retryInterval, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), ClusterListOpt(couchbase))
 		if err != nil {
 			return err
@@ -207,7 +195,7 @@ func WaitUntilBucketsExist(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
+	if err := retryutil.Retry(ctx, retryInterval, callback); err != nil {
 		return err
 	}
 
@@ -233,7 +221,7 @@ func WaitUntilBucketsExist(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
+	if err := retryutil.Retry(ctx, retryInterval, callback); err != nil {
 		return err
 	}
 
@@ -300,10 +288,7 @@ func MustWaitUntilBucketExists(t *testing.T, k8s *types.Cluster, couchbase *couc
 }
 
 func WaitUntilBucketNotExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, retryInterval, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -326,9 +311,6 @@ func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *c
 }
 
 func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		cl, err := GetCouchbaseCluster(k8s.CRClient, cluster)
 		if err != nil {
@@ -378,7 +360,7 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, retryInterval, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		return fmt.Errorf("fail to wait for cluster status to be healthy: %w", err)
 	}
 
@@ -408,10 +390,7 @@ func WaitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.L
 func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.ListOptions, filters ...filterFunc) ([]*v1.Pod, error) {
 	var pods []*v1.Pod
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	err := retryutil.RetryOnErr(ctx, retryInterval, func() error {
+	err := retryutil.RetryFor(time.Minute, func() error {
 		podList, err := kubecli.CoreV1().Pods(namespace).List(context.Background(), lo)
 		if err != nil {
 			return err
@@ -446,9 +425,6 @@ func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.L
 
 // WaitUntilOperatorReady will wait until the first pod selected for couchbase-operator is ready.
 func WaitUntilOperatorReady(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), k8s.OperatorDeployment.Name, metav1.GetOptions{})
 		if err != nil {
@@ -468,7 +444,7 @@ func WaitUntilOperatorReady(k8s *types.Cluster, timeout time.Duration) error {
 		return fmt.Errorf("operator deployment missing Available condition")
 	}
 
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
+	return retryutil.RetryFor(timeout, callback)
 }
 
 // waits until the provided condition type occurs with associated status.
@@ -534,9 +510,6 @@ func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *couchbasev2.C
 // has or will happen e.g. is less racy.  This requires that the event is unique within a test
 // run as multiple events of the same type will cause this to trigger.
 func MustObserveClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	opts := metav1.ListOptions{
 		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
 	}
@@ -556,7 +529,7 @@ func MustObserveClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbas
 		return fmt.Errorf("unable to locate event %v", event)
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		Die(t, err)
 	}
 }
@@ -618,9 +591,6 @@ func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, b *couchbasev2.Cou
 
 // waits until the provided condition type with associated status after specified timestamp.
 func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		cluster, err := GetCouchbaseCluster(crClient, cl)
 		if err != nil {
@@ -641,7 +611,7 @@ func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditi
 		return fmt.Errorf("condition does not exist")
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		return err
 	}
 
@@ -655,15 +625,12 @@ func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType
 }
 
 func WaitForPVC(k8s *types.Cluster, name string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		_, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
 		return err
 	}
 
-	return retryutil.RetryOnErr(ctx, retryInterval, callback)
+	return retryutil.RetryFor(timeout, callback)
 }
 
 func MustWaitForPVC(t *testing.T, k8s *types.Cluster, name string, timeout time.Duration) {
@@ -687,7 +654,7 @@ func WaitForPVCDeletion(ctx context.Context, k8s *types.Cluster) error {
 	selector := labels.NewSelector()
 	selector = selector.Add(requirements...)
 
-	return retryutil.RetryOnErr(ctx, 10*time.Second, func() error {
+	return retryutil.Retry(ctx, 10*time.Second, func() error {
 		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return err
@@ -722,7 +689,7 @@ func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName string, timeo
 	selector = selector.Add(requirements...)
 
 	// Retry deletion until success or the timeout context fires.
-	return retryutil.RetryOnErr(ctx, time.Second, func() error {
+	return retryutil.Retry(ctx, time.Second, func() error {
 		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return err
@@ -776,7 +743,7 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.RetryOnErr(ctx, 1*time.Second, func() error {
+	return retryutil.Retry(ctx, time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -824,10 +791,7 @@ func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *c
 // WaitForFirstPodContainerWaiting waits for the first pods's container to enter a waiting state
 // with optional reasons to validate.
 func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, reasons ...string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, retryInterval, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
 		if err != nil {
 			return err
@@ -869,10 +833,7 @@ func MustWaitForFirstPodContainerWaiting(t *testing.T, k8s *types.Cluster, couch
 }
 
 func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 10*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -906,9 +867,6 @@ func MustWaitUntilUserExists(t *testing.T, k8s *types.Cluster, couchbase *couchb
 // WaitForClusterUserDeletion waits user to be deleted
 // from couchbase cluster.
 func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
@@ -932,7 +890,7 @@ func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.Couch
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, retryInterval, callback)
+	return retryutil.RetryFor(timeout, callback)
 }
 
 func MustWaitForClusterUserDeletion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, timeout time.Duration) error {
@@ -946,10 +904,7 @@ func MustWaitForClusterUserDeletion(t *testing.T, k8s *types.Cluster, couchbase 
 
 // WaitForCRDDeletion waits until CRD is deleted.
 func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 1*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		if _, err := cs.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crdName, metav1.GetOptions{}); err != nil {
 			if k8sutil.IsKubernetesResourceNotFoundError(err) {
 				// api reported crd deleted ok
@@ -966,10 +921,7 @@ func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Du
 }
 
 func WaitUntilCouchbaseAutoscalerExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 10*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -999,10 +951,7 @@ func MustWaitUntilCouchbaseAutoscalerExists(t *testing.T, k8s *types.Cluster, co
 
 // WaitForCouchbaseAutoscalerDeletion waits for autoscaler to be deleted.
 func WaitForCouchbaseAutoscalerDeletion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 1*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		_, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(couchbase.Namespace).Get(context.Background(), autoscalerName, metav1.GetOptions{})
 		if err != nil {
 			if k8sutil.IsKubernetesResourceNotFoundError(err) {
@@ -1106,9 +1055,6 @@ func MustReceiveErrorValue(t *testing.T, op *AsyncOperation) {
 }
 
 func WaitForBackupDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
@@ -1122,7 +1068,7 @@ func WaitForBackupDeletion(k8s *types.Cluster, timeout time.Duration) error {
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, retryInterval, callback)
+	return retryutil.RetryFor(timeout, callback)
 }
 
 func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, timeout time.Duration) {
@@ -1132,10 +1078,7 @@ func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, timeout time.Du
 }
 
 func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, retryInterval, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		listOptions := metav1.ListOptions{
 			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 		}

@@ -319,10 +319,7 @@ func (c *Cluster) create() error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(c.ctx, time.Minute)
-	defer cancel()
-
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
 		return err
 	}
 

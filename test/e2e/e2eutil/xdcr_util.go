@@ -122,7 +122,7 @@ func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couch
 		t.Logf("inserted %d documents in %v", inserted, time.Since(start))
 	}()
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		return err
 	}
 
@@ -138,10 +138,7 @@ func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 // VerifyDocCountInBucket polls the Couchbase API for the named bucket and checks whether the
 // document count matches the expected number of items.
 func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 10*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
 		defer cleanup()
 
@@ -173,10 +170,7 @@ func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couch
 // VerifyDocCountInBucketNonZerp polls the Couchbase API for the named bucket and checks whether the
 // document count is non-zero.
 func VerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
 		defer cleanup()
 
@@ -229,10 +223,7 @@ func getRemoteUUID(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseClus
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
 		return "", err
 	}
 
@@ -469,10 +460,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 }
 
 func DeleteXDCRReplication(k8s *types.Cluster, source *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Delete(context.Background(), replication.Name, metav1.DeleteOptions{}); err != nil {
 			return err
 		}

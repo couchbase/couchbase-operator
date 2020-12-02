@@ -24,9 +24,6 @@ const (
 
 // waitSyncGatewayAvailable waits for the sync gateway deployment to become available.
 func waitSyncGatewayAvailable(k8s *types.Cluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), syncGatewayResourceName, metav1.GetOptions{})
 		if err != nil {
@@ -42,7 +39,7 @@ func waitSyncGatewayAvailable(k8s *types.Cluster, timeout time.Duration) error {
 		return fmt.Errorf("sync-gateway deployment not available")
 	}
 
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
+	return retryutil.RetryFor(timeout, callback)
 }
 
 // createSyncGateway creates a sync gateway instance in the given cluster.

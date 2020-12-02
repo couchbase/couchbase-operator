@@ -127,10 +127,7 @@ func getKubernetesNodeServices(k8s *types.Cluster, couchbase *couchbasev2.Couchb
 // CheckForIPAlternateAddresses gets external addressability configuration from the Couchbase API
 // and checks that alternate addresses are defined and IPv4 addresses.
 func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		nodeServices, err := getNodeServices(k8s, couchbase)
 		if err != nil {
 			return err
@@ -159,10 +156,7 @@ func MustCheckForIPAlternateAddresses(t *testing.T, k8s *types.Cluster, couchbas
 // CheckForDNSAlternateAddresses gets external addressability configuration from the Couchbase API
 // and checks that alternate addresses are defined and DNS names in the requested domain.
 func CheckForDNSAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		nodeServices, err := getNodeServices(k8s, couchbase)
 		if err != nil {
 			return err
@@ -191,10 +185,7 @@ func MustCheckForDNSAlternateAddresses(t *testing.T, k8s *types.Cluster, couchba
 // CheckForDNSServiceAnnotations gets all node services defined for the cluster and
 // checks that the DDNS annotations exist and in the requested domain.
 func CheckForDNSServiceAnnotations(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		services, err := getKubernetesNodeServices(k8s, couchbase)
 		if err != nil {
 			return err
@@ -227,10 +218,7 @@ func MustCheckForDNSServiceAnnotations(t *testing.T, k8s *types.Cluster, couchba
 
 // CheckForNodeServiceType checks that the node service type is as expected.
 func CheckForNodeServiceType(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		services, err := getKubernetesNodeServices(k8s, couchbase)
 		if err != nil {
 			return err
@@ -258,10 +246,7 @@ func MustCheckForNodeServiceType(t *testing.T, k8s *types.Cluster, couchbase *co
 
 // CheckForDNSAdminAnnotation checks that a DNS annotaion is added to the console service.
 func CheckForDNSAdminAnnotation(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -288,10 +273,7 @@ func MustCheckForDNSAdminAnnotation(t *testing.T, k8s *types.Cluster, couchbase 
 
 // CheckForConsoleServiceType checks that the console service is of the epxected type.
 func CheckForConsoleServiceType(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serviceType corev1.ServiceType, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -313,10 +295,7 @@ func MustCheckForConsoleServiceType(t *testing.T, k8s *types.Cluster, couchbase 
 
 // CheckConsoleServiceStatus checks that if Console service type is LoadBalancer then an ingress route is established.
 func CheckConsoleServiceStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -349,10 +328,7 @@ func MustCheckConsoleServiceStatus(t *testing.T, k8s *types.Cluster, couchbase *
 // CheckConsoleServiceLoadBalancerSourceRanges checks that loda balancer source ranges
 // are as we expect.
 func CheckConsoleServiceLoadBalancerSourceRanges(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, sourceRanges []string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
 		if err != nil {
 			return err

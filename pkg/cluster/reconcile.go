@@ -926,7 +926,7 @@ func (c *Cluster) createServerGroups(existingGroups *couchbaseutil.ServerGroups)
 			return nil
 		}
 
-		if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
+		if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
 			return err
 		}
 	}

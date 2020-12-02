@@ -139,7 +139,7 @@ func MustCheckLDAPServer(t *testing.T, k8s *types.Cluster, pod string, tls *TLSC
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		Die(t, err)
 	}
 
@@ -161,7 +161,7 @@ func MustCheckLDAPServer(t *testing.T, k8s *types.Cluster, pod string, tls *TLSC
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		Die(t, err)
 	}
 }

@@ -89,10 +89,7 @@ func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(
 		Port:      sport + ":" + port,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	err = retryutil.RetryFor(time.Minute, func() error {
 		if err := pf.ForwardPorts(); err != nil {
 			return err
 		}
@@ -230,10 +227,7 @@ func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCl
 
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
 func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -423,7 +417,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
 
@@ -452,7 +446,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
 
@@ -476,7 +470,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 		return nil
 	}
 
-	return retryutil.RetryOnErr(ctx, time.Second, callback)
+	return retryutil.Retry(ctx, time.Second, callback)
 }
 
 func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member couchbaseutil.Member) {
@@ -487,9 +481,6 @@ func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 
 // EjectMember removes the given member index from the cluster.
 func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
 	defer cleanup()
 
@@ -542,7 +533,7 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		return err
 	}
 
@@ -567,10 +558,7 @@ func MemberFromSpecProps(couchbase *couchbasev2.CouchbaseCluster, serverConfig s
 }
 
 func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -613,10 +601,7 @@ func MustFailoverNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.
 }
 
 func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -650,10 +635,7 @@ func MustVerifyClusterBalancedAndHealthy(t *testing.T, k8s *types.Cluster, couch
 }
 
 func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, numUnhealthy int, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -690,10 +672,7 @@ func MustWaitForUnhealthyNodes(t *testing.T, k8s *types.Cluster, couchbase *couc
 
 // PatchCouchbaseInfo tries patching the cluster information returned directly from Couchbase server.
 func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -721,10 +700,7 @@ func MustPatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchba
 }
 
 func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -752,10 +728,7 @@ func MustPatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couc
 }
 
 func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -783,10 +756,7 @@ func MustPatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couc
 }
 
 func PatchAutoCompactionSettings(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -814,10 +784,7 @@ func MustPatchAutoCompactionSettings(t *testing.T, k8s *types.Cluster, couchbase
 }
 
 func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -880,9 +847,6 @@ func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCou
 }
 
 func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	requestType := "POST"
 	hostUsername := "Administrator"
 	hostPassword := "password"
@@ -899,7 +863,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 		`"appcode": "` + jsFunc + `"` +
 		`}]`
 
-	err := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	err := retryutil.RetryFor(timeout, func() error {
 		var eventingURL string
 
 		var cleanup func()
@@ -963,9 +927,6 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	var data []byte
 
 	callback := func() error {
@@ -1006,7 +967,7 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 
 		return nil
 	}
-	if err := retryutil.RetryOnErr(ctx, 10*time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		return nil, err
 	}
 
@@ -1049,9 +1010,6 @@ func MustGetDatasetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbas
 }
 
 func GetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) (int64, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	var count int64
 
 	callback := func() error {
@@ -1078,7 +1036,7 @@ func GetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, 10*time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		return 0, err
 	}
 
@@ -1095,9 +1053,6 @@ func MustGetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 }
 
 func CreateBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
@@ -1121,7 +1076,7 @@ func CreateBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 		return couchbaseutil.CreateBucket(b).On(client.client, client.host)
 	}
 
-	return retryutil.RetryOnErr(ctx, 10*time.Second, callback)
+	return retryutil.RetryFor(timeout, callback)
 }
 
 func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
@@ -1132,10 +1087,7 @@ func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 
 // PatchUserInfo tries patching the user returned directly from Couchbase server.
 func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -1175,10 +1127,7 @@ func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.
 // CheckLDAPStatus checks for successful connectivity
 // between couchbase and an LDAP server.
 func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(timeout, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
@@ -1255,10 +1204,7 @@ func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, callback)
+	return retryutil.RetryFor(timeout, callback)
 }
 
 func MustCheckN2NEnabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) {
@@ -1290,9 +1236,6 @@ func NodeListOpt(cluster *couchbasev2.CouchbaseCluster, memberName string) metav
 
 // MustCheckStatusVersion checks that the status version is as we expect.
 func MustCheckStatusVersion(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, version string, timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	callback := func() error {
 		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 		if err != nil {
@@ -1306,7 +1249,7 @@ func MustCheckStatusVersion(t *testing.T, k8s *types.Cluster, cluster *couchbase
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		Die(t, err)
 	}
 }

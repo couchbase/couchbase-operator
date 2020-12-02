@@ -633,10 +633,7 @@ func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchba
 
 // PatchCluster updates the specified cluster with a list of JSON patch objects, returning the updated cluster.
 func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return cluster, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return cluster, retryutil.RetryFor(timeout, func() error {
 		// Get the current cluster resource
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 		if err != nil {
@@ -685,10 +682,7 @@ func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.
 }
 
 func PatchBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseBackup, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return backup, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return backup, retryutil.RetryFor(timeout, func() error {
 		// Get the current backup resource
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
 		if err != nil {
@@ -729,10 +723,7 @@ func MustPatchBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.Couch
 }
 
 func PatchBucket(k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.PatchSet, timeout time.Duration) (metav1.Object, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return bucket, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return bucket, retryutil.RetryFor(timeout, func() error {
 		// Get the current bucket resource
 		switch t := bucket.(type) {
 		case *couchbasev2.CouchbaseBucket:
@@ -802,10 +793,7 @@ func MustPatchBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object, pat
 }
 
 func PatchReplication(k8s *types.Cluster, replication *couchbasev2.CouchbaseReplication, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseReplication, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return replication, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return replication, retryutil.RetryFor(timeout, func() error {
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Get(context.Background(), replication.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -1084,7 +1072,7 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, timeout time
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		Die(t, err)
 	}
 
@@ -1107,7 +1095,7 @@ func MustDeleteOperatorDeployment(t *testing.T, k8s *types.Cluster, timeout time
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		Die(t, err)
 	}
 }
@@ -1121,14 +1109,11 @@ func MustCreateOperatorDeployment(t *testing.T, k8s *types.Cluster) {
 }
 
 func GetOperatorName(k8s *types.Cluster) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	var pods *v1.PodList
 
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("app", "couchbase-operator")))
 
-	outerErr := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	outerErr := retryutil.RetryFor(time.Minute, func() error {
 		var err error
 
 		pods, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
@@ -1318,7 +1303,7 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext, timeo
 			return nil
 		}
 
-		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 			return err
 		}
 	}
@@ -1335,10 +1320,7 @@ func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, ctx *TLSContext, time
 func deletePod(t *testing.T, k8s *types.Cluster, podName string) error {
 	t.Logf("deleting pod: %v", podName)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	err := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	err := retryutil.RetryFor(time.Minute, func() error {
 		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), podName, *metav1.NewDeleteOptions(0)); err != nil {
 			return err
 		}
@@ -1456,9 +1438,6 @@ func MustGenerateWorkload(t *testing.T, k8s *types.Cluster, couchbase *couchbase
 func GetUUID(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) (string, error) {
 	uuid := ""
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	callback := func() error {
 		c, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
@@ -1474,7 +1453,7 @@ func GetUUID(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeou
 		return nil
 	}
 
-	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
 		return "", err
 	}
 

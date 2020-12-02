@@ -638,10 +638,7 @@ func recreateCRDs(k8s *types.Cluster) error {
 			return nil
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-
-		if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
+		if err := retryutil.RetryFor(time.Minute, callback); err != nil {
 			return err
 		}
 	}
@@ -652,10 +649,7 @@ func recreateCRDs(k8s *types.Cluster) error {
 func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 	logrus.Info("Marking all nodes as schedulable")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(time.Minute, func() error {
 		nodeTaintList := []v1.Taint{}
 
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -751,12 +745,9 @@ func (f *Framework) GetOperatorRestartCount(k8s *types.Cluster) (int32, error) {
 		return 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	var operatorPod *v1.Pod
 
-	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	err = retryutil.RetryFor(time.Minute, func() error {
 		operatorPod, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), operatorPodName, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -776,12 +767,9 @@ func DeleteOperatorCompletely(k8s *types.Cluster, deploymentName string) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
-	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
+	return retryutil.RetryFor(10*time.Minute, func() error {
 		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
 		if err == nil {
 			return err
