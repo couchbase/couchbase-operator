@@ -10,7 +10,6 @@ package externalversions
 import (
 	"fmt"
 
-	v1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
@@ -42,11 +41,7 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=couchbase.com, Version=v1
-	case v1.SchemeGroupVersion.WithResource("couchbaseclusters"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V1().CouchbaseClusters().Informer()}, nil
-
-		// Group=couchbase.com, Version=v2
+	// Group=couchbase.com, Version=v2
 	case v2.SchemeGroupVersion.WithResource("couchbaseautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseAutoscalers().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbasebackups"):

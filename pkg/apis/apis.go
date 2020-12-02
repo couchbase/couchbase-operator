@@ -1,7 +1,6 @@
 package apis
 
 import (
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -9,7 +8,6 @@ import (
 
 func AddToScheme(s *runtime.Scheme) error {
 	schemeBuilders := runtime.SchemeBuilder{
-		couchbasev1.AddToScheme,
 		couchbasev2.AddToScheme,
 	}
 

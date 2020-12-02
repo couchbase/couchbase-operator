@@ -9,8 +9,6 @@ package fake
 
 import (
 	clientset "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v1"
-	fakecouchbasev1 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v1/fake"
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2"
 	fakecouchbasev2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/typed/couchbase/v2/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,11 +64,6 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 }
 
 var _ clientset.Interface = &Clientset{}
-
-// CouchbaseV1 retrieves the CouchbaseV1Client
-func (c *Clientset) CouchbaseV1() couchbasev1.CouchbaseV1Interface {
-	return &fakecouchbasev1.FakeCouchbaseV1{Fake: &c.Fake}
-}
 
 // CouchbaseV2 retrieves the CouchbaseV2Client
 func (c *Clientset) CouchbaseV2() couchbasev2.CouchbaseV2Interface {

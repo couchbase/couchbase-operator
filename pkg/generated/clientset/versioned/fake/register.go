@@ -8,7 +8,6 @@
 package fake
 
 import (
-	couchbasev1 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v1"
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -21,7 +20,6 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 var localSchemeBuilder = runtime.SchemeBuilder{
-	couchbasev1.AddToScheme,
 	couchbasev2.AddToScheme,
 }
 
