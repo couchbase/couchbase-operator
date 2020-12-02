@@ -18,7 +18,7 @@ var (
 	mutex = &sync.Mutex{}
 	// instances is a counter of how many instances are alive.
 	instances = 0
-	// handlers backs up port forward error handlers when in silent mode
+	// handlers backs up port forward error handlers when in silent mode.
 	handlers []func(error)
 )
 

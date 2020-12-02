@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -152,7 +153,7 @@ func mustVerifyArchiveContents(t *testing.T, archive string, expected []string) 
 	for {
 		hdr, err := tarReader.Next()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 
@@ -632,7 +633,7 @@ func cbopinfo(t *testing.T, args e2eutil.ArgumentList) (string, func()) {
 
 	stdout, err := e2eutil.Cbopinfo(framework.Global.CbopinfoPath, args.Slice())
 	if err != nil {
-		e2eutil.Die(t, fmt.Errorf("cbopinfo command failed: %v: %s", err, string(stdout)))
+		e2eutil.Die(t, fmt.Errorf("cbopinfo command failed: %w: %s", err, string(stdout)))
 	}
 
 	re := regexp.MustCompile(`Wrote cluster information to (\S+)`)
@@ -687,7 +688,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	// Validate args which won't produce output file
 	for _, arg := range []string{"--help", "--version"} {
 		if _, err := e2eutil.Cbopinfo(f.CbopinfoPath, []string{arg}); err != nil {
-			e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %v", arg, err))
+			e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %w", arg, err))
 		}
 	}
 
@@ -746,7 +747,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 			t.Logf("Returned: %s\n", execOutStr)
 
 			if err != nil {
-				e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %v", arg.Arg, err))
+				e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %w", arg.Arg, err))
 			}
 
 			logFileName := getLogFileNameFromExecOutput(execOutStr)
@@ -763,7 +764,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 				t.Logf("Returned: %s\n", execOutStr)
 
 				if err == nil {
-					e2eutil.Die(t, fmt.Errorf("Command executed successfully without providing value for %s: %v", arg.Arg, err))
+					e2eutil.Die(t, fmt.Errorf("Command executed successfully without providing value for %s: %w", arg.Arg, err))
 				}
 
 				// Verify valid error message
@@ -1225,7 +1226,6 @@ func TestLogCollectInvalid(t *testing.T) {
 	invalidImgName := "couchbase/couchbase-operator:invalidversion"
 	invalidPortVal := "32080"
 	clusterSize := constants.Size1
-	//cbopinfoAllFlag := false
 
 	// Create Couchbase cluster
 	e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)

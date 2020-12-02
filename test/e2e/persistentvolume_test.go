@@ -719,7 +719,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 
 		podList, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + testCouchbase.Name})
 		if err != nil {
-			e2eutil.Die(t, fmt.Errorf("Failed to fetch pod list: %v", err))
+			e2eutil.Die(t, fmt.Errorf("Failed to fetch pod list: %w", err))
 		}
 
 		for _, pod := range podList.Items {

@@ -22,7 +22,7 @@ func WaitFor(f WaitFunc, timeout time.Duration) error {
 		select {
 		case <-tick.C:
 		case <-ctx.Done():
-			return fmt.Errorf("failed to wait for condition: %v", err)
+			return fmt.Errorf("failed to wait for condition: %w", err)
 		}
 	}
 

@@ -92,12 +92,12 @@ func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	err = retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
+	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		if err := pf.ForwardPorts(); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 	if err != nil {
 		return "", nil, err
@@ -233,33 +233,33 @@ func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		before, err := getBucket(client, bucketName)
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		after := *before
 		if err := jsonpatch.Apply(&after, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		if reflect.DeepEqual(before, after) {
-			return true, nil
+			return nil
 		}
 
 		if err := couchbaseutil.UpdateBucket(&after).On(client.client, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -409,35 +409,35 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	callback := func() (bool, error) {
+	callback := func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		if err := couchbaseutil.AddNode(member.GetHostURLPlaintext(), username, password, svcs).On(client.client, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	}
-	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
+	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
 
-	callback = func() (bool, error) {
+	callback = func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		known := make(couchbaseutil.OTPNodeList, len(info.Nodes))
@@ -447,32 +447,36 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 		}
 
 		if err := couchbaseutil.Rebalance(known, nil).On(client.client, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	}
-	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
+	if err := retryutil.RetryOnErr(ctx, 5*time.Second, callback); err != nil {
 		return err
 	}
 
-	callback = func() (bool, error) {
+	callback = func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return info.RebalanceStatus == "none", nil
+		if info.RebalanceStatus != "none" {
+			return fmt.Errorf("rebalance is still running")
+		}
+
+		return nil
 	}
 
-	return retryutil.Retry(ctx, time.Second, callback)
+	return retryutil.RetryOnErr(ctx, time.Second, callback)
 }
 
 func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, services couchbasev2.ServiceList, member couchbaseutil.Member) {
@@ -519,22 +523,26 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	// Given we could be balancing out the member we are talking to using a progress channel
 	// is not the best option here as it may error as the operator does things in the background
 	// affecting this.  The best option is to just check for the rebalance status to complete.
-	callback := func() (bool, error) {
+	callback := func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return info.RebalanceStatus == "none", nil
+		if info.RebalanceStatus != "none" {
+			return fmt.Errorf("rebalance is still running")
+		}
+
+		return nil
 	}
-	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryOnErr(ctx, time.Second, callback); err != nil {
 		return err
 	}
 
@@ -562,10 +570,10 @@ func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
@@ -585,10 +593,10 @@ func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 		}
 
 		if err := client.client.Post(request, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -685,24 +693,24 @@ func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
-			return false, err
+			return err
 		}
 
 		if err := jsonpatch.Apply(info, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -716,24 +724,24 @@ func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		info := &couchbaseutil.AutoFailoverSettings{}
 		if err := couchbaseutil.GetAutoFailoverSettings(info).On(client.client, client.host); err != nil {
-			return false, err
+			return err
 		}
 
 		if err := jsonpatch.Apply(info, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -747,24 +755,24 @@ func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		info := &couchbaseutil.IndexSettings{}
 		if err := couchbaseutil.GetIndexSettings(info).On(client.client, client.host); err != nil {
-			return false, err
+			return err
 		}
 
 		if err := jsonpatch.Apply(info, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -778,24 +786,24 @@ func PatchAutoCompactionSettings(k8s *types.Cluster, couchbase *couchbasev2.Couc
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		info := &couchbaseutil.AutoCompactionSettings{}
 		if err := couchbaseutil.GetAutoCompactionSettings(info).On(client.client, client.host); err != nil {
-			return false, err
+			return err
 		}
 
 		if err := jsonpatch.Apply(info, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -809,26 +817,26 @@ func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		for _, verify := range verifiers {
 			if !verify(t, info, value) {
-				return false, retryutil.RetryOkError(NewErrVerifyServices())
+				return NewErrVerifyServices()
 			}
 		}
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -891,7 +899,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 		`"appcode": "` + jsFunc + `"` +
 		`}]`
 
-	err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
+	err := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		var eventingURL string
 
 		var cleanup func()
@@ -900,7 +908,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 
 		if eventingURL, cleanup, err = GetHostURL(targetKube, cluster, couchbasev2.EventingService); err != nil {
 			t.Log(err)
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
@@ -909,7 +917,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 
 		request, err := http.NewRequest(requestType, hostURL, strings.NewReader(eventingJSONFunc))
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		request.SetBasicAuth(hostUsername, hostPassword)
@@ -919,7 +927,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 
 		response, err := client.Do(request)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer response.Body.Close()
@@ -927,10 +935,10 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 		responseData, _ = ioutil.ReadAll(response.Body)
 
 		if response.StatusCode != http.StatusOK {
-			return false, retryutil.RetryOkError(fmt.Errorf("remote call failed with response: %s %s", response.Status, string(responseData)))
+			return fmt.Errorf("remote call failed with response: %s %s", response.Status, string(responseData))
 		}
 
-		return true, nil
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -1127,30 +1135,34 @@ func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couc
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		actual := &couchbaseutil.User{}
 		if err := couchbaseutil.GetUser(userName, userAuthDomain, actual).On(client.client, client.host); err != nil {
-			return false, err
+			return err
 		}
 
 		expected := &couchbaseutil.User{}
 		if err := couchbaseutil.GetUser(userName, userAuthDomain, expected).On(client.client, client.host); err != nil {
-			return false, err
+			return err
 		}
 
 		if err := jsonpatch.Apply(expected, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// loop until resources equal
-		return reflect.DeepEqual(actual, expected), nil
+		if !reflect.DeepEqual(actual, expected) {
+			return fmt.Errorf("users do not match, expected %v, actial %v", expected, actual)
+		}
+
+		return nil
 	})
 }
 
@@ -1166,27 +1178,28 @@ func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		defer cleanup()
 
 		status := &couchbaseutil.LDAPStatus{}
 		if err := couchbaseutil.GetLDAPConnectivityStatus(status).On(client.client, client.host); err != nil {
-			return false, err
+			return err
 		}
 
 		if status.Result == couchbaseutil.LDAPStatusResultSuccess {
-			return true, nil
-		} else if status.Reason != "" {
-			err = fmt.Errorf("failed to connect to LDAP server: %s", status.Reason)
-			return false, retryutil.RetryOkError(err)
+			return nil
 		}
 
-		return false, nil
+		if status.Reason != "" {
+			return fmt.Errorf("failed to connect to LDAP server: %s", status.Reason)
+		}
+
+		return nil
 	})
 }
 

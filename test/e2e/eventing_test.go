@@ -71,7 +71,7 @@ var (
 )
 
 var (
-	// dataServiceMemoryQuota is enough memory to support the bucket requirements
+	// dataServiceMemoryQuota is enough memory to support the bucket requirements.
 	dataServiceMemoryQuota = e2espec.NewResourceQuantityMi(300)
 )
 

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	// Default pod names
+	// Default pod names.
 	podName1 = "alice"
 	podName2 = "bob"
 	podName3 = "charlie"
@@ -20,19 +20,19 @@ const (
 	podName6 = "faythe"
 	podName7 = "grace"
 
-	// Default cluster name to use
+	// Default cluster name to use.
 	clusterName = "dragon"
 
-	// Default namespace to use
+	// Default namespace to use.
 	namespace = "unicorn"
 
 	// Server group labels.  For all create and delete events where there
-	// is contention we pick the 'smallest' e.g. alice < bob
+	// is contention we pick the 'smallest' e.g. alice < bob.
 	serverGroup1 = "alice"
 	serverGroup2 = "bob"
 	serverGroup3 = "charlie"
 
-	// Server classes to test configuration
+	// Server classes to test configuration.
 	serverClass1 = "mickey"
 	serverClass2 = "minnie"
 )
@@ -40,7 +40,7 @@ const (
 var (
 	// Defines a cluster with a global server group definition
 	// and an override for serverClass2.  Randomize the order of
-	// the groups to ensure they are picked in order
+	// the groups to ensure they are picked in order.
 	fixtureCluster = &couchbasev2.CouchbaseCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
@@ -68,7 +68,7 @@ var (
 	}
 
 	// Defines a cluster with invalid configuration; serverClass2 enables
-	// scheduling however there is no global default for serverClass1
+	// scheduling however there is no global default for serverClass1.
 	fixtureClusterInvalid = &couchbasev2.CouchbaseCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
@@ -90,11 +90,11 @@ var (
 		},
 	}
 
-	// An empty set of pods
+	// An empty set of pods.
 	fixturePodsEmpty = []*v1.Pod{}
 
 	// A set of pods N-1 allocated per server class
-	// Used to ensure correct insertion with pre existing pods
+	// Used to ensure correct insertion with pre existing pods.
 	fixturePodsCreate = []*v1.Pod{
 		podFixture(podName1, serverClass1, serverGroup1),
 		podFixture(podName2, serverClass1, serverGroup2),
@@ -102,7 +102,7 @@ var (
 	}
 
 	// A set of pods with multiple servers per class.
-	// Used to test correct deletion from server groups
+	// Used to test correct deletion from server groups.
 	fixturePodsDelete = []*v1.Pod{
 		podFixture(podName1, serverClass1, serverGroup1),
 		podFixture(podName2, serverClass1, serverGroup2),
@@ -112,19 +112,19 @@ var (
 		podFixture(podName6, serverClass1, serverGroup3),
 	}
 
-	// A set of pods where one server has failed
+	// A set of pods where one server has failed.
 	fixturePodsFailure = []*v1.Pod{
 		podFixture(podName1, serverClass1, serverGroup1),
 		podFixture(podName2, serverClass1, serverGroup2),
 		podFixtureFailed(podName3, serverClass1, serverGroup3),
 	}
 
-	// A set of pods who are missing the server class label
+	// A set of pods who are missing the server class label.
 	fixturePodsInvalidServerClassLabels = []*v1.Pod{
 		podFixture(podName1, "", serverGroup1),
 	}
 
-	// A set of pods who are missing the server group label
+	// A set of pods who are missing the server group label.
 	fixturePodsInvalidServerGroupNodeSelector = []*v1.Pod{
 		podFixture(podName1, serverClass1, ""),
 	}

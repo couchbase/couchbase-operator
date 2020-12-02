@@ -98,8 +98,9 @@ func (v *ClusterConfigValue) String() string {
 	return ""
 }
 
-// RegistryConfigValue allows multiple container image registries to be passed on the command line
-// e.g. --registry https://index.docker.io/v1/,organization,password
+// RegistryConfigValue allows multiple container image registries to be passed on the command
+// line e.g:
+// --registry https://index.docker.io/v1/,organization,password.
 type RegistryConfigValue struct {
 	values []RegistryConfig
 }
@@ -550,18 +551,18 @@ func updateKubernetesClusterDynamicClient(k8s *types.Cluster) error {
 func recreateCRDs(k8s *types.Cluster) error {
 	clientSet, err := clientset.NewForConfig(k8s.Config)
 	if err != nil {
-		return fmt.Errorf("failed to create clientset object: %v", err)
+		return fmt.Errorf("failed to create clientset object: %w", err)
 	}
 
 	crds, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list CRDs: %v", err)
+		return fmt.Errorf("failed to list CRDs: %w", err)
 	}
 
 	for _, crd := range crds.Items {
 		if crd.Spec.Group == "couchbase.com" {
 			if err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Delete(context.Background(), crd.Name, *metav1.NewDeleteOptions(0)); err != nil {
-				return fmt.Errorf("failed to delete CRD: %v", err)
+				return fmt.Errorf("failed to delete CRD: %w", err)
 			}
 
 			// wait for crd delete
@@ -659,12 +660,12 @@ func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
 
 		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to get node list: %v", err)
+			return fmt.Errorf("failed to get node list: %w", err)
 		}
 
 		for nodeIndex := range k8sNodeList.Items {
 			if err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex); err != nil {
-				return fmt.Errorf("failed to update node taint: %v", err)
+				return fmt.Errorf("failed to update node taint: %w", err)
 			}
 		}
 
@@ -755,13 +756,13 @@ func (f *Framework) GetOperatorRestartCount(k8s *types.Cluster) (int32, error) {
 
 	var operatorPod *v1.Pod
 
-	err = retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
+	err = retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		operatorPod, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), operatorPodName, metav1.GetOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 	if err != nil {
 		return 0, err
@@ -780,17 +781,17 @@ func DeleteOperatorCompletely(k8s *types.Cluster, deploymentName string) error {
 
 	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
 	// We work around by increasing the wait time. Revisit this later.
-	return retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
+	return retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
 		if err == nil {
-			return false, err
+			return err
 		}
 
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return true, nil
+			return nil
 		}
 
-		return false, err
+		return err
 	})
 }
 

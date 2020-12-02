@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	// This is an illegal target version
+	// This is an illegal target version.
 	targetVersionIllegalUpgrade = "couchbase/server:enterprise-10.0.0"
-	// This is an illegal target version
+	// This is an illegal target version.
 	targetVersionIllegalDowngrade = "couchbase/server:enterprise-5.0.0"
 )
 

@@ -203,7 +203,7 @@ type CertificateAuthority struct {
 func NewCertificateAuthority(keyType KeyType, commonName string, certValidFrom, certValidTo time.Time, caCertType CertType) (*CertificateAuthority, error) {
 	key, err := GeneratePrivateKey(keyType)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate CA key: %v", err)
+		return nil, fmt.Errorf("unable to generate CA key: %w", err)
 	}
 
 	ca := &CertificateAuthority{
@@ -218,17 +218,17 @@ func NewCertificateAuthority(keyType KeyType, commonName string, certValidFrom, 
 
 	req, err = CreateCertificateRequest(req, key)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate CA req: %v", err)
+		return nil, fmt.Errorf("unable to generate CA req: %w", err)
 	}
 
 	pem, err := ca.SignCertificateRequest(req, caCertType, certValidFrom, certValidTo)
 	if err != nil {
-		return nil, fmt.Errorf("unable to sign CA cert: %v", err)
+		return nil, fmt.Errorf("unable to sign CA cert: %w", err)
 	}
 
 	cert, err := ParseCertificate(pem)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse CA cert: %v", err)
+		return nil, fmt.Errorf("unable to parse CA cert: %w", err)
 	}
 
 	ca.certificate = cert
@@ -241,7 +241,7 @@ func NewCertificateAuthority(keyType KeyType, commonName string, certValidFrom, 
 func (ca *CertificateAuthority) NewIntermediateCertificateAuthority(keyType KeyType, commonName string, certValidFrom, certValidTo time.Time) (*CertificateAuthority, error) {
 	key, err := GeneratePrivateKey(keyType)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate CA key: %v", err)
+		return nil, fmt.Errorf("unable to generate CA key: %w", err)
 	}
 
 	intermediate := &CertificateAuthority{
@@ -256,17 +256,17 @@ func (ca *CertificateAuthority) NewIntermediateCertificateAuthority(keyType KeyT
 
 	req, err = CreateCertificateRequest(req, key)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate CA req: %v", err)
+		return nil, fmt.Errorf("unable to generate CA req: %w", err)
 	}
 
 	pem, err := ca.SignCertificateRequest(req, CertTypeCA, certValidFrom, certValidTo)
 	if err != nil {
-		return nil, fmt.Errorf("unable to sign CA cert: %v", err)
+		return nil, fmt.Errorf("unable to sign CA cert: %w", err)
 	}
 
 	cert, err := ParseCertificate(pem)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse CA cert: %v", err)
+		return nil, fmt.Errorf("unable to parse CA cert: %w", err)
 	}
 
 	intermediate.certificate = cert

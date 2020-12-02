@@ -91,34 +91,34 @@ func PatchGroup(k8s *types.Cluster, group *couchbasev2.CouchbaseGroup, patches j
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return group, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return group, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		// get the group
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Get(context.Background(), group.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// Apply the patch set to the group
 		after := before.DeepCopy()
 		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// If we are not modifiying e.g. just testing, then return ok
 		if reflect.DeepEqual(before, after) {
-			return true, nil
+			return nil
 		}
 
 		// Attempt to post the update, updating the group
 		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		group = updated
 
 		// Everything successful
-		return true, nil
+		return nil
 	})
 }
 
@@ -136,34 +136,34 @@ func PatchRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBind
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return binding, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return binding, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		// get the binding
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(binding.Namespace).Get(context.Background(), binding.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// Apply the patch set to the binding
 		after := before.DeepCopy()
 		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// If we are not modifiying e.g. just testing, then return ok
 		if reflect.DeepEqual(before, after) {
-			return true, nil
+			return nil
 		}
 
 		// Attempt to post the update, updating the binding
 		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseRoleBindings(binding.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		binding = updated
 
 		// Everything successful
-		return true, nil
+		return nil
 	})
 }
 

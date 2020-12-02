@@ -21,12 +21,12 @@ import (
 func readRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err error) {
 	ymlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
-		err = fmt.Errorf("unable to read cluster config file `%s`: %v", ymlFilePath, err)
+		err = fmt.Errorf("unable to read cluster config file `%s`: %w", ymlFilePath, err)
 		return
 	}
 
 	if err = yaml.Unmarshal(ymlFileContent, &runTimeConfig); err != nil {
-		err = fmt.Errorf("unable to decode test config: %v", err)
+		err = fmt.Errorf("unable to decode test config: %w", err)
 		return
 	}
 
@@ -37,13 +37,13 @@ func readRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err erro
 func getSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
 	if err != nil {
-		err = fmt.Errorf("unable to read suite config file: %v", err)
+		err = fmt.Errorf("unable to read suite config file: %w", err)
 		return
 	}
 
 	err = yaml.Unmarshal(yamlFileContent, &suiteData)
 	if err != nil {
-		err = fmt.Errorf("unable to decode suite config: %v", err)
+		err = fmt.Errorf("unable to decode suite config: %w", err)
 		return
 	}
 

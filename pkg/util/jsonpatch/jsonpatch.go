@@ -18,7 +18,9 @@ import (
 )
 
 var ErrException = fmt.Errorf("caught an exception")
+
 var ErrTypeError = fmt.Errorf("unsupported type")
+
 var ErrOperationInvalid = fmt.Errorf("invalid operation type")
 
 // Operation defines valid operation types.
@@ -203,7 +205,7 @@ func test(document interface{}, path string, value interface{}) error {
 	// Get a reference to the object to update
 	v, k, err := jsonpointer.LookupPath(document, path)
 	if err != nil {
-		return fmt.Errorf("%w: failed to lookup %s in test: %v", ErrException, path, err)
+		return fmt.Errorf("failed to lookup %s in test: %w", path, err)
 	}
 
 	// Dereference pointer types

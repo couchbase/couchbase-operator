@@ -21,12 +21,12 @@ const (
 	// Name of config with only query ndoes.
 	queryConfigName = "test_config_query"
 
-	// Metric incrementing from 0-100 by 10
+	// Metric incrementing from 0-100 by 10.
 	testMetricIncrement = "test-metric-increment"
 
 	// TODO: additional metric targets to test against
-	//       uncomment as tests are implemented
-	// Metric decrementing from 100-0 by 10
+	// uncomment as tests are implemented.
+	// Metric decrementing from 100-0 by 10.
 	testMetricDecrement = "test-metric-decrement"
 	/*
 		// Metric with eventual average value of 200
@@ -197,7 +197,7 @@ func testAutoscale(t *testing.T, targetKube *types.Cluster, metricName string, m
 	_ = e2eutil.MustCreateAverageValueHPA(t, targetKube, testCouchbase.Namespace, autoscalerName, 1, 6, metricName, metricValue)
 
 	// Allow cluster to finish rebalancing
-	//e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
+	// e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 
 	// expected events for scaling up with autoscaler
 	expectedEvents := []eventschema.Validatable{
@@ -286,7 +286,7 @@ func TestAutoscaleUpMandatoryMutualTLS(t *testing.T) {
 
 // TestAutoscaleDown tests that operator reacts to downscale requests from HPA.
 // NOTE: depending on HPA configuration, can take 10-15 mins
-//       before downscaling is triggered.
+// before downscaling is triggered.
 func TestAutoscaleDown(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global

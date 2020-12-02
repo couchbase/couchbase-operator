@@ -66,7 +66,7 @@ var (
 		{Resource: &policyv1beta1.PodDisruptionBudget{}, Scope: resource.ScopeCluster},
 	}
 
-	// Define all implied sub-resources we can collect information for
+	// Define all implied sub-resources we can collect information for.
 	collectorInitializers = []collector.Initializer{
 		collector.NewEventCollector,
 		collector.NewLogCollector,
@@ -76,7 +76,7 @@ var (
 
 // harvestSub collects resources implicitly associated with a resource type e.g. logs/events.
 func harvestSub(context *context.Context, backend backend.Backend, references []resource.Reference) {
-	// For all sub resource types create a handler, fetch and write to the backend
+	// For all sub resource types create a handler, fetch and write to the backend.
 	for _, initializer := range collectorInitializers {
 		for _, ref := range references {
 			collector := initializer(context)
@@ -106,18 +106,18 @@ func clusterExists(clusters *couchbasev2.CouchbaseClusterList, name string) bool
 
 // main is the entry point of this application.
 func main() {
-	// Parse our configuration
+	// Parse our configuration.
 	context := &context.Context{Config: config.Parse()}
 
-	// Allocate and initialize all Kubernetes specific context
+	// Allocate and initialize all Kubernetes specific context.
 	if err := k8s.InitContext(context); err != nil {
 		fmt.Println("unable to initialize context:", err)
 		os.Exit(1)
 	}
 
 	// Before we do anything further ensure we've been correctly configured.
-	// Check basic connectivity via the discovery API.  This is plain text
-	// TODO: Use the resource list to filter the resources we gather
+	// Check basic connectivity via the discovery API.  This is plain text.
+	// TODO: Use the resource list to filter the resources we gather.
 	if _, _, err := context.KubeClient.Discovery().ServerGroupsAndResources(); err != nil {
 		fmt.Println("unable to connect to kubernetes cluster:", err)
 		os.Exit(1)
@@ -135,25 +135,25 @@ func main() {
 	}
 
 	// Check we have at least access to the couchbase clusters.  This will test
-	// TLS and RBAC settings are correct
+	// TLS and RBAC settings are correct.
 	clusters, err := k8s.GetCouchbaseClusters(context)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	// This is set to true if there is anything worth collecting
+	// This is set to true if there is anything worth collecting.
 	anythingToCollect := false
 
 	// Check there is something to collect, warn if not but continue so we get
-	// debug information about the operator itself
+	// debug information about the operator itself.
 	if len(clusters.Items) == 0 {
 		fmt.Println("no CouchbaseCluster resources discovered in name space", context.Namespace())
 	} else {
 		anythingToCollect = true
 	}
 
-	// Finally check to see if any requested CouchbaseClusters exist
+	// Finally check to see if any requested CouchbaseClusters exist.
 	for _, name := range context.Config.Clusters {
 		if !clusterExists(clusters, name) {
 			fmt.Println("requested cluster", name, "not found in namespace", context.Namespace())
@@ -161,7 +161,7 @@ func main() {
 		}
 	}
 
-	// Check that there is an operator deployment running
+	// Check that there is an operator deployment running.
 	deployment, err := k8s.GetOperatorDeployment(context)
 	if err != nil {
 		fmt.Println(err)
@@ -174,7 +174,7 @@ func main() {
 		anythingToCollect = true
 	}
 
-	// Bomb out if there is nothing of interest to collect from
+	// Bomb out if there is nothing of interest to collect from.
 	if !anythingToCollect {
 		fmt.Println("nothing to collect in name space", context.Namespace())
 		os.Exit(1)
@@ -197,7 +197,7 @@ func main() {
 
 	defer backend.Close()
 
-	// Store the arguments used to invoke the command
+	// Store the arguments used to invoke the command.
 	if err := backend.WriteFile(util.ArchiveName()+"/cmdline", strings.Join(os.Args, " ")); err != nil {
 		fmt.Println("failed to archive:", err)
 	}
@@ -205,9 +205,9 @@ func main() {
 	references := resource.Collect(context, backend, resources)
 	harvestSub(context, backend, references)
 
-	// If system collections are allowed harvest from explicitly from that namespace
+	// If system collections are allowed harvest from explicitly from that namespace.
 	if context.Config.System {
-		// Switch to collecting everything in the system namespace
+		// Switch to collecting everything in the system namespace.
 		context := context.Copy()
 		context.NamespaceOverride = "kube-system"
 		context.Config.All = true

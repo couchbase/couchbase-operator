@@ -320,7 +320,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 			for _, replication := range replications.Items {
 				if err := validateBucketExists(v, customResource, replication.Spec.Bucket); err != nil {
-					errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist: %v", replication.Spec.Bucket, replication.Name, err))
+					errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist: %w", replication.Spec.Bucket, replication.Name, err))
 				}
 			}
 		}
@@ -515,12 +515,12 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// version check
 	currentVersionString, err := k8sutil.CouchbaseVersion(customResource.Spec.Image)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("unsupported Couchbase version: %v", err))
+		errs = append(errs, fmt.Errorf("unsupported Couchbase version: %w", err))
 	}
 
 	currentVersion, err := couchbaseutil.NewVersion(currentVersionString)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("unsupported Couchbase version: %v", err))
+		errs = append(errs, fmt.Errorf("unsupported Couchbase version: %w", err))
 	} else {
 		// current version must be equal or greater than min version
 		minVersion, _ := couchbaseutil.NewVersion(constants.CouchbaseVersionMin)
@@ -989,10 +989,10 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 
 // validateMemoryConstraints works in two different ways:
 // * If a cluster is specified we are creating or updating cluster. Look up all buckets selected by it
-//   and ensure the total memory requirements do not surpass the data service memory quota.
+// and ensure the total memory requirements do not surpass the data service memory quota.
 // * If a bucket is specified then a bucket is being created or updated.  Look up all clusters that
-//   may select the bucket and ensure the total memory requirements do not surpass the data service memory
-//   quota for each cluster.
+// may select the bucket and ensure the total memory requirements do not surpass the data service memory
+// quota for each cluster.
 func validateMemoryConstraints(v *types.Validator, object runtime.Object) error {
 	var namespace string
 
@@ -1165,7 +1165,7 @@ func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name s
 
 	p := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 	if _, err := p.Parse(schedule.Schedule); err != nil {
-		return fmt.Errorf("%s.schedule : %s", name, err)
+		return fmt.Errorf("%s.schedule : %w", name, err)
 	}
 
 	return nil

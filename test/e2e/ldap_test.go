@@ -90,7 +90,7 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 
 	testCouchbase := setupLDAP(t, targetKube)
 
-	//Create LDAP User with Cluster admin privileges
+	// Create LDAP User with Cluster admin privileges
 	user, _, _ := mustCreateLDAPBoundUser(t, targetKube)
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, 4*time.Minute)
 

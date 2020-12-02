@@ -59,31 +59,31 @@ func ConvertTemplate(testScope scope, templates []string) []string {
 	for i, str := range templates {
 		if strings.Contains(str, "{{FIRST_NODE_CLUSTER1}}") {
 			hostname := testScope.nodes1[0]
-			str = strings.Replace(str, "{{FIRST_NODE_CLUSTER1}}", hostname, -1)
+			str = strings.ReplaceAll(str, "{{FIRST_NODE_CLUSTER1}}", hostname)
 		}
 
 		if strings.Contains(str, "{{FIRST_NODE_CLUSTER2}}") {
 			hostname := testScope.nodes2[0]
-			str = strings.Replace(str, "{{FIRST_NODE_CLUSTER2}}", hostname, -1)
+			str = strings.ReplaceAll(str, "{{FIRST_NODE_CLUSTER2}}", hostname)
 		}
 
 		if strings.Contains(str, "{{FIRST_NODE_NO_PORT_CLUSTER1}}") {
 			hostname := strings.Split(testScope.nodes1[0], ":")
-			str = strings.Replace(str, "{{FIRST_NODE_NO_PORT_CLUSTER1}}", hostname[0], -1)
+			str = strings.ReplaceAll(str, "{{FIRST_NODE_NO_PORT_CLUSTER1}}", hostname[0])
 		}
 
 		if strings.Contains(str, "{{FIRST_NODE_NO_PORT_CLUSTER2}}") {
 			hostname := strings.Split(testScope.nodes2[0], ":")
-			str = strings.Replace(str, "{{FIRST_NODE_NO_PORT_CLUSTER2}}", hostname[0], -1)
+			str = strings.ReplaceAll(str, "{{FIRST_NODE_NO_PORT_CLUSTER2}}", hostname[0])
 		}
 
 		if strings.Contains(str, "{{SECOND_NODE_CLUSTER1}}") {
 			hostname := testScope.nodes1[1]
-			str = strings.Replace(str, "{{SECOND_NODE_CLUSTER1}}", hostname, -1)
+			str = strings.ReplaceAll(str, "{{SECOND_NODE_CLUSTER1}}", hostname)
 		}
 
 		if strings.Contains(str, "{{BUCKET}}") {
-			str = strings.Replace(str, "{{BUCKET}}", testScope.buckets[rand.Intn(len(testScope.buckets))], -1)
+			str = strings.ReplaceAll(str, "{{BUCKET}}", testScope.buckets[rand.Intn(len(testScope.buckets))])
 		}
 
 		templates[i] = str
@@ -419,7 +419,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	t.Logf("test ops: %v", testDef.ops)
 
-	//create rbac user, required for some operation to succeed
+	// create rbac user, required for some operation to succeed
 	rbacOp := operation{
 		name:    "create-user-1",
 		image:   "sequoiatools/couchbase-cli:v5.0.1",
@@ -491,7 +491,7 @@ outerLoop:
 
 				delete(jobList, result["jobName"])
 				time.Sleep(3 * time.Second)
-			//launch next job if any left
+			// launch next job if any left
 			default:
 				if len(jobList) == 0 && i == len(testDef.ops) {
 					break innerLoop

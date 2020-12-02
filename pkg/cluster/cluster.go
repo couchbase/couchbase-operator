@@ -35,8 +35,8 @@ var log = logf.Log.WithName("cluster")
 
 var (
 	// Be very aggressive here.  If pods are deleted with volumes missing then
-	// they stay Terminating forever.  This should emulate --grace-period=0 --force
-	// See: https://github.com/kubernetes/kubernetes/issues/51835
+	// they stay Terminating forever.  This should emulate --grace-period=0 --force.
+	// See: https://github.com/kubernetes/kubernetes/issues/51835.
 	podTerminationGracePeriod = int64(0)
 
 	reconcileTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{

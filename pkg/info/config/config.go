@@ -13,24 +13,24 @@ import (
 )
 
 const (
-	// help is the header text to echo out before printing individual flags
+	// help is the header text to echo out before printing individual flags.
 	help = `usage: cbopinfo [flags] [cluster ...]
 flags:`
 )
 
 // Configuration holds command line parameters.
 type Configuration struct {
-	// ConfigFlags is a generic set of Kubernetes client flags
+	// ConfigFlags is a generic set of Kubernetes client flags.
 	ConfigFlags *genericclioptions.ConfigFlags
-	// Clusters is the set of clusters to collect information for
+	// Clusters is the set of clusters to collect information for.
 	Clusters []string
-	// All specifies whether to collect all information in the namespace
+	// All specifies whether to collect all information in the namespace.
 	All bool
-	// System specifies whether to attempt to collect system service logs
+	// System specifies whether to attempt to collect system service logs.
 	System bool
-	// CollectInfo determines whether to collect Couchbase server logs
+	// CollectInfo determines whether to collect Couchbase server logs.
 	CollectInfo bool
-	// CollectInfoRedact determines whether to automatically redact logs
+	// CollectInfoRedact determines whether to automatically redact logs.
 	CollectInfoRedact bool
 	// CollectInfoList lists the logs that can be collected to the console and
 	// immediatedly exists.
@@ -38,19 +38,19 @@ type Configuration struct {
 	// CollectInfoCollect determines the logs to collect from the CLI.  Valid values
 	// are an indices e.g. 1, ranges 2-3, a comma separated combination 1,3,5-6 or all.
 	CollectInfoCollect string
-	// Help determines whether to print help and exit
+	// Help determines whether to print help and exit.
 	Help bool
-	// Version determines whether to print out the version string and exit
+	// Version determines whether to print out the version string and exit.
 	Version bool
-	// OperatorImage defines what the operator image is called
+	// OperatorImage defines what the operator image is called.
 	OperatorImage string
-	// OperatorRestPort defines what port the operator is listening on for HTTP requests
+	// OperatorRestPort defines what port the operator is listening on for HTTP requests.
 	OperatorRestPort string
-	// OperatorMetricsPort defines what port the operator is listening on for prometheus metrics
+	// OperatorMetricsPort defines what port the operator is listening on for prometheus metrics.
 	OperatorMetricsPort string
-	// ServerImage defines the server image to use for log collection
+	// ServerImage defines the server image to use for log collection.
 	ServerImage string
-	// Directory records where to store the files
+	// Directory records where to store the files.
 	Directory string
 }
 

@@ -317,8 +317,8 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	// The new node will not be part of the cluster yet  so the API calls will fail
 	// when checking the UUID, temporarily disable these checks while installing
 	// TLS configuration
-	//c.api.SetUUID("")
-	//defer c.api.SetUUID(c.cluster.Status.ClusterID)
+	// c.api.SetUUID("")
+	// defer c.api.SetUUID(c.cluster.Status.ClusterID)
 
 	// Check the pod is EE.  DNS should be working (as checked by the wait above), but
 	// it has been observed that this may still need a retry.

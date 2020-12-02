@@ -40,7 +40,7 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 	for _, pod := range pods.Items {
 		port, err := netutil.GetFreePort()
 		if err != nil {
-			return responseDataStr, fmt.Errorf("unable to allocate port %v", err)
+			return responseDataStr, fmt.Errorf("unable to allocate port: %w", err)
 		}
 
 		pf := portforward.PortForwarder{
@@ -165,7 +165,7 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 	for _, pod := range pods.Items {
 		port, err := netutil.GetFreePort()
 		if err != nil {
-			return responseDataStr, fmt.Errorf("unable to allocate port %v", err)
+			return responseDataStr, fmt.Errorf("unable to allocate port %w", err)
 		}
 
 		pf := portforward.PortForwarder{

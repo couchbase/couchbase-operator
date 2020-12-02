@@ -41,7 +41,7 @@ func (r *operatorCollector) Kind() string {
 func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, paths map[string]string) error {
 	port, err := netutil.GetFreePort()
 	if err != nil {
-		return fmt.Errorf("unable to allocate port %v", err)
+		return fmt.Errorf("unable to allocate port: %w", err)
 	}
 
 	// Open a channel to the operator http endpoint

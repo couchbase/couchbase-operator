@@ -22,9 +22,7 @@ func (e EventList) Less(a, b int) bool {
 }
 
 func (e EventList) Swap(a, b int) {
-	t := e[a]
-	e[a] = e[b]
-	e[b] = t
+	e[a], e[b] = e[b], e[a]
 }
 
 func EventExistsInEventList(event *v1.Event, eventList EventList) bool {

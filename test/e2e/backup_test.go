@@ -26,7 +26,7 @@ import (
 func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule string, s3 bool) *v2.CouchbaseBackup {
 	backup := &v2.CouchbaseBackup{
 		ObjectMeta: v1.ObjectMeta{
-			Name: strings.Replace(string(strategy), "_", "-", -1),
+			Name: strings.ReplaceAll(string(strategy), "_", "-"),
 		},
 		Spec: v2.CouchbaseBackupSpec{
 			Strategy: strategy,

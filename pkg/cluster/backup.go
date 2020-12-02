@@ -87,7 +87,7 @@ func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) err
 				return fmt.Errorf("static tls operator secret required: %w", errors.NewStackTracedError(errors.ErrResourceRequired))
 			}
 
-			//Add the TLS secret volume to the podSpec
+			// Add the TLS secret volume to the podSpec
 			volume := corev1.Volume{
 				Name: "couchbase-operator-tls",
 			}

@@ -108,9 +108,9 @@ const (
 )
 
 const (
-	// LDAPSecretCACert is the field within a k8s secret containing the cacert PEM
+	// LDAPSecretCACert is the field within a k8s secret containing the cacert PEM.
 	LDAPSecretCACert = "ca.crt"
-	// LDAPSecretPassword is the field within a k8s secret containing the password PEM
+	// LDAPSecretPassword is the field within a k8s secret containing the password PEM.
 	LDAPSecretPassword = "password"
 )
 
@@ -118,7 +118,7 @@ const (
 // ¯\_(ツ)_/¯
 //
 // TODO: Use downward api to VolumeMount annotations into Pod and do this lookup because
-// annotations can only be accessed in volumes and not in environment variables."
+// annotations can only be accessed in volumes and not in environment variables.
 // https://docs.openshift.com/container-platform/4.3/nodes/containers/nodes-containers-downward-api.html
 var ImageDigests = map[string]string{
 	"e83852666816dd0a0d86180a0867aa25458c21702f28e5903bb012e079ebe055": "couchbase-6.0.4-1",

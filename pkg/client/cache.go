@@ -6,6 +6,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	couchbaseclientv2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
@@ -56,14 +57,18 @@ func newResourceCache(ctx context.Context, client cache.Getter, resource runtime
 	go rc.informer.Run(rc.stopChan)
 
 	// Wait for the cache to heat up before continuing.
-	ready := func() (bool, error) {
-		return rc.informer.HasSynced(), nil
+	ready := func() error {
+		if !rc.informer.HasSynced() {
+			return errors.NewStackTracedError(fmt.Errorf("%w: client has not synced", errors.ErrInternalError))
+		}
+
+		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	if err := retryutil.Retry(ctx, time.Second, ready); err != nil {
+	if err := retryutil.RetryOnErr(ctx, time.Second, ready); err != nil {
 		rc.stop()
 		return nil, err
 	}

@@ -59,7 +59,7 @@ var (
 const (
 	OperatorRestPort = 8080
 
-	// Couchbase cluster constants
+	// Couchbase cluster constants.
 	CbClusterRestPort int32 = 8091
 )
 
@@ -72,13 +72,13 @@ const (
 	Size5 = 5
 )
 
-//DefaultBucket naming.
+// DefaultBucket naming.
 const (
 	DefaultBucket          = "default"
 	DefaultEphemeralBucket = "ephemeral-bucket"
 )
 
-//DefaultReplication naming.
+// DefaultReplication naming.
 const (
 	DefaultReplication = "test-replication"
 )
@@ -91,22 +91,22 @@ const (
 	BucketRoleName        = "bucket-role"
 	RoleBindingName       = "role-binding"
 
-	// Couchbase specific roles
+	// Couchbase specific roles.
 	ClusterAdminRole = "cluster_admin"
 	BucketAdminRole  = "bucket_admin"
 
-	// Binding
+	// Binding.
 	CouchbaseSubjectUserKind  = "CouchbaseUser"
 	CouchbaseSubjectGroupKind = "CouchbaseGroup"
 )
 
-//ldap naming.
+// ldap naming.
 const (
 	LDAPDomain        = "openldap"
 	LDAPLabelSelector = "openldap.couchbase.com"
 )
 
-//test secrets Label.
+// test secrets Label.
 const (
 	TestLabelSelector = "couchbaseqe"
 )

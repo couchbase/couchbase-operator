@@ -137,7 +137,7 @@ func GetOperatorRole(namespace string, cluster bool) metav1.Object {
 			Resources: []string{
 				couchbasev2.ClusterCRDResourcePlural,
 				// Not supported by GKE 1.13 for some odd reason
-				//couchbasev2.ClusterCRDResourcePlural + "/status",
+				// couchbasev2.ClusterCRDResourcePlural + "/status",
 			},
 			Verbs: []string{
 				"get",    // used by the operator to update status.

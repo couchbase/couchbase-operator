@@ -12,25 +12,25 @@ import (
 
 // LDAP Settings.
 var (
-	// pod
+	// pod.
 	openLDAPImage     = "osixia/openldap:1.2.4"
 	openLDAPInitImage = "busybox:1.28"
 	commonName        = "admin"
 	ldapHostName      = "ldap-test"
 	ldapSubdomain     = constants.LDAPDomain
 
-	// tls
+	// tls.
 	ldapCrtFile   = "couchbase-operator.crt"
 	ldapKeyFile   = "couchbase-operator.key"
 	ldapCACrtFile = "ca.crt"
 
-	// network
+	// network.
 	ldapPortName    = "ldap-port"
 	ldapPort        = 389
 	ldapSSLPortName = "ssl-ldap-port"
 	ldapSSLPort     = 636
 
-	// volume
+	// volume.
 	ldapCerDirtMount = "certdir"
 	ldapSecretMount  = "certsecret"
 )

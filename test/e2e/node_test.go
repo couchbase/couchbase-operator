@@ -748,7 +748,7 @@ func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 
-	//block all incoming and outgoing traffic expect ssh on port 22
+	// block all incoming and outgoing traffic expect ssh on port 22
 	e2eutil.MustExecShellInPod(t, targetKube, memberName, "iptables -A INPUT -p tcp -s 0/0 -d $(/bin/hostname -i) --sport 513:65535 --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT")
 	e2eutil.MustExecShellInPod(t, targetKube, memberName, "iptables -A OUTPUT -p tcp -s $(/bin/hostname -i) -d 0/0 --sport 22 --dport 513:65535 -m state --state ESTABLISHED -j ACCEPT")
 	time.Sleep(autofailoverTimeout / 2)
@@ -806,7 +806,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	nodeIndex := 2
 
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, true, podTaint, nodeIndex); err != nil {
-		e2eutil.Die(t, fmt.Errorf("Failed to set node taint and schedulable property: %v", err))
+		e2eutil.Die(t, fmt.Errorf("Failed to set node taint and schedulable property: %w", err))
 	}
 
 	defer func() {
@@ -816,7 +816,7 @@ func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
 	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 1, time.Minute)
 
 	if err := e2eutil.SetNodeTaintAndSchedulableProperty(targetKube.KubeClient, false, []v1.Taint{}, nodeIndex); err != nil {
-		e2eutil.Die(t, fmt.Errorf("Failed to unset node taint and schedulable property: %v", err))
+		e2eutil.Die(t, fmt.Errorf("Failed to unset node taint and schedulable property: %w", err))
 	}
 
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)

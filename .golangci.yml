@@ -32,6 +32,13 @@ linters:
   - goconst # repeated things that should be constants
   - prealloc # constant sized arrays can be preallocated
   - nakedret # using naked returns in complicated functions
+  - exhaustive # doesn't pay attention to default in switch statements
+  - exhaustivestruct # it's okay not to define every field
+  - gofumpt # really anal
+  - paralleltest # really really anal
+  - nlreturn # seems at odds with cuddling
+  - noctx # do want to fix this
+  - wrapcheck # we do want this, but I want https://github.com/tomarrell/wrapcheck/issues/2 fixing first
 
 linters-settings:
   # Code duplication filter catches a lot of duplication in test

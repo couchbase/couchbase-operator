@@ -26,57 +26,54 @@ import (
 var log = logf.Log.WithName("kubernetes")
 
 const (
-	// Used to annotate services which belong to an SRV record.
-	//srvAnnotaion = "external-dns.alpha.kubernetes.io/service"
-
-	// Fixed port names (generate SRV records for the peer services)
+	// Fixed port names (generate SRV records for the peer services).
 	couchbaseSRVName    = "couchbase"
 	couchbaseSRVNameTLS = "couchbases"
 
 	couchbaseUIPortName    = "couchbase-ui"
 	couchbaseUIPortNameTLS = couchbaseUIPortName + tlsPortNameSuffix
 
-	// tlsBasePort is the port number relative to which TLS ports are (usually) translated
+	// tlsBasePort is the port number relative to which TLS ports are (usually) translated.
 	tlsBasePort       = 10000
 	tlsPortNameSuffix = "-tls"
 
-	// Admin service constants
+	// Admin service constants.
 	adminServicePortName    = string(couchbasev2.AdminService)
 	adminServicePortNameTLS = string(couchbasev2.AdminService) + tlsPortNameSuffix
 	adminServicePort        = 8091
 	adminServicePortTLS     = tlsBasePort + adminServicePort
 
-	// Index service constants
+	// Index service constants.
 	indexServicePortName    = string(couchbasev2.IndexService)
 	indexServicePortNameTLS = string(couchbasev2.IndexService) + tlsPortNameSuffix
 	indexServicePort        = 8092
 	indexServicePortTLS     = tlsBasePort + indexServicePort
 
-	// Query service constants
+	// Query service constants.
 	queryServicePortName    = string(couchbasev2.QueryService)
 	queryServicePortNameTLS = string(couchbasev2.QueryService) + tlsPortNameSuffix
 	queryServicePort        = 8093
 	queryServicePortTLS     = tlsBasePort + queryServicePort
 
-	// Full text search service constants
+	// Full text search service constants.
 	searchServicePortName    = string(couchbasev2.SearchService)
 	searchServicePortNameTLS = string(couchbasev2.SearchService) + tlsPortNameSuffix
 	searchServicePort        = 8094
 	searchServicePortTLS     = tlsBasePort + searchServicePort
 
-	// Analytics service constants
+	// Analytics service constants.
 	analyticsServicePortName    = string(couchbasev2.AnalyticsService)
 	analyticsServicePortNameTLS = string(couchbasev2.AnalyticsService) + tlsPortNameSuffix
 	analyticsServicePort        = 8095
 	analyticsServicePortTLS     = tlsBasePort + analyticsServicePort
 
-	// Eventing service constants
+	// Eventing service constants.
 	eventingServicePortName    = string(couchbasev2.EventingService)
 	eventingServicePortNameTLS = string(couchbasev2.EventingService) + tlsPortNameSuffix
 	eventingServicePort        = 8096
 	eventingServicePortTLS     = tlsBasePort + eventingServicePort
 
-	// Data service constants
+	// Data service constants.
 	dataServicePortName    = string(couchbasev2.DataService)
 	dataServicePortNameTLS = string(couchbasev2.DataService) + tlsPortNameSuffix
 	dataServicePort        = 11210

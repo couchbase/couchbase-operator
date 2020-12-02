@@ -27,9 +27,9 @@ import (
 )
 
 var (
-	// scheme contains versioned resource types
+	// scheme contains versioned resource types.
 	scheme = runtime.NewScheme()
-	// codecs provides a way to decode raw json into a versioned resource
+	// codecs provides a way to decode raw json into a versioned resource.
 	codecs = serializer.NewCodecFactory(scheme)
 )
 

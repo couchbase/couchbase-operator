@@ -3,6 +3,7 @@ package util
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -115,7 +116,7 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 
 	for {
 		header, err := tarReader.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 

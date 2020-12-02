@@ -13,11 +13,11 @@ const (
 )
 
 var (
-	// timestamp caches the timestamp returned by Timestamp()
+	// timestamp caches the timestamp returned by Timestamp().
 	timestamp = ""
-	// salt caches the uuid used to salt redacted logs
+	// salt caches the uuid used to salt redacted logs.
 	salt = ""
-	// saltMutex is used to avoid concurrent updates
+	// saltMutex is used to avoid concurrent updates.
 	saltMutex = &sync.Mutex{}
 )
 

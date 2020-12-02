@@ -242,7 +242,7 @@ func GenerateAuthClusterRoleBinding(namespace string) *rbacv1.ClusterRoleBinding
 // extension-apiserver-authentication configmap.
 //
 // NOTE: The custom metric service always looks for this in
-//       kube-system namespace.  Pretty sure this can be changed.
+// kube-system namespace.  Pretty sure this can be changed.
 //
 // Ref: https://kubernetes.io/docs/tasks/extend-kubernetes/setup-extension-api-server/
 func GenerateAPIExtensionRoleBinding(subjectNamespace string) *rbacv1.RoleBinding {

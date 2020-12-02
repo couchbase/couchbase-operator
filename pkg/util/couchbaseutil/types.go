@@ -874,7 +874,7 @@ type Replication struct {
 type ReplicationList []Replication
 
 // ReplicationSettings describes an XDCR replication settings as returned by
-//   GET /settings/replications/<remote UUID>/<local bucket>/<remote bucket>.
+// GET /settings/replications/<remote UUID>/<local bucket>/<remote bucket>.
 type ReplicationSettings struct {
 	CompressionType string `json:"compressionType" url:"compressionType,omitempty"`
 	PauseRequested  bool   `json:"pauseRequested" url:"pauseRequested"`
@@ -993,7 +993,7 @@ const (
 	// Insecure, do not use.
 	TLS11 TLSVersion = "tls1.1"
 
-	// Obsolete, use 1.3... which isn't supported :D
+	// Obsolete, use 1.3... which isn't supported.
 	TLS12 TLSVersion = "tls1.2"
 )
 

@@ -487,7 +487,7 @@ func CreateCouchbaseAutoscaler(client *client.Client, cl *couchbasev2.CouchbaseC
 	// create autoscaler cr
 	autoscaler, err := client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(cl.Namespace).Create(context.Background(), autoscaler, metav1.CreateOptions{})
 	if err != nil {
-		return nil, err
+		return nil, errors.NewStackTracedError(err)
 	}
 
 	// set status subresource

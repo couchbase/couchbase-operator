@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	// BackupResource is the name used for all resources involving automated backup
+	// BackupResource is the name used for all resources involving automated backup.
 	BackupResourceName = "couchbase-backup"
 )
 

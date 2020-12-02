@@ -636,34 +636,34 @@ func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, pat
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return cluster, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return cluster, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		// Get the current cluster resource
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// Apply the patch set to the cluster
 		after := before.DeepCopy()
 		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// If we are not modifiying e.g. just testing, then return ok
 		if reflect.DeepEqual(before, after) {
-			return true, nil
+			return nil
 		}
 
 		// Attempt to post the update, updating the cluster
 		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// Everything successful
 		cluster = updated
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -688,34 +688,34 @@ func PatchBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, patche
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return backup, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return backup, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		// Get the current backup resource
 		before, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// Apply the patch set to the backup
 		after := before.DeepCopy()
 		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// If we are not modifiying e.g. just testing, then return ok
 		if reflect.DeepEqual(before, after) {
-			return true, nil
+			return nil
 		}
 
 		// Attempt to post the update, updating the backup
 		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
 		// Everything successful
 		backup = updated
 
-		return true, nil
+		return nil
 	})
 }
 
@@ -732,63 +732,63 @@ func PatchBucket(k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.Pat
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return bucket, retryutil.Retry(ctx, 5*time.Second, func() (done bool, err error) {
+	return bucket, retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		// Get the current bucket resource
 		switch t := bucket.(type) {
 		case *couchbasev2.CouchbaseBucket:
 			before, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(t.Namespace).Get(context.Background(), t.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, retryutil.RetryOkError(err)
+				return err
 			}
 
 			// Apply the patch set to the bucket
 			after := before.DeepCopy()
 			if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-				return false, retryutil.RetryOkError(err)
+				return err
 			}
 
 			// If we are not modifiying e.g. just testing, then return ok
 			if reflect.DeepEqual(before, after) {
-				return true, nil
+				return nil
 			}
 
 			// Attempt to post the update, updating the bucket
 			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(t.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 			if err != nil {
-				return false, retryutil.RetryOkError(err)
+				return err
 			}
 
 			bucket = updated
 		case *couchbasev2.CouchbaseEphemeralBucket:
 			before, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Get(context.Background(), t.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, retryutil.RetryOkError(err)
+				return err
 			}
 
 			// Apply the patch set to the bucket
 			after := before.DeepCopy()
 			if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-				return false, retryutil.RetryOkError(err)
+				return err
 			}
 
 			// If we are not modifiying e.g. just testing, then return ok
 			if reflect.DeepEqual(before, after) {
-				return true, nil
+				return nil
 			}
 
 			// Attempt to post the update, updating the bucket
 			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
 			if err != nil {
-				return false, retryutil.RetryOkError(err)
+				return err
 			}
 
 			bucket = updated
 		default:
-			return false, fmt.Errorf("unsupported type")
+			return fmt.Errorf("unsupported type")
 		}
 
 		// Everything successful
-		return true, nil
+		return nil
 	})
 }
 
@@ -1043,11 +1043,11 @@ func MustDeleteCouchbaseOperator(t *testing.T, k8s *types.Cluster) {
 
 func KillOperatorAndWaitForRecovery(k8s *types.Cluster) error {
 	if err := deleteCouchbaseOperator(k8s); err != nil {
-		return fmt.Errorf("failed to kill couchbase operator: %v", err)
+		return fmt.Errorf("failed to kill couchbase operator: %w", err)
 	}
 
 	if err := WaitUntilOperatorReady(k8s, 5*time.Minute); err != nil {
-		return fmt.Errorf("failed to recover couchbase operator: %v", err)
+		return fmt.Errorf("failed to recover couchbase operator: %w", err)
 	}
 
 	return nil
@@ -1128,15 +1128,15 @@ func GetOperatorName(k8s *types.Cluster) (string, error) {
 
 	selector := labels.SelectorFromSet(labels.Set(NameLabelSelector("app", "couchbase-operator")))
 
-	outerErr := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
+	outerErr := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		var err error
 
 		pods, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 	if outerErr != nil {
 		return "couchbase-operator", outerErr
@@ -1300,7 +1300,7 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext, timeout time.Duration) error {
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
 	if err != nil {
-		return fmt.Errorf("unable to get couchbase pods: %v", err)
+		return fmt.Errorf("unable to get couchbase pods: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -1312,7 +1312,7 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext, timeo
 
 		callback := func() error {
 			if err := tlsCheckForPod(k8s, pod.GetName(), tls); err != nil {
-				return fmt.Errorf("TLS verification failed: %v", err)
+				return fmt.Errorf("TLS verification failed: %w", err)
 			}
 
 			return nil
@@ -1338,12 +1338,12 @@ func deletePod(t *testing.T, k8s *types.Cluster, podName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err := retryutil.Retry(ctx, 5*time.Second, func() (bool, error) {
+	err := retryutil.RetryOnErr(ctx, 5*time.Second, func() error {
 		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), podName, *metav1.NewDeleteOptions(0)); err != nil {
-			return false, retryutil.RetryOkError(err)
+			return err
 		}
 
-		return true, nil
+		return nil
 	})
 
 	return err

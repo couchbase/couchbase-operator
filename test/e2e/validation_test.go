@@ -447,7 +447,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, command string) {
 			// If there were any errors to expect look for them.
 			if err != nil {
 				if !test.shouldFail {
-					e2eutil.Die(t, fmt.Errorf("test unexpectedly failed: %v", err))
+					e2eutil.Die(t, fmt.Errorf("test unexpectedly failed: %w", err))
 				}
 
 				if len(test.expectedErrors) > 0 {

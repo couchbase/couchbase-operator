@@ -141,7 +141,7 @@ func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbase
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return retryutil.Retry(ctx, 10*time.Second, func() (bool, error) {
+	return retryutil.RetryOnErr(ctx, 10*time.Second, func() error {
 		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
 		defer cleanup()
 
@@ -153,14 +153,14 @@ func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbase
 		}
 
 		if err := client.client.Get(request, client.host); err != nil {
-			return false, err
+			return err
 		}
 
 		if info.BasicStats.ItemCount != items {
-			return false, retryutil.RetryOkError(fmt.Errorf("document count %d, expected %d", info.BasicStats.ItemCount, items))
+			return fmt.Errorf("document count %d, expected %d", info.BasicStats.ItemCount, items)
 		}
 
-		return true, nil
+		return nil
 	})
 }
 
