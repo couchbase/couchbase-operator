@@ -43,6 +43,7 @@ pipeline {
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 'kubectl_version', defaultValue: '1.17.9')
+    string(name: 'release_channel', defaultValue: 'None')
     string(name: 's3_bucket', defaultValue: '')
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '1000')
@@ -99,8 +100,14 @@ pipeline {
 
     stage('GKE Provisioning') {
       steps {
-        sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --cluster-version ${params.kubernetes_version}"
-        sh "KUBECONFIG=${env.WORKSPACE}/config1 gcloud container clusters get-credentials ${env.NAME} --region us-east1"
+          script {
+              if (params.release_channel != 'None') {
+                  sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --release-channel ${params.release_channel}"
+              } else {
+                  sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --cluster-version ${params.kubernetes_version}"
+              }
+          }
+	sh "KUBECONFIG=${env.WORKSPACE}/config1 gcloud container clusters get-credentials ${env.NAME} --region us-east1"
         sh "KUBECONFIG=${env.WORKSPACE}/config2 gcloud container clusters get-credentials ${env.NAME} --region us-west1"
       }
     }

@@ -131,6 +131,7 @@ def start(args):
         if args.release_channel:
             dynamic_args.extend(('beta', 'container', 'clusters', 'create', args.name,
                                  '--release-channel', args.release_channel))
+            gcloud('components', 'install', 'beta')
         else:
             dynamic_args.extend(('container', 'clusters', 'create', args.name,
                                  '--cluster-version', get_cluster_version(args, region)))
@@ -193,7 +194,7 @@ def main():
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-c', '--cluster-version')
-    group.add_argument('-r', '--release-channel', choices=['rapid', 'regular', 'stable'])
+    group.add_argument('-r', '--release-channel', choices=['None', 'rapid', 'regular', 'stable'])
 
     args = parser.parse_args()
     if args.command == 'start' and not (args.cluster_version or args.release_channel):
