@@ -3,11 +3,14 @@ package cluster
 import (
 	"encoding/json"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
+	jsonpatch "github.com/evanphx/json-patch"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -68,8 +71,21 @@ type upgradableResource interface {
 // it iterates through each discoverred item attempting to apply upgrade actions.  Once
 // complete it will commit upgraded items back to Kubernetes to persist the upgrades.
 func (c *Cluster) operatorUpgrade() error {
+	// Get the most up to date version, we may have updated something since starting...
+	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(c.cluster.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	// If we go to/from JSON space for patching, then we need to add in explicit
+	// type information so the scheme can be determined.
+	cluster.TypeMeta = metav1.TypeMeta{
+		APIVersion: couchbasev2.Group,
+		Kind:       couchbasev2.ClusterCRDResourceKind,
+	}
+
 	// Check first whether any new defaults need applying to the existing cluster.
-	data, err := json.Marshal(c.cluster)
+	data, err := json.Marshal(cluster)
 	if err != nil {
 		return err
 	}
@@ -81,16 +97,29 @@ func (c *Cluster) operatorUpgrade() error {
 
 	v := validator.New(c.k8s.KubeClient, c.k8s.CouchbaseClient)
 	if patches := validator.ApplyDefaults(v, unstructuredCluster); patches != nil {
-		cluster := c.cluster.DeepCopy()
+		log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", cluster.Kind, "name", cluster.Name, "version", version.Version, "patch", patches)
 
-		log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", cluster.Kind, "name", cluster.Name, "version", version.Version)
-
-		if err := jsonpatch.Apply(cluster, patches); err != nil {
+		patchRaw, err := json.Marshal(patches)
+		if err != nil {
 			return err
 		}
 
-		cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
+		patch, err := jsonpatch.DecodePatch(patchRaw)
 		if err != nil {
+			return err
+		}
+
+		patchedData, err := patch.Apply(data)
+		if err != nil {
+			return err
+		}
+
+		cluster := &couchbasev2.CouchbaseCluster{}
+		if err := json.Unmarshal(patchedData, cluster); err != nil {
+			return err
+		}
+
+		if cluster, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
 			return err
 		}
 
