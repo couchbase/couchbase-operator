@@ -64,15 +64,8 @@ func (nodeServices *NodeServices) validateAlternateAddresses(couchbase *couchbas
 }
 
 // getNodeServices polls the Couchbase API, gets and decodes external addressability configuration.
-func getNodeServices(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) (*NodeServices, error) {
-	host, cleanup, err := GetHostURL(k8s, couchbase, couchbasev2.AdminService)
-	if err != nil {
-		return nil, err
-	}
-
-	defer cleanup()
-
-	request, err := http.NewRequest("GET", "http://"+host+"/pools/default/nodeServices", nil)
+func getNodeServices(couchbase *couchbasev2.CouchbaseCluster) (*NodeServices, error) {
+	request, err := http.NewRequest("GET", fmt.Sprintf("http://%s.%s.svc:8091/pools/default/nodeServices", couchbase.Name, couchbase.Namespace), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +241,7 @@ func MustCheckServicePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 // and checks that alternate addresses are defined and IPv4 addresses.
 func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		nodeServices, err := getNodeServices(k8s, couchbase)
+		nodeServices, err := getNodeServices(couchbase)
 		if err != nil {
 			return err
 		}
@@ -281,9 +274,9 @@ func MustCheckForIPAlternateAddresses(t *testing.T, k8s *types.Cluster, couchbas
 
 // CheckForDNSAlternateAddresses gets external addressability configuration from the Couchbase API
 // and checks that alternate addresses are defined and DNS names in the requested domain.
-func CheckForDNSAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) error {
+func CheckForDNSAlternateAddresses(couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		nodeServices, err := getNodeServices(k8s, couchbase)
+		nodeServices, err := getNodeServices(couchbase)
 		if err != nil {
 			return err
 		}
@@ -302,8 +295,8 @@ func CheckForDNSAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.Co
 	})
 }
 
-func MustCheckForDNSAlternateAddresses(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) {
-	if err := CheckForDNSAlternateAddresses(k8s, couchbase, domain, timeout); err != nil {
+func MustCheckForDNSAlternateAddresses(t *testing.T, couchbase *couchbasev2.CouchbaseCluster, domain string, timeout time.Duration) {
+	if err := CheckForDNSAlternateAddresses(couchbase, domain, timeout); err != nil {
 		Die(t, err)
 	}
 }

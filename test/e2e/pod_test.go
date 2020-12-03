@@ -21,7 +21,8 @@ func TestPodResourcesBasic(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	// This is broken because the memory allocation stuff cannot be trusted.
+	framework.Requires(t, targetKube).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := 1
@@ -56,7 +57,8 @@ func TestNegPodResourcesBasic(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	// This is broken because the memory allocation stuff cannot be trusted.
+	framework.Requires(t, targetKube).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := 1
@@ -94,7 +96,10 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	// Put this on a big cluster and it's going to literally take it over with
+	// hundreds of pods.  Poor test, we should constrain it with label selectors
+	// to limit the blast radius.  Also the memory calculations are just wrong.
+	framework.Requires(t, targetKube).StaticCluster().Rethink()
 
 	minMem := e2eutil.MustGetMinNodeMem(t, targetKube)
 	memoryRequest := 0.9 * minMem
@@ -131,7 +136,8 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	// This is broken because the memory allocation stuff cannot be trusted.
+	framework.Requires(t, targetKube).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := 1
@@ -158,7 +164,9 @@ func TestAntiAffinityOn(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	// This test is broken because we cannot guarantee the N node cluster will
+	// fit when CPU and memory constraints are taken into account.
+	framework.Requires(t, targetKube).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
@@ -183,7 +191,8 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	// This is broken because it doesn't consider memory allocation.
+	framework.Requires(t, targetKube).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodesAbsolute(t, targetKube) + 1
@@ -212,7 +221,8 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	// This is broken because it doesn't consider memory allocation.
+	framework.Requires(t, targetKube).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)

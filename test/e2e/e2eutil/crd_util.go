@@ -34,7 +34,7 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 
 	// If we left the CPU requests as default, that would have some nasty side effects
 	// e.g. things failing more frequently, so set it low enough not to interfere :D
-	if k8s.Platform != "gke-autopilot" {
+	if !k8s.DynamicPlatform {
 		cpuRequest := resource.MustParse("500m")
 		cl.Spec.AutoResourceAllocation.CPURequests = &cpuRequest
 	}
@@ -45,8 +45,6 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 	if err != nil {
 		return res, err
 	}
-
-	t.Logf("creating couchbase cluster: %s", res.Name)
 
 	return res, nil
 }

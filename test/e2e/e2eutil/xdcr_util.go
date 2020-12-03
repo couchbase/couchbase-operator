@@ -3,12 +3,6 @@ package e2eutil
 import (
 	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,113 +12,62 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	gocb "github.com/couchbase/gocb/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func GenerateHTTPRequest(requestType, hostURL, hostUsername, hostPassword string, reqParams io.Reader) ([]byte, error) {
-	request, err := http.NewRequest(requestType, hostURL, reqParams)
-	if err != nil {
-		return nil, err
-	}
-
-	request.SetBasicAuth(hostUsername, hostPassword)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return nil, err
-	}
-
-	defer response.Body.Close()
-
-	responseData, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("remote call failed with response: %s %s", response.Status, string(responseData))
-	}
-
-	return responseData, nil
-}
-
-// insertAtMostDocuments creates as many documents as it can over a single connection and
-// bails on an error.  Any retry logic needs to be handled at a higher level.
-func insertAtMostDocuments(ctx context.Context, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket, prefix string, items, offset int) (int, error) {
-	host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
-	if err != nil {
-		return 0, err
-	}
-
-	defer cleanup()
-
-	for i := 0; i < items; i++ {
-		documentID := prefix + strconv.Itoa(offset+i)
-
-		uri := "http://" + host + "/pools/default/buckets/" + bucket + "/docs/" + documentID
-		values := url.Values{}
-		values.Add(`flags`, `24`)
-		values.Add(`value`, `{"key":"value"}`)
-
-		if _, err := GenerateHTTPRequest("POST", uri, "Administrator", "password", strings.NewReader(values.Encode())); err != nil {
-			return i, err
-		}
-
-		// Check to see if the timer has blown, respect the timeout and abort from the loop.
-		select {
-		case <-ctx.Done():
-			return i, ctx.Err()
-		default:
-		}
-	}
-
-	return items, nil
-}
 
 // PopulateBucket selects a random pod from the cluster and then uses the API
 // to create a defined number of documents.  The prefix is randomized so subsequent
 // runs do not collide.  Documents are inserted one at a time, so we can keep a count
 // of exactly how many were successfully committed.
 func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int) error {
-	document := RandomSuffix()
+	prefix := RandomSuffix()
 
-	// This method of inserting buckets is p*** poor, and IRL you get something like
-	// "inserted 435 documents in 1m0.105061306s".  Locally, this is pretty fast, but
-	// over the internet it sucks (we MUST start testing in Kubernetes with SDKs...).
-	// We need to scale any timeouts by the number of documents, so lets pick a
-	// conservative estimate of way less than this, server may hang for a bit....  So if you
-	// decide to run with 1,000,000 documents, don't be shocked if the test suddently takes
-	// 3 days to run!
-	timeout := (time.Duration(items) * time.Minute) / 250
+	opts := gocb.ClusterOptions{
+		Username: string(k8s.DefaultSecret.Data["username"]),
+		Password: string(k8s.DefaultSecret.Data["password"]),
+	}
 
-	// This is a fudge for server blocking, say due to failover...
-	timeout += 5 * time.Minute
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	inserted := 0
-
-	callback := func() error {
-		i, err := insertAtMostDocuments(ctx, k8s, cluster, bucket, document, items-inserted, inserted)
-
-		inserted += i
-
+	c, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", cluster.Name, cluster.Namespace), opts)
+	if err != nil {
 		return err
+	}
+
+	b := c.Bucket(bucket)
+
+	collection := b.DefaultCollection()
+
+	document := map[string]interface{}{
+		"flags": "24",
+		"value": map[string]interface{}{
+			"key": "value",
+		},
 	}
 
 	start := time.Now()
 
-	defer func() {
-		t.Logf("inserted %d documents in %v", inserted, time.Since(start))
-	}()
+	for i := 0; i < items; i++ {
+		id := i
 
-	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
-		return err
+		callback := func() error {
+			if _, err := collection.Upsert(fmt.Sprintf("%s%d", prefix, id), document, &gocb.UpsertOptions{}); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
+		// SDKs are not infallible :/
+		if err := retryutil.RetryFor(time.Minute, callback); err != nil {
+			return err
+		}
 	}
+
+	defer func() {
+		t.Logf("inserted %d documents in %v", items, time.Since(start))
+	}()
 
 	return nil
 }
@@ -137,8 +80,7 @@ func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 
 // getBucketInfo returns information of the bucket.
 func getBucketInfo(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string) (*couchbaseutil.BucketStatus, error) {
-	client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
-	defer cleanup()
+	client := MustCreateAdminConsoleClient(t, k8s, cluster)
 
 	info := &couchbaseutil.BucketStatus{}
 

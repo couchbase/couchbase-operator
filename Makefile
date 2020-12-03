@@ -4,9 +4,12 @@ OPERATOR_BINARY = build/bin/couchbase-operator
 ADMISSION_BINARY = build/bin/couchbase-operator-admission
 CBOPCFG_BINARY = build/bin/cbopcfg
 CBOPINFO_BINARY = build/bin/cbopinfo
+CERTIFICATION_BINARY = build/bin/certification
+CAO_BINARY = build/bin/cao
 ARTIFACTS = build/artifacts
 OPERATOR_ARTIFACTS = $(ARTIFACTS)/couchbase-operator
 ADMISSION_ARTIFACTS = $(ARTIFACTS)/couchbase-admission-controller
+CERTIFICATION_ARTIFACTS = $(ARTIFACTS)/couchbase-certification
 
 kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
 operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
@@ -50,7 +53,7 @@ LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(vers
 # Common flags to apply during build (and test build)
 BUILDFLAGS = "-trimpath"
 
-.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs docs-lint
+.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs docs-lint certification-container certification-container-public
 
 all: binaries crd
 
@@ -120,7 +123,10 @@ pkg/generated/informers: pkg/generated/clientset pkg/generated/listers
 	go run k8s.io/code-generator/cmd/informer-gen --input-dirs $(API_PACKAGE_V2) --versioned-clientset-package $(CLIENTSET_PACKAGE)/$(CLIENTSET_NAME) --listers-package $(LISTERS_PACKAGE) --output-package $(INFORMERS_PACKAGE) $(CODEGEN_ARGS)
 
 # Make the main binaries
-binaries: $(OPERATOR_BINARY) $(ADMISSION_BINARY) $(CBOPCFG_BINARY) $(CBOPINFO_BINARY)
+binaries: $(OPERATOR_BINARY) $(ADMISSION_BINARY) $(CBOPCFG_BINARY) $(CBOPINFO_BINARY) $(CAO_BINARY)
+
+# Make the certification binary separately, it's not cross platform.
+certification-binary: ${CERTIFICATION_BINARY}
 
 # Operator binary build target.
 $(OPERATOR_BINARY): $(GENERATED_FILES) $(SOURCE)
@@ -138,6 +144,14 @@ $(CBOPCFG_BINARY): $(GENERATED_FILES) $(SOURCE)
 $(CBOPINFO_BINARY): $(GENERATED_FILES) $(SOURCE)
 	$(GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/cbopinfo
 
+$(CAO_BINARY): $(SOURCE)
+	$(GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/cao
+
+# test binary framework build target.
+# This is a linux only build, use the certification-container target instead.
+${CERTIFICATION_BINARY}: $(GENERATED_FILES) $(SOURCE)
+	GOOS=linux GOARCH=amd64 go test $(BUILDFLAGS) -race -c $(PACKAGE_BASE)/test/e2e -o $@ -ldflags $(LDFLAGS)
+
 # Build target for the CRD files.
 crd: $(CRD_FILE)
 
@@ -149,8 +163,7 @@ $(CRD_FILE): $(APISRC_V2)
 	@rm example/couchbase.com_*.yaml
 
 # Build target to test that e2e testing compiles.
-build-test: $(GENERATED_FILES) $(SOURCE)
-	go test $(BUILDFLAGS) -c $(PACKAGE_BASE)/test/e2e
+build-test: ${CERTIFICATION_BINARY}
 
 # Lint target to test source code compliance.
 lint: $(GENERATED_FILES)
@@ -167,8 +180,8 @@ lint-python:
 # need to be moved to a separate repo in which case the "docker build" command
 # can't be here anyway.
 container: $(OPERATOR_BINARY) $(ADMISSION_BINARY) crd
-	docker build -f Dockerfile -t ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG} .
-	docker build -f Dockerfile.admission -t ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG} .
+	DOCKER_BUILDKIT=1 docker build -f Dockerfile -t ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG} .
+	DOCKER_BUILDKIT=1 docker build -f Dockerfile.admission -t ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG} .
 
 # Clean up any images for this build, useful for CI jobs.
 container-clean:
@@ -181,6 +194,14 @@ container-clean:
 container-public: container
 	docker push ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG}
 	docker push ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG}
+
+# Create certification test framework contianer.
+certification-container:
+	DOCKER_BUILDKIT=1 docker build -f Dockerfile.qa -t ${DOCKER_USER}/couchbase-operator-certification:${DOCKER_TAG} .
+
+# Create and push certification test framework contianer.
+certification-container-public: certification-container
+	docker push ${DOCKER_USER}/couchbase-operator-certification:${DOCKER_TAG}
 
 # NOTE: This target is only for local development. While we use this Dockerfile
 # (for now), the actual "docker build" command is located in the Jenkins job
@@ -206,6 +227,10 @@ tools: generated
 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/arm64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/linux/x86_64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/windows/amd64/bin/cbopinfo.exe -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/x86_64/bin/cao -ldflags $(LDFLAGS) ./cmd/cao/
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/arm64/bin/cao -ldflags $(LDFLAGS) ./cmd/cao/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/linux/x86_64/bin/cao -ldflags $(LDFLAGS) ./cmd/cao/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/windows/amd64/bin/cao.exe -ldflags $(LDFLAGS) ./cmd/cao/
 
 tools-platform-specific:
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/darwin/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
@@ -244,6 +269,12 @@ image-artifacts: binaries
 	cp $(ADMISSION_BINARY) $(ADMISSION_ARTIFACTS)/$(ADMISSION_BINARY)
 	cp Dockerfile.admission $(ADMISSION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.admission-rhel $(ADMISSION_ARTIFACTS)/Dockerfile.rhel
+	# Create a subdirectory for self certification
+	# Note: we are linux company, building linux software, however do most of the dev on
+	# Mac OS (lusers!), so need to build in a container due to certain constraints.  The
+	# copy command should mirror 
+	cp -a Makefile .git go.mod go.sum cmd pkg scripts test docs/License.txt docs/README.txt $(CERTIFICATION_ARTIFACTS)
+	cp Dockerfile.qa $(CERTIFICATION_ARTIFACTS)/Dockerfile
 	# Create the archive
 	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(revisionedProductVersion).tgz .
 	rm -rf $(ARTIFACTS)

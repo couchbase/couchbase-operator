@@ -270,7 +270,8 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster().ServerGroups(2)
+	// This is broken because it doesn't take into account memory allocation.
+	framework.Requires(t, targetKube).StaticCluster().ServerGroups(2).Rethink()
 
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 	// WARNING: this assumes all AZs have the same number of nodes

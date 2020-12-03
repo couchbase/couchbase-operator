@@ -332,7 +332,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 	defer cleanup()
 
 	// Clean up resources that may have been left behind by a job that was interrupted.
-	objectsPristine, err := loadResources("./resources/validation/validation.yaml")
+	objectsPristine, err := loadResources("/resources/validation/validation.yaml")
 	if err != nil {
 		e2eutil.Die(t, err)
 	}

@@ -62,6 +62,8 @@ type Cluster struct {
 	Platform string
 	// PlatformType is the container type we are running on.
 	PlatformType string
+	// DynamicPlatform is whether the plaform uses cluster autoscaling.
+	DynamicPlatform bool
 	// IPv6 is whether or not we are using IPv6.
 	IPv6 bool
 

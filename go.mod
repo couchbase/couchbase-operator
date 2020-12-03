@@ -5,6 +5,8 @@ go 1.16
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/aws/aws-sdk-go v1.38.40
+	github.com/couchbase/gocb/v2 v2.3.0
+	github.com/couchbase/gocbcore/v9 v9.0.8 // indirect
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-lintpack/lintpack v0.5.2 // indirect

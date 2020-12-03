@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1 "k8s.io/api/core/v1"
@@ -46,50 +44,5 @@ func MustNewLDAPService(t *testing.T, k8s *types.Cluster, service *v1.Service) *
 // MustCheckLDAPServer ensures the LDAP server is up and running before letting
 // Couchbase loose with it.
 func MustCheckLDAPServer(t *testing.T, k8s *types.Cluster, pod string, tls *TLSContext, timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	callback := func() error {
-		port, cleanup, err := forwardPort(k8s, k8s.Namespace, pod, "389")
-		if err != nil {
-			return err
-		}
-
-		defer cleanup()
-
-		innerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		cancel()
-
-		if err := netutil.WaitForHostPort(innerCtx, "localhost:"+port); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
-		Die(t, err)
-	}
-
-	callback = func() error {
-		port, cleanup, err := forwardPort(k8s, k8s.Namespace, pod, "636")
-		if err != nil {
-			return err
-		}
-
-		defer cleanup()
-
-		innerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		cancel()
-
-		if err := netutil.WaitForHostPortTLS(innerCtx, "localhost:"+port, tls.CA.Certificate); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
-		Die(t, err)
-	}
+	// Check port 389 and 636
 }

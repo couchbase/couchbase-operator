@@ -1,0 +1,29 @@
+# This bit is very much linux only, so we do the build in a container
+# to tolerate the Mac users.
+FROM golang:1.16.3 as build
+
+ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
+
+RUN mkdir -p ${WORKDIR}
+COPY . ${WORKDIR}
+RUN ls -l ${WORKDIR}
+
+WORKDIR ${WORKDIR}
+RUN make crd binaries certification-binary
+
+# This builds the actual container, copying the binaries over from
+# the build container, and installing any other static dependencies.
+FROM golang:1.16.3
+
+ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
+
+COPY --from=build ${WORKDIR}/build/bin/cbopinfo /
+COPY --from=build ${WORKDIR}/build/bin/cbopcfg /
+COPY --from=build ${WORKDIR}/build/bin/certification /
+COPY --from=build ${WORKDIR}/example/crd.yaml /
+
+COPY docs/README.txt /
+COPY docs/License.txt /
+COPY test/e2e/resources/validation /resources/validation/
+
+ENTRYPOINT ["/certification"]

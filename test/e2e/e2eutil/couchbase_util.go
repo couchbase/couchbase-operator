@@ -6,12 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
-	"net"
 	"net/http"
 	"net/url"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,14 +18,12 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	gocb "github.com/couchbase/gocb/v2"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -54,146 +49,28 @@ func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster
 	return client, nil
 }
 
-// getFreePort probes the kernel for a randomly allocated port to use for port forwarding.
-func getFreePort() (string, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return "", err
-	}
-
-	defer listener.Close()
-
-	_, port, err := net.SplitHostPort(listener.Addr().String())
-	if err != nil {
-		return "", err
-	}
-
-	return port, nil
-}
-
-// forwardPort creates a local listener that forwards connections on to the specified
-// pod.  It returns a network adddress/port and a clean up function.  The port is random
-// so that multiple forwards can be active for the target port.
-func forwardPort(k8s *types.Cluster, namespace, pod, port string) (string, func(), error) {
-	// Allocate a free port to use
-	sport, err := getFreePort()
-	if err != nil {
-		return "", nil, err
-	}
-
-	pf := &portforward.PortForwarder{
-		Config:    k8s.Config,
-		Client:    k8s.KubeClient,
-		Namespace: namespace,
-		Pod:       pod,
-		Port:      sport + ":" + port,
-	}
-
-	err = retryutil.RetryFor(time.Minute, func() error {
-		if err := pf.ForwardPorts(); err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err != nil {
-		return "", nil, err
-	}
-
-	// Analytics and eventing don't support persistent connections so we get a
-	// lot of "connection reset by peer" spam on the console.
-	portforward.Silent()
-
-	return sport, func() { _ = pf.Close() }, nil
-}
-
 // CreateAdminConsoleClient returns a client for interacting with the admin service of a cluster.
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*CouchbaseClient, func(), error) {
-	// Create a port forward and get a host connection string
-	host, cleanup, err := GetAdminConsoleHostURL(k8s, cluster)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Return a client proxying through the port forwarder.
-	client, err := newClient(k8s.KubeClient, cluster, "http://"+host)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return client, cleanup, nil
+func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*CouchbaseClient, error) {
+	return newClient(k8s.KubeClient, cluster, fmt.Sprintf("http://%s.%s.svc:8091", cluster.Name, cluster.Namespace))
 }
 
-func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*CouchbaseClient, func()) {
-	client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) *CouchbaseClient {
+	client, err := CreateAdminConsoleClient(k8s, cluster)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return client, cleanup
-}
-
-// GetPod selects a random pod that may be running a specified service or set of services from the cluster.
-func GetPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, services []couchbasev2.Service) (*corev1.Pod, error) {
-	appreq, err := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{constants.App})
-	if err != nil {
-		return nil, err
-	}
-
-	serverreq, err := labels.NewRequirement(constants.LabelServer, selection.Equals, []string{"true"})
-	if err != nil {
-		return nil, err
-	}
-
-	clusterreq, err := labels.NewRequirement(constants.LabelCluster, selection.Equals, []string{cluster.Name})
-	if err != nil {
-		return nil, err
-	}
-
-	selector := labels.NewSelector()
-	selector = selector.Add(*appreq, *serverreq, *clusterreq)
-
-	for _, service := range services {
-		requirement, err := labels.NewRequirement(fmt.Sprintf("%s%s", constants.LabelServicePrefix, (service)), selection.Equals, []string{constants.EnabledValue})
-		if err != nil {
-			return nil, err
-		}
-
-		selector = selector.Add(*requirement)
-	}
-
-	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(pods.Items) == 0 {
-		return nil, fmt.Errorf("no pods selected")
-	}
-
-	return &pods.Items[rand.Int()%len(pods.Items)], nil
+	return client
 }
 
 // GetHostURL returns a URL for interacting with a specified service of a cluster.
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func GetHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, service couchbasev2.Service) (string, func(), error) {
-	// Admin is special as it's enabled everywhere and doesn't have a label selector
-	services := []couchbasev2.Service{}
-
-	if service != couchbasev2.AdminService {
-		services = append(services, service)
-	}
-
-	pod, err := GetPod(k8s, cluster, services)
-	if err != nil {
-		return "", nil, err
-	}
-
+func GetHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, service couchbasev2.Service) (string, error) {
 	portMap := map[couchbasev2.Service]string{
 		couchbasev2.AdminService:     "8091",
 		couchbasev2.QueryService:     "8093",
@@ -203,36 +80,29 @@ func GetHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, servi
 		couchbasev2.DataService:      "11210",
 	}
 
-	targetPort, ok := portMap[service]
+	port, ok := portMap[service]
 	if !ok {
-		return "", nil, fmt.Errorf("unsupported service specified")
+		return "", fmt.Errorf("unsupported service specified")
 	}
 
-	port, cleanup, err := forwardPort(k8s, cluster.Namespace, pod.Name, targetPort)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return "127.0.0.1:" + port, cleanup, nil
+	return fmt.Sprintf("%s.%s.svc:%s", cluster.Name, cluster.Namespace, port), nil
 }
 
 // GetAdminConsoleHostURL returns a URL for interacting with the Admin service of a cluster.
 // Localhost ports are randomly allocated to allow for multiple clients to exist at any given time.
 // If during the lifetime of the cluster a pod is deleted the client will need to be reinitialized,
 // the cleanup callback must be invoked first.
-func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, func(), error) {
+func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (string, error) {
 	return GetHostURL(k8s, cluster, couchbasev2.AdminService)
 }
 
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
 func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		before, err := getBucket(client, bucketName)
 		if err != nil {
@@ -277,60 +147,41 @@ func getBucket(client *CouchbaseClient, bucketName string) (*couchbaseutil.Bucke
 	return bucket, nil
 }
 
-// InsertJSONDocIntoBucket inserts a JSON doc into a Couchbase bucket.
-func InsertJSONDocIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docIndex int) error {
-	urlBase, cleanup, err := GetHostURL(k8s, cluster, couchbasev2.AdminService)
-	if err != nil {
-		return err
-	}
-
-	defer cleanup()
-
-	docKey := "doc" + strconv.Itoa(docIndex)
-	docMap := map[string]string{}
-	docMap["key1"] = "dummyVal 1"
-	docMap["key2"] = "dummyVal 2"
-	docMap["key3"] = "dummyVal 3"
-	docMap["key4"] = "dummyVal 4"
-
-	// Convert map data to byte array
-	docData, err := json.Marshal(docMap)
-	if err != nil {
-		return err
-	}
-
-	body := "value=" + string(docData)
-	url := "http://" + urlBase + "/pools/default/buckets/" + bucketName + "/docs/" + docKey
-
-	request, err := http.NewRequest("POST", url, strings.NewReader(body))
-	if err != nil {
-		return err
-	}
-
-	request.SetBasicAuth("Administrator", "password")
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := http.Client{Timeout: time.Minute}
-
-	response, err := client.Do(request)
-	if err != nil {
-		return err
-	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %v", response.StatusCode)
-	}
-
-	return nil
-}
-
 // Inserts Json docs into couchbase bucket.
 func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
-	numOfDocs += docStartIndex
-	for docIndex := docStartIndex; docIndex < numOfDocs; docIndex++ {
-		if err := InsertJSONDocIntoBucket(k8s, cluster, bucketName, docIndex); err != nil {
+	opts := gocb.ClusterOptions{
+		Username: string(k8s.DefaultSecret.Data["username"]),
+		Password: string(k8s.DefaultSecret.Data["password"]),
+	}
+
+	c, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", cluster.Name, cluster.Namespace), opts)
+	if err != nil {
+		return err
+	}
+
+	b := c.Bucket(bucketName)
+
+	collection := b.DefaultCollection()
+
+	document := map[string]interface{}{
+		"key1": "dummyVal1",
+		"key2": "dummyVal2",
+		"key3": "dummyVal3",
+		"key4": "dummyVal4",
+	}
+
+	for i := 0; i < numOfDocs; i++ {
+		id := i
+
+		callback := func() error {
+			if _, err := collection.Upsert(fmt.Sprintf("doc%d", docStartIndex+id), document, &gocb.UpsertOptions{}); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
+		if err := retryutil.RetryFor(time.Minute, callback); err != nil {
 			return err
 		}
 	}
@@ -345,12 +196,10 @@ func MustInsertJSONDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *cou
 }
 
 func CompactBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket metav1.Object) error {
-	urlBase, cleanup, err := GetHostURL(k8s, cluster, couchbasev2.AdminService)
+	urlBase, err := GetHostURL(k8s, cluster, couchbasev2.AdminService)
 	if err != nil {
 		return err
 	}
-
-	defer cleanup()
 
 	url := fmt.Sprintf("http://%s/pools/default/buckets/%s/controller/compactBucket", urlBase, bucket.GetName())
 
@@ -403,12 +252,10 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 	defer cancel()
 
 	callback := func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		if err := couchbaseutil.AddNode(member.GetHostURLPlaintext(), username, password, svcs).On(client.client, client.host); err != nil {
 			return err
@@ -421,12 +268,10 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 	}
 
 	callback = func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
@@ -450,12 +295,10 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 	}
 
 	callback = func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
@@ -480,8 +323,7 @@ func MustAddNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 
 // EjectMember removes the given member index from the cluster.
 func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) error {
-	client, cleanup := MustCreateAdminConsoleClient(t, k8s, couchbase)
-	defer cleanup()
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
 
 	info := &couchbaseutil.ClusterInfo{}
 	if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
@@ -514,12 +356,10 @@ func EjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	// is not the best option here as it may error as the operator does things in the background
 	// affecting this.  The best option is to just check for the rebalance status to complete.
 	callback := func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
@@ -558,12 +398,10 @@ func MemberFromSpecProps(couchbase *couchbasev2.CouchbaseCluster, serverConfig s
 
 func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		data := url.Values{}
 
@@ -601,12 +439,10 @@ func MustFailoverNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.
 
 func VerifyClusterBalancedAndHealthy(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		clusterInfo := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(clusterInfo).On(client.client, client.host); err != nil {
@@ -635,12 +471,10 @@ func MustVerifyClusterBalancedAndHealthy(t *testing.T, k8s *types.Cluster, couch
 
 func WaitForUnhealthyNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, numUnhealthy int, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		clusterInfo := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(clusterInfo).On(client.client, client.host); err != nil {
@@ -672,12 +506,10 @@ func MustWaitForUnhealthyNodes(t *testing.T, k8s *types.Cluster, couchbase *couc
 // PatchCouchbaseInfo tries patching the cluster information returned directly from Couchbase server.
 func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
@@ -700,12 +532,10 @@ func MustPatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchba
 
 func PatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.AutoFailoverSettings{}
 		if err := couchbaseutil.GetAutoFailoverSettings(info).On(client.client, client.host); err != nil {
@@ -728,12 +558,10 @@ func MustPatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couc
 
 func PatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.IndexSettings{}
 		if err := couchbaseutil.GetIndexSettings(info).On(client.client, client.host); err != nil {
@@ -756,12 +584,10 @@ func MustPatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couc
 
 func PatchAutoCompactionSettings(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.AutoCompactionSettings{}
 		if err := couchbaseutil.GetAutoCompactionSettings(info).On(client.client, client.host); err != nil {
@@ -784,12 +610,10 @@ func MustPatchAutoCompactionSettings(t *testing.T, k8s *types.Cluster, couchbase
 
 func VerifyServices(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, value map[string]int, verifiers ...serviceVerifier) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
@@ -847,16 +671,12 @@ func getEventingData(t *testing.T, targetKube *types.Cluster, cluster *couchbase
 	err := retryutil.RetryFor(timeout, func() error {
 		var eventingURL string
 
-		var cleanup func()
-
 		var err error
 
-		if eventingURL, cleanup, err = GetHostURL(targetKube, cluster, couchbasev2.EventingService); err != nil {
+		if eventingURL, err = GetHostURL(targetKube, cluster, couchbasev2.EventingService); err != nil {
 			t.Log(err)
 			return err
 		}
-
-		defer cleanup()
 
 		hostURL := "http://" + eventingURL + "/api/v1/functions/test"
 
@@ -973,12 +793,10 @@ func ExecuteQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, que
 	var data []byte
 
 	callback := func() error {
-		url, cleanup, err := GetHostURL(k8s, cluster, couchbaseservice)
+		url, err := GetHostURL(k8s, cluster, couchbaseservice)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		hostURL := "http://" + url + service
 
@@ -1124,12 +942,10 @@ func GetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 	var count int64
 
 	callback := func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+		client, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := &couchbaseutil.BucketStatus{}
 
@@ -1165,12 +981,10 @@ func MustGetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 
 func CreateBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
 	callback := func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+		client, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		b := &couchbaseutil.Bucket{
 			BucketName:         bucket,
@@ -1199,12 +1013,10 @@ func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 // PatchUserInfo tries patching the user returned directly from Couchbase server.
 func PatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		actual := &couchbaseutil.User{}
 		if err := couchbaseutil.GetUser(userName, userAuthDomain, actual).On(client.client, client.host); err != nil {
@@ -1239,12 +1051,10 @@ func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.
 // between couchbase and an LDAP server.
 func CheckLDAPStatus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		status := &couchbaseutil.LDAPStatus{}
 		if err := couchbaseutil.GetLDAPConnectivityStatus(status).On(client.client, client.host); err != nil {
@@ -1273,12 +1083,10 @@ func MustCheckLDAPStatus(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.
 // CheckN2N checks that all nodes are in the requested encryption state.
 func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled bool, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) error {
 	callback := func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+		client, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		clusterInfo := &couchbaseutil.ClusterInfo{}
 		if err := couchbaseutil.GetPoolsDefault(clusterInfo).On(client.client, client.host); err != nil {
@@ -1403,12 +1211,10 @@ func MustGetCouchbaseVersion(t *testing.T, image string) string {
 // Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
 func MustVerifyReaderWriterThreads(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads int, timeout time.Duration) {
 	callback := func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+		client, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		current := couchbaseutil.MemcachedGlobals{}
 		if err := couchbaseutil.GetMemcachedGlobalSettings(&current).On(client.client, client.host); err != nil {

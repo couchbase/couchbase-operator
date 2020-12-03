@@ -76,7 +76,7 @@ func testPrometheusMetrics(t *testing.T, targetKube *types.Cluster, tls *e2eutil
 
 	if tls != nil {
 		// When the cluster is healthy, check the TLS is correctly configured.
-		e2eutil.MustCheckClusterTLS(t, targetKube, tls, 5*time.Minute)
+		e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, tls, 5*time.Minute)
 	}
 
 	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics
@@ -446,7 +446,7 @@ func TestPrometheusRotateCA(t *testing.T) {
 
 	// Rotate the CA, and give Prometheus a moment to catch up.
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
 	time.Sleep(10 * time.Second)
 
 	// Check Prometheus is still functioning.

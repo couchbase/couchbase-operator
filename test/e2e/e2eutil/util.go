@@ -853,8 +853,6 @@ func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 }
 
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
-	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
-
 	return patchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/spec/servers/%d/size", service), clusterSize), 30*time.Second)
 }
 
@@ -1240,7 +1238,7 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 	return result
 }
 
-func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext, timeout time.Duration) error {
+func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tls *TLSContext, timeout time.Duration) error {
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
 	if err != nil {
 		return fmt.Errorf("unable to get couchbase pods: %w", err)
@@ -1254,7 +1252,7 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext, timeo
 		pod := pods.Items[i]
 
 		callback := func() error {
-			if err := tlsCheckForPod(k8s, pod.GetName(), tls); err != nil {
+			if err := tlsCheckForPod(cluster, pod.GetName(), tls); err != nil {
 				return fmt.Errorf("TLS verification failed: %w", err)
 			}
 
@@ -1269,15 +1267,13 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, tls *TLSContext, timeo
 	return nil
 }
 
-func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, ctx *TLSContext, timeout time.Duration) {
-	if err := TLSCheckForCluster(t, k8s, ctx, timeout); err != nil {
+func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext, timeout time.Duration) {
+	if err := TLSCheckForCluster(t, k8s, cluster, ctx, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func deletePod(t *testing.T, k8s *types.Cluster, podName string) error {
-	t.Logf("deleting pod: %v", podName)
-
+func deletePod(k8s *types.Cluster, podName string) error {
 	err := retryutil.RetryFor(time.Minute, func() error {
 		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), podName, *metav1.NewDeleteOptions(0)); err != nil {
 			return err
@@ -1307,7 +1303,7 @@ func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, member, kubernet
 		return
 	}
 
-	if err := deletePod(t, k8s, member); err != nil {
+	if err := deletePod(k8s, member); err != nil {
 		Die(t, err)
 	}
 }
@@ -1540,7 +1536,11 @@ func (a ArgumentList) Add(k, v string) {
 // AddClusterDefaults adds in configuration specific default arguments that must
 // be used for a successful run.
 func (a ArgumentList) AddClusterDefaults(k8s *types.Cluster) {
-	a.Add("--kubeconfig", k8s.KubeConfPath)
+	// Hmmm... good point, I wonder if cli tools support in-cluster, let's find out!
+	if k8s.KubeConfPath != "" {
+		a.Add("--kubeconfig", k8s.KubeConfPath)
+	}
+
 	a.Add("--namespace", k8s.Namespace)
 
 	if k8s.Context != "" {

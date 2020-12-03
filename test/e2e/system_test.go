@@ -366,11 +366,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	testCouchbase2 = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase2)
 
-	if err := e2eutil.TLSCheckForCluster(t, targetKube, ctx1, time.Minute); err != nil {
+	if err := e2eutil.TLSCheckForCluster(t, targetKube, testCouchbase1, ctx1, time.Minute); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 
-	if err := e2eutil.TLSCheckForCluster(t, targetKube, ctx2, time.Minute); err != nil {
+	if err := e2eutil.TLSCheckForCluster(t, targetKube, testCouchbase2, ctx2, time.Minute); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 
@@ -539,6 +539,7 @@ outerLoop:
 
 func TestFeaturesAll(t *testing.T) {
 	f := framework.Global
+
 	testDef := sysTestDef{
 		name:     "simple",
 		duration: 7 * 24 * time.Hour,

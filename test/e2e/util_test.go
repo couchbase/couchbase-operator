@@ -466,7 +466,7 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 	// passing on retry.  The operator does tend to get moved at the most inopportune
 	// of moments so events go missing.  From what I've see everything is actually is
 	// beign, and it's working as designed in the face of shifting sands.
-	if k8s.Platform == "gke-autopilot" {
+	if k8s.DynamicPlatform {
 		return
 	}
 

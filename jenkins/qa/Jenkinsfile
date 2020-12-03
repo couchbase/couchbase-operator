@@ -21,7 +21,7 @@ pipeline {
 
     // We only have a single cluster for now, control concurrency with other runs of this
     // job, or another job with a reservation on a global lockable resource.
-    lock resource: 'gke-cluster-couchbase-operator'
+    lock resource: 'gke-cluster-couchbase-operator-certification'
   }
 
   parameters {
@@ -44,7 +44,7 @@ pipeline {
   environment {
     GOVERSION = "1.16.3"
     GOROOT = "${env.WORKSPACE}/go"
-    PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:$PATH"
+    PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:${env.WORKSPACE}/google-cloud-sdk/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
     AWS_CREDENTIALS = credentials('aws-simon')
@@ -66,6 +66,15 @@ pipeline {
       }
     }
 
+    stage('Install Google Cloud SDK') {
+      steps {
+        sh 'wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-315.0.0-linux-x86_64.tar.gz | tar xz'
+        sh 'gcloud components install kubectl'
+        sh 'gcloud auth activate-service-account couchbase-operator@couchbase-engineering.iam.gserviceaccount.com --project couchbase-engineering --key-file ${GCLOUD_SERVICE_TOKEN}'
+        sh 'KUBECONFIG=config gcloud container clusters get-credentials couchbase-operator-ci-certification --region us-east1'
+      }
+    }
+
     stage('Install Kind') {
       steps {
         sh 'mkdir -p kind/bin'
@@ -84,6 +93,7 @@ pipeline {
       steps {
         sh 'docker login -u ${DOCKER_CREDENTIALS_USR} -p ${DOCKER_CREDENTIALS_PSW}'
         sh 'make container-public -e DOCKER_USER=${DOCKER_CREDENTIALS_USR} DOCKER_TAG=${GIT_COMMIT}'
+        sh 'make certification-container-public -e DOCKER_USER=${DOCKER_CREDENTIALS_USR} DOCKER_TAG=${GIT_COMMIT}'
       }
 
       post {
@@ -108,7 +118,16 @@ pipeline {
           stage('Validation Test') {
             steps {
               sh 'kind create cluster --name ${version} --image kindest/node:${version} --kubeconfig kubeconfig.${version}'
-              sh 'go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -suite validation --suite-suffix ${version} -operator-image ${DOCKER_CREDENTIALS_USR}/couchbase-operator:${GIT_COMMIT} -admission-image ${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:${GIT_COMMIT} -cluster ${WORKSPACE}/kubeconfig.${version}'
+              sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${version} ./build/bin/cao \
+                certify \
+                --image ${DOCKER_CREDENTIALS_USR}/couchbase-operator-certification:${GIT_COMMIT} \
+                --timeout 10m \
+                -- \
+                -suite validation \
+                -suite-suffix ${version} \
+                -operator-image ${DOCKER_CREDENTIALS_USR}/couchbase-operator:${GIT_COMMIT} \
+                -admission-image ${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:${GIT_COMMIT}'
+              sh 'tar xf couchbase-platform-certification.tar.bz2'
             }
 
             post {
@@ -121,22 +140,40 @@ pipeline {
       }
     }
 
-    stage('Install Google Cloud SDK') {
-      steps {
-        sh 'wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-315.0.0-linux-x86_64.tar.gz | tar xz'
-        sh './google-cloud-sdk/bin/gcloud components install kubectl'
-        sh './google-cloud-sdk/bin/gcloud auth activate-service-account couchbase-operator@couchbase-engineering.iam.gserviceaccount.com --project couchbase-engineering --key-file ${GCLOUD_SERVICE_TOKEN}'
-        sh 'KUBECONFIG=config1 ./google-cloud-sdk/bin/gcloud container clusters get-credentials couchbase-operator-ci --region us-east1'
-        sh 'KUBECONFIG=config2 ./google-cloud-sdk/bin/gcloud container clusters get-credentials couchbase-operator-ci --region us-west1'
-      }
-    }
-
     stage('Acceptance Test') {
       steps {
         // Warn if something went wrong, but don't fail, it's probably just an unstable test/platform.
         warnError('Suite failed') {
-          sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -suite sanity ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} ${params.features.split().collect{s -> '-suite ' + s}.join(' ')} ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} -platform-type kubernetes -operator-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator:\${GIT_COMMIT} -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:\${GIT_COMMIT} -mobile-image \${mobile_image} -server-image \${server_image} -server-image-upgrade \${server_image_upgrade} -exporter-image \${exporter_image} -exporter-image-upgrade \${exporter_image_upgrade} -backup-image \${backup_image} -logging-image \${logging_image} -logging-image-upgrade \${logging_image_upgrade} -storage-class dynamic-bound -bucket-type \${bucket_type} -compression-mode \${compression_mode} -cluster \${WORKSPACE}/config1 -cluster \${WORKSPACE}/config2 -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} -collect-logs -s3-access-key \${AWS_CREDENTIALS_USR} -s3-secret-id \${AWS_CREDENTIALS_PSW}"
+          sh "KUBECONFIG=${WORKSPACE}/config ./build/bin/cao \
+            certify \
+            --clean \
+            --parallel 8 \
+            --image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-certification:${GIT_COMMIT} \
+            -- \
+            -suite sanity \
+            ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} \
+            ${params.features.split().collect{s -> '-suite ' + s}.join(' ')} \
+            ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
+            -platform-type kubernetes \
+            -operator-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator:\${GIT_COMMIT} \
+            -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:\${GIT_COMMIT} \
+            -mobile-image \${mobile_image} \
+            -server-image \${server_image} \
+            -server-image-upgrade \${server_image_upgrade} \
+            -exporter-image \${exporter_image} \
+            -exporter-image-upgrade \${exporter_image_upgrade} \
+            -backup-image \${backup_image} \
+            -logging-image \${logging_image} \
+            -logging-image-upgrade \${logging_image_upgrade} \
+            -storage-class standard-rwo \
+            -bucket-type \${bucket_type} \
+            -compression-mode \${compression_mode} \
+            -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} \
+            -collect-logs \
+            -s3-access-key \${AWS_CREDENTIALS_USR} \
+            -s3-secret-id \${AWS_CREDENTIALS_PSW}"
         }
+        sh 'tar xf couchbase-platform-certification.tar.bz2'
       }
     }
   }
@@ -144,10 +181,10 @@ pipeline {
   post {
     always {
       // Save JUnit results, this is what we will review.
-      junit 'test/e2e/*.xml'
+      junit 'artifacts/*.xml'
 
       // Archive any logs as an artifact, these may be needed to debug an issue.
-      sh 'tar czf logs.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
+      sh 'tar czf logs.tar.gz artifacts/logs'
       archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
 
       // Clean up the workspace to free disk space.

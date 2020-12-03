@@ -45,8 +45,10 @@ type Framework struct {
 	// list is derived from the TestCaseGroup and used by individual
 	// tests to select the cluster configuration to use.
 	TestClusters []*types.Cluster
+
 	// CouchbaseServerImage is the image of Couchbase server we are running with
 	CouchbaseServerImage string
+
 	// CouchbaseServerImageUpgrade is the image of Couchbase server we are upgrading to
 	CouchbaseServerImageUpgrade string
 	ServiceAccountName          string
@@ -55,30 +57,13 @@ type Framework struct {
 	// created.
 	PodCreateTimeout time.Duration
 	Platform         couchbasev2.PlatformType
-
-	// Cluster configs are named virtual clusters (i.e. they may be resident on the
-	// same physical cluster, but use a different namespace).  Tests are run against
-	// these virtual clusters, and are explicitly referenced by test suites.
-	// Note: When all clusters are homogeneous, then you can just pick one.  Better
-	// still you can run single-cluster tests concurrently and gate execution based
-	// on allocating from the available pool.  The net result, you go a lot faster.
-	ClusterConfigs []ClusterConfig
-
 	// RegistryConfigs define private container registries that need to be defined
 	// as docker pull secrets in order to access private container images.
 	RegistryConfigs []RegistryConfig
-}
 
-// ClusterConfig holds configuration data about a cluster to use for
-// testing.
-type ClusterConfig struct {
-	// Config is the path to a Kubernetes configuration file, typically ~/.kube/conf.
-	Config string `yaml:"config"`
-
-	// Context is the context within the Kubernetes configuration file to use.
-	// This is the mechanism Kubernetes uses for defining multiple users or clusters
-	// in the same configuration file.
-	Context string `yaml:"context"`
+	// DynamicPlatform is your GKE Autopilots or anything with cluster autoscaling
+	// enabled.
+	DynamicPlatform bool
 }
 
 // RegistryConfig defines a container image registry.  Registry configurations will

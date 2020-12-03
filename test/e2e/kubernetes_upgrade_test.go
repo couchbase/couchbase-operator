@@ -51,7 +51,7 @@ func TestKubernetesRollingUpgrade(t *testing.T) {
 	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).StaticCluster()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := 3

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/couchbase/couchbase-operator/test/e2e/analyzer"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -41,14 +43,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	autoscalev2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/client-go/tools/clientcmd"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 )
 
 // Init performs one time only initialization of the framework.  Dynamic calls to these
 // functions will result in race conditions and spurious failures.
 func Init() error {
+	fmt.Println("couchbase-operator-certification", version.WithBuildNumber())
+
 	// Register CouchbaseCluster and CustomResourceDefinition types with the main library.
 	if err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
 		return err
@@ -66,6 +70,10 @@ func Init() error {
 		return err
 	}
 
+	if err := preflight(); err != nil {
+		return err
+	}
+
 	if err := setup(); err != nil {
 		return err
 	}
@@ -73,35 +81,81 @@ func Init() error {
 	return nil
 }
 
-// ClusterConfigValue allows multiple cluster configurations to be passed on the command line
-// e.g. --cluster ~/.kube/conf,,default --cluster ~/kubeconfig,,remote.
-type ClusterConfigValue struct {
-	values []ClusterConfig
+const (
+	// Not defined by the library, usually due to ordering mismatches across
+	// architectures. This is the number of processes/PIDs/TIDs that are allowed
+	// within the container.
+	RLIMIT_NPROC = 6 // nolint:golint,stylecheck
+)
+
+// rlimitCheck defines an rlimit check.
+type rlimitCheck struct {
+	// metric is a textual representation of the metric.
+	metric string
+
+	// resource is the resource number as Linux understands it.  See:
+	// /usr/include/asm-generic/resource.h
+	// /usr/include/x86_64-linux-gnu/bits/resource.h
+	resource int
+
+	// threhold is the minimum resource requirements that Couchbase server
+	// needs to function.
+	threshold uint64
 }
 
-func (v *ClusterConfigValue) Set(value string) error {
-	fields := strings.Split(value, ",")
+// rlimitChecks is the set of preflight rlimit checks we need to perform before
+// allowing the test to proceed.  If these fail, then your platform is not going
+// to be able to run Couchbase reliably, let alone pass any tests.
+var rlimitChecks = []rlimitCheck{
+	// https://docs.couchbase.com/server/7.0/install/non-root.html
+	{
+		metric:    "Number of processes",
+		resource:  RLIMIT_NPROC,
+		threshold: 10000,
+	},
+	{
+		metric:    "Number of open files",
+		resource:  syscall.RLIMIT_NOFILE,
+		threshold: 70000,
+	},
+}
 
-	num := len(fields)
-	if num > 2 {
-		return fmt.Errorf("invalid cluster config value, expected FILE(,CONTEXT)")
+// preflight checks the platform is capable of running Couchbase before allowing
+// the test framework to run.
+func preflight() error {
+	logrus.Info(util.PrettyHeading("Platform Preflight Checks"))
+
+	fails := 0
+
+	for _, check := range rlimitChecks {
+		limit := &syscall.Rlimit{}
+
+		if err := syscall.Getrlimit(check.resource, limit); err != nil {
+			return err
+		}
+
+		pass := limit.Max >= check.threshold
+
+		value := strconv.FormatUint(limit.Max, 10)
+		if limit.Max == ^uint64(0) {
+			value = "unlimited"
+		}
+
+		result := types.ResultTypePass
+
+		if !pass {
+			result = types.ResultTypeFail
+			fails++
+		}
+
+		logrus.Infof("%s = %s (>= %d) %s", check.metric, value, check.threshold, util.PrettyResult(result))
 	}
 
-	config := ClusterConfig{
-		Config: fields[0],
+	if fails > 0 {
+		return fmt.Errorf("%d preflight checks failed", fails)
 	}
-
-	if num >= 2 {
-		config.Context = fields[1]
-	}
-
-	v.values = append(v.values, config)
 
 	return nil
-}
-
-func (v *ClusterConfigValue) String() string {
-	return ""
 }
 
 // RegistryConfigValue allows multiple container image registries to be passed on the command
@@ -192,8 +246,6 @@ func configure() (err error) {
 
 	var platform string
 
-	var clusters ClusterConfigValue
-
 	var registries RegistryConfigValue
 
 	var tests TestConfigValue
@@ -207,37 +259,95 @@ func configure() (err error) {
 	}
 
 	// CLI based configuration (CI/computer friendly)
-	flag.StringVar(&params.KubeType, "platform-type", "kubernetes", "Either kubernetes or openshift")
-	flag.StringVar(&platform, "platform-vendor", "", "Either aws, gce or azure")
-	flag.StringVar(&params.OpImage, "operator-image", "couchbase/couchbase-operator:v1", "Docker image to use for the operator")
-	flag.StringVar(&params.AdmissionControllerImage, "admission-image", "couchbase/couchbase-operator-admission:v1", "Docker image to use for the admission controller")
-	flag.StringVar(&params.SyncGatewayImage, "mobile-image", "couchbase/sync-gateway:2.8.2-enterprise", "Docker image to use for couchbase mobile")
-	flag.StringVar(&params.CouchbaseServerImage, "server-image", "couchbase/server:6.6.2", "Docker image to use for couchbase server")
-	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade", "couchbase/server:6.6.1", "Docker image to use for couchbase server upgrades to upgrade from")
-	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.5", "Docker image to use for the couchbase exporter")
-	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.4", "Docker image to use for couchbase exporter upgrades to upgrade from")
-	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:1.1.0", "Docker image to use for couchbase backup")
-	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image", "couchbase/fluent-bit:1.1.0", "Docker image to use for couchbase log shipping")
-	flag.StringVar(&params.CouchbaseLoggingImageUpgrade, "logging-image-upgrade", "couchbase/fluent-bit:1.0.4", "Docker image to use for couchbase log shipping upgrades to upgrade from")
-	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
-	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
-	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
-	flag.StringVar(&params.S3Region, "s3-region", "us-west-2", "S3 Region to use")
-	flag.StringVar(&params.S3AccessKey, "s3-access-key", "", "S3 Access Key")
-	flag.StringVar(&params.S3SecretID, "s3-secret-id", "", "S3 Secret ID")
-	flag.StringVar(&suiteSuffix, "suite-suffix", "", "Suffix to apply to suite name in JUnit results, useful when running multiple versions of the same suite in parallel")
-	flag.BoolVar(&params.CollectLogs, "collect-logs", false, "Whether to collect logs on failure")
-	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs", false, "Whether to collect logs from the server pods on failure")
-	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
-	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
-	flag.Var(&suites, "suite", "Test suites to run")
-	flag.Var(&tests, "test", "Individual test to run")
-	flag.BoolVar(&util.UseANSIColor, "color", false, "Prettify output")
-	flag.IntVar(&params.DocsCount, "docs", 10, "The amount of Documents created during tests")
-	flag.StringVar(&params.LogLevel, "log-level", "debug", "Log Level to use")
-	flag.Var(&podCreateTimeout, "pod-creation-timeout", "Time before giving up on pod creation")
-	flag.BoolVar(&params.EnableIstio, "istio", false, "Enable istio injection")
-	flag.BoolVar(&params.IPv6, "ipv6", false, "Use IPv6")
+	flag.StringVar(&params.KubeType, "platform-type",
+		"kubernetes",
+		"Controls handling of security settings. Either 'kubernetes' or 'openshift'.")
+	flag.StringVar(&platform, "platform-vendor",
+		"",
+		"Controls handling of platform specific behavior. Either 'aws', 'gce' or 'azure'.")
+	flag.StringVar(&params.OpImage, "operator-image",
+		fmt.Sprintf("couchbase/operator:%s", version.Version),
+		"Docker image to use for the operator.")
+	flag.StringVar(&params.AdmissionControllerImage, "admission-image",
+		fmt.Sprintf("couchbase/admission-controller:%s", version.Version),
+		"Docker image to use for the admission controller.")
+	flag.StringVar(&params.SyncGatewayImage, "mobile-image",
+		"couchbase/sync-gateway:2.8.2-enterprise",
+		"Docker image to use for couchbase mobile.")
+	flag.StringVar(&params.CouchbaseServerImage, "server-image",
+		"couchbase/server:6.6.2",
+		"Docker image to use for couchbase server.")
+	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade",
+		"couchbase/server:6.6.1",
+		"Docker image to use for couchbase server upgrades to upgrade from.")
+	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image",
+		"couchbase/exporter:1.0.5",
+		"Docker image to use for the couchbase exporter.")
+	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade",
+		"couchbase/exporter:1.0.4",
+		"Docker image to use for couchbase exporter upgrades to upgrade from.")
+	flag.StringVar(&params.CouchbaseBackupImage, "backup-image",
+		"couchbase/operator-backup:1.1.0",
+		"Docker image to use for couchbase backup.")
+	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image",
+		"couchbase/fluent-bit:1.0.4",
+		"Docker image to use for couchbase log shipping.")
+	flag.StringVar(&params.CouchbaseLoggingImageUpgrade, "logging-image-upgrade",
+		"couchbase/fluent-bit:1.0.4",
+		"Docker image to use for couchbase log shipping upgrades to upgrade from.")
+	flag.StringVar(&params.StorageClassName, "storage-class",
+		"",
+		"Storage class to use, platform default if not specified.")
+	flag.StringVar(&params.BucketType, "bucket-type",
+		"couchbase",
+		"Bucket type to use.  Either 'couchbase', 'ephemeral' or 'memcached'.")
+	flag.StringVar(&params.CompressionMode, "compression-mode",
+		"passive",
+		"Compression mode to use.  Either 'off', 'passive' or 'active'.")
+	flag.StringVar(&params.S3Region, "s3-region",
+		"us-west-2",
+		"S3 region to use for backup.")
+	flag.StringVar(&params.S3AccessKey, "s3-access-key",
+		"",
+		"S3 access key to use for backup.")
+	flag.StringVar(&params.S3SecretID, "s3-secret-id",
+		"",
+		"S3 secret ID to use for backup.")
+	flag.StringVar(&suiteSuffix, "suite-suffix",
+		"",
+		"Suffix to apply to suite name in JUnit results, useful when running multiple versions of the same suite in parallel.")
+	flag.BoolVar(&params.CollectLogs, "collect-logs",
+		false,
+		"Whether to collect logs on failure.  These will be saved in the /logs directory.")
+	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs",
+		false,
+		"Whether to collect Couchbase Server logs on failure.")
+	flag.Var(&registries, "registry",
+		"Container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  May be specified multiple times.")
+	flag.Var(&suites, "suite",
+		"Test suites to run.  Either 'validation', 'sanity', 'p0' or 'p1'.  May be specified more than once.")
+	flag.Var(&tests, "test",
+		"Individual test to run.  May be specified more than once.")
+	flag.BoolVar(&util.UseANSIColor, "color",
+		false,
+		"Prettify output.")
+	flag.IntVar(&params.DocsCount, "docs",
+		10,
+		"The number of Documents created during tests.")
+	flag.StringVar(&params.LogLevel, "log-level",
+		"debug",
+		"Log level to use.  This affects Couchbase Autonomous Operator logs.  Either 'info', or 'debug'")
+	flag.Var(&podCreateTimeout, "pod-creation-timeout",
+		"Time before giving up on pod creation.  Platforms with cluster autoscaling may require a larger value e.g. 15m.")
+	flag.BoolVar(&params.EnableIstio, "istio",
+		false,
+		"Enable istio injection.  This annotates per-test namespaces with Istio injecttion, and enables any Operator specific workarounds.")
+	flag.BoolVar(&params.DynamicPlatform, "dynamic-platform",
+		false,
+		"Enable dynamic platform support e.g. GKE Autopilot, AWS Fargate or anything with cluster autoscaling enabled.")
+	flag.BoolVar(&params.IPv6, "ipv6",
+		false,
+		"Force the use use of IPv6 with Couchbase Server.")
 
 	flag.Parse()
 
@@ -245,29 +355,14 @@ func configure() (err error) {
 		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
 	}
 
-	params.ClusterConfigs = clusters.values
 	params.RegistryConfigs = registries.values
 	params.PodCreateTimeout = podCreateTimeout.value
 	params.Platform = couchbasev2.PlatformType(platform)
 
-	// If no cluster configurations were specified, then provide some
-	// sane defaults.  At most we need two clusters in different namespaces
-	// to run XDCR/client tests.
-	if len(params.ClusterConfigs) == 0 {
-		params.ClusterConfigs = []ClusterConfig{
-			{
-				Config: "~/.kube/config",
-			},
-		}
-	}
-
-	// Heretical use of global variables alert.
-	Global = params
-
-	for index, config := range Global.ClusterConfigs {
-		if strings.HasPrefix(config.Config, "~/") {
-			Global.ClusterConfigs[index].Config = strings.Replace(config.Config, "~", os.Getenv("HOME"), 1)
-		}
+	// Hack... if nothing is specified then it's likely the user will
+	// want platform certification.
+	if len(suites.values) == 0 && len(tests.values) == 0 {
+		suites.values = append(suites.values, "platform")
 	}
 
 	SelectedTests = TestDefinitions.Select(suites.values, tests.values)
@@ -301,28 +396,25 @@ func setup() error {
 
 	Global.LogDir = logDir
 
-	Global.ClusterSpec = make([]*types.Cluster, len(Global.ClusterConfigs))
+	cluster, err := createKubeClusterObject()
+	if err != nil {
+		return err
+	}
 
-	for i, kubeConf := range Global.ClusterConfigs {
-		clusterSpec, err := createKubeClusterObject(kubeConf)
-		if err != nil {
-			return err
+	Global.ClusterSpec = []*types.Cluster{
+		cluster,
+	}
+
+	Global.CbopinfoPath = "/cbopinfo"
+
+	if len(Global.RegistryConfigs) > 0 {
+		logrus.Info(util.PrettyHeading("Docker Registries"))
+
+		for _, registry := range Global.RegistryConfigs {
+			logrus.Info(" →  server: " + registry.Server)
+			logrus.Info("    username: " + registry.Username)
+			logrus.Info("    password: " + strings.Repeat("*", len(registry.Password)))
 		}
-
-		Global.ClusterSpec[i] = clusterSpec
-	}
-
-	// Set any defaults.
-	if Global.SyncGatewayImage == "" {
-		Global.SyncGatewayImage = "couchbase/sync-gateway:2.7.0-enterprise"
-	}
-
-	logrus.Info(util.PrettyHeading("Docker Registries"))
-
-	for _, registry := range Global.RegistryConfigs {
-		logrus.Info(" →  server: " + registry.Server)
-		logrus.Info("    username: " + registry.Username)
-		logrus.Info("    password: " + strings.Repeat("*", len(registry.Password)))
 	}
 
 	logrus.Info(util.PrettyHeading("Container Images"))
@@ -339,29 +431,15 @@ func setup() error {
 
 	logrus.Info(util.PrettyHeading("Framework Configuration"))
 	logrus.Info(" →  Bucket Type: " + Global.BucketType)
-	logrus.Info(" →  Compression Mode: " + Global.CompressionMode)
+	logrus.Info(" →  Bucket Compression Mode: " + Global.CompressionMode)
 	logrus.Info(" →  Documents: " + strconv.Itoa(Global.DocsCount))
 	logrus.Info(" →  Logging Level: " + Global.LogLevel)
 
-	logrus.Info(util.PrettyHeading("Clusters"))
-
-	for _, config := range Global.ClusterSpec {
-		logrus.Info(" →  path: " + config.KubeConfPath)
-		logrus.Info("    context: " + config.Context)
-	}
-
 	logrus.Info(util.PrettyHeading("Kubernetes"))
 	logrus.Info(" →  storage class: " + Global.StorageClassName)
+
 	logrus.Info(util.PrettyHeading("Logs"))
 	logrus.Info(" →  directory: " + Global.LogDir)
-
-	// Setup the cbopinfo absolute path so it will not change if we move directories
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	Global.CbopinfoPath = wd + "/../../build/bin/cbopinfo"
 
 	for i, k8s := range Global.ClusterSpec {
 		logrus.Info(util.PrettyHeading(fmt.Sprintf("Configuring Cluster %d", i)))
@@ -378,11 +456,8 @@ func setup() error {
 	return nil
 }
 
-func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
-	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: c.Config},
-		&clientcmd.ConfigOverrides{CurrentContext: c.Context},
-	).ClientConfig()
+func createKubeClusterObject() (*types.Cluster, error) {
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +479,7 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 
 	restMapper := restmapper.NewDiscoveryRESTMapper(groupresources)
 
-	return &types.Cluster{
+	cluster := &types.Cluster{
 		Config:          config,
 		CRClient:        client.MustNew(config),
 		KubeClient:      kubernetes.NewForConfigOrDie(config),
@@ -412,12 +487,13 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 		AutoscaleClient: autoscalev2.NewForConfigOrDie(config),
 		APIRegClient:    apiregistrationv1.NewForConfigOrDie(config),
 		RESTMapper:      restMapper,
-		KubeConfPath:    c.Config,
-		Context:         c.Context,
 		Platform:        string(Global.Platform),
 		PlatformType:    Global.KubeType,
 		IPv6:            Global.IPv6,
-	}, nil
+		DynamicPlatform: Global.DynamicPlatform,
+	}
+
+	return cluster, nil
 }
 
 // updateKubernetesCluster is called *after* the cluster has been initialized (e.g. after
@@ -465,7 +541,7 @@ func recreateCRDs(k8s *types.Cluster) error {
 		}
 	}
 
-	crdsRaw, err := ioutil.ReadFile("../../example/crd.yaml")
+	crdsRaw, err := ioutil.ReadFile("/crd.yaml")
 	if err != nil {
 		return err
 	}
@@ -509,7 +585,7 @@ const (
 
 // tells us if the underlying physical cluster on a host exists.
 func (f *Framework) SetupFramework(k8s *types.Cluster) error {
-	if Global.Platform != "gke-autopilot" {
+	if !Global.DynamicPlatform {
 		logrus.Info("Removing node taints")
 
 		if err := e2eutil.UntaintAll(k8s); err != nil {
@@ -807,7 +883,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 			args = append(args, "--image-pull-secret="+secret)
 		}
 
-		if _, err := exec.Command("../../build/bin/cbopcfg", args...).CombinedOutput(); err != nil {
+		if _, err := exec.Command("/cbopcfg", args...).CombinedOutput(); err != nil {
 			e2eutil.Die(t, err)
 		}
 
@@ -861,24 +937,15 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 }
 
 func makeLogDir() (string, error) {
-	dir, err := generateLogDir()
-	if err != nil {
-		return "", err
-	}
-
+	dir := generateLogDir()
 	return dir, os.MkdirAll(dir, os.ModePerm)
 }
 
-func generateLogDir() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
+func generateLogDir() string {
 	t := time.Now()
 	ts := t.Format(time.RFC3339)
 
-	return filepath.Join(cwd, "logs", ts), nil
+	return filepath.Join("/artifacts", "logs", ts)
 }
 
 // TestRequirement is a type used to check if a cluster has the ability to run a test.
@@ -899,8 +966,8 @@ func Requires(t *testing.T, kubernetes *types.Cluster) *TestRequirement {
 // test filling it up.  This is as opposed to a dynamic cluster that will keep
 // on growing to fufil your capacity needs.
 func (r *TestRequirement) StaticCluster() *TestRequirement {
-	if Global.Platform == "gke-autopilot" {
-		r.t.Skip("GKE Autopilot implements cluster autoscaling")
+	if Global.DynamicPlatform {
+		r.t.Skip("Test unsupported on dynamic platform")
 	}
 
 	return r
@@ -1107,6 +1174,21 @@ func (r *TestRequirement) ServerGroups(i int) *TestRequirement {
 	return r
 }
 
+func (r *TestRequirement) getDefaultStorageClassName() (string, error) {
+	scs, err := r.kubernetes.KubeClient.StorageV1().StorageClasses().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	for _, sc := range scs.Items {
+		if _, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]; ok {
+			return sc.Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("no default storage class specified")
+}
+
 // DefaultAndExplicitStorageClass does what it says, looks for an implicit storage class
 // and that an explcit named one is configured.
 func (r *TestRequirement) DefaultAndExplicitStorageClass() *TestRequirement {
@@ -1114,25 +1196,27 @@ func (r *TestRequirement) DefaultAndExplicitStorageClass() *TestRequirement {
 		r.t.Skip("No storage class name configured")
 	}
 
-	scs, err := r.kubernetes.KubeClient.StorageV1().StorageClasses().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		r.t.Skip(fmt.Sprintf("Unable to list storage classes: %v", err))
+	if _, err := r.getDefaultStorageClassName(); err != nil {
+		r.t.Skip("No default storage class configured for platform")
 	}
-
-	for _, sc := range scs.Items {
-		if _, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]; ok {
-			return r
-		}
-	}
-
-	r.t.Skip("No default storage class configured for platform")
 
 	return r
 }
 
 // ExpandableStorage skips the test if the storage class does not have allowVolumeExpansion set to True.
 func (r *TestRequirement) ExpandableStorage() *TestRequirement {
-	sc, err := r.kubernetes.KubeClient.StorageV1().StorageClasses().Get(context.Background(), Global.StorageClassName, metav1.GetOptions{})
+	storageClassName := Global.StorageClassName
+
+	if storageClassName == "" {
+		name, err := r.getDefaultStorageClassName()
+		if err != nil {
+			e2eutil.Die(r.t, err)
+		}
+
+		storageClassName = name
+	}
+
+	sc, err := r.kubernetes.KubeClient.StorageV1().StorageClasses().Get(context.Background(), storageClassName, metav1.GetOptions{})
 	if err != nil {
 		e2eutil.Die(r.t, err)
 	}
@@ -1140,6 +1224,14 @@ func (r *TestRequirement) ExpandableStorage() *TestRequirement {
 	if sc.AllowVolumeExpansion == nil || !*sc.AllowVolumeExpansion {
 		r.t.Skip("Storage Class does not have allowVolumeExpansion=true")
 	}
+
+	return r
+}
+
+// Rethink a tongue in cheek way of saying the test doesn't work.  For example, if we were to
+// simulate a rolling cluster upgrade, the test container would get killed!
+func (r *TestRequirement) Rethink() *TestRequirement {
+	r.t.Skip("test unstable")
 
 	return r
 }

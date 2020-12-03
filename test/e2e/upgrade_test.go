@@ -79,13 +79,23 @@ func upgradeFailedAddRecoverableSequence(victimName string) eventschema.Validata
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+			// This suffers from race conditions, so it's essentially random...
+			// Either the pod is killed before the operator can detect it and
+			// rebalance picks it up, or the operator will spot it's broken, abort
+			// the loop and recover it straight away.
 			eventschema.Optional{
 				Validator: eventschema.Sequence{
 					Validators: []eventschema.Validatable{
-						eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
-						eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+						eventschema.Optional{
+							Validator: eventschema.Sequence{
+								Validators: []eventschema.Validatable{
+									eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+									eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -104,9 +114,27 @@ func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Valida
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-			eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
+			// This suffers from race conditions, so it's essentially random...
+			eventschema.AnyOf{
+				Validators: []eventschema.Validatable{
+					// ... either the pod is added to the cluster and rebalance is started before
+					// server complains ...
+					eventschema.Sequence{
+						Validators: []eventschema.Validatable{
+							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+							eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+							eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
+						},
+					},
+					// ... or the operator notices it's gone pop, aborts the topology reconcile
+					// and next time around the pod is already in failed add.
+					eventschema.Sequence{
+						Validators: []eventschema.Validatable{
+							eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
+						},
+					},
+				},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			// I wonder why this is the only case where a member removed event doesn't happen?
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
@@ -770,7 +798,7 @@ func TestUpgradeToTLS(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls", tls), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -822,7 +850,7 @@ func TestUpgradeToMandatoryMutualTLS(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls", tls), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, ctx, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1025,7 +1053,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 1, numOfDocs)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
@@ -1039,7 +1067,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/spec/minimumDurability", couchbasev2.CouchbaseBucketMinimumDurabilityMajority), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityMinLevel", couchbaseutil.DurabilityMajority), time.Minute)
 
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs+1, numOfDocs)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, numOfDocs)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 2*numOfDocs, 2*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{

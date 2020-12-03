@@ -449,12 +449,10 @@ func WaitUntilBucketsExist(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 	}
 
 	// Next wait until all nodes are warmed up before allowing tests to do I/O
-	client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+	client, err := CreateAdminConsoleClient(k8s, couchbase)
 	if err != nil {
 		return err
 	}
-
-	defer cleanup()
 
 	callback = func() error {
 		info := &couchbaseutil.ClusterInfo{}
@@ -699,11 +697,10 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 	defer cancel()
 
 	return retryutil.Retry(ctx, time.Second, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-		defer cleanup()
 
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -757,12 +754,10 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 		}
 
 		// user must also be in couchbase
-		client, cleanup, err := CreateAdminConsoleClient(k8s, currCluster)
+		client, err := CreateAdminConsoleClient(k8s, currCluster)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		u := &couchbaseutil.User{}
 		return couchbaseutil.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host)
@@ -779,12 +774,10 @@ func MustWaitUntilUserExists(t *testing.T, k8s *types.Cluster, couchbase *couchb
 // from couchbase cluster.
 func WaitForClusterUserDeletion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, timeout time.Duration) error {
 	callback := func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		// we should get an error attempting to get user
 		users := &couchbaseutil.UserList{}

@@ -24,12 +24,10 @@ import (
 
 func checkAuditConfig(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) error {
 	return retryutil.RetryFor(time.Minute, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		info := couchbaseutil.AuditSettings{}
 
@@ -89,12 +87,10 @@ func MustCheckAuditConfiguration(t *testing.T, k8s *types.Cluster, couchbase *co
 
 func enableAuditLogging(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) error {
 	return retryutil.RetryFor(1*time.Minute, func() error {
-		client, cleanup, err := CreateAdminConsoleClient(k8s, couchbase)
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
 			return err
 		}
-
-		defer cleanup()
 
 		data := url.Values{}
 		data.Add("auditdEnabled", "true")

@@ -298,7 +298,11 @@ func TestNodeUnschedulable(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	// This is broken because the memory allocation stuff is inherently flawed.
+	// There could be a prior cluster undergoing cleanup, thus making the allocations
+	// at calculation time not tally with those at execution time.  Perhaps we need
+	// to synchronize on namespace deletion??
+	framework.Requires(t, targetKube).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1

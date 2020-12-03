@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -1115,27 +1115,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 
 // tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
 // using TlsCheckForCluster which is safer.
-func tlsCheckForPod(k8s *types.Cluster, podName string, ctx *TLSContext) error {
-	// Allocate a free port to use
-	sport, err := getFreePort()
-	if err != nil {
-		return err
-	}
-
-	// Start the port forwarder
-	pf := portforward.PortForwarder{
-		Config:    k8s.Config,
-		Client:    k8s.KubeClient,
-		Namespace: k8s.Namespace,
-		Pod:       podName,
-		Port:      sport + ":18091",
-	}
-	if err := pf.ForwardPorts(); err != nil {
-		return err
-	}
-
-	defer pf.Close()
-
+func tlsCheckForPod(cluster *couchbasev2.CouchbaseCluster, podName string, ctx *TLSContext) error {
 	clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
 	if err != nil {
 		return err
@@ -1150,7 +1130,9 @@ func tlsCheckForPod(k8s *types.Cluster, podName string, ctx *TLSContext) error {
 	}
 	tlsConfig.RootCAs.AddCert(ctx.CA.certificate)
 
-	conn, err := tls.Dial("tcp", "localhost:"+sport, tlsConfig)
+	host := fmt.Sprintf("%s.%s.%s.svc:18091", podName, cluster.Name, cluster.Namespace)
+
+	conn, err := tls.Dial("tcp", host, tlsConfig)
 	if err != nil {
 		return err
 	}
@@ -1171,7 +1153,7 @@ func tlsCheckForPod(k8s *types.Cluster, podName string, ctx *TLSContext) error {
 		},
 	}
 
-	request, err := http.NewRequest("GET", "https://localhost:"+sport+"/pools/default/certificate", nil)
+	request, err := http.NewRequest("GET", "https://"+host+"/pools/default/certificate", nil)
 	if err != nil {
 		return err
 	}

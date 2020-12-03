@@ -108,7 +108,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that all nodes advertise a DNS based alternate address.
-	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, domain, time.Minute)
+	e2eutil.MustCheckForDNSAlternateAddresses(t, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, targetKube, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 }
@@ -159,14 +159,14 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that all nodes advertise a DNS based alternate address, and it changes when updated.
-	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, domain, time.Minute)
+	e2eutil.MustCheckForDNSAlternateAddresses(t, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, targetKube, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 	subjectAltNames := x509.MandatorySANs(testCouchbase.Name, testCouchbase.Namespace)
 	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
 	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", newDomain), time.Minute)
-	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, newDomain, 5*time.Minute)
+	e2eutil.MustCheckForDNSAlternateAddresses(t, testCouchbase, newDomain, 5*time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, targetKube, testCouchbase, newDomain, time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 }

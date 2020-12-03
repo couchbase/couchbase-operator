@@ -484,7 +484,8 @@ func NewBasicCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
 			GenerateName: e2e_constants.ClusterNamePrefix,
 		},
 		Spec: couchbasev2.ClusterSpec{
-			Image: options.Image,
+			Platform: options.Platform,
+			Image:    options.Image,
 			Security: couchbasev2.CouchbaseClusterSecuritySpec{
 				AdminSecret: e2e_constants.KubeTestSecretName,
 				RBAC: couchbasev2.RBAC{
@@ -506,10 +507,6 @@ func NewBasicCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
 			},
 			AutoscaleStabilizationPeriod: options.AutoscaleStabilizationPeriod,
 		},
-	}
-
-	if options.Platform != "gke-autopilot" {
-		cluster.Spec.Platform = options.Platform
 	}
 
 	for _, class := range options.Topology {

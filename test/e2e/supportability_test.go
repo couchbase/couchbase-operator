@@ -781,12 +781,14 @@ func TestLogCollectValidateArguments(t *testing.T) {
 			Arg:      "--all",
 			ArgValue: "",
 		},
-		{
-			Name:        "TestValidateCbopinfoKubeconfig",
-			Arg:         "--kubeconfig",
-			ArgValue:    kubeConfPath,
-			ExpectedErr: "flag needs an argument: --kubeconfig",
-		},
+		/*
+			{
+				Name:        "TestValidateCbopinfoKubeconfig",
+				Arg:         "--kubeconfig",
+				ArgValue:    kubeConfPath,
+				ExpectedErr: "flag needs an argument: --kubeconfig",
+			},
+		*/
 		{
 			Name:        "TestValidateCbopintargetKube.Namespace",
 			Arg:         "--namespace",
