@@ -1,0 +1,92 @@
+= CouchbaseAutoscaler Resource
+
+:toc: macro
+
+The Couchbase Autonomous Operator operates on `CouchbaseAutoscaler` objects.
+Autoscale resources are associated with Couchbase xref:reference-couchbasecluster.adoc#spec-cluster-servers[`spec.servers[\]`] configuration.
+
+
+The `CouchbaseAutoscaler` resource implements Kubernetes `autoscaling/v1.Scale` interface and exposes a `spec.size` parameter to external clients such as the Horizontal Pod Autoscaler.
+
+[WARNING]
+The `CouchbaseAutoscaler` resource is created and managed by the Autonomous Operator and should not be manually created or deleted.
+This document is for reference purposes only.
+
+.All available CouchbaseAutoscaler configuration parameters
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseAutoscaler
+metadata:
+  name: query.cb-example
+spec:
+  servers: query
+  size: 2
+status:
+  labelSelector: app=couchbase,couchbase_cluster=cb-example,couchbase_node_conf=query
+  size: 2
+----
+
+== `spec`
+
+The following are parameters that may be set on the autoscaler:
+
+[source,yaml]
+----
+spec:
+  servers: query
+  size: 2
+----
+
+=== `spec.servers`
+
+The `servers` parameter refers to xref:reference-couchbasecluster.adoc#spec-cluster-servers[`spec.servers[\].name`] of the Couchbase servers to autoscale.
+
+____
+_Field rules:_ This field is required and must be set to value of the associated Couchbase server configuration.
+____
+
+=== `spec.size`
+
+The `spec.size` parameter refers to xref:reference-couchbasecluster.adoc#spec-cluster-servers[`spec.servers[\].size`] of the associated Couchbase servers to autoscale.
+
+This value defines the `specReplicasPath` of the `autoscaling/v1.Scale` interface.
+Changes to this value are sent as the payload for `/scale`.
+
+____
+_Field rules:_ This field is required and is an `integer`.
+____
+
+== `status`
+
+The following status fields are provided for the autoscaler:
+
+[source,yaml]
+----
+status:
+  labelSelector: app=couchbase,couchbase_cluster=cb-example,couchbase_node_conf=query
+  size: 2
+----
+
+=== `status.labelSelector`
+
+The `labelSelector` parameter is the label selector used to query the status of Couchbase Pods being autoscaled.
+
+This value defines the `labelSelectorPath` of the `autoscaling/v1.Scale` interface.
+The Autonomous Operator sets this string to match the Pods of the associated server configuration.
+
+____
+_Field rules:_ This field is a `string`.
+____
+
+
+=== `status.size`
+
+The `status.size` parameter reflects the existing number of Pods associated with the Couchbase server configuration.
+
+This value defines the `statusReplicasPath` of the `autoscaling/v1.Scale` interface.
+The Autonomous Operator updates this value using the `labelSelector` as Pods are added and removed from the cluster.
+
+____
+_Field rules:_ This field is an `integer`.
+____

@@ -84,6 +84,7 @@
  ** xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
  ** xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
  ** xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding Resource]
+ ** xref:reference-couchbaseautoscaler.adoc[CouchbaseAutoscaler Resource]
 * Operator
  ** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
  ** xref:reference-operator-configuration.adoc[Operator Deployment Settings]

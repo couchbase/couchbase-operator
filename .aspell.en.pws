@@ -115,6 +115,8 @@ CouchbaseGroup
 CouchbaseRoleBinding
 CouchbaseBackup
 CouchbaseBackupRestore
+CouchbaseAutoscale
+CouchbaseAutoscaler
 CronJob
 lifecycle
 GiB
