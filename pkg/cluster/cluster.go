@@ -146,6 +146,11 @@ type Cluster struct {
 	// by a persistent volume.  When the current time passes this threshold
 	// then we attempt manual recovery by recreating the pod.
 	recoveryTime map[string]time.Time
+
+	// generation is the most recent resource generation we know about.  For
+	// some reason a read after write can go back in time, I'm not certain it's
+	// caching we are doing, but the API itself.
+	generation int64
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.
@@ -166,6 +171,7 @@ func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 		recoveryTime:    map[string]time.Time{},
 		members:         couchbaseutil.MemberSet{},
 		callableMembers: couchbaseutil.MemberSet{},
+		generation:      cl.Generation,
 	}
 
 	// Cancel is used to abort the go routine when the operator is deleted
@@ -410,6 +416,11 @@ func (c *Cluster) runReconcile() {
 // Update is called periodically or on a CR change, print out any diffs in the spec
 // then update the specification and unconditionally reconcile.
 func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
+	if cluster.Generation < c.generation {
+		log.Info("API returned old version, skipping reconcile", "cluster", c.namespacedName())
+		return
+	}
+
 	if !reflect.DeepEqual(cluster.Spec, c.cluster.Spec) {
 		c.logUpdate(c.cluster.Spec, cluster.Spec)
 	}
@@ -448,14 +459,26 @@ func (c *Cluster) updateCRStatus() error {
 		return nil
 	}
 
+	d, err := diff.Diff(c.cluster.Status, cluster.Status)
+	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	if d == "" {
+		return nil
+	}
+
 	c.logUpdate(cluster.Status, c.cluster.Status)
 
 	// Copy the updated status to our cluster object and try update it
 	cluster.Status = c.cluster.Status
 
-	if _, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster); err != nil {
+	newCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(cluster)
+	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
+
+	c.generation = newCluster.Generation
 
 	return nil
 }
