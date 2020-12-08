@@ -5,7 +5,7 @@ The Couchbase Autonomous Operator manages Couchbase Role-Based Access Control (R
 
 == Overview
 
-Users are created when a xref:reference-couchbaseuser.adoc[`CouchbaseUser` resource] is bound to one or more xref:reference-couchbasegroup.adoc[`CouchbaseGroup` resources] using a xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding` resource].
+Users are created when a `CouchbaseUser` resource is bound to one or more `CouchbaseGroup` resources using a `CouchbaseRoleBinding` resource.
 The `CouchbaseGroup` resource contains a set of roles that are to be applied to one or more users.
 
 [#image-user-binding-model]
@@ -91,7 +91,7 @@ spec:
 
 The example above demonstrates the creation of a Couchbase Server RBAC group which grants the `cluster_admin` role to all LDAP users within the reference group.
 
-Note that you'll need to have LDAP connectivity configured in the xref:reference-couchbasecluster.adoc[`CouchbaseCluster` resource] in order use this functionality.
+Note that you'll need to have LDAP connectivity configured in the `CouchbaseCluster` resource in order use this functionality.
 
 == Managing Users
 

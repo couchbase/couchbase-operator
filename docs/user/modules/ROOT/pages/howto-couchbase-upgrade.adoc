@@ -15,7 +15,7 @@ spec:
   image: couchbase/server:{couchbase-version-upgrade-from} # <.>
 ----
 
-<.> xref:reference-couchbasecluster.adoc#spec-image[`spec.image`] can be modified to any valid Couchbase Server image, in this example we want to upgrade the version only.
+<.> `couchbaseclusters.spec.image` can be modified to any valid Couchbase Server image, in this example we want to upgrade the version only.
 
 [source,yaml,subs="attributes,verbatim"]
 ----

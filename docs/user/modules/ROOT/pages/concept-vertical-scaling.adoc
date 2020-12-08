@@ -30,7 +30,7 @@ Where possible, we recommend horizontal scaling as scaling up reduces the impact
 The impact of balancing in or out Couchbase nodes is far less than required for vertical scaling.
 
 For whatever reason you wish to vertically scale your existing cluster, the process will be the same.
-Changing either the xref:reference-couchbasecluster.adoc#spec-servers-resources[resource requests] to tell Kubernetes to allocate more CPU and memory on shared workload nodes, xref:reference-couchbasecluster.adoc#spec-volumeclaimtemplates-spec-resources[resource requests] to modify persistent storage, or modifying xref:concept-scheduling.adoc[node selectors and tolerations] to run the cluster on new nodes, will require modifying Couchbase server pods.
+Changing either the `couchbaseclusters.spec.servers.resources` attribute to tell Kubernetes to allocate more CPU and memory on shared workload nodes, the `couchbaseclusters.spec.volumeClaimTemplates.spec.resources` attribute to modify persistent storage, or modifying xref:concept-scheduling.adoc[node selectors and tolerations] to run the cluster on new nodes, will require modifying Couchbase server pods.
 
 As pods are immutable, the operator must intelligently replace old pods with new ones as described in the xref:concept-upgrade.adoc[upgrade] concepts documentation.
 You should fully understand and plan for the upgrade operation when performing vertical scaling.

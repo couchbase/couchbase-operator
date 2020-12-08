@@ -587,7 +587,7 @@ helm install my-release -f values-persistent.yaml couchbase/couchbase-cluster
 
 === additional values
 
-All of the remaining values which can be overridden in this spec are described here in the xref:reference-couchbasecluster.adoc[Couchbase Cluster Configuration] documentation.
+All of the remaining values which can be overridden in this spec are described in the `CouchbaseCluster` documentation.
 
 
 == TLS
@@ -681,7 +681,7 @@ This value is optional and when not set, the name of the object key is used inst
 
 === additional values
 
-All of the remaining values which can be overridden in this spec are described here in the xref:reference-couchbasecluster.adoc[Couchbase Cluster Configuration] documentation.
+All of the remaining values which can be overridden in this spec are described in the `CouchbaseCluster` documentation.
 
 
 
@@ -741,7 +741,7 @@ This value is required and must provide the `name` of a valid Couchbase Server r
 If the Couchbase Server role is a bucket role, then the name of a `bucket` value may also be provided.
 If the name of a bucket is not provided for a bucket role then the value defaults to `*` which means the role applies to all buckets.
 
-Refer to xref:reference-couchbasegroup.adoc[Couchbase Groups] for list of Administrator and Bucket roles.
+Refer to `CouchbaseGroups` documentation for list of Administrator and Bucket roles.
 
 == Backups
 This object defines parameters and variables for automated backup.

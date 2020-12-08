@@ -54,6 +54,6 @@ If our assumptions change in the future our cluster can be scaled with zero impa
 Using MDS also allows each class of server to have its own unique configuration.
 For example, if you wish to run data and index nodes where data is 50% in memory and 50% on disk you may want to use high performance NVMe storage.
 As this is expensive, your other services may want to use cheap, commodity storage.
-Server classes running the data and index services can set node selectors in their xref:reference-couchbasecluster.adoc#spec-servers-pod[`spec.servers[\].pod`] templates that select the high performance nodes, and use taints/tolerations to ensure other processes aren't scheduled on to them.
+Server classes running the data and index services can set node selectors in their `couchbaseclusters.spec.servers.pod` templates that select the high performance nodes, and use taints/tolerations to ensure other processes aren't scheduled on to them.
 
 For further information see the xref:concept-scheduling.adoc[scheduling and isolation concepts] documentation.

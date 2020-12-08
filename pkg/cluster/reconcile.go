@@ -385,7 +385,7 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.
 
 	// Add to the cluster. Note we have to use the plain text url as
 	// /controller/addNode will not work with a https reference
-	services, err := couchbaseutil.ServiceListFromStringArray(serverSpec.Services.StringSlice())
+	services, err := couchbaseutil.ServiceListFromStringArray(couchbasev2.ServiceList(serverSpec.Services).StringSlice())
 	if err != nil {
 		return newMember, err
 	}
@@ -798,7 +798,7 @@ func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec couchbasev2.Serv
 	}
 
 	// Setup the services running on this node.
-	services, err := couchbaseutil.ServiceListFromStringArray(serverSpec.Services.StringSlice())
+	services, err := couchbaseutil.ServiceListFromStringArray(couchbasev2.ServiceList(serverSpec.Services).StringSlice())
 	if err != nil {
 		return err
 	}

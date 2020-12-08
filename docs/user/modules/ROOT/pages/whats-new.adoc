@@ -21,7 +21,7 @@ The Operator can now delegate scaling responsibilities to the HPA.
 The HPA allows high-level functionality such as allowing scaling to be driven by Prometheus metrics, and scaling decisions to be constrained, for example introducing delays to even out load spikes.
 
 While this feature is generic, and will work for any server class, it has been inhibited to only work with server classes comprised of the stateless query service, and only when all buckets are ephemeral, by default.
-This restriction can be removed with the xref:reference-couchbasecluster.adoc#spec-enablepreviewscaling[`spec.enablePreviewScaling`] configuration switch, allowing -- for example -- the data service to be scaled when using standard Couchbase buckets.
+This restriction can be removed with the `couchbaseclusters.spec.enablePreviewScaling` configuration switch, allowing -- for example -- the data service to be scaled when using standard Couchbase buckets.
 
 == Administrator Password Rotation
 
@@ -56,13 +56,13 @@ This provides true off-site backups, decoupled from the underlying Kubernetes cl
 == Configuration Enhancements
 
 Operator version {operator-version-minor} includes added ability to modify Couchbase cluster configuration.
-This includes xref:reference-couchbasecluster.adoc#spec-cluster-indexer-threads[full control over the indexer], and xref:reference-couchbasebucket.adoc#spec-maxttl[bucket-level document expiration].
+This includes full control over the indexer, and bucket-level document expiration.
 
 == Networking Enhancements
 
 With the coming of Couchbase Server 6.5, comes the ability to xref:howto-ui.adoc#configuring-an-ingress[use Kubernetes ingresses] to expose the administrative UI outside of the Kubernetes cluster.
 
-Full support for Istio service mesh is now provided, and may be enabled in the xref:reference-couchbasecluster.adoc#spec-networking-networkplatform[Couchbase cluster networking configuration].
+Full support for Istio service mesh is now provided, and may be enabled in the `couchbaseclusters.spec.networking.networkPlatform` configuration.
 This supports both basic and mTLS modes of operation.
 
 == Upgrading to Operator 2.1

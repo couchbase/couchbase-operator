@@ -34,15 +34,15 @@ spec:
           storage: 1Gi
 ----
 
-<.> xref:reference-couchbasecluster.adoc#spec-servers-volumemounts-default[`spec.servers[\].volumeMounts.default`] tells the Operator to provision a default persistent volume claim and attach it to a pod of that server class.
+<.> `couchbaseclusters.spec.servers.volumeMounts.default` tells the Operator to provision a default persistent volume claim and attach it to a pod of that server class.
 
-<.> xref:reference-couchbasecluster.adoc#spec-volumeclaimtemplates[`spec.volumeClaimTemplates[\]`] defines a list of templates related to storage.
+<.> `couchbaseclusters.spec.volumeClaimTemplates`] defines a list of templates related to storage.
 These will be used to create Kubernetes persistent volume claims and therefore have the same data structure.
 However the Operator is only concerned with the following parameters, any others are ignored.
 
-<.> xref:reference-couchbasecluster.adoc#spec-volumeclaimtemplates-metadata-name[`spec.volumeClaimTemplates[\].metadata.name`] is a unique identifier for a persistent volume template.
-It is referred to by attributes in the xref:reference-couchbasecluster.adoc#spec-servers-volumemounts[`spec.servers[\].volumeMounts`] object.
+<.> `couchbaseclusters.spec.volumeClaimTemplates.metadata.name` is a unique identifier for a persistent volume template.
+It is referred to by attributes in the `couchbaseclusters.spec.servers.volumeMounts` object.
 
-<.> xref:reference-couchbasecluster.adoc#spec-volumeclaimtemplates-spec-storageclassname[`spec.volumeClaimTemplates[\].spec.storageClassName`] refers to a dynamically allocated storage class defined on the platform.
+<.> `couchbaseclusters.spec.volumeClaimTemplates.spec.storageClassName` refers to a dynamically allocated storage class defined on the platform.
 
-<.> xref:reference-couchbasecluster.adoc#spec-volumeclaimtemplates-spec-resources[`spec.volumeClaimTemplates[\].spec.resources`] defines the size of the volume that will be allocated.
+<.> `couchbasecluster.spec.volumeClaimTemplates.spec.resources` defines the size of the volume that will be allocated.

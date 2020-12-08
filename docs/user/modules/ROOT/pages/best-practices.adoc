@@ -101,7 +101,7 @@ In some use cases, such as an in-memory cache, it is undesirable to have to prov
 In other situations, it may be impossible, if the platform doesn't support dynamic persistent volume provisioning for example.
 
 The Operator provides the option to run clusters with ephemeral storage only.
-In this mode of operation, the Operator can recover a partially down cluster -- where Couchbase server is unable to automatically failover the pods -- by xref:reference-couchbasecluster.adoc#spec-recoverypolicy[forcing the down pods out of the cluster].
+In this mode of operation, the Operator can recover a partially down cluster -- where Couchbase server is unable to automatically failover the pods -- by forcing the down pods out of the cluster with the `couchbaseclusters.spec.recoveryPolicy` attribute.
 The Operator will also fully rebuild a cluster that has had all pods deleted.
 
 Due to pods being ephemeral in nature, it is highly likely that data will be unrecoverable when a Couchbase server node goes down, so there is little risk in using a forced failover.

@@ -60,7 +60,7 @@ const (
 	CouchbaseBucketIOPriorityLow CouchbaseBucketIOPriority = "low"
 )
 
-// CouchbsaeBucketConflictResolution defines the XDCR conflict resolution for a bucket.
+// CouchbaseBucketConflictResolution defines the XDCR conflict resolution for a bucket.
 // +kubebuilder:validation:Enum=seqno;lww
 type CouchbaseBucketConflictResolution string
 
@@ -321,6 +321,10 @@ type CouchbaseBackupRestoreList struct {
 	Items           []CouchbaseBackupRestore `json:"items"`
 }
 
+// The CouchbaseBucket resource defines a set of documents in Couchbase server.
+// A Couchbase client connects to and operates on a bucket, which provides independent
+// management of a set documents and a security boundary for role based access control.
+// A CouchbaseBucket provides replication and persistence for documents contained by it.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -339,28 +343,102 @@ type CouchbaseBucket struct {
 	Spec CouchbaseBucketSpec `json:"spec"`
 }
 
+// CouchbaseBucketSpec is the specification for a Couchbase bucket resource, and
+// allows the bucket to be customized.
 type CouchbaseBucketSpec struct {
+	// Name is the name of the bucket within Couchbase server.  By default the Operator
+	// will use the `metadata.name` field to define the bucket name.  The `metadata.name`
+	// field only supports a subset of the supported character set.  When specified, this
+	// field overrides `metadata.name`.  Legal bucket names have a maximum length of 100
+	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
 	// +kubebuilder:validation:MaxLength=100
 	Name string `json:"name,omitempty"`
+
+	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
+	// documents will be evicted from memory to disk as defined by the eviction policy.  The
+	// memory quota is defined per Couchbase pod running the data service.  This field defaults
+	// to, and must be greater than or equal to 100Mi.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="100Mi"
+	// +kubebuilder:validation:Type=string
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
+
+	// Replicas defines how many copies of documents Couchbase server maintains.  This directly
+	// affects how fault toleratnt a Couchbase cluster is.  With a single repica, the cluster
+	// can tolerate one data pod going down and still service requests without data loss.  The
+	// number of replicas also affect memory use.  With a single replica, the effective memory
+	// quota for documents is halved, with two replicas it is one third.  The number of replicas
+	// must be between 0 and 3, defaulting to 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=3
 	Replicas int `json:"replicas,omitempty"`
+
+	// IOPriority controls how many threads a bucket has, per pod, to process reads and writes.
+	// This field must be "low" or "high", defaulting to "low".  Modification of this field will
+	// cause a temporary service disruption as threads are restarted.
 	// +kubebuilder:default="low"
 	IoPriority CouchbaseBucketIOPriority `json:"ioPriority,omitempty"`
+
+	// EvictionPolicy controls how Couchbase handles memory exhaustion.  Value only eviction
+	// flushes documents to disk but maintains document metadata in memory in order to improve
+	// query performance.  Full eviction removes all data from memory after the document is
+	// flushed to disk.  This field must be "valueOnly" or "fullEviction", defaulting to
+	// "valueOnly".
 	// +kubebuilder:default="valueOnly"
 	EvictionPolicy CouchbaseBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
+
+	// ConflictResolution defines how XDCR handles concurrent write conflicts.  Sequence number
+	// based resolution selects the document with the highest sequence number as the most recent.
+	// Timestamp based resolution selects the document that was written to most recently as the
+	// most recent.  This field must be "seqno" (sequence based), or "lww" (timestamp based),
+	// defaulting to "seqno".
 	// +kubebuilder:default="seqno"
 	ConflictResolution CouchbaseBucketConflictResolution `json:"conflictResolution,omitempty"`
-	EnableFlush        bool                              `json:"enableFlush,omitempty"`
-	EnableIndexReplica bool                              `json:"enableIndexReplica,omitempty"`
+
+	// EnableFlush defines whether a client can delete all docuements in a bucket.
+	// This field defaults to false.
+	EnableFlush bool `json:"enableFlush,omitempty"`
+
+	// EnableIndexReplica defines whether indexes for this bucket are replicated.
+	// This field defaults to false.
+	EnableIndexReplica bool `json:"enableIndexReplica,omitempty"`
+
+	// CompressionMode defines how Couchbase server handles document compression.  When
+	// off, documents are stored in memory, and transferred to the client uncompressed.
+	// When passive, documents are stored compressed in memory, and transferred to the
+	// client compressed when requested.  When active, documents are stored compresses
+	// in memory and when tranferred to the client.  This field must be "off", "passive"
+	// or "active", defaulting to "passive".  Be aware "off" in YAML 1.2 is a boolean, so
+	// must be quoted as a string in configuration files.
 	// +kubebuilder:default="passive"
-	CompressionMode   CouchbaseBucketCompressionMode   `json:"compressionMode,omitempty"`
+	CompressionMode CouchbaseBucketCompressionMode `json:"compressionMode,omitempty"`
+
+	// MiniumumDurability defines how durable a document write is by default, and can
+	// be made more durable by the client.  This feature enables ACID transactions.
+	// When none, Couchbase server will respond when the document is in memory, it will
+	// become eventually consistent across the cluster.  When majority, Couchbase server will
+	// respond when the document is replicated to at least half of the pods running the
+	// data service in the cluster.  When majorityAndPersistActive, Couchbase server will
+	// respond when the document is replicated to at least half of the pods running the
+	// data service in the cluster and the document has been persisted to disk on the
+	// document master pod.  When persistToMajority, Couchbase server will respond when
+	// the document is replicated and persisted to disk on at least half of the pods running
+	// the data service in the cluster.  This field must be either "none", "majority",
+	// "majorityAndPersistActive" or "persistToMajority", defaulting to "none".
 	MinimumDurability CouchbaseBucketMinimumDurability `json:"minimumDurability,omitempty"`
-	MaxTTL            *metav1.Duration                 `json:"maxTTL,omitempty"`
+
+	// MaxTTL defines how long a document is permitted to exist for, without
+	// modification, until it is automatically deleted.  This is a default and maximum
+	// time-to-live and may be set to a lower value by the client.  If the client specifes
+	// a higher value, then it is truncated to the maximum durability.  Documents are
+	// removed by Couchbase, after they have expired, when either accessed, the expiry
+	// pager is run, or the bucket is compacted.  When set to 0, then documents are not
+	// expired by default.  This field must be a duration in the range 0-2147483648s,
+	// defaulting to 0.  More info:
+	// https://golang.org/pkg/time/#ParseDuration
+	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -370,6 +448,11 @@ type CouchbaseBucketList struct {
 	Items           []CouchbaseBucket `json:"items"`
 }
 
+// The CouchbaseEphemeralBucket resource defines a set of documents in Couchbase server.
+// A Couchbase client connects to and operates on a bucket, which provides independent
+// management of a set documents and a security boundary for role based access control.
+// A CouchbaseEphemeralBucket provides in-memory only storage and replication for documents
+// contained by it.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -388,27 +471,93 @@ type CouchbaseEphemeralBucket struct {
 	Spec CouchbaseEphemeralBucketSpec `json:"spec"`
 }
 
+// CouchbaseEphemeralBucketSpec is the specification for an ephemeral Couchbase bucket
+// resource, and allows the bucket to be customized.
 type CouchbaseEphemeralBucketSpec struct {
+	// Name is the name of the bucket within Couchbase server.  By default the Operator
+	// will use the `metadata.name` field to define the bucket name.  The `metadata.name`
+	// field only supports a subset of the supported character set.  When specified, this
+	// field overrides `metadata.name`.  Legal bucket names have a maximum length of 100
+	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
 	// +kubebuilder:validation:MaxLength=100
 	Name string `json:"name,omitempty"`
+
+	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
+	// documents will be evicted from memory defined by the eviction policy.  The memory quota
+	// is defined per Couchbase pod running the data service.  This field defaults to, and must
+	// be greater than or equal to 100Mi.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="100Mi"
+	// +kubebuilder:validation:Type=string
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
+
+	// Replicas defines how many copies of documents Couchbase server maintains.  This directly
+	// affects how fault toleratnt a Couchbase cluster is.  With a single repica, the cluster
+	// can tolerate one data pod going down and still service requests without data loss.  The
+	// number of replicas also affect memory use.  With a single replica, the effective memory
+	// quota for documents is halved, with two replicas it is one third.  The number of replicas
+	// must be between 0 and 3, defaulting to 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=3
 	Replicas int `json:"replicas,omitempty"`
+
+	// IOPriority controls how many threads a bucket has, per pod, to process reads and writes.
+	// This field must be "low" or "high", defaulting to "low".  Modification of this field will
+	// cause a temporary service disruption as threads are restarted.
 	// +kubebuilder:default="low"
 	IoPriority CouchbaseBucketIOPriority `json:"ioPriority,omitempty"`
+
+	// EvictionPolicy controls how Couchbase handles memory exhaustion.  No eviction means
+	// that Couchbase server will make this bucket read-only when memory is exhausted in
+	// order to avoid data loss.  NRU eviction will delete documents that haven't been used
+	// recently in order to free up memory. This field must be "noEviction" or "nruEviction",
+	// defaulting to "noEviction".
 	// +kubebuilder:default="noEviction"
 	EvictionPolicy CouchbaseEphemeralBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
+
+	// ConflictResolution defines how XDCR handles concurrent write conflicts.  Sequence number
+	// based resolution selects the document with the highest sequence number as the most recent.
+	// Timestamp based resolution selects the document that was written to most recently as the
+	// most recent.  This field must be "seqno" (sequence based), or "lww" (timestamp based),
+	// defaulting to "seqno".
 	// +kubebuilder:default="seqno"
 	ConflictResolution CouchbaseBucketConflictResolution `json:"conflictResolution,omitempty"`
-	EnableFlush        bool                              `json:"enableFlush,omitempty"`
+
+	// EnableFlush defines whether a client can delete all docuements in a bucket.
+	// This field defaults to false.
+	EnableFlush bool `json:"enableFlush,omitempty"`
+
+	// CompressionMode defines how Couchbase server handles document compression.  When
+	// off, documents are stored in memory, and transferred to the client uncompressed.
+	// When passive, documents are stored compressed in memory, and transferred to the
+	// client compressed when requested.  When active, documents are stored compresses
+	// in memory and when tranferred to the client.  This field must be "off", "passive"
+	// or "active", defaulting to "passive".  Be aware "off" in YAML 1.2 is a boolean, so
+	// must be quoted as a string in configuration files.
 	// +kubebuilder:default="passive"
-	CompressionMode   CouchbaseBucketCompressionMode            `json:"compressionMode,omitempty"`
+	CompressionMode CouchbaseBucketCompressionMode `json:"compressionMode,omitempty"`
+
+	// MiniumumDurability defines how durable a document write is by default, and can
+	// be made more durable by the client.  This feature enables ACID transactions.
+	// When none, Couchbase server will respond when the document is in memory, it will
+	// become eventually consistent across the cluster.  When majority, Couchbase server will
+	// respond when the document is replicated to at least half of the pods running the
+	// data service in the cluster.  This field must be either "none" or "majority",
+	// defaulting to "none".
 	MinimumDurability CouchbaseEphemeralBucketMinimumDurability `json:"minimumDurability,omitempty"`
-	MaxTTL            *metav1.Duration                          `json:"maxTTL,omitempty"`
+
+	// MaxTTL defines how long a document is permitted to exist for, without
+	// modification, until it is automatically deleted.  This is a default and maximum
+	// time-to-live and may be set to a lower value by the client.  If the client specifes
+	// a higher value, then it is truncated to the maximum durability.  Documents are
+	// removed by Couchbase, after they have expired, when either accessed, the expiry
+	// pager is run, or the bucket is compacted.  When set to 0, then documents are not
+	// expired by default.  This field must be a duration in the range 0-2147483648s,
+	// defaulting to 0.  More info:
+	// https://golang.org/pkg/time/#ParseDuration
+	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -418,6 +567,10 @@ type CouchbaseEphemeralBucketList struct {
 	Items           []CouchbaseEphemeralBucket `json:"items"`
 }
 
+// The CouchbaseMemcachedBucket resource defines a set of documents in Couchbase server.
+// A Couchbase client connects to and operates on a bucket, which provides independent
+// management of a set documents and a security boundary for role based access control.
+// A CouchbaseEphemeralBucket provides in-memory only storage for documents contained by it.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -432,13 +585,29 @@ type CouchbaseMemcachedBucket struct {
 	Spec CouchbaseMemcachedBucketSpec `json:"spec"`
 }
 
+// CouchbaseMemcachedBucketSpec is the specification for a Memcached bucket
+// resource, and allows the bucket to be customized.
 type CouchbaseMemcachedBucketSpec struct {
+	// Name is the name of the bucket within Couchbase server.  By default the Operator
+	// will use the `metadata.name` field to define the bucket name.  The `metadata.name`
+	// field only supports a subset of the supported character set.  When specified, this
+	// field overrides `metadata.name`.  Legal bucket names have a maximum length of 100
+	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
 	// +kubebuilder:validation:MaxLength=100
 	Name string `json:"name,omitempty"`
+
+	// MemoryQuota is a memory limit to the size of a bucket. The memory quota
+	// is defined per Couchbase pod running the data service.  This field defaults to, and must
+	// be greater than or equal to 100Mi.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="100Mi"
+	// +kubebuilder:validation:Type=string
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
-	EnableFlush bool               `json:"enableFlush,omitempty"`
+
+	// EnableFlush defines whether a client can delete all docuements in a bucket.
+	// This field defaults to false.
+	EnableFlush bool `json:"enableFlush,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -448,6 +617,9 @@ type CouchbaseMemcachedBucketList struct {
 	Items           []CouchbaseMemcachedBucket `json:"items"`
 }
 
+// The CouchbaseReplication resource represents a Couchbase-to-Couchbase, XDCR replication
+// stream from a source bucket to a destination bucket.  This provides off-site backup,
+// migration, and disaster recovery.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -473,19 +645,29 @@ const (
 	CompressionTypeAuto CompressionType = "Auto"
 )
 
+// CouchbaseReplicationSpec allows configuration of an XDCR replication.
 type CouchbaseReplicationSpec struct {
-	// Bucket is the source bucket to replicate from.  This must be defined and
-	// selected by the cluster.
+	// Bucket is the source bucket to replicate from.  This refers to the Couchbase
+	// bucket name, not the resource name of the bucket.  A bucket with this name must
+	// be defined on this cluster.  Legal bucket names have a maximum length of 100
+	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
 	// +kubebuilder:validation:MaxLength=100
-	Bucket string `json:"bucket,omitempty"`
+	Bucket string `json:"bucket"`
 
-	// RemoteBucket is the remote bucket name to synchronize to.
+	// RemoteBucket is the remote bucket name to synchronize to.  This refers to the
+	// Couchbase bucket name, not the resource name of the bucket.  Legal bucket names
+	// have a maximum length of 100 characters and may be composed of any character from
+	// "a-z", "A-Z", "0-9" and "-_%\.".
 	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
 	// +kubebuilder:validation:MaxLength=100
-	RemoteBucket string `json:"remoteBucket,omitempty"`
+	RemoteBucket string `json:"remoteBucket"`
 
 	// CompressionType is the type of compression to apply to the replication.
+	// When None, no compression will be applied to documents as they are
+	// transferred between clusters.  When Auto, Couchbase server will automatically
+	// compress documents as they are transferred to reduce bandwidth requirements.
+	// This field must be one of "None" or "Auto", defaulting to "Auto".
 	// +kubebuilder:default="Auto"
 	// +kubebuilder:validation:Enum=None;Auto
 	CompressionType CompressionType `json:"compressionType,omitempty"`
@@ -493,7 +675,8 @@ type CouchbaseReplicationSpec struct {
 	// FilterExpression allows certain documents to be filtered out of the replication.
 	FilterExpression string `json:"filterExpression,omitempty"`
 
-	// Paused allows a replication to be stopped and restarted.
+	// Paused allows a replication to be stopped and restarted without having to
+	// restart the replication from the beginning.
 	Paused bool `json:"paused,omitempty"`
 }
 
@@ -705,6 +888,8 @@ type CouchbaseClusterList struct {
 	Items           []CouchbaseCluster `json:"items"`
 }
 
+// The CouchbaseCluster resource represents a Couchbase cluster.  It allows configuration
+// of cluster tolopogy, networking, storage and security options.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -811,43 +996,67 @@ const (
 	ImmediateHibernation HibernationStrategy = "Immediate"
 )
 
+// ClusterSpec is the specification for a CouchbaseCluster resources, and allows
+// the cluster to be customized.
 type ClusterSpec struct {
-	// BaseImage is the base couchbase image name that will be used to launch
-	// couchbase clusters. This is useful for private registries, etc.
+	// Image is the container image name that will be used to launch Couchbase
+	// server instances.  Updating this field will cause an automatic upgrade of
+	// the cluster.
 	// +kubebuilder:validation:Pattern="^(.*?(:\\d+)?/)?.*?/.*?(:.*?\\d+\\.\\d+\\.\\d+.*|@sha256:[0-9a-f]{64})$"
 	Image string `json:"image"`
 
 	// Paused is to pause the control of the operator for the couchbase cluster.
+	// This does not pause the cluster itself, instead stopping the operator from
+	// taking any action.
 	Paused bool `json:"paused,omitempty"`
 
 	// Hibernate is whether to hibernate the cluster.
 	Hibernate bool `json:"hibernate,omitempty"`
 
-	// HibernationStrategy is how aggressive the are when hibernating.
+	// HibernationStrategy defines how to hibernate the cluster.  When Immediate
+	// the Operator will immediately delete all pods and take no further action until
+	// the hibernate field is set to false.
 	HibernationStrategy *HibernationStrategy `json:"hibernationStrategy,omitempty"`
 
-	// This controls how aggressive we are when recovering cluster topology.
+	// RecoveryPolicy controls how aggressive the Operator is when recovering cluster
+	// topology.  When PrioritizeDataIntegrity, the Operator will delegate failover
+	// exclusively to Couchbase server, relying on it to only allow recovery when safe to
+	// do so.  When PrioritizeUptime, the Operator will wait for a period after the
+	// expected auto-failover of the cluster, before forcefully failing-over the pods.
+	// This may cause data loss, and is only expected to be used on clusters with ephemeral
+	// data, where the loss of the pod means that the data is known to be unrecoverable.
+	// This field must be either "PrioritizeDataIntegrity" or "PrioritizeUptime", defaulting
+	// to "PrioritizeDataIntegrity".
 	RecoveryPolicy *RecoveryPolicy `json:"recoveryPolicy,omitempty"`
 
-	// This controls how aggressive we are when performing a cluster upgrade.
+	// UpgradeStrategy controls how aggressive the Operator is when performing a cluster
+	// upgrade.  When a rolling upgrade is requested, pods are upgraded one at a time.  This
+	// strategy is slower, however less disruptive.  When an immediate upgrade strategy is
+	// requested, all pods are upgraded at the same time.  This strategy is faster, but more
+	// disruptive.  This field must be either "RollingUpgrade" or "ImmediateUpgrade", defaulting
+	// to "RollingUpgrade".
 	UpgradeStrategy *UpgradeStrategy `json:"upgradeStrategy,omitempty"`
 
-	// AntiAffinity determines if the couchbase-operator tries to avoid putting
-	// the couchbase members in the same cluster onto the same node.
+	// AntiAffinity forces the Operator to schedule different Couchbase server pods on
+	// different Kubernetes nodes.  Anti-affinity reduces the likelihood of unrecoverable
+	// failure in the event of a node issue.  Use of anti-affinity is highly recommended for
+	// production clusters.
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
-	// Cluster specific settings
+	// ClusterSettings define Couchbsae cluster-wide settings such as memory allocation,
+	// failover characteristics and index settings.
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	ClusterSettings ClusterConfig `json:"cluster"`
 
-	// Enables software update notifications in the UI
+	// SoftwareUpdateNotifications enables software update notifications in the UI.
+	// When enabled, the UI will alert when a Couchbase server upgrade is available.
 	SoftwareUpdateNotifications bool `json:"softwareUpdateNotifications,omitempty"`
 
 	// VolumeClaimTemplates define the desired characteristics of a volume
-	// that can be requested/claimed by a pod.
-	// When specified, each claim should map to the name of a volumeMount
-	// defined in a PodPolicy
+	// that can be requested/claimed by a pod, for example the storage class to
+	// use and the volume size.  Volume claim templates are referred to by name
+	// by server class volume mount configuration.
 	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
 	// ServerGroups define the set of availability zones you want to distribute
@@ -862,39 +1071,57 @@ type ClusterSpec struct {
 	// +listType=set
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
-	// Security Context for all pods
+	// SecurityContext allows the configuration of the security context for all
+	// Couchbase server pods.  When using persistent volumes you may need to set
+	// the fsGroup field in order to write to the volume.  For non-root clusters
+	// you must also set runAsUser to 1000, corresponding to the couchbase user
+	// in official container images.  More info:
+	// https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
 
 	// Platform gives a hint as to what platform we are running on and how
-	// to configure services etc.
+	// to configure services.  This field must be one of "aws", "gke" or "azure".
 	Platform PlatformType `json:"platform,omitempty"`
 
-	// Security groups together related security options.
+	// Security defines Couchbase cluster security options such as the administrator
+	// account username and password, and user RBAC settings.
 	Security CouchbaseClusterSecuritySpec `json:"security"`
 
-	// Networking groups together related networking options.
+	// Networking defines Couchbase cluster networking options such as network
+	// topology, TLS and DDNS settings.
 	Networking CouchbaseClusterNetworkingSpec `json:"networking,omitempty"`
 
-	// Logging groups together logging related options.
+	// Logging defines Operator logging options.
 	Logging CouchbaseClusterLoggingSpec `json:"logging,omitempty"`
 
-	// Servers specifies
+	// Servers defines server classes for the Operator to provision and manage.
+	// A server class defines what services are running and how many members make
+	// up that class.  Specifying multiple server classes allows the Operator to
+	// provision clusters with Multi-Dimensional Scaling (MDS).  At least one server
+	// class must be defined, and at least one server class must be running the data
+	// service.
+	// +listType=map
+	// +listMapKey=name
 	// +kubebuilder:validation:MinItems=1
 	Servers []ServerConfig `json:"servers"`
 
-	// Bucket specific settings
+	// Buckets defines whether the Operator should manage buckets, and how to lookup
+	// bucket resources.
 	Buckets Buckets `json:"buckets,omitempty"`
 
-	// XDCR specific settings.
+	// XDCR defines whether the Operator should manage XDCR, remote clusters and how
+	// to lookup replication resources.
 	XDCR XDCR `json:"xdcr,omitempty"`
 
-	// Prometheus Monitoring settings.
+	// Monitoring defines any Operator managed integration into 3rd party monitoring
+	// infrastructure.
 	Monitoring *CouchbaseClusterMonitoringSpec `json:"monitoring,omitempty"`
 
-	// Backup specific settings
+	// Backup defines whether the Operator should manage automated backups, and how
+	// to lookup backup resources.
 	Backup Backup `json:"backup,omitempty"`
 
-	// EnablePreviewScaling enables autoscaling for stateful services and buckets
+	// EnablePreviewScaling enables autoscaling for stateful services and buckets.
 	EnablePreviewScaling bool `json:"enablePreviewScaling,omitempty"`
 }
 
@@ -1012,24 +1239,47 @@ type IPv4Prefix string
 
 type IPV4PrefixList []IPv4Prefix
 
-// ObjectMeta is a sanitized object metadata object that exposes
-// what we allow a user to modify.
+// Standard objects metadata.  This is a curated version for use with Couchbase
+// resource templates.
 type ObjectMeta struct {
-	Labels      map[string]string `json:"labels,omitempty"`
+	// Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services. More info: http://kubernetes.io/docs/user-guide/labels
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations is an unstructured key value map stored with a resource that
+	// may be set by external tools to store and retrieve arbitrary metadata. They
+	// are not queryable and should be preserved when modifying objects. More
+	// info: http://kubernetes.io/docs/user-guide/annotations
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// NamedObjectMeta is used to define object metadata requiring a name.
+// Standard objects metadata.  This is a curated version for use with Couchbase
+// resource templates.
 type NamedObjectMeta struct {
-	Name        string            `json:"name"`
-	Labels      map[string]string `json:"labels,omitempty"`
+	// Name must be unique within a namespace. Is required when creating
+	// resources, although some resources may allow a client to request the
+	// generation of an appropriate name automatically. Name is primarily intended
+	// for creation idempotence and configuration definition. Cannot be updated.
+	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
+	Name string `json:"name"`
+
+	// Map of string keys and values that can be used to organize and categorize
+	// (scope and select) objects. May match selectors of replication controllers
+	// and services. More info: http://kubernetes.io/docs/user-guide/labels
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations is an unstructured key value map stored with a resource that
+	// may be set by external tools to store and retrieve arbitrary metadata. They
+	// are not queryable and should be preserved when modifying objects. More
+	// info: http://kubernetes.io/docs/user-guide/annotations
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // ServiceTemplateSpec is a sanitized version of a service that exposes
 // what we allow a user to modify.
 type ServiceTemplateSpec struct {
-	ObjectMeta `json:"metadata,inline,omitempty"`
+	ObjectMeta `json:"metadata,omitempty"`
 	Spec       *v1.ServiceSpec `json:"spec,omitempty"`
 }
 
@@ -1045,62 +1295,91 @@ const (
 
 type CouchbaseClusterNetworkingSpec struct {
 	// ExposeAdminConsole creates a service referencing the admin console.
+	// The service is configured by the adminConsoleServiceTemplate field.
 	ExposeAdminConsole bool `json:"exposeAdminConsole,omitempty"`
 
-	// DEPRECATED from Couchbase Server 6.5.0 onwards.
-	// AdminConsoleServices is a selector to choose specific services to expose via the admin console.
-	AdminConsoleServices ServiceList `json:"adminConsoleServices,omitempty"`
+	// DEPRECATED - not required by Couchbase Server 6.5.0 onward.
+	// AdminConsoleServices is a selector to choose specific services to expose via the admin
+	// console. This field may contain any of "data", "index", "query", "search", "eventing"
+	// and "analytics".  Each service may only be included once.
+	// +listType=set
+	AdminConsoleServices []Service `json:"adminConsoleServices,omitempty"`
 
-	// AdminConsoleServiceTemplate provides user access to every possible
-	// field so they can control anything they want.
+	// AdminConsoleServiceTemplate provides a template used by the Operator to create
+	// and manage the admin console service.  This allows services to be annotated, the
+	// service type defined and any other options that Kubernetes provides.  When using
+	// a LoadBalancer service type, TLS and dynamic DNS must also be enabled. The Operator
+	// reserves the right to modify or replace any field.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#service-v1-core
 	AdminConsoleServiceTemplate *ServiceTemplateSpec `json:"adminConsoleServiceTemplate,omitempty"`
 
-	// DEPRECATED this will be removed in a later release.
-	// AdminConsoleServiceType defines whether to create a NodePort or LoadBalancer service.
+	// DEPRECATED - by adminConsoleServiceTemplate.
+	// AdminConsoleServiceType defines whether to create a node port or load balancer service.
+	// When using a LoadBalancer service type, TLS and dynamic DNS must also be enabled.
+	// This field must be one of "NodePort" or "LoadBalancer", defaulting to "NodePort".
 	// +kubebuilder:default="NodePort"
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
 
-	// ExposedFeatures is a list of features to expose on the K8S node
-	// network.  They represent a subset of ports e.g. admin=8091,
-	// xdcr=8091,8092,11210, and thus may overlap.
-	ExposedFeatures ExposedFeatureList `json:"exposedFeatures,omitempty"`
+	// ExposedFeatures is a list of Couchbase features to expose when using a networking
+	// model that exposes the Couchbase cluster externally to Kubernetes.  This field also
+	// triggers the creation of per-pod services used by clients to connect to the Couchbase
+	// cluster.  When admin, only the administrator port is exposed, allowing remote
+	// administration.  When xdcr, only the services required for remote replication are exposed.
+	// The xdcr feature is only required when the cluster is the destrination of an XDCR
+	// replication.  When client, all services are exposed as required for client SDK operation.
+	// This field may contain any of "admin", "xdcr" and "client".  Each feature may only be
+	// included once.
+	// +listType=set
+	ExposedFeatures []ExposedFeature `json:"exposedFeatures,omitempty"`
 
-	// ExposedFeatureServiceTemplate provides user access to every possible
-	// field so they can control anything they want.
+	// ExposedFeatureServiceTemplate provides a template used by the Operator to create
+	// and manage per-pod services.  This allows services to be annotated, the
+	// service type defined and any other options that Kubernetes provides.  When using
+	// a LoadBalancer service type, TLS and dynamic DNS must also be enabled. The Operator
+	// reserves the right to modify or replace any field.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#service-v1-core
 	ExposedFeatureServiceTemplate *ServiceTemplateSpec `json:"exposedFeatureServiceTemplate,omitempty"`
 
-	// DEPRECATED this will be removed in a later release.
-	// ExposedFeatureServiceType defines whether to create a NodePort or LoadBalancer service.
+	// DEPRECATED - by exposedFeatureServiceTemplate.
+	// ExposedFeatureServiceType defines whether to create a node port or load balancer service.
+	// When using a LoadBalancer service type, TLS and dynamic DNS must also be enabled.
+	// This field must be one of "NodePort" or "LoadBalancer", defaulting to "NodePort".
 	// +kubebuilder:default="NodePort"
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	ExposedFeatureServiceType v1.ServiceType `json:"exposedFeatureServiceType,omitempty"`
 
-	// DEPRECATED this will be removed in a later release.
-	// ExposedFeatureTrafficPolicy defines how packets should be routed.
+	// DEPRECATED  - by exposedFeatureServiceTemplate.
+	// ExposedFeatureTrafficPolicy defines how packets should be routed from a load balancer
+	// service to a Couchbase pod.  When local, traffic is routed directly to the pod.  When
+	// cluster, traffic is routed to any node, then forwarded on.  While cluster routing may be
+	// slower, there are some situations where it is required for connectivity.  This field
+	// must be either "Cluster" or "Local", defaulting to "Local",
 	// +kubebuilder:validation:Enum=Cluster;Local
 	ExposedFeatureTrafficPolicy *v1.ServiceExternalTrafficPolicyType `json:"exposedFeatureTrafficPolicy,omitempty"`
 
-	// TLS contains the TLS configuration for the cluster.
+	// TLS defines the TLS configuration for the cluster including
+	// server and client certificate configuration, and TLS security policies.
 	TLS *TLSPolicy `json:"tls,omitempty"`
 
-	// DNS points to information for Dynamic DNS support.
+	// DNS defines information required for Dynamic DNS support.
 	DNS *DNS `json:"dns,omitempty"`
 
-	// DEPRECATED this will be removed in a later release.
+	// DEPRECATED - by adminConsoleServiceTemplate and exposedFeatureServiceTemplate.
 	// ServiceAnnotations allows services to be annotated with custom labels.
 	// Operator annotations are merged on top of these so have precedence as
 	// they are required for correct operation.
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 
-	// DEPRECATED this will be removed in a later release.
+	// DEPRECATED - by adminConsoleServiceTemplate and exposedFeatureServiceTemplate.
 	// LoadBalancerSourceRanges applies only when an exposed service is of type
 	// LoadBalancer and limits the source IP ranges that are allowed to use the
-	// service.
+	// service.  Items must use IPv4 class-less interdomain routing (CIDR) notation
+	// e.g. 10.0.0.0/16.
 	LoadBalancerSourceRanges IPV4PrefixList `json:"loadBalancerSourceRanges,omitempty"`
 
 	// NetworkPlatform is used to enable support for vairous netwokring
-	// technologoes.
+	// technologies.  This field must be one of "Istio".
 	NetworkPlatform *NetworkPlatform `json:"networkPlatform,omitempty"`
 
 	// DisableUIOverHTTP is used to explicitly enable and disable UI access over
@@ -1124,7 +1403,11 @@ type CouchbaseClusterLoggingSpec struct {
 
 // DNS contains information for Dynamic DNS support.
 type DNS struct {
-	// Domain is the domain to create pods in.
+	// Domain is the domain to create pods in.  When populated the Operator
+	// will annotate the admin console and per-pod services with the key
+	// "external-dns.alpha.kubernetes.io/hostname".  These annotations can
+	// be used directly by a Kubernetes External-DNS controler to replicate
+	// load balancer service IP addresses into a public DNS server.
 	Domain string `json:"domain,omitempty"`
 }
 
@@ -1142,56 +1425,97 @@ const (
 )
 
 type ClusterConfig struct {
-	// The name of the cluster
+	// ClusterName defines the name of the cluster, as displayed in the Couchbase UI.
+	// By default, the cluster name is that specified in the CouchbaseCluster resource's
+	// metadata.
 	ClusterName string `json:"clusterName,omitempty"`
 
-	// The amount of memory that should be allocated to the data service
+	// DataServiceMemQuota is the amount of memory that should be allocated to the data service.
+	// This value is per-pod, and only applicable to pods belonging to server classes running
+	// the data service.  This field must be a quantity greater than or equal to 256Mi.  This
+	// field defaults to 256Mi.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="256Mi"
+	// +kubebuilder:validation:Type=string
 	DataServiceMemQuota *resource.Quantity `json:"dataServiceMemoryQuota,omitempty"`
 
-	// The amount of memory that should be allocated to the index service
+	// IndexServiceMemQuota is the amount of memory that should be allocated to the index service.
+	// This value is per-pod, and only applicable to pods belonging to server classes running
+	// the index service.  This field must be a quantity greater than or equal to 256Mi.  This
+	// field defaults to 256Mi.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="256Mi"
+	// +kubebuilder:validation:Type=string
 	IndexServiceMemQuota *resource.Quantity `json:"indexServiceMemoryQuota,omitempty"`
 
-	// The amount of memory that should be allocated to the search service
+	// SearchServiceMemQuota is the amount of memory that should be allocated to the search service.
+	// This value is per-pod, and only applicable to pods belonging to server classes running
+	// the search service.  This field must be a quantity greater than or equal to 256Mi.  This
+	// field defaults to 256Mi.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="256Mi"
+	// +kubebuilder:validation:Type=string
 	SearchServiceMemQuota *resource.Quantity `json:"searchServiceMemoryQuota,omitempty"`
 
-	// The amount of memory that should be allocated to the eventing service
+	// EventingServiceMemQuota is the amount of memory that should be allocated to the eventing service.
+	// This value is per-pod, and only applicable to pods belonging to server classes running
+	// the eventing service.  This field must be a quantity greater than or equal to 256Mi.  This
+	// field defaults to 256Mi.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="256Mi"
+	// +kubebuilder:validation:Type=string
 	EventingServiceMemQuota *resource.Quantity `json:"eventingServiceMemoryQuota,omitempty"`
 
-	// The amount of memory that should be allocated to the analytics service
+	// AnalyticsServiceMemQuota is the amount of memory that should be allocated to the analytics service.
+	// This value is per-pod, and only applicable to pods belonging to server classes running
+	// the analytics service.  This field must be a quantity greater than or equal to 1Gi.  This
+	// field defaults to 1Gi.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="1Gi"
+	// +kubebuilder:validation:Type=string
 	AnalyticsServiceMemQuota *resource.Quantity `json:"analyticsServiceMemoryQuota,omitempty"`
 
-	// The index storage mode to use for secondary indexing (DEPRECATED)
+	// DEPRECATED - by indexer.
+	// The index storage mode to use for secondary indexing.  This field must be one of
+	// "memory_optimized" or "plasma", defaulting to "memory_optimized".  This field is
+	// immutable and cannot be changed unless there are no server classes running the
+	// index service in the cluster.
 	// +kubebuilder:default="memory_optimized"
 	IndexStorageSetting CouchbaseClusterIndexStorageSetting `json:"indexStorageSetting,omitempty"`
 
-	// Indexer allows the small number of index variables to be tuned.
-	// If specified this attribute overrides `indexStorageSetting`.
+	// Indexer allows the indexer to be configured.
 	Indexer *CouchbaseClusterIndexerSettings `json:"indexer,omitempty"`
 
-	// Timeout that expires to trigger the auto failover.
+	// AutoFailoverTimeout defines how long Couchbase server will wait between a pod
+	// being witnessed as down, until when it will failover the pod.  Couchbase server
+	// will only failover pods if it deems it safe to do so, and not result in data
+	// loss.  This field must be in the range 5-3600s, defaulting to 120s.
+	// More info:  https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="120s"
 	AutoFailoverTimeout *metav1.Duration `json:"autoFailoverTimeout,omitempty"`
 
-	// The number of failover events we can tolerate
+	// AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server
+	// will allow before not allowing any more.  This field must be between 1-3, default 3.
 	// +kubebuilder:default=3
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=3
 	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount,omitempty"`
 
-	// Whether to auto failover if disk issues are detected
+	// AutoFailoverOnDataDiskIssues defines whether Couchbase server should failover a pod
+	// if a disk issue was detected.
 	AutoFailoverOnDataDiskIssues bool `json:"autoFailoverOnDataDiskIssues,omitempty"`
 
-	// How long to wait for transient errors before failing over a faulty disk
+	// AutoFailoverOnDataDiskIssuesTimePeriod defines how long to wait for transient errors
+	// before failing over a faulty disk.  This field must be in the range 5-3600s, defaulting
+	// to 120s.  More info:  https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="120s"
 	AutoFailoverOnDataDiskIssuesTimePeriod *metav1.Duration `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
 
-	// Whether to enable failing over a server group
+	// AutoFailoverServerGroup whether to enable failing over a server group.
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
 
-	// Auto-compaction settings
+	// AutoCompaction allows the configuration of auto-compaction, including on what
+	// conditions disk space is reclaimed and when it is allowed to run.
 	// +kubebuilder:default="x-couchbase-object"
 	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty"`
 }
@@ -1215,12 +1539,14 @@ const (
 // CouchbaseClusterIndexerSettings allow the indexer to be configured.
 type CouchbaseClusterIndexerSettings struct {
 	// Threads controls the number of processor threads to use for indexing.
-	// A value of 0 means 1 per CPU (default).  This attribute must be greater
-	// than or equal to 0.
+	// A value of 0 means 1 per CPU.  This attribute must be greater
+	// than or equal to 0, defaulting to 0.
 	// +kubebuilder:validation:Minimum=0
 	Threads int `json:"threads,omitempty"`
 
-	// LogLevel controls the verbosity of indexer logs.
+	// LogLevel controls the verbosity of indexer logs.  This field must be one of
+	// "silent", "fatal", "error", "warn", "info", "verbose", "timing", "debug" or
+	// "trace", defaulting to "info".
 	// +kubebuilder:default="info"
 	LogLevel IndexerLogLevel `json:"logLevel,omitempty"`
 
@@ -1242,42 +1568,51 @@ type CouchbaseClusterIndexerSettings struct {
 
 	// StorageMode controls the underlying storage engine for indexes.  Once set
 	// it can only be modified if there are no nodes in the cluster running the
-	// index service.
+	// index service.  The field must be one of "memory_optimized" or "plasma",
+	// defaulting to "memory_optimized".
 	// +kubebuilder:default="memory_optimized"
 	StorageMode CouchbaseClusterIndexStorageSetting `json:"storageMode,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.
 type DatabaseFragmentationThreshold struct {
-	// Percent is the percentage of disk fragmentation (2-100).
+	// Percent is the percentage of disk fragmentation after which to decompaction will be
+	// triggered. This field must be in the range 2-100, defaulting to 30.
 	// +kubebuilder:default=30
 	// +kubebuilder:validation:Minimum=2
 	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
 
-	// Size is the size of disk framentation.
+	// Size is the amount of disk framentation, that once exceeded, will trigger decompaction.
+	// More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// +kubebuilder:validation:Type=string
 	Size *resource.Quantity `json:"size,omitempty"`
 }
 
 // ViewFragmentationThreshold lists triggers for when view compaction should start.
 type ViewFragmentationThreshold struct {
-	// Percent is the percentage of disk fragmentation (2-100).
+	// Percent is the percentage of disk fragmentation after which to decompaction will be
+	// triggered. This field must be in the range 2-100, defaulting to 30.
 	// +kubebuilder:default=30
 	// +kubebuilder:validation:Minimum=2
 	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
 
-	// Size is the size of disk framentation.
+	// Size is the amount of disk framentation, that once exceeded, will trigger decompaction.
+	// More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// +kubebuilder:validation:Type=string
 	Size *resource.Quantity `json:"size,omitempty"`
 }
 
 // TimeWindow allows the user to restrict when compaction can occur.
 type TimeWindow struct {
-	// Start is a string in the form HH:MM.
+	// Start is a wallclock time, in the form HH:MM, when a compaction is permitted to start.
 	// +kubebuilder:validation:Pattern="^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$"
 	Start string `json:"start,omitempty"`
 
-	// End is a string in the form HH:MM.
+	// End is a wallclock time, in the form HH:MM, when a compaction shold stop.
 	// +kubebuilder:validation:Pattern="^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$"
 	End string `json:"end,omitempty"`
 
@@ -1288,12 +1623,12 @@ type TimeWindow struct {
 
 // AutoCompaction define auto compaction settings.
 type AutoCompaction struct {
-	// DatabaseFragmentationThreshold lists triggers for when database compaction should start.
+	// DatabaseFragmentationThreshold defines triggers for when database compaction should start.
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	DatabaseFragmentationThreshold DatabaseFragmentationThreshold `json:"databaseFragmentationThreshold,omitempty"`
 
-	// ViewFragmentationThreshold lists triggers for when view compaction should start.
+	// ViewFragmentationThreshold defines triggers for when view compaction should start.
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	ViewFragmentationThreshold ViewFragmentationThreshold `json:"viewFragmentationThreshold,omitempty"`
@@ -1302,10 +1637,12 @@ type AutoCompaction struct {
 	// in parallel.
 	ParallelCompaction bool `json:"parallelCompaction,omitempty"`
 
-	// TimeWindow allows the user to restrict when compaction can occur.
+	// TimeWindow allows restriction of when compaction can occur.
 	TimeWindow TimeWindow `json:"timeWindow,omitempty"`
 
 	// TombstonePurgeInterval controls how long to wait before purging tombstones.
+	// This field must be in the range 1h-1440h, defaulting to 72h.
+	// More info:  https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="72h"
 	TombstonePurgeInterval *metav1.Duration `json:"tombstonePurgeInterval,omitempty"`
 }
@@ -1334,33 +1671,39 @@ const (
 // RemoteClusterTLS is a structure that can source TLS certificates from
 // different sources.
 type RemoteClusterTLS struct {
-	// Secret references a secret containing the CA certificate, and optionally a
-	// client certificate and key.
+	// Secret references a secret containing the CA certificate (data key "ca"),
+	// and optionally a client certificate (data key "certificate") and key
+	// (data key "key").
 	Secret *string `json:"secret"`
 }
 
 // RemoteCluster is a reference to a remote cluster for XDCR.
 type RemoteCluster struct {
-	// Name of the remote cluster.  Referenced by Replications.
-	Name string `json:"name,omitempty"`
+	// Name of the remote cluster.
+	Name string `json:"name"`
 
-	// UUID of the remote cluster.
+	// UUID of the remote cluster.  The UUID of a CouchbaseCluster resource
+	// is advertised in the status.clusterId field of the resource.
 	// +kubebuilder:validation:Pattern="^[0-9a-f]{32}$"
-	UUID string `json:"uuid,omitempty"`
+	UUID string `json:"uuid"`
 
 	// Hostname is the connection string to use to connect the remote cluster.
 	// +kubebuilder:validation:Pattern="^((couchbase|couchbases|http|https)://)?[0-9a-zA-Z\\-\\.]+(:\\d+)?(\\?network=[^&]+)?$"
-	Hostname string `json:"hostname,omitempty"`
+	Hostname string `json:"hostname"`
 
 	// AuthenticationSecret is a secret used to authenticate when establishing a
-	// remote connection.  It is only required when not using mTLS
+	// remote connection.  It is only required when not using mTLS.  The secret
+	// must contain a username (secret key "username") and password (secret key
+	// "password").
 	AuthenticationSecret *string `json:"authenticationSecret,omitempty"`
 
 	// Replications are replication streams from this cluster to the remote one.
+	// This field defines how to look up CouchbaseReplication resources.  By default
+	// any CouchbaseReplication resources in the namespace will be considered.
 	Replications Replications `json:"replications,omitempty"`
 
 	// TLS if specified references a resource containing the necessary certificate
-	// data.
+	// data for an encrypted connection.
 	TLS *RemoteClusterTLS `json:"tls,omitempty"`
 }
 
@@ -1370,6 +1713,8 @@ type XDCR struct {
 	Managed bool `json:"managed,omitempty"`
 
 	// RemoteClusters is a set of named remote clusters to establish replications to.
+	// +listType=map
+	// +listMapKey=name
 	RemoteClusters []RemoteCluster `json:"remoteClusters,omitempty"`
 }
 
@@ -1396,18 +1741,22 @@ type PodTemplate struct {
 }
 
 type ServerConfig struct {
-	// Size is the expected size of the couchbase cluster. The
-	// couchbase-operator will eventually make the size of the running
-	// cluster equal to the expected size. The vaild range of the size is
-	// from 1 to 50.
+	// Size is the expected requested of the server class.  This field
+	// must be greater than or equal to 1.
 	// +kubebuilder:validation:Minimum=1
 	Size int `json:"size"`
 
-	// A name for the server configuration. It must be unique.
+	// Name is a textual name for the server configuration and must be unique.
+	// The name is used by the operator to uniquely identify a server class,
+	// and map pods back to an intended configuration.
 	Name string `json:"name"`
 
-	// The services to run on nodes created with this spec
-	Services ServiceList `json:"services"`
+	// Services is the set of Couchbase services to run on this server class.
+	// At least one class must contain the data service.  The field may contain
+	// any of "data", "index", "query", "search", "eventing" or "analytics".
+	// Each service may only be specified once.
+	// +listType=set
+	Services []Service `json:"services"`
 
 	// ServerGroups define the set of availability zones you want to distribute
 	// pods over, and construct Couchbase server groups for.  By default, most
@@ -1421,31 +1770,34 @@ type ServerConfig struct {
 	// +listType=set
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
-	// Pod defines the policy to create pod for the couchbase pod.
-	//
-	// Updating Pod does not take effect on any existing couchbase pods.
+	// Pod defines a template used to create pod for each Couchbase server
+	// instance.  Modifying pod metadata such as labels and annotations will
+	// update the pod in-place.  Any other modification will result in a cluster
+	// upgrade in order to fulfil the request. The Operator reserves the right
+	// to modify or replace any field.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#pod-v1-core
 	Pod *PodTemplate `json:"pod,omitempty"`
 
-	// Volume mounts represent persistent volume claims to attach to pod.
-	// If defined new pods will use persistent volumes.
+	// VolumeMounts define persistent volume claims to attach to pod.
 	VolumeMounts *VolumeMounts `json:"volumeMounts,omitempty"`
 
-	// Resources is the resource requirements for the couchbase container.
-	// This field cannot be updated once the cluster is created.
+	// Resources are the resource requirements for the Couchbase server container.
+	// If not specified, or missing the requests.memory field, then the Operator
+	// will automatically populate memory requests by calculating the total memory
+	// requirements for each service enabled for this class, then scaling by an
+	// overhead.
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 
-	// List of environment variables to set in the couchbase container.
-	// This is used to configure couchbase process. couchbase cluster cannot be
-	// created, when bad environement variables are provided. Do not overwrite
-	// any flags used to bootstrap the cluster (for example `--initial-cluster`
-	// flag). This field cannot be updated.
+	// Env allows the setting of environment variables in the Couchbase server container.
 	Env []v1.EnvVar `json:"env,omitempty"`
 
-	// EnvFrom allows the setting of environment variables from things like
-	// Secrets and ConfigMaps.
+	// EnvFrom allows the setting of environment variables in the Couchbase server container.
 	EnvFrom []v1.EnvFromSource `json:"envFrom,omitempty"`
 
-	// Enabled defines whether Autoscale feature is enabled for this config
+	// AutoscaledEnabled defines whether the autoscaling feature is enabled for this class.
+	// When true, the Operator will create a CouchbaseAutoscaler resource for this
+	// server class.  The CouchbaseAutoscaler implements the Kubernetes scale API and
+	// can be controlled by the Kubernetes horizontal pod autoscaler (HPA).
 	AutoscaleEnabled bool `json:"autoscaleEnabled,omitempty"`
 }
 
@@ -1460,15 +1812,44 @@ const (
 )
 
 type VolumeMounts struct {
-	// Name of claim to use for couchbases default install path
+	// DefaultClaim is a persistent volume that encompasses all Couchbase persistent
+	// data, including document storage, indexes and logs.  The default volume can be
+	// used with any server class.  Use of the default claim allows the Operator to
+	// recover failed pods from the persistent volume far quicker than if the pod were
+	// using ephemeral storage.  The default claim cannot be used at the same time
+	// as the logs claim within the same server class.  This field references a volume
+	// claim template name as defined in "spec.volumeClaimTemplates".
 	DefaultClaim string `json:"default,omitempty"`
-	// Name of claim to use for index path
-	IndexClaim string `json:"index,omitempty"`
-	// Name of claim to use for data path
+
+	// DataClaim is a persistent volume that encompasses key/value storage associated
+	// with the data service.  The data claim can only be used on server classes running
+	// the data service, and must be used in conjunction with the default claim.  This
+	// field allows the data service to use different storage media (e.g. SSD) to
+	// improve performance of this service.  This field references a volume
+	// claim template name as defined in "spec.volumeClaimTemplates".
 	DataClaim string `json:"data,omitempty"`
-	// Name of claims to use for analytics paths
+
+	// IndexClaim s a persistent volume that encompasses index storage asscociated
+	// with the index service.  The index claim can only be used on server classes running
+	// the index service, and must be used in conjunction with the default claim.  This
+	// field allows the index service to use different storage media (e.g. SSD) to
+	// improve performance of this service. This field references a volume
+	// claim template name as defined in "spec.volumeClaimTemplates".
+	IndexClaim string `json:"index,omitempty"`
+
+	// AnalyticsClaims are persistent volumes that encompass analytics storage asscociated
+	// with the analytics service.  Analytics claims can only be used on server classes
+	// running the analytics service, and must be used in conjunction with the default claim.
+	// This field allows the analytics service to use different storage media (e.g. SSD), and
+	// scale horizontally, to improve performance of this service.  This field references a volume
+	// claim template name as defined in "spec.volumeClaimTemplates".
 	AnalyticsClaims []string `json:"analytics,omitempty"`
-	// Name of claim to use for logs path
+
+	// LogsClaim is a persistent volume that encompasses only Couchbase server logs to aid
+	// with supporting the product.  The logs claim can only be used on server classes running
+	// stateless services: query, search & eventing.  The logs claim cannot be used at the same
+	// time as the default claim within the same server class.  This field references a volume
+	// claim template name as defined in "spec.volumeClaimTemplates".
 	LogsClaim string `json:"logs,omitempty"`
 }
 
@@ -1501,21 +1882,24 @@ const (
 
 // TLSPolicy defines the TLS policy of an couchbase cluster
 type TLSPolicy struct {
-	// StaticTLS enables user to generate static x509 certificates and keys,
-	// put them into Kubernetes secrets, and specify them into here.
+	// Static enables user to generate static x509 certificates and keys,
+	// put them into Kubernetes secrets, and specify them here.
 	Static *StaticTLS `json:"static,omitempty"`
 
-	// ClientCertificatePolicy optionally defines the policy to use.
-	// If set then the OperatorSecret must contain a valid
-	// certificate/key pair for the Administrator account.
+	// ClientCertificatePolicy defines the client authentication policy to use.
+	// If set, the Operator expects TLS configuration to contain a valid certificate/key pair
+	// for the Administrator account.
 	ClientCertificatePolicy *ClientCertificatePolicy `json:"clientCertificatePolicy,omitempty"`
 
-	// ClientCertificatePaths optionally defines where to look in client
-	// certificates to extract the user name.
+	// ClientCertificatePaths defines where to look in client certificates in order
+	// to extract the user name.
 	ClientCertificatePaths []ClientCertificatePath `json:"clientCertificatePaths,omitempty"`
 
 	// NodeToNodeEncryption specifies whether to encrypt data between Couchbase nodes
-	// within the same cluster.  This may come at the expense of performance.
+	// within the same cluster.  This may come at the expense of performance.  When
+	// control plane only encryption is used, only cluster management traffic is encrypted
+	// between nodes.  When all, all traffic is encrypted, including database documents.
+	// This field must be either "ControlPlaneOnly" or "All".
 	NodeToNodeEncryption *NodeToNodeEncryptionType `json:"nodeToNodeEncryption,omitempty"`
 
 	// TLSMinimumVersion specifies the minimum TLS version the Couchbase server can
@@ -1533,12 +1917,20 @@ type TLSPolicy struct {
 }
 
 type StaticTLS struct {
-	// ServerSecret is the secret containing TLS certs used by each couchbase member pod
-	// for the communication between couchbase server and its clients.
+	// ServerSecret is a secret name containing TLS certs used by each couchbase member pod
+	// for the communication between couchbase server and its clients.  The secret must
+	// contain a certificate chain (data key "couchbase-operator.crt") and a private
+	// key (data key "couchbase-operator.key").  The private key must be in the PKCS#1 RSA
+	// format.  The certificate chain must have a required set of X.509v3 subject alternative
+	// names for all cluster addressing modes.  See the Operator TLS documentation for more
+	// information.
 	ServerSecret string `json:"serverSecret,omitempty"`
 
-	// OperatorSecret is the secret containing TLS certs used by operator to
-	// talk securely to this cluster.
+	// OperatorSecret is a secret name containing TLS certs used by operator to
+	// talk securely to this cluster.  The secret must contain a CA certificate (data key
+	// ca.crt).  If client authentication is enabled, then the secret must also contain
+	// a client certificate chain (data key "couchbase-operator.crt") and private key
+	// (data key "couchbase-operator.key").
 	OperatorSecret string `json:"operatorSecret,omitempty"`
 }
 
@@ -1561,28 +1953,35 @@ const (
 // ClientCertificatePath defines how to extract a username from a client ceritficate.
 type ClientCertificatePath struct {
 	// Path defines where in the X.509 specification to extract the username from.
-	// Valid values are subject.cn, san.uri, san.dnsname, san.email.
+	// This field must be either "subject.cn", "san.uri", "san.dnsname" or  "san.email".
 	// +kubebuilder:validation:Pattern="^subject\\.cn|san\\.uri|san\\.dnsname|san\\.email$"
 	Path string `json:"path"`
 
-	// Prefix if specified allows a prefix to be stripped from the username.
+	// Prefix allows a prefix to be stripped from the username, once extracted from the
+	// certificate path.
 	Prefix string `json:"prefix,omitempty"`
 
-	// Delimiter if specified allows a suffix to be stripped from the username.
+	// Delimiter if specified allows a suffix to be stripped from the username, once
+	// extracted from the certificate path.
 	Delimiter string `json:"delimiter,omitempty"`
 }
 
 type ClusterCondition struct {
-	// Type is the type of condition
+	// Type is the type of condition.
 	Type ClusterConditionType `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
+
+	// Status is the status of the condition. Can be one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status"`
-	// The last time this condition was updated.
+
+	// Last time the condition status message updated.
 	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
 	// Last time the condition transitioned from one status to another.
 	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
+
+	// Unique, one-word, CamelCase reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
+
 	// A human readable message indicating details about the transition.
 	Message string `json:"message,omitempty"`
 }
@@ -1599,35 +1998,45 @@ const (
 	ClusterConditionHibernating  ClusterConditionType = "Hibernating"
 )
 
+// ClusterStatus defines any read-only status fields for the Couchbase server cluster.
 type ClusterStatus struct {
-	// ControlPaused indicates the operator pauses the control of the cluster.
+	// ControlPaused indicates if the Operator has acknowldged and paused the
+	// control of the cluster.
 	ControlPaused bool `json:"controlPaused,omitempty"`
 
-	// Condition keeps ten most recent cluster conditions
+	// Current service state of the Couchbase cluster.
 	Conditions []ClusterCondition `json:"conditions,omitempty"`
 
-	// A unique cluster identifier
+	// ClusterID is the unique cluster UUID.  This is generated every time
+	// a new cluster is created, so may vary over the lifetime of a cluster
+	// if it is recreated by disaster recovery mechanisms.
 	ClusterID string `json:"clusterId,omitempty"`
-	// Size is the current size of the cluster
+
+	// Size is the current size of the cluster in terms of pods.  Individual
+	// pod status conditions are listed in the members status.
 	Size int `json:"size"`
-	// Members are the couchbase members in the cluster
+
+	// Members are the couchbase members in the cluster.
 	Members *MembersStatus `json:"members,omitempty"`
-	// CurrentVersion is the current cluster version
+
+	// CurrentVersion is the current Couchbase version.  This reflects the
+	// version of the whole cluster, therefore during upgrade, it is only
+	// updated when the upgrade has completed.
 	CurrentVersion string `json:"currentVersion,omitempty"`
 
 	// Allocations shows memory allocations within server classes.
 	Allocations []ServerClassStatus `json:"allocations,omitempty"`
 
-	// Name of buckets active within cluster
+	// Buckets describes all the buckets managed by the cluster.
 	Buckets []BucketStatus `json:"buckets,omitempty"`
 
-	// Name of users active within cluster
+	// Users describes all the users managed by the cluster.
 	Users []string `json:"users,omitempty"`
 
-	// Name of groups active within cluster
+	// Groups describes all the groups managed by the cluster.
 	Groups []string `json:"groups,omitempty"`
 
-	// Name of active autoscaler resources
+	// Autscalers describes all the autoscalers managed by the cluster.
 	Autoscalers []string `json:"autoscalers,omitempty"`
 }
 
@@ -1637,9 +2046,11 @@ type ServerClassStatus struct {
 	Name string `json:"name"`
 
 	// RequestedMemory, if set, defines the Kubernetes resource request for the server class.
+	// +kubebuilder:validation:Type=string
 	RequestedMemory *resource.Quantity `json:"requestedMemory,omitempty"`
 
 	// AllocatedMemory defines the total memory allocated for constrained Couchbase services.
+	// +kubebuilder:validation:Type=string
 	AllocatedMemory *resource.Quantity `json:"allocatedMemory,omitempty"`
 
 	// AllocatedMemoryPercent is set when memory resources are requested and define how much of
@@ -1648,6 +2059,7 @@ type ServerClassStatus struct {
 
 	// UnusedMemory is set when memory resources are requested and is the difference between
 	// the requestedMemory and allocatedMemory.
+	// +kubebuilder:validation:Type=string
 	UnusedMemory *resource.Quantity `json:"unusedMemory,omitempty"`
 
 	// UnusedMemoryPercent is set when memory resources are requested and defines how much
@@ -1656,22 +2068,27 @@ type ServerClassStatus struct {
 
 	// DataServiceAllocation is set when the data service is enabled for this class and
 	// defines how much memory this service consumes per pod.
+	// +kubebuilder:validation:Type=string
 	DataServiceAllocation *resource.Quantity `json:"dataServiceAllocation,omitempty"`
 
 	// IndexServiceAllocation is set when the index service is enabled for this class and
 	// defines how much memory this service consumes per pod.
+	// +kubebuilder:validation:Type=string
 	IndexServiceAllocation *resource.Quantity `json:"indexServiceAllocation,omitempty"`
 
 	// SearchServiceAllocation is set when the search service is enabled for this class and
 	// defines how much memory this service consumes per pod.
+	// +kubebuilder:validation:Type=string
 	SearchServiceAllocation *resource.Quantity `json:"searchServiceAllocation,omitempty"`
 
 	// EventingServiceAllocation is set when the eventing service is enabled for this class and
 	// defines how much memory this service consumes per pod.
+	// +kubebuilder:validation:Type=string
 	EventingServiceAllocation *resource.Quantity `json:"eventingServiceAllocation,omitempty"`
 
 	// AnalyticsServiceAllocation is set when the analytics service is enabled for this class and
 	// defines how much memory this service consumes per pod.
+	// +kubebuilder:validation:Type=string
 	AnalyticsServiceAllocation *resource.Quantity `json:"analyticsServiceAllocation,omitempty"`
 }
 
@@ -1692,10 +2109,12 @@ type BucketStatus struct {
 type MemberStatusList []string
 
 type MembersStatus struct {
-	// Ready are the couchbase members that are ready to serve requests
-	// The member names are the same as the couchbase pod names
+	// Ready are the couchbase members that are clustered and ready to serve
+	// client requests.  The member names are the same as the couchbase pod names.
 	Ready MemberStatusList `json:"ready,omitempty"`
-	// Unready are the couchbase members not ready to serve requests
+
+	// Unready are the couchbase members not clustered or unready to serve
+	// client requests.  The member names are the same as the couchbase pod names.
 	Unready MemberStatusList `json:"unready,omitempty"`
 }
 

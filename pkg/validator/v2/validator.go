@@ -42,16 +42,8 @@ var (
 func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "cluster"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/cluster", Value: emptyObject})
-	}
-
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
 		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "networking"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/networking", Value: emptyObject})
 	}
 
 	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
@@ -190,11 +182,12 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	errs := []error{}
 
 	// Basic schema openapi v3 validation (not provided by structural schema)
-	if !util.UniqueString(customResource.Spec.Networking.AdminConsoleServices.StringSlice()) {
+	// DELETE ME AFTER 1.17
+	if !util.UniqueString(couchbasev2.ServiceList(customResource.Spec.Networking.AdminConsoleServices).StringSlice()) {
 		errs = append(errs, errors.DuplicateItems("spec.networking.adminConsoleServices", "body"))
 	}
 
-	if !util.UniqueString(customResource.Spec.Networking.ExposedFeatures.StringSlice()) {
+	if !util.UniqueString(couchbasev2.ExposedFeatureList(customResource.Spec.Networking.ExposedFeatures).StringSlice()) {
 		errs = append(errs, errors.DuplicateItems("spec.networking.exposedFeatures", "body"))
 	}
 
@@ -203,7 +196,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 
 	for i, class := range customResource.Spec.Servers {
-		if !util.UniqueString(class.Services.StringSlice()) {
+		if !util.UniqueString(couchbasev2.ServiceList(class.Services).StringSlice()) {
 			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].services", i), "body"))
 		}
 
@@ -334,6 +327,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	hasDataService := false
 
 	for i, config := range customResource.Spec.Servers {
+		// DELETE ME AFTER 1.17
 		if _, ok := unique[customResource.Spec.Servers[i].Name]; ok {
 			errs = append(errs, errors.DuplicateItems("spec.servers.name", "body"))
 		}
@@ -376,7 +370,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			// Volume mounts must be specified if any others are supportable
 			if class.VolumeMounts == nil {
 				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d]", index)))
-			} else if class.Services.ContainsAny(couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.AnalyticsService) && class.VolumeMounts.DefaultClaim == "" {
+			} else if couchbasev2.ServiceList(class.Services).ContainsAny(couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.AnalyticsService) && class.VolumeMounts.DefaultClaim == "" {
 				// These stateful services must have a "default" mount
 				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
 			}
@@ -407,15 +401,15 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			hasSecondaryMounts := len(secondaryMounts) > 0
 
 			// Check the associated service is enabled
-			if mounts.DataClaim != "" && !config.Services.Contains(couchbasev2.DataService) {
+			if mounts.DataClaim != "" && !couchbasev2.ServiceList(config.Services).Contains(couchbasev2.DataService) {
 				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.data requires the data service to be enabled", index))
 			}
 
-			if mounts.IndexClaim != "" && !config.Services.Contains(couchbasev2.IndexService) {
+			if mounts.IndexClaim != "" && !couchbasev2.ServiceList(config.Services).Contains(couchbasev2.IndexService) {
 				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.index requires the index service to be enabled", index))
 			}
 
-			if mounts.AnalyticsClaims != nil && !config.Services.Contains(couchbasev2.AnalyticsService) {
+			if mounts.AnalyticsClaims != nil && !couchbasev2.ServiceList(config.Services).Contains(couchbasev2.AnalyticsService) {
 				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.analytics requires the analytics service to be enabled", index))
 			}
 
@@ -1186,7 +1180,7 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 	for _, cur := range current.Spec.Servers {
 		for i, up := range updated.Spec.Servers {
 			if cur.Name == up.Name {
-				if !util.StringArrayCompare(cur.Services.StringSlice(), up.Services.StringSlice()) {
+				if !util.StringArrayCompare(couchbasev2.ServiceList(cur.Services).StringSlice(), couchbasev2.ServiceList(up.Services).StringSlice()) {
 					err := util.NewUpdateError(fmt.Sprintf("spec.servers[%d].services", i), "body")
 					errs = append(errs, err)
 				}

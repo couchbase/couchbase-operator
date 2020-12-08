@@ -105,10 +105,10 @@ Both <<public-networking-with-external-dns>> and <<generic-networking>> require 
 In both cases clients connect to different IP addresses than those of the underlying Couchbase pods.
 As a result when clients initially contact Couchbase Server to get a map of nodes and their hostnames then Operator must override the internal Kubernetes DNS names.
 
-Setting xref:reference-couchbasecluster.adoc#spec-networking-exposedfeatures[`spec.networking.exposedFeatures`] when creating a Couchbase cluster will instruct the Operator to override node mappings so that clients can connect to the correct IP address that a client can connect to.
+Setting `couchbasecluster.spec.networking.exposedFeatures` when creating a Couchbase cluster will instruct the Operator to override node mappings so that clients can connect to the correct IP address that a client can connect to.
 It will also cause the Operator to create separate services that are visible external to the Kubernetes cluster.
 
-Additionally xref:reference-couchbasecluster.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] is specified when using <<public-networking-with-external-dns>>, populating the cluster node maps with DNS names and annotating the services so https://github.com/kubernetes-sigs/external-dns[External DNS^] can replicate this to a cloud DDNS service provider.
+Additionally `couchbaseclusters.spec.networking.dns.domain` is specified when using <<public-networking-with-external-dns>>, populating the cluster node maps with DNS names and annotating the services so https://github.com/kubernetes-sigs/external-dns[External DNS^] can replicate this to a cloud DDNS service provider.
 
 === Supported Client Versions for use with Exposed Features
 

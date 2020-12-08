@@ -59,7 +59,7 @@ The Operator locally caches these resources, so needs to list them to get an ini
 _Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 events::
-The Operator will raise xref:reference-couchbasecluster-events.adoc[events] that are associated with a `CouchbaseCluster` resource, which can be used to synchronize external operations or raise alerts.
+The Operator will raise events that are associated with a `CouchbaseCluster` resource, which can be used to synchronize external operations or raise alerts.
 +
 _Required Permissions_: `list`, `create`, `update`
 

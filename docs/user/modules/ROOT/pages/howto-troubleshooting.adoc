@@ -9,8 +9,6 @@ When troubleshooting the Couchbase Operator, it is important to rule out Kuberne
 
 The following topics are also helpful to understand when troubleshooting the Operator:
 
-* xref:reference-couchbasecluster-status.adoc[Cluster Status and Conditions]
-* xref:reference-couchbasecluster-events.adoc[Understanding Conditions and Events]
 * xref:reference-operator-configuration.adoc[Operator Configuration]
 
 == Full Deployment Logs

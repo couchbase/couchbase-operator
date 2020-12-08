@@ -101,6 +101,20 @@ The Operator itself can provision and manage simple clusters for most use cases.
 In more complex situations that involve complex networking or interaction with other, external services, we need to provide guidance on how to integrate.
 These tutorial are provided as-is and may become inaccurate as 3rd party dependencies evolve.
 
+=== Conventions
+
+Resource Names::
+Kubernetes resources names, such as `Service` or `CouchbaseCluster`, will be rendered verbatim.
+These are distinguished by the use of bumpy-capitals, or camel-case, with an upper case first character.
+These are the names of resources when specified as `kind` in a resource's YAML definition.
+
+Attribute Paths::
+Resources contain attributes, such as `spec.security.authSecret` will be rendered verbatim.
+These are distinguished by the use of bumpy-capitals, or camel-case, with a lower case first character.
+Paths are based on the JSON path specification, and consecutive elements are separated by periods (`.`).
++
+Where attribute paths are used in the documentation, they have been prefixed with the resource name, and can be used directly with `kubectl explain` to xref:reference-resources.adoc[access online documentation].
+
 == Further Reading
 
 * xref:whats-new.adoc[What's New?]

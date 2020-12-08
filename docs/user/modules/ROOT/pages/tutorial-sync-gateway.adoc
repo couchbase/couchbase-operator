@@ -82,7 +82,7 @@ stringData:
     The connection string may be determined the same way as for xref:howto-client-sdks.adoc[client SDKs].
     The connection options are dependent on the chosen xref:concept-couchbase-networking.adoc[network architecture].
 
-<.> `databases.cb-example.bucket` defines the xref:reference-couchbasebucket.adoc#metadata-name[bucket name] to connect to and use to store mobile data.
+<.> `databases.cb-example.bucket` defines the `couchbasebuckets.metadata.name` to connect to and use to store mobile data.
 
 <.> `databases.cb-example.username` defines the user that will be used to connect to the cluster.
 
@@ -172,7 +172,7 @@ With this method, the Autonomous Operator takes care of creating the relevant Sy
 ==== Enabling RBAC Management
 
 RBAC security management on the Couchbase Server cluster defaults to `false`.
-This is the relevant snippet that would need to be added or modified in your xref:reference-couchbasecluster.adoc[`CouchbaseCluster`] configuration:
+This is the relevant snippet that would need to be added or modified in your `CouchbaseCluster` configuration:
 
 [source,yaml]
 ----

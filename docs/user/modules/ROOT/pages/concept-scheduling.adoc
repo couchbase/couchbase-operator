@@ -12,7 +12,7 @@ This section aims to define best practices to minimize undesirable and unpredict
 
 == Pod Isolation
 
-The simplest method of avoiding unpredictability in Couchbase Server performance is the xref:reference-couchbasecluster.adoc#spec-antiaffinity[`spec.antiAffinity`] parameter.
+The simplest method of avoiding unpredictability in Couchbase Server performance is the `couchbaseclusters.spec.antiAffinity` parameter.
 This guarantees that Couchbase Server pods in the same cluster are unable to be scheduled by Kubernetes on the same node.
 
 If anti-affinity were not specified, consider a three-pod Couchbase cluster.
@@ -30,7 +30,7 @@ The Autonomous Operator offers two parameters that can be used in concert to gua
 
 === Taints and Tolerations
 
-The xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-tolerations[`spec.servers[\].pod.spec.tolerations`] attribute allows Couchbase server pods exclusive access to a set of nodes.
+The `couchbaseclusters.spec.servers.pod.spec.tolerations` attribute allows Couchbase server pods exclusive access to a set of nodes.
 
 By https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/[tainting^] Kubernetes nodes with `NoSchedule`, you can guarantee that no other pods will be scheduled to run there unless they have a matching toleration.
 Couchbase Server pods can be configured with a toleration that will allow them to be scheduled on these nodes.
@@ -55,7 +55,7 @@ Then cordon with `NoSchedule`, before finally removing the `NoExecute` taint.
 === Node Selectors
 
 Given Kubernetes nodes have now been cordoned off from other processes and are now earmarked for exclusive use by Couchbase pods, we need to ensure they are scheduled on them.
-The xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-nodeselector[`spec.servers.[\].pod.spec.nodeselector`] attribute achieves this goal.
+The `couchbaseclusters.spec.servers.pod.spec.nodeselector` attribute achieves this goal.
 
 A Kubernetes https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector[node selector^] forces a pod to be scheduled on a node only when it has a matching label.
 In this scenario you should label the nodes that have already been cordoned with a taint.
@@ -91,4 +91,4 @@ It is possible to run pods with an elevated priority.
 If a high priority pod cannot be scheduled then it is possible for it to preempt pods of a lower priority -- evict them from a node so that the high priority pod may be scheduled.
 If designed correctly, your platform will be able to tolerate evictions as those lower priority pods will be stateless and part of a highly available deployment.
 
-Priority classes can be assigned to Couchbase server pods with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-priorityclassname[`spec.servers[\].pod.spec.priorityClassName`] parameter.
+Priority classes can be assigned to Couchbase server pods with the `couchbaseclusters.spec.servers.pod.spec.priorityClassName` parameter.

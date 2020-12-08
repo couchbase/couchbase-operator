@@ -1011,7 +1011,7 @@ func (in *CouchbaseClusterNetworkingSpec) DeepCopyInto(out *CouchbaseClusterNetw
 	*out = *in
 	if in.AdminConsoleServices != nil {
 		in, out := &in.AdminConsoleServices, &out.AdminConsoleServices
-		*out = make(ServiceList, len(*in))
+		*out = make([]Service, len(*in))
 		copy(*out, *in)
 	}
 	if in.AdminConsoleServiceTemplate != nil {
@@ -1021,7 +1021,7 @@ func (in *CouchbaseClusterNetworkingSpec) DeepCopyInto(out *CouchbaseClusterNetw
 	}
 	if in.ExposedFeatures != nil {
 		in, out := &in.ExposedFeatures, &out.ExposedFeatures
-		*out = make(ExposedFeatureList, len(*in))
+		*out = make([]ExposedFeature, len(*in))
 		copy(*out, *in)
 	}
 	if in.ExposedFeatureServiceTemplate != nil {
@@ -2017,7 +2017,7 @@ func (in *ServerConfig) DeepCopyInto(out *ServerConfig) {
 	*out = *in
 	if in.Services != nil {
 		in, out := &in.Services, &out.Services
-		*out = make(ServiceList, len(*in))
+		*out = make([]Service, len(*in))
 		copy(*out, *in)
 	}
 	if in.ServerGroups != nil {

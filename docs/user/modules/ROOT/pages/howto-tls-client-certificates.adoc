@@ -66,17 +66,17 @@ spec:
         delimiter: @
 ----
 
-<.> xref:reference-couchbasecluster.adoc#spec-networking-tls-static-serversecret[`spec.networking.tls.static.serverSecret`] defines a secret that will be mounted to all Couchbase Server pods.
+<.> `couchbaseclusters.spec.networking.tls.static.serverSecret` defines a secret that will be mounted to all Couchbase Server pods.
 It contains the server wildcard certificate and it's private key.
 As the private key is securely mounted to the pod by Kubernetes it is never exposed over the network.
 
-<.> xref:reference-couchbasecluster.adoc#spec-networking-tls-static-operatorsecret[`spec.networking.tls.static.operatorSecret`] defines a secret containing client related certificates.
+<.> `couchbaseclusters.spec.networking.tls.static.operatorSecret` defines a secret containing client related certificates.
 The client certificate contains a subject common name e.g. `Administrator`.
-The administrator user `Administrator` is configured by the xref:reference-couchbasecluster.adoc#spec-security-adminsecret[`spec.security.adminSecret`].
+The administrator user `Administrator` is configured by the `couchbaseclusters.spec.security.adminSecret`.
 
-<.> xref:reference-couchbasecluster.adoc#spec-networking-tls-clientcertificatepolicy[`spec.networking.tls.clientCertificatePolicy`] is set to mandatory meaning all clients will need to provide a valid client certificate in order to authenticate against the cluster.
+<.> `couchbaseclusters.spec.networking.tls.clientCertificatePolicy` is set to mandatory meaning all clients will need to provide a valid client certificate in order to authenticate against the cluster.
 
-<.> xref:reference-couchbasecluster.adoc#spec-networking-tls-clientcertificatepaths[`spec.networking.tls.clientCertificatePaths`] defines a path that is able to correctly parse and extract the Operator's `Administrator` use from the client certificate.
+<.> `couchbaseclusters.spec.networking.tls.clientCertificatePaths` defines a path that is able to correctly parse and extract the Operator's `Administrator` use from the client certificate.
 In this example all we need to specify is that the user name is explicitly encoded in the certificate's subject common name.
 This covers the base requirements in order for the Operator to be able to connect to the cluster.
 +

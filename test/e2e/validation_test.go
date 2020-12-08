@@ -683,7 +683,7 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			name:           "TestValidateServerNameUnique",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/name", "data_only")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers.name"},
+			expectedErrors: []string{"spec.servers"},
 		},
 		{
 			name:           "TestValidateServerServicesUnique",
@@ -1328,14 +1328,6 @@ func TestValidationDefaultCreate(t *testing.T) {
 			},
 		},
 		{
-			name:      "TestValidateNetworkingDefault",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/networking")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Test("/spec/networking/adminConsoleServiceType", corev1.ServiceTypeNodePort).
-				Test("/spec/networking/exposedFeatureServiceType", corev1.ServiceTypeNodePort),
-			},
-		},
-		{
 			name: "TestValidateCouchbaseBucketDefault",
 			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().
 				Remove("/spec/memoryQuota").
@@ -1493,7 +1485,7 @@ func TestNegValidationApply(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name:           "TestValidateServerServicesImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/name", "data_only")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/services/0", "analytics")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.servers[0].services"},
 		},

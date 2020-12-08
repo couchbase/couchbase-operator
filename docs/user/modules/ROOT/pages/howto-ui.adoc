@@ -69,7 +69,7 @@ If you are using the xref:concept-couchbase-networking.adoc#public-networking-wi
 When using public networking the Couchbase administrative service is exposed as a load balancer service in order to provide resilient connectivity for clients.
 This same service provides access to the UI.
 
-The connection string is determined by the xref:reference-couchbasecluster.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] cluster parameter.
+The connection string is determined by the `couchbaseclusters.spec.networking.dns.domain` cluster parameter.
 The connection string is in the form `\https://console.$\{dns-domain}`.
 Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `\https://console.my-cluster.acme.org:18091`.
 

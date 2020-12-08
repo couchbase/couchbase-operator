@@ -84,13 +84,16 @@ var discard = pathMatcher{
 	{
 		path: ".status",
 	},
-	// This key is broken for native types.
+	// These native types are invalid, and also unnecessary, so just remove them.
 	{
-		path: "*.x-kubernetes-list-map-keys",
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.networking.properties.adminConsoleServiceTemplate.properties.spec.properties.ports",
 	},
-	// This key is broken for native types.
 	{
-		path: "*.x-kubernetes-list-type",
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.networking.properties.exposedFeatureServiceTemplate.properties.spec.properties.ports",
 	},
 	// In operator 2.0 (1.13) this was not marked as omitempty, as a result
 	// when upgrading to operator 2.1+ (1.17+), the "null" fails validation because
@@ -102,13 +105,19 @@ var discard = pathMatcher{
 		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.volumeClaimTemplates.items.properties.spec.properties.dataSource",
 	},
 	// Validation is "broken" for pod templates, in that they require at least
-	// one container, so remove this restriction.  The removal of required is
-	// somewhat imprecise and may need fixing in the future, it's a hard problem
-	// as we cannot remove array elements by value with JSON paths.
+	// one container, so remove this restriction, and prevent process injection!
+	// The removal of required is somewhat imprecise and may need fixing in the
+	// future, it's a hard problem as we cannot remove array elements by value
+	// with JSON paths.
 	{
 		group: "couchbase.com",
 		kind:  "CouchbaseCluster",
 		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.containers",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.initContainers",
 	},
 	{
 		group: "couchbase.com",

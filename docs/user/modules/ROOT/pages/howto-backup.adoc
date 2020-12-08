@@ -9,10 +9,10 @@ You can configure the Autonomous Operator to take periodic, automated backups of
 
 The Autonomous Operator provides automated backup and restore capabilities through a native integration with the Couchbase Server tool xref:server:backup-restore:enterprise-backup-restore.adoc[`cbbackupmgr`].
 
-Automated backup is enabled in the xref:reference-couchbasecluster.adoc#spec-backup[`CouchbaseCluster` resource].
+Automated backup is enabled in the `CouchbaseCluster` resource.
 The configuration allows you to specify a Couchbase-provided container image that contains the `cbbackupmgr` tool.
 
-Once automated backup is enabled, individual backup policies can be configured using xref:reference-couchbasebackup.adoc[`CouchbaseBackup` resources], which define things like schedule and backup strategy.
+Once automated backup is enabled, individual backup policies can be configured using `CouchbaseBackup` resources, which define things like schedule and backup strategy.
 Each `CouchbaseBackup` resource creates one or two Kubernetes https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/[`CronJob` resources^] that will spawn backup jobs according to the given Cron schedule(s).
 These backup jobs execute a helper script which performs logging and cleanup, and utilizes `cbbackupmgr` to perform backup and restore.
 
@@ -59,7 +59,7 @@ Only `cbbackupmgr` version 6.6 supports this feature, as mentioned https://docs.
 
 == Enable Automated Backup
 
-In order for the Autonomous Operator to manage the automated backup of a cluster, the feature must be enabled in the xref:reference-couchbasecluster.adoc#spec-backup[`CouchbaseCluster` resource].
+In order for the Autonomous Operator to manage the automated backup of a cluster, the feature must be enabled in the `CouchbaseCluster` resource.
 
 [source,yaml,subs="attributes,verbatim"]
 ----
@@ -72,15 +72,15 @@ spec:
     serviceAccountName: couchbase-backup # <.>
 ----
 
-<.> The only required field to enable automated backup is xref:reference-couchbasecluster.adoc#spec-backup-managed[`spec.backup.managed`].
+<.> The only required field to enable automated backup is `couchbaseclusters.spec.backup.managed`.
 
-<.> If the xref:reference-couchbasecluster.adoc#spec-backup-image[`spec.backup.image`] field is left unspecified, then the dynamic admission controller will automatically populate it with the most recent container image that was available when the installed version of the Autonomous Operator was released.
+<.> If the `couchbaseclusters.spec.backup.image` field is left unspecified, then the dynamic admission controller will automatically populate it with the most recent container image that was available when the installed version of the Autonomous Operator was released.
 The default image for open source Kubernetes comes from https://hub.docker.com/r/couchbase/operator-backup[Docker Hub^], and the default image for OpenShift comes from the https://access.redhat.com/containers/#/vendor/couchbase[Red Hat Container Catalog^].
 +
 If pulling directly from the the Red Hat Container Catalog, then the path will be something similar to `registry.connect.redhat.com/couchbase/operator-backup:{backup-version}` (you can refer to the catalog for the most recent images).
-If image pull secrets are required to access the image, they are inherited from the Couchbase Server Pod and can be set explicitly with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-imagepullsecrets[`spec.servers[\].pod.spec.imagePullSecrets`] field or implicitly with a service account specified with the xref:reference-couchbasecluster.adoc#spec-servers-pod-spec-serviceaccountname[`spec.servers[\].pod.spec.serviceAccountName`] field.
+If image pull secrets are required to access the image, they are inherited from the Couchbase Server Pod and can be set explicitly with the `couchbaseclusters.spec.servers.pod.spec.imagePullSecrets` field or implicitly with a service account specified with the `couchbasecluster.spec.servers.pod.spec.serviceAccountName` field.
 
-<.> If left unspecified, xref:reference-couchbasecluster.adoc#spec-backup-serviceAccountName[`spec.backup.serviceAccountName`] will default to the value of `couchbase-backup`.
+<.> If left unspecified, `couchbaseclusters.spec.backup.serviceAccountName` will default to the value of `couchbase-backup`.
 These Kubernetes resources *must* exist, otherwise backup jobs will not have the required permissions to complete successfully.
 This will be covered in the next xref:howto-backup.adoc#grant-backup-permissions[section].
 
@@ -100,7 +100,7 @@ Without these resources, backup jobs will still run as scheduled, but they will 
 
 == Configure Backups
 
-After automated backup is enabled for the cluster, individual backup policies can be configured using xref:reference-couchbasebackup.adoc[`CouchbaseBackup` resources].
+After automated backup is enabled for the cluster, individual backup policies can be configured using `CouchbaseBackup` resources.
 The following is a very simple configuration with only the minimum required fields set.
 
 [source,yaml]
@@ -206,7 +206,7 @@ Once the first Job has been spawned by a backup cron job, the status fields of a
 
 == Restoring From a Backup
 
-Restoring from a backup requires that you create a xref:reference-couchbasebackuprestore.adoc[`CouchbaseBackupRestore` resource].
+Restoring from a backup requires that you create a `CouchbaseBackupRestore` resource.
 
 [source,yaml]
 ----
@@ -226,7 +226,7 @@ A `CouchbaseBackupRestore` resource behaves differently from a `CouchbaseBackup`
 In the example above, the `CouchbaseBackupRestore` resource configuration is restoring the first backup in the repository `"cb-example-2020-02-12T19_00_03"`.
 The first backup in any repository will be a full backup since the Autonomous Operator performs a full backup of the cluster after the creation of each backup repository.
 
-If you don't know the name of the backup repository that you want to restore from, you can find the name without having to explore the contents of a Persistent Volume Claim by simply referring to the xref:reference-couchbasebackup-status.adoc[status object] of the existing `CouchbaseBackup` resource.
+If you don't know the name of the backup repository that you want to restore from, you can find the name without having to explore the contents of a Persistent Volume Claim by simply referring to the `couchbasebackups.status` object of the existing `CouchbaseBackup` resource.
 
 You also have the option to restore a range of backups from the latest backup repository.
 
@@ -282,7 +282,7 @@ So instead of executing `kubectl get couchbasebackup` you can instead write `kub
 To find out if any other of your current Kubernetes resources support a short name, run `kubectl api-resources`.
 ====
 
-The command output should show the given `CouchbaseBackup` specification and also a xref:reference-couchbasebackup-status.adoc[status section] containing useful information similar to the following output.
+The command output should show the given `CouchbaseBackup` specification and also a `couchbasebackups.status` section containing useful information similar to the following output.
 
 [source,console]
 ----
@@ -367,7 +367,7 @@ $ oc get cronjob my-backup-full -o yaml
 --
 ====
 
-And finally we can check that the backup Jobs and their respective pods are there, and there is no more than the set limit specified in xref:reference-couchbasebackup.adoc#failedJobsHistoryLimit[`spec.failedJobsHistoryLimit`] and xref:reference-couchbasebackup.adoc#successfulJobsHistoryLimit[`spec.successfulJobsHistorylimit`].
+And finally we can check that the backup Jobs and their respective pods are there, and there is no more than the set limit specified in `couchbasebackups.spec.failedJobsHistoryLimit` and `couchbasebackups.spec.successfulJobsHistorylimit`.
 These default to 5 and 3 respectively.
 
 [{tabs}]
@@ -524,7 +524,7 @@ Like with other Couchbase custom resources, this means specifying a label for RB
 With taints and tolerations, you can grant backup pods exclusive access to specific nodes.
 In this example, if we wish to run all backup pods on a dedicated node and isolate them from the rest of the Autonomous Operator pods, we can do this by tainting a node with the key-value of `app:cbbackup` and defining a matching toleration.
 
-Further reference on all of these fields can be found in the xref:reference-couchbasecluster.adoc#spec-backup[`CouchbaseCluster` resource configuration].
+Further reference on all of these fields can be found in the `couchbaseclusters.spec.backup` resource configuration.
 For more overall information please see xref:concept-scheduling[Couchbase Scheduling and Isolation].
 
 === Backup Time Scheduling
@@ -539,7 +539,7 @@ This particularly common in situations where backups have been scheduled too fre
 Scheduling of backup and restore jobs is exactly the same as the mechanism used for Couchbase Server pods.
 The affinity and anti-affinity mechanisms are described in xref:concept-scheduling.adoc[].
 
-Backup and restore job affinity can be set, per `CouchbaseCluster`, with the xref:reference-couchbasecluster.adoc#spec-backup-nodeselector[`spec.backup.nodeSelector`] attribute, and toleration of anti-affinity rules can be set with the xref:reference-couchbasecluster.adoc#spec-backup-tolerations[`spec.backup.tolerations`] attribute.
+Backup and restore job affinity can be set, per `CouchbaseCluster`, with the `couchbaseclusters.spec.backup.nodeSelector` attribute, and toleration of anti-affinity rules can be set with the `couchbaseclusters.spec.backup.tolerations` attribute.
 
 == Backup and Restore to S3
 

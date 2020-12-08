@@ -8,8 +8,8 @@ This documents what hibernation means and the hibernation life-cycle.
 
 Hibernation is the process of deactivating a Couchbase cluster.
 
-When a cluster is put into xref:reference-couchbasecluster.adoc#spec-hibernate[hibernation], all the pods associated with the cluster are terminated.
-How the pods are terminated, and under what conditions can be xref:reference-couchbasecluster.adoc#spec-hibernationstrategy[specified] by the user.
+When a cluster is put into hibernation with the `couchbaseclusters.spec.hibernate` attribute, all the pods associated with the cluster are terminated.
+How the pods are terminated, and under what conditions can be specified by the user with the `couchbaseclusters.spec.hibernationStrategy` attribute.
 
 By hibernating a Couchbase cluster:
 
@@ -31,7 +31,7 @@ Any writes that must be persisted to disk should use durable writes that guarant
 
 == Waking from Hibernation
 
-A cluster that is hibernating can be xref:reference-couchbasecluster.adoc#spec-hibernate[awoken].
+A cluster that is hibernating can be awoken by setting `couchbaseclusters.spec.hibernate` to false, or removing that attribute.
 The cluster will be recovered in exactly the same way as it would from a total loss of all pods.
 
 Ephemeral clusters--with no persistent volumes--will be recreated.
@@ -42,11 +42,11 @@ The persistent metadata on the volumes will ensure the cluster is restored exact
 
 Supportable clusters, with both volume backed and ephemeral server classes, will be first recovered from persistent volumes, then the ephemeral pods will be failed over and reprovisioned.
 When using this cluster topology, it is possible that Couchbase server will refuse to fail over ephemeral nodes.
-Automatic recovery can be enabled, in this situation, by setting the xref:reference-couchbasecluster.adoc#spec-recoverypolicy[`spec.recoveryPolicy`] attribute to `PrioritizeUptime`.
+Automatic recovery can be enabled, in this situation, by setting the `couchbaseclusters.spec.recoveryPolicy` attribute to `PrioritizeUptime`.
 This will allow the Operator to force failover of the affected pods, and then recover.
 
 == Monitoring Hibernation
 
-The Operator updates the cluster xref:reference-couchbasecluster-status.adoc#status-conditions[conditions] during the life cycle of a hibernation.
+The Operator updates the cluster conditions during the life cycle of a hibernation.
 This allows 3rd party observers to know when a cluster has hibernated fully.
 When completely hibernated all I/O to persistent volumes will have terminated and be in a stable state.

@@ -17,7 +17,7 @@ This allows vBucket replicas to be scheduled in a completely separate server gro
 == Operator Server Group Scheduling
 
 The following diagram depicts a cluster with two server classes (multi-dimensional scaling groups) that directly map to server configurations.
-These classes are defined in the specification with the property xref:reference-couchbasecluster.adoc#spec-servers[`spec.servers[\]`]:
+These classes are defined in the specification with the property `couchbasecluster.spec.servers`:
 
 image::ServerGroupsScheduling.png[Server Group Scheduling Overview]
 

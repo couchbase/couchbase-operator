@@ -71,20 +71,7 @@
 
 .Reference
 * Resource Types
- ** xref:reference-couchbasecluster.adoc[`CouchbaseCluster` Resource]
-  *** xref:reference-couchbasecluster-status.adoc[`CouchbaseCluster` Status]
-  *** xref:reference-couchbasecluster-events.adoc[`CouchbaseCluster` Events]
- ** xref:reference-couchbasebackup.adoc[`CouchbaseBackup` Resource]
-  *** xref:reference-couchbasebackuprestore.adoc[`CouchbaseBackupRestore` Resource]
-  *** xref:reference-couchbasebackup-status.adoc[`CouchbaseBackup` and `CouchbaseBackupRestore` Status]
- ** xref:reference-couchbasebucket.adoc[`CouchbaseBucket` Resource]
- ** xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket` Resource]
- ** xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket` Resource]
- ** xref:reference-couchbasereplication.adoc[`CouchbaseReplication` Resource]
- ** xref:reference-couchbaseuser.adoc[`CouchbaseUser` Resource]
- ** xref:reference-couchbasegroup.adoc[`CouchbaseGroup` Resource]
- ** xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding` Resource]
- ** xref:reference-couchbaseautoscaler.adoc[`CouchbaseAutoscaler` Resource]
+ ** xref:reference-resources.adoc[Resource Documentation]
 * Operator
  ** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
  ** xref:reference-operator-configuration.adoc[Operator Deployment Settings]

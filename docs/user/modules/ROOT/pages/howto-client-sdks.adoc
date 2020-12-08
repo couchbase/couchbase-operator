@@ -54,7 +54,7 @@ DNS based addressing with External DNS is slightly different to plain DNS.
 The External DNS controller does not support SRV records, instead we use HTTPS.
 Fault-tolerance is provided by a load balancer service.
 
-The connection string is determined by the xref:reference-couchbasecluster.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] cluster parameter.
+The connection string is determined by the `couchbaseclusters.spec.networking.dns.domain` cluster parameter.
 The connection string is in the form `\couchbases://console.$\{dns-domain}?network=external`.
 Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `\couchbases://console.my-cluster.acme.org?network=external`.
 
@@ -135,7 +135,7 @@ $ kubectl list pods -l couchbase_cluster=foo
 ----
 
 Select any pod that is returned e.g. `foo-0000`.
-The DNS domain is the same as specified by the xref:reference-couchbasecluster.adoc#spec-networking-dns-domain[`spec.networking.dns.domain`] attribute.
+The DNS domain is the same as specified by the `couchbasecluster.spec.networking.dns.domain` attribute.
 If the DNS domain is set to `my-cluster.acme.org`, then the connection string to use will be `\https://foo-0000.my-cluster.acme.org:18091`.
 
 === IP Based Addressing
