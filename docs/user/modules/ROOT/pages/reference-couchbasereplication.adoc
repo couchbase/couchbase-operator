@@ -1,4 +1,4 @@
-= CouchbaseReplication Resource
+= `CouchbaseReplication` Resource
 
 :toc: macro
 
@@ -8,7 +8,7 @@ XDCR replications are decoupled from this configuration and are selected for inc
 The following YAML shows all possible fields that may be configured for a `CouchbaseReplication`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseReplication configuration parameters
+.All available `CouchbaseReplication` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -62,7 +62,7 @@ ____
 The metadata name defines the name of the resource.
 The name must be unique for the kind defined.
 Furthermore the name must be unique for all bucket kinds defined and used by the cluster.
-For example you cannot have a `CouchbaseBucket` named "default" and a CouchbaseEphemeralBucket also named "default".
+For example you cannot have a `CouchbaseBucket` named "default" and a `CouchbaseEphemeralBucket` also named "default".
 
 ____
 _Field rules:_ This field is required and must be unique as described above.
@@ -70,7 +70,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____

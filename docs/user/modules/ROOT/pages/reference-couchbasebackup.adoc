@@ -1,15 +1,15 @@
-= CouchbaseBackup Resource
+= `CouchbaseBackup` Resource
 
 :toc: macro
 
-Once you have allowed the Autonomous Operator to manage and perform Automated Backup, you will need to create a CouchbaseBackup object to specify the timings and details of the backups.
+Once you have allowed the Autonomous Operator to manage and perform Automated Backup, you will need to create a `CouchbaseBackup` object to specify the timings and details of the backups.
 
 A `CouchbaseBackup` object will spawn either 1 or 2 cron jobs that belong to that resource, and those cron jobs in turn will create the Kubernetes jobs which perform the backup jobs themselves.
 
 The following YAML shows all possible fields that may be configured for a `CouchbaseBackup`.
 In this case the following YAML is completely valid.
 
-.All available CouchbaseBackup configuration parameters
+.All available `CouchbaseBackup` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -77,7 +77,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____
@@ -86,7 +86,7 @@ ____
 
 == `spec`
 
-The following are parameters that may be set on the CouchbaseBackup:
+The following are parameters that may be set on the `CouchbaseBackup`:
 
 [source,yaml]
 ----

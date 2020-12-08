@@ -308,14 +308,14 @@ Starting with Autonomous Operator 2.0, parts of the `CouchbaseCluster` resource 
 
 The available set of Couchbase custom resource types include:
 
-* xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
-* xref:reference-couchbasebucket.adoc[CouchbaseBucket Resource]
-* xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
-* xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
-* xref:reference-couchbasereplication.adoc[CouchbaseReplication Resource]
-* xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
-* xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
-* xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding]
+* xref:reference-couchbasecluster.adoc[`CouchbaseCluster` Resource]
+* xref:reference-couchbasebucket.adoc[`CouchbaseBucket` Resource]
+* xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket` Resource]
+* xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket` Resource]
+* xref:reference-couchbasereplication.adoc[`CouchbaseReplication` Resource]
+* xref:reference-couchbaseuser.adoc[`CouchbaseUser` Resource]
+* xref:reference-couchbasegroup.adoc[`CouchbaseGroup` Resource]
+* xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding`]
 
 Autonomous Operator {operator-version-minor} requires that all Couchbase custom resources use the new format.
 Couchbase custom resources -- such as `CouchbaseCluster` -- are not backwards compatible between Autonomous Operator versions 1 and 2.

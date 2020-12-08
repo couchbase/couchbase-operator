@@ -1,8 +1,8 @@
-= CouchbaseBackup and CouchbaseBackupRestore Status
+= `CouchbaseBackup` and `CouchbaseBackupRestore` Status
 include::partial$constants.adoc[]
 
 [abstract]
-Status fields attached to CouchbaseBackup and CouchbaseBackupRestore resources by the Operator.
+Status fields attached to `CouchbaseBackup` and `CouchbaseBackupRestore` resources by the Operator.
 
 Each `CouchbaseBackup` and `CouchbaseBackupRestore` resource has a status object.
 These resources share very similar status objects which is why they have been collated into this single document.

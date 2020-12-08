@@ -15,7 +15,7 @@ This page documents configuration of mTLS.
 
 == Creating Secrets
 
-Secrets are specified in the CouchbaseCluster resource, therefore they may have any name you choose. The format of individual secrets is discussed below.
+Secrets are specified in the `CouchbaseCluster` resource, therefore they may have any name you choose. The format of individual secrets is discussed below.
 
 Please see the xref:tutorial-tls.adoc[TLS certificate tutorial] for a simple guide to creating TLS certificates.
 

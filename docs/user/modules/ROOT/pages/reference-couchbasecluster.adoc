@@ -1,15 +1,15 @@
-= CouchbaseCluster Resource
+= `CouchbaseCluster` Resource
 :page-aliases: couchbase-cluster-config
 include::partial$constants.adoc[]
 
 :toc: macro
 
-To use the Couchbase Autonomous Operator to deploy a Couchbase Server cluster, you need to create a CouchbaseCluster configuration file that describes how the cluster should be configured and maintained by the Operator. Like all Kubernetes configurations, Couchbase Server clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes.
+To use the Couchbase Autonomous Operator to deploy a Couchbase Server cluster, you need to create a `CouchbaseCluster` configuration file that describes how the cluster should be configured and maintained by the Operator. Like all Kubernetes configurations, Couchbase Server clusters are defined using either YAML or JSON (YAML is preferred by Kubernetes) and then pushed into Kubernetes.
 
-The following CouchbaseCluster configuration shows all of the available parameters.
+The following `CouchbaseCluster` configuration shows all of the available parameters.
 (Note that this configuration is not valid and is meant for example purposes only.)
 
-.All available CouchbaseCluster configuration parameters
+.All available `CouchbaseCluster` configuration parameters
 [source,yaml,subs="attributes"]
 ----
 apiVersion: couchbase.com/v2
@@ -242,7 +242,7 @@ toc::[]
 
 == Top-Level Definitions
 
-The following are the top-level parameters for a CouchbaseCluster configuration:
+The following are the top-level parameters for a `CouchbaseCluster` configuration:
 
 [source,yaml]
 ----
@@ -632,7 +632,7 @@ ____
 
 === `spec.cluster.autoFailoverTimeout`
 
-Specifies the auto-failover timeout. The Operator relies on the CouchbaseCluster to auto-failover nodes before removing them, so setting this field to an appropriate value is important.
+Specifies the auto-failover timeout. The Operator relies on the Couchbase cluster to auto-failover nodes before removing them, so setting this field to an appropriate value is important.
 
 ____
 _Field rules:_ The `autoFailoverTimeout` is optional and must be a duration in the range 5s-3600s.

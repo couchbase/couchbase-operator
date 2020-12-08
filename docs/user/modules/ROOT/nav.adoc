@@ -71,27 +71,27 @@
 
 .Reference
 * Resource Types
- ** xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
-  *** xref:reference-couchbasecluster-status.adoc[CouchbaseCluster Status]
-  *** xref:reference-couchbasecluster-events.adoc[CouchbaseCluster Events]
- ** xref:reference-couchbasebackup.adoc[CouchbaseBackup Resource]
-  *** xref:reference-couchbasebackuprestore.adoc[CouchbaseBackupRestore Resource]
-  *** xref:reference-couchbasebackup-status.adoc[CouchbaseBackup and CouchbaseBackupRestore Status]
- ** xref:reference-couchbasebucket.adoc[CouchbaseBucket Resource]
- ** xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
- ** xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
- ** xref:reference-couchbasereplication.adoc[CouchbaseReplication Resource]
- ** xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
- ** xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
- ** xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding Resource]
- ** xref:reference-couchbaseautoscaler.adoc[CouchbaseAutoscaler Resource]
+ ** xref:reference-couchbasecluster.adoc[`CouchbaseCluster` Resource]
+  *** xref:reference-couchbasecluster-status.adoc[`CouchbaseCluster` Status]
+  *** xref:reference-couchbasecluster-events.adoc[`CouchbaseCluster` Events]
+ ** xref:reference-couchbasebackup.adoc[`CouchbaseBackup` Resource]
+  *** xref:reference-couchbasebackuprestore.adoc[`CouchbaseBackupRestore` Resource]
+  *** xref:reference-couchbasebackup-status.adoc[`CouchbaseBackup` and `CouchbaseBackupRestore` Status]
+ ** xref:reference-couchbasebucket.adoc[`CouchbaseBucket` Resource]
+ ** xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket` Resource]
+ ** xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket` Resource]
+ ** xref:reference-couchbasereplication.adoc[`CouchbaseReplication` Resource]
+ ** xref:reference-couchbaseuser.adoc[`CouchbaseUser` Resource]
+ ** xref:reference-couchbasegroup.adoc[`CouchbaseGroup` Resource]
+ ** xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding` Resource]
+ ** xref:reference-couchbaseautoscaler.adoc[`CouchbaseAutoscaler` Resource]
 * Operator
  ** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
  ** xref:reference-operator-configuration.adoc[Operator Deployment Settings]
  ** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
  ** xref:reference-operator-logging.adoc[Operator Logging]
 * Couchbase Cluster
- ** xref:reference-couchbasecluster-services.adoc[CouchbaseCluster Services]
+ ** xref:reference-couchbasecluster-services.adoc[`CouchbaseCluster` Services]
 * Helm
  ** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]
 * Tools

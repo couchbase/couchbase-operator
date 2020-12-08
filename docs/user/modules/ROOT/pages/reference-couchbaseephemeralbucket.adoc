@@ -1,4 +1,4 @@
-= CouchbaseEphemeralBucket Resource
+= `CouchbaseEphemeralBucket` Resource
 
 :toc: macro
 
@@ -12,7 +12,7 @@ They may be used for cross data center replication (XDCR).
 The following YAML shows all possible fields that may be configured for a `CouchbaseEphemeralBucket`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseEphemeralBucket configuration parameters
+.All available `CouchbaseEphemeralBucket` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -83,7 +83,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____

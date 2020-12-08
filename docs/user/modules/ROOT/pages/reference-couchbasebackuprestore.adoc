@@ -1,15 +1,15 @@
-= CouchbaseBackupRestore Resource
+= `CouchbaseBackupRestore` Resource
 
 :toc: macro
 
-In order to restore data to a cluster from a Persistent Volume Claim you will need to create a CouchbaseBackupRestore object.
+In order to restore data to a cluster from a Persistent Volume Claim you will need to create a `CouchbaseBackupRestore` object.
 
 A `CouchbaseBackupRestore` object will spawn a restore job that restores the latest backup file or a specific backup file from a existing Persistent Volume Claim.
 
 The following YAML shows all possible fields that may be configured for a `CouchbaseBackupRestore`.
 This configuration is not valid and is only for illustrative purposes.
 
-.All available CouchbaseBackupRestore configuration parameters
+.All available `CouchbaseBackupRestore` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -75,7 +75,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____
@@ -84,7 +84,7 @@ ____
 
 == `spec`
 
-The following are parameters that may be set on the CouchbaseBackup:
+The following are parameters that may be set on the `CouchbaseBackup`:
 
 [source,yaml]
 ----

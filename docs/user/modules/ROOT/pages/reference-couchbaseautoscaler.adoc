@@ -1,4 +1,4 @@
-= CouchbaseAutoscaler Resource
+= `CouchbaseAutoscaler` Resource
 
 :toc: macro
 
@@ -12,7 +12,7 @@ The `CouchbaseAutoscaler` resource implements Kubernetes `autoscaling/v1.Scale` 
 The `CouchbaseAutoscaler` resource is created and managed by the Autonomous Operator and should not be manually created or deleted.
 This document is for reference purposes only.
 
-.All available CouchbaseAutoscaler configuration parameters
+.All available `CouchbaseAutoscaler` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2

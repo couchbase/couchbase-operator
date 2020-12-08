@@ -1,4 +1,4 @@
-= CouchbaseBucket Resource
+= `CouchbaseBucket` Resource
 
 :toc: macro
 
@@ -11,7 +11,7 @@ They may be used for cross data center replication (XDCR).
 The following YAML shows all possible fields that may be configured for a `CouchbaseBucket`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseBucket configuration parameters
+.All available `CouchbaseBucket` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -71,7 +71,7 @@ ____
 The metadata name defines the name of the resource, and is used as the bucket name by default.
 The name must be unique for the kind defined.
 Furthermore the name must be unique for all bucket kinds defined and used by the cluster.
-For example you cannot have a `CouchbaseBucket` named "default" and a CouchbaseEphemeralBucket also named "default".
+For example you cannot have a `CouchbaseBucket` named "default" and a `CouchbaseEphemeralBucket` also named "default".
 
 Like other Kubernetes resource names, the metadata name is restricted to the character limits of https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names[DNS label names^].
 This means that this field cannot accept the full character set that Couchbase supports for bucket names.
@@ -83,7 +83,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____

@@ -1,4 +1,4 @@
-= CouchbaseRoleBinding Resource
+= `CouchbaseRoleBinding` Resource
 
 :toc: macro
 
@@ -9,7 +9,7 @@ The Couchbase Autonomous Operator operates on `CouchbaseCluster` objects.
 The following YAML shows all possible fields that may be configured for a `CouchbaseRoleBinding`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseRoleBinding configuration parameters
+.All available `CouchbaseRoleBinding` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2

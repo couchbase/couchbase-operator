@@ -1,14 +1,14 @@
-= CouchbaseCluster Events
+= `CouchbaseCluster` Events
 :page-aliases: conditions-and-events
 
 [abstract]
-Kubernetes events that are raised by the Operator for CouchbaseCluster resources.
+Kubernetes events that are raised by the Operator for `CouchbaseCluster` resources.
 
 Kubernetes can displays extended information about a resource using the `kubectl describe` command.
 The Operator generated life-cycle events as the cluster is provisioned, edited or repaired.
 These events may be used for problem determination or as synchronous triggers for external Kubernetes orchestration.
 
-The lifecycle of a CouchbaseCluster includes the following events (in no particular order):
+The lifecycle of a `CouchbaseCluster` includes the following events (in no particular order):
 
 == Member Lifecycle
 
