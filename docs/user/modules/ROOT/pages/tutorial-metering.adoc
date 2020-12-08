@@ -1,0 +1,248 @@
+
+= Metering Couchbase Resources
+
+[abstract]
+A tutorial for configuring Couchbase to use Metering for querying and reporting resource usage over an arbitrary period time.
+
+include::partial$tutorial.adoc[]
+
+== Overview
+
+This tutorial describes how to use the Autonomous Operator in conjunction with the Metering Operator within OpenShift.
+
+The Metering Operator is available as an open source framework.
+Overall project information and status can be discovered from the GitHub repository:
+
+* https://github.com/kube-reporting/metering-operator
+
+=== Required
+
+The following is required to follow the steps of this tutorial:
+
+* OpenShift 4.3 or higher is required since the Operator Lifecycle Manager (OLM) is the recommended installation method.
+* A `StorageClass` for dynamic volume provisioning for persisting historical metrics.
+
+== Installing The Metering Operator
+
+The Metering Operator can be installed using OLM.
+Prepare a new project for installing the Metering Operator.
+[source,console]
+----
+$ oc new-project cb-metering
+----
+
+Install the Metering Operator into the `cb-metering` project using OLM.
+Open the `OperatorHub` tab within OpenShift and search for `metering`.
+
+.OLM Metering install
+image::metering-olm-install.png[]
+
+Click through the deployment steps and select `cb-metering` as the *Installed Namespace*.
+
+==== Create a Couchbase Cluster
+Visit the OpenShift Operator Hub and install the Couchbase Autonomous Operator into the the `cb-metering` project.
+When the Couchbase Autonomous Operator is installed, create an instance of the Couchbase Cluster using all of the default values.
+
+
+== Setting up Metering Storage
+
+The Metering Framework requires storage for persisting collected metrics and storing reports.
+For the purposes of this tutorial, a `PersistentVolumeClaim` is manually created to request a `PersistentVolume` from a storage.
+List the storage classes available in your OpenShift cluster.
+[source,console]
+----
+$ oc get storageclass
+----
+This tutorial will use the storage class named `default`.
+Best practices require the use of a storage class with `ReadWriteMany` access mode.
+Check the Kubernetes storage documentation for environments which support this access mode:
+
+* https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
+
+Create a `PersistentVolumeClaim` to request a disk that is 5GB in size with `ReadWriteMany` access.
+In the event that this mode is not available `ReadWriteOnce` may be used for experimental purposes.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cb-metering-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: default
+  resources:
+    requests:
+      storage: 5Gi
+----
+
+In the event that your OpenShift installation doesn't provide a storage class, Metering can be configured to use https://github.com/kube-reporting/metering-operator/blob/master/Documentation/configuring-storage.md[Cloud Provided Storage].
+
+== Configuring The Metering Operator
+
+Navigate to the *`Metering Configuration`* Custom Resource in the *`Provided APIs`* section of the installed Operator page.
+Click on the *`Create MeteringConfig`* button.
+.Create Metering Configuration
+image::metering-create-config.png[]
+
+Input the following yaml as the `MeteringConfig` resource and then click the *Create* button:
+[source,yaml]
+----
+apiVersion: metering.openshift.io/v1
+kind: MeteringConfig
+metadata:
+  name: operator-metering
+  namespace: cb-metering
+spec:
+  storage:
+    hive:
+      sharedPVC:
+        claimName: "cb-metering-pvc" <.>
+      type: "sharedPVC"
+    type: hive
+----
+
+<.> `claimName` must match the name of the created `PersistentVolumeClaim`.
+
+New `MeteringConfig` resources cause the Metering Operator to kick off an Ansible script to setup the Metering Framework.
+Check the Metering Operator logs to monitor the configuration progress:
+
+[source,console]
+----
+$ oc logs deploy/metering-operator -c operator
+----
+
+When the process is complete you will be able to get available `ReportQuery` and `ReportDataSource` resources:
+[source,console]
+----
+$ oc get reportquery
+$ oc get reportdatasources
+----
+
+== Report Generation
+
+Default report generation allows for usage collection against the resource metric API.
+The following steps will guide you through collecting Pod compute usage against a Couchbase Cluster.
+
+=== Create a Report Query
+
+Metering uses Report queries to fetch metrics being stored inside of report data sources.
+The default report data source is `Presto` which provides a SQL like database for querying metrics.
+Example Report queries already exist which can be re-used for Couchbase purposes.
+To get Pod compute usage for Couchbase specific pods, edit the `pod-cpu-usage` `ReportQuery` object.
+
+[source, console]
+----
+$ oc edit reportquery pod-cpu-usage
+----
+
+Add the following `AND` clause to the editable report query:
+[source, yaml]
+----
+apiVersion: metering.openshift.io/v1
+kind: ReportQuery
+metadata:
+  name: couchbase-pod-cpu-usage <.>
+    ...
+    AND pod LIKE 'cb-example-%' <.>
+    GROUP BY namespace, pod, node
+----
+<.> Use a different name for the report query spec.
+<.> Restrict query to report only on Pods which match the default Couchbase Cluster named `cb-example`.
+
+[IMPORTANT]
+Save `yaml` as a *different file* with the name `couchbase-pod-cpu-usage.yaml`.
+Do not overwrite the original resource when saving this change.
+The Metering Operator will undo any changes made to the default resources.
+
+Create the updated report query resource:
+[source,yaml]
+----
+oc create -f couchbase-pod-cpu-usage.yaml
+----
+
+=== Report Generation
+
+Metering Reports generate resource usage over start and end timestamps.
+Reports rely on `ReportQuery` resources for requesting data within the desired time period.
+
+The following creates a Report named `couchbase-pod-cpu-usage` which uses the Pod compute usage Query created from the previous step.
+[source,yaml]
+----
+apiVersion: metering.openshift.io/v1
+kind: Report
+metadata:
+  name: couchbase-pod-cpu-usage
+  namespace: "cb-metering"
+spec:
+  reportingStart: '2020-12-10T20:00:19Z' <.>
+  reportingEnd: '2021-10-20T00:00:19Z'
+  query: "couchbase-pod-cpu-usage" <.>
+  schedule:
+    period: "cron"
+    cron:
+      expression: '*/10 * * * *' <.>
+----
+<.> `reportingStart` can be any timestamp prior to cluster to creation.  If you decide to use a timestamp after cluster creation then be aware that some reporting data may be lost.
+<.> `query` refers to the `ReportQuery` resource which selects Pod Compute usage from Couchbase only.
+<.> The report is scheduled to run every 10 seconds.
+
+Check that the report status shows that the query is `Finished`.
+[source,console]
+----
+$ oc describe report couchbase-pod-cpu-usage
+----
+
+Reports can be scheduled to run periodically.
+Refer to the https://github.com/kube-reporting/metering-operator/blob/master/Documentation/reports.md[Report Guide] for available options when scheduling reports.
+
+==== Viewing the Report
+
+The report is ready to be downloaded with the status has changed to `Finished`.
+Run the following command to view data from the `couchbase-pod-cpu-usage` report:
+
+[source,console]
+----
+export METERING_NAMESPACE=cb-metering
+METERING_ROUTE_HOSTNAME=$(oc -n $METERING_NAMESPACE get routes metering -o json | jq -r '.status.ingress[].host')
+TOKEN=$(oc -n $METERING_NAMESPACE serviceaccounts get-token reporting-operator)
+curl -H "Authorization: Bearer $TOKEN" -k "https://$METERING_ROUTE_HOSTNAME/api/v1/reports/get?name=couchbase-pod-cpu-usage&namespace=$METERING_NAMESPACE&format=csv" <.>
+----
+<.> Setting report generation to `csv` format
+
+The result shows a report for Couchbase Pod compute usage at 10 minute intervals within the requested time frame.
+[source,console]
+----
+period_start,period_end,pod,namespace,node,pod_usage_cpu_core_seconds
+2020-12-07 22:50:00 +0000 UTC,2020-12-07 23:00:00 +0000 UTC,cb-example-0000,cb-metering3,cluster-wt5q9-worker-eastus3-b2rbg,95.214000
+2020-12-07 22:50:00 +0000 UTC,2020-12-07 23:00:00 +0000 UTC,cb-example-0001,cb-metering3,cluster-wt5q9-worker-eastus1-g79d6,83.406060
+2020-12-07 22:50:00 +0000 UTC,2020-12-07 23:00:00 +0000 UTC,cb-example-0002,cb-metering3,cluster-wt5q9-worker-eastus2-rxxvc,89.368200
+...
+2020-12-07 23:40:00 +0000 UTC,2020-12-07 23:50:00 +0000 UTC,cb-example-0001,cb-metering3,cluster-wt5q9-worker-eastus1-g79d6,64.375320
+2020-12-07 23:40:00 +0000 UTC,2020-12-07 23:50:00 +0000 UTC,cb-example-0002,cb-metering3,cluster-wt5q9-worker-eastus2-rxxvc,61.297320
+----
+
+The key metric here is `pod_usage_cpu_core_seconds` which represents total Compute Core seconds used by each Pod.
+This metric is defined as:
+[source, console]
+----
+(# of CPU cores) * (% total utilization) * (total time in seconds)
+----
+
+It helps to understand what these values mean from a percentage standpoint to get a sense of what sort of load is being applied to the nodes before passing this report into a cost analysis system.
+For this particular cluster, each node has 4 Cores.
+Therefore the percent utilization can be calculated for `cb-example-0000` in the initial interval using the following calculation:
+[source, console]
+----
+(% total utilization ) = 95.214000 / (4 * 600)
+(% total utilization ) = 3.9%
+----
+
+At this point you may choose to add a business integration layer which understands cost analysis based on core seconds to make further use of generated reports.
+
+== Further Reading
+
+* https://github.com/kube-reporting/metering-operator/blob/master/Documentation/using-metering.md[Using Metering]
+* https://github.com/kube-reporting/metering-operator/blob/master/Documentation/writing-custom-queries.md[Writing Custom Reports]
+* xref:tutorial-prometheus.adoc[Couchbase Prometheus Monitoring]

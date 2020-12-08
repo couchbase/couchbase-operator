@@ -107,6 +107,7 @@
 * xref:tutorial-velero-backup.adoc[Backup with VMware Velero]
 * xref:tutorial-prometheus.adoc[Quick Start with Prometheus Monitoring]
 * xref:tutorial-rbac-auth.adoc[Authenticating with Couchbase and LDAP]
+* xref:tutorial-metering.adoc[Metering Couchbase Resources]
 * xref:tutorial-aks.adoc[Installing AKS]
 * xref:tutorial-eks.adoc[Installing EKS]
 * xref:tutorial-gke.adoc[Installing GKE]
