@@ -89,7 +89,7 @@ spec:
     spec:
       containers:
       - name: sync-gateway
-        image: couchbase/sync-gateway:2.7.0-enterprise
+        image: couchbase/sync-gateway:2.8.0-enterprise
         volumeMounts:
         - name: config
           mountPath: /etc/sync_gateway

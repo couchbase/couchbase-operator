@@ -58,7 +58,7 @@ spec:
     spec:
       containers:
       - name: sync-gateway
-        image: registry.connect.redhat.com/couchbase/sync-gateway:2.7.0-1
+        image: registry.connect.redhat.com/couchbase/sync-gateway:2.8.0-1
         volumeMounts:
         - name: config
           mountPath: /etc/sync_gateway

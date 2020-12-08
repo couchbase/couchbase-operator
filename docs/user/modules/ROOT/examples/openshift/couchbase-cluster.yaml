@@ -17,7 +17,7 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  image: registry.connect.redhat.com/couchbase/server:6.5.0-2
+  image: registry.connect.redhat.com/couchbase/server:6.6.0-2
   security:
     adminSecret: cb-example-auth
   buckets:
