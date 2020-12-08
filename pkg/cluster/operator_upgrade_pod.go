@@ -37,8 +37,6 @@ func newPodUpgradableResource(c *Cluster) upgradableResource {
 	return &podUpgradableResource{
 		cluster: c,
 		actions: podUpgradeActionList{
-			{upgradeRange: upgradeRange{"0.0.0", "1.2.0"}, action: upgradePodFrom000000To010200},
-			{upgradeRange: upgradeRange{"1.2.0", "2.0.0"}, action: upgradePodFrom010200To020000},
 			{upgradeRange: upgradeRange{"2.0.0", "2.1.0"}, action: upgradePodFrom020000To020100},
 		},
 	}
@@ -94,46 +92,6 @@ func (r *podUpgradableResource) commit(item int) error {
 	pod := r.pods[item]
 	if _, err := r.cluster.k8s.KubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// upgradePodFrom000000To010200 performs pod upgrades to 1.2.0 from all prior versions.
-// * The "couchbase.version" annotation was changed to "server.couchbase.com/version".
-func upgradePodFrom000000To010200(cluster *Cluster, pod *corev1.Pod) error {
-	// Update the version annotation
-	pod.Annotations[constants.ResourceVersionAnnotation] = "1.2.0"
-
-	// Add the server version annotation from the cluster's current version.
-	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = cluster.cluster.Status.CurrentVersion
-
-	delete(pod.Annotations, "couchbase.version")
-
-	return nil
-}
-
-// upgradePodFrom010200To020000 performs pod upgrades to 2.0.0 from 1.2.0.
-// * The "pod.couchbase.com/tls" annotation was added.
-// * The "pod.couchbase.com/spec" annotation was added (very hard, just let upgrade happen).
-func upgradePodFrom010200To020000(cluster *Cluster, pod *corev1.Pod) error {
-	// Update the version annotation
-	pod.Annotations[constants.ResourceVersionAnnotation] = "2.0.0"
-
-	// Previously we allowed TLS to be on or off during the life cycle of a cluster.
-	// Now we can allow upgrade and downgrade we must explicitly monitor which pods
-	// have TLS secrets mounted.
-	for _, container := range pod.Spec.Containers {
-		if container.Name == constants.CouchbaseContainerName {
-			for _, mount := range container.VolumeMounts {
-				if mount.Name == constants.CouchbaseTLSVolumeName {
-					pod.Annotations[constants.PodTLSAnnotation] = "enabled"
-					break
-				}
-			}
-
-			break
-		}
 	}
 
 	return nil
