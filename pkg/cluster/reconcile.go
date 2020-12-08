@@ -172,6 +172,10 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
+	if err := c.reconcilePods(); err != nil {
+		return err
+	}
+
 	if err := c.reconcileClusterSettings(); err != nil {
 		return err
 	}
@@ -1555,6 +1559,58 @@ func (c *Cluster) resourcesEqual(current, requested interface{}) (bool, string) 
 	}
 
 	return false, d
+}
+
+// reconcilePods updates pod metadata only, this is mutable.  All other changes are done
+// with the upgrade mechanism, as these are immutable and need a replacement.  The assumption
+// here is that topology changes, e.g upgrades, have been detected and done before this call.
+// If that dodesn't hold, then we risk updating the pod spec annotation and ignoring changes.
+func (c *Cluster) reconcilePods() error {
+	for name, member := range c.members {
+		actual, exists := c.k8s.Pods.Get(name)
+		if !exists {
+			continue
+		}
+
+		// Get what the member should look like.
+		serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
+		if serverClass == nil {
+			continue
+		}
+
+		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member.Name(), c.cluster, *serverClass)
+		if err != nil {
+			return err
+		}
+
+		serverGroup := ""
+
+		if actual.Spec.NodeSelector != nil {
+			if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+				serverGroup = group
+			}
+		}
+
+		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState)
+		if err != nil {
+			return err
+		}
+
+		if reflect.DeepEqual(actual.Labels, requested.Labels) && reflect.DeepEqual(actual.Annotations, requested.Annotations) {
+			continue
+		}
+
+		// Don't modify the cache!!
+		updated := actual.DeepCopy()
+		updated.Labels = requested.Labels
+		updated.Annotations = requested.Annotations
+
+		if _, err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Update(context.Background(), updated, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // needsUpgrade does an ordered walk down the list of members, if a member is not

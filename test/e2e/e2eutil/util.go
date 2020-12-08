@@ -254,7 +254,7 @@ func NewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service,
 	if dns != nil {
 		for index := range clusterSpec.Spec.Servers {
 			if clusterSpec.Spec.Servers[index].Pod == nil {
-				clusterSpec.Spec.Servers[index].Pod = &v1.PodTemplateSpec{}
+				clusterSpec.Spec.Servers[index].Pod = &couchbasev2.PodTemplate{}
 			}
 
 			clusterSpec.Spec.Servers[index].Pod.Spec.DNSPolicy = v1.DNSNone

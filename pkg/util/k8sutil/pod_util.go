@@ -506,7 +506,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		// things to happen...
 		podTemplate := config.Pod.DeepCopy()
 
-		pod.ObjectMeta = podTemplate.ObjectMeta
+		pod.ObjectMeta = podTemplate.ObjectMeta.ToObjectMeta()
 		pod.Spec = podTemplate.Spec
 	}
 

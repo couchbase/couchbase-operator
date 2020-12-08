@@ -301,7 +301,7 @@ func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster, imagePullSecret
 
 	for i := range cluster.Spec.Servers {
 		if cluster.Spec.Servers[i].Pod == nil {
-			cluster.Spec.Servers[i].Pod = &v1.PodTemplateSpec{}
+			cluster.Spec.Servers[i].Pod = &couchbasev2.PodTemplate{}
 		}
 
 		cluster.Spec.Servers[i].Pod.Spec.ImagePullSecrets = references

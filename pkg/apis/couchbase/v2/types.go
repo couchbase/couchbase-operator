@@ -1374,6 +1374,12 @@ type RBAC struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
+// PodTemplate is a v1.PodTemplateSpec with a metadata that will be preserved.
+type PodTemplate struct {
+	ObjectMeta `json:"metadata,omitempty"`
+	Spec       v1.PodSpec `json:"spec,omitempty"`
+}
+
 type ServerConfig struct {
 	// Size is the expected size of the couchbase cluster. The
 	// couchbase-operator will eventually make the size of the running
@@ -1396,7 +1402,7 @@ type ServerConfig struct {
 	// Pod defines the policy to create pod for the couchbase pod.
 	//
 	// Updating Pod does not take effect on any existing couchbase pods.
-	Pod *v1.PodTemplateSpec `json:"pod,omitempty"`
+	Pod *PodTemplate `json:"pod,omitempty"`
 
 	// Volume mounts represent persistent volume claims to attach to pod.
 	// If defined new pods will use persistent volumes.

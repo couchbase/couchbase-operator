@@ -217,6 +217,13 @@ func (cs *ClusterSpec) TotalSize() int {
 	return size
 }
 
+func (o ObjectMeta) ToObjectMeta() metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Labels:      o.Labels,
+		Annotations: o.Annotations,
+	}
+}
+
 func (o NamedObjectMeta) ToObjectMeta() metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:        o.Name,
