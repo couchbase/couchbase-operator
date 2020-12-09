@@ -50,41 +50,45 @@ func LoadYAMLs(path string) ([]*unstructured.Unstructured, error) {
 }
 
 // CouchbaseOperatorConfig runs cbopcfg and unmarshals the output.
-func CouchbaseOperatorConfig(args ...string) ([]*unstructured.Unstructured, error) {
-	command := exec.Command("../../build/bin/cbopcfg", args...)
+func CouchbaseOperatorConfig(args ...string) error {
+	output, err := exec.Command("../../build/bin/cbopcfg", args...).CombinedOutput()
+	logrus.Infof("Command output:\n%s", string(output))
 
-	data, err := command.CombinedOutput()
-	if err != nil {
-		return nil, err
-	}
-
-	return parseYAMLs(data)
+	return err
 }
 
-// CreateResource dynamically creates an unstructured resource.
-func CreateResource(c *Clients, resource *unstructured.Unstructured) error {
+// CreateResourceWithUpdate dynamically creates an unstructured resource.
+func CreateResourceWithUpdate(c *Clients, resource *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	logrus.Infof("Creating resource %v %v %v", resource.GetAPIVersion(), resource.GetKind(), resource.GetName())
 
 	gvk := resource.GroupVersionKind()
 
 	mapping, err := c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-		if _, err := c.dynamic.Resource(mapping.Resource).Create(context.Background(), resource, metav1.CreateOptions{}); err != nil {
-			return err
+		updated, err := c.dynamic.Resource(mapping.Resource).Create(context.Background(), resource, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
 		}
 
-		return nil
+		return updated, nil
 	}
 
-	if _, err := c.dynamic.Resource(mapping.Resource).Namespace("default").Create(context.Background(), resource, metav1.CreateOptions{}); err != nil {
-		return err
+	updated, err := c.dynamic.Resource(mapping.Resource).Namespace(resource.GetNamespace()).Create(context.Background(), resource, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return updated, nil
+}
+
+// CreateResource dynamically creates an unstructured resource, omitting the updated resource.
+func CreateResource(c *Clients, resource *unstructured.Unstructured) error {
+	_, err := CreateResourceWithUpdate(c, resource)
+	return err
 }
 
 // CreateResources creates resources, in order, from a list of raw YAMl data.
@@ -118,7 +122,7 @@ func ReplaceResource(c *Clients, resource *unstructured.Unstructured) error {
 			return err
 		}
 	} else {
-		if old, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
+		if old, err = c.dynamic.Resource(mapping.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
 			return err
 		}
 	}
@@ -138,7 +142,7 @@ func ReplaceResource(c *Clients, resource *unstructured.Unstructured) error {
 			return err
 		}
 	} else {
-		if _, err := c.dynamic.Resource(mapping.Resource).Namespace("default").Update(context.Background(), old, metav1.UpdateOptions{}); err != nil {
+		if _, err := c.dynamic.Resource(mapping.Resource).Namespace(resource.GetNamespace()).Update(context.Background(), old, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 	}
@@ -174,7 +178,7 @@ func ReplaceOrCreateResource(c *Clients, resource *unstructured.Unstructured) er
 			return err
 		}
 	} else {
-		if _, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
+		if _, err = c.dynamic.Resource(mapping.Resource).Namespace(resource.GetNamespace()).Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
 			if errors.IsNotFound(err) {
 				return CreateResource(c, resource)
 			}
@@ -215,7 +219,7 @@ func DeleteResource(c *Clients, resource *unstructured.Unstructured) error {
 		return nil
 	}
 
-	if err := c.dynamic.Resource(mapping.Resource).Namespace("default").Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
+	if err := c.dynamic.Resource(mapping.Resource).Namespace(resource.GetNamespace()).Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
 		return err
 	}
 
@@ -234,7 +238,7 @@ func DeleteResources(c *Clients, resources []*unstructured.Unstructured) error {
 }
 
 // ResourceCondition allows things to wait on any condition on any object type.
-func ResourceCondition(c *Clients, group, version, kind, name, conditionType, conditionStatus string) WaitFunc {
+func ResourceCondition(c *Clients, group, version, kind, namespace, name, conditionType, conditionStatus string) WaitFunc {
 	return func() error {
 		gvk := schema.GroupVersionKind{
 			Group:   group,
@@ -255,7 +259,7 @@ func ResourceCondition(c *Clients, group, version, kind, name, conditionType, co
 				return err
 			}
 		} else {
-			resource, err = c.dynamic.Resource(mapping.Resource).Namespace("default").Get(context.Background(), name, metav1.GetOptions{})
+			resource, err = c.dynamic.Resource(mapping.Resource).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -297,9 +301,63 @@ func ResourceCondition(c *Clients, group, version, kind, name, conditionType, co
 	}
 }
 
+// NoResourceCondition allows things to check a condition doesn't exist (e.g. an error) for a
+// period of time.
+func NoResourceCondition(c *Clients, group, version, kind, namespace, name, conditionType string) WaitFunc {
+	return func() error {
+		gvk := schema.GroupVersionKind{
+			Group:   group,
+			Version: version,
+			Kind:    kind,
+		}
+
+		mapping, err := c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		var resource *unstructured.Unstructured
+
+		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			resource, err = c.dynamic.Resource(mapping.Resource).Get(context.Background(), name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+		} else {
+			resource, err = c.dynamic.Resource(mapping.Resource).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+		}
+
+		conditions, ok, _ := unstructured.NestedSlice(resource.Object, "status", "conditions")
+		if !ok {
+			return fmt.Errorf("object has no status conditions")
+		}
+
+		for _, condition := range conditions {
+			object, ok := condition.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("condition malformed")
+			}
+
+			typ, ok, _ := unstructured.NestedString(object, "type")
+			if !ok {
+				return fmt.Errorf("condition type malformed")
+			}
+
+			if typ == conditionType {
+				return fmt.Errorf("condition set unexpectedly")
+			}
+		}
+
+		return nil
+	}
+}
+
 // ResourceEvent allows waiting on an event happening.  This matches any event raised ever
 // (in the last hour at least), so beware of using static names and reusing the cluster.
-func ResourceEvent(c *Clients, group, version, kind, name, reason string) WaitFunc {
+func ResourceEvent(c *Clients, group, version, kind, namespace, name, reason string) WaitFunc {
 	return func() error {
 		selector := map[string]string{
 			"involvedObject.apiVersion": group + "/" + version,
@@ -307,7 +365,7 @@ func ResourceEvent(c *Clients, group, version, kind, name, reason string) WaitFu
 			"involvedObject.name":       name,
 		}
 
-		events, err := c.kubernetes.CoreV1().Events("default").List(context.Background(), metav1.ListOptions{FieldSelector: labels.FormatLabels(selector)})
+		events, err := c.kubernetes.CoreV1().Events(namespace).List(context.Background(), metav1.ListOptions{FieldSelector: labels.FormatLabels(selector)})
 		if err != nil {
 			return err
 		}
@@ -319,5 +377,41 @@ func ResourceEvent(c *Clients, group, version, kind, name, reason string) WaitFu
 		}
 
 		return fmt.Errorf("no event of reason %s seen", reason)
+	}
+}
+
+// ResourceDeleted checks for a resource being deleted before continuing.
+func ResourceDeleted(c *Clients, group, version, kind, namespace, name string) WaitFunc {
+	return func() error {
+		gvk := schema.GroupVersionKind{
+			Group:   group,
+			Version: version,
+			Kind:    kind,
+		}
+
+		mapping, err := c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			if _, err = c.dynamic.Resource(mapping.Resource).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+
+				return err
+			}
+		} else {
+			if _, err = c.dynamic.Resource(mapping.Resource).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{}); err != nil {
+				if errors.IsNotFound(err) {
+					return nil
+				}
+
+				return err
+			}
+		}
+
+		return fmt.Errorf("resource %s/%s/%s %s/%s still exists", group, version, kind, namespace, name)
 	}
 }
