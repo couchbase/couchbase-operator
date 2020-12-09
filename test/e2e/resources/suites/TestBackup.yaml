@@ -1,0 +1,20 @@
+---
+suite: TestP0
+timeout: 12h
+tcGroups:
+  - name: AutomatedBackupTests
+    clusters:
+      - BasicCluster
+    testcases:
+      - name: TestFullIncremental
+      - name: TestFullOnly
+      - name: TestBackupAndRestore
+      - name: TestFullIncrementalOverTLS
+      - name: TestFullOnlyOverTLS
+      - name: TestMultipleBackups
+      - name: TestFailedBackupBehaviour
+      - name: TestBackupPVCReconcile
+      - name: TestReplaceFullOnlyBackup
+      - name: TestReplaceFullIncrementalBackup
+      - name: TestUpdateBackupStatus
+  
