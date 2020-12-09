@@ -547,7 +547,7 @@ This option requires some extra configuration related to your AWS credentials an
 
 First of all, a separate `Secret` must be created that holds the AWS region name, access key ID, and secret access key.
 
-[source,yaml,subs="attributes,verabitm"]
+[source,yaml]
 ----
 apiVersion: v1
 kind: Secret
@@ -576,7 +576,7 @@ spec:
 
 And finally, the S3 bucket that we wish to hold backups needs to be specified in the desired `CouchbaseBackup` and `CouchbaseBackupRestore` CRDs.
 
-[source,yaml,subs="attributes,verbatim"]
+[source,yaml]
 ----
 apiVersion: couchbase.com/v2
 kind: CouchbaseBackup

@@ -456,7 +456,7 @@ A server configuration is considered stateless if it contains only the `query` s
 A bucket is considered stateless if is a `CouchbaseEphemeralBucket`.
 When `enablePreviewScaling` is `false` only stateless server configurations associated with stateless buckets are permitted to autoscale.
 
-[WARN]
+[IMPORTANT]
 ====
 Enabling preview autoscaling is unsupported and for experimental purposes only.
 ====

@@ -57,7 +57,7 @@ These improvements will ease platform adoption as the Operator will constantly r
 [#fixed-issues-v210]
 === Fixed Issues
 
-[#table-fixed-issues-v202,cols="25,66"]
+[#table-fixed-issues-v210,cols="25,66"]
 |===
 | Issue | Description
 
@@ -95,7 +95,7 @@ Couchbase Autonomous Operator 2.0.3 was released in November 2020.
 [#fixed-issues-v203]
 === Fixed Issues
 
-[#table-fixed-issues-v202,cols="25,66"]
+[#table-fixed-issues-v203,cols="25,66"]
 |===
 | Issue | Description
 
