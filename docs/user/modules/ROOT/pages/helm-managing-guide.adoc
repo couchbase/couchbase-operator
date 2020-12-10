@@ -49,7 +49,7 @@ Refer to the xref:howto-operator-upgrade.adoc[Operator upgrade documentation] fo
 
 ==== Limitations
 
-* It is not possible to upgrade the 1.2.x Autonomous Operator chart to 2.0.x.
+* It is not possible to upgrade the 1.2.x Autonomous Operator chart to 2.x.x.
 If you have a previous installation of the Autonomous Operator chart, you will need to <<delete-deployment,delete the release>>, as well as delete the CRD.
 
 * If you didn't originally install the Autonomous Operator using Helm, then you cannot upgrade the Autonomous Operator using Helm.

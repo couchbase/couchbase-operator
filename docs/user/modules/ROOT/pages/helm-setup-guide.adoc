@@ -275,16 +275,16 @@ helm search hub couchbase
 [source,console]
 ----
 NAME                        	                      CHART VERSION	APP VERSION	DESCRIPTION
-https://hub.helm.sh/charts/couchbase/couchbase-...	2.0.0        	2.0.0      	A Helm chart to deploy the Couchbase Autonomous...
+https://hub.helm.sh/charts/couchbase/couchbase-...	2.1.0        	2.1.0      	A Helm chart to deploy the Couchbase Autonomous...
 ----
 
-Here, the `CHART VERSION` is *2.0.0*, and the `APP VERSION` (the Autonomous Operator version) is *2.0.0*.
+Here, the `CHART VERSION` is *2.1.0*, and the `APP VERSION` (the Autonomous Operator version) is *2.1.0*.
 
 To install a specific version of the Couchbase Helm Chart chart, include the `--version` argument during installation:
 
 [source,console]
 ----
-helm install my-release --version 2.0.0 couchbase/couchbase-operator
+helm install my-release --version 2.1.0 couchbase/couchbase-operator
 ----
 
 [NOTE]
