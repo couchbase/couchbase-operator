@@ -9,26 +9,287 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 var retryInterval = 10 * time.Second
 
-type filterFunc func(*v1.Pod) bool
+// resourceCheckFunc is a function type consumed by ResourceConstraints.
+type resourceCheckFunc func(*unstructured.Unstructured, error) error
+
+// resourceExists checks that a resource exists.
+func resourceExists(resource *unstructured.Unstructured, lookupError error) error {
+	if lookupError != nil {
+		return fmt.Errorf("resource must exist: %w", lookupError)
+	}
+
+	return nil
+}
+
+// resourceNotExists checks that a resource does not exist.
+func resourceNotExists(resource *unstructured.Unstructured, lookupError error) error {
+	if lookupError == nil {
+		return fmt.Errorf("resource nust not exist")
+	}
+
+	return nil
+}
+
+// resourceConditionExists checks that a resource has a condition in the correct state.
+func resourceConditionExists(conditionType, conditionStatus string) resourceCheckFunc {
+	return func(resource *unstructured.Unstructured, lookupError error) error {
+		conditions, ok, _ := unstructured.NestedSlice(resource.Object, "status", "conditions")
+		if !ok {
+			return fmt.Errorf("resource has no conditions")
+		}
+
+		for _, c := range conditions {
+			condition, ok := c.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("malformed condition %v", c)
+			}
+
+			concreteType, ok, _ := unstructured.NestedString(condition, "type")
+			if !ok {
+				return fmt.Errorf("condition has no type %v", condition)
+			}
+
+			if concreteType != conditionType {
+				continue
+			}
+
+			concreteStatus, ok, _ := unstructured.NestedString(condition, "status")
+			if !ok {
+				return fmt.Errorf("condition has no status %v", condition)
+			}
+
+			if concreteStatus != conditionStatus {
+				return fmt.Errorf("condition status mismatch, expected %v, got %v", conditionStatus, concreteStatus)
+			}
+
+			return nil
+		}
+
+		return fmt.Errorf("condition %v missing", conditionType)
+	}
+}
+
+// resourceConditionNotExists checks that a resource does not have a condition.
+func resourceConditionNotExists(conditionType string) resourceCheckFunc {
+	return func(resource *unstructured.Unstructured, lookupError error) error {
+		conditions, ok, _ := unstructured.NestedSlice(resource.Object, "status", "conditions")
+		if !ok {
+			return fmt.Errorf("resource has no conditions")
+		}
+
+		for _, c := range conditions {
+			condition, ok := c.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("malformed condition %v", c)
+			}
+
+			concreteType, ok, _ := unstructured.NestedString(condition, "type")
+			if !ok {
+				return fmt.Errorf("condition has no type %v", condition)
+			}
+
+			if concreteType == conditionType {
+				return fmt.Errorf("condition %s must not exist", conditionType)
+			}
+		}
+
+		return nil
+	}
+}
+
+// couchbaseClusterScaled checks that the requested cluster size matched the reported size.
+func couchbaseClusterScaled(resource *unstructured.Unstructured, lookupError error) error {
+	classes, ok, _ := unstructured.NestedSlice(resource.Object, "spec", "servers")
+	if !ok {
+		return fmt.Errorf("resource has no server classes")
+	}
+
+	var requested int64
+
+	for _, c := range classes {
+		class, ok := c.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("malformed class %v", c)
+		}
+
+		size, ok, _ := unstructured.NestedInt64(class, "size")
+		if !ok {
+			return fmt.Errorf("class has no size %v", class)
+		}
+
+		requested += size
+	}
+
+	actual, ok, _ := unstructured.NestedInt64(resource.Object, "status", "size")
+	if !ok {
+		return fmt.Errorf("status has no size")
+	}
+
+	if requested != actual {
+		return fmt.Errorf("size does not match, wanted %v, got %v", requested, actual)
+	}
+
+	return nil
+}
+
+// ResourceConstraints gets a resource and then applies constraints to it, if any fail, so
+// does this.
+func ResourceConstraints(k8s *types.Cluster, resource runtime.Object, constraints ...resourceCheckFunc) func() error {
+	return func() error {
+		// Map from object to dynamic API mapping... "e.g. couchbase.com/v2/couchbaseclusters"
+		kinds, _, err := scheme.Scheme.ObjectKinds(resource)
+		if err != nil {
+			return err
+		}
+
+		gvk := kinds[0]
+
+		mapping, err := k8s.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		// Up cast the resource into a meta object so we can interrogate name and namespace.
+		metaResource, ok := resource.(metav1.Object)
+		if !ok {
+			return fmt.Errorf("unable to convert from runtime to meta resource")
+		}
+
+		var unstructuredResource *unstructured.Unstructured
+
+		var lookupError error
+
+		// Lookup the resource.
+		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			unstructuredResource, lookupError = k8s.DynamicClient.Resource(mapping.Resource).Get(context.Background(), metaResource.GetName(), metav1.GetOptions{})
+		} else {
+			unstructuredResource, lookupError = k8s.DynamicClient.Resource(mapping.Resource).Namespace(metaResource.GetNamespace()).Get(context.Background(), metaResource.GetName(), metav1.GetOptions{})
+		}
+
+		// Check all constraints return with no error.
+		for _, constraint := range constraints {
+			if err := constraint(unstructuredResource, lookupError); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+}
+
+// ResourceDeleted checks if a given resource has been deleted.  This returns a closure
+// that should be used with RetryFor().
+func ResourceDeleted(k8s *types.Cluster, resource runtime.Object) func() error {
+	return ResourceConstraints(k8s, resource, resourceNotExists)
+}
+
+// ResourceCondition checks if a given resource has the given condition. This returns a closure
+// that should be used with RetryFor().
+func ResourceCondition(k8s *types.Cluster, resource runtime.Object, conditionType, conditionStatus string) func() error {
+	return ResourceConstraints(k8s, resource, resourceExists, resourceConditionExists(conditionType, conditionStatus))
+}
+
+// waitForResourceEvent watches event streams for a given resource and returns when the requested
+// event has been seen.
+func waitForResourceEvent(ctx context.Context, k8s *types.Cluster, resource runtime.Object, event *v1.Event, epoch time.Time) error {
+	// Map from object to dynamic API mapping... "e.g. couchbase.com/v2/couchbaseclusters"
+	kinds, _, err := scheme.Scheme.ObjectKinds(resource)
+	if err != nil {
+		return err
+	}
+
+	gvk := kinds[0]
+
+	// Up cast the resource into a meta object so we can interrogate name and namespace.
+	metaResource, ok := resource.(metav1.Object)
+	if !ok {
+		return fmt.Errorf("unable to convert from runtime to meta resource")
+	}
+
+	selector := map[string]string{
+		"involvedObject.apiVersion": gvk.GroupVersion().String(),
+		"involvedObject.kind":       gvk.Kind,
+		"involvedObject.name":       metaResource.GetName(),
+	}
+
+	watch, err := k8s.KubeClient.CoreV1().Events(metaResource.GetNamespace()).Watch(context.Background(), metav1.ListOptions{FieldSelector: labels.FormatLabels(selector)})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		// There is a race when you call stop, but the watcher is trying to send
+		// on the result channel, so drain any events to cause the routine to exit
+		// cleanly.
+		watch.Stop()
+
+		for {
+			if _, ok := <-watch.ResultChan(); !ok {
+				break
+			}
+		}
+	}()
+
+	resultChan := watch.ResultChan()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%w: failed to wait for event %v/%v", ctx.Err(), event.Reason, event.Message)
+
+		case watchEvent := <-resultChan:
+			ev := watchEvent.Object.(*v1.Event)
+			// Watch() returns every event since the dawn of time, so ensure we
+			// only return things after we started the wait.  This avoids matching
+			// events that may have already occurred
+			if ev.LastTimestamp.Before(&metav1.Time{Time: epoch}) {
+				continue
+			}
+
+			if EqualEvent(event, ev) {
+				return nil
+			}
+		}
+	}
+}
+
+func waitForResourceEventFromNow(ctx context.Context, k8s *types.Cluster, resource runtime.Object, event *v1.Event) error {
+	return waitForResourceEvent(ctx, k8s, resource, event, time.Now())
+}
+
+func waitForResourceEventEver(ctx context.Context, k8s *types.Cluster, resource runtime.Object, event *v1.Event) error {
+	// Tonight we're gonna party like it's 1999... you must have royally screwed up if this
+	// isn't far enough in the past to see every event!
+	return waitForResourceEvent(ctx, k8s, resource, event, time.Date(1999, time.December, 31, 23, 59, 59, 0, time.UTC))
+}
+
+// mustWaitForResourceEventFromNow watches event streams for a given resource and returns when the requested
+// event has been seen.
+func mustWaitForResourceEventFromNow(t *testing.T, k8s *types.Cluster, resource runtime.Object, event *v1.Event, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := waitForResourceEventFromNow(ctx, k8s, resource, event); err != nil {
+		Die(t, err)
+	}
+}
 
 // WaitForBackupCreation waits for a backup resources associated with a cluster to be created.
 func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) error {
@@ -138,33 +399,6 @@ func MustWaitStatusUpdate(t *testing.T, k8s *types.Cluster, backupName, statusFi
 	}
 
 	return s
-}
-
-func WaitUntilPodSizeReached(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, size int, timeout time.Duration) error {
-	return retryutil.RetryFor(timeout, func() error {
-		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), ClusterListOpt(couchbase))
-		if err != nil {
-			return err
-		}
-
-		for _, pod := range podList.Items {
-			if pod.Status.Phase != v1.PodRunning {
-				return fmt.Errorf("pod %s not running %v", pod.Name, pod.Status.Phase)
-			}
-		}
-
-		if len(podList.Items) != size {
-			return fmt.Errorf("expected %d pods, have %d", size, len(podList.Items))
-		}
-
-		return nil
-	})
-}
-
-func MustWaitUntilPodSizeReached(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, size int, timeout time.Duration) {
-	if err := WaitUntilPodSizeReached(k8s, couchbase, size, timeout); err != nil {
-		Die(t, err)
-	}
 }
 
 func WaitUntilBucketsExist(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, buckets []string, timeout time.Duration) error {
@@ -311,60 +545,18 @@ func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *c
 }
 
 func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	callback := func() error {
-		cl, err := GetCouchbaseCluster(k8s.CRClient, cluster)
-		if err != nil {
-			return err
-		}
-
-		if cl.Status.Size != cluster.Spec.TotalSize() {
-			return fmt.Errorf("requested size %d, reported size %d", cluster.Spec.TotalSize(), cl.Status.Size)
-		}
-
-		requiredConditions := map[couchbasev2.ClusterConditionType]v1.ConditionStatus{
-			couchbasev2.ClusterConditionAvailable: v1.ConditionTrue,
-			couchbasev2.ClusterConditionBalanced:  v1.ConditionTrue,
-		}
-
-		optionalConditions := map[couchbasev2.ClusterConditionType]v1.ConditionStatus{
-			couchbasev2.ClusterConditionScaling:   v1.ConditionFalse,
-			couchbasev2.ClusterConditionUpgrading: v1.ConditionFalse,
-		}
-
-	NextCondition:
-		for typ, status := range requiredConditions {
-			for _, condition := range cl.Status.Conditions {
-				if condition.Type == typ {
-					if condition.Status == status {
-						continue NextCondition
-					}
-
-					return fmt.Errorf("required condition %v is %v", typ, condition.Status)
-				}
-			}
-
-			return fmt.Errorf("required condition %v not defined", typ)
-		}
-
-		for _, condition := range cl.Status.Conditions {
-			status, ok := optionalConditions[condition.Type]
-			if !ok {
-				continue
-			}
-
-			if condition.Status != status {
-				return fmt.Errorf("optional condition %v is %v", condition.Type, condition.Status)
-			}
-		}
-
-		return nil
+	// Bit complex, probably a strong sign that our conditions are wrong!
+	// Cluster needs to be available, balanced, not scaling and not upgrading.
+	constraints := []resourceCheckFunc{
+		resourceExists,
+		couchbaseClusterScaled,
+		resourceConditionExists(string(couchbasev2.ClusterConditionAvailable), string(v1.ConditionTrue)),
+		resourceConditionExists(string(couchbasev2.ClusterConditionBalanced), string(v1.ConditionTrue)),
+		resourceConditionNotExists(string(couchbasev2.ClusterConditionScaling)),
+		resourceConditionNotExists(string(couchbasev2.ClusterConditionUpgrading)),
 	}
 
-	if err := retryutil.RetryFor(timeout, callback); err != nil {
-		return fmt.Errorf("fail to wait for cluster status to be healthy: %w", err)
-	}
-
-	return nil
+	return retryutil.RetryFor(timeout, ResourceConstraints(k8s, cluster, constraints...))
 }
 
 func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
@@ -373,136 +565,14 @@ func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
-func WaitPodDeleted(t *testing.T, kubeClient kubernetes.Interface, podName string, cl *couchbasev2.CouchbaseCluster) error {
-	_, err := WaitPodsDeleted(kubeClient, cl.Namespace, NodeListOpt(cl, podName))
-	if err != nil {
-		return fmt.Errorf("fail to wait pods deleted: %w", err)
-	}
-
-	return nil
-}
-
-func WaitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.ListOptions) ([]*v1.Pod, error) {
-	f := func(p *v1.Pod) bool { return p.DeletionTimestamp != nil }
-	return waitPodsDeleted(kubecli, namespace, lo, f)
-}
-
-func waitPodsDeleted(kubecli kubernetes.Interface, namespace string, lo metav1.ListOptions, filters ...filterFunc) ([]*v1.Pod, error) {
-	var pods []*v1.Pod
-
-	err := retryutil.RetryFor(time.Minute, func() error {
-		podList, err := kubecli.CoreV1().Pods(namespace).List(context.Background(), lo)
-		if err != nil {
-			return err
-		}
-
-		pods = nil
-
-		for i := range podList.Items {
-			p := &podList.Items[i]
-			filtered := false
-
-			for _, filter := range filters {
-				if filter(p) {
-					filtered = true
-				}
-			}
-
-			if !filtered {
-				pods = append(pods, p)
-			}
-		}
-
-		if len(pods) != 0 {
-			return fmt.Errorf("%d pods still waiting to be deleted", len(pods))
-		}
-
-		return nil
-	})
-
-	return pods, err
-}
-
 // WaitUntilOperatorReady will wait until the first pod selected for couchbase-operator is ready.
 func WaitUntilOperatorReady(k8s *types.Cluster, timeout time.Duration) error {
-	callback := func() error {
-		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), k8s.OperatorDeployment.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		for _, condition := range deployment.Status.Conditions {
-			if condition.Type == appsv1.DeploymentAvailable {
-				if condition.Status == v1.ConditionTrue {
-					return nil
-				}
-
-				return fmt.Errorf("operator deployment not ready")
-			}
-		}
-
-		return fmt.Errorf("operator deployment missing Available condition")
-	}
-
-	return retryutil.RetryFor(timeout, callback)
+	return retryutil.RetryFor(timeout, ResourceCondition(k8s, k8s.OperatorDeployment, "Available", "True"))
 }
 
-// waits until the provided condition type occurs with associated status.
-func WaitForClusterEvent(ctx context.Context, kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event) error {
-	opts := metav1.ListOptions{
-		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
-	}
-
-	watch, err := kubeClient.CoreV1().Events(cl.Namespace).Watch(context.Background(), opts)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		// There is a race when you call stop, but the watcher is trying to send
-		// on the result channel, so drain any events to cause the routine to exit
-		// cleanly.
-		watch.Stop()
-
-		for {
-			if _, ok := <-watch.ResultChan(); !ok {
-				break
-			}
-		}
-	}()
-
-	now := metav1.Now()
-
-	resultChan := watch.ResultChan()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("%w: failed to wait for event %v/%v", ctx.Err(), event.Reason, event.Message)
-
-		case watchEvent := <-resultChan:
-			crdEvent := watchEvent.Object.(*v1.Event)
-			// Watch() returns every event since the dawn of time, so ensure we
-			// only return things after we started the wait.  This avoids matching
-			// events that may have already occurred
-			if crdEvent.LastTimestamp.Before(&now) {
-				continue
-			}
-
-			if EqualEvent(event, crdEvent) {
-				return nil
-			}
-		}
-	}
-}
-
-func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	if err := WaitForClusterEvent(ctx, k8s.KubeClient, cl, event); err != nil {
-		Die(t, err)
-	}
+// MustWaitForClusterEvent waits for the specified event to be raised.
+func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
+	mustWaitForResourceEventFromNow(t, k8s, cluster, event, timeout)
 }
 
 // MustObserveClusterEvent differs from MustWaitForClusterEvent in that the latter waits for
@@ -510,230 +580,33 @@ func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cl *couchbasev2.C
 // has or will happen e.g. is less racy.  This requires that the event is unique within a test
 // run as multiple events of the same type will cause this to trigger.
 func MustObserveClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
-	opts := metav1.ListOptions{
-		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.ClusterCRDResourceKind},
-	}
-
-	callback := func() error {
-		events, err := k8s.KubeClient.CoreV1().Events(cluster.Namespace).List(context.Background(), opts)
-		if err != nil {
-			return err
-		}
-
-		for i := range events.Items {
-			if EqualEvent(&events.Items[i], event) {
-				return nil
-			}
-		}
-
-		return fmt.Errorf("unable to locate event %v", event)
-	}
-
-	if err := retryutil.RetryFor(timeout, callback); err != nil {
-		Die(t, err)
-	}
-}
-
-func WaitForBackupEvent(kubeClient kubernetes.Interface, b *couchbasev2.CouchbaseBackup, event *v1.Event, timeout time.Duration) error {
-	opts := metav1.ListOptions{
-		TypeMeta: metav1.TypeMeta{Kind: couchbasev2.BackupCRDResourceKind},
-	}
-
-	watch, err := kubeClient.CoreV1().Events(b.Namespace).Watch(context.Background(), opts)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		// There is a race when you call stop, but the watcher is trying to send
-		// on the result channel, so drain any events to cause the routine to exit
-		// cleanly.
-		watch.Stop()
-
-		for {
-			if _, ok := <-watch.ResultChan(); !ok {
-				break
-			}
-		}
-	}()
-
-	now := metav1.Now()
-
-	resultChan := watch.ResultChan()
-	timeoutChan := time.After(timeout)
-
-	for {
-		select {
-		case <-timeoutChan:
-			return fmt.Errorf("time out waiting for backup event %s, %s", event.Reason, event.Message)
-
-		case watchEvent := <-resultChan:
-			crdEvent := watchEvent.Object.(*v1.Event)
-			// Watch() returns every event since the dawn of time, so ensure we
-			// only return things after we started the wait.  This avoids matching
-			// events that may have already occurred
-			if crdEvent.LastTimestamp.Before(&now) {
-				continue
-			}
-
-			if EqualEvent(event, crdEvent) {
-				return nil
-			}
-		}
-	}
-}
-
-func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, b *couchbasev2.CouchbaseBackup, event *v1.Event, timeout time.Duration) {
-	if err := WaitForBackupEvent(k8s.KubeClient, b, event, timeout); err != nil {
-		Die(t, err)
-	}
-}
-
-// waits until the provided condition type with associated status after specified timestamp.
-func WaitForClusterCondition(t *testing.T, crClient versioned.Interface, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	callback := func() error {
-		cluster, err := GetCouchbaseCluster(crClient, cl)
-		if err != nil {
-			return err
-		}
-
-		// compare cluster conditions to desired condition
-		for _, condition := range cluster.Status.Conditions {
-			if condition.Type == conditionType {
-				if condition.Status == status {
-					return nil
-				}
-
-				return fmt.Errorf("condition exists, expected status %v, got %v", status, condition.Status)
-			}
-		}
-
-		return fmt.Errorf("condition does not exist")
-	}
-
-	if err := retryutil.RetryFor(timeout, callback); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	if err := WaitForClusterCondition(t, k8s.CRClient, conditionType, status, cl, timeout); err != nil {
-		Die(t, err)
-	}
-}
-
-func WaitForPVC(k8s *types.Cluster, name string, timeout time.Duration) error {
-	callback := func() error {
-		_, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
-		return err
-	}
-
-	return retryutil.RetryFor(timeout, callback)
-}
-
-func MustWaitForPVC(t *testing.T, k8s *types.Cluster, name string, timeout time.Duration) {
-	if err := WaitForPVC(k8s, name, timeout); err != nil {
-		Die(t, err)
-	}
-}
-
-// WaitForPVCDeletion is used as synchronization between runs, especially in the cloud
-// as PVC reclaim is not instant.
-func WaitForPVCDeletion(ctx context.Context, k8s *types.Cluster) error {
-	requirements := []labels.Requirement{}
-
-	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
-	if err != nil {
-		return err
-	}
-
-	requirements = append(requirements, *req)
-
-	selector := labels.NewSelector()
-	selector = selector.Add(requirements...)
-
-	return retryutil.Retry(ctx, 10*time.Second, func() error {
-		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
-		if err != nil {
-			return err
-		}
-
-		if len(pvcs.Items) != 0 {
-			return fmt.Errorf("%d pvcs still waiting to be deleted", len(pvcs.Items))
-		}
-
-		return nil
-	})
-}
-
-// DeleteAndWaitForPVCDeletionSingle deletes a specific PVC in the cluster and waits for it
-// to be deleted.  If this operation fails we retry again and again until it does
-// work or the context timeout triggers.
-func DeleteAndWaitForPVCDeletionSingle(k8s *types.Cluster, pvcName string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// Select all Couchbase PVCs in the namespace.
-	requirements := []labels.Requirement{}
+	if err := waitForResourceEventEver(ctx, k8s, cluster, event); err != nil {
+		Die(t, err)
+	}
+}
 
-	req, err := labels.NewRequirement(operator_constants.LabelApp, selection.Equals, []string{operator_constants.App})
-	if err != nil {
-		return err
+func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, event *v1.Event, timeout time.Duration) {
+	mustWaitForResourceEventFromNow(t, k8s, backup, event, timeout)
+}
+
+// waits until the provided condition type with associated status.
+func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, cl, string(conditionType), string(status))); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustDeletePVC(t *testing.T, k8s *types.Cluster, pvc *v1.PersistentVolumeClaim, timeout time.Duration) {
+	if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Delete(context.Background(), pvc.Name, metav1.DeleteOptions{}); err != nil {
+		Die(t, err)
 	}
 
-	requirements = append(requirements, *req)
-
-	selector := labels.NewSelector()
-	selector = selector.Add(requirements...)
-
-	// Retry deletion until success or the timeout context fires.
-	return retryutil.Retry(ctx, time.Second, func() error {
-		pvcs, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
-		if err != nil {
-			return err
-		}
-
-		found := false
-
-		// If there are any finalizers make sure they aren't there, this causes most hangs
-		for i := range pvcs.Items {
-			pvc := pvcs.Items[i]
-
-			if len(pvc.Finalizers) == 0 {
-				continue
-			}
-
-			pvc.Finalizers = []string{}
-
-			if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Update(context.Background(), &pvc, metav1.UpdateOptions{}); err != nil {
-				return err
-			}
-
-			if pvc.Name == pvcName {
-				found = true
-			}
-		}
-
-		if !found {
-			return nil
-		}
-
-		if err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Delete(context.Background(), pvcName, *metav1.NewDeleteOptions(0)); err != nil {
-			return err
-		}
-
-		// Wait for upto a minute for the PVCs to be deleted before we retry the deletion.
-		waitContext, waitCancel := context.WithTimeout(ctx, time.Minute)
-		defer waitCancel()
-
-		if err := WaitForPVCDeletion(waitContext, k8s); err != nil {
-			return err
-		}
-
-		return nil
-	})
+	if err := retryutil.RetryFor(timeout, ResourceDeleted(k8s, pvc)); err != nil {
+		Die(t, err)
+	}
 }
 
 // WaitForRebalanceProgress waits until a rebalance is running and the progress is greater
@@ -784,50 +657,6 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 
 func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, threshold float64, timeout time.Duration) {
 	if err := WaitForRebalanceProgress(t, k8s, couchbase, threshold, timeout); err != nil {
-		Die(t, err)
-	}
-}
-
-// WaitForFirstPodContainerWaiting waits for the first pods's container to enter a waiting state
-// with optional reasons to validate.
-func WaitForFirstPodContainerWaiting(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, reasons ...string) error {
-	return retryutil.RetryFor(timeout, func() error {
-		pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
-		if err != nil {
-			return err
-		}
-
-		if len(pods.Items) == 0 {
-			return nil
-		}
-
-		pod := pods.Items[0]
-		if len(pod.Status.ContainerStatuses) == 0 {
-			return fmt.Errorf("pod has no container status")
-		}
-
-		if pod.Status.ContainerStatuses[0].State.Waiting == nil {
-			return fmt.Errorf("pod is not waiting")
-		}
-
-		if len(reasons) == 0 {
-			return nil
-		}
-
-		waitReason := pod.Status.ContainerStatuses[0].State.Waiting.Reason
-
-		for _, reason := range reasons {
-			if waitReason == reason {
-				return nil
-			}
-		}
-
-		return fmt.Errorf("pod waiting reason is %s", waitReason)
-	})
-}
-
-func MustWaitForFirstPodContainerWaiting(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, reasons ...string) {
-	if err := WaitForFirstPodContainerWaiting(k8s, couchbase, timeout, reasons...); err != nil {
 		Die(t, err)
 	}
 }
@@ -902,24 +731,6 @@ func MustWaitForClusterUserDeletion(t *testing.T, k8s *types.Cluster, couchbase 
 	return nil
 }
 
-// WaitForCRDDeletion waits until CRD is deleted.
-func WaitForCRDDeletion(cs *clientset.Clientset, crdName string, timeout time.Duration) error {
-	return retryutil.RetryFor(timeout, func() error {
-		if _, err := cs.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crdName, metav1.GetOptions{}); err != nil {
-			if k8sutil.IsKubernetesResourceNotFoundError(err) {
-				// api reported crd deleted ok
-				return nil
-			}
-
-			// crd doesn't exists, but for unknown reason
-			return err
-		}
-
-		// crd still exists, retry
-		return fmt.Errorf("crd %s still exists", crdName)
-	})
-}
-
 func WaitUntilCouchbaseAutoscalerExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
@@ -949,28 +760,16 @@ func MustWaitUntilCouchbaseAutoscalerExists(t *testing.T, k8s *types.Cluster, co
 	}
 }
 
-// WaitForCouchbaseAutoscalerDeletion waits for autoscaler to be deleted.
-func WaitForCouchbaseAutoscalerDeletion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) error {
-	return retryutil.RetryFor(timeout, func() error {
-		_, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(couchbase.Namespace).Get(context.Background(), autoscalerName, metav1.GetOptions{})
-		if err != nil {
-			if k8sutil.IsKubernetesResourceNotFoundError(err) {
-				// cr deleted ok
-				return nil
-			}
-
-			// cr doesn't exists, but for unknown reason
-			return err
-		}
-
-		// cr still exists, retry
-		return fmt.Errorf("autoscaler %s still exists", autoscalerName)
-	})
-}
-
+// MustWaitForCouchbaseAutoscalerDeletion waits for autoscaler to be deleted.
 func MustWaitForCouchbaseAutoscalerDeletion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, autoscalerName string, timeout time.Duration) {
-	err := WaitForCouchbaseAutoscalerDeletion(k8s, couchbase, autoscalerName, timeout)
-	if err != nil {
+	autoscaler := &couchbasev2.CouchbaseAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      autoscalerName,
+			Namespace: couchbase.Namespace,
+		},
+	}
+
+	if err := retryutil.RetryFor(timeout, ResourceDeleted(k8s, autoscaler)); err != nil {
 		Die(t, err)
 	}
 }
@@ -1035,9 +834,9 @@ func (a *AsyncOperation) Cancel() {
 
 // WaitForPendingClusterEvent returns a channel to be
 // populated with result of a pending cluster event.
-func WaitForPendingClusterEvent(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) *AsyncOperation {
+func WaitForPendingClusterEvent(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) *AsyncOperation {
 	f := func(ctx context.Context) error {
-		return WaitForClusterEvent(ctx, kubeClient, cl, event)
+		return waitForResourceEventFromNow(ctx, k8s, cl, event)
 	}
 
 	op := NewAsyncOperationWithTimeout(timeout)
@@ -1054,25 +853,8 @@ func MustReceiveErrorValue(t *testing.T, op *AsyncOperation) {
 	}
 }
 
-func WaitForBackupDeletion(k8s *types.Cluster, timeout time.Duration) error {
-	callback := func() error {
-		backups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
-		if err != nil {
-			return err
-		}
-
-		if len(backups.Items) != 0 {
-			return fmt.Errorf("waiting for %v backups to delete", len(backups.Items))
-		}
-
-		return nil
-	}
-
-	return retryutil.RetryFor(timeout, callback)
-}
-
-func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, timeout time.Duration) {
-	if err := WaitForBackupDeletion(k8s, timeout); err != nil {
+func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) {
+	if err := retryutil.RetryFor(timeout, ResourceDeleted(k8s, backup)); err != nil {
 		Die(t, err)
 	}
 }

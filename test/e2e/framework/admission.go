@@ -95,7 +95,7 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		return err
 	}
 
-	if err := waitAdmissionController(k8s); err != nil {
+	if err := waitAdmissionController(k8s, deployment); err != nil {
 		return err
 	}
 
@@ -143,33 +143,13 @@ func deleteAdmissionController(k8s *types.Cluster) error {
 
 // waitAdmissionController polls the Kubernetes API for the admission controller deployment
 // and waits for it to become ready.
-func waitAdmissionController(k8s *types.Cluster) error {
-	var deployment *appsv1.Deployment
-
-	callback := func() error {
-		var err error
-
-		deployment, err = k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Get(context.Background(), config.AdmissionResourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		if deployment.Status.ReadyReplicas != deployment.Status.Replicas {
-			return fmt.Errorf("requested %d replicas, ready replicas %d", deployment.Status.Replicas, deployment.Status.ReadyReplicas)
-		}
-
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
+func waitAdmissionController(k8s *types.Cluster, deployment *appsv1.Deployment) error {
+	if err := retryutil.RetryFor(5*time.Minute, e2eutil.ResourceCondition(k8s, deployment, "Available", "True")); err != nil {
 		return err
 	}
 
 	// Retry an operation that requires the DAC so we know for sure it's up and running.
-	callback = func() error {
+	callback := func() error {
 		bucket := &couchbasev2.CouchbaseBucket{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "dry-run",
@@ -194,7 +174,7 @@ func waitAdmissionController(k8s *types.Cluster) error {
 		return nil
 	}
 
-	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
+	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
 		return err
 	}
 

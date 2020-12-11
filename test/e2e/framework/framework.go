@@ -17,7 +17,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/analyzer"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -369,7 +368,7 @@ func GetDuration(timeoutStr string) time.Duration {
 }
 
 func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
-	deployment := config.GetOperatorDeployment("", operatorImage, k8s.PullSecrets, false, podCreateTimeout, "--zap-level", "debug")
+	deployment := config.GetOperatorDeployment(k8s.Namespace, operatorImage, k8s.PullSecrets, false, podCreateTimeout, "--zap-level", "debug")
 
 	return deployment
 }
@@ -450,6 +449,8 @@ func Setup() (err error) {
 	logrus.Info(" →  couchbase exporter: " + runtimeParams.CouchbaseExporterImage)
 	logrus.Info(" →  couchbase exporter upgrade: " + runtimeParams.CouchbaseExporterImageUpgrade)
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
+
+	logrus.Info(util.PrettyHeading("Framework Configuration"))
 	logrus.Info(" →  Bucket Type: " + runtimeParams.BucketType)
 	logrus.Info(" →  Compression Mode: " + runtimeParams.CompressionMode)
 	logrus.Info(" →  S3 Bucket: " + runtimeParams.S3Bucket)
@@ -559,14 +560,16 @@ func recreateCRDs(k8s *types.Cluster) error {
 		return fmt.Errorf("failed to list CRDs: %w", err)
 	}
 
-	for _, crd := range crds.Items {
+	for i := range crds.Items {
+		crd := &crds.Items[i]
+
 		if crd.Spec.Group == "couchbase.com" {
 			if err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Delete(context.Background(), crd.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				return fmt.Errorf("failed to delete CRD: %w", err)
 			}
 
 			// wait for crd delete
-			if err := e2eutil.WaitForCRDDeletion(clientSet, crd.Name, time.Minute); err != nil {
+			if err := retryutil.RetryFor(time.Minute, e2eutil.ResourceDeleted(k8s, crd)); err != nil {
 				return err
 			}
 		}
@@ -593,53 +596,16 @@ func recreateCRDs(k8s *types.Cluster) error {
 			return err
 		}
 
-		// Ensure CRDs are installed and working before proceeding.
-		callback := func() error {
-			crd, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crd.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			var established bool
-
-			var namesAccepted bool
-
-			// Catch conditions that are set to the incorrect values.
-			for _, condition := range crd.Status.Conditions {
-				switch condition.Type {
-				case apiextensionsv1.Established:
-					if condition.Status != apiextensionsv1.ConditionTrue {
-						return fmt.Errorf("CRD %s not established: %s %s", crd.Name, condition.Reason, condition.Message)
-					}
-
-					established = true
-				case apiextensionsv1.NamesAccepted:
-					if condition.Status != apiextensionsv1.ConditionTrue {
-						return fmt.Errorf("CRD %s names not accepted: %s %s", crd.Name, condition.Reason, condition.Message)
-					}
-
-					namesAccepted = true
-				case apiextensionsv1.NonStructuralSchema:
-					if condition.Status != apiextensionsv1.ConditionFalse {
-						return fmt.Errorf("CRD %s non structural: %s %s", crd.Name, condition.Reason, condition.Message)
-					}
-				}
-			}
-
-			// Catch conditions that were unexpectedly not set.
-			if !established {
-				return fmt.Errorf("CRD %s has no established condition", crd.Name)
-			}
-
-			if !namesAccepted {
-				return fmt.Errorf("CRD %s has no names accepted condition", crd.Name)
-			}
-
-			return nil
+		if err := retryutil.RetryFor(time.Minute, e2eutil.ResourceCondition(k8s, crd, string(apiextensionsv1.Established), string(apiextensionsv1.ConditionTrue))); err != nil {
+			return err
 		}
 
-		if err := retryutil.RetryFor(time.Minute, callback); err != nil {
+		if err := retryutil.RetryFor(time.Minute, e2eutil.ResourceCondition(k8s, crd, string(apiextensionsv1.NamesAccepted), string(apiextensionsv1.ConditionTrue))); err != nil {
 			return err
+		}
+
+		if err := e2eutil.ResourceCondition(k8s, crd, string(apiextensionsv1.NonStructuralSchema), string(apiextensionsv1.ConditionTrue)); err == nil {
+			return fmt.Errorf("CRD %s reports as non-structural", crd.Name)
 		}
 	}
 
@@ -760,42 +726,6 @@ func (f *Framework) GetOperatorRestartCount(k8s *types.Cluster) (int32, error) {
 	}
 
 	return operatorPod.Status.ContainerStatuses[0].RestartCount, nil
-}
-
-func DeleteOperatorCompletely(k8s *types.Cluster, deploymentName string) error {
-	if err := deleteOperator(k8s, deploymentName); err != nil {
-		return err
-	}
-
-	// On k8s 1.6.1, grace period isn't accurate. It took ~10s for operator pod to completely disappear.
-	// We work around by increasing the wait time. Revisit this later.
-	return retryutil.RetryFor(10*time.Minute, func() error {
-		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
-		if err == nil {
-			return fmt.Errorf("resource stil exists")
-		}
-
-		if k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return nil
-		}
-
-		return err
-	})
-}
-
-func deleteOperator(k8s *types.Cluster, deploymentName string) error {
-	deletePropagation := metav1.DeletePropagationForeground
-
-	deleteOpts := metav1.NewDeleteOptions(0)
-	deleteOpts.PropagationPolicy = &deletePropagation
-
-	if err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Delete(context.Background(), deploymentName, *deleteOpts); err != nil {
-		if !k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // allocationLock is used to control access to consurrent cluster use.

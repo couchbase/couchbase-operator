@@ -345,7 +345,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 			},
 		},
 	}
-	if _, err = PatchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/Spec/XDCR", xdcr), time.Minute); err != nil {
+	if _, err = patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/spec/xdcr", xdcr), time.Minute); err != nil {
 		return
 	}
 
@@ -355,7 +355,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	if err = WaitForClusterEvent(ctx, srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
+	if err = waitForResourceEventFromNow(ctx, srcK8s, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
 		return
 	}
 
@@ -442,7 +442,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 		xdcr.RemoteClusters[0].AuthenticationSecret = &xdcrSecret
 	}
 
-	if _, err = PatchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/Spec/XDCR", xdcr), time.Minute); err != nil {
+	if _, err = patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/spec/xdcr", xdcr), time.Minute); err != nil {
 		return
 	}
 
@@ -452,7 +452,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	if err = WaitForClusterEvent(ctx, srcK8s.KubeClient, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
+	if err = waitForResourceEventFromNow(ctx, srcK8s, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
 		return
 	}
 

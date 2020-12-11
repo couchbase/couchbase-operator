@@ -860,8 +860,8 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 
 	// Enable mTLS and ensure the cluster still appears to work.
 	patchset := jsonpatch.NewPatchSet().
-		Add("/Spec/Networking/TLS/ClientCertificatePolicy", &policy).
-		Add("/Spec/Networking/TLS/ClientCertificatePaths", []couchbasev2.ClientCertificatePath{
+		Add("/spec/networking/tls/clientCertificatePolicy", policy).
+		Add("/spec/networking/tls/clientCertificatePaths", []couchbasev2.ClientCertificatePath{
 			{
 				Path: "subject.cn",
 			},
@@ -915,7 +915,7 @@ func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePoli
 
 	// Disable mTLS and ensure the cluster still works.
 	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/Spec/Networking/TLS/ClientCertificatePolicy"), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/networking/tls/clientCertificatePolicy"), time.Minute)
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonDeleteClientAuth), 5*time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
@@ -1388,7 +1388,7 @@ func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType c
 	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, clusterSize, ctx)
 
 	// Enable N2N encryption and check the state is as we expect.
-	patchset := jsonpatch.NewPatchSet().Add("/Spec/Networking/TLS/NodeToNodeEncryption", &encryptionType)
+	patchset := jsonpatch.NewPatchSet().Add("/spec/networking/tls/nodeToNodeEncryption", encryptionType)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
@@ -1445,7 +1445,7 @@ func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbas
 	}
 
 	// Enable N2N encryption and check the state is as we expect.
-	patchset := jsonpatch.NewPatchSet().Add("/Spec/Networking/TLS", tls)
+	patchset := jsonpatch.NewPatchSet().Add("/spec/networking/tls", tls)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
@@ -1512,7 +1512,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, en
 	// Disable N2N then check state is as we expect.
 	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
-	patchset := jsonpatch.NewPatchSet().Remove("/Spec/Networking/TLS/NodeToNodeEncryption")
+	patchset := jsonpatch.NewPatchSet().Remove("/spec/networking/tls/nodeToNodeEncryption")
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 
 	e2eutil.MustCheckN2NDisabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
@@ -1572,7 +1572,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	// Check the state is as we expect.
 	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
 
-	patchset := jsonpatch.NewPatchSet().Replace("/Spec/Networking/TLS/NodeToNodeEncryption", &newEncryptionType)
+	patchset := jsonpatch.NewPatchSet().Replace("/spec/networking/tls/nodeToNodeEncryption", &newEncryptionType)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 
 	// Check the events match what we expect:

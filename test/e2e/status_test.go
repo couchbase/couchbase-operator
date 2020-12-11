@@ -34,13 +34,13 @@ func TestStatusRecovery(t *testing.T) {
 	// reconciliation is in flight and will just reset the status to what it was.  Next delete
 	// the status and enusre it has gone.  Finally restart the operator and ensure all status
 	// fields are correctly populated.
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Status/ControlPaused", true), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/Status"), time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Status", couchbasev2.ClusterStatus{ControlPaused: true}), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/status"), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/status", couchbasev2.ClusterStatus{ControlPaused: true}), time.Minute)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
 
 	version, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
 	if err != nil {
@@ -48,9 +48,9 @@ func TestStatusRecovery(t *testing.T) {
 	}
 
 	tests := jsonpatch.NewPatchSet().
-		Test("/Status/ClusterID", uuid).
-		Test("/Status/Size", clusterSize).
-		Test("/Status/CurrentVersion", version)
+		Test("/status/clusterId", uuid).
+		Test("/status/size", clusterSize).
+		Test("/status/currentVersion", version)
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, tests, time.Minute)
 }

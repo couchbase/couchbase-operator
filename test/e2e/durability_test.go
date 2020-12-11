@@ -67,10 +67,10 @@ func TestEditDurableBucket(t *testing.T) {
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/Spec/MinimumDurability", couchbasev2.CouchbaseBucketMinimumDurabilityMajority), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/spec/minimumDurability", couchbasev2.CouchbaseBucketMinimumDurabilityMajority), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityMinLevel", couchbaseutil.DurabilityMajority), time.Minute)
 
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MinimumDurability", couchbasev2.CouchbaseBucketMinimumDurabilityPersistToMajority), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/minimumDurability", couchbasev2.CouchbaseBucketMinimumDurabilityPersistToMajority), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityMinLevel", couchbaseutil.DurabilityPersistToMajority), time.Minute)
 
 	expectedEvents := []eventschema.Validatable{

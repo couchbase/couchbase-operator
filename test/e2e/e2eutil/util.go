@@ -1,7 +1,9 @@
 package e2eutil
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -9,13 +11,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -26,14 +28,17 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	other_jsonpatch "github.com/evanphx/json-patch"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // randomSuffix generates a 5 character random suffix to be appended to
@@ -573,7 +578,7 @@ func MustDeleteBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object) {
 
 func AddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	settings := append(cl.Spec.Servers, newService)
-	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", settings), timeout)
+	return patchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/spec/servers", settings), timeout)
 }
 
 func MustAddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -594,7 +599,7 @@ func RemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseC
 		}
 	}
 
-	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
+	return patchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/spec/servers", newServiceConfig), timeout)
 }
 
 func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, removeServiceName string, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -619,7 +624,7 @@ func ScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 		newServiceConfig = append(newServiceConfig, service)
 	}
 
-	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/Spec/Servers", newServiceConfig), timeout)
+	return patchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/spec/servers", newServiceConfig), timeout)
 }
 
 func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) *couchbasev2.CouchbaseCluster {
@@ -631,42 +636,107 @@ func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchba
 	return couchbase
 }
 
-// PatchCluster updates the specified cluster with a list of JSON patch objects, returning the updated cluster.
-func PatchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
-	return cluster, retryutil.RetryFor(timeout, func() error {
-		// Get the current cluster resource
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
+// patchResource applies a JSON patch to any resource type.
+func patchResource(k8s *types.Cluster, resource runtime.Object, patches jsonpatch.PatchSet, timeout time.Duration) (runtime.Object, error) {
+	// Map from object to dynamic API mapping... "e.g. couchbase.com/v2/couchbaseclusters"
+	kinds, _, err := scheme.Scheme.ObjectKinds(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	gvk := kinds[0]
+
+	mapping, err := k8s.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	// Up cast the resource into a meta object so we can interrogate name and namespace.
+	metaResource, ok := resource.(metav1.Object)
+	if !ok {
+		return nil, fmt.Errorf("unable to convert from runtime to meta resource")
+	}
+
+	// Convert our JSON patch into a generic JSON one.
+	patchSet, err := json.Marshal(patches.Patches())
+	if err != nil {
+		return nil, err
+	}
+
+	patch, err := other_jsonpatch.DecodePatch(patchSet)
+	if err != nil {
+		return nil, err
+	}
+
+	callback := func() error {
+		// Load up the most recent revision of the requested resource so we don't get
+		// CAS errors from etcd.
+		current, err := k8s.DynamicClient.Resource(mapping.Resource).Namespace(metaResource.GetNamespace()).Get(context.Background(), metaResource.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		// Apply the patch set to the cluster
-		after := before.DeepCopy()
-		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
+		// Convert to JSON and apply the patch.
+		document, err := json.Marshal(current)
+		if err != nil {
 			return err
 		}
 
-		// If we are not modifiying e.g. just testing, then return ok
-		if reflect.DeepEqual(before, after) {
+		patchedDocument, err := patch.Apply(document)
+		if err != nil {
+			return err
+		}
+
+		// If everything applied correctly, and anything changed, then update the
+		// resource.
+		if bytes.Equal(document, patchedDocument) {
 			return nil
 		}
 
-		// Attempt to post the update, updating the cluster
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
+		updated := &unstructured.Unstructured{}
+		if err := json.Unmarshal(patchedDocument, updated); err != nil {
+			return err
+		}
+
+		if updated, err = k8s.DynamicClient.Resource(mapping.Resource).Namespace(metaResource.GetNamespace()).Update(context.Background(), updated, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+
+		// All good, update the return type
+		typedUpdated, err := scheme.Scheme.New(gvk)
 		if err != nil {
 			return err
 		}
 
-		// Everything successful
-		cluster = updated
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(updated.Object, typedUpdated); err != nil {
+			return err
+		}
+
+		resource = typedUpdated
 
 		return nil
-	})
+	}
+
+	// Retry the patching to handle CAS errors, transient errors and waiting for
+	// resource values to change asynchronously.
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		return nil, err
+	}
+
+	return resource, nil
 }
 
-// MustPatchCluster patches the cluster with a list of JSON patch objects, returning the updated cluster and dying on error.
+func patchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
+	resource, err := patchResource(k8s, cluster, patches, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource.(*couchbasev2.CouchbaseCluster), nil
+}
+
 func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseCluster {
-	cluster, err := PatchCluster(k8s, cluster, patches, timeout)
+	cluster, err := patchCluster(k8s, cluster, patches, timeout)
 	if err != nil {
 		Die(t, err)
 	}
@@ -676,160 +746,36 @@ func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 
 // MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
 func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet) {
-	if _, err := PatchCluster(k8s, cluster, patches, 30*time.Second); err == nil {
+	if _, err := patchCluster(k8s, cluster, patches, 30*time.Second); err == nil {
 		Die(t, fmt.Errorf("cluster patch applied unexpectedly"))
 	}
 }
 
-func PatchBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseBackup, error) {
-	return backup, retryutil.RetryFor(timeout, func() error {
-		// Get the current backup resource
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Get(context.Background(), backup.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		// Apply the patch set to the backup
-		after := before.DeepCopy()
-		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-			return err
-		}
-
-		// If we are not modifiying e.g. just testing, then return ok
-		if reflect.DeepEqual(before, after) {
-			return nil
-		}
-
-		// Attempt to post the update, updating the backup
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-
-		// Everything successful
-		backup = updated
-
-		return nil
-	})
-}
-
 func MustPatchBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseBackup {
-	backup, err := PatchBackup(k8s, backup, patches, timeout)
+	resource, err := patchResource(k8s, backup, patches, timeout)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return backup
-}
-
-func PatchBucket(k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.PatchSet, timeout time.Duration) (metav1.Object, error) {
-	return bucket, retryutil.RetryFor(timeout, func() error {
-		// Get the current bucket resource
-		switch t := bucket.(type) {
-		case *couchbasev2.CouchbaseBucket:
-			before, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(t.Namespace).Get(context.Background(), t.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			// Apply the patch set to the bucket
-			after := before.DeepCopy()
-			if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-				return err
-			}
-
-			// If we are not modifiying e.g. just testing, then return ok
-			if reflect.DeepEqual(before, after) {
-				return nil
-			}
-
-			// Attempt to post the update, updating the bucket
-			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseBuckets(t.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
-			if err != nil {
-				return err
-			}
-
-			bucket = updated
-		case *couchbasev2.CouchbaseEphemeralBucket:
-			before, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Get(context.Background(), t.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-
-			// Apply the patch set to the bucket
-			after := before.DeepCopy()
-			if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-				return err
-			}
-
-			// If we are not modifiying e.g. just testing, then return ok
-			if reflect.DeepEqual(before, after) {
-				return nil
-			}
-
-			// Attempt to post the update, updating the bucket
-			updated, err := k8s.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(t.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
-			if err != nil {
-				return err
-			}
-
-			bucket = updated
-		default:
-			return fmt.Errorf("unsupported type")
-		}
-
-		// Everything successful
-		return nil
-	})
+	return resource.(*couchbasev2.CouchbaseBackup)
 }
 
 func MustPatchBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.PatchSet, timeout time.Duration) metav1.Object {
-	bucket, err := PatchBucket(k8s, bucket, patches, timeout)
+	resource, err := patchResource(k8s, bucket.(runtime.Object), patches, timeout)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return bucket
-}
-
-func PatchReplication(k8s *types.Cluster, replication *couchbasev2.CouchbaseReplication, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseReplication, error) {
-	return replication, retryutil.RetryFor(timeout, func() error {
-		before, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Get(context.Background(), replication.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		// Apply the patch set
-		after := before.DeepCopy()
-		if err := jsonpatch.Apply(after, patches.Patches()); err != nil {
-			return err
-		}
-
-		// If we are not modifiying e.g. just testing, then return ok
-		if reflect.DeepEqual(before, after) {
-			return nil
-		}
-
-		// Attempt to post the update
-		updated, err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Update(context.Background(), after, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-
-		replication = updated
-
-		// Everything successful
-		return nil
-	})
+	return resource.(metav1.Object)
 }
 
 func MustPatchReplication(t *testing.T, k8s *types.Cluster, replication *couchbasev2.CouchbaseReplication, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseReplication {
-	replication, err := PatchReplication(k8s, replication, patches, timeout)
+	resource, err := patchResource(k8s, replication, patches, timeout)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return replication
+	return resource.(*couchbasev2.CouchbaseReplication)
 }
 
 func KillMembers(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster, names ...string) error {
@@ -891,7 +837,7 @@ func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	t.Logf("Changing Cluster Size To: %v...\n", strconv.Itoa(clusterSize))
 
-	return PatchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/Spec/Servers/%d/Size", service), clusterSize), 30*time.Second)
+	return patchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/spec/servers/%d/size", service), clusterSize), 30*time.Second)
 }
 
 func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
@@ -927,8 +873,8 @@ func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cl
 	return cluster
 }
 
-func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, numToKill int) {
-	pods, err := kubeCli.CoreV1().Pods(cl.Namespace).List(context.Background(), ClusterListOpt(cl))
+func KillPods(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, numToKill int) {
+	pods, err := k8s.KubeClient.CoreV1().Pods(cl.Namespace).List(context.Background(), ClusterListOpt(cl))
 	if err != nil {
 		Die(t, err)
 	}
@@ -938,19 +884,20 @@ func KillPods(t *testing.T, kubeCli kubernetes.Interface, cl *couchbasev2.Couchb
 		Die(t, fmt.Errorf("trying to kill %d pods, but only %d exist", numToKill, items))
 	}
 
-	killPods := []string{}
+	killPods := []*v1.Pod{}
+	killPodNames := []string{}
+
 	for i := 0; i < numToKill; i++ {
-		killPods = append(killPods, pods.Items[i].Name)
+		killPods = append(killPods, &pods.Items[i])
+		killPodNames = append(killPodNames, pods.Items[i].Name)
 	}
 
-	t.Logf("Killing pods: %v", killPods)
-
-	if err := KillMembers(kubeCli, cl, killPods...); err != nil {
+	if err := KillMembers(k8s.KubeClient, cl, killPodNames...); err != nil {
 		Die(t, err)
 	}
 
 	for _, pod := range killPods {
-		if err := WaitPodDeleted(t, kubeCli, pod, cl); err != nil {
+		if err := retryutil.RetryFor(time.Minute, ResourceDeleted(k8s, pod)); err != nil {
 			Die(t, err)
 		}
 	}

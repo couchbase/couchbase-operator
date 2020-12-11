@@ -77,7 +77,7 @@ func TestRBACDeleteUser(t *testing.T) {
 
 	// Expect user delete event eventually to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
-	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, event, timeout)
 
 	defer echan.Cancel()
 
@@ -119,7 +119,7 @@ func TestRBACDeleteRole(t *testing.T) {
 
 	// Expect user delete event to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
-	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, event, timeout)
 
 	defer echan.Cancel()
 
@@ -166,7 +166,7 @@ func TestRBACUpdateRole(t *testing.T) {
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
 
 	// Change to bucket role user
-	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Replace("/Spec/Roles/0/Name", couchbasev2.RoleBucketAdmin), time.Minute)
+	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", couchbasev2.RoleBucketAdmin), time.Minute)
 	e2eutil.MustPatchUserInfo(t, targetKube, testCouchbase, user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Replace("/Roles/0/Role", string(couchbasev2.RoleBucketAdmin)), time.Minute)
 
 	// Check the events match what we expect:
@@ -212,7 +212,7 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 
 	// Expect user delete event eventually occur
 	event := k8sutil.UserDeleteEvent(user.Name, testCouchbase)
-	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, event, timeout)
 
 	defer echan.Cancel()
 
@@ -221,13 +221,13 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 		Kind: e2e_constants.CouchbaseSubjectUserKind,
 		Name: customUser.Name,
 	}
-	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Add("/Spec/Subjects/1", subject), time.Minute)
+	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Add("/spec/subjects/1", subject), time.Minute)
 
 	// New user is created
 	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, customUser, timeout)
 
 	// Remove original user from binding
-	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Remove("/Spec/Subjects/0"), time.Minute)
+	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Remove("/spec/subjects/0"), time.Minute)
 	_ = e2eutil.MustWaitForClusterUserDeletion(t, targetKube, testCouchbase, user.Name, timeout)
 
 	// Ensure user delete event emitted
@@ -264,7 +264,7 @@ func TestRBACDeleteBinding(t *testing.T) {
 
 	// Expect user delete event to eventually occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
-	echan := e2eutil.WaitForPendingClusterEvent(targetKube.KubeClient, testCouchbase, event, timeout)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, event, timeout)
 
 	defer echan.Cancel()
 
@@ -358,14 +358,14 @@ func TestRBACSelection(t *testing.T) {
 	customUser = e2eutil.MustNewUser(t, targetKube, customUser)
 
 	// Patch group with labels
-	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Add("/Labels", labels), time.Minute)
+	e2eutil.MustPatchGroup(t, targetKube, group, jsonpatch.NewPatchSet().Add("/metadata/labels", labels), time.Minute)
 
 	// Add second user to role binding
 	subject := couchbasev2.CouchbaseRoleBindingSubject{
 		Kind: e2e_constants.CouchbaseSubjectUserKind,
 		Name: customUser.Name,
 	}
-	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Add("/Spec/Subjects/-", subject), time.Minute)
+	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Add("/spec/subjects/-", subject), time.Minute)
 
 	// Create a cluster that selects only labelled users.
 	couchbase := e2espec.NewBasicCluster(clusterSize)

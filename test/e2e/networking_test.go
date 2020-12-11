@@ -154,7 +154,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	subjectAltNames := x509.MandatorySANs(testCouchbase.Name, testCouchbase.Namespace)
 	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
 	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/DNS/Domain", newDomain), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", newDomain), time.Minute)
 	e2eutil.MustCheckForDNSAlternateAddresses(t, targetKube, testCouchbase, newDomain, 5*time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, targetKube, testCouchbase, newDomain, time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
@@ -207,9 +207,9 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 
 	// Verify that changing the node port type is reflected in the services.
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/ExposedFeatureServiceType", corev1.ServiceTypeNodePort), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/networking/exposedFeatureServiceType", corev1.ServiceTypeNodePort), time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeNodePort, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/ExposedFeatureServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/networking/exposedFeatureServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 }
 
@@ -312,7 +312,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	subjectAltNames := x509.MandatorySANs(testCouchbase.Name, testCouchbase.Namespace)
 	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
 	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/DNS/Domain", newDomain), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", newDomain), time.Minute)
 	e2eutil.MustCheckForDNSAdminAnnotation(t, targetKube, testCouchbase, newDomain, 5*time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 }
@@ -364,9 +364,9 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 
 	// Verify that changing the node port type is reflected in the services.
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/AdminConsoleServiceType", corev1.ServiceTypeNodePort), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/networking/adminConsoleServiceType", corev1.ServiceTypeNodePort), time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeNodePort, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Networking/AdminConsoleServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/networking/adminConsoleServiceType", corev1.ServiceTypeLoadBalancer), time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
 }
 
@@ -452,8 +452,8 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 	// Ensure the source ranges are correctly installed, then remove and verify, then
 	// add back again and verify.
 	e2eutil.MustCheckConsoleServiceLoadBalancerSourceRanges(t, targetKube, testCouchbase, sourceRanges, time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/Networking/AdminConsoleServiceTemplate/Spec/LoadBalancerSourceRanges"), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/spec/networking/adminConsoleServiceTemplate/spec/loadBalancerSourceRanges"), time.Minute)
 	e2eutil.MustCheckConsoleServiceLoadBalancerSourceRanges(t, targetKube, testCouchbase, nil, time.Minute)
-	_ = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Networking/AdminConsoleServiceTemplate/Spec/LoadBalancerSourceRanges", sourceRanges), time.Minute)
+	_ = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/networking/adminConsoleServiceTemplate/spec/loadBalancerSourceRanges", sourceRanges), time.Minute)
 	e2eutil.MustCheckConsoleServiceLoadBalancerSourceRanges(t, targetKube, testCouchbase, sourceRanges, time.Minute)
 }

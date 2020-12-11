@@ -363,15 +363,8 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 		e2eutil.Die(t, fmt.Errorf("pvc name %s is a mismatch with backup name %s", pvc.Name, fullBackup.Name))
 	}
 
-	// DELET the PVC!!
-	if err := e2eutil.DeleteAndWaitForPVCDeletionSingle(targetKube, pvc.Name, 5*time.Minute); err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	// check pvc is recreated and exists
-	e2eutil.MustWaitForPVC(t, targetKube, fullBackup.Name, 5*time.Minute)
-
 	// Expect backup to complete
+	e2eutil.MustDeletePVC(t, targetKube, pvc, 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
 
 	// Check the events match what we expect:
@@ -440,10 +433,9 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
 
-	// DELET THIS
-	e2eutil.MustDeleteBackup(t, targetKube, fullBackup)
 	// wait for backup to be deleted
-	e2eutil.MustWaitForBackupDeletion(t, targetKube, 2*time.Minute)
+	e2eutil.MustDeleteBackup(t, targetKube, fullBackup)
+	e2eutil.MustWaitForBackupDeletion(t, targetKube, fullBackup, 2*time.Minute)
 
 	// create new backup
 	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
@@ -527,10 +519,9 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
 
-	// DELET THIS
-	e2eutil.MustDeleteBackup(t, targetKube, fullIncrementalBackup)
 	// wait for backup to be deleted
-	e2eutil.MustWaitForBackupDeletion(t, targetKube, 2*time.Minute)
+	e2eutil.MustDeleteBackup(t, targetKube, fullIncrementalBackup)
+	e2eutil.MustWaitForBackupDeletion(t, targetKube, fullIncrementalBackup, 2*time.Minute)
 
 	// create new backup
 	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
@@ -971,11 +962,11 @@ func testBackupRetention(t *testing.T, s3 bool) {
 
 	// Trigger another full backup, the old one should be discarded because it is
 	// too old.
-	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/Spec/Full/Schedule", cronScheduleOnceIn(2*time.Minute)), time.Minute)
+	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/spec/full/schedule", cronScheduleOnceIn(2*time.Minute)), time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// And one more time to make sure the discard didn't do anything stupid...
-	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/Spec/Full/Schedule", cronScheduleOnceIn(2*time.Minute)), time.Minute)
+	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/spec/full/schedule", cronScheduleOnceIn(2*time.Minute)), time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 }
 

@@ -108,15 +108,15 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	// When ready, kill the victim nodes, waiting long enough for server to perform
 	// auto failover, then expect recovery.  Yes to test this we have to be not running
 	// in order for the condition to manifest.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/ControlPaused", true), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
 
 	for _, victim := range victims {
 		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, true)
 		time.Sleep(2 * autoFailoverTimeout)
 	}
 
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Minute)
 

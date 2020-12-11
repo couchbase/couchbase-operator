@@ -70,10 +70,10 @@ func TestBucketTTLUpdate(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Add TTL and verify, update the TTL and verify, delete the TTL and verify.
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/Spec/MaxTTL", &metav1.Duration{Duration: time.Minute}), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/spec/maxTTL", &metav1.Duration{Duration: time.Minute}), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/MaxTTL", 60), time.Minute)
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/Spec/MaxTTL", &metav1.Duration{Duration: time.Hour}), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/maxTTL", &metav1.Duration{Duration: time.Hour}), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/MaxTTL", 3600), time.Minute)
-	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Remove("/Spec/MaxTTL"), time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Remove("/spec/maxTTL"), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/MaxTTL", 0), time.Minute)
 }

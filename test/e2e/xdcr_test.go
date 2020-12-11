@@ -399,12 +399,12 @@ func TestXDCRPauseReplication(t *testing.T) {
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
-	replication = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
+	replication = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
 	time.Sleep(time.Minute)
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
 	time.Sleep(time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
-	_ = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
+	_ = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, time.Minute)
 
 	// Check the events match what we expect:

@@ -3,7 +3,6 @@ package e2eutil
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -21,26 +20,6 @@ const (
 	// syncGatewayResourceName is the name used for all sync gateway resources.
 	syncGatewayResourceName = "test-sync-gateway"
 )
-
-// waitSyncGatewayAvailable waits for the sync gateway deployment to become available.
-func waitSyncGatewayAvailable(k8s *types.Cluster, timeout time.Duration) error {
-	callback := func() error {
-		deployment, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), syncGatewayResourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		for _, condition := range deployment.Status.Conditions {
-			if condition.Type == appsv1.DeploymentAvailable && condition.Status == corev1.ConditionTrue {
-				return nil
-			}
-		}
-
-		return fmt.Errorf("sync-gateway deployment not available")
-	}
-
-	return retryutil.RetryFor(timeout, callback)
-}
 
 // createSyncGateway creates a sync gateway instance in the given cluster.
 // Communication, being external has to be with a port-forward so creating
@@ -198,11 +177,12 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 		},
 	}
 
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(context.Background(), deployment, metav1.CreateOptions{}); err != nil {
+	deployment, err = k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(context.Background(), deployment, metav1.CreateOptions{})
+	if err != nil {
 		return err
 	}
 
-	if err := waitSyncGatewayAvailable(k8s, timeout); err != nil {
+	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, deployment, string(appsv1.DeploymentAvailable), string(corev1.ConditionTrue))); err != nil {
 		return err
 	}
 

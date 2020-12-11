@@ -18,7 +18,6 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/config"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -1139,9 +1138,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 
 func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port int) error {
 	// Delete existing Deployment
-	if err := framework.DeleteOperatorCompletely(k8s, config.OperatorResourceName); err != nil {
-		return err
-	}
+	e2eutil.MustDeleteOperatorDeployment(t, k8s, time.Minute)
 
 	// Create new deployment object to deploy
 	deployment := k8s.OperatorDeployment.DeepCopy()
@@ -1818,7 +1815,7 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 
 	// Ensure cluster 1 is healthy and update the retention period to be 1m.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, 2*time.Minute)
-	_ = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/Spec/Logging/LogRetentionTime", "1m"), time.Minute)
+	_ = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/spec/logging/logRetentionTime", "1m"), time.Minute)
 
 	// Ensure cluster2 is healthy then kill the first stateless pod in cluster 2.  Wait for the recovery to
 	// start and complete.

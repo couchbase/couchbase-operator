@@ -380,12 +380,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	// pause the operator for the test duration
 	t.Logf("Pausing operator...")
 
-	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
-	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
+	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
 
 	// make sure cluster is healthy before proceeding
-	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
-	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Test("/Spec/Paused", true), time.Minute)
+	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Test("/spec/paused", true), time.Minute)
+	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Test("/spec/paused", true), time.Minute)
 
 	t.Logf("grabbing bucket info")
 

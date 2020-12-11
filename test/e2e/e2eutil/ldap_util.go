@@ -5,10 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1 "k8s.io/api/core/v1"
@@ -43,76 +41,6 @@ func MustNewLDAPService(t *testing.T, k8s *types.Cluster, service *v1.Service) *
 	}
 
 	return service
-}
-
-// Delete LDAP Service.
-func DeleteLDAPService(k8s *types.Cluster) error {
-	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
-
-	svcList, err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).List(context.Background(), opts)
-	if err != nil {
-		return err
-	}
-
-	for _, service := range svcList.Items {
-		err := k8s.KubeClient.CoreV1().Services(k8s.Namespace).Delete(context.Background(), service.Name, *metav1.NewDeleteOptions(0))
-		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Delete LDAP Server.
-func DeleteLDAPServer(k8s *types.Cluster) error {
-	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
-
-	podList, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), opts)
-	if err != nil {
-		return err
-	}
-
-	for _, pod := range podList.Items {
-		err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0))
-		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Delete LDAP Secret.
-func DeleteLDAPSecret(k8s *types.Cluster) error {
-	opts := metav1.ListOptions{LabelSelector: "group=" + constants.LDAPLabelSelector}
-
-	secretList, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).List(context.Background(), opts)
-	if err != nil {
-		return err
-	}
-
-	for _, secret := range secretList.Items {
-		err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(context.Background(), secret.Name, *metav1.NewDeleteOptions(0))
-		if (err != nil) && !k8sutil.IsKubernetesResourceNotFoundError(err) {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Clean up ldap service and server.
-func CleanLDAPResources(k8s *types.Cluster) error {
-	if err := DeleteLDAPServer(k8s); err != nil {
-		return nil
-	}
-
-	if err := DeleteLDAPSecret(k8s); err != nil {
-		return nil
-	}
-
-	return DeleteLDAPService(k8s)
 }
 
 // MustCheckLDAPServer ensures the LDAP server is up and running before letting

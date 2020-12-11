@@ -122,9 +122,9 @@ func TestEditClusterSettings(t *testing.T) {
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.
 	patches := jsonpatch.NewPatchSet().
-		Replace("/Spec/ClusterSettings/DataServiceMemQuota", e2espec.NewResourceQuantityMi(257)).
-		Replace("/Spec/ClusterSettings/IndexServiceMemQuota", e2espec.NewResourceQuantityMi(257)).
-		Replace("/Spec/ClusterSettings/SearchServiceMemQuota", e2espec.NewResourceQuantityMi(257))
+		Replace("/spec/cluster/dataServiceMemoryQuota", e2espec.NewResourceQuantityMi(257)).
+		Replace("/spec/cluster/indexServiceMemoryQuota", e2espec.NewResourceQuantityMi(257)).
+		Replace("/spec/cluster/searchServiceMemoryQuota", e2espec.NewResourceQuantityMi(257))
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patches, time.Minute)
 
 	validationPatches := jsonpatch.NewPatchSet().
@@ -133,7 +133,7 @@ func TestEditClusterSettings(t *testing.T) {
 		Test("/SearchMemoryQuotaMB", int64(257))
 	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, validationPatches, time.Minute)
 
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/AutoFailoverTimeout", e2espec.NewDurationS(31)), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", e2espec.NewDurationS(31)), time.Minute)
 	e2eutil.MustPatchAutoFailoverInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Timeout", int64(31)), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
@@ -173,17 +173,17 @@ func TestIndexerSettings(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Edit the index settings so they aren't the defaults.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/Threads", 8), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/threads", 8), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Threads", 8), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/LogLevel", couchbasev2.IndexerLogLevelDebug), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/logLevel", couchbasev2.IndexerLogLevelDebug), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/LogLevel", couchbaseutil.IndexLogLevelDebug), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/MaxRollbackPoints", 8), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/maxRollbackPoints", 8), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/MaxRollbackPoints", 8), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/MemorySnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/memorySnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/MemSnapInterval", 1000), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/StableSnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/stableSnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/StableSnapInterval", 1000), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/ClusterSettings/Indexer/StorageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/StorageMode", couchbaseutil.IndexStoragePlasma), time.Minute)
 
 	// Check that the user can see the cluster being edited.
@@ -209,7 +209,6 @@ func TestInvalidBaseImage(t *testing.T) {
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
-	e2eutil.MustWaitForFirstPodContainerWaiting(t, targetKube, testCouchbase, time.Minute, "ErrImagePull", "ImagePullBackOff")
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
 
 	// Check the events match what we expect:
@@ -235,7 +234,6 @@ func TestInvalidVersion(t *testing.T) {
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
-	e2eutil.MustWaitForFirstPodContainerWaiting(t, targetKube, testCouchbase, time.Minute, "ErrImagePull", "ImagePullBackOff")
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
 
 	// Check the events match what we expect:
@@ -278,7 +276,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	// upgraded to keep the spec synchronized.
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-2), 10*time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/Servers/0/Resources"), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/spec/servers/0/resources"), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 2*f.PodCreateTimeout)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
@@ -424,9 +422,9 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
 
 	// pause operator
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", true), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
 	e2eutil.MustEjectMember(t, targetKube, testCouchbase, removePodMemberID, 5*time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/Spec/Paused", false), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
@@ -618,7 +616,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_2",
 		Services: couchbasev2.ServiceList{couchbasev2.QueryService},
 	}
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Servers/-", newService), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
@@ -628,7 +626,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_3",
 		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Servers/-", newService), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
@@ -638,24 +636,24 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_4",
 		Services: couchbasev2.ServiceList{couchbasev2.SearchService},
 	}
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/Spec/Servers/-", newService), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// swapping nodes search - 1 and index + 1
-	patchset := jsonpatch.NewPatchSet().Replace("/Spec/Servers/2/Size", constants.Size2).Replace("/Spec/Servers/3/Size", constants.Size1)
+	patchset := jsonpatch.NewPatchSet().Replace("/spec/servers/2/size", constants.Size2).Replace("/spec/servers/3/size", constants.Size1)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// swapping nodes index - 1 and query + 1
-	patchset = jsonpatch.NewPatchSet().Replace("/Spec/Servers/1/Size", constants.Size2).Replace("/Spec/Servers/2/Size", constants.Size1)
+	patchset = jsonpatch.NewPatchSet().Replace("/spec/servers/1/size", constants.Size2).Replace("/spec/servers/2/size", constants.Size1)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// swapping nodes query - 1 and data + 1
-	patchset = jsonpatch.NewPatchSet().Replace("/Spec/Servers/0/Size", constants.Size2).Replace("/Spec/Servers/1/Size", constants.Size1)
+	patchset = jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", constants.Size2).Replace("/spec/servers/1/size", constants.Size1)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
@@ -835,7 +833,7 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Remove a service and ensure things still work.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/Spec/Servers/1"), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/spec/servers/1"), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
@@ -877,7 +875,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	for _, testCouchbase := range clusters {
 		// When each cluster is ready create a bucket and verify it appears in the
 		// cluster status.
-		e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Status/Buckets/0/BucketName", "default"), time.Minute)
+		e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/status/buckets/0/name", "default"), time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 		// Check the events match what we expect:

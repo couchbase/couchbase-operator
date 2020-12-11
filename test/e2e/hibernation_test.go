@@ -35,11 +35,11 @@ func TestHibernateEphemeralImmediate(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Hibernate the cluster, wait for the hibernating status then allow recovery.
-	patchset := jsonpatch.NewPatchSet().Add("/Spec/Hibernate", true)
+	patchset := jsonpatch.NewPatchSet().Add("/spec/hibernate", true)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionHibernating, v1.ConditionTrue, cluster, time.Minute)
 
-	patchset = jsonpatch.NewPatchSet().Remove("/Spec/Hibernate")
+	patchset = jsonpatch.NewPatchSet().Remove("/spec/hibernate")
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -76,11 +76,11 @@ func TestHibernateSupportableImmediate(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Hibernate the cluster, wait for the hibernating status then allow recovery.
-	patchset := jsonpatch.NewPatchSet().Add("/Spec/Hibernate", true)
+	patchset := jsonpatch.NewPatchSet().Add("/spec/hibernate", true)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, 3*time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionHibernating, v1.ConditionTrue, cluster, 3*time.Minute)
 
-	patchset = jsonpatch.NewPatchSet().Remove("/Spec/Hibernate")
+	patchset = jsonpatch.NewPatchSet().Remove("/spec/hibernate")
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
