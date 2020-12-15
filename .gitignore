@@ -23,3 +23,5 @@ e2e.test
 /go/
 /venv/
 /node-*/
+
+*terraform.*
