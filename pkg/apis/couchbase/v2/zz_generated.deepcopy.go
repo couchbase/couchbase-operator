@@ -2170,6 +2170,11 @@ func (in *TLSPolicy) DeepCopyInto(out *TLSPolicy) {
 		*out = new(NodeToNodeEncryptionType)
 		**out = **in
 	}
+	if in.CipherSuites != nil {
+		in, out := &in.CipherSuites, &out.CipherSuites
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -866,7 +866,7 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 //   * have the correct attributes
 // * leaf certificate has the correct SANs.
 func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subjectAltNames []string) (errs []error) {
-	if cluster.Spec.Networking.TLS != nil {
+	if cluster.Spec.Networking.TLS != nil && cluster.Spec.Networking.TLS.Static != nil {
 		// CRD validation requires all the necessary fields are populated
 		operatorSecretName := cluster.Spec.Networking.TLS.Static.OperatorSecret
 		serverSecretName := cluster.Spec.Networking.TLS.Static.ServerSecret

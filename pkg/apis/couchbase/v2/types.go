@@ -1095,6 +1095,14 @@ type CouchbaseClusterNetworkingSpec struct {
 	// NetworkPlatform is used to enable support for vairous netwokring
 	// technologoes.
 	NetworkPlatform *NetworkPlatform `json:"networkPlatform,omitempty"`
+
+	// DisableUIOverHTTP is used to explicitly enable and disable UI access over
+	// the HTTP protocol.  If not specified, this field defaults to false.
+	DisableUIOverHTTP bool `json:"disableUIOverHTTP,omitempty"`
+
+	// DisableUIOverHTTPS is used to explicitly enable and disable UI access over
+	// the HTTPS protocol.  If not specified, this field defaults to false.
+	DisableUIOverHTTPS bool `json:"disableUIOverHTTPS,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
@@ -1462,6 +1470,21 @@ const (
 	NodeToNodeAll NodeToNodeEncryptionType = "All"
 )
 
+// TLSVersion defines the minimum TLS version to use.
+// +kubebuilder:validation:Enum=TLS1.0;TLS1.1;TLS1.2
+type TLSVersion string
+
+const (
+	// Insecure, don't use.
+	TLS10 TLSVersion = "TLS1.0"
+
+	// Insecure, don't use.
+	TLS11 TLSVersion = "TLS1.1"
+
+	// Obsolete, don't... oh wait.
+	TLS12 TLSVersion = "TLS1.2"
+)
+
 // TLSPolicy defines the TLS policy of an couchbase cluster
 type TLSPolicy struct {
 	// StaticTLS enables user to generate static x509 certificates and keys,
@@ -1480,6 +1503,19 @@ type TLSPolicy struct {
 	// NodeToNodeEncryption specifies whether to encrypt data between Couchbase nodes
 	// within the same cluster.  This may come at the expense of performance.
 	NodeToNodeEncryption *NodeToNodeEncryptionType `json:"nodeToNodeEncryption,omitempty"`
+
+	// TLSMinimumVersion specifies the minimum TLS version the Couchbase server can
+	// negotiate with a client.  Must be one of TLS1.0, TLS1.1 or TLS1.2, defaulting
+	// to TLS1.2.
+	// +kubebuilder:default=TLS1.2
+	TLSMinimumVersion TLSVersion `json:"tlsMinimumVersion,omitempty"`
+
+	// CipherSuites specifies a list of cipher suites for Couchbase server to select
+	// from when negotiating TLS handshakes with a client.  Suites are not validated
+	// by the Operator.  Run "openssl ciphers -v" in a Couchbase server pod to
+	// interrogate supported values.
+	// +listType=set
+	CipherSuites []string `json:"cipherSuites,omitempty"`
 }
 
 type StaticTLS struct {

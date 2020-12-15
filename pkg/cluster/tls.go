@@ -794,6 +794,59 @@ func (c *Cluster) reconcileNodeToNode(requestedEncryption bool) error {
 	return nil
 }
 
+// updateSecuritySettings updates network security settings other than node-to-node.
+func (c *Cluster) updateSecuritySettings() error {
+	securitySettings := &couchbaseutil.SecuritySettings{}
+	if err := couchbaseutil.GetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requestedSecuritySettings := &couchbaseutil.SecuritySettings{
+		DisableUIOverHTTP:      c.cluster.Spec.Networking.DisableUIOverHTTP,
+		DisableUIOverHTTPS:     c.cluster.Spec.Networking.DisableUIOverHTTPS,
+		TLSMinVersion:          couchbaseutil.TLS12,
+		HonorCipherOrder:       true, // This is plain stupid, I'm hard coding it for the good of humanity.
+		ClusterEncryptionLevel: securitySettings.ClusterEncryptionLevel,
+	}
+
+	if c.cluster.Spec.Networking.TLS != nil {
+		var tlsVersion couchbaseutil.TLSVersion
+
+		switch c.cluster.Spec.Networking.TLS.TLSMinimumVersion {
+		case couchbasev2.TLS10:
+			tlsVersion = couchbaseutil.TLS10
+		case couchbasev2.TLS11:
+			tlsVersion = couchbaseutil.TLS11
+		case couchbasev2.TLS12:
+			tlsVersion = couchbaseutil.TLS12
+		}
+
+		requestedSecuritySettings.TLSMinVersion = tlsVersion
+		requestedSecuritySettings.CipherSuites = c.cluster.Spec.Networking.TLS.CipherSuites
+	}
+
+	// As per usual, normalize nil/empty arrays...
+	if len(securitySettings.CipherSuites) == 0 {
+		securitySettings.CipherSuites = nil
+	}
+
+	if len(requestedSecuritySettings.CipherSuites) == 0 {
+		requestedSecuritySettings.CipherSuites = nil
+	}
+
+	if reflect.DeepEqual(securitySettings, requestedSecuritySettings) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetSecuritySettings(requestedSecuritySettings).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.raiseEvent(k8sutil.SecuritySettingsUpdatedEvent(c.cluster, k8sutil.SecuritySettingUpdated))
+
+	return nil
+}
+
 // reconcileTLSPreTopology handles TLS reconciliation before the topology changes.
 func (c *Cluster) reconcileTLSPreTopologyChange() error {
 	// If the cluster is upgrading, then don't interfere with TLS until the process
@@ -865,6 +918,12 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 	// If node-to-node encryption is enabled, only turn it on once the cluster is fully
 	// TLS enabled, server will refuse to upload a new CA when enabled.
 	if err := c.updateNodeToNode(); err != nil {
+		return err
+	}
+
+	// Security settings are updated independently of node-to-node due to ordering
+	// constraints of the latter.
+	if err := c.updateSecuritySettings(); err != nil {
 		return err
 	}
 

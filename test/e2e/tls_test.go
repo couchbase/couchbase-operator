@@ -1648,3 +1648,50 @@ func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificat
 func TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t, couchbasev2.NodeToNodeControlPlaneOnly)
 }
+
+// TestTLSEditSettings checks that doing so works.
+func TestTLSEditSettings(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create the cluster.
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, clusterSize, ctx)
+
+	op1 := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.SecuritySettingsUpdatedEvent(cluster, k8sutil.SecuritySettingUpdated), time.Minute)
+	defer op1.Cancel()
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/tlsMinimumVersion", couchbasev2.TLS10), time.Minute)
+	e2eutil.MustReceiveErrorValue(t, op1)
+
+	op2 := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.SecuritySettingsUpdatedEvent(cluster, k8sutil.SecuritySettingUpdated), time.Minute)
+	defer op2.Cancel()
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/disableUIOverHTTP", true), time.Minute)
+	e2eutil.MustReceiveErrorValue(t, op2)
+
+	op3 := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.SecuritySettingsUpdatedEvent(cluster, k8sutil.SecuritySettingUpdated), time.Minute)
+	defer op3.Cancel()
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/disableUIOverHTTPS", true), time.Minute)
+	e2eutil.MustReceiveErrorValue(t, op3)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Settings edited
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{
+			Times:     3,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdated},
+		},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

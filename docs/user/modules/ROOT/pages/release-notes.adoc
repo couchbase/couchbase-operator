@@ -6,6 +6,22 @@ It also extends functionality to allow automatic scaling of your Couchbase clust
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
+[#release-v220]
+== Release 2.2.0
+
+Couchbase Autonomous Operator 2.2.0 was released in 2021.
+
+[#changes-in-behavior-v220]
+=== Major Behavior Changes and Enhancements
+
+==== Improved Security Defaults
+
+The Couchbase server default minimum TLS version 1.0.
+This is insecure and easily compromised if a client downgrades to a version less than 1.2.
+Operator 2.2 makes TLS 1.2 the minimum by default, and will automatically update the TLS minimum version unless it is explicitly specified with the `couchbaseclusters.spec.networking.tls.tlsMinimumVersion` parameter.
+
+You can prevent this change from occurring when xref:howto-operator-upgrade.adoc[upgrading the Operator] on existing clusters by setting `couchbaseclusters.spec.networking.tls.tlsMinimumVersion` to `TLS1.0` after upgrading the CRDs, and before restarting the Operator.
+
 [#release-v210]
 == Release 2.1.0
 

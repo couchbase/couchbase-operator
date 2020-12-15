@@ -988,13 +988,13 @@ type TLSVersion string
 
 const (
 	// Insecure, do not use.
-	TLS10 TLSVersion = "tls1"
+	TLS10 TLSVersion = "tlsv1"
 
 	// Insecure, do not use.
-	TLS11 TLSVersion = "tls1.1"
+	TLS11 TLSVersion = "tlsv1.1"
 
 	// Obsolete, use 1.3... which isn't supported.
-	TLS12 TLSVersion = "tls1.2"
+	TLS12 TLSVersion = "tlsv1.2"
 )
 
 // ClusterEncryptionLevel is used to fully encrypt everything.
@@ -1012,13 +1012,13 @@ const (
 // Security settings for the cluster.
 type SecuritySettings struct {
 	// Disallow access to web APIs over 8091.
-	DisableUIOverHTTP bool `json:"disableUIOverHttp" url:"disableUIOverHttp,omitempty"`
+	DisableUIOverHTTP bool `json:"disableUIOverHttp" url:"disableUIOverHttp"`
 
 	// Disallow access to web APIs over 18091.
-	DisableUIOverHTTPS bool `json:"disableUIOverHttps" url:"disableUIOverHttps,omitempty"`
+	DisableUIOverHTTPS bool `json:"disableUIOverHttps" url:"disableUIOverHttps"`
 
 	// Set the minimum TLS version, should always be 1.2.
-	TLSMinVersion TLSVersion `json:"tlsMinVersion" url:"tlsMinVersion,omitempty"`
+	TLSMinVersion TLSVersion `json:"tlsMinVersion" url:"tlsMinVersion"`
 
 	// Cipher suites is a list of OpenSSL suites (openssl ciphers -v)
 	CipherSuites []string `json:"cipherSuites" url:"cipherSuites"`
@@ -1026,7 +1026,7 @@ type SecuritySettings struct {
 	// Choose the first suite that the client accepts.  This goes against
 	// standard security practice in that you should always use the most
 	// secure.  When in the hands of users this isn't the case...
-	HonorCipherOrder bool `json:"honorCipherOrder" url:"honorCipherOrder,omitempty"`
+	HonorCipherOrder bool `json:"honorCipherOrder" url:"honorCipherOrder"`
 
 	// Enable cluster level encryption.
 	ClusterEncryptionLevel ClusterEncryptionLevel `json:"clusterEncryptionLevel" url:"clusterEncryptionLevel,omitempty"`

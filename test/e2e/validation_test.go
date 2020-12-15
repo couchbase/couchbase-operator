@@ -660,6 +660,12 @@ func TestNegValidationCreateCouchbaseClusterNetworking(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.networking.tls.nodeToNodeEncryption`},
 		},
+		{
+			name:           "TestValidateTLSMinimumVersionIllegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/tlsMinimumVersion", "SSL1.3")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.tls.tlsMinimumVersion`},
+		},
 	}
 
 	runValidationTest(t, testDefs, "create")

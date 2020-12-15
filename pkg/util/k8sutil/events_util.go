@@ -532,6 +532,7 @@ func AutoscaleDownEvent(cl *couchbasev2.CouchbaseCluster, name string, from int,
 }
 
 const (
+	SecuritySettingUpdated                          = "Security settings modified"
 	SecuritySettingUpdatedN2NEncryptionModified     = "Node-to-Node encryption modified"
 	SecuritySettingUpdatedN2NEncryptionModeModified = "Node-to-Node encryption mode modified"
 )

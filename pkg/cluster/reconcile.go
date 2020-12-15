@@ -826,7 +826,23 @@ func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec couchbasev2.Serv
 
 	// This needs a retry, setting the username and password causes server to
 	// do something that may reject requests for a short period.
-	return couchbaseutil.SetAutoFailoverSettings(autoFailoverSettings).RetryFor(time.Minute).On(c.api, m)
+	if err := couchbaseutil.SetAutoFailoverSettings(autoFailoverSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
+		return err
+	}
+
+	// For some utterly bizarre reason the default is TLS1.0, screw that!
+	securitySettings := &couchbaseutil.SecuritySettings{}
+	if err := couchbaseutil.GetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	securitySettings.TLSMinVersion = couchbaseutil.TLS12
+
+	if err := couchbaseutil.SetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Initialize a member with TLS certificates.

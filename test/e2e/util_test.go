@@ -123,6 +123,7 @@ var (
 		"TestTLSRotateCAAndKillOperator":                   TestTLSRotateCAAndKillOperator,
 		"TestTLSRotateCAKillPodAndKillOperator":            TestTLSRotateCAKillPodAndKillOperator,
 		"TestTLSRotateInvalid":                             TestTLSRotateInvalid,
+		"TestTLSEditSettings":                              TestTLSEditSettings,
 
 		// mTLS test cases
 		"TestMutualTLSCreateCluster":     TestMutualTLSCreateCluster,
