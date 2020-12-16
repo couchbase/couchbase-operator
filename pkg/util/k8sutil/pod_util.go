@@ -556,7 +556,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	}
 
 	// If TLS is specified then add the certificate volume.
-	if err := applyPodTLSConfiguration(cluster.Spec, pod); err != nil {
+	if err := applyPodTLSConfiguration(cluster, pod); err != nil {
 		return nil, err
 	}
 
@@ -911,41 +911,56 @@ func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 	return nil, fmt.Errorf("%w: unable to locate couchbase container", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 }
 
+// ShadowTLSSecretName generates a TLS secret name when shadowing is in use.
+func ShadowTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
+	return cluster.Name + "-tls-shadow"
+}
+
 // Adds any necessary pod prerequisites before enabling TLS.
-func applyPodTLSConfiguration(cs couchbasev2.ClusterSpec, pod *v1.Pod) error {
-	if cs.Networking.TLS != nil {
-		// Static configuration:
-		// * Defines a volume which contains the secrets necessary
-		//   to explicitly define TLS certificates and keys
-		// * Mounts the volume in in the correct location so that API
-		//   calls to /node/controller/reloadCertificate succeed
-		if cs.Networking.TLS.Static != nil {
-			// Add the TLS secret volume to the pod
-			volume := v1.Volume{
-				Name: constants.CouchbaseTLSVolumeName,
-			}
-			volume.VolumeSource.Secret = &v1.SecretVolumeSource{
-				SecretName: cs.Networking.TLS.Static.ServerSecret,
-			}
-			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
-
-			// Mount the secret volume in Couchbase's inbox
-			volumeMount := v1.VolumeMount{
-				Name:      constants.CouchbaseTLSVolumeName,
-				ReadOnly:  true,
-				MountPath: couchbaseTLSVolumeMountDir,
-			}
-
-			container, err := getCouchbaseContainer(pod)
-			if err != nil {
-				return err
-			}
-
-			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-
-			// Annotate the pod as having TLS enabled
-			pod.Annotations[constants.PodTLSAnnotation] = "enabled"
+func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
+	// Static configuration:
+	// * Defines a volume which contains the secrets necessary
+	//   to explicitly define TLS certificates and keys
+	// * Mounts the volume in in the correct location so that API
+	//   calls to /node/controller/reloadCertificate succeed
+	if cluster.IsTLSEnabled() {
+		// Add the TLS secret volume to the pod
+		volume := v1.Volume{
+			Name: constants.CouchbaseTLSVolumeName,
 		}
+
+		var secretName string
+
+		switch {
+		case cluster.Spec.Networking.TLS.Static != nil:
+			secretName = cluster.Spec.Networking.TLS.Static.ServerSecret
+		case cluster.Spec.Networking.TLS.SecretSource != nil:
+			secretName = ShadowTLSSecretName(cluster)
+		default:
+			return fmt.Errorf("%w: no TLS source configured", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
+
+		volume.VolumeSource.Secret = &v1.SecretVolumeSource{
+			SecretName: secretName,
+		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
+		// Mount the secret volume in Couchbase's inbox
+		volumeMount := v1.VolumeMount{
+			Name:      constants.CouchbaseTLSVolumeName,
+			ReadOnly:  true,
+			MountPath: couchbaseTLSVolumeMountDir,
+		}
+
+		container, err := getCouchbaseContainer(pod)
+		if err != nil {
+			return err
+		}
+
+		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+
+		// Annotate the pod as having TLS enabled
+		pod.Annotations[constants.PodTLSAnnotation] = "enabled"
 	}
 
 	return nil

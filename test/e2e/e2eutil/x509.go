@@ -45,6 +45,14 @@ const (
 	KeyTypeEllipticP521
 )
 
+type KeyEncodingType int
+
+const (
+	KeyEncodingPKCS1 KeyEncodingType = iota
+	KeyEncodingPKCS8
+	KeyEncodingSEC1
+)
+
 // CertType defines the type of certificate generated when a certificate
 // request is signed.
 type CertType int
@@ -63,9 +71,10 @@ const (
 // KeyPairRequest contains the necessary configuration to generate
 // a private key and signed public key pair by a CA.
 type KeyPairRequest struct {
-	keyType  KeyType
-	certType CertType
-	req      *x509.CertificateRequest
+	keyType         KeyType
+	keyEncodingType KeyEncodingType
+	certType        CertType
+	req             *x509.CertificateRequest
 }
 
 // Generate returns a PEM encoded private key and signed certificate
@@ -79,7 +88,7 @@ func (req *KeyPairRequest) Generate(ca *CertificateAuthority, certValidFrom, cer
 	}
 
 	// PEM encode the private key
-	if key, err = CreatePrivateKey(pkey); err != nil {
+	if key, err = CreatePrivateKey(pkey, req.keyEncodingType); err != nil {
 		return
 	}
 
@@ -118,24 +127,54 @@ func GeneratePrivateKey(keyType KeyType) (crypto.PrivateKey, error) {
 
 // CreatePrivateKeyPEM takes a private key input and returns it as a PEM
 // encoded slice.
-func CreatePrivateKey(key crypto.PrivateKey) ([]byte, error) {
+func CreatePrivateKey(key crypto.PrivateKey, keyEncoding KeyEncodingType) ([]byte, error) {
 	var block *pem.Block
 
 	switch t := key.(type) {
 	case *rsa.PrivateKey:
-		block = &pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: x509.MarshalPKCS1PrivateKey(t),
+		switch keyEncoding {
+		case KeyEncodingPKCS1:
+			block = &pem.Block{
+				Type:  "RSA PRIVATE KEY",
+				Bytes: x509.MarshalPKCS1PrivateKey(t),
+			}
+		case KeyEncodingPKCS8:
+			bytes, err := x509.MarshalPKCS8PrivateKey(t)
+			if err != nil {
+				return nil, err
+			}
+
+			block = &pem.Block{
+				Type:  "PRIVATE KEY",
+				Bytes: bytes,
+			}
+		default:
+			return nil, fmt.Errorf("RSA key cannot be encoded")
 		}
 	case *ecdsa.PrivateKey:
-		bytes, err := x509.MarshalECPrivateKey(t)
-		if err != nil {
-			return nil, err
-		}
+		switch keyEncoding {
+		case KeyEncodingPKCS8:
+			bytes, err := x509.MarshalPKCS8PrivateKey(t)
+			if err != nil {
+				return nil, err
+			}
 
-		block = &pem.Block{
-			Type:  "EC PRIVATE KEY",
-			Bytes: bytes,
+			block = &pem.Block{
+				Type:  "PRIVATE KEY",
+				Bytes: bytes,
+			}
+		case KeyEncodingSEC1:
+			bytes, err := x509.MarshalECPrivateKey(t)
+			if err != nil {
+				return nil, err
+			}
+
+			block = &pem.Block{
+				Type:  "EC PRIVATE KEY",
+				Bytes: bytes,
+			}
+		default:
+			return nil, fmt.Errorf("ECDSA key cannot be encoded")
 		}
 	default:
 		info := reflect.TypeOf(t)
@@ -396,11 +435,12 @@ func CreateIntermedateCACertReq(commonName string) *x509.CertificateRequest {
 	}
 }
 
-func CreateKeyPairReqData(keyType KeyType, certType CertType, certReq *x509.CertificateRequest) *KeyPairRequest {
+func CreateKeyPairReqData(keyType KeyType, keyEncodingType KeyEncodingType, certType CertType, certReq *x509.CertificateRequest) *KeyPairRequest {
 	return &KeyPairRequest{
-		keyType:  keyType,
-		certType: certType,
-		req:      certReq,
+		keyType:         keyType,
+		keyEncodingType: keyEncodingType,
+		certType:        certType,
+		req:             certReq,
 	}
 }
 
@@ -412,39 +452,71 @@ const (
 	clusterTLSSecretChain  = "chain.pem"
 )
 
-func CreateOperatorSecretData(namespace, secretName string, caCertData []uint8, certPEM, keyPEM []byte) *corev1.Secret {
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      secretName,
-			Labels: map[string]string{
-				"group": constants.LDAPLabelSelector,
-				"name":  constants.TestLabelSelector,
+// CreateOperatorSecretData creates TLS for the Operator.
+func CreateOperatorSecretData(namespace string, ctx *TLSContext) *corev1.Secret {
+	switch ctx.Source {
+	case TLSSourceTLSSecret:
+		// The standard way supplies just the client certificates.
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      ctx.OperatorSecretName,
 			},
-		},
-		Data: map[string][]byte{
-			operatorTLSSecretCA:    caCertData,
-			operatorTLSSecretChain: certPEM,
-			operatorTLSSecretKey:   keyPEM,
-		},
-	}
+			Data: map[string][]byte{
+				"tls.crt": ctx.ClientCert,
+				"tls.key": ctx.ClientKey,
+			},
+		}
 
-	return secret
+	case TLSSourceLegacy:
+		fallthrough
+	default:
+		// The legacy way also specifies the CA certificate.
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      ctx.OperatorSecretName,
+			},
+			Data: map[string][]byte{
+				operatorTLSSecretCA:    ctx.CA.Certificate,
+				operatorTLSSecretChain: ctx.ClientCert,
+				operatorTLSSecretKey:   ctx.ClientKey,
+			},
+		}
+	}
 }
 
-func CreateClusterSecretData(namespace, secretName string, certPEM, keyPEM []byte) *corev1.Secret {
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      secretName,
-		},
-		Data: map[string][]byte{
-			clusterTLSSecretChain: certPEM,
-			clusterTLSSecretKey:   keyPEM,
-		},
-	}
+func CreateClusterSecretData(namespace string, ctx *TLSContext) *corev1.Secret {
+	switch ctx.Source {
+	case TLSSourceTLSSecret:
+		// The standard way supplies cerver certificates and the CA.
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      ctx.ClusterSecretName,
+			},
+			Data: map[string][]byte{
+				"ca.crt":  ctx.CA.Certificate,
+				"tls.crt": ctx.ServerCert,
+				"tls.key": ctx.ServerKey,
+			},
+		}
 
-	return secret
+	case TLSSourceLegacy:
+		fallthrough
+	default:
+		// The legacy way doesn't specify the CA.
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      ctx.ClusterSecretName,
+			},
+			Data: map[string][]byte{
+				clusterTLSSecretKey:   ctx.ServerKey,
+				clusterTLSSecretChain: ctx.ServerCert,
+			},
+		}
+	}
 }
 
 const (
@@ -452,6 +524,19 @@ const (
 	intermediateCACN = "Couchbase Intermediate CA"
 	operatorCN       = "Administrator"
 	clusterCN        = "Couchbase Cluster"
+)
+
+// This defines how to configure the operator and data formats.
+type TLSSource string
+
+const (
+	// Legacy sources are all just wrong and are inflexible caused by being
+	// too heavily tied to Couchbase's requirements.
+	TLSSourceLegacy TLSSource = "legacy"
+
+	// TLS secret sources use Kubernetes standards, and allow us to slip an
+	// abstraction layer in to hide all the badness.
+	TLSSourceTLSSecret TLSSource = "tlsSecret"
 )
 
 // tlsContext is generated per test, it contains certificates to be injected into
@@ -465,8 +550,12 @@ type TLSContext struct {
 	ClusterName string
 	// CA is the certificate authority used to sign the certificates.
 	CA *CertificateAuthority
-	// ServerCert is the server certifcate at the leaf of the chain
-	ServerCert *x509.Certificate
+	// ServerCertificate is the server certifcate at the leaf of the chain
+	ServerCertificate *x509.Certificate
+	// ServerCert is the full certificate chain.
+	ServerCert []byte
+	// Server key is the private key.
+	ServerKey []byte
 	// ClientCert is the client certificate chain used for verification
 	ClientCert []byte
 	// CLientKey is the client key used for verification
@@ -475,8 +564,8 @@ type TLSContext struct {
 	OperatorSecretName string
 	// ClusterSecretName is the name of the secret created for cluster certificates.
 	ClusterSecretName string
-	// LDAPSecretName is the name of the secret created for ldap certificates.
-	LDAPSecretName string
+	// Source is the type of TLS to use for the Operator.
+	Source TLSSource
 }
 
 type TLSOpts struct {
@@ -484,6 +573,8 @@ type TLSOpts struct {
 	ClusterName string
 	// keyType is the type of key to use e.g. RSA or EC.  Defaults to KeyTypeRSA.
 	KeyType *KeyType
+	// KeyEncoding is the type of key encoding e.g. PKCS#1 or PKCS#8 etc.  Defaults to PKCS#1.
+	KeyEncoding *KeyEncodingType
 	// altNames is the set of DNS alternative names to use.  Defaults to the cluster wildcard and localhost.
 	AltNames []string
 	// ExtraAltNames is the set of additional alternative names to append to the AltNames.
@@ -501,6 +592,8 @@ type TLSOpts struct {
 	// ldapAltName is DNS name of ldap server to optionally add to AltNames
 	// ldapCertType sets the ldap certificate type.  Defaults to CertTypeServer.
 	LDAPCertType *CertType
+	// Source is the type of TLS to use for the Operator.
+	Source TLSSource
 }
 
 // clusterSANs generates a valid set of SANs for a cluster.
@@ -539,6 +632,12 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 		keyType = *opts.KeyType
 	}
 
+	keyEncoding := KeyEncodingPKCS1
+
+	if opts.KeyEncoding != nil {
+		keyEncoding = *opts.KeyEncoding
+	}
+
 	validFrom := time.Now().In(time.UTC)
 
 	if opts.ValidFrom != nil {
@@ -569,14 +668,16 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 		clusterCertType = *opts.ClusterCertType
 	}
 
-	// Generate the CA
+	ctx.Source = opts.Source
+
+	// Generate the CA.
 	if ctx.CA, err = NewCertificateAuthority(keyType, caCN, validFrom, validTo, caCertType); err != nil {
 		return
 	}
 
-	// Create the operator secret
+	// Create the client TLS certifcates.
 	operatorReq := CreateCertReq(operatorCN)
-	operatorReqKeyPair := CreateKeyPairReqData(keyType, operatorCertType, operatorReq)
+	operatorReqKeyPair := CreateKeyPairReqData(keyType, keyEncoding, operatorCertType, operatorReq)
 
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -586,28 +687,32 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 	ctx.ClientKey = operatorKey
 	ctx.ClientCert = operatorCert
 
-	ctx.OperatorSecretName = "operator-secret-tls-" + RandomSuffix()
-	operatorSecretData := CreateOperatorSecretData(k8s.Namespace, ctx.OperatorSecretName, ctx.CA.Certificate, operatorCert, operatorKey)
-
-	if _, err = CreateSecret(k8s, operatorSecretData); err != nil {
-		return
-	}
-
-	// Create the cluster secret
+	// Create the server TLS certificates.
 	clusterReq := CreateCertReqDNS(clusterCN, altNames)
-	clusterReqKeyPair := CreateKeyPairReqData(keyType, clusterCertType, clusterReq)
+	clusterReqKeyPair := CreateKeyPairReqData(keyType, keyEncoding, clusterCertType, clusterReq)
 
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		return
 	}
 
-	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+	ctx.ServerKey = clusterKey
+	ctx.ServerCert = clusterCert
+
+	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
+		return
+	}
+
+	// Create the actual secrets.
+	ctx.OperatorSecretName = "operator-secret-tls-" + RandomSuffix()
+	operatorSecretData := CreateOperatorSecretData(k8s.Namespace, ctx)
+
+	if _, err = CreateSecret(k8s, operatorSecretData); err != nil {
 		return
 	}
 
 	ctx.ClusterSecretName = "cluster-secret-tls-" + RandomSuffix()
-	clusterSecretData := CreateClusterSecretData(k8s.Namespace, ctx.ClusterSecretName, clusterCert, clusterKey)
+	clusterSecretData := CreateClusterSecretData(k8s.Namespace, ctx)
 
 	if _, err = CreateSecret(k8s, clusterSecretData); err != nil {
 		return
@@ -637,14 +742,14 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, subjectAltNames 
 	}
 
 	clusterReq := CreateCertReqDNS(clusterCN, subjectAltNames)
-	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
 
-	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
 
@@ -669,7 +774,7 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 
 	// Generate a new client certificate
 	operatorReq := CreateCertReq(operatorCN)
-	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, operatorReq)
 
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -703,14 +808,14 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 
 	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
-	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
 
-	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
 
@@ -743,7 +848,7 @@ func MustRotateClientCertificateChain(t *testing.T, ctx *TLSContext) {
 
 	// Generate a new client certificate
 	operatorReq := CreateCertReq(operatorCN)
-	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, operatorReq)
 
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
@@ -785,14 +890,14 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 
 	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
-	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
 
-	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
 
@@ -835,20 +940,20 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 
 	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
-	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
 
-	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
 
 	// Generate a new client certificate
 	operatorReq := CreateCertReq(operatorCN)
-	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, operatorReq)
 
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
@@ -898,14 +1003,14 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 
 	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
-	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeServer, clusterReq)
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
 
-	if ctx.ServerCert, err = ParseCertificate(clusterCert); err != nil {
+	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
 		Die(t, err)
 	}
 
@@ -936,7 +1041,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 
 	// Generate a new client certificate
 	operatorReq := CreateCertReq(operatorCN)
-	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, CertTypeClient, operatorReq)
+	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, operatorReq)
 
 	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
@@ -1004,8 +1109,8 @@ func tlsCheckForPod(k8s *types.Cluster, podName string, ctx *TLSContext) error {
 
 	// Verify the certificate is as the context expects.
 	podCert := conn.ConnectionState().PeerCertificates[0]
-	if !podCert.Equal(ctx.ServerCert) {
-		return fmt.Errorf("server certificate mismatch, expected %v/%v, got %v/%v", ctx.ServerCert.Issuer.String(), ctx.ServerCert.SerialNumber, podCert.Issuer.String(), podCert.SerialNumber)
+	if !podCert.Equal(ctx.ServerCertificate) {
+		return fmt.Errorf("server certificate mismatch, expected %v/%v, got %v/%v", ctx.ServerCertificate.Issuer.String(), ctx.ServerCertificate.SerialNumber, podCert.Issuer.String(), podCert.SerialNumber)
 	}
 
 	// Get the cluster CA and verify it matches the context's CA.
@@ -1065,6 +1170,7 @@ func InitLDAPTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err error)
 
 	// Set the certificate parameters
 	keyType := KeyTypeRSA
+	keyEncoding := KeyEncodingPKCS8
 
 	if opts.KeyType != nil {
 		keyType = *opts.KeyType
@@ -1101,16 +1207,24 @@ func InitLDAPTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err error)
 
 	// Create the req
 	ldapReq := CreateCertReqDNS(operatorCN, altNames)
-	ldapReqKeyPair := CreateKeyPairReqData(keyType, ldapCertType, ldapReq)
+	ldapReqKeyPair := CreateKeyPairReqData(keyType, keyEncoding, ldapCertType, ldapReq)
 
 	ldapKey, ldapCert, err := ldapReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		return
 	}
 
-	ctx.LDAPSecretName = "ldap-secret-tls-" + RandomSuffix()
+	ctx.ClusterSecretName = "ldap-secret-tls-" + RandomSuffix()
+	ctx.ServerKey = ldapKey
+	ctx.ServerCert = ldapCert
+	ctx.Source = TLSSourceTLSSecret
 
-	ldapSecretData := CreateOperatorSecretData(k8s.Namespace, ctx.LDAPSecretName, ctx.CA.Certificate, ldapCert, ldapKey)
+	ldapSecretData := CreateClusterSecretData(k8s.Namespace, ctx)
+	ldapSecretData.Labels = map[string]string{
+		"group": constants.LDAPLabelSelector,
+		"name":  constants.TestLabelSelector,
+	}
+
 	if _, err = CreateSecret(k8s, ldapSecretData); err != nil {
 		return
 	}

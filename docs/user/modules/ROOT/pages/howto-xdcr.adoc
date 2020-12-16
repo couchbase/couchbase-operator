@@ -33,10 +33,8 @@ metadata:
 spec:
   networking:
     tls: # <.>
-      static:
-        member:
-          serverSecret: my-server-tls-secret
-        operatorSecret: my-operator-tls-secret
+      secretSource:
+        serverSecretName: my-server-tls-secret
 ----
 
 <.> **TLS only:** TLS configuration is configured as per the xref:tutorial-tls.adoc[TLS configuration guide].
@@ -135,10 +133,8 @@ metadata:
 spec:
   networking:
     tls: # <.>
-      static:
-        member:
-          serverSecret: my-server-tls-secret
-        operatorSecret: my-operator-tls-secret
+      secretSource:
+        serverSecretName: my-server-tls-secret
     dns: # <.>
       domain: my-remote-cluster.example.com
     exposeAdminConsole: true # <.>

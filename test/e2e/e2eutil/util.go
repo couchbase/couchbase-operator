@@ -145,11 +145,21 @@ func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, size int) *couchbasev
 func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
 	clusterSpec := e2espec.NewBasicCluster(size)
 	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-		Static: &couchbasev2.StaticTLS{
+	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{}
+
+	switch ctx.Source {
+	case TLSSourceTLSSecret:
+		clusterSpec.Spec.Networking.TLS.SecretSource = &couchbasev2.TLSSecretSource{
+			ServerSecretName: ctx.ClusterSecretName,
+			ClientSecretName: ctx.OperatorSecretName,
+		}
+	case TLSSourceLegacy:
+		fallthrough
+	default:
+		clusterSpec.Spec.Networking.TLS.Static = &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
-		},
+		}
 	}
 
 	return newClusterFromSpec(t, k8s, clusterSpec)

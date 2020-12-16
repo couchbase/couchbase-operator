@@ -79,7 +79,7 @@ To generate a certificate for the cluster `cb-example` in the `default` namespac
 $ ./easyrsa --subject-alt-name='DNS:*.cb-example,DNS:*.cb-example.default,DNS:*.cb-example.default.svc,DNS:*.cb-example.default.svc.cluster.local,DNS:cb-example-srv,DNS:cb-example-srv.default,DNS:cb-example-srv.default.svc,DNS:*.cb-example-srv.default.svc.cluster.local,DNS:localhost' build-server-full couchbase-server nopass
 ----
 
-The key/certificate pair can be found in `pki/private/couchbase-server.key` and `pki/issued/couchbase-server.crt` and used as `pkey.pem` and `chain.pem`, respectively, in the `couchbaseclusters.spec.networking.tls.static.serverSecret` parameter.
+The key/certificate pair can be found in `pki/private/couchbase-server.key` and `pki/issued/couchbase-server.crt` and used as `tls.key` and `tls.crt`, respectively, in the `couchbaseclusters.spec.networking.tls.secretSource.serverSecretName` parameter.
 
 [NOTE]
 ====
@@ -88,7 +88,9 @@ Password-protected keys are not supported by Couchbase Server or the Operator.
 
 === Private Key Formatting
 
-Due to an https://issues.couchbase.com/browse/MB-24404[issue^] with Couchbase Server's private key handling, server keys need to be PKCS#1 formatted.
+Due to an https://issues.couchbase.com/browse/MB-24404[issue^] with Couchbase Server's private key handling, server keys may need to be PKCS#1 formatted.
+This is only required when using legacy TLS configuration (with `couchbaseclusters.spec.networking.tls.static`).
+
 This can be achieved with the following commands:
 
 [source,console]
@@ -102,6 +104,9 @@ $ openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
 ----
 
 == Creating a Dynamic Admission Controller Server Certificate
+
+This section is only relevant if you wish to manually deploy the dynamic admission controller.
+Most users should use `cbopcfg` to automatically install the DAC.
 
 To create a server certificate that can be used by the dynamic admission controller, simply specify the service name that the Kubernetes API webhooks will connect to.
 This is in the form `$\{service}.$\{namespace}.svc`, so if our service is called `couchbase-operator-admission` and we were deploying it in the `operator-admission` namespace, run the following:
@@ -121,5 +126,5 @@ Assuming the administrative user defined for Couchbase Server is `Administrator`
 $ ./easyrsa build-client-full Administrator nopass
 ----
 
-The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `couchbase-operator.key` and `couchbase-operator.crt` respectively when specifying the `CouchbaseCluster` `spec.networking.tls.static.operatorSecret`.
+The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `tls.key` and `tls.crt` respectively when specifying the `couchbaseclusters.spec.networking.tls.secretSource.clientSecretName` field.
 

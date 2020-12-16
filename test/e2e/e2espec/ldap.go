@@ -20,8 +20,8 @@ var (
 	ldapSubdomain     = constants.LDAPDomain
 
 	// tls.
-	ldapCrtFile   = "couchbase-operator.crt"
-	ldapKeyFile   = "couchbase-operator.key"
+	ldapCrtFile   = "tls.crt"
+	ldapKeyFile   = "tls.key"
 	ldapCACrtFile = "ca.crt"
 
 	// network.

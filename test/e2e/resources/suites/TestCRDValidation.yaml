@@ -4,6 +4,8 @@ testcases:
 - TestValidationCreate
 - TestNegValidationCreateCouchbaseCluster
 - TestNegValidationCreateCouchbaseClusterNetworking
+- TestNegValidationCreateCouchbaseClusterNetworkingTLSStandard
+- TestNegValidationCreateCouchbaseClusterNetworkingTLSLegacy
 - TestNegValidationCreateCouchbaseClusterServers
 - TestNegValidationCreateCouchbaseClusterPersistentVolumes
 - TestNegValidationCreateCouchbaseClusterLogging

@@ -32,7 +32,7 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 	validFrom := time.Now()
 	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)
 	ca, _ := e2eutil.NewCertificateAuthority(e2eutil.KeyTypeRSA, config.AdmissionResourceName+" CA", validFrom, validTo, e2eutil.CertTypeCA)
-	req := e2eutil.CreateKeyPairReqData(e2eutil.KeyTypeRSA, e2eutil.CertTypeServer, &x509.CertificateRequest{
+	req := e2eutil.CreateKeyPairReqData(e2eutil.KeyTypeRSA, e2eutil.KeyEncodingPKCS8, e2eutil.CertTypeServer, &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: config.AdmissionResourceName,
 		},

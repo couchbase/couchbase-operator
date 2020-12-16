@@ -851,6 +851,139 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 	return nil
 }
 
+// getCA returns the CA, whether there was a soft error, or whether there was a hard error.
+func getCA(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, bool, error) {
+	var secretPath string
+
+	var secretName string
+
+	caKey := "ca.crt"
+
+	if cluster.IsTLSShadowed() {
+		secretPath = "spec.networking.tls.secretSource.serverSecretName"
+		secretName = cluster.Spec.Networking.TLS.SecretSource.ServerSecretName
+	} else {
+		secretPath = "spec.networking.tls.static.operatorSecret"
+		secretName = cluster.Spec.Networking.TLS.Static.OperatorSecret
+	}
+
+	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	if err != nil {
+		if apierrors.IsForbidden(err) {
+			return nil, false, nil
+		}
+
+		return nil, false, err
+	}
+
+	if secret == nil {
+		return nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
+	}
+
+	ca, ok := secret.Data[caKey]
+	if !ok {
+		return nil, false, fmt.Errorf("tls secret %s must contain %s", secretName, caKey)
+	}
+
+	return ca, true, nil
+}
+
+// getServerTLS returns the server key and chain, whether there was a soft error, or whether there was a hard error.
+func getServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, []byte, bool, error) {
+	var secretPath string
+
+	var secretName string
+
+	var keyKey string
+
+	var chainKey string
+
+	if cluster.IsTLSShadowed() {
+		secretPath = "spec.networking.tls.secretSource.serverSecretName"
+		secretName = cluster.Spec.Networking.TLS.SecretSource.ServerSecretName
+		keyKey = "tls.key"
+		chainKey = "tls.crt"
+	} else {
+		secretPath = "spec.networking.tls.static.serverSecret"
+		secretName = cluster.Spec.Networking.TLS.Static.ServerSecret
+		keyKey = "pkey.key"
+		chainKey = "chain.pem"
+	}
+
+	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	if err != nil {
+		if apierrors.IsForbidden(err) {
+			return nil, nil, false, nil
+		}
+
+		return nil, nil, false, err
+	}
+
+	if secret == nil {
+		return nil, nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
+	}
+
+	key, ok := secret.Data[keyKey]
+	if !ok {
+		return nil, nil, false, fmt.Errorf("tls secret %s must contain %s", secretName, keyKey)
+	}
+
+	chain, ok := secret.Data[chainKey]
+	if !ok {
+		return nil, nil, false, fmt.Errorf("tls secret %s must contain %s", secretName, chainKey)
+	}
+
+	return key, chain, true, nil
+}
+
+// getClientTLS returns the client key and chain, whether there was a soft error, or whether there was a hard error.
+func getClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, []byte, bool, error) {
+	var secretPath string
+
+	var secretName string
+
+	var keyKey string
+
+	var chainKey string
+
+	if cluster.IsTLSShadowed() {
+		secretPath = "spec.networking.tls.secretSource.clientSecretName"
+		secretName = cluster.Spec.Networking.TLS.SecretSource.ClientSecretName
+		keyKey = "tls.key"
+		chainKey = "tls.crt"
+	} else {
+		secretPath = "spec.networking.tls.static.operatorSecret"
+		secretName = cluster.Spec.Networking.TLS.Static.OperatorSecret
+		keyKey = "couchbase-operator.key"
+		chainKey = "couchbase-operator.crt"
+	}
+
+	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	if err != nil {
+		if apierrors.IsForbidden(err) {
+			return nil, nil, false, nil
+		}
+
+		return nil, nil, false, err
+	}
+
+	if secret == nil {
+		return nil, nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
+	}
+
+	key, ok := secret.Data[keyKey]
+	if !ok {
+		return nil, nil, false, fmt.Errorf("tls secret %s must contain %s", secretName, keyKey)
+	}
+
+	chain, ok := secret.Data[chainKey]
+	if !ok {
+		return nil, nil, false, fmt.Errorf("tls secret %s must contain %s", secretName, chainKey)
+	}
+
+	return key, chain, true, nil
+}
+
 // validateTLS checks TLS configuration exists and is valid
 // * correct secrets exist
 // * correct keys exist in the secrets
@@ -859,89 +992,56 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 //   * in date
 //   * have the correct attributes
 // * leaf certificate has the correct SANs.
-func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subjectAltNames []string) (errs []error) {
-	if cluster.Spec.Networking.TLS != nil && cluster.Spec.Networking.TLS.Static != nil {
-		// CRD validation requires all the necessary fields are populated
-		operatorSecretName := cluster.Spec.Networking.TLS.Static.OperatorSecret
-		serverSecretName := cluster.Spec.Networking.TLS.Static.ServerSecret
-
-		var key []byte
-
-		var chain []byte
-
-		var ca []byte
-
-		var ok bool
-
-		// Check the operator secret exists and has the correct keys
-		operatorSecret, err := v.Abstraction.GetSecret(cluster.Namespace, operatorSecretName)
-		if err != nil {
-			// Silently ignore permissions errors, some users may not want us seeing these resources.
-			if apierrors.IsForbidden(err) {
-				return
-			}
-
-			errs = append(errs, err)
-		} else if operatorSecret == nil {
-			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.operatorSecret must exist", operatorSecretName))
-		} else if ca, ok = operatorSecret.Data["ca.crt"]; !ok {
-			errs = append(errs, fmt.Errorf("tls operator secret %s must contain ca.crt", operatorSecretName))
-		}
-
-		// Check the server secret exists and has the correct keys
-		serverSecret, err := v.Abstraction.GetSecret(cluster.Namespace, serverSecretName)
-		if err != nil {
-			// Silently ignore permissions errors, some users may not want us seeing these resources.
-			if apierrors.IsForbidden(err) {
-				return
-			}
-
-			errs = append(errs, err)
-
-			return
-		}
-
-		if serverSecret == nil {
-			errs = append(errs, fmt.Errorf("secret %s referenced by spec.networking.tls.static.serverSecret must exist", serverSecretName))
-		} else {
-			if chain, ok = serverSecret.Data["chain.pem"]; !ok {
-				errs = append(errs, fmt.Errorf("tls server secret %s must contain chain.pem", serverSecretName))
-			}
-
-			if key, ok = serverSecret.Data["pkey.key"]; !ok {
-				errs = append(errs, fmt.Errorf("tls server secret %s must contain pkey.key", serverSecretName))
-			}
-		}
-
-		// Something is wrong, bomb out now
-		if len(errs) > 0 {
-			return
-		}
-
-		// Validate the TLS configuration is going to work
-		errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames)
-
-		// Do client certificate verification if necessary
-		if cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
-			if chain, ok = operatorSecret.Data["couchbase-operator.crt"]; !ok {
-				errs = append(errs, fmt.Errorf("tls operator secret %s must contain couchbase-operator.crt", operatorSecretName))
-			}
-
-			if key, ok = operatorSecret.Data["couchbase-operator.key"]; !ok {
-				errs = append(errs, fmt.Errorf("tls operator secret %s must contain couchbase-operator.key", operatorSecretName))
-			}
-
-			// Something is wrong, bomb out now
-			if len(errs) > 0 {
-				return
-			}
-
-			// Validate the TLS configuration is going to work
-			errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageClientAuth, nil)
-		}
+func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subjectAltNames []string) []error {
+	if !cluster.IsTLSEnabled() {
+		return nil
 	}
 
-	return
+	// Get the CA for verification.
+	ca, ok, err := getCA(v, cluster)
+	if err != nil {
+		return []error{err}
+	}
+
+	if !ok {
+		return nil
+	}
+
+	// Check server certificates.
+	key, chain, ok, err := getServerTLS(v, cluster)
+	if err != nil {
+		return []error{err}
+	}
+
+	if !ok {
+		return nil
+	}
+
+	errs := util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !cluster.IsTLSShadowed())
+	if errs != nil {
+		return errs
+	}
+
+	// Check the client certificates.
+	if !cluster.IsMutualTLSEnabled() {
+		return nil
+	}
+
+	key, chain, ok, err = getClientTLS(v, cluster)
+	if err != nil {
+		return []error{err}
+	}
+
+	if !ok {
+		return nil
+	}
+
+	errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageClientAuth, nil, false)
+	if errs != nil {
+		return errs
+	}
+
+	return nil
 }
 
 // validateTLSXDCR checks that TLS configuration for a remote cluster is valid.

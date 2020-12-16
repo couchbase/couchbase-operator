@@ -48,6 +48,37 @@ func TestTlsCreateCluster(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+// TestTLSCreateClusterWithShadowing tests deploying a cluster with standard names
+// in the TLS secret (standard as in ingresses, cert-manager, everything not Couchbase etc.)
+func TestTLSCreateClusterWithShadowing(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create the cluster.  Use the same names as are standard on Kubernetes.
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
+
+	testCouchbase := e2eutil.MustNewTLSClusterBasic(t, targetKube, clusterSize, ctx)
+
+	// When the cluster is healthy, check the TLS is correctly configured.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
 // Tests scenario where a third node is being added to a cluster, and a separate
 // node goes down immediately after the add & before the rebalance.
 // Expects: autofailover of down node occurs and a replacement node is added

@@ -65,8 +65,8 @@ metadata:
   name: couchbase-server-tls
 type: Opaque
 data:
-  chain.pem: Q2VydGlmaWXRhO...
-  pkey.key: LS0tLS1CRUdJTi...
+  tls.crt: Q2VydGlmaWXRhO...
+  tls.key: LS0tLS1CRUdJTi...
 ----
 
 Next, replace the relevant data fields in the YAML file.
@@ -76,14 +76,14 @@ Certificate chain:
 
 [source,console]
 ----
-$ base64 -i chain.pem
+$ base64 -i tls.crt
 ----
 
 Private key:
 
 [source,console]
 ----
-$ base64 -i pkey.key
+$ base64 -i tls.key
 ----
 
 Then replace the relevant fields under `data` with the new base64 values:
@@ -96,8 +96,8 @@ metadata:
   name: couchbase-server-tls
 type: Opaque
 data:
-  chain.pem: NhdGU6CiAgICBEY...
-  pkey.key: LSUlFcFFJQkFBS0N...
+  tls.crt: NhdGU6CiAgICBEY...
+  tls.key: LSUlFcFFJQkFBS0N...
 ----
 
 Finish the certificate rotation by pushing the new secret to Kubernetes:
@@ -118,8 +118,8 @@ $ kubectl get secret couchbase-server-tls -o yaml
 ----
 apiVersion: v1
 data:
-  chain.pem: NhdGU6CiAgICBEY...
-  pkey.key: LSUlFcFFJQkFBS0N...
+  tls.crt: NhdGU6CiAgICBEY...
+  tls.key: LSUlFcFFJQkFBS0N...
 kind: Secret
 metadata:
   creationTimestamp: "2019-01-09T09:42:35Z"
@@ -133,12 +133,7 @@ type: Opaque
 
 Each pod will have a copy of the new certificate and key in a mounted inbox on each node.
 
-NOTE: Since the Operator secret (`couchbase-operator-tls`) contains the root CA, there should be no need to rotate the Operator secret when a server certificate has been compromised or expired.
-However, if the root CA has been compromised, you will need to replace the Operator secret, as described in the next section.
-
 == Replacing the entire PKI
 
 If the root CA is compromised, a full rotation and replacement of the PKI will be required.
-When you replace the PKI, you'll also need to replace the server _and_ Operator TLS secrets with ones that include certificates and keys that align to the new CA.
-
-Replacing the Operator secret (`couchbase-operator-tls`) involves the same procedure as replacing the server secret.
+When you replace the PKI, you'll also need to replace the CA certificate in the server secret.

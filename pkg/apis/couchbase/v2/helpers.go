@@ -414,11 +414,15 @@ func (cs *ClusterSpec) IsAdminConsoleServiceTypePublic() bool {
 }
 
 func (c *CouchbaseCluster) IsTLSEnabled() bool {
-	return c.Spec.Networking.TLS != nil && c.Spec.Networking.TLS.Static != nil
+	return c.Spec.Networking.TLS != nil && (c.Spec.Networking.TLS.Static != nil || c.Spec.Networking.TLS.SecretSource != nil)
 }
 
 func (c *CouchbaseCluster) IsMutualTLSEnabled() bool {
 	return c.IsTLSEnabled() && c.Spec.Networking.TLS.ClientCertificatePolicy != nil
+}
+
+func (c *CouchbaseCluster) IsTLSShadowed() bool {
+	return c.IsTLSEnabled() && c.Spec.Networking.TLS.SecretSource != nil
 }
 
 // Set ready members from list.

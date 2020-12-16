@@ -105,7 +105,7 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 }
 
 // Verify checks the given chain and CA are valid to be installed.
-func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string) (errs []error) {
+func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string, legacy bool) (errs []error) {
 	// Decode CA certificate
 	caPem := DecodePEM(caData)
 
@@ -190,9 +190,11 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 	}
 
 	if extKeyUsage == x509.ExtKeyUsageServerAuth {
-		if _, err := x509.ParsePKCS1PrivateKey(keyPem[0].Bytes); err != nil {
-			// This is an annoying bug with NS server not supporting PKCS8 *sigh*
-			errs = append(errs, fmt.Errorf("%w: private key not formatted as PKCS1", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid)))
+		if legacy {
+			if _, err := x509.ParsePKCS1PrivateKey(keyPem[0].Bytes); err != nil {
+				// This is an annoying bug with NS server not supporting PKCS8 *sigh*
+				errs = append(errs, fmt.Errorf("%w: private key not formatted as PKCS1", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid)))
+			}
 		}
 	}
 

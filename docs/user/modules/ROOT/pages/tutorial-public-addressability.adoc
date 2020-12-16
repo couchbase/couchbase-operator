@@ -188,9 +188,8 @@ spec:
     dns:
       domain: gandalf.rockstar-wizard.com
     tls:
-      static:
-        operatorSecret: couchbase-ca
-        serverSecret: couchbase-cert
+      secretSource:
+        serverSecretName: couchbase-cert
   servers:
   - name: default
     services:

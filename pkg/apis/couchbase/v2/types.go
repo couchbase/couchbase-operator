@@ -1883,8 +1883,13 @@ const (
 // TLSPolicy defines the TLS policy of an couchbase cluster
 type TLSPolicy struct {
 	// Static enables user to generate static x509 certificates and keys,
-	// put them into Kubernetes secrets, and specify them here.
+	// put them into Kubernetes secrets, and specify them here.  Static secrets
+	// are very Couchbase specific.
 	Static *StaticTLS `json:"static,omitempty"`
+
+	// SecretSource enables the user to specify a secret conforming to the Kubernetes TLS
+	// secret specification.
+	SecretSource *TLSSecretSource `json:"secretSource,omitempty"`
 
 	// ClientCertificatePolicy defines the client authentication policy to use.
 	// If set, the Operator expects TLS configuration to contain a valid certificate/key pair
@@ -1932,6 +1937,19 @@ type StaticTLS struct {
 	// a client certificate chain (data key "couchbase-operator.crt") and private key
 	// (data key "couchbase-operator.key").
 	OperatorSecret string `json:"operatorSecret,omitempty"`
+}
+
+type TLSSecretSource struct {
+	// ServerSecretName specfies the secret name, in the same namespace as the cluster,
+	// that contains server TLS data.  The secret is expected to contain "tls.crt" and
+	// "tls.key" as per the kubernetes.io/tls secret type.  It also additionally
+	// must contain "ca.crt".
+	ServerSecretName string `json:"serverSecretName"`
+
+	// ClientSecretName specifies the secret name, in the same namespace as the cluster,
+	// the contains client TLS data.  The secret is expected to contain "tls.crt" and
+	// "tls.key" as per the Kubernetes.io/tls secret type.
+	ClientSecretName string `json:"clientSecretName,omitempty"`
 }
 
 // ClientCertificatePolicy defines the type of TLS policy to apply.  The default

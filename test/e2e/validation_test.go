@@ -295,7 +295,38 @@ func getStorageClass(t *testing.T, cluster *types.Cluster) string {
 	return scs.Items[0].Name
 }
 
-func runValidationTest(t *testing.T, testDefs []testDef, command string) {
+// validationOperationType determines when to apply patches to objects and what to do.
+type validationOperationType int
+
+const (
+	// operationCreate applies patches to objects and creates them.
+	operationCreate validationOperationType = iota
+
+	// operationApply creates objects, applies patches and updates them.
+	operationApply
+)
+
+// validationTLSType determines the TLS strategy to use.
+type validationTLSType int
+
+const (
+	// tlsLegacy uses the old (pre-2.2) TLS layout.
+	tlsLegacy validationTLSType = iota
+
+	// tlsStandard uses Kubernetes TLS secrets.
+	tlsStandard
+)
+
+// validationContext controls things about the validation environment.
+type validationContext struct {
+	// operation must be set.
+	operation validationOperationType
+
+	// tls may be set, if left zero, then it will default to legacy mode.
+	tls validationTLSType
+}
+
+func runValidationTest(t *testing.T, testDefs []testDef, validation validationContext) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t, framework.NoOperator)
@@ -304,10 +335,6 @@ func runValidationTest(t *testing.T, testDefs []testDef, command string) {
 	// Clean up resources that may have been left behind by a job that was interrupted.
 	objectsPristine, err := loadResources("./resources/validation/validation.yaml")
 	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	if err := deleteResources(targetKube, objectsPristine); err != nil {
 		e2eutil.Die(t, err)
 	}
 
@@ -354,16 +381,30 @@ func runValidationTest(t *testing.T, testDefs []testDef, command string) {
 						AltNames:    util_x509.MandatorySANs(object.GetName(), targetKube.Namespace),
 					}
 					tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
+
+					if validation.tls == tlsStandard {
+						tlsOpts.Source = e2eutil.TLSSourceTLSSecret
+					}
+
 					ctx = e2eutil.MustInitClusterTLS(t, targetKube, tlsOpts)
 
 					tlsCache[object.GetName()] = ctx
 				}
 
-				if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "static", "serverSecret"); err != nil {
-					e2eutil.Die(t, err)
-				}
-				if err := unstructured.SetNestedField(object.Object, ctx.OperatorSecretName, "spec", "networking", "tls", "static", "operatorSecret"); err != nil {
-					e2eutil.Die(t, err)
+				if validation.tls == tlsStandard {
+					if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "secretSource", "serverSecretName"); err != nil {
+						e2eutil.Die(t, err)
+					}
+					if err := unstructured.SetNestedField(object.Object, ctx.OperatorSecretName, "spec", "networking", "tls", "secretSource", "clientSecretName"); err != nil {
+						e2eutil.Die(t, err)
+					}
+				} else {
+					if err := unstructured.SetNestedField(object.Object, ctx.ClusterSecretName, "spec", "networking", "tls", "static", "serverSecret"); err != nil {
+						e2eutil.Die(t, err)
+					}
+					if err := unstructured.SetNestedField(object.Object, ctx.OperatorSecretName, "spec", "networking", "tls", "static", "operatorSecret"); err != nil {
+						e2eutil.Die(t, err)
+					}
 				}
 
 				// Do XDCR configuration.
@@ -409,7 +450,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, command string) {
 			}
 
 			// If we are applying a change or deleting a cluster we first need to create it...
-			if command == "apply" {
+			if validation.operation == operationApply {
 				if err := createResources(targetKube, objects); err != nil {
 					e2eutil.Die(t, err)
 				}
@@ -423,10 +464,10 @@ func runValidationTest(t *testing.T, testDefs []testDef, command string) {
 			}
 
 			// Execute the main test, update the new resource for verification.
-			switch command {
-			case "create":
+			switch validation.operation {
+			case operationCreate:
 				err = createResources(targetKube, objects)
-			case "apply":
+			case operationApply:
 				err = updateResources(targetKube, objects)
 			}
 
@@ -507,7 +548,7 @@ func TestValidationCreate(t *testing.T) {
 		testDefs = append(testDefs, testDefCase)
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
@@ -538,7 +579,7 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseClusterNetworking(t *testing.T) {
@@ -568,18 +609,6 @@ func TestNegValidationCreateCouchbaseClusterNetworking(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/adminConsoleServices", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.Service("indxe"), couchbasev2.QueryService, couchbasev2.SearchService})},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.networking.adminConsoleServices"},
-		},
-		{
-			name:           "TestValidateTLSServerSecretMissing",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/static/serverSecret", "does-not-exist")},
-			shouldFail:     true,
-			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.serverSecret must exist"},
-		},
-		{
-			name:           "TestValidateTLSOperatorSecretMissing",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/static/operatorSecret", "does-not-exist")},
-			shouldFail:     true,
-			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.operatorSecret must exist"},
 		},
 		{
 			name:           "TestValidateTLSClientCertificatePolicyInvalid",
@@ -668,7 +697,45 @@ func TestNegValidationCreateCouchbaseClusterNetworking(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestNegValidationCreateCouchbaseClusterNetworkingTLSStandard(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestValidateTLSStandardServerSecretMissing",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/secretSource/serverSecretName", "does-not-exist")},
+			shouldFail:     true,
+			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.secretSource.serverSecretName must exist"},
+		},
+		{
+			name:           "TestValidateTLSStandardClientSecretMissing",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/secretSource/clientSecretName", "does-not-exist")},
+			shouldFail:     true,
+			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.secretSource.clientSecretName must exist"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, tls: tlsStandard})
+}
+
+func TestNegValidationCreateCouchbaseClusterNetworkingTLSLegacy(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestValidateTLSLegacyServerSecretMissing",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/static/serverSecret", "does-not-exist")},
+			shouldFail:     true,
+			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.serverSecret must exist"},
+		},
+		{
+			name:           "TestValidateTLSLegacyOperatorSecretMissing",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/static/operatorSecret", "does-not-exist")},
+			shouldFail:     true,
+			expectedErrors: []string{"secret does-not-exist referenced by spec.networking.tls.static.operatorSecret must exist"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, tls: tlsLegacy})
 }
 
 func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
@@ -711,7 +778,7 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
@@ -826,7 +893,7 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 	}
 	testDefs = append(testDefs, testCase)
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
@@ -845,7 +912,7 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
@@ -972,7 +1039,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseClusterSecurity(t *testing.T) {
@@ -985,7 +1052,7 @@ func TestNegValidationCreateCouchbaseClusterSecurity(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseClusterXDCR(t *testing.T) {
@@ -1022,7 +1089,7 @@ func TestNegValidationCreateCouchbaseClusterXDCR(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseClusterMonitoring(t *testing.T) {
@@ -1035,7 +1102,7 @@ func TestNegValidationCreateCouchbaseClusterMonitoring(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
@@ -1096,7 +1163,7 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseEphemeralBucket(t *testing.T) {
@@ -1139,7 +1206,7 @@ func TestNegValidationCreateCouchbaseEphemeralBucket(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseMemcachedBucket(t *testing.T) {
@@ -1158,7 +1225,7 @@ func TestNegValidationCreateCouchbaseMemcachedBucket(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
@@ -1189,7 +1256,7 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
@@ -1238,7 +1305,7 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationCreateCouchbaseBackupRestore(t *testing.T) {
@@ -1287,7 +1354,7 @@ func TestNegValidationCreateCouchbaseBackupRestore(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestValidationDefaultCreate(t *testing.T) {
@@ -1400,7 +1467,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 			},
 		},
 	}
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationDefaultCreate(t *testing.T) {
@@ -1414,7 +1481,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 			expectedErrors: []string{"bucket memory allocation (500Mi) exceeds data service quota (256Mi) on cluster cluster"},
 		},
 	}
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestNegValidationConstraintsCreate(t *testing.T) {
@@ -1456,7 +1523,7 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			expectedErrors: []string{"spec.evictionPolicy"},
 		},
 	}
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 // CRD apply tests.
@@ -1478,7 +1545,7 @@ func TestValidationApply(t *testing.T) {
 		testDefs = append(testDefs, testDefCase)
 	}
 
-	runValidationTest(t, testDefs, "apply")
+	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
 
 func TestNegValidationApply(t *testing.T) {
@@ -1551,7 +1618,7 @@ func TestNegValidationApply(t *testing.T) {
 		testDefs = append(testDefs, testCase)
 	}
 
-	runValidationTest(t, testDefs, "apply")
+	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
 
 func TestValidationDefaultApply(t *testing.T) {
@@ -1572,7 +1639,7 @@ func TestValidationDefaultApply(t *testing.T) {
 			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/cluster/autoFailoverTimeout", "120s")},
 		},
 	}
-	runValidationTest(t, testDefs, "apply")
+	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
 
 func TestNegValidationConstraintsApply(t *testing.T) {
@@ -1609,7 +1676,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			expectedErrors: []string{"spec.evictionPolicy"},
 		},
 	}
-	runValidationTest(t, testDefs, "apply")
+	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
 
 func TestNegValidationImmutableApply(t *testing.T) {
@@ -1690,7 +1757,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 		},
 		// Poor po!
 	}
-	runValidationTest(t, testDefs, "apply")
+	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
 
 // Test cases for RBAC testing.
@@ -1749,7 +1816,7 @@ func TestRBACValidationCreate(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 // Test cases for LDAP Validation.
@@ -1828,7 +1895,7 @@ func TestRBACValidationLDAP(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 // Test cases for Autoscaler Validation.
@@ -1852,7 +1919,7 @@ func TestAutoscalerValidation(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 // Test cases for RZA / Server group testing.
@@ -1871,5 +1938,5 @@ func TestRzaNegCreateCluster(t *testing.T) {
 			expectedErrors: []string{"spec.servergroups"},
 		},
 	}
-	runValidationTest(t, testDefs, "create")
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }

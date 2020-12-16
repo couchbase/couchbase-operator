@@ -64,9 +64,8 @@ func init() {
 }
 
 const (
-	tlsOperatorSecretCACert string = "ca.crt"
-	tlsOperatorSecretCert   string = "couchbase-operator.crt"
-	tlsOperatorSecretKey    string = "couchbase-operator.key"
+	tlsOperatorSecretCert string = "couchbase-operator.crt"
+	tlsOperatorSecretKey  string = "couchbase-operator.key"
 )
 
 type Config struct {
@@ -803,30 +802,22 @@ func (c *Cluster) initCouchbaseClient() error {
 	if ca == nil && c.cluster.IsTLSEnabled() {
 		log.V(1).Info("No TLS configuration cached")
 
-		// Grab the operator secret
-		secretName := c.cluster.Spec.Networking.TLS.Static.OperatorSecret
-
-		secret, found := c.k8s.Secrets.Get(secretName)
-		if !found {
-			return fmt.Errorf("unable to get operator secret %s: %w", secretName, errors.NewStackTracedError(errors.ErrResourceRequired))
+		caTemp, _, _, err := c.getTLSData()
+		if err != nil {
+			return err
 		}
 
-		// Extract the data
-		if _, ok := secret.Data[tlsOperatorSecretCACert]; !ok {
-			return fmt.Errorf("unable to find %s in operator secret: %w", tlsOperatorSecretCACert, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
-		}
-
-		ca = secret.Data[tlsOperatorSecretCACert]
+		ca = caTemp
 
 		// Optionally enable client authentication
 		if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
-			clientCertTemp, clientKeyTemp, err := c.getTLSClientData()
+			cert, key, err := c.getTLSClientData()
 			if err != nil {
 				return err
 			}
 
-			clientCert = clientCertTemp
-			clientKey = clientKeyTemp
+			clientCert = cert
+			clientKey = key
 		}
 	}
 

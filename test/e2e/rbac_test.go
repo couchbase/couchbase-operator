@@ -313,11 +313,11 @@ func TestRBACWithLDAPAuth(t *testing.T) {
 
 	ctx := e2eutil.MustInitLDAPTLS(t, targetKube, tlsOpts)
 
-	pod := e2espec.NewLDAPServerTLS(targetKube.Namespace, ctx.LDAPSecretName)
+	pod := e2espec.NewLDAPServerTLS(targetKube.Namespace, ctx.ClusterSecretName)
 	_ = e2eutil.MustNewLDAPServer(t, targetKube, pod)
 
 	// Create a cluster with LDAP Auth
-	testCouchbase := e2espec.NewLDAPClusterBasic(targetKube.Namespace, clusterSize, ctx.LDAPSecretName, targetKube.DefaultSecret.Name)
+	testCouchbase := e2espec.NewLDAPClusterBasic(targetKube.Namespace, clusterSize, ctx.ClusterSecretName, targetKube.DefaultSecret.Name)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 

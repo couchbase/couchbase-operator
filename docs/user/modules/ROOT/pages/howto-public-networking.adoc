@@ -30,9 +30,8 @@ spec:
     dns:
       domain: my-cluster.example.com # <.>
     tls:
-      static:
-        serverSecret: my-server-secret # <.>
-        operatorSecret: my-operator-secret
+      secretSource:
+        serverSecretName: my-server-secret # <.>
 ----
 
 <.> `couchbaseclusters.spec.networking.exposeAdminConsole` is enabled to allow the creation of a service pointing to the Couchbase admin port.
@@ -51,6 +50,6 @@ The Operator will create annotations for the admin console as `console.my-cluste
 Annotations are attached to the admin console and per-pod services.
 The External DNS controller needs to create DNS A records for these service endpoints.
 
-<.> `couchbaseclusters.spec.networking.tls.static.serverSecret` specifies the Couchbase server certificate.
+<.> `couchbaseclusters.spec.networking.tls.secretSource.serverSecretName` specifies the Couchbase server certificate.
 Mandatory subject alternative names (SANs) are described in the xref:tutorial-tls.adoc[TLS certificate tutorial].
 An additional SAN is required for the public DNS names, in this case `DNS:*.my-cluster.example.com`.

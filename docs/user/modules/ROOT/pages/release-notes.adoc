@@ -22,6 +22,19 @@ Operator 2.2 makes TLS 1.2 the minimum by default, and will automatically update
 
 You can prevent this change from occurring when xref:howto-operator-upgrade.adoc[upgrading the Operator] on existing clusters by setting `couchbaseclusters.spec.networking.tls.tlsMinimumVersion` to `TLS1.0` after upgrading the CRDs, and before restarting the Operator.
 
+==== TLS Certificate and Key Handling
+
+Couchbase server requires that the TLS resources be called `pkey.key` and `chain.pem`, however the majority of 3rd party certificate managers generate `tls.key` and `tls.crt`.
+This format is governed by the Kubernetes `kubernetes.io/tls` secret type.
+To provide integration with 3rd party providers, and to maintain backward compatibility with existing clusters, we provide secret shadowing.
+
+A new TLS source -- `couchbaseclusters.spec.networking.tls.secretSource` -- allows you to use `kubernetes.io/tls` type secrets to configure Couchbase server.
+When in shadowing mode, a shadow copy of the TLS secret is created, with the key names changed to those hard coded in Couchbase server.
+The shadow secret can then be mounted and used inside Couchbase server pods.
+As the secret is shadowed, the Operator can reformat private keys, and therefore now supports PKCS#8 formatted private keys.
+
+For existing clusters using the legacy `couchbaseclusters.spec.networking.tls.static` source, the Operator works as before -- directly mounting and consuming the TLS secret without a shadow secret.
+
 ==== Improved Server Group Support
 
 Prior to this release, server groups had to be enabled on cluster creation, and were immutable for the lifetime of the cluster.

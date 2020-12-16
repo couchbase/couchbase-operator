@@ -94,6 +94,11 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
+	// Ensure any resources required by pods are in place.
+	if err := c.refreshTLSShadowSecret(); err != nil {
+		return err
+	}
+
 	// Pod recovery has precedence over cluster creation.  If cluster creation happened
 	// first, there would actually be a pod, but the initial condition would be none
 	// and weird could happen.
@@ -337,7 +342,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	}
 
 	// Enable TLS if requested
-	if err := c.initMemberTLS(ctx, newMember, c.cluster.Spec); err != nil {
+	if err := c.initMemberTLS(ctx, newMember); err != nil {
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 		return nil, err
 	}
@@ -846,41 +851,28 @@ func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec couchbasev2.Serv
 }
 
 // Initialize a member with TLS certificates.
-func (c *Cluster) initMemberTLS(ctx context.Context, m couchbaseutil.Member, cs couchbasev2.ClusterSpec) error {
-	if cs.Networking.TLS != nil {
-		// Static configuration:
-		// * Upload the cluster CA certifcate
-		// * Reload the server certifcate/key.  These were injected into
-		//   the pod's file system from a secret during creation
-		if cs.Networking.TLS.Static != nil {
-			// Grab the operator secret
-			secretName := cs.Networking.TLS.Static.OperatorSecret
+func (c *Cluster) initMemberTLS(ctx context.Context, m couchbaseutil.Member) error {
+	if !c.cluster.IsTLSEnabled() {
+		return nil
+	}
 
-			secret, found := c.k8s.Secrets.Get(secretName)
-			if !found {
-				return fmt.Errorf("%w: unable to get operator secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), secretName)
-			}
+	ca, _, _, err := c.getTLSData()
+	if err != nil {
+		return err
+	}
 
-			// Extract the CA's PEM data
-			ca, ok := secret.Data[tlsOperatorSecretCACert]
-			if !ok {
-				return fmt.Errorf("%w: unable to find %s in operator secret", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), tlsOperatorSecretCACert)
-			}
+	// Update Couchbase's TLS configuration
+	if err := couchbaseutil.SetClusterCACert(ca).InPlaintext().On(c.api, m); err != nil {
+		return err
+	}
 
-			// Update Couchbase's TLS configuration
-			if err := couchbaseutil.SetClusterCACert(ca).InPlaintext().On(c.api, m); err != nil {
-				return err
-			}
+	if err := couchbaseutil.ReloadNodeCert().InPlaintext().On(c.api, m); err != nil {
+		return err
+	}
 
-			if err := couchbaseutil.ReloadNodeCert().InPlaintext().On(c.api, m); err != nil {
-				return err
-			}
-
-			// Wait for the port to come backup with the correct certificate chain
-			if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), ca); err != nil {
-				return err
-			}
-		}
+	// Wait for the port to come backup with the correct certificate chain
+	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), ca); err != nil {
+		return err
 	}
 
 	return nil

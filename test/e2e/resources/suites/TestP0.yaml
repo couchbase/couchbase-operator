@@ -66,6 +66,7 @@ testcases:
 - TestMandatoryMutualTLSRotateCA
 - TestMandatoryMutualTLSRotateInvalid
 - TestTLSEditSettings
+- TestTLSCreateClusterWithShadowing
 
 # XDCR Intra-Cluster Tests
 - TestXdcrCreateClusterLocal
