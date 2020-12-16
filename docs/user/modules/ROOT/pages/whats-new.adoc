@@ -20,7 +20,7 @@ By using the scale API, Couchbase clusters are directly compatible with the Kube
 The Operator can now delegate scaling responsibilities to the HPA.
 The HPA allows high-level functionality such as allowing scaling to be driven by Prometheus metrics, and scaling decisions to be constrained, for example introducing delays to even out load spikes.
 
-While this feature is generic, and will work for any server class, it has been inhibited to only work with server classes comprised of stateless services (e.g. query, search and eventing), and only when all buckets are ephemeral, by default.
+While this feature is generic, and will work for any server class, it has been inhibited to only work with server classes comprised of the stateless query service, and only when all buckets are ephemeral, by default.
 This restriction can be removed with the xref:reference-couchbasecluster.adoc#spec-enablepreviewscaling[`spec.enablePreviewScaling`] configuration switch, allowing -- for example -- the data service to be scaled when using standard Couchbase buckets.
 
 == Administrator Password Rotation
