@@ -87,6 +87,21 @@ This behavior has been modified to only set the condition once the cluster is fu
 `Available` now correctly reflects that the cluster is available and ready for use.
 |===
 
+
+[#known-issues-v210]
+=== Known Issues
+
+[#table-known-issues-v210,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-1585[K8S-1585^]
+a| *Summary:* The sample YAML for the libcouchbase cbc tools pillowfight workload generator needs to be edited for use with OpenShift.
+
+*Workaround:* Edit the included YAML to use the OpenShift namespace you are using.
+In OpenShift, you switch namespaces via the `oc project` command.
+|===
+
 [#release-v203]
 == Release 2.0.3
 
