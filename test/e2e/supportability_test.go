@@ -737,6 +737,9 @@ func TestLogCollectValidateArguments(t *testing.T) {
 		arg := validArgumentList[i]
 
 		t.Run(arg.Name, func(t *testing.T) {
+			cleanup := f.SetupSubTest(t)
+			defer cleanup()
+
 			args := e2eutil.ArgumentList{}
 			args.AddClusterDefaults(targetKube)
 			args.Add(arg.Arg, arg.ArgValue)
@@ -912,6 +915,9 @@ func TestLogCollect(t *testing.T) {
 	commonArgs.AddEnvironmentDefaults(f.OpImage)
 
 	t.Run("TestLogCollectSingle", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := commonArgs.Clone()
 		args.Add(cluster1.Name, "")
 
@@ -923,6 +929,9 @@ func TestLogCollect(t *testing.T) {
 	})
 
 	t.Run("TestLogCollectMultiple", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := commonArgs.Clone()
 		args.Add(cluster1.Name, "")
 		args.Add(cluster3.Name, "")
@@ -935,6 +944,9 @@ func TestLogCollect(t *testing.T) {
 	})
 
 	t.Run("TestLogCollect", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		archive, cleanCbopinfo := cbopinfo(t, commonArgs)
 		defer cleanCbopinfo()
 
@@ -943,6 +955,9 @@ func TestLogCollect(t *testing.T) {
 	})
 
 	t.Run("TestLogCollectSingleSystem", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := commonArgs.Clone()
 		args.Add("--system", "")
 		args.Add(cluster2.Name, "")
@@ -956,6 +971,9 @@ func TestLogCollect(t *testing.T) {
 	})
 
 	t.Run("TestLogCollectMultipleSystem", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := commonArgs.Clone()
 		args.Add("--system", "")
 		args.Add(cluster1.Name, "")
@@ -970,6 +988,9 @@ func TestLogCollect(t *testing.T) {
 	})
 
 	t.Run("TestLogCollectSystem", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := commonArgs.Clone()
 		args.Add("--system", "")
 
@@ -982,6 +1003,9 @@ func TestLogCollect(t *testing.T) {
 	})
 
 	t.Run("TestLogCollectSingleCollectInfo", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := commonArgs.Clone()
 		args.Add("--collectinfo", "")
 		args.Add("--collectinfo-collect", "all")
@@ -996,6 +1020,9 @@ func TestLogCollect(t *testing.T) {
 	})
 
 	t.Run("TestLogCollectAll", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := commonArgs.Clone()
 		args.Add("--all", "")
 
@@ -1232,6 +1259,9 @@ func TestLogCollectInvalid(t *testing.T) {
 
 	// Collect logs with invalid operator-image-name
 	t.Run("TestLogCollectInvalidOperatorImage", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := e2eutil.ArgumentList{}
 		args.AddClusterDefaults(targetKube)
 		args.Add("--operator-image", invalidImgName)
@@ -1254,6 +1284,9 @@ func TestLogCollectInvalid(t *testing.T) {
 
 	// Collect logs with invalid operator-rest-port
 	t.Run("TestLogCollectInvalidRestPort", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
 		args := e2eutil.ArgumentList{}
 		args.AddClusterDefaults(targetKube)
 		args.AddEnvironmentDefaults(f.OpImage)

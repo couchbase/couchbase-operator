@@ -891,7 +891,7 @@ func (f *Framework) SetupTest(t *testing.T, o ...TestOption) (*types.Cluster, fu
 
 	cleanup := func() {
 		// Report the test status.
-		reporter.Report(t)
+		reporter.Report(t, recover())
 
 		cleanup1()
 	}
@@ -912,7 +912,7 @@ func (f *Framework) SetupTestExclusive(t *testing.T, o ...TestOption) (*types.Cl
 
 	cleanup := func() {
 		// Report the test status.
-		reporter.Report(t)
+		reporter.Report(t, recover())
 
 		cleanup1()
 	}
@@ -939,13 +939,23 @@ func (f *Framework) SetupTestRemote(t *testing.T, o ...TestOption) (*types.Clust
 
 	cleanup := func() {
 		// Report the test status.
-		reporter.Report(t)
+		reporter.Report(t, recover())
 
 		cleanup1()
 		cleanup2()
 	}
 
 	return cluster1, cluster2, cleanup
+}
+
+func (f *Framework) SetupSubTest(t *testing.T) func() {
+	analyzer.RegisterSubTest(t.Name())
+
+	reporter := analyzer.New()
+
+	return func() {
+		reporter.Report(t, recover())
+	}
 }
 
 // setupCluster takes an allocated cluster and makes a virtual cluster i.e.

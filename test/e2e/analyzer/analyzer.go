@@ -126,6 +126,31 @@ func RegisterTest(suite, test string) {
 	s.testCases = append(s.testCases, test)
 }
 
+// RegisterSubTest finds the parent test, then maps to a specific suite.
+func RegisterSubTest(test string) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	// This is fully qualifed, so will have a TestOperator prefix that needs killing
+	// off.
+	testName := strings.Join(strings.Split(test, "/")[1:], "/")
+
+	for i, testSuite := range testSuites {
+		for _, testCase := range testSuite.testCases {
+			// Perhaps longest path is safest...?
+			if !strings.HasPrefix(testName, testCase) {
+				continue
+			}
+
+			testSuites[i].testCases = append(testSuites[i].testCases, testName)
+
+			return
+		}
+	}
+
+	logrus.Warnf("unable to associate subtest %s with parent test/suite", test)
+}
+
 // result is a type for caching information about a test run.
 type result struct {
 	// runtime is the length of time a test ran for,
@@ -172,7 +197,9 @@ func RecordFailureMessage(t *testing.T, m, s string) {
 type Analyzer interface {
 	// Report must be invoked in a defer statement.  That is the only
 	// place that can catch panics and see the full go testing state.
-	Report(*testing.T)
+	// For some odd reason, you cannot recover from a called function
+	// so this must be invoked there and passed down to the reporter.
+	Report(*testing.T, interface{})
 }
 
 // analyzerImpl realizes the Analyzer interface.
@@ -193,15 +220,13 @@ func New() Analyzer {
 var lock sync.Mutex
 
 // Report submits a test report.
-func (a *analyzerImpl) Report(t *testing.T) {
+func (a *analyzerImpl) Report(t *testing.T, recoverError interface{}) {
 	lock.Lock()
 	defer lock.Unlock()
 
 	r := result{
 		runtime: time.Since(a.start),
 	}
-
-	recoverError := recover()
 
 	var message string
 
@@ -239,7 +264,7 @@ func (a *analyzerImpl) Report(t *testing.T) {
 	// be invoked.  Therefore we only want to key this on the last test name element,
 	// i.e. TestC
 	names := strings.Split(t.Name(), "/")
-	results[names[len(names)-1]] = r
+	results[strings.Join(names[1:], "/")] = r
 }
 
 // accounting is a container for statistics about a collection of tests.
