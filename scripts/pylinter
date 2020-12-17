@@ -2,7 +2,7 @@
 
 set -e 
 
-for f in $(grep -re '^#!.*python' --exclude-dir venv | cut -d : -f 1); do
+for f in $(git ls-tree -r --name-only HEAD | grep -v testrunner | xargs -exec file -i | grep text/x-python | cut -d: -f1); do
   echo "Linting: $f"
   pylint $f
 done

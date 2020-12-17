@@ -5,14 +5,19 @@ pipeline {
 
   environment {
     GOVERSION = '1.13.3'
-    GOROOT = "${env.WORKSPACE}/go"
-    PATH = "${env.WORKSPACE}/go/bin:${PATH}"
+    NODEVERSION = '14.15.4'
+    PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
   }
 
   stages {
     stage('Go Install') {
       steps {
         sh 'wget -q -O- https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz | tar xz'
+      }
+    }
+    stage('Node.js Install') {
+      steps {
+        sh 'wget -q -O- https://nodejs.org/dist/v${NODEVERSION}/node-v${NODEVERSION}-linux-x64.tar.xz | tar xJ'
       }
     }
     stage('Post Checkout') {

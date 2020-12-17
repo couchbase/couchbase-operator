@@ -11,6 +11,8 @@
 /test/e2e/logs/
 /test/e2e/resources/*.yaml
 /test/e2e/resources/suites/TestCustom.yaml
+/node_modules/
+/scripts/build/
 example/crd.yaml
 test/e2e/*.xml
 test/e2e/*.zip

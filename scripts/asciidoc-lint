@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eu -o pipefail
+set -e -o pipefail
 shopt -s inherit_errexit
 
 # FILTER allows us to pre-process the source and discard irrelevant parts.
@@ -54,5 +54,14 @@ done
 if [[ ${FAIL} != "" ]]; then
   echo "Documentation contains errors"
   echo "    run 'aspell check ${CHECK_ARGS}' to fix typos or add to .aspell.en.pws"
+  exit 1
+fi
+
+# Now that your general spelling has been corrected, let's look at syntax...
+npm install
+WARNINGS=$(node_modules/@antora/cli/bin/antora generate scripts/playbook.yaml 2>&1 | sed -e /^.*tabs.*$/d)
+if [[ "${WARNINGS}" != "" ]]; then
+  echo "Asciidoc markup contains errors"
+  echo "${WARNINGS}" | sed 's/^/    /g'
   exit 1
 fi
