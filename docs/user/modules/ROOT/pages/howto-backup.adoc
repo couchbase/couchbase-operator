@@ -91,8 +91,9 @@ They also need write access to Events and the `CouchbaseBackup`/`CouchbaseBackup
 
 To grant these permissions, you can use `cbopcfg` to generate the required resources by running the following command:
 
+[source,console]
 ----
-./bin/cbopcfg -backup true | kubectl create -f -
+$ bin/cbopcfg generate backup | kubectl create -f -
 ----
 
 Without these resources, backup jobs will still run as scheduled, but they will ultimately fail as the pods won't have the required permissions.
