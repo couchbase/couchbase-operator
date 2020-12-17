@@ -30,6 +30,7 @@ spec:
   conflictResolution: lww
   enableFlush: false
   compressionMode: passive
+  minimumDurability: none
   maxTTL: 720h
 ----
 
@@ -105,6 +106,8 @@ spec:
   conflictResolution: lww
   enableFlush: false
   compressionMode: passive
+  minimumDurability: none
+  maxTTL: 720h
 ----
 
 [#spec-name]
@@ -203,6 +206,19 @@ ____
 _Field rules:_ This field is optional and must be either `"off"`, `passive` or `active`.
 Note that Kubernetes uses the https://yaml.org/type/bool.html[YAML 1.1^] specification, so `off` _must_ be in quotes (`"off"`) in order to be interpreted as a string, not a Boolean.
 ____
+
+=== `spec.minimumDurability`
+
+This field defines how durable a document write is by default, and can be made more durable by the client.
+This feature enables ACID transactions.
+
+When `none`, Couchbase server will respond when the document is in memory, it will become eventually consistent across the cluster.
+When `majority`, Couchbase server will respond when the document is replicated to at least half of the pods running the data service in the cluster.
+
+____
+_Field_rules:_ This field must be either `none` or `majority`, defaulting to `none`.
+____
+
 
 === `spec.maxTTL`
 
