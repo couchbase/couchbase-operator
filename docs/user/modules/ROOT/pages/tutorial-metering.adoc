@@ -84,6 +84,7 @@ In the event that your OpenShift installation doesn't provide a storage class, M
 
 Navigate to the *`Metering Configuration`* Custom Resource in the *`Provided APIs`* section of the installed Operator page.
 Click on the *`Create MeteringConfig`* button.
+
 .Create Metering Configuration
 image::metering-create-config.png[]
 
