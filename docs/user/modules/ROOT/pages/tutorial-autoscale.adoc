@@ -1,0 +1,373 @@
+= Autoscaling Couchbase Stateless Services
+
+[abstract]
+A tutorial for autoscaling a Couchbase cluster according to changes on observable metrics.
+
+include::partial$tutorial.adoc[]
+
+== Overview
+
+This tutorial describes how to use the Autonomous Operator for autoscaling the stateless Couchbase query service in order to reduce request latency.
+You will learn more about how the Kubernetes Horizontal Pod Autoscaler initiates a request to scale the Couchbase query service in order to maintain desired performance thresholds.
+
+
+=== Required
+
+The following is required to follow the steps of this tutorial:
+
+* https://helm.sh/docs/intro/install/[Helm version 3.1] or higher is required to install dependencies.
+
+Once helm in installed run the following commands:
+[source,console]
+----
+$ helm repo add couchbase https://couchbase-partners.github.io/helm-charts/
+$ helm repo update
+----
+
+
+== Installing Couchbase
+
+Autoscaling is only supported by Couchbase clusters with stateless server configurations.
+A server configuration is considered stateless when the following conditions are met:
+
+. All buckets are defined as ephemeral buckets using the `CouchbaseEphemeralBucket` resource.
+. At least one group of servers is configured to run only the `query` service.
+
+The helm chart can be used to quickly get started with a Couchbase which meets the stateless service requirements.
+Create the following override values to use with the Operator Helm Chart:
+
+[source,console]
+----
+$ cat << EOF >> autoscale_values.yaml
+---
+cluster:
+  enablePreviewScaling: false <.>
+  name:
+  monitoring:
+    prometheus:
+      enabled: true  <.>
+  servers:
+    default:
+      size: 3
+      services:
+        - data
+        - index
+    query:
+      size: 2
+      autoscaleEnabled: true <.>
+      services:
+        - query
+    search:
+      size: 2
+      services:
+        - search
+        - analytics
+        - eventing
+users:
+  developer:
+    password: password
+    authDomain: local
+    roles:
+      - name: admin
+
+buckets:
+  default:
+    name: travel-sample
+    kind: CouchbaseEphemeralBucket <.>
+    evictionPolicy: nruEviction
+EOF
+----
+
+Install the Operator Chart with autoscale enabled:
+[source,console]
+----
+$ helm install -f autoscale_values.yaml scale couchbase/couchbase-operator
+----
+
+
+<.> `enablePreviewScaling` is disabled here, restricting autoscaling functionality to service running the query service.
+<.> Prometheus monitoring is enabled to allow the Horizontal Pod Autoscaler to monitor Couchbase metrics.
+<.> `autoscaleEnabled` is set to true to allow autoscaling of the associated Couchbase servers.
+The Couchbase servers within this configuration are stateless since they contains only the query service.
+<.> All buckets must be ephemeral in order for autoscaling to be performed on the enabled servers.
+
+[NOTE]
+====
+In order to autoscale stateful services such as data and index, along with non-ephemeral buckets, `enablePreviewScaling` must be set to `true`.
+Also be aware that this configuration is unsupported, see xref:concep-couchbase-autoscaling.adoc[Couchbase Autoscaling] conceptual documentation.
+====
+
+=== Verify Installation
+
+Creation of the Couchbase Cluster can take a few minutes.
+Wait for the cluster creation to complete by checking the `CouchbaseCluster` status:
+[source, console]
+----
+$ kubectl describe couchbasecluster scale-couchbase-cluster
+
+Events:
+  Type    Reason                  Age   From  Message
+  ----    ------                  ----  ----  -------
+	...
+  Normal  EventAutoscalerCreated  22m         Autoscaler for config `query` added <.>
+  Normal  UserCreated             22m         A new user `developer` was created
+----
+<.> Status will show that a `CouchbaseAutoscaler` resource is created for the query configuration.
+
+Verify that the `CouchbaseAutoscaler` exists and matches the size of its associated server configuration:
+[source, console]
+----
+$ kubectl get couchbaseautoscalers
+NAME                            SIZE   SERVERS
+query.scale-couchbase-cluster   2      query
+----
+
+The Autonomous Operator automatically creates a `CouchbaseAutoscaler` resources for each server configuration with `autoscaleEnabled` set to `true` and keeps the size of the `CouchbaseAutoscaler` resource in sync with the size of its associated server configuration.
+
+
+=== Opening the Administrator Console
+
+Check the status of the helm chart to get username and password of the Couchbase Cluster:
+[source, console]
+----
+$ helm status scale
+
+== Connect to Admin console
+   kubectl port-forward --namespace default scale-couchbase-cluster-0000 8091:8091
+
+   # open http://localhost:8091
+   username: Administrator
+   password: <redacted>
+----
+
+== Installing a Monitoring Stack
+
+Couchbase resource metrics are collected by the Prometheus adapter and passed to Kubernetes customer metrics API for consumption by the Horizontal Pod Autoscaler.
+
+Install the Couchbase monitoring chart which provides Prometheus and a Custom Metrics `APIServer`:
+[source,console]
+----
+$ helm install --set clusterName=scale-couchbase-cluster monitor \ <.>
+couchbase/couchbase-monitor-stack
+----
+<.> `clusterName` is the name of the `CouchbaseCluster` resource from the previous installation section.
+
+=== Verify Monitoring
+
+Verify that Couchbase metrics are being collected by the custom metrics API server.
+The following command will return the values of the `cbquery_requests_1000ms` for each Pod.
+[source,console]
+----
+$ kubectl get --raw="/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/pods/*/cbquery_requests_1000ms" | jq .
+
+{
+  "kind": "MetricValueList",
+  "apiVersion": "custom.metrics.k8s.io/v1beta1",
+	...
+      "metricName": "cbquery_requests_1000ms",
+      "value": "0",
+      "selector": null
+  ...
+----
+
+This query is also helpful for debugging as the Horizontal Pod Autoscaler takes the averages of these values when making autoscaling decisions.
+Also, any metric may be provided in place of the `cbquery_requests_1000ms` metric.
+
+== Creating a Horizontal Pod Autoscaler
+
+Now that metrics are being collected on the `cbquery_requests_1000ms` metric, you can create a `HorizontalPodAutoscaler` resource with target value for this metric.
+
+The following creates a `HorizontalPodAutoscaler` that will take action when queries with a latency of 1000ms exceed *7* (per second).
+Also, if the number of queries fall below this value then the autoscaler will consider scaling down to reduce overhead.
+
+[source,console]
+----
+$ cat << EOF | kubectl create -f -
+---
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta2
+metadata:
+  name: query-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: couchbase.com/v2
+    kind: CouchbaseAutoscaler <.>
+    name: query.scale-couchbase-cluster <.>
+  # autoscale between 2 and 6 replicas
+  minReplicas: 2 <.>
+  maxReplicas: 6
+  metrics:
+  - type: Pods
+    pods:
+      metric:
+        name: cbquery_requests_1000ms <.>
+      target:
+        type: AverageValue <.>
+        averageValue: 7000m <.>
+EOF
+horizontalpodautoscaler.autoscaling/query-hpa created
+----
+<.> The target ref is set to the `CouchbaseAutoscaler` kind created by the Operator.
+<.> The name of the `CouchbaseAutoscaler` resource being referenced.
+<.> `minReplicas` sets the minimum number of query nodes.
+<.> Targeting Couchbase metric for number of requests which exceed 1000ms.
+<.> `AverageValue` type means that the metric will be averaged across all of the Pods.
+<.> Setting *7* queries at 1000ms as an operational baseline.
+
+Details about how sizing decisions are made are discussed in the xref:concep-couchbase-autoscaling.adoc[Couchbase Autoscaling] conceptual documentation.
+
+=== Verify `HorizontalPodAutoscaler` status
+
+The `HorizontalPodAutoscaler` will begin to monitor the target metric and report that the initial size of the query servers are within desired range.
+[source, console]
+----
+$ kubectl describe hpa query-hpa
+
+Metrics:                              ( current / target )
+  "cbquery_requests_1000ms" on pods:  0 / 7  <.>
+Min replicas:                         2
+Max replicas:                         6
+CouchbaseAutoscaler pods:             2 current / 2 desired  <.>
+Conditions:
+  Type            Status  Reason               Message
+  ----            ------  ------               -------
+  ...
+  ScalingLimited  False   DesiredWithinRange   the desired count is within the acceptable range
+----
+<.> There are currently 0 queries with latency above 1000ms, and the target is *7* queries.
+<.> There are currently 2 query nodes in the cluster, and 2 are desired to maintain the current target.
+
+
+== Generating a Workload
+
+Now we will load some data into the Couchbase cluster and then query the documents.
+We will use a Kubernetes Job to install the sample travel data set provided by the `cbdocloader` tool:
+[source, console]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: travel-sample-dataset
+spec:
+  template:
+    spec:
+      containers:
+      - name: travel-sample
+        image: couchbase/server:6.6.0
+        command: ["/opt/couchbase/bin/cbdocloader",
+                  "-c", "scale-couchbase-cluster-0000.default.svc",
+                  "-u", "developer", "-p", "password",
+                  "-b" ,"travel-sample",
+                  "-m", "100",
+                  "-d", "/opt/couchbase/samples/travel-sample.zip"]
+      restartPolicy: Never
+EOF
+job.batch/travel-sample-dataset
+----
+
+Check the Administrator Console to ensure that the data set is being loaded.
+You should also see that indexes are created for querying the documents.
+
+=== Apply Query Workload
+
+Now that travel sample data is loaded and indexed, the data set can be queries in order to generate query latencies that should trigger an autoscale operator to occur.
+At this point any tool an be used to apply stress on the query services.
+For this tutorial we will use an experimental tool called `n1qlgen` which applies stress for a set duration:
+[source, console]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: n1qlgen-1
+spec:
+  template:
+    spec:
+      containers:
+      - name: n1qlgen
+        image: tahmmee/n1qlgen
+        imagePullPolicy: Always
+        command: ["/go/bin/n1qlgen",
+                  "-pod=scale-couchbase-cluster-0003", <.>
+                   "-cluster=scale-couchbase-cluster",
+                   "-bucket=travel-sample",
+                   "-username=developer",
+                   "-password=password",
+                   "-duration=600", "-concurrency=20", <.>
+                   "-seed=1234"] <.>
+      restartPolicy: Never
+EOF
+job.batch/n1qlgen-1 created
+----
+<.> Name of one of the query Pods within the cluster.
+<.> `duration` and `concurrency` can be used to adjust workload stress.
+<.> `seed` adjusts randomness for running multiple jobs.
+
+
+=== Verify Autoscaling
+
+Latency of the query requests should increase as the query generation tool applies stress to the cluster.
+Watch the Horizontal Pod Autoscaler as it monitors the target metric:
+[source, console]
+----
+$ kubectl get hpa -w
+NAME        REFERENCE                        TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
+query-hpa   CouchbaseAutoscaler/query.scale  0/7       2         6         2          27m
+query-hpa   CouchbaseAutoscaler/query.scale  3503m/7   2         6         2          31m
+query-hpa   CouchbaseAutoscaler/query.scale  10978m/7  2         6         4          32m <.>
+query-hpa   CouchbaseAutoscaler/query.scale  7251m/7   2         6         4          32m
+----
+<.> The Horizontal Pod Autoscaler detected 10978m (approx. *10*) queries per second which exceeds *7* and scales up from *2* to *4*.
+
+The following https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#algorithm-details[scaling algorithm] was applied by the Horizontal Pod Autoscaler to determine the desired replicas:
+[source, console]
+----
+desiredReplicas = ceil[currentReplicas * ( currentMetricValue / desiredMetricValue )]
+              4 = ceil[       2        * (      10.978        /     7.0            )]
+----
+
+See also the `HorizontalPodAutoscaler` status for additional information:
+[source, console]
+----
+$ kubectl describe hpa query-hpa
+----
+
+[source, console]
+----
+$ kubectl get cba
+NAME                            SIZE   SERVERS
+query.scale-couchbase-cluster   4      query
+----
+
+Note that you will very likely do some experimentation before settling on a target value that make sense for your workload objectives.
+In the example here, the target value is a bit low and this causes scaling up to happen quickly.
+In this case, the target value could be increased to a higher value.
+Nevertheless, the purpose of choosing this value is to demonstrate behavior of the autoscaler.
+[NOTE]
+====
+If your query latency does not reach the target value, you can try with a lower value, or apply additional query generators by adjusting the `concurrency` and `seed` value.
+====
+
+After 5 minutes the query generator will complete and the query nodes will eventually scale back down to the 2 node minimum.
+
+=== Cleaning up
+
+The following commands will uninstall all of the resources created by this tutorial:
+[source, console]
+----
+# remove workload jobs
+kubectl delete jobs travel-sample-dataset n1qlgen-1
+# delete hpa
+kubectl delete hpa query-hpa
+# uninstall monitoring stack
+helm delete monitor
+# uninstall Couchbase Operator and cluster
+helm delete scale
+----
+
+== Further Reading
+
+* xref:concept-couchbase-autoscaling.adoc[Couchbase Cluster Autoscaling] concept documentation.
