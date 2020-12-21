@@ -31,7 +31,7 @@ COPY --from=official /usr/local/bin/couchbase-operator-admission /usr/local/bin/
 
 To build and tag the image run the following:
 
-[source,shell,subs="attributes"]
+[source,console,subs="attributes"]
 ----
 $ docker build . -t my-company/couchbase-operator-admission:{operator-version}
 ----
@@ -58,7 +58,7 @@ e for simplicity.
 
 To build and tag the image run the following:
 
-[source,shell,subs="attributes"]
+[source,console,subs="attributes"]
 ----
 $ docker build . -t my-company/couchbase-operator:{operator-version}
 ----
@@ -70,7 +70,8 @@ You may use any combination of tag you wish.
 When installing the Operator with xref:reference-cbopcfg.adoc[`cbopcfg`] you can specify the images to use.
 Consider the following command that uses the images we created in the prior steps:
 
-[source,shell,subs="attributes"]
+[source,console,subs="attributes"]
 ----
-$ cbopcfg -operator-image my-company/couchbase-operator:{operator-version} -dynamic-admission-controller-image my-company/couchbase-operator-admission:{operator-version} | kubectl create -f -
+$ cbopcfg generate admission --image my-company/couchbase-operator-admission:{operator-version} | kubectl create -f -
+$ cbopcfg generate operator --image my-company/couchbase-operator:{operator-version} | kubectl create -f -
 ----

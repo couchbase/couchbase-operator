@@ -170,19 +170,19 @@ To create configuration to run the operator in the `default` namespace.
 
 [source,console]
 ----
-$ cbopcfg operator | kubectl create -f -
+$ cbopcfg generate operator | kubectl create -f -
 ----
 
 To create a configuration file:
 
 [source,console]
 ----
-$ cbopcfg operator > operator.yaml
+$ cbopcfg generate operator > operator.yaml
 ----
 
 To create configuration to run on Red Hat OpenShift:
 
 [source,console]
 ----
-$ cbopcfg operator --namespace myproject --image-pull-secret my-redhat-docker-credentials > operator.yaml
+$ cbopcfg generate operator --namespace myproject --image-pull-secret my-redhat-docker-credentials > operator.yaml
 ----

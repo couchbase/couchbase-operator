@@ -31,7 +31,7 @@ For this tutorial we will install the dynamic admission controller (DAC) in the 
 
 [source,console]
 ----
-$ cbopcfg --namespace default -no-operator | kubectl create -n default -f -
+$ cbopcfg -n default generate admission | kubectl create -f -
 serviceaccount/couchbase-operator-admission created
 clusterrole.rbac.authorization.k8s.io/couchbase-operator-admission created
 clusterrolebinding.rbac.authorization.k8s.io/couchbase-operator-admission created
@@ -52,7 +52,7 @@ namespace/test created
 
 [source,console]
 ----
-$ ./build/bin/cbopcfg --namespace test -no-admission | kubectl create -n test -f -
+$ cbopcfg -n test generate operator | kubectl create -f -
 serviceaccount/couchbase-operator created
 role.rbac.authorization.k8s.io/couchbase-operator created
 rolebinding.rbac.authorization.k8s.io/couchbase-operator created
