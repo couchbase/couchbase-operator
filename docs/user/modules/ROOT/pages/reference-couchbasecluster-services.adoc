@@ -1,4 +1,4 @@
-= CouchbaseCluster Services
+= `CouchbaseCluster` Services
 :page-aliases: services
 
 When creating a Couchbase cluster the Operator is responsible for creating services to allow various functionality.  This documents what they are and what they are used for.

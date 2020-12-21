@@ -34,7 +34,7 @@ This depends on your specific deployment configuration.
 If the pods belong to the same cluster, they may need to be manually failed over via the xref:howto-ui.adoc[Couchbase Web Console] in order for the Operator to recover and rebalance.
 
 The Operator itself is a stateless application typically managed by a https://kubernetes.io/docs/concepts/workloads/controllers/deployment/[Deployment^].
-When an Operator pod is evicted, the Deployment controller will automatically recreate a replacement pod that will begin managing _CouchbaseCluster_ resources in its name space.
+When an Operator pod is evicted, the Deployment controller will automatically recreate a replacement pod that will begin managing `CouchbaseCluster` resources in its name space.
 
 == Preparation for Upgrade
 

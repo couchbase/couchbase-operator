@@ -1,4 +1,4 @@
-= CouchbaseUser Resource
+= `CouchbaseUser` Resource
 
 :toc: macro
 
@@ -10,7 +10,7 @@ Users are decoupled from this configuration and are selected for inclusion withi
 The following YAML shows all possible fields that may be configured for a `CouchbaseUser`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseUser configuration parameters
+.All available `CouchbaseUser` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -68,7 +68,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____

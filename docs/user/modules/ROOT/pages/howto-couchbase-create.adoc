@@ -17,11 +17,11 @@ IMPORTANT: After you unpack the download, the resulting directory will be titled
 
 == Preparing the Couchbase Cluster Configuration
 
-To deploy a Couchbase Server cluster using the Operator, all you have to do is create a xref:reference-couchbasecluster.adoc[CouchbaseCluster] configuration file that describes what you want the cluster to look like (e.g. number of nodes, types of services, system resources, etc), and then push that configuration file into Kubernetes. Like all Kubernetes configurations, a CouchbaseCluster is defined using either YAML or JSON (YAML is preferred by Kubernetes).
+To deploy a Couchbase Server cluster using the Operator, all you have to do is create a xref:reference-couchbasecluster.adoc[`CouchbaseCluster`] configuration file that describes what you want the cluster to look like (e.g. number of nodes, types of services, system resources, etc), and then push that configuration file into Kubernetes. Like all Kubernetes configurations, a `CouchbaseCluster` is defined using either YAML or JSON (YAML is preferred by Kubernetes).
 
-The Operator package contains an example CouchbaseCluster configuration file (`couchbase-cluster.yaml`), also listed here:
+The Operator package contains an example `CouchbaseCluster` configuration file (`couchbase-cluster.yaml`), also listed here:
 
-.Example CouchbaseCluster Configuration for open source Kubernetes (`couchbase-cluster.yaml`)
+.Example `CouchbaseCluster` Configuration for open source Kubernetes (`couchbase-cluster.yaml`)
 [source,yaml,subs="attributes,verbatim"]
 ----
 apiVersion: v1
@@ -73,7 +73,7 @@ By taking a quick look at this configuration file, you can see that it defines a
 <.> Couchbase image: `couchbase/server:{couchbase-version}`
 <.> Size: 3-node cluster with all services on each node
 
-You can use this example CouchbaseCluster configuration file "as-is" to test out how the Operator deploys a Couchbase Server cluster. However, to deploy a Couchbase cluster that is more specifically tailored to your development and production needs, you need to create your own custom configuration file that conforms to the xref:reference-couchbasecluster.adoc[CouchbaseCluster specification].
+You can use this example `CouchbaseCluster` configuration file "as-is" to test out how the Operator deploys a Couchbase Server cluster. However, to deploy a Couchbase cluster that is more specifically tailored to your development and production needs, you need to create your own custom configuration file that conforms to the xref:reference-couchbasecluster.adoc[`CouchbaseCluster` specification].
 
 
 [TIP]
@@ -92,7 +92,7 @@ $ minikube start --cpus 2 --memory 8192
 
 == Deploying the Couchbase Cluster
 
-The next step after creating the CouchbaseCluster configuration file is to push it to Kubernetes. To push the configuration, run the following command:
+The next step after creating the `CouchbaseCluster` configuration file is to push it to Kubernetes. To push the configuration, run the following command:
 
 [{tabs}]
 ====

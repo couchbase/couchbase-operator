@@ -57,7 +57,7 @@ Modifying the Couchbase Server version during an upgrade is permitted only if th
 == Upgrading Pods
 
 In Kubernetes pods are immutable -- they cannot be modified once they are created.
-If a CouchbaseCluster configuration value is modified that would also modify the underlying pod, then the Operator must create a new pod to replace the old one that does not match the required specification.
+If a `CouchbaseCluster` configuration value is modified that would also modify the underlying pod, then the Operator must create a new pod to replace the old one that does not match the required specification.
 Pod upgrades work in exactly the same way as an upgrade to the Couchbase Server version; in fact upgrading the Couchbase Server image is just a subset of modifying any other pod specification parameter.
 
 The Operator compares the required pod specification with the one used to create the original pod, a candidate is selected if the specifications differ.

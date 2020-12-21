@@ -1,4 +1,4 @@
-= CouchbaseMemcachedBucket Resource
+= `CouchbaseMemcachedBucket` Resource
 
 :toc: macro
 
@@ -10,7 +10,7 @@ Buckets are decoupled from this configuration and are selected for inclusion wit
 The following YAML shows all possible fields that may be configured for a `CouchbaseMemcachedBucket`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseMemcachedBucket configuration parameters
+.All available `CouchbaseMemcachedBucket` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -63,7 +63,7 @@ ____
 The metadata name defines the name of the resource, and is used as the bucket name by default.
 The name must be unique for the kind defined.
 Furthermore the name must be unique for all bucket kinds defined and used by the cluster.
-For example you cannot have a `CouchbaseMemcachedBucket` named "default" and a CouchbaseBucket also named "default".
+For example you cannot have a `CouchbaseMemcachedBucket` named "default" and a `CouchbaseBucket` also named "default".
 
 Like other Kubernetes resource names, the metadata name is restricted to the character limits of https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names[DNS label names^].
 This means that this field cannot accept the full character set that Couchbase supports for bucket names.
@@ -75,7 +75,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____

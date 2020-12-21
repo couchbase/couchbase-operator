@@ -1,4 +1,4 @@
-= CouchbaseBucket Resource
+= `CouchbaseBucket` Resource
 
 :toc: macro
 
@@ -11,7 +11,7 @@ They may be used for cross data center replication (XDCR).
 The following YAML shows all possible fields that may be configured for a `CouchbaseBucket`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseBucket configuration parameters
+.All available `CouchbaseBucket` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -30,6 +30,7 @@ spec:
   enableFlush: false
   enableIndexReplica: true
   compressionMode: passive
+  minimumDurability: none
   maxTTL: 720h
 ----
 
@@ -71,7 +72,7 @@ ____
 The metadata name defines the name of the resource, and is used as the bucket name by default.
 The name must be unique for the kind defined.
 Furthermore the name must be unique for all bucket kinds defined and used by the cluster.
-For example you cannot have a `CouchbaseBucket` named "default" and a CouchbaseEphemeralBucket also named "default".
+For example you cannot have a `CouchbaseBucket` named "default" and a `CouchbaseEphemeralBucket` also named "default".
 
 Like other Kubernetes resource names, the metadata name is restricted to the character limits of https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names[DNS label names^].
 This means that this field cannot accept the full character set that Couchbase supports for bucket names.
@@ -83,7 +84,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources and RBAC page].
 
 ____
@@ -106,6 +107,8 @@ spec:
   enableFlush: false
   enableIndexReplica: true
   compressionMode: passive
+  minimumDurability: none
+  maxTTL: 720h
 ----
 
 [#spec-name]
@@ -211,6 +214,20 @@ This parameter defaults to `passive` if not specified.
 ____
 _Field rules:_ This field is optional and must be either `"off"`, `passive` or `active`.
 Note that Kubernetes uses the https://yaml.org/type/bool.html[YAML 1.1^] specification, so `off` _must_ be in quotes (`"off"`) in order to be interpreted as a string, not a Boolean.
+____
+
+=== `spec.minimumDurability`
+
+This field defines how durable a document write is by default, and can be made more durable by the client.
+This feature enables ACID transactions.
+
+When `none`, Couchbase server will respond when the document is in memory, it will become eventually consistent across the cluster.
+When `majority`, Couchbase server will respond when the document is replicated to at least half of the pods running the data service in the cluster.
+When `majorityAndPersistActive`, Couchbase server will respond when the document is replicated to at least half of the pods running the data service in the cluster and the document has been persisted to disk on the document master pod.
+When `persistToMajority`, Couchbase server will respond when the document is replicated and persisted to disk on at least half of the pods running the data service in the cluster.
+
+____
+_Field_rules:_ This field must be either `none`, `majority`, `majorityAndPersistActive` or `persistToMajority`, defaulting to `none`.
 ____
 
 === `spec.maxTTL`

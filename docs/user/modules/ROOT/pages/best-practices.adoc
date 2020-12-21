@@ -84,7 +84,7 @@ They will be automatically deleted due to a user initiated action e.g. scaling t
 [IMPORTANT]
 ====
 Production clusters may now be deployed as combination of _Production Stateful_ and _Production Stateless_ node deployments, depending on the services running on the individual server class configurations.
-The `default` and `logs` mounts in the CouchbaseCluster configuration are mutually exclusive — if any server class is detected by the cluster validation to be supportable (e.g. `default` or `logs` is specified under `volumeMounts`), then all other server classes must also have supportable configurations in order for the validation check to pass.
+The `default` and `logs` mounts in the `CouchbaseCluster` configuration are mutually exclusive — if any server class is detected by the cluster validation to be supportable (e.g. `default` or `logs` is specified under `volumeMounts`), then all other server classes must also have supportable configurations in order for the validation check to pass.
 ====
 
 It is also highly recommended that in cloud deployments, storage be located in the same data center as the pods that are running in that server group.

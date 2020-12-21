@@ -1,0 +1,302 @@
+= Couchbase Cluster Autoscaling
+
+[abstract]
+The Autonomous Operator is capable of autoscaling a cluster based on observable metrics.
+Couchbase autoscaling works in conjunction with Kubernetes `HorizontalPodAutoscaler`.
+You will need to be aware of how metrics are monitored by `HorizontalPodAutoscaler` and applied to `CouchbaseAutoscaler` to ensure stable operation.
+
+.Overview Autoscaling
+image::autoscale-overview.png[]
+
+
+== Enabling Couchbase Autoscaling
+
+Autoscaling is only supported by Couchbase clusters with stateless server configurations.
+A server configuration is considered stateless when the following conditions are met:
+
+. All buckets are defined as ephemeral buckets using the `CouchbaseEphemeralBucket` resource.
+. At least one group of servers is configured to run only the `query` service.
+
+The following defines a set of `query` services that can be autoscaled:
+
+[source,yaml]
+----
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  servers:
+    - size: 2
+      name: data
+      services:
+        - data
+        - index
+    - size: 3
+      name: query
+      services:
+        - query <.>
+      autoscaleEnabled: true <.>
+----
+
+<.> Configurations with *only* the stateless `query` service are permitted to autoscale.
+<.> `autoscaleEnabled` must be to `true` to enable autoscaling of query service nodes.
+
+NOTE: All buckets associated with the cluster must be defined as `CouchbaseEphemeralBucket` resources.
+
+=== Preview Autoscaling Mode
+
+Autoscaling can be enabled in a preview mode for services other than `query` along with buckets other than `CouchbaseEphemeralBucket`.
+Set `enablePreviewScaling` to `true` within the `CouchbaseCluster` resource to enable preview scaling mode.
+
+[source,yaml]
+----
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  enablePreviewScaling: true <.>
+  servers:
+    - size: 3
+      name: data
+      services:
+        - data
+        - index
+      autoscaleEnabled: true <.>
+----
+
+<.> Enabling preview scaling mode to allow autoscaling of stateful services
+<.> Autoscaling is now allowed for `data` and `index` services
+
+
+[WARNING]
+====
+Enabling preview autoscaling is unsupported and for experimental purposes only.
+While preview autoscaling is powerful it should be used with caution as it may increase resource usage at exactly the time Couchbase is under pressure for resources, impacting service levels.
+Furthermore, Couchbase cannot be stopped while rebalance operations are being performed in an attempt to maintain service levels.
+Therefore, when enabling preview autoscaling, much consideration should be given to the way an observed metric behaves during cluster topology changes.
+
+====
+
+== How Autoscaling Works
+The Autonomous Operator will create a  `CouchbaseAutoscaler` resource for each server configuration with `autoscaleEnabled` set to `true`.
+Once created, the Operator will keep the size of the `CouchbaseAutoscaler` resource in sync with the size of its associated server configuration.
+
+.Autoscale Resource
+image::autoscale-crd.png[]
+
+The size of a `CouchbaseAutoscaler` resource is then adjusted by a Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/[Horizontal Pod Autoscaler^] when target metric values are reached.
+Couchbase is then autoscaled as changes to a `HorizontalPodAutoscaler` are propagated through the associated `CouchbaseAutoscaler`.
+
+.Autoscale Apply
+image::autoscale-crd-hpa.png[]
+
+
+=== Managed Autoscale Resources
+
+The Operator creates `CouchbaseAutoscale` based on the name of its associated server configuration along with the name of the Couchbase cluster.
+For example, a server configuration named `query` will result in a `CouchbaseAutoscale` resource named `query.cb-example`.
+
+
+As with all Custom resources, `CouchbaseAutoscale` resources can be listed with `kubectl`:
+
+[source,shell]
+----
+$ kubectl get couchbaseautoscalers
+----
+
+[IMPORTANT]
+====
+The `CouchbaseAutoscaler` resources are fully managed by the Autonomous Operator and should not be manually created or deleted.
+====
+
+==== scale subresource
+
+The `CouchbaseAutoscaler` implements the Kubernetes https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#scale-subresource[Scale subresource] which allows the `CouchbaseAutoscaler` to be used as a target reference for `HorizontalPodAutoscaler` resources.
+Implementing the `/scale` subresource allows `CouchbaseAutoscaler` resources to perform similar resizing operations as native Kubernetes deployments.
+Therefore, manual scaling is also possible using `kubectl`:
+
+[source, shell]
+----
+$ kubectl scale --replicas=6 query.cb-example
+----
+
+The above command results in scaling the server configuration named `query` to a size of 6.
+The Autonomous Operator monitors the value of `CouchbaseAutoscaler.spec.size` and applies the value as `spec.servers[].size` to the associated server configuration.
+
+== Exporting Metrics
+
+Couchbase Autoscaling can be performed based on target values of observed metrics.
+Metrics can be collected from from either the resource metrics API, or the custom metrics API.
+
+
+=== Exposing Resource Metrics
+
+The resource metrics API exposes resource metrics such as `cpu` and `memory` values from Pods and Nodes.
+The resource metrics are provided by the metrics-server and may need to be launched as a cluster add-on.
+Run the following command to verify that your cluster is capable of performing autoscaling based on resource metrics:
+[source,shell]
+----
+$ kubectl get --raw /apis/metrics.k8s.io/v1beta1
+----
+
+The response should contain an `APIResourceList` with the type of resources that can be fetched.
+If you receive a `NotFound` error then you will need to https://github.com/kubernetes-sigs/metrics-server#installation[install the metrics-server], if you plan on performing autoscaling based on values from the resource metrics API.
+
+
+=== Exposing Couchbase Metrics
+
+Couchbase Metrics can be exposed through the custom metrics API.
+The custom metrics API exposes 3rd-party metrics to the Kubernetes API server.
+For Couchbase Autoscaling, this means that Couchbase metrics related to memory quota and query latency can be used as targets to determine when autoscaling should occur.
+Run the following command to verify that your cluster is capable of performing autoscaling based on custom metrics:
+[source,shell]
+----
+$ kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1
+----
+
+[NOTE]
+The Couchbase cluster needs to running with `monitoring.prometheus.enabled: true` in order for Couchbase metrics to be collected by the custom metrics API service.
+
+If you receive a `NotFound` error then you will need to install a custom metrics service.
+The recommended custom metrics service to use with the Operator is the https://github.com/DirectXMan12/k8s-prometheus-adapter[Prometheus Adapter] since the metrics are being exported Prometheus.
+
+== Connecting Horizontal Pod Autoscaler
+
+The Horizontal Pod Autoscaler is a central component to autoscaling as it that observes target metrics and sends sizing requests to the `CouchbaseAutoscaler`.
+As mentioned previously, sizing requests from the Horizontal Pod Autoscaler propagate to Couchbase Server configurations.
+
+.`HPA` Workflow
+image::autoscale-hpa-connection.png[]
+
+To Connect a `HorizontalPodAutoscaler` resource to a `CouchbaseAutoscaler` resource, the `scaleTargetRef` value must be set within https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#horizontalpodautoscalerspec-v2beta2-autoscaling[`HorizontalPodAutoscalerSpec`].
+
+[source,yaml]
+----
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta2
+metadata:
+  name: query-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: couchbase.com/v2
+    kind: CouchbaseAutoscaler <.>
+    name: query.cb-example <.>
+----
+
+<.> The target ref kind is set to `CouchbaseAutoscaler` which implements the `/scale` API.
+<.> The name of the `CouchbaseAutoscaler` resource being referenced.
+
+=== Target Metrics
+
+The Horizontal Pod Autoscaler is capable of targeting any metric exposed to the Kubernetes API.
+As discussed previously, these metrics can originate from the resource metric server or custom metric server.
+When using custom metrics for performing autoscaling based on Couchbase Server metrics, the discovery of available metrics can be performed through Prometheus queries and is beyond the scope of this document.
+An alternative method of discovery is to check the https://github.com/couchbase/couchbase-exporter/blob/0953a39f96ae4a98059920de846ab9f5f19474de/pkg/objects/query.go#L25[couchbase exporter repository] for the names of the metrics being exported (remember to include the `cb` prefix to name of the metric).
+
+The following example shows how to define target values around the `cbquery_requests_1000ms` metric as an objective for performing Autoscale operations:
+
+----
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta2
+metadata:
+  name: query-hpa
+  metrics:
+  - type: Pods
+    pods:
+      metric:
+        name: cbquery_requests_1000ms <.>
+      target:
+        type: AverageValue <.>
+        averageValue: 7 <.>
+----
+
+<.> Targeting Couchbase metric for number of requests which exceed 1000ms.
+<.> `AverageValue` type means that the metric will be averaged across all of the Pods.
+<.> Setting 7 queries at 1000ms as an operational baseline.
+
+In the above example, the autoscaler will take action when queries with a latency of 1000ms exceed 7 (per second).
+Also, if the number of queries fall below this value then the autoscaler will consider scaling down to reduce overhead.
+Details about how sizing decisions are made are discussed in the following section.
+
+=== Sizing Constraints
+
+The Horizontal Pod Autoscaler applies constraints to the sizing values that are allowed to be propagated to the `CouchbaseAutoscaler`.
+Specifically, defining `minReplicas` and `maxReplicas` within the `HorizontalPodAutoscalerSpec` sets lower and upper boundaries for autoscaling.
+
+[source,yaml]
+----
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta2
+metadata:
+  name: query-hpa
+spec:
+  ...
+  minReplicas: 1
+  maxReplicas: 6
+----
+
+When the Horizontal Pod Autoscaler detects that a metric is relatively above or below a target value, the requested number of replicas will never fall beyond the set boundary for min or max replicas.
+Refer to the  https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#algorithm-details[algorithm details] of the Horizontal Pod Autoscaler for information about how scaling decisions are determined.
+
+
+=== Sizing Policies
+
+Additional control over autoscaling decisions are available in Kubernetes `v1.18` through the `behavior` field of the `HorizontalPodAutoscalerSpec`.
+There are several supported policies such as stabilization windows along with scale up and down disabling and rate of change control.
+
+For example to prevent scaling down:
+[source,yaml]
+----
+behavior:
+  scaleDown:
+    selectPolicy: Disabled
+----
+
+Refer to Kubernetes documentation for additional examples and information related to https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#scaling-policies[scaling policies].
+
+
+=== Example Specification
+
+The following is a complete example of a `HorizontalPodAutoscaler` which incorporates all the ideas of the previous section.
+You will need to edit this according to the name of your server configuration and cluster.
+
+[source,yaml]
+----
+---
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta2
+metadata:
+  name: query-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: couchbase.com/v2
+    kind: CouchbaseAutoscaler
+    name: query.cb-example
+  # autoscale between 1 and 6 replicas
+  minReplicas: 1
+  maxReplicas: 6
+  metrics:
+  - type: Pods
+    pods:
+      metric:
+        name: cbquery_requests_1000ms
+      target:
+        type: AverageValue
+        averageValue: 7000m
+----
+
+== Including Cluster Autoscaler
+
+Kubernetes Cluster Autoscaler provides a means to autoscale the underlying Kubernetes nodes.
+Cluster Autoscaling is highly recommended for production deployments as it adds an additional dimension of scalability for adding and removing Pods since the underlying physical hardware is being scaled alongside of the Couchbase Cluster.
+Also, since production deployments tend to schedule Pods with specific resource limits and requests with performance expectations, Cluster Autoscaling allow for 1 to 1 matching of node with the underlying resources without concern that Node is sharing resources with several Pods.
+
+Several cloud offerings such as EKS and AKS offer Cluster Autoscaling with their Kubernetes Offerings.
+Couchbase Autoscaling will work with Cluster Autoscaling without any additional configuration.
+As the Horizontal Pod Autoscaler requests additional Couchbase Pods, resource pressure will be applied (or removed) from Kubernetes, and Kubernetes will automatically add (or remove) the number of required physical nodes.
+
+Refer to the following documentation for additional information about Cloud Providers which offer https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler#faqdocumentation[Cluster Autoscaling] and how to configure it for your environment.

@@ -172,7 +172,7 @@ With this method, the Autonomous Operator takes care of creating the relevant Sy
 ==== Enabling RBAC Management
 
 RBAC security management on the Couchbase Server cluster defaults to `false`.
-This is the relevant snippet that would need to be added or modified in your xref:reference-couchbasecluster.adoc[CouchbaseCluster] configuration:
+This is the relevant snippet that would need to be added or modified in your xref:reference-couchbasecluster.adoc[`CouchbaseCluster`] configuration:
 
 [source,yaml]
 ----

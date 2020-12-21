@@ -25,6 +25,7 @@
  ** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
  ** xref:concept-sizing.adoc[Couchbase Sizing]
  ** xref:concept-vertical-scaling.adoc[Couchbase Cluster Vertical Scaling]
+ ** xref:concept-couchbase-autoscaling.adoc[Couchbase Cluster AutoScaling]
  ** xref:concept-couchbase-networking.adoc[Couchbase Networking]
  ** xref:concept-tls.adoc[Couchbase TLS]
  ** xref:concept-credential-rotation.adoc[Couchbase Credential Rotation]
@@ -70,26 +71,27 @@
 
 .Reference
 * Resource Types
- ** xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
-  *** xref:reference-couchbasecluster-status.adoc[CouchbaseCluster Status]
-  *** xref:reference-couchbasecluster-events.adoc[CouchbaseCluster Events]
- ** xref:reference-couchbasebackup.adoc[CouchbaseBackup Resource]
-  *** xref:reference-couchbasebackuprestore.adoc[CouchbaseBackupRestore Resource]
-  *** xref:reference-couchbasebackup-status.adoc[CouchbaseBackup and CouchbaseBackupRestore Status]
- ** xref:reference-couchbasebucket.adoc[CouchbaseBucket Resource]
- ** xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
- ** xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
- ** xref:reference-couchbasereplication.adoc[CouchbaseReplication Resource]
- ** xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
- ** xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
- ** xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding Resource]
+ ** xref:reference-couchbasecluster.adoc[`CouchbaseCluster` Resource]
+  *** xref:reference-couchbasecluster-status.adoc[`CouchbaseCluster` Status]
+  *** xref:reference-couchbasecluster-events.adoc[`CouchbaseCluster` Events]
+ ** xref:reference-couchbasebackup.adoc[`CouchbaseBackup` Resource]
+  *** xref:reference-couchbasebackuprestore.adoc[`CouchbaseBackupRestore` Resource]
+  *** xref:reference-couchbasebackup-status.adoc[`CouchbaseBackup` and `CouchbaseBackupRestore` Status]
+ ** xref:reference-couchbasebucket.adoc[`CouchbaseBucket` Resource]
+ ** xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket` Resource]
+ ** xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket` Resource]
+ ** xref:reference-couchbasereplication.adoc[`CouchbaseReplication` Resource]
+ ** xref:reference-couchbaseuser.adoc[`CouchbaseUser` Resource]
+ ** xref:reference-couchbasegroup.adoc[`CouchbaseGroup` Resource]
+ ** xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding` Resource]
+ ** xref:reference-couchbaseautoscaler.adoc[`CouchbaseAutoscaler` Resource]
 * Operator
  ** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
  ** xref:reference-operator-configuration.adoc[Operator Deployment Settings]
  ** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
  ** xref:reference-operator-logging.adoc[Operator Logging]
 * Couchbase Cluster
- ** xref:reference-couchbasecluster-services.adoc[CouchbaseCluster Services]
+ ** xref:reference-couchbasecluster-services.adoc[`CouchbaseCluster` Services]
 * Helm
  ** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]
 * Tools
@@ -107,6 +109,7 @@
 * xref:tutorial-velero-backup.adoc[Backup with VMware Velero]
 * xref:tutorial-prometheus.adoc[Quick Start with Prometheus Monitoring]
 * xref:tutorial-rbac-auth.adoc[Authenticating with Couchbase and LDAP]
+* xref:tutorial-autoscale.adoc[Autoscaling Couchbase Stateless Services]
 * xref:tutorial-metering.adoc[Metering Couchbase Resources]
 * xref:tutorial-aks.adoc[Installing AKS]
 * xref:tutorial-eks.adoc[Installing EKS]
@@ -114,3 +117,6 @@
 
 .Release Notes
 * xref:release-notes.adoc[Release Notes]
+
+.Cloud-Native Database
+* xref:cloud-native-database::index.adoc[Go to Cloud-Native Database Documentation]

@@ -1,4 +1,4 @@
-= CouchbaseGroup Resource
+= `CouchbaseGroup` Resource
 
 :toc: macro
 
@@ -11,7 +11,7 @@ The `CouchbaseGroup` resource contains a set of roles that are to be applied to 
 The following YAML shows all possible fields that may be configured for a `CouchbaseGroup`.
 This configuration may not be valid and is only for illustrative purposes.
 
-.All available CouchbaseGroup configuration parameters
+.All available `CouchbaseGroup` configuration parameters
 [source,yaml]
 ----
 apiVersion: couchbase.com/v2
@@ -70,7 +70,7 @@ ____
 
 === `metadata.labels`
 
-The metadata labels allow the resource to be tagged so that it is only selected by specific CouchbaseCluster resources.
+The metadata labels allow the resource to be tagged so that it is only selected by specific `CouchbaseCluster` resources.
 Further details about resource selection can be found on the xref:concept-label-selection.adoc[Couchbase Resources] and xref:concept-user-rbac.adoc[RBAC page].
 
 ____

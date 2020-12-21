@@ -339,6 +339,6 @@ You can test authentication/authorization by logging into the Couchbase Web Cons
 == Further Reading
 
 * xref:concept-user-rbac.adoc [Learn RBAC Concepts]
-* xref:reference-couchbaseuser.adoc[CouchbaseUser resource]
-* xref:reference-couchbasegroup.adoc[CouchbaseGroup resources]
-* xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding resource]
+* xref:reference-couchbaseuser.adoc[`CouchbaseUser` resource]
+* xref:reference-couchbasegroup.adoc[`CouchbaseGroup` resources]
+* xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding` resource]

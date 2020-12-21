@@ -39,7 +39,8 @@ image::metering-olm-install.png[]
 
 Click through the deployment steps and select `cb-metering` as the *Installed Namespace*.
 
-==== Create a Couchbase Cluster
+=== Create a Couchbase Cluster
+
 Visit the OpenShift Operator Hub and install the Couchbase Autonomous Operator into the the `cb-metering` project.
 When the Couchbase Autonomous Operator is installed, create an instance of the Couchbase Cluster using all of the default values.
 
@@ -83,6 +84,7 @@ In the event that your OpenShift installation doesn't provide a storage class, M
 
 Navigate to the *`Metering Configuration`* Custom Resource in the *`Provided APIs`* section of the installed Operator page.
 Click on the *`Create MeteringConfig`* button.
+
 .Create Metering Configuration
 image::metering-create-config.png[]
 

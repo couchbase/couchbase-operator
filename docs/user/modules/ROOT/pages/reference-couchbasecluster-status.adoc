@@ -1,9 +1,9 @@
-= CouchbaseCluster Status
+= `CouchbaseCluster` Status
 :page-aliases: cluster-status-guide
 include::partial$constants.adoc[]
 
 [abstract]
-Status fields attached to CouchbaseCluster resources by the Operator.
+Status fields attached to `CouchbaseCluster` resources by the Operator.
 
 Every `CouchbaseCluster` resource has a status object.
 This object is used to communicate non-obvious resources associated with the cluster or domain specific information that would otherwise be unavailable.

@@ -57,7 +57,7 @@ These improvements will ease platform adoption as the Operator will constantly r
 [#fixed-issues-v210]
 === Fixed Issues
 
-[#table-fixed-issues-v202,cols="25,66"]
+[#table-fixed-issues-v210,cols="25,66"]
 |===
 | Issue | Description
 
@@ -87,6 +87,21 @@ This behavior has been modified to only set the condition once the cluster is fu
 `Available` now correctly reflects that the cluster is available and ready for use.
 |===
 
+
+[#known-issues-v210]
+=== Known Issues
+
+[#table-known-issues-v210,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-1585[K8S-1585^]
+a| *Summary:* The sample YAML for the libcouchbase cbc tools pillowfight workload generator needs to be edited for use with OpenShift.
+
+*Workaround:* Edit the included YAML to use the OpenShift namespace you are using.
+In OpenShift, you switch namespaces via the `oc project` command.
+|===
+
 [#release-v203]
 == Release 2.0.3
 
@@ -95,7 +110,7 @@ Couchbase Autonomous Operator 2.0.3 was released in November 2020.
 [#fixed-issues-v203]
 === Fixed Issues
 
-[#table-fixed-issues-v202,cols="25,66"]
+[#table-fixed-issues-v203,cols="25,66"]
 |===
 | Issue | Description
 
@@ -308,14 +323,14 @@ Starting with Autonomous Operator 2.0, parts of the `CouchbaseCluster` resource 
 
 The available set of Couchbase custom resource types include:
 
-* xref:reference-couchbasecluster.adoc[CouchbaseCluster Resource]
-* xref:reference-couchbasebucket.adoc[CouchbaseBucket Resource]
-* xref:reference-couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
-* xref:reference-couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
-* xref:reference-couchbasereplication.adoc[CouchbaseReplication Resource]
-* xref:reference-couchbaseuser.adoc[CouchbaseUser Resource]
-* xref:reference-couchbasegroup.adoc[CouchbaseGroup Resource]
-* xref:reference-couchbaserolebinding.adoc[CouchbaseRoleBinding]
+* xref:reference-couchbasecluster.adoc[`CouchbaseCluster` Resource]
+* xref:reference-couchbasebucket.adoc[`CouchbaseBucket` Resource]
+* xref:reference-couchbaseephemeralbucket.adoc[`CouchbaseEphemeralBucket` Resource]
+* xref:reference-couchbasememcachedbucket.adoc[`CouchbaseMemcachedBucket` Resource]
+* xref:reference-couchbasereplication.adoc[`CouchbaseReplication` Resource]
+* xref:reference-couchbaseuser.adoc[`CouchbaseUser` Resource]
+* xref:reference-couchbasegroup.adoc[`CouchbaseGroup` Resource]
+* xref:reference-couchbaserolebinding.adoc[`CouchbaseRoleBinding`]
 
 Autonomous Operator {operator-version-minor} requires that all Couchbase custom resources use the new format.
 Couchbase custom resources -- such as `CouchbaseCluster` -- are not backwards compatible between Autonomous Operator versions 1 and 2.

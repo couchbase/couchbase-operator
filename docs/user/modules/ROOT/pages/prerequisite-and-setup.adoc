@@ -45,6 +45,15 @@ Supported 1.19
 Supported 4.5, 4.6
 |===
 
+[IMPORTANT]
+====
+The Operator can function on Kubernetes 1.20, however custom resource definitions (CRDs) will have a `NonStructuralSchema` condition associated with them.
+This can be ignored, and does not affect functionality.
+
+We recommend that Kubernetes 1.20 not be used for production workloads, only proof-of-concept work.
+Full support for Kubernetes 1.20 will be provided in Operator 2.2.
+====
+
 === Public Kubernetes Service Compatibility
 
 [#table-operator-compatibility-public,cols="1,1",options="header"]

@@ -102,7 +102,7 @@ For examples of this tutorial we have just left it in the `default` namespace fo
 
 <.> `interval` tells Prometheus how often to scrape the endpoint.
 
-<.> If it is specified in the CouchbaseCluster spec, by xref:howto-prometheus.adoc#Configuration[`spec.monitoring.prometheus.authorizationSecret`], we then need to provide the correct `Secret` details in order for Prometheus to be able to gain access to the scrape endpoints.
+<.> If it is specified in the `CouchbaseCluster` spec, by xref:howto-prometheus.adoc#Configuration[`spec.monitoring.prometheus.authorizationSecret`], we then need to provide the correct `Secret` details in order for Prometheus to be able to gain access to the scrape endpoints.
 Please see xref:howto-prometheus.adoc#Configuration[Configure Prometheus Metrics Collection] on how to create said `Secret`.
 
 <.> Pass in the value of the `key` field in the secret data.
