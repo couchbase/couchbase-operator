@@ -1,0 +1,473 @@
+= Metering Couchbase Resources In Kubernetes
+
+[abstract]
+A tutorial for configuring Couchbase in Kubernetes to use Metering for querying and reporting resource usage over an arbitrary period time.
+
+include::partial$tutorial.adoc[]
+
+== Overview
+
+This tutorial describes how to use the Autonomous Operator in conjunction with the Metering Operator within Kubernetes.
+
+The Metering Operator is available as an open source framework.
+Overall project information and status can be discovered from the GitHub repository:
+
+* https://github.com/kube-reporting/metering-operator
+
+=== Required
+
+The following is required to follow the steps of this tutorial:
+
+* Kubernetes v1.16+ or higher is required to use the `apiextensions.k8s.io/v1` API for metric.
+* 3 or more Kubernetes nodes with at least 4 CPU's and 8 GB
+* A `StorageClass` for dynamic volume provisioning for persisting historical metrics.
+* https://helm.sh/docs/intro/install/[Helm version 3.1] or higher is required to install dependencies.
+
+Once helm in installed run the following commands:
+[source,console]
+----
+$ helm repo add couchbase https://couchbase-partners.github.io/helm-charts/
+$ helm repo update
+----
+
+== Install Couchbase Cluster
+
+The helm chart can be used to quickly get started with installing a Couchbase Cluster for monitoring.
+Install the Operator Helm Chart with the following overrides:
+[source,console]
+----
+$ helm install demo --set cluster.monitoring.prometheus.enabled=true couchbase/couchbase-operator
+----
+
+=== Add The Monitoring Stack
+
+The Metering Operator fetches metrics directly from Prometheus and saves to persistent storage for report generation.
+Install the Couchbase monitoring chart which provides a Prometheus service for use by the Metering Operator:
+[source,console]
+----
+$ helm install --set clusterName=demo-couchbase-cluster monitor \
+couchbase/couchbase-monitor-stack
+----
+
+== Installing The Metering Operator
+
+The Metering Operator is released as an package within the Operator Lifecycle Manager (OLM).
+If your Kubernetes cluster does not currently have OLM installed, you can download and install from the GitHub release page:
+[source,console]
+----
+$ curl -L https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.17.0/install.sh -o install.sh
+$ chmod +x install.sh
+$ ./install.sh v0.17.0
+----
+
+OLM is installed into the `olm` namespace.
+Verify that OLM provides the metering package:
+[source,console]
+----
+$ kubectl get packagemanifest -n olm | grep metering
+metering-upstream                          Community Operators   22m
+----
+
+Before installing the metering package from OLM, an `OperatorGroup` resource needs to be created to define which namespace(s) OLM will install the operator.
+For this tutorial, the metering operator is only installed into the single `default` namespace.
+Create the `OperatorGroup` resource with the single target namespace:
+
+[source,console]
+----
+$ cat << EOF | kubectl create -f -
+---
+kind: OperatorGroup
+apiVersion: operators.coreos.com/v1
+metadata:
+  name: og-single
+spec:
+ targetNamespaces:
+ - default
+EOF
+----
+
+OLM Packages are installed according to a subscription model.
+Specifically, the Operators within a package are deployed when a `Subscription` resource is created with information about which version to fetch.
+Create a subscription to the metering operator:
+[source,console]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: metering
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: metering-upstream
+  source: operatorhubio-catalog
+  sourceNamespace: olm
+  startingCSV: metering-operator-upstream.v4.2.0
+EOF
+----
+
+OLM will install a `ClusterServiceVersion` resource which specifies a `Deployment` resource.
+Verify that both resources are installed into the default namespace:
+[source,console]
+----
+$ kubectl get csv
+NAME                                DISPLAY    VERSION   REPLACES   PHASE
+metering-operator-upstream.v4.2.0   Metering   4.2.0                Succeeded
+
+$ kubectl get deploy metering-operator
+NAME                                   READY   UP-TO-DATE   AVAILABLE   AGE
+metering-operator                      1/1     1            1           3h33m
+----
+
+The Metering Operator is simply running and now needs to be configured with storage information for persisting report data.
+
+== Setting up Metering Storage
+
+The Metering Framework requires storage for persisting collected metrics and storing reports.
+For the purposes of this tutorial, a `PersistentVolumeClaim` is manually created to request a `PersistentVolume` from a storage.
+List the storage classes available in your Kubernetes cluster.
+[source,console]
+----
+$ kubectl get storageclass
+----
+
+[IMPORTANT]
+====
+Operator Metering requires the use of a storage class with `ReadWriteMany` access mode.
+Check the Kubernetes storage documentation for vendors which support this access mode:
+https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
+====
+
+This tutorial will use the storage class named `default`.
+You will very likely need to change this based on your Kubernetes environment:
+
+* For AKS, the native Azure File storage can be used.
+* For EKS, consider using https://github.com/kube-reporting/metering-operator/blob/master/Documentation/configuring-storage.md#storing-data-in-amazon-s3[S3] or the https://docs.aws.amazon.com/eks/latest/userguide/efs-csi.html[CSI driver].
+* For GKE https://github.com/kube-reporting/metering-operator/blob/master/Documentation/configuring-storage.md#storing-data-in-google-cloud-storage[Google Cloud Storage] or https://medium.com/@Sushil_Kumar/readwritemany-persistent-volumes-in-google-kubernetes-engine-a0b93e203180[NFS] may be used.
+
+Create a `PersistentVolumeClaim` to request a 120GB volume with `ReadWriteMany` access.
+
+[source,yaml]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cb-metering-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: default
+  resources:
+    requests:
+      storage: 120Gi
+EOF
+----
+
+
+== Configuring The Metering Operator
+
+The Metering Operator watches for a `MeteringConfig` resource to complete the installation process of the Metering Framework.
+When a `MeteringConfig` resource is created, the Metering Operator beings to install example reports along with Pods that are used to store and query report data.
+
+Create the following `MeteringConfig` resource:
+[source,yaml]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: metering.openshift.io/v1
+kind: MeteringConfig
+metadata:
+  name: operator-metering
+  namespace: default
+spec:
+  reporting-operator:
+    spec:
+      config:
+        prometheus:
+          url: "http://couchbase-monitor-stack-prometheus.default.svc:9090"
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        fsGroup: 0
+  hive:
+    spec:
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        fsGroup: 0
+  presto:
+    spec:
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        fsGroup: 0
+  tls:
+    enabled: false
+  storage:
+    hive:
+      sharedPVC:
+        claimName: "cb-metering-pvc"
+      type: "sharedPVC"
+    type: hive
+EOF
+----
+
+<.> `claimName` must match the name of the created `PersistentVolumeClaim`.
+
+The `MeteringConfig` resource cause the Metering Operator to kick off an Ansible script to setup the Metering Framework.
+Check the Metering Operator logs to monitor the installation progress:
+
+[source,console]
+----
+$ kubectl logs deploy/metering-operator -c ansible -f
+----
+
+When the process is complete you will be able to get available `ReportQuery` and `ReportDataSource` resources:
+[source,console]
+----
+$ kubectl get reportquery
+$ kubectl get reportdatasources
+----
+
+== Generating a Workload
+
+Now we will apply some workload to the cluster in order to generate an interesting report.
+First set the Administrator password for use by the document generator.
+[source, console]
+----
+$ ADMIN_PASSWORD=$(helm status demo | grep password: | awk '{print $2}')
+----
+
+Create a Kubernetes Job to install the sample travel data set provided by the `cbdocloader` tool:
+[source, console]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: travel-sample-dataset
+spec:
+  template:
+    spec:
+      containers:
+      - name: travel-sample
+        image: couchbase/server:6.6.0
+        command: ["/opt/couchbase/bin/cbdocloader",
+                  "-c", "demo-couchbase-cluster-0000.default.svc",
+                  "-u", "Administrator", "-p", "$ADMIN_PASSWORD",
+                  "-b" ,"travel-sample",
+                  "-m", "100",
+                  "-d", "/opt/couchbase/samples/travel-sample.zip"]
+      restartPolicy: Never
+EOF
+----
+
+Check the Administrator Console to ensure that the data set is being loaded.
+You should also see that indexes are created for querying the documents.
+
+=== Apply Query Workload
+
+Now that travel sample data is loaded and indexed, the data set can be queries in order to generate query latencies that should trigger an autoscale operator to occur.
+At this point any tool an be used to apply stress on the query services.
+For this tutorial we will use an experimental tool called `n1qlgen` which applies stress for a set duration.
+
+First set the Administrator password for use by the document generator.
+[source, console]
+----
+$ ADMIN_PASSWORD=$(helm status demo | grep password: | awk '{print $2}')
+----
+
+Create a Kubernetes job to start the query load generator:
+[source, console]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: n1qlgen-1
+spec:
+  template:
+    spec:
+      containers:
+      - name: n1qlgen
+        image: tahmmee/n1qlgen
+        imagePullPolicy: Always
+        command: ["/go/bin/n1qlgen",
+                  "-pod=demo-couchbase-cluster-0000", <.>
+                   "-cluster=demo-couchbase-cluster",
+                   "-bucket=travel-sample",
+                   "-username=Administrator",
+                   "-password=$ADMIN_PASSWORD", <.>
+                   "-duration=600", "-concurrency=20", <.>
+                   "-seed=1234"] <.>
+      restartPolicy: Never
+EOF
+----
+<.> Name of one of the query Pods within the cluster.
+<.> `duration` and `concurrency` can be used to adjust workload stress.
+<.> `password` of the Administrator user as *provided by the `helm status demo` command*
+<.> `seed` adjusts randomness for running multiple jobs.
+
+
+== Report Generation
+
+Report generation allows for usage collection against the resource and custom metric API.
+The following steps will guide you through collecting Couchbase average query count from a Couchbase Cluster.
+
+=== Create a Report Data Source
+
+Report data sources provide reports with a source of data to query.
+Data sources are represented in the Metering Framework as queries which collect specific data from Prometheus.
+Create the following `ReportDatasource` resource to collect the average number of queries occurring:
+
+[source,console]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: metering.openshift.io/v1
+kind: ReportDataSource
+metadata:
+  name: cbquery-result-count
+spec:
+  prometheusMetricsImporter:
+    timeprecision: 5  <.>
+    query: |
+      avg(cbquery_avg_result_count) by (cluster)  <.>
+EOF
+----
+<.> `query` field maps directly to a Prometheus statement which selects average Couchbase query count across nodes
+<.> `timeprecision` is the query resolution step width (default is 60 seconds)
+
+The report data source will store values from the `cbquery_avg_result_count` metric into a SQL like database for use by the `ReportQuery` resource.
+
+=== Create a Report Query
+
+Metering uses Report queries to fetch metrics being stored inside of report data sources.
+The report query essentially formats the report data source into a tabular form with labels and timestamps.
+
+Create the following `ReportQuery` to select and format metrics from the report data source for report generation:
+[source, yaml]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: metering.openshift.io/v1
+kind: ReportQuery
+metadata:
+  name: cbquery-result-count
+spec:
+  columns:
+  - name: period_start
+    type: timestamp
+  - name: period_end
+    type: timestamp
+  - name: avg_query_count
+    type: double
+  - name: cluster
+    type: varchar
+  inputs:
+  - name: QueryResultCountDataSourceName
+    type: ReportDataSource
+    default: cbquery-result-count
+  - name: ReportingStart
+    type: time
+  - name: ReportingEnd
+  query: |
+    SELECT <.>
+      timestamp '{| default .Report.ReportingStart .Report.Inputs.ReportingStart| prestoTimestamp |}' AS period_start,
+      timestamp '{| default .Report.ReportingEnd .Report.Inputs.ReportingEnd | prestoTimestamp |}' AS period_end,
+    	avg(amount) as avg_query_count, <.>
+    	labels['cluster'] as cluster
+    FROM {| dataSourceTableName .Report.Inputs.QueryResultCountDataSourceName |}
+    WHERE "timestamp" >= timestamp '{| default .Report.ReportingStart .Report.Inputs.ReportingStart | prestoTimestamp |}'
+    AND "timestamp" < timestamp '{| default .Report.ReportingEnd .Report.Inputs.ReportingEnd | prestoTimestamp |}'
+    GROUP BY labels['cluster'] <.>
+    ORDER BY avg_query_count DESC
+EOF
+----
+<.> `ReportQuery` is a SQL like statement which selects values from the remote data source according to timestamps.
+<.> The `avg_query_count` is being averaged over the the start and end time of the query.
+<.> Results are grouped according to Couchbase cluster.
+
+The report query will be consumed by the report generator to request metrics over an arbitrary period of time.
+
+=== Report Generation
+
+Metering Reports generate resource usage over start and end timestamps.
+Reports rely on `ReportQuery` resources for requesting data within the desired time period.
+
+Get the first import timestamp to use as the start period of the report:
+[source,yaml]
+----
+REPORT_START_TIME=`kubectl get reportdatasource cbquery-result-count  | awk '{print $2}' | tail -1`
+REPORT_END_TIME=`kubectl get reportdatasource cbquery-result-count  | awk '{print $5}' | tail -1`
+----
+
+The following creates a Report named `cbquery-result-count` which uses the Pod compute usage Query created from the previous step.
+
+[source,yaml]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: metering.openshift.io/v1
+kind: Report
+metadata:
+  name: cbquery-result-count
+spec:
+  reportingStart: '$REPORT_START_TIME' <.>
+  reportingEnd: '$REPORT_END_TIME'
+  query: "cbquery-result-count"
+  schedule:
+    period: "cron"
+    cron:
+      expression: '*/1 * * * *'
+EOF
+----
+<.> `reportingStart` *must* match the start time of the `ReportDatasource` used by the `ReportQuery`.
+<.> `query` refers to the `ReportQuery` resource which selects Pod Compute usage from Couchbase only.
+<.> The report is scheduled to run every minute.
+
+Check that the report status shows does not show any errors.
+[source,console]
+----
+$ kubectl describe report cbquery-result-count
+----
+
+Reports can be scheduled to run according to various schedules.
+Refer to the https://github.com/kube-reporting/metering-operator/blob/master/Documentation/reports.md[Report Guide] for available options when scheduling reports.
+
+==== Viewing the Report
+
+The report is ready to be downloaded when the status has changed to `Finished`.
+Run the following command to view data from the `cbquery-result-count` report:
+
+[source,console]
+----
+$ kubectl proxy &
+$ export METERING_NAMESPACE=default
+$ curl "http://127.0.0.1:8001/api/v1/namespaces/$METERING_NAMESPACE/services/http:reporting-operator:api/proxy/api/v1/reports/get?name=cbquery-result-count&namespace=default&format=csv" <.>
+----
+<.> Setting report generation to `csv` format
+
+The result shows a report for average query count at 1 minute intervals since the requested start time.
+[source,console]
+----
+period_start,period_end,avg_query_count,cluster
+2020-12-21 20:14:00 +0000 UTC,2020-12-21 20:15:00 +0000 UTC,0.000000, demo-couchbase-cluster
+2020-12-21 20:15:00 +0000 UTC,2020-12-21 20:16:00 +0000 UTC,14.525261,demo-couchbase-cluster
+2020-12-21 20:16:00 +0000 UTC,2020-12-21 20:17:00 +0000 UTC,12.941536,demo-couchbase-cluster
+2020-12-21 20:17:00 +0000 UTC,2020-12-21 20:18:00 +0000 UTC,11.882800,demo-couchbase-cluster
+2020-12-21 20:18:00 +0000 UTC,2020-12-21 20:19:00 +0000 UTC,11.755050,demo-couchbase-cluster
+2020-12-21 20:19:00 +0000 UTC,2020-12-21 20:20:00 +0000 UTC,11.183306,demo-couchbase-cluster
+----
+At this point you may choose to add a business integration layer which understands cost analysis based on average query requests to make further use of generated reports.
+
+== Further Reading
+
+* https://github.com/kube-reporting/metering-operator/blob/master/Documentation/using-metering.md[Using Metering]
+* https://github.com/kube-reporting/metering-operator/blob/master/Documentation/writing-custom-queries.md[Writing Custom Reports]
+* xref:tutorial-prometheus.adoc[Couchbase Prometheus Monitoring]

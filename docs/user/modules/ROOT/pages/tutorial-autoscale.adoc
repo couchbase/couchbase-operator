@@ -33,7 +33,7 @@ A server configuration is considered stateless when the following conditions are
 . All buckets are defined as ephemeral buckets using the `CouchbaseEphemeralBucket` resource.
 . At least one group of servers is configured to run only the `query` service.
 
-The helm chart can be used to quickly get started with a Couchbase which meets the stateless service requirements.
+The helm chart can be used to quickly get started with installing a Couchbase which meets the stateless service requirements.
 Create the following override values to use with the Operator Helm Chart:
 
 [source,console]
