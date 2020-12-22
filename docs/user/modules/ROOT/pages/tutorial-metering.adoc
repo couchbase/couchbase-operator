@@ -1,8 +1,7 @@
-
-= Metering Couchbase Resources
+= Metering Couchbase Resources In OpenShift
 
 [abstract]
-A tutorial for configuring Couchbase to use Metering for querying and reporting resource usage over an arbitrary period time.
+A tutorial for configuring Couchbase in OpenShift to use Metering for querying and reporting resource usage over an arbitrary period time.
 
 include::partial$tutorial.adoc[]
 
@@ -20,6 +19,7 @@ Overall project information and status can be discovered from the GitHub reposit
 The following is required to follow the steps of this tutorial:
 
 * OpenShift 4.3 or higher is required since the Operator Lifecycle Manager (OLM) is the recommended installation method.
+* 3 or more OpenShift nodes with at least 4 CPU's and 8 GB
 * A `StorageClass` for dynamic volume provisioning for persisting historical metrics.
 
 == Installing The Metering Operator

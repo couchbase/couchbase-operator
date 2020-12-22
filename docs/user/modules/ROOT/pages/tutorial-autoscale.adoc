@@ -33,7 +33,7 @@ A server configuration is considered stateless when the following conditions are
 . All buckets are defined as ephemeral buckets using the `CouchbaseEphemeralBucket` resource.
 . At least one group of servers is configured to run only the `query` service.
 
-The helm chart can be used to quickly get started with a Couchbase which meets the stateless service requirements.
+The helm chart can be used to quickly get started with installing a Couchbase which meets the stateless service requirements.
 Create the following override values to use with the Operator Helm Chart:
 
 [source,console]
@@ -147,8 +147,7 @@ Couchbase resource metrics are collected by the Prometheus adapter and passed to
 Install the Couchbase monitoring chart which provides Prometheus and a Custom Metrics `APIServer`:
 [source,console]
 ----
-$ helm install --set clusterName=scale-couchbase-cluster monitor \ <.>
-couchbase/couchbase-monitor-stack
+$ helm install --set clusterName=scale-couchbase-cluster monitor couchbase/couchbase-monitor-stack <.>
 ----
 <.> `clusterName` is the name of the `CouchbaseCluster` resource from the previous installation section.
 
@@ -205,7 +204,6 @@ spec:
         type: AverageValue <.>
         averageValue: 7000m <.>
 EOF
-horizontalpodautoscaler.autoscaling/query-hpa created
 ----
 <.> The target ref is set to the `CouchbaseAutoscaler` kind created by the Operator.
 <.> The name of the `CouchbaseAutoscaler` resource being referenced.
@@ -264,7 +262,6 @@ spec:
                   "-d", "/opt/couchbase/samples/travel-sample.zip"]
       restartPolicy: Never
 EOF
-job.batch/travel-sample-dataset
 ----
 
 Check the Administrator Console to ensure that the data set is being loaded.
@@ -300,7 +297,6 @@ spec:
                    "-seed=1234"] <.>
       restartPolicy: Never
 EOF
-job.batch/n1qlgen-1 created
 ----
 <.> Name of one of the query Pods within the cluster.
 <.> `duration` and `concurrency` can be used to adjust workload stress.
@@ -314,6 +310,7 @@ Watch the Horizontal Pod Autoscaler as it monitors the target metric:
 [source, console]
 ----
 $ kubectl get hpa -w
+
 NAME        REFERENCE                        TARGETS   MINPODS   MAXPODS   REPLICAS   AGE
 query-hpa   CouchbaseAutoscaler/query.scale  0/7       2         6         2          27m
 query-hpa   CouchbaseAutoscaler/query.scale  3503m/7   2         6         2          31m
@@ -333,13 +330,6 @@ See also the `HorizontalPodAutoscaler` status for additional information:
 [source, console]
 ----
 $ kubectl describe hpa query-hpa
-----
-
-[source, console]
-----
-$ kubectl get cba
-NAME                            SIZE   SERVERS
-query.scale-couchbase-cluster   4      query
 ----
 
 Note that you will very likely do some experimentation before settling on a target value that make sense for your workload objectives.
