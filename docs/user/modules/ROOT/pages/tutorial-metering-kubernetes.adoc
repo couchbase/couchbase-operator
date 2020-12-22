@@ -148,7 +148,7 @@ You will very likely need to change this based on your Kubernetes environment:
 
 Create a `PersistentVolumeClaim` to request a 120GB volume with `ReadWriteMany` access.
 
-[source,yaml]
+[source,console]
 ----
 $ cat << EOF | kubectl create -f -
 ---
@@ -173,7 +173,7 @@ The Metering Operator watches for a `MeteringConfig` resource to complete the in
 When a `MeteringConfig` resource is created, the Metering Operator beings to install example reports along with Pods that are used to store and query report data.
 
 Create the following `MeteringConfig` resource:
-[source,yaml]
+[source,console]
 ----
 $ cat << EOF | kubectl create -f -
 ---
@@ -209,7 +209,7 @@ spec:
   storage:
     hive:
       sharedPVC:
-        claimName: "cb-metering-pvc"
+        claimName: "cb-metering-pvc" # <.>
       type: "sharedPVC"
     type: hive
 EOF
@@ -351,7 +351,7 @@ Metering uses Report queries to fetch metrics being stored inside of report data
 The report query essentially formats the report data source into a tabular form with labels and timestamps.
 
 Create the following `ReportQuery` to select and format metrics from the report data source for report generation:
-[source, yaml]
+[source,console]
 ----
 $ cat << EOF | kubectl create -f -
 ---
@@ -401,7 +401,7 @@ Metering Reports generate resource usage over start and end timestamps.
 Reports rely on `ReportQuery` resources for requesting data within the desired time period.
 
 Get the first import timestamp to use as the start period of the report:
-[source,yaml]
+[source,console]
 ----
 REPORT_START_TIME=`kubectl get reportdatasource cbquery-result-count  | awk '{print $2}' | tail -1`
 REPORT_END_TIME=`kubectl get reportdatasource cbquery-result-count  | awk '{print $5}' | tail -1`
@@ -409,7 +409,7 @@ REPORT_END_TIME=`kubectl get reportdatasource cbquery-result-count  | awk '{prin
 
 The following creates a Report named `cbquery-result-count` which uses the Pod compute usage Query created from the previous step.
 
-[source,yaml]
+[source,console]
 ----
 $ cat << EOF | kubectl create -f -
 ---
@@ -418,13 +418,13 @@ kind: Report
 metadata:
   name: cbquery-result-count
 spec:
-  reportingStart: '$REPORT_START_TIME' <.>
+  reportingStart: '$REPORT_START_TIME' # <.>
   reportingEnd: '$REPORT_END_TIME'
-  query: "cbquery-result-count"
+  query: "cbquery-result-count" # <.>
   schedule:
     period: "cron"
     cron:
-      expression: '*/1 * * * *'
+      expression: '*/1 * * * *' # <.>
 EOF
 ----
 <.> `reportingStart` *must* match the start time of the `ReportDatasource` used by the `ReportQuery`.
