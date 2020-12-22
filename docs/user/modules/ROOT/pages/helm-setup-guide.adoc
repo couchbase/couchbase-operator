@@ -70,13 +70,13 @@ oc create secret docker-registry rh-catalog \
 couchbaseOperator:
   image:
     repository: registry.connect.redhat.com/couchbase/operator
-    tag: {operator-version-redhat}
+    tag: {operator-version}
   imagePullSecrets:
   - rh-catalog
 admissionController:
   image:
     repository: registry.connect.redhat.com/couchbase/admission-controller
-    tag: {admission-controller-version-redhat}
+    tag: {admission-controller-version}
   imagePullSecrets:
   - rh-catalog
 cluster:

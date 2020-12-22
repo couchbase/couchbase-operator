@@ -25,10 +25,6 @@ DOCKER_TAG = v1
 # This is analogous to revisions in DEB and RPM archives.
 revision = $(if $(REVISION),$(REVISION),)
 
-# Red Hat CC has its own revisioning system that adds another one
-# on above and beyond ours.  This should always be 1
-revisionRedHat = $(if $(REVISION_REDHAT),$(REVISION_REDHAT),1)
-
 # Revisioned version is used for package creation.
 ifeq ($(revision),)
 revisionedVersion = $(version)
@@ -49,7 +45,7 @@ CONTAINER_GOENV = $(GOENV) GOOS=linux GOARCH=amd64
 
 # These are propagated into each binary so we can tell for sure the exact build
 # that a binary came from.
-LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(version) -X github.com/couchbase/couchbase-operator/pkg/version.Revision=$(revision) -X github.com/couchbase/couchbase-operator/pkg/version.RevisionRedHat=$(revisionRedHat) -X github.com/couchbase/couchbase-operator/pkg/version.BuildNumber=$(bldNum) -X github.com/couchbase/couchbase-operator/pkg/revision.gitRevision=$(GIT_REVISION)"
+LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(version) -X github.com/couchbase/couchbase-operator/pkg/version.Revision=$(revision) -X github.com/couchbase/couchbase-operator/pkg/version.BuildNumber=$(bldNum) -X github.com/couchbase/couchbase-operator/pkg/revision.gitRevision=$(GIT_REVISION)"
 
 .PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs
 

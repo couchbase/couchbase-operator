@@ -11,10 +11,9 @@ const (
 )
 
 var (
-	Version        string
-	Revision       string
-	RevisionRedHat string
-	BuildNumber    string
+	Version     string
+	Revision    string
+	BuildNumber string
 )
 
 // This will generate things like 1.0.0 and 1.0.0-beta1 and should be used
@@ -27,12 +26,6 @@ func WithRevision() string {
 	}
 
 	return v
-}
-
-// This will do as above, but also adds in the Red Hat container tag revision
-// e.g. 1.0.0-beta1-1.
-func WithRevisionRedHat() string {
-	return WithRevision() + "-" + RevisionRedHat
 }
 
 // This will generate things like "1.0.0 (build 123)" and should be used for
