@@ -772,7 +772,7 @@ func DeleteOperatorCompletely(k8s *types.Cluster, deploymentName string) error {
 	return retryutil.RetryFor(10*time.Minute, func() error {
 		_, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Get(context.Background(), deploymentName, metav1.GetOptions{})
 		if err == nil {
-			return err
+			return fmt.Errorf("resource stil exists")
 		}
 
 		if k8sutil.IsKubernetesResourceNotFoundError(err) {
