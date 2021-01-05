@@ -115,7 +115,7 @@ func (e *compoundError) Error() string {
 // any differences with these types.
 func isIgnroableResource(path string) bool {
 	ignored := []string{
-		"persistentvolumes",
+		"persistentvolume",
 	}
 
 	for _, i := range ignored {
