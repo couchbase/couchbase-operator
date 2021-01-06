@@ -484,7 +484,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Create a expected RZA results map for verification
-	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	// kill the first N pods where N is the no of server groups
@@ -560,7 +560,7 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Create a expected RZA results map for verification
-	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	// kill the first N pods where N is the no of server groups
@@ -634,7 +634,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Create a expected RZA results map for verification
-	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	// Kill nodes in 1st server group

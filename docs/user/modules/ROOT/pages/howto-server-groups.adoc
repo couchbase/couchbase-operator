@@ -58,14 +58,3 @@ When the Operator schedules pods in this class it will default to server groups 
 <.> This server class has xref:reference-couchbasecluster.adoc#spec-servers-servergroups[`spec.servers[\].serverGroups`] defined.
 When the Operator schedules pods in this class it will override the global defaults set with xref:reference-couchbasecluster.adoc#spec-servergroups[`spec.serverGroups`] and use xref:reference-couchbasecluster.adoc#spec-servers-servergroups[`spec.servers[\].serverGroups`] instead.
 This is useful when a server class is sized in a way that cannot be fully balanced across the default set of server groups.
-
-[WARNING]
-====
-Server groups are enabled for the cluster if any of the server classes have xref:reference-couchbasecluster.adoc#spec-servers-servergroups[`spec.servers[\].serverGroups`] set, or the global default -- xref:reference-couchbasecluster.adoc#spec-servergroups[`spec.serverGroups`]  -- is enabled.
-It is considered an invalid configuration when server groups is enabled and a server class doesn't have either an explicit set of server groups or an inherited set of global defaults.
-====
-
-[IMPORTANT]
-====
-Server groups are immutable and cannot be modified during the cluster lifetime.
-====

@@ -1,11 +1,13 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/astar"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	v1 "k8s.io/api/core/v1"
 )
@@ -20,6 +22,11 @@ type stripeSchedulerImpl struct {
 	// serverClasses is for tracking our internal state of where pods reside
 	// within server classes
 	serverClasses serverClassGroupMap
+
+	// unschedulableServerClasses is for tracking pods that exist, but that aren't
+	// scheduled for some reason, either we're enabling schduling or the server
+	// group is no longer valid.
+	unschedulableServerClasses serverClassGroupMap
 }
 
 // getServerGroupsForClass gets the list of server groups to schedule pods across
@@ -44,7 +51,8 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 	// Initialize data structures, creating maps for each server class
 	// and empty lists for each server group defined for that class
 	sched := &stripeSchedulerImpl{
-		serverClasses: serverClassGroupMap{},
+		serverClasses:              serverClassGroupMap{},
+		unschedulableServerClasses: serverClassGroupMap{},
 	}
 
 	for i := range cluster.Spec.Servers {
@@ -79,13 +87,36 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 			continue
 		}
 
+		// Pod has no scheduling information... we're upgrading from a non-scheduled
+		// to a scheduled cluster.
 		group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
 		if !ok {
-			return nil, fmt.Errorf("%s: pod %s does not have server group selector: %w", stripeErrorHeader, pod.Name, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+			if _, ok := sched.unschedulableServerClasses[class]; !ok {
+				sched.unschedulableServerClasses[class] = serverGroups{}
+			}
+
+			if _, ok := sched.unschedulableServerClasses[class][group]; !ok {
+				sched.unschedulableServerClasses[class][group] = &serverList{}
+			}
+
+			sched.unschedulableServerClasses[class][group].push(pod.Name)
+
+			continue
 		}
 
+		// Pod is not part of an active server class... we're migrating server classes.
 		if _, ok := sched.serverClasses[class][group]; !ok {
-			return nil, fmt.Errorf("%s: pod %s server group '%s' undefined: %w", stripeErrorHeader, pod.Name, group, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+			if _, ok := sched.unschedulableServerClasses[class]; !ok {
+				sched.unschedulableServerClasses[class] = serverGroups{}
+			}
+
+			if _, ok := sched.unschedulableServerClasses[class][group]; !ok {
+				sched.unschedulableServerClasses[class][group] = &serverList{}
+			}
+
+			sched.unschedulableServerClasses[class][group].push(pod.Name)
+
+			continue
 		}
 
 		sched.serverClasses[class][group].push(pod.Name)
@@ -139,7 +170,293 @@ func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
 		}
 	}
 
+	for serverGroup := range sched.unschedulableServerClasses[class] {
+		if err := sched.unschedulableServerClasses[class][serverGroup].del(name); err == nil {
+			return nil
+		}
+	}
+
 	return fmt.Errorf("%s: server '%s' does not exist in class '%s': %w", stripeErrorHeader, name, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+}
+
+// Member records information about a cluster member.
+type Member struct {
+	// ServerGroup records the server group a member is currently in.
+	// Leave this empty for a sentinel that means it has no scheduling
+	// information.
+	ServerGroup string
+
+	// Moved indicates whether this member has already moved.  It should
+	// be possible to balance members across server groups in a single
+	// move.
+	Moved bool
+}
+
+// clone deep copies a member.
+func (m *Member) clone() *Member {
+	t := *m
+	return &t
+}
+
+// ServerGroup records information about a server group.
+type ServerGroup struct {
+	// Size is the number of members in this group.
+	Size int
+
+	// Unschedulable means that the server group is known about but is
+	// not desired to be used.
+	Unschedulable bool
+}
+
+// clone deep copies a server group.
+func (b *ServerGroup) clone() *ServerGroup {
+	t := *b
+	return &t
+}
+
+// state implments our AStarable game state.
+type state struct {
+	// Members maps member names to member information.
+	Members map[string]*Member
+
+	// ServerGroups maps server group names to group information.
+	ServerGroups map[string]*ServerGroup
+
+	// Moves recores the moves required to get to this state.
+	Moves []Move
+}
+
+// clone deep copies the state.
+func (s *state) clone() *state {
+	c := &state{
+		Members:      map[string]*Member{},
+		ServerGroups: map[string]*ServerGroup{},
+		Moves:        make([]Move, len(s.Moves)),
+	}
+
+	for k, v := range s.Members {
+		c.Members[k] = v.clone()
+	}
+
+	for k, v := range s.ServerGroups {
+		c.ServerGroups[k] = v.clone()
+	}
+
+	copy(c.Moves, s.Moves)
+
+	return c
+}
+
+// score is used to "score" the state, e.g. how close to a solution are we.
+// We use this to converge on a winning solution.
+func (s *state) score() (min, max int, unschedulable bool) {
+	// Initaalize the minimum to the largest possible integer, so we are
+	// guaranteed everything else real will be smaller than it.
+	min = int(^uint(0) >> 1)
+
+	for _, serverGroup := range s.ServerGroups {
+		// Ignore the size for unschedulable groups, as this shouldn't
+		// be used for scheduling/scoring, but do indicate it's not okay
+		// and needs fixing.
+		if serverGroup.Unschedulable {
+			if serverGroup.Size > 0 {
+				unschedulable = true
+			}
+
+			continue
+		}
+
+		if serverGroup.Size > max {
+			max = serverGroup.Size
+		}
+
+		if serverGroup.Size < min {
+			min = serverGroup.Size
+		}
+	}
+
+	return
+}
+
+// Done indicates the state is a winning solution, in this case when
+// all server groups are balanced -- the difference in magnitude must be no
+// greater than one.
+func (s *state) Done() bool {
+	min, max, unschedulable := s.score()
+	if unschedulable {
+		return false
+	}
+
+	return (max - min) < 2
+}
+
+// Hash returns a unique scalar representing the state, so we only
+// ever interrogate it once.
+func (s *state) Hash() string {
+	// Only concern ourselves with the size of the serverGroups, we should not
+	// need to bother with repeating moves from serverGroup to serverGroup but with
+	// different members.
+	raw, err := json.Marshal(s.ServerGroups)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(raw)
+}
+
+// Move performs a member movement into another server group that moves us
+// nearer to the solution state.
+func (s *state) Move() []astar.AStarable {
+	// Calculate the "score" for this move, selecting the largest and smallest
+	// server group size that is also allowed to be used.
+	min, max, _ := s.score()
+
+	moves := []astar.AStarable{}
+
+	// Members in a server group that isn't schedulable must move to the smallest
+	// one that is.  This takes precedence over normal rebalancing.
+	for name, member := range s.Members {
+		// Ignore moved pieces and those that are already on schedulable server groups.
+		if member.Moved || !s.ServerGroups[member.ServerGroup].Unschedulable {
+			continue
+		}
+
+		// Try move each unmoved, unschedulable, member to one of the
+		// smallest schedulable server groups.
+		for serverGroupName, serverGroup := range s.ServerGroups {
+			if serverGroup.Unschedulable || serverGroup.Size != min {
+				continue
+			}
+
+			next := s.clone()
+			next.Members[name].ServerGroup = serverGroupName
+			next.Members[name].Moved = true
+			next.ServerGroups[member.ServerGroup].Size--
+			next.ServerGroups[serverGroupName].Size++
+
+			m := Move{
+				Name: name,
+				From: member.ServerGroup,
+				To:   serverGroupName,
+			}
+
+			next.Moves = append(next.Moves, m)
+
+			moves = append(moves, next)
+		}
+	}
+
+	if len(moves) != 0 {
+		return moves
+	}
+
+	// Once all the unschedulable members have been moved, we can restore balance
+	// (to the Force), and move members from the biggest server groups, to the
+	// smallest.
+	for name, member := range s.Members {
+		// Ignore moved pieces and those that aren't in the largest server groups.
+		if member.Moved || s.ServerGroups[member.ServerGroup].Size != max {
+			continue
+		}
+
+		// Try move each unmoved member from the largest to the smallest
+		// schedulable server groups.
+		for serverGroupName, serverGroup := range s.ServerGroups {
+			// Select the serverGroup only if it is a minimum set.
+			if serverGroup.Unschedulable || serverGroup.Size != min {
+				continue
+			}
+
+			next := s.clone()
+			next.Members[name].ServerGroup = serverGroupName
+			next.Members[name].Moved = true
+			next.ServerGroups[member.ServerGroup].Size--
+			next.ServerGroups[serverGroupName].Size++
+
+			m := Move{
+				Name: name,
+				From: member.ServerGroup,
+				To:   serverGroupName,
+			}
+
+			next.Moves = append(next.Moves, m)
+
+			moves = append(moves, next)
+		}
+	}
+
+	return moves
+}
+
+// Reschedule looks at the current state, and if it doesn't match that
+// requested when the scheduler was initialized, return a set of mutually
+// exclusive moves to get us back into a conforming state.
+func (sched *stripeSchedulerImpl) Reschedule() ([]Move, error) {
+	var moves []Move
+
+	knownClasses := map[string]interface{}{}
+
+	for class := range sched.serverClasses {
+		knownClasses[class] = nil
+	}
+
+	for class := range sched.unschedulableServerClasses {
+		knownClasses[class] = nil
+	}
+
+	for class := range knownClasses {
+		s := &state{
+			Members:      map[string]*Member{},
+			ServerGroups: map[string]*ServerGroup{},
+		}
+
+		if groups, ok := sched.serverClasses[class]; ok {
+			for group, members := range groups {
+				if _, ok := s.ServerGroups[group]; !ok {
+					s.ServerGroups[group] = &ServerGroup{}
+				}
+
+				for _, member := range members.servers {
+					s.Members[member] = &Member{
+						ServerGroup: group,
+					}
+
+					s.ServerGroups[group].Size++
+				}
+			}
+		}
+
+		if groups, ok := sched.unschedulableServerClasses[class]; ok {
+			for group, members := range groups {
+				if _, ok := s.ServerGroups[group]; !ok {
+					s.ServerGroups[group] = &ServerGroup{
+						Unschedulable: true,
+					}
+				}
+
+				for _, member := range members.servers {
+					s.Members[member] = &Member{
+						ServerGroup: group,
+					}
+
+					s.ServerGroups[group].Size++
+				}
+			}
+		}
+
+		if s.Done() {
+			return nil, nil
+		}
+
+		result, err := astar.AStar(s)
+		if err != nil {
+			return nil, err
+		}
+
+		moves = append(moves, result.(*state).Moves...)
+	}
+
+	return moves, nil
 }
 
 // LogStatus writes formatted state for debugging.
@@ -183,6 +500,14 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 
 			for _, server := range servers.servers {
 				log.Info("Scheduler status", "cluster", cluster, "name", server, "class", class, "group", group)
+			}
+		}
+	}
+
+	for class, groups := range sched.unschedulableServerClasses {
+		for group, servers := range groups {
+			for _, server := range servers.servers {
+				log.Info("Scheduler status (unschedulable)", "cluster", cluster, "name", server, "class", class, "group", group)
 			}
 		}
 	}

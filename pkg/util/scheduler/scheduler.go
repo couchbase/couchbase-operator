@@ -10,6 +10,18 @@ import (
 
 var log = logf.Log.WithName("scheduler")
 
+// Move is the movement of a member as a result of a rescheduling operation.
+type Move struct {
+	// Name is the name of the member.
+	Name string
+
+	// From is the source server group.
+	From string
+
+	// To is the destination server group.
+	To string
+}
+
 // Scheduler is an abstraction for something that is able to inspect the cluster
 // and make intelligent decisions about which server groups to add pods to or
 // remove them from in a deterministic fashion.
@@ -24,6 +36,11 @@ type Scheduler interface {
 
 	// Upgrade removes a node from the scheduler as it's an upgrade target.
 	Upgrade(class, name string) error
+
+	// Reschedule looks at the current state, and if it doesn't match that
+	// requested when the scheduler was initialized, return a set of mutually
+	// exclusive moves to get us back into a conforming state.
+	Reschedule() ([]Move, error)
 
 	// LogStatus writes out the status to a writer.
 	LogStatus(cluster string)

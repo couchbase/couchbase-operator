@@ -1672,19 +1672,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.cluster.indexer.storageMode"},
 		},
-		// Server groups updates
-		{
-			name:           "TestValidateApplyServerGroupsImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/serverGroups", []string{"NewGroupUpdate-1", "NewGroupUpdate-2"})},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.serverGroups"},
-		},
-		{
-			name:           "TestValidateApplyServerServerGroupsImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/2/serverGroups", []string{"us-east-1a", "us-east-1b", "us-east-1c"})},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[2].serverGroups"},
-		},
 		{
 			name:           "TestValidateBackupStrategyImmutable",
 			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/strategy", "full_only")},

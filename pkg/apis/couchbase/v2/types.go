@@ -850,9 +850,16 @@ type ClusterSpec struct {
 	// defined in a PodPolicy
 	VolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 
-	// ServerGroups define the set of availability zones we want to distribute
-	// pods over.  This allows the Kubernetes cluster administrator to label all
-	// nodes, but use a specific subset for a particular Couchbase cluster.
+	// ServerGroups define the set of availability zones you want to distribute
+	// pods over, and construct Couchbase server groups for.  By default, most
+	// cloud providers will label nodes with the key "failure-domain.beta.kubernetes.io/zone",
+	// the values associated with that key are used here to provide explicit
+	// scheduling by the Operator.  You may manually label nodes using the
+	// "failure-domain.beta.kubernetes.io/zone" key, to provide failure-domain
+	// aware scheduling when none is provided for you.  Global server groups are
+	// applied to all server classes, and may be overridden on a per-server class
+	// basis to give more control over scheduling and server groups.
+	// +listType=set
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
 	// Security Context for all pods
@@ -1402,9 +1409,16 @@ type ServerConfig struct {
 	// The services to run on nodes created with this spec
 	Services ServiceList `json:"services"`
 
-	// ServerGroups define the set of availability zones we want to distribute
-	// pods over.  This allows the Kubernetes cluster administrator to label all
-	// nodes, but use a specific subset for a particular Couchbase cluster.
+	// ServerGroups define the set of availability zones you want to distribute
+	// pods over, and construct Couchbase server groups for.  By default, most
+	// cloud providers will label nodes with the key "failure-domain.beta.kubernetes.io/zone",
+	// the values associated with that key are used here to provide explicit
+	// scheduling by the Operator.  You may manually label nodes using the
+	// "failure-domain.beta.kubernetes.io/zone" key, to provide failure-domain
+	// aware scheduling when none is provided for you.  Global server groups are
+	// applied to all server classes, and may be overridden on a per-server class
+	// basis to give more control over scheduling and server groups.
+	// +listType=set
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
 	// Pod defines the policy to create pod for the couchbase pod.

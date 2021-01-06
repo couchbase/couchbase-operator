@@ -18,7 +18,7 @@ const (
 // server deletion.
 type nullSchedulerImpl struct {
 	// A plain list of servers per server class
-	serverClasses map[string]*serverList
+	serverClasses serverGroups
 }
 
 // NewNullScheduler returns a new null scheduler.
@@ -80,7 +80,18 @@ func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 
 // Upgrade removes a node from the scheduler as it's an upgrade target.
 func (sched *nullSchedulerImpl) Upgrade(class, name string) error {
-	return sched.serverClasses[class].del(name)
+	if err := sched.serverClasses[class].del(name); err != nil {
+		return nil
+	}
+
+	return nil
+}
+
+// Reschedule looks at the current state, and if it doesn't match that
+// requested when the scheduler was initialized, return a set of mutually
+// exclusive moves to get us back into a conforming state.
+func (sched *nullSchedulerImpl) Reschedule() ([]Move, error) {
+	return nil, nil
 }
 
 // LogStatus returns nothing.

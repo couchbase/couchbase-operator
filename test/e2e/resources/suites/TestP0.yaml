@@ -97,6 +97,11 @@ testcases:
 
 # Server Group Tests
 - TestRzaResizeCluster
+- TestServerGroupEnable
+- TestServerGroupDisable
+- TestServerGroupAddGroup
+- TestServerGroupRemoveGroup
+- TestServerGroupReplaceGroup
 
 # Persistent Volume Tests
 - TestPersistentVolumeAutoFailover

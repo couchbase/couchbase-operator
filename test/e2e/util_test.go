@@ -229,6 +229,11 @@ var (
 		"TestRzaResizeCluster":                     TestRzaResizeCluster,
 		"TestRzaAntiAffinityOn":                    TestRzaAntiAffinityOn,
 		"TestRzaAntiAffinityOff":                   TestRzaAntiAffinityOff,
+		"TestServerGroupEnable":                    TestServerGroupEnable,
+		"TestServerGroupDisable":                   TestServerGroupDisable,
+		"TestServerGroupAddGroup":                  TestServerGroupAddGroup,
+		"TestServerGroupRemoveGroup":               TestServerGroupRemoveGroup,
+		"TestServerGroupReplaceGroup":              TestServerGroupReplaceGroup,
 
 		// 5.5 feature - Eventing cases
 		"TestEventingCreateEventingCluster": TestEventingCreateEventingCluster,

@@ -123,11 +123,6 @@ var (
 	fixturePodsInvalidServerClassLabels = []*v1.Pod{
 		podFixture(podName1, "", serverGroup1),
 	}
-
-	// A set of pods who are missing the server group label.
-	fixturePodsInvalidServerGroupNodeSelector = []*v1.Pod{
-		podFixture(podName1, serverClass1, ""),
-	}
 )
 
 // podFixture returns a pod object with the node configuration (server class) set.
@@ -264,16 +259,6 @@ func TestStripeInvalidPodServerClassLabels(t *testing.T) {
 	_, err := NewStripeScheduler(fixturePodsInvalidServerClassLabels, c)
 	if err == nil {
 		t.Fatal("Scheduler accepted pods with missing server class labels")
-	}
-}
-
-// Test pods missing server group labels error.
-func TestStripeInvalidPodServerGroupNodeSelector(t *testing.T) {
-	c := fixtureCluster
-
-	_, err := NewStripeScheduler(fixturePodsInvalidServerGroupNodeSelector, c)
-	if err == nil {
-		t.Fatal("Scheduler accepted pods with missing server group labels")
 	}
 }
 

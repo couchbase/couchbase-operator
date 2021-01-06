@@ -48,7 +48,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
-	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroupList)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	victimGroup := 0

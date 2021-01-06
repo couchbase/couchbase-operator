@@ -1640,6 +1640,21 @@ func (c *Cluster) reconcilePods() error {
 func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 	candidates := couchbaseutil.MemberSet{}
 
+	var moves []scheduler.Move
+
+	if c.cluster.Spec.ServerGroupsEnabled() {
+		m, err := c.scheduler.Reschedule()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, move := range m {
+			log.V(1).Info("rescheduled member", "cluster", c.namespacedName(), "name", move.Name, "from", move.From, "to", move.To)
+		}
+
+		moves = m
+	}
+
 	for name, member := range c.members {
 		// Get what the member actually looks like.
 		actual, exists := c.k8s.Pods.Get(name)
@@ -1660,11 +1675,25 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
 
+		// For server groups, if off, then leave it blank.  If it's enabled, default to
+		// what was there originally, unless overridden by a resceduling move.
 		serverGroup := ""
 
-		if actual.Spec.NodeSelector != nil {
-			if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
-				serverGroup = group
+		if c.cluster.Spec.ServerGroupsEnabled() {
+			// Keep the existing selector if one exists.
+			if actual.Spec.NodeSelector != nil {
+				if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+					serverGroup = group
+				}
+			}
+
+			// Check the rescheuling information for any overrides.
+			for _, move := range moves {
+				if move.Name == member.Name() {
+					serverGroup = move.To
+
+					break
+				}
 			}
 		}
 

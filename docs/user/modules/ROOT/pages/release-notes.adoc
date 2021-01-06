@@ -22,6 +22,20 @@ Operator 2.2 makes TLS 1.2 the minimum by default, and will automatically update
 
 You can prevent this change from occurring when xref:howto-operator-upgrade.adoc[upgrading the Operator] on existing clusters by setting `couchbaseclusters.spec.networking.tls.tlsMinimumVersion` to `TLS1.0` after upgrading the CRDs, and before restarting the Operator.
 
+==== Improved Server Group Support
+
+Prior to this release, server groups had to be enabled on cluster creation, and were immutable for the lifetime of the cluster.
+These restrictions have now been lifted.
+
+It is now possible to enable Couchbase server groups, and Operator pod scheduling, while a cluster is running.
+
+It is also now possible to modify the list of server groups used for scheduling.
+Previously if an availability zone were to suffer an outage, the Operator would continually attempt to recreate failed pods in the same availability zone to maintain even balance across the requested set.
+While the availability zone continues to suffer an outage, the Couchbase cluster would be undersized, potentially impacting the ability to service client requests.
+This release allows the availability zones to be modified, excluding the failed one, so that the Operator is able to scale the cluster back up to the correct size.
+
+All server group migration operations use a shortest-path algorithm in order to minimize disruption.
+
 [#release-v210]
 == Release 2.1.0
 

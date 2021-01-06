@@ -1183,17 +1183,9 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 		errs = append(errs, err)
 	}
 
-	if !util.StringArrayCompare(current.Spec.ServerGroups, updated.Spec.ServerGroups) {
-		errs = append(errs, util.NewUpdateError("spec.serverGroups", "body"))
-	}
-
 	for _, cur := range current.Spec.Servers {
 		for i, up := range updated.Spec.Servers {
 			if cur.Name == up.Name {
-				if !util.StringArrayCompare(cur.ServerGroups, up.ServerGroups) {
-					errs = append(errs, util.NewUpdateError(fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"))
-				}
-
 				if !util.StringArrayCompare(cur.Services.StringSlice(), up.Services.StringSlice()) {
 					err := util.NewUpdateError(fmt.Sprintf("spec.servers[%d].services", i), "body")
 					errs = append(errs, err)

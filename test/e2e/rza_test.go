@@ -10,6 +10,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -18,6 +19,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -27,10 +29,7 @@ type rzaMap map[string]int
 // Note: Should be used only when using static server-group configuration
 // Returns for map of expected ServerGroup names with the pod count in the group
 // assuming the CRD is having static server-group configuration in it.
-func mustGetExpectedRzaResultMap(t *testing.T, cluster *types.Cluster, groupSize int) rzaMap {
-	// Get the sorted list of AZs and the number of them.
-	serverGroups := getAvailabilityZones(t, cluster)
-
+func getExpectedRzaResultMap(groupSize int, serverGroups []string) rzaMap {
 	expected := rzaMap{}
 	expected.accumulateRzaServerClass(groupSize, serverGroups)
 
@@ -150,7 +149,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Create a expected RZA results map for verification
-	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	expectedEvents := []eventschema.Validatable{
@@ -257,7 +256,7 @@ func TestRzaResizeCluster(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Create a map for server-groups based on deployed cb-server nodes
-	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	// Starting resize cluster test
@@ -270,7 +269,7 @@ func TestRzaResizeCluster(t *testing.T) {
 		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 
 		// Update deployed server-groups based on new cluster size
-		expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+		expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 		expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 	}
 
@@ -308,7 +307,7 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// When ready scale up, with AA on it should fail.
-	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, class, clusterSize+1, targetKube, testCouchbase)
@@ -349,7 +348,7 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// When ready scale up, with AA on it should fail.
-	expected := mustGetExpectedRzaResultMap(t, targetKube, clusterSize)
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	testCouchbase = e2eutil.MustResizeClusterNoWait(t, class, clusterSize+1, targetKube, testCouchbase)
@@ -357,7 +356,7 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Create a map for server-groups based on deployed cb-server nodes
-	expected = mustGetExpectedRzaResultMap(t, targetKube, testCouchbase.Spec.TotalSize())
+	expected = getExpectedRzaResultMap(testCouchbase.Spec.TotalSize(), availableServerGroups)
 	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
 
 	expectedEvents := []eventschema.Validatable{
@@ -365,4 +364,207 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 		e2eutil.ClusterScaleUpSequence(1),
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestServerGroupEnable tests server groups can be enabled on a running cluster.
+func TestServerGroupEnable(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipServerGroupTest(t, kubernetes)
+
+	// Dynamic configuration.
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+	clusterSize := len(availableServerGroups)
+
+	// Create the cluster.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+
+	// Enable server groups, expecting an upgrade as the pods specification
+	// is augmented with scheduling information.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/serverGroups", availableServerGroups), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check things are spread out as we expect.
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestServerGroupDisable tests server groups can be removed from a running cluster...
+// the ultimate "get out of jail free" card for support.
+func TestServerGroupDisable(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipServerGroupTest(t, kubernetes)
+
+	// Dynamic configuration.
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+	clusterSize := len(availableServerGroups)
+
+	// Create the cluster.
+	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster.Spec.ServerGroups = availableServerGroups
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Disable server groups, expecting an upgrade as the pod specification
+	// is deprived of scheduling information.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/serverGroups"), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestServerGroupAddGroup starts with one fewer server groups than the cluster can support
+// then adds the remaining one.  Possible use cases are rebalancing the cluster over more
+// server groups for better fault tolerance.
+func TestServerGroupAddGroup(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipServerGroupTest(t, kubernetes)
+
+	// Dynamic configuration.
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+	initialServerGroups := availableServerGroups[:len(availableServerGroups)-1]
+	clusterSize := len(availableServerGroups)
+
+	// Create the cluster.
+	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster.Spec.ServerGroups = initialServerGroups
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Replace the initial server group set with the total available to scale
+	// this parameter up.  The cluster should upgrade as the scheduling constraints
+	// are adapted.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", availableServerGroups), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check things are spread out as we expect.
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		upgradeSequence,
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestServerGroupRemoveGroup removes a server group.  Possible use cases are reducing the
+// number of server groups in order to scale down the cluster while maintaining equal balance
+// across the server groups.
+func TestServerGroupRemoveGroup(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipServerGroupTest(t, kubernetes)
+
+	// Dynamic configuration.
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+	finalServerGroups := availableServerGroups[:len(availableServerGroups)-1]
+	clusterSize := len(availableServerGroups)
+
+	// Create the cluster.
+	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster.Spec.ServerGroups = availableServerGroups
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Replace the initial server group set with the total available to scale
+	// this parameter up.  The cluster should upgrade as the scheduling constraints
+	// are adapted.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", finalServerGroups), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check things are spread out as we expect.
+	expected := getExpectedRzaResultMap(clusterSize, finalServerGroups)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		upgradeSequence,
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestServerGroupReplaceGroup tests migrating a server group from one availability zone
+// to another, possibly because the provider needs to perform maintenance or something...
+// if it can be done a user will find a way to use it!
+func TestServerGroupReplaceGroup(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipServerGroupTest(t, kubernetes)
+
+	// Dynamic configuration.
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+	initialServerGroups := availableServerGroups[:len(availableServerGroups)-1]
+	finalServerGroups := availableServerGroups[1:]
+	clusterSize := len(initialServerGroups)
+
+	// Create the cluster.
+	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster.Spec.ServerGroups = initialServerGroups
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Replace the initial server group set with the total available to scale
+	// this parameter up.  The cluster should upgrade as the scheduling constraints
+	// are adapted.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", finalServerGroups), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check things are spread out as we expect.
+	expected := getExpectedRzaResultMap(clusterSize, finalServerGroups)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		upgradeSequence,
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
