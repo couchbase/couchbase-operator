@@ -746,10 +746,8 @@ func TestLogCollectValidateArguments(t *testing.T) {
 			execOut, err := e2eutil.Cbopinfo(f.CbopinfoPath, args.Slice())
 			execOutStr := strings.TrimSpace(string(execOut))
 
-			t.Logf("Returned: %s\n", execOutStr)
-
 			if err != nil {
-				e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %w", arg.Arg, err))
+				e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %w\n Returned: %s", arg.Arg, err, execOutStr))
 			}
 
 			logFileName := getLogFileNameFromExecOutput(execOutStr)
@@ -763,10 +761,8 @@ func TestLogCollectValidateArguments(t *testing.T) {
 				execOut, err := e2eutil.Cbopinfo(f.CbopinfoPath, args.Slice())
 				execOutStr := strings.TrimSpace(string(execOut))
 
-				t.Logf("Returned: %s\n", execOutStr)
-
 				if err == nil {
-					e2eutil.Die(t, fmt.Errorf("Command executed successfully without providing value for %s: %w", arg.Arg, err))
+					e2eutil.Die(t, fmt.Errorf("Command executed successfully without providing value for %s: %w\n Returned: %s", arg.Arg, err, execOutStr))
 				}
 
 				// Verify valid error message
