@@ -91,11 +91,18 @@ var discard = pathMatcher{
 		path:  ".spec.validation.openAPIV3Schema.properties.spec.properties.volumeClaimTemplates.items.properties.spec.properties.dataSource",
 	},
 	// Validation is "broken" for pod templates, in that they require at least
-	// one container, so remove this restriction.
+	// one container, so remove this restriction.  The removal of required is
+	// somewhat imprecise and may need fixing in the future, it's a hard problem
+	// as we cannot remove array elements by value with JSON paths.
 	{
 		group: "couchbase.com",
 		kind:  "CouchbaseCluster",
 		path:  ".spec.validation.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.containers",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.validation.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.required",
 	},
 }
 
