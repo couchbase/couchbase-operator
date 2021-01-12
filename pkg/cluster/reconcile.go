@@ -1596,6 +1596,11 @@ func (c *Cluster) reconcilePods() error {
 			return err
 		}
 
+		// Preserve any labels or annotations that are updated by other means, typically
+		// for pods this is only upgrades.
+		requested.Annotations[constants.PodSpecAnnotation] = actual.Annotations[constants.PodSpecAnnotation]
+		requested.Annotations[constants.CouchbaseVersionAnnotationKey] = actual.Annotations[constants.CouchbaseVersionAnnotationKey]
+
 		if reflect.DeepEqual(actual.Labels, requested.Labels) && reflect.DeepEqual(actual.Annotations, requested.Annotations) {
 			continue
 		}

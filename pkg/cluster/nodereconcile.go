@@ -390,6 +390,11 @@ func handleUnknownMembers(r *ReconcileMachine, c *Cluster) error {
 // before doing any cluster operations.
 func handleWarmupNodes(r *ReconcileMachine, c *Cluster) error {
 	if r.couchbase.WarmupNodes.Size() > 0 && r.couchbase.DownNodes.Empty() {
+		// SM: So, this and a lot of others causes silent skipping of topology changes and
+		// then we do other things... I'm of a mind that only allowing said things
+		// after we have completed the topology changes is a good thing, and we are in
+		// a known good state is a good assumption to make, meaning less code and fewer
+		// hidden race condition bugs.
 		log.Info("Pods warming up, skipping", "cluster", c.namespacedName())
 		r.transitionState(ReconcileNotifyFinished)
 
