@@ -1,0 +1,366 @@
+#!/usr/bin/env python3
+"""
+asciidoc-gen generates asciidoc reference documentation from the CRDs.
+"""
+
+# pylint: disable=line-too-long
+# pylint: disable=invalid-name
+# pylint: disable=too-many-branches
+# pylint: disable=too-many-locals
+
+import argparse
+import logging
+import re
+import sys
+import yaml
+
+# These are from Kubernetes libraries, therefore must not be documented as
+# it will end up huge.  The root element is selected to be generated, and
+# should have a link to the native Kubernetes documentation.
+NATIVE_TYPES = [
+    'couchbaseclusters.spec.backup.nodeSelector',
+    'couchbaseclusters.spec.backup.resources',
+    'couchbaseclusters.spec.backup.selector',
+    'couchbaseclusters.spec.networking.adminConsoleServiceTemplate',
+    'couchbaseclusters.spec.networking.exposedFeatureServiceTemplate',
+    'couchbaseclusters.spec.security.rbac.selector',
+    'couchbaseclusters.spec.securityContext',
+    'couchbaseclusters.spec.servers.env',
+    'couchbaseclusters.spec.servers.envFrom',
+    'couchbaseclusters.spec.servers.pod',
+    'couchbaseclusters.spec.servers.resources',
+    'couchbaseclusters.spec.volumeClaimTemplates',
+    'couchbaseclusters.spec.xdcr.remoteClusters.replications.selector',
+]
+
+# Used to indicate this is the root element of a document.
+ROOT_DEPTH = 1
+
+# Output constants.
+CONSTRAINTS_HEADING = 'Constraints'
+DESCRIPTION_HEADING = 'Description'
+
+REQUIRED_LABEL = 'Required'
+TYPE_LABEL = 'Type'
+DEFAULT_LABEL = 'Default'
+MINIMUM_LABEL = 'Minimum'
+MAXIMUM_LABEL = 'Maximum'
+MINIMUM_LENGTH_LABEL = 'Minimum Length'
+MAXIMUM_LENGTH_LABEL = 'Maximum Length'
+MINIMUM_ITEMS_LABEL = 'Minimum Items'
+MAXIMUM_ITEMS_LABEL = 'Maximum Items'
+ENUMERATIONS_LABEL = 'Enumerations'
+PATTERN_LABEL = 'Pattern (Regular Expression)'
+
+
+def escape_attributes(attribute):
+    """
+    Raw strings like "{blah}" need escaping, or asciidoc thinks the
+    regular expression is actual macro expansion syntax.
+    """
+
+    if isinstance(attribute, str):
+        # Escape attributes.
+        attribute = re.sub(r'\{', r'\{', attribute)
+
+        # Escape capitalization.
+        attribute = re.sub(r'\*', r'\*', attribute)
+
+        # Escape italics.
+        attribute = re.sub(r'_', r'\_', attribute)
+
+    return attribute
+
+
+def generate_heading(content, depth, heading):
+    """
+    Helper for create Asciidoc headings.
+    """
+
+    content.append('{} {}'.format('=' * depth, heading))
+    content.append('')
+
+
+def generate_flag(content, flag, value):
+    """
+    Helper to create asciidoc flags.
+    """
+    if not value:
+        return
+
+    content.append('*{}*'.format(flag))
+    content.append('')
+
+
+def generate_constraint(content, key, value):
+    """
+    Helper to create asciidoc constaints.
+    """
+    if value is None:
+        return
+
+    content.append('*{}*: `{}`'.format(key, escape_attributes(value)))
+    content.append('')
+
+
+def generate_scalar_constraints(content, typ, schema):
+    """
+    If the data type is a scalar, create any optional constraints
+    that are defined for it.
+    """
+    if typ == 'number':
+        if 'minimum' in schema:
+            generate_constraint(content, MINIMUM_LABEL, schema['minimum'])
+        if 'maximum' in schema:
+            generate_constraint(content, MAXIMUM_LABEL, schema['maximum'])
+    elif typ == 'string':
+        if 'minLength' in schema:
+            generate_constraint(content, MINIMUM_LENGTH_LABEL, schema['minLength'])
+        if 'maxLength' in schema:
+            generate_constraint(content, MAXIMUM_LENGTH_LABEL, schema['maxLength'])
+        if 'pattern' in schema:
+            generate_constraint(content, PATTERN_LABEL, schema['pattern'])
+        if 'enum' in schema:
+            generate_constraint(content, ENUMERATIONS_LABEL, ', '.join(schema['enum']))
+
+
+def generate_array_constraints(content, typ, array_type, schema):
+    """
+    If the data type is an array, create any array specifc constraints.
+    If the array item type is a scalar, also create any constraints for that
+    too.
+    """
+    if typ != 'array':
+        return
+
+    if 'minItems' in schema:
+        generate_constraint(content, MINIMUM_ITEMS_LABEL, schema['minItems'])
+    if 'maxItems' in schema:
+        generate_constraint(content, MAXIMUM_ITEMS_LABEL, schema['maxItems'])
+
+    generate_scalar_constraints(content, array_type, schema['items'])
+
+
+def generate_description(content, description):
+    """
+    Process the description strings for any special markup, and also format to
+    more easily grok any changes to the documentation.
+    """
+    lines = re.split(r'\.\s+', description)
+
+    def periodify(line):
+        if line.endswith('.'):
+            return line
+
+        return line + '.'
+
+    lines = [periodify(line) for line in lines]
+
+    for line in lines:
+        # A simple filter to demonstrate how we can mutate the description field.
+        line_break = False
+        if 'DEPRECATED' in line:
+            line = re.sub('DEPRECATED', '*DEPRECATED*', line)
+            line_break = True
+
+        content.append(line)
+        if line_break:
+            content.append('')
+
+    content.append('')
+
+
+def generate_metadata(content, depth, path):
+    """
+    Inject boilerplate documentation for resource type metadata
+    """
+
+    generate_heading(content, depth, path)
+    generate_heading(content, depth + 1, CONSTRAINTS_HEADING)
+    generate_flag(content, REQUIRED_LABEL, True)
+    generate_constraint(content, TYPE_LABEL, 'object')
+    generate_heading(content, depth + 1, DESCRIPTION_HEADING)
+    generate_description(content, 'Standard object metadata as defined for all Kubernetes types.')
+
+
+def generate_schema(content, path, schema, required):
+    """
+    Generate ASCII documentation from a JSON schema object.
+    Valid keyword arguments are:
+    """
+
+    depth = min(3, len(path.split('.')))
+
+    # Process the root of a native type, because we should document where
+    # to look for official documentation, but reject any children.
+    for ignored in NATIVE_TYPES:
+        if path == ignored:
+            break
+
+        if path.startswith(ignored):
+            return
+
+    # Metadata is not documented in the CRD by default, so catch that and
+    # treat it specially.
+    if re.match(r'[\w\d]+\.metadata', path):
+        generate_metadata(content, depth, path)
+        return
+
+    # If the schema doesn't have a description, then it must do.  The only
+    # exception is for Kubernetes native types, which should be ignored.
+    try:
+        description = schema['description']
+        typ = schema['type']
+    except KeyError:
+        logging.error('unable to extract schema metadata at %s', path)
+        return
+
+    # Arrays a special in that array items only get interrogated if they are
+    # an object.  Therefore do a look-ahead and see if it's a scalar and handle
+    # it slightly differently.
+    display_type = typ
+    array_type = None
+
+    if typ == 'array':
+        array_type = schema['items']['type']
+        display_type = '[]{}'.format(array_type)
+
+    # Every schema can have an optional default.
+    default = None
+
+    if 'default' in schema:
+        default = schema['default']
+
+    # Every attribute gets a heading.
+    generate_heading(content, depth, path)
+
+    # Every attribute has a set of constraints.  For certain types they may have a
+    # further set of constraints.
+    if depth != ROOT_DEPTH:
+        generate_heading(content, depth+1, CONSTRAINTS_HEADING)
+        generate_flag(content, REQUIRED_LABEL, required)
+        generate_constraint(content, TYPE_LABEL, display_type)
+        generate_constraint(content, DEFAULT_LABEL, default)
+        generate_scalar_constraints(content, typ, schema)
+        generate_array_constraints(content, typ, array_type, schema)
+
+    # Print out the description after the flags.
+    if depth != ROOT_DEPTH:
+        generate_heading(content, depth+1, DESCRIPTION_HEADING)
+
+    generate_description(content, description)
+
+    # For objects, recursively descend into each property.
+    if typ == 'object':
+        try:
+            properties = schema['properties']
+        except KeyError:
+            logging.error('unable to extract object properites at %s', path)
+            return
+
+        required = []
+        if 'required' in schema:
+            required = schema['required']
+
+        for property_name, property_schema in properties.items():
+            generate_schema(content, '{}.{}'.format(path, property_name), property_schema, property_name in required)
+
+    # Arrays are--obviously--special... Arrays of scalars have already been handled
+    # due to look-ahead, so we only need concern ourselves with arrays of objects.  Arrays
+    # of arrays are possible, but like ROUSs, I don't think they exist...
+    elif typ == 'array' and array_type == 'object':
+        try:
+            items = schema['items']
+            properties = items['properties']
+        except KeyError:
+            logging.error('unable to extract array item properties at %s', path)
+            return
+
+        required = []
+        if 'required' in items:
+            required = items['required']
+
+        for property_name, property_schema in properties.items():
+            generate_schema(content, '{}.{}'.format(path, property_name), property_schema, property_name in required)
+
+
+def generate(args, crd, content):
+    """
+    Create an asciidoc rendition of the CRD's structure and validation constraints.
+    """
+
+    try:
+        kind = crd['spec']['names']['kind']
+        plural = crd['spec']['names']['plural']
+        versions = crd['spec']['versions']
+    except KeyError:
+        logging.error('unable to extract CRD metadata')
+        return ''
+
+    for version in versions:
+        try:
+            name = version['name']
+            schema = version['schema']['openAPIV3Schema']
+        except KeyError:
+            logging.error('unable to extract CRD version metadata for %s', kind)
+            continue
+
+        if name != args.version:
+            continue
+
+        generate_schema(content, plural, schema, False)
+
+    return plural
+
+
+def main():
+    """
+    Load up the CRD file, and generate docs for it.
+    """
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--version', type=str, required=True)
+    parser.add_argument('--dry-run', action='store_true')
+    args = parser.parse_args()
+
+    logging.getLogger().setLevel(logging.INFO)
+    formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)03d %(levelname)s %(message)s',
+                                  datefmt='%Y-%m-%d %H:%M:%S')
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(formatter)
+    logging.getLogger().addHandler(handler)
+
+    crd_path = 'example/crd.yaml'
+
+    with open(crd_path) as f:
+        crd_data = f.read()
+
+    crds = yaml.load_all(crd_data, Loader=yaml.SafeLoader)
+
+    generated_docs = {}
+
+    for crd in crds:
+        content = []
+
+        plural = generate(args, crd, content)
+
+        if args.dry_run:
+            continue
+
+        adoc_file_name = 'autogenerated-reference-{}.adoc'.format(plural)
+        adoc_file_path = 'docs/user/modules/ROOT/pages/{}'.format(adoc_file_name)
+
+        with open(adoc_file_path, 'w') as adoc_file:
+            adoc_file.write("\n".join(content))
+
+        generated_docs[plural] = adoc_file_name
+
+    with open('docs/user/modules/ROOT/partials/auto-reference.adoc', 'w') as nav_file:
+        for plural, generated_doc in generated_docs.items():
+            nav_file.write("** xref:{}[{}]\n".format(generated_doc, plural))
+
+
+if __name__ == '__main__':
+    main()
+
+# vi: ts=8 et:

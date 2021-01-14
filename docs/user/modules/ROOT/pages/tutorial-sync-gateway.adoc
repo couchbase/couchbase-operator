@@ -82,7 +82,7 @@ stringData:
     The connection string may be determined the same way as for xref:howto-client-sdks.adoc[client SDKs].
     The connection options are dependent on the chosen xref:concept-couchbase-networking.adoc[network architecture].
 
-<.> `databases.cb-example.bucket` defines the `couchbasebuckets.metadata.name` to connect to and use to store mobile data.
+<.> `databases.cb-example.bucket` defines the Couchbase bucket name to connect to and use to store mobile data.
 
 <.> `databases.cb-example.username` defines the user that will be used to connect to the cluster.
 

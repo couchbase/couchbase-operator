@@ -30,5 +30,5 @@ spec:
 The node port can be accessed on any Kubernetes node and will provide a degree of high-availability to a client connecting to it.
 However as node IP addresses may vary during the life cycle of a Kubernetes cluster it is considered unstable and may cause clients to fail.
 
-<.> `couchbasecluster.spec.networking.exposedFeatures` defines the `client` feature set, meaning all enabled services are exposed.
+<.> `couchbaseclusters.spec.networking.exposedFeatures` defines the `client` feature set, meaning all enabled services are exposed.
 This also causes a per-pod service to be created allowing direct access by a client to each pod as required.

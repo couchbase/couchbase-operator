@@ -104,7 +104,7 @@ The hostname is calculated as per the xref:howto-client-sdks.adoc#dns-based-addr
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
 
 <.> **TLS only:** For TLS connections you need to specify the remote cluster CA certificate in order to verify the remote cluster is trusted.
-`couchbasecluster.spec.xdcr.remoteClusters.tls.secret` documents the secret format.
+`couchbaseclusters.spec.xdcr.remoteClusters.tls.secret` documents the secret format.
 
 <.> Replications are selected that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
 

@@ -135,7 +135,7 @@ $ kubectl get pods -l couchbase_cluster=foo
 ----
 
 Select any pod that is returned e.g. `foo-0000`.
-The DNS domain is the same as specified by the `couchbasecluster.spec.networking.dns.domain` attribute.
+The DNS domain is the same as specified by the `couchbaseclusters.spec.networking.dns.domain` attribute.
 If the DNS domain is set to `my-cluster.acme.org`, then the connection string to use will be `\https://foo-0000.my-cluster.acme.org:18091`.
 
 === IP Based Addressing

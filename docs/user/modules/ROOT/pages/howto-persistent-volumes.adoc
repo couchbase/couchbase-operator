@@ -45,4 +45,4 @@ It is referred to by attributes in the `couchbaseclusters.spec.servers.volumeMou
 
 <.> `couchbaseclusters.spec.volumeClaimTemplates.spec.storageClassName` refers to a dynamically allocated storage class defined on the platform.
 
-<.> `couchbasecluster.spec.volumeClaimTemplates.spec.resources` defines the size of the volume that will be allocated.
+<.> `couchbaseclusters.spec.volumeClaimTemplates.spec.resources` defines the size of the volume that will be allocated.

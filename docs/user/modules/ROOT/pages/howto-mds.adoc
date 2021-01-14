@@ -40,6 +40,6 @@ The `couchbaseclusters.spec.servers.pod` template can even allow execution on di
 <.> `couchbaseclusters.spec.servers.size` is the number of pods to create per-server class.
 This can be independently scaled per-server class.
 
-<.> `couchbasecluster.spec.servers.services` can be independently defined per-server class.
+<.> `couchbaseclusters.spec.servers.services` can be independently defined per-server class.
 Services are immutable and cannot be changed once provisioned.
 It is highly recommended that each service only appear in one class -- this simplifies memory allocation.

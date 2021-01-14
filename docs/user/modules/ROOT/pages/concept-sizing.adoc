@@ -47,7 +47,7 @@ Therefore only a single additional Kubernetes node need be available to schedule
 
 === Server Groups
 
-When using the `couchbaseclusters.spec.servergroups` feature, the Operator schedules pods equally across each availability zone defined.
+When using the `couchbaseclusters.spec.serverGroups` feature, the Operator schedules pods equally across each availability zone defined.
 A number of Couchbase server crashes in one zone will require sufficient capacity in order to replace them and restore balance.
 Therefore when using server groups any additional required capacity will need to be replicated across all availability zones.
 
