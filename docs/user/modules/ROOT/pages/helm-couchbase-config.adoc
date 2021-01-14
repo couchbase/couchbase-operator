@@ -294,7 +294,7 @@ buckets:
 # CouchbaseBackups runs a job which preserves data into backups
 backups: {}
 #
-# Uncomment to create an backup restore named 'my-restore'
+# Uncomment to create a backup named 'my-backup'
 #
 #   default-backup:
 #     name: my-backup
@@ -313,7 +313,7 @@ backups: {}
 # CouchbaseBackupRestore restores data from backups
 backuprestores: {}
 #
-# Uncomment to create an backup restore named 'my-restore'
+# Uncomment to create a restore named 'my-restore'
 #
 # default-restore:
 #   name: my-restore
