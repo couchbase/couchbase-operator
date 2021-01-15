@@ -63,7 +63,10 @@ This includes xref:reference-couchbasecluster.adoc#spec-cluster-indexer-threads[
 With the coming of Couchbase Server 6.5, comes the ability to xref:howto-ui.adoc#configuring-an-ingress[use Kubernetes ingresses] to expose the administrative UI outside of the Kubernetes cluster.
 
 Full support for Istio service mesh is now provided, and may be enabled in the xref:reference-couchbasecluster.adoc#spec-networking-networkplatform[Couchbase cluster networking configuration].
-This supports both basic and mTLS modes of operation.
+Both basic and mTLS modes of operation are supported.
+
+Please note that service meshes (including Istio), must already be enabled in the namespace before you install the Autonomous Operator and provision any Couchbase clusters.
+Therefore, in order to use Istio with an existing Autonomous Operator deployment, you'll need to recreate the deployment in a namespace that already has Istio enabled, and then migrate any cluster data to the new deployment using methods such as XDCR.
 
 == Upgrading to Operator 2.1
 
