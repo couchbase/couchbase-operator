@@ -115,7 +115,7 @@ $ oc create -f couchbase-cluster.yaml
 --
 ====
 
-After receiving the configuration, the Operator automatically begins creating the cluster. The amount of time it takes to create the cluster depends on the configuration. You can track the progress of cluster creation using the `couchbaseclusters.status` attributes.
+After receiving the configuration, the Operator automatically begins creating the cluster. The amount of time it takes to create the cluster depends on the configuration. You can track the progress of cluster creation using the xref:resource/couchbasecluster.adoc#couchbaseclusters-status[`couchbaseclusters.status`] attributes.
 
 === Verifying the Deployment
 
@@ -155,7 +155,7 @@ cb-example-0002                       1/1       Running   0          1m
 couchbase-operator-1917615544-pd4q6   1/1       Running   0          8m
 ----
 The `CouchbaseCluster` object status is continually updated during cluster operation and can be used to trigger external events.
-See the `couchbaseclusters.status` documentation for details.
+See the xref:resource/couchbasecluster.adoc#couchbaseclusters-status[`couchbaseclusters.status`] documentation for details.
 
 == Next Steps
 

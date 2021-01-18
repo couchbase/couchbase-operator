@@ -50,11 +50,11 @@ spec:
       - us-east-1b
 ----
 
-<.> `couchbaseclusters.spec.serverGroups` is a global default that can used by any server class.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servergroups[`couchbaseclusters.spec.serverGroups`] is a global default that can used by any server class.
 
-<.> This server class does not have `couchbaseclusters.spec.servers.serverGroups` defined.
-When the Operator schedules pods in this class it will default to server groups set with `couchbaseclusters.spec.serverGroups`.
+<.> This server class does not have xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-servergroups[`couchbaseclusters.spec.servers.serverGroups`] defined.
+When the Operator schedules pods in this class it will default to server groups set with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servergroups[`couchbaseclusters.spec.serverGroups`].
 
-<.> This server class has `couchbaseclusters.spec.servers.serverGroups` defined.
-When the Operator schedules pods in this class it will override the global defaults set with `couchbaseclusters.spec.serverGroups` and use `couchbaseclusters.spec.servers.serverGroups` instead.
+<.> This server class has xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-servergroups[`couchbaseclusters.spec.servers.serverGroups`] defined.
+When the Operator schedules pods in this class it will override the global defaults set with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servergroups[`couchbaseclusters.spec.serverGroups`] and use xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-servergroups[`couchbaseclusters.spec.servers.serverGroups`] instead.
 This is useful when a server class is sized in a way that cannot be fully balanced across the default set of server groups.

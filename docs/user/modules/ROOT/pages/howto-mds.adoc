@@ -8,7 +8,7 @@ This allows independent scaling of services as needs dictate.
 
 == Couchbase Cluster Configuration
 
-MDS is modeled with the `couchbaseclusters.spec.servers` configuration attribute:
+MDS is modeled with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers[`couchbaseclusters.spec.servers`] configuration attribute:
 
 [source,yaml]
 ----
@@ -30,16 +30,16 @@ spec:
     - query
 ----
 
-<.> `couchbaseclusters.spec.servers` is a list of different classes of server.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers[`couchbaseclusters.spec.servers`] is a list of different classes of server.
 Each is independently configurable and can be used to run different services on different classes.
 Different classes may have different scales to handle different workloads on different services.
-The `couchbaseclusters.spec.servers.pod` template can even allow execution on different hardware types.
+The xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-pod[`couchbaseclusters.spec.servers.pod`] template can even allow execution on different hardware types.
 
-<.> `couchbaseclusters.spec.servers.name` must be a unique per-server class.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-name[`couchbaseclusters.spec.servers.name`] must be a unique per-server class.
 
-<.> `couchbaseclusters.spec.servers.size` is the number of pods to create per-server class.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-size[`couchbaseclusters.spec.servers.size`] is the number of pods to create per-server class.
 This can be independently scaled per-server class.
 
-<.> `couchbaseclusters.spec.servers.services` can be independently defined per-server class.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-services[`couchbaseclusters.spec.servers.services`] can be independently defined per-server class.
 Services are immutable and cannot be changed once provisioned.
 It is highly recommended that each service only appear in one class -- this simplifies memory allocation.

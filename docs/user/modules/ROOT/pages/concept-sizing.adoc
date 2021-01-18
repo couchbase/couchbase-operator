@@ -10,7 +10,7 @@ You also need to be aware of how memory allocations will affect database perform
 
 One of the key features of the Operator is its ability to automatically recover from a pod failure or Couchbase Server crash.
 
-When using persistent volume backing storage with the `couchbaseclusters.spec.servers.volumeMounts.default` mount then the Operator will recreate the pod in the event of a failure.
+When using persistent volume backing storage with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-volumemounts-default[`couchbaseclusters.spec.servers.volumeMounts.default`] mount then the Operator will recreate the pod in the event of a failure.
 This involves deleting the old pod and replacing it with a new one, reusing the existing storage volumes.
 Not only is this form of recovery faster -- using delta-node recovery -- but it also does not require additional Kubernetes resource to re-provision.
 
@@ -19,7 +19,7 @@ For example a cluster containing three replicas can tolerate 3 sequential Couchb
 In order to recover in this situation the Operator creates 3 new pods, rebalances data then deletes the old ones.
 In this situation you would potentially need an additional 3 Kubernetes nodes in order to accommodate the new pods.
 
-You will need extra Kubernetes node capacity if using the `couchbaseclusters.spec.antiAffinity` attribute, or your `couchbaseclusters.spec.servers.resources`] scheduling hints are sufficiently large enough to necessitate the use of a new node for each pod.
+You will need extra Kubernetes node capacity if using the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-antiaffinity[`couchbaseclusters.spec.antiAffinity`] attribute, or your xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-resources[`couchbaseclusters.spec.servers.resources`] scheduling hints are sufficiently large enough to necessitate the use of a new node for each pod.
 
 === Rolling Upgrade
 
@@ -31,7 +31,7 @@ This is potentially additive with the number of pod's that can be failed over as
 
 === Server Class Replacement
 
-It is possible to replace one named server class with another in the `couchbaseclusters.spec.servers` list
+It is possible to replace one named server class with another in the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers[`couchbaseclusters.spec.servers`] list
 .
 This allows wholesale replacement of servers outside of the rolling upgrade mechanism.
 For example this can be used to migrate from a homogeneous topology to one that takes advantage of the multi-dimensional scaling feature of Couchbase Server.
@@ -47,7 +47,7 @@ Therefore only a single additional Kubernetes node need be available to schedule
 
 === Server Groups
 
-When using the `couchbaseclusters.spec.serverGroups` feature, the Operator schedules pods equally across each availability zone defined.
+When using the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servergroups[`couchbaseclusters.spec.serverGroups`] feature, the Operator schedules pods equally across each availability zone defined.
 A number of Couchbase server crashes in one zone will require sufficient capacity in order to replace them and restore balance.
 Therefore when using server groups any additional required capacity will need to be replicated across all availability zones.
 
@@ -58,7 +58,7 @@ It is therefore critical to determine your memory requirements before deployment
 
 For example if your data set size is 1 GiB and you have 2 replicas, then you will need approximately 3 GiB of memory in order to contain the entire working set in memory and yield the highest possible performance.
 This in turn affects how the cluster is configured.
-If the `couchbaseclusters.spec.cluster.dataServiceMemoryQuota` parameter was set to `256Mi` for your cluster, you would require 12 instances to host your data set in memory.
+If the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-cluster-dataservicememoryquota[`couchbaseclusters.spec.cluster.dataServiceMemoryQuota`] parameter was set to `256Mi` for your cluster, you would require 12 instances to host your data set in memory.
 
 Persistent storage is orders of magnitude less expensive than memory, so you may wish to adjust the amount of memory required.
 Your business workload may be able to function adequately with a 20% memory residency.

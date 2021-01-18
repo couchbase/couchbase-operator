@@ -79,7 +79,7 @@ To generate a certificate for the cluster `cb-example` in the `default` namespac
 $ ./easyrsa --subject-alt-name='DNS:*.cb-example,DNS:*.cb-example.default,DNS:*.cb-example.default.svc,DNS:*.cb-example.default.svc.cluster.local,DNS:cb-example-srv,DNS:cb-example-srv.default,DNS:cb-example-srv.default.svc,DNS:*.cb-example-srv.default.svc.cluster.local,DNS:localhost' build-server-full couchbase-server nopass
 ----
 
-The key/certificate pair can be found in `pki/private/couchbase-server.key` and `pki/issued/couchbase-server.crt` and used as `tls.key` and `tls.crt`, respectively, in the `couchbaseclusters.spec.networking.tls.secretSource.serverSecretName` parameter.
+The key/certificate pair can be found in `pki/private/couchbase-server.key` and `pki/issued/couchbase-server.crt` and used as `tls.key` and `tls.crt`, respectively, in the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-serversecretname[`couchbaseclusters.spec.networking.tls.secretSource.serverSecretName`] parameter.
 
 [NOTE]
 ====
@@ -89,7 +89,7 @@ Password-protected keys are not supported by Couchbase Server or the Operator.
 === Private Key Formatting
 
 Due to an https://issues.couchbase.com/browse/MB-24404[issue^] with Couchbase Server's private key handling, server keys may need to be PKCS#1 formatted.
-This is only required when using legacy TLS configuration (with `couchbaseclusters.spec.networking.tls.static`).
+This is only required when using legacy TLS configuration (with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-static[`couchbaseclusters.spec.networking.tls.static`]).
 
 This can be achieved with the following commands:
 
@@ -126,5 +126,5 @@ Assuming the administrative user defined for Couchbase Server is `Administrator`
 $ ./easyrsa build-client-full Administrator nopass
 ----
 
-The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `tls.key` and `tls.crt` respectively when specifying the `couchbaseclusters.spec.networking.tls.secretSource.clientSecretName` field.
+The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `tls.key` and `tls.crt` respectively when specifying the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-clientsecretname[`couchbaseclusters.spec.networking.tls.secretSource.clientSecretName`] field.
 

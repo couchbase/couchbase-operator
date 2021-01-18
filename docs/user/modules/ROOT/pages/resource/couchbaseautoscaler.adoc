@@ -1,0 +1,117 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseAutoscaler Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbaseautoscaler]
+
+CouchbaseAutoscaler provides an interface for the Kubernetes Horizontal Pod Autoscaler to interactive with the Couchbase cluster and provide autoscaling.
+This resource is not defined by the end user, and is managed by the Operator.
+
+== couchbaseautoscalers.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbaseautoscalers.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+== couchbaseautoscalers.metadata
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+Standard object metadata as defined for all Kubernetes types.
+For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+
+== couchbaseautoscalers.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseAutoscalerSpec allows control over an autoscaling group.
+
+=== couchbaseautoscalers.spec.servers
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+==== Description
+
+Servers specifies the server group that this autoscaler belongs to.
+
+=== couchbaseautoscalers.spec.size
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+==== Description
+
+Size allows the server group to be dynamically scaled.
+
+== couchbaseautoscalers.status
+
+=== Constraints
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseAutoscalerStatus provides information to the HPA to assist with scaling server groups.
+
+=== couchbaseautoscalers.status.labelSelector
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+LabelSelector allows the HPA to select resources to monitor for resource utilization in order to trigger scaling.
+
+=== couchbaseautoscalers.status.size
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+==== Description
+
+Size is the current size of the server group.

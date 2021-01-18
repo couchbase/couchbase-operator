@@ -72,13 +72,14 @@
 .Reference
 * Resource Types
  ** xref:reference-resources.adoc[Resource Documentation]
-include::partial$auto-reference.adoc[]
+include::partial$autogen-reference.adoc[]
 * Operator
  ** xref:reference-admission-rbac.adoc[Dynamic Admission Controller RBAC Settings]
  ** xref:reference-operator-configuration.adoc[Operator Deployment Settings]
  ** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
  ** xref:reference-operator-logging.adoc[Operator Logging]
 * Couchbase Cluster
+ ** xref:reference-couchbasecluster-events.adoc[`CouchbaseCluster` Events]
  ** xref:reference-couchbasecluster-services.adoc[`CouchbaseCluster` Services]
 * Helm
  ** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]

@@ -1,0 +1,348 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseBackupRestore Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbasebackuprestore]
+
+CouchbaseBackupRestore allows the restoration of all Couchbase cluster data from a CouchbaseBackup resource.
+
+== couchbasebackuprestores.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbasebackuprestores.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+== couchbasebackuprestores.metadata
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+Standard object metadata as defined for all Kubernetes types.
+For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+
+== couchbasebackuprestores.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseBackupRestoreSpec allows the specification of data restoration to be configured.
+This includes the backup and repository to restore data from, and the time range of data to be restored.
+
+=== couchbasebackuprestores.spec.backoffLimit
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `2`
+
+==== Description
+
+Number of times the restore job should try to execute.
+
+=== couchbasebackuprestores.spec.backup
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+The backup resource name associated with this restore, or the backup PVC we want to restore from.
+
+=== couchbasebackuprestores.spec.end
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+End denotes the last backup to restore from.
+Omitting this field will only restore the backup referenced by start.
+
+=== couchbasebackuprestores.spec.end.int
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+Int references a relative backup by index.
+
+=== couchbasebackuprestores.spec.end.str
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Str references an absolute backup by name.
+
+=== couchbasebackuprestores.spec.logRetention
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `168h`
+
+==== Description
+
+Number of hours to hold restore script logs for, everything older will be deleted.
+
+=== couchbasebackuprestores.spec.repo
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Repo is the backup folder to restore from.
+
+=== couchbasebackuprestores.spec.s3bucket
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of S3 bucket to restore from.
+If non-empty this overrides local backup.
+
+=== couchbasebackuprestores.spec.start
+
+==== Constraints
+
+*Required*
+
+*Type*: `object`
+
+==== Description
+
+Start denotes the first backup to restore from.
+
+=== couchbasebackuprestores.spec.start.int
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+Int references a relative backup by index.
+
+=== couchbasebackuprestores.spec.start.str
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Str references an absolute backup by name.
+
+== couchbasebackuprestores.status
+
+=== Constraints
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseBackupRestoreStatus provides status indications of a restore from backup.
+This includes whether or not the restore is running, whether the restore succeed or not, and the duration the restore took.
+
+=== couchbasebackuprestores.status.archive
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Location of Backup Archive.
+
+=== couchbasebackuprestores.status.backups
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Backups gives us a full list of all backups and their respective repository locations.
+
+=== couchbasebackuprestores.status.backups.full
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Full backup inside the repository.
+
+=== couchbasebackuprestores.status.backups.incrementals
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Incremental backups inside the repository.
+
+=== couchbasebackuprestores.status.backups.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name of the repository.
+
+=== couchbasebackuprestores.status.duration
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Duration tells us how long the last restore took.
+
+=== couchbasebackuprestores.status.failed
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+Failed indicates whether the most recent restore has failed.
+
+=== couchbasebackuprestores.status.job
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Job tells us which job is running/ran last.
+
+=== couchbasebackuprestores.status.lastFailure
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LastFailure tells us the time the last failed restore failed.
+
+=== couchbasebackuprestores.status.lastRun
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LastRun tells us the time the last restore job started.
+
+=== couchbasebackuprestores.status.lastSuccess
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LastSuccess gives us the time the last successful restore finished.
+
+=== couchbasebackuprestores.status.output
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Output reports useful information from the backup process.
+
+=== couchbasebackuprestores.status.pod
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Pod tells us which pod is running/ran last.
+
+=== couchbasebackuprestores.status.repo
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Repo is where we are currently performing operations.
+
+=== couchbasebackuprestores.status.running
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+Running indicates whether a restore is currently being performed.

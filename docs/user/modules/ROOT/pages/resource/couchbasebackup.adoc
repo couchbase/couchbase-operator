@@ -1,0 +1,409 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseBackup Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbasebackup]
+
+CouchbaseBackup allows automatic backup of all data from a Couchbase cluster into persistent storage.
+
+== couchbasebackups.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbasebackups.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+== couchbasebackups.metadata
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+Standard object metadata as defined for all Kubernetes types.
+For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+
+== couchbasebackups.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseBackupSpec is allows the specification of how a Couchbase backup is configured, including when backups are performed, how long they are retained for, and where they are backed up to.
+
+=== couchbasebackups.spec.backoffLimit
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `2`
+
+==== Description
+
+Number of times a backup job should try to execute.
+Once it hits the BackoffLimit it will not run until the next scheduled job.
+
+=== couchbasebackups.spec.backupRetention
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `720h`
+
+==== Description
+
+Number of hours to hold backups for, everything older will be deleted.
+
+=== couchbasebackups.spec.failedJobsHistoryLimit
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `3`
+
+==== Description
+
+Amount of failed jobs to keep.
+
+=== couchbasebackups.spec.full
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Full is the schedule on when to take full backups.
+Used in Full/Incremental and FullOnly backup strategies.
+
+=== couchbasebackups.spec.full.schedule
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Schedule takes a cron schedule in string format.
+
+=== couchbasebackups.spec.incremental
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Incremental is the schedule on when to take incremental backups.
+Used in Full/Incremental backup strategies.
+
+=== couchbasebackups.spec.incremental.schedule
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Schedule takes a cron schedule in string format.
+
+=== couchbasebackups.spec.logRetention
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `168h`
+
+==== Description
+
+Number of hours to hold script logs for, everything older will be deleted.
+
+=== couchbasebackups.spec.s3bucket
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of S3 bucket to backup to.
+If non-empty this overrides local backup.
+
+=== couchbasebackups.spec.size
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `20Gi`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+Size allows the specification of a backup persistent volume, when using volume based backup.
+
+=== couchbasebackups.spec.storageClassName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of StorageClass to use.
+
+=== couchbasebackups.spec.strategy
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Default*: `full\_incremental`
+
+*Enumerations*: `full\_incremental, full\_only`
+
+==== Description
+
+CB backup strategy - Full/Incremental, Full only.
+Default: Full/Incremental.
+
+=== couchbasebackups.spec.successfulJobsHistoryLimit
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `3`
+
+==== Description
+
+Amount of successful jobs to keep.
+
+== couchbasebackups.status
+
+=== Constraints
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseBackupStatus provides status notifications about the Couchbase backup including when the last backup occurred, whether is succeeded or not, the run time of the backup and the size of the backup.
+
+=== couchbasebackups.status.archive
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Location of Backup Archive.
+
+=== couchbasebackups.status.backups
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Backups gives us a full list of all backups and their respective repository locations.
+
+=== couchbasebackups.status.backups.full
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Full backup inside the repository.
+
+=== couchbasebackups.status.backups.incrementals
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Incremental backups inside the repository.
+
+=== couchbasebackups.status.backups.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name of the repository.
+
+=== couchbasebackups.status.capacityUsed
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+CapacityUsed tells us how much of the PVC we are using.
+
+=== couchbasebackups.status.cronjob
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Cronjob tells us which Cronjob the job belongs to.
+
+=== couchbasebackups.status.duration
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Duration tells us how long the last backup took.
+
+=== couchbasebackups.status.failed
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+Failed indicates whether the most recent backup has failed.
+
+=== couchbasebackups.status.job
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Job tells us which job is running/ran last.
+
+=== couchbasebackups.status.lastFailure
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LastFailure tells us the time the last failed backup failed.
+
+=== couchbasebackups.status.lastRun
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LastRun tells us the time the last backup job started.
+
+=== couchbasebackups.status.lastSuccess
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LastSuccess gives us the time the last successful backup finished.
+
+=== couchbasebackups.status.output
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Output reports useful information from the backup_script.
+
+=== couchbasebackups.status.pod
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Pod tells us which pod is running/ran last.
+
+=== couchbasebackups.status.repo
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Repo is where we are currently performing operations.
+
+=== couchbasebackups.status.running
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+Running indicates whether a backup is currently being performed.

@@ -1,0 +1,104 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseMemcachedBucket Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbasememcachedbucket]
+
+The CouchbaseMemcachedBucket resource defines a set of documents in Couchbase server.
+A Couchbase client connects to and operates on a bucket, which provides independent management of a set documents and a security boundary for role based access control.
+A CouchbaseEphemeralBucket provides in-memory only storage for documents contained by it.
+
+== couchbasememcachedbuckets.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbasememcachedbuckets.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+== couchbasememcachedbuckets.metadata
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+Standard object metadata as defined for all Kubernetes types.
+For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+
+== couchbasememcachedbuckets.spec
+
+=== Constraints
+
+*Type*: `object`
+
+*Default*: `{}`
+
+=== Description
+
+CouchbaseMemcachedBucketSpec is the specification for a Memcached bucket resource, and allows the bucket to be customized.
+
+=== couchbasememcachedbuckets.spec.enableFlush
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+EnableFlush defines whether a client can delete all documents in a bucket.
+This field defaults to false.
+
+=== couchbasememcachedbuckets.spec.memoryQuota
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `100Mi`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+MemoryQuota is a memory limit to the size of a bucket.
+The memory quota is defined per Couchbase pod running the data service.
+This field defaults to, and must be greater than or equal to 100Mi.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+
+=== couchbasememcachedbuckets.spec.name
+
+==== Constraints
+
+*Type*: `string`
+
+*Maximum Length*: `100`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-\_%\.]+$`
+
+==== Description
+
+Name is the name of the bucket within Couchbase server.
+By default the Operator will use the `metadata.name` field to define the bucket name.
+The `metadata.name` field only supports a subset of the supported character set.
+When specified, this field overrides `metadata.name`.
+Legal bucket names have a maximum length of 100 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".

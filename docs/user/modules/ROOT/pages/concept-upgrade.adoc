@@ -8,7 +8,7 @@ This includes upgrading the Couchbase Server version and also related Kubernetes
 
 The Couchbase Server version can be xref:howto-couchbase-upgrade.adoc[upgraded] by the Operator.
 
-Upgrades may be performed using one of a number of different strategies as specified by `couchbaseclusters.spec.upgradeStrategy` in the `CouchbaseCluster` resource:
+Upgrades may be performed using one of a number of different strategies as specified by xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-upgradestrategy[`couchbaseclusters.spec.upgradeStrategy`] in the `CouchbaseCluster` resource:
 
 * Rolling upgrades upgrade one pod at a time
 * Immediate upgrades upgrade all pods at the same time

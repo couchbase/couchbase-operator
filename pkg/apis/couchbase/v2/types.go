@@ -39,7 +39,7 @@ const (
 type CouchbaseEphemeralBucketEvictionPolicy string
 
 const (
-	// CouchbaseEphemeralBucketEvictionPolicyNoEviction never evicts a docuement from
+	// CouchbaseEphemeralBucketEvictionPolicyNoEviction never evicts a document from
 	// memory.
 	CouchbaseEphemeralBucketEvictionPolicyNoEviction CouchbaseEphemeralBucketEvictionPolicy = "noEviction"
 
@@ -111,6 +111,8 @@ const (
 	CouchbaseEphemeralBucketMinimumDurabilityMajority CouchbaseEphemeralBucketMinimumDurability = "majority"
 )
 
+// CouchbaseBackup allows automatic backup of all data from a Couchbase cluster
+// into persistent storage.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -130,82 +132,104 @@ type CouchbaseBackup struct {
 	Status            CouchbaseBackupStatus `json:"status,omitempty"`
 }
 
+// CouchbaseBackupSpec is allows the specification of how a Couchbase backup is
+// configured, including when backups are performed, how long they are retained
+// for, and where they are backed up to.
 type CouchbaseBackupSpec struct {
 	// CB backup strategy - Full/Incremental, Full only. Default: Full/Incremental
 	// +kubebuilder:default="full_incremental"
 	Strategy Strategy `json:"strategy"`
 
 	// Incremental is the schedule on when to take incremental backups.
-	// Used in Full/Incremental backup strategies
+	// Used in Full/Incremental backup strategies.
 	Incremental *CouchbaseBackupSchedule `json:"incremental,omitempty"`
 
 	// Full is the schedule on when to take full backups.
-	// Used in Full/Incremental and FullOnly backup strategies
+	// Used in Full/Incremental and FullOnly backup strategies.
 	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
 
-	// Amount of successful jobs to keep
+	// Amount of successful jobs to keep.
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=0
 	SuccessfulJobsHistoryLimit int32 `json:"successfulJobsHistoryLimit,omitempty"`
 
-	// Amount of failed jobs to keep
+	// Amount of failed jobs to keep.
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=0
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
 	// Number of times a backup job should try to execute.
-	// Once it hits the BackoffLimit it will not run until the next scheduled job
+	// Once it hits the BackoffLimit it will not run until the next scheduled job.
 	// +kubebuilder:default=2
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 
-	// Number of hours to hold backups for, everything older will be deleted
+	// Number of hours to hold backups for, everything older will be deleted.
 	// +kubebuilder:default="720h"
 	BackupRetention *metav1.Duration `json:"backupRetention,omitempty"`
 
-	// Number of hours to hold script logs for, everything older will be deleted
+	// Number of hours to hold script logs for, everything older will be deleted.
 	// +kubebuilder:default="168h"
 	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
 
-	// Size in GB of the associated PVC
+	// Size allows the specification of a backup persistent volume, when using
+	// volume based backup.
 	// +kubebuilder:default="20Gi"
+	// +kubebuilder:validation:Type=string
 	Size *resource.Quantity `json:"size,omitempty"`
 
-	// Name of StorageClass to use
+	// Name of StorageClass to use.
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
-	// Name of S3 bucket to backup to. If non-empty this overrides local backup
+	// Name of S3 bucket to backup to. If non-empty this overrides local backup.
 	S3Bucket string `json:"s3bucket,omitempty"`
 }
 
+// CouchbaseBackupStatus provides status notifications about the Couchbase backup
+// including when the last backup occurred, whether is succeeded or not, the run
+// time of the backup and the size of the backup.
 type CouchbaseBackupStatus struct {
-	// CapacityUsed tells us how much of the PVC we are using
+	// CapacityUsed tells us how much of the PVC we are using.
+	// +kubebuilder:validation:Type=string
 	CapacityUsed *resource.Quantity `json:"capacityUsed,omitempty"`
-	// Location of Backup Archive
+
+	// Location of Backup Archive.
 	Archive string `json:"archive,omitempty"`
-	// Repo is where we are currently performing operations
+
+	// Repo is where we are currently performing operations.
 	Repo string `json:"repo,omitempty"`
+
 	// Backups gives us a full list of all backups
-	// and their respective repo locations
+	// and their respective repository locations.
 	Backups []BackupStatus `json:"backups,omitempty"`
-	// Running indicates whether a backup is currently being performed
+
+	// Running indicates whether a backup is currently being performed.
 	Running bool `json:"running"`
-	// Failed indicates whether the most recent backup has failed
+
+	// Failed indicates whether the most recent backup has failed.
 	Failed bool `json:"failed"`
-	// Output reports useful information from the backup_script
+
+	// Output reports useful information from the backup_script.
 	Output string `json:"output,omitempty"`
-	// Pod tells us which pod is running/ran last
+
+	// Pod tells us which pod is running/ran last.
 	Pod string `json:"pod"`
-	// Job tells us which job is running/ran last
+
+	// Job tells us which job is running/ran last.
 	Job string `json:"job"`
-	// Cronjob tells us which Cronjob the job belongs to
+
+	// Cronjob tells us which Cronjob the job belongs to.
 	CronJob string `json:"cronjob"`
-	// Duration tells us how long the last backup took
+
+	// Duration tells us how long the last backup took.
 	Duration *metav1.Duration `json:"duration,omitempty"`
-	// LastFailure tells us the time the last failed backup failed
+
+	// LastFailure tells us the time the last failed backup failed.
 	LastFailure *metav1.Time `json:"lastFailure,omitempty"`
-	// LastSuccess gives us the time the last successful backup finished
+
+	// LastSuccess gives us the time the last successful backup finished.
 	LastSuccess *metav1.Time `json:"lastSuccess,omitempty"`
-	// LastRun tells us the time the last backup job started
+
+	// LastRun tells us the time the last backup job started.
 	LastRun *metav1.Time `json:"lastRun,omitempty"`
 }
 
@@ -213,7 +237,7 @@ type CouchbaseBackupStatus struct {
 type Strategy string
 
 const (
-	// Similar to Periodic but we create a new backup repo and take a full backup instead of merging.
+	// Similar to Periodic but we create a new backup repository and take a full backup instead of merging.
 	FullIncremental Strategy = "full_incremental"
 
 	// Expensive Full Backup only recommended for small clusters.
@@ -228,19 +252,23 @@ type CouchbaseBackupList struct {
 }
 
 type CouchbaseBackupSchedule struct {
-	// Schedule takes a cron schedule in string format
+	// Schedule takes a cron schedule in string format.
 	Schedule string `json:"schedule"`
 }
 
 type BackupStatus struct {
-	// name of the repo
+	// Name of the repository.
 	Name string `json:"name"`
-	// the full backup inside the repo
+
+	// Full backup inside the repository.
 	Full string `json:"full,omitempty"`
-	// incremental backups inside the repo
+
+	// Incremental backups inside the repository.
 	Incrementals []string `json:"incrementals,omitempty"`
 }
 
+// CouchbaseBackupRestore allows the restoration of all Couchbase cluster data from
+// a CouchbaseBackup resource.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -259,58 +287,85 @@ type CouchbaseBackupRestore struct {
 	Status            CouchbaseBackupRestoreStatus `json:"status,omitempty"`
 }
 
+// CouchbaseBackupRestoreSpec allows the specification of data restoration to be
+// configured.  This includes the backup and repository to restore data from, and
+// the time range of data to be restored.
 type CouchbaseBackupRestoreSpec struct {
-	// the cbbackup we associate this restore with or the cbbackup pvc we want to restore from
+	// The backup resource name associated with this restore, or the backup PVC
+	// we want to restore from.
 	Backup string `json:"backup"`
-	// Repo is the backup folder to restore from
+
+	// Repo is the backup folder to restore from.
 	Repo string `json:"repo,omitempty"`
-	// Start and End denote the names of the start and end backups of a time range to restore backups from
-	// this will restore these two backups and any backups in between.
-	// If we only wish to restore one backup leave end blank or use the same backup for End
+
+	// Start denotes the first backup to restore from.
 	Start *StrOrInt `json:"start"`
-	End   *StrOrInt `json:"end,omitempty"`
-	// Number of hours to hold restore script logs for, everything older will be deleted
+
+	// End denotes the last backup to restore from.  Omitting this field will only
+	// restore the backup referenced by start.
+	End *StrOrInt `json:"end,omitempty"`
+
+	// Number of hours to hold restore script logs for, everything older will be deleted.
 	// +kubebuilder:default="168h"
 	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
+
 	// Number of times the restore job should try to execute.
 	// +kubebuilder:default=2
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
-	// Name of S3 bucket to restore from. If non-empty this overrides local backup
+
+	// Name of S3 bucket to restore from. If non-empty this overrides local backup.
 	S3Bucket string `json:"s3bucket,omitempty"`
 }
 
 // struct we use in CouchbaseBackupRestoreSpec to enforce type-safeness
 type StrOrInt struct {
+	// Str references an absolute backup by name.
 	Str *string `json:"str,omitempty"`
+
+	// Int references a relative backup by index.
 	// +kubebuilder:validation:Minimum=1
 	Int *int `json:"int,omitempty"`
 }
 
+// CouchbaseBackupRestoreStatus provides status indications of a restore from
+// backup.  This includes whether or not the restore is running, whether the
+// restore succeed or not, and the duration the restore took.
 type CouchbaseBackupRestoreStatus struct {
-	// Location of Backup Archive
+	// Location of Backup Archive.
 	Archive string `json:"archive,omitempty"`
-	// Repo is where we are currently performing operations
+
+	// Repo is where we are currently performing operations.
 	Repo string `json:"repo,omitempty"`
+
 	// Backups gives us a full list of all backups
-	// and their respective repo locations
+	// and their respective repository locations.
 	Backups []BackupStatus `json:"backups,omitempty"`
-	// Running indicates whether a restore is currently being performed
+
+	// Running indicates whether a restore is currently being performed.
 	Running bool `json:"running"`
-	// Failed indicates whether the most recent restore has failed
+
+	// Failed indicates whether the most recent restore has failed.
 	Failed bool `json:"failed"`
-	// Output reports useful information from the backup_script
+
+	// Output reports useful information from the backup process.
 	Output string `json:"output,omitempty"`
-	// Pod tells us which pod is running/ran last
+
+	// Pod tells us which pod is running/ran last.
 	Pod string `json:"pod"`
-	// Job tells us which job is running/ran last
+
+	// Job tells us which job is running/ran last.
 	Job string `json:"job"`
-	// Duration tells us how long the last restore took
+
+	// Duration tells us how long the last restore took.
 	Duration *metav1.Duration `json:"duration,omitempty"`
-	// LastFailure tells us the time the last failed restore failed
+
+	// LastFailure tells us the time the last failed restore failed.
 	LastFailure *metav1.Time `json:"lastFailure,omitempty"`
-	// LastSuccess gives us the time the last successful restore finished
+
+	// LastSuccess gives us the time the last successful restore finished.
 	LastSuccess *metav1.Time `json:"lastSuccess,omitempty"`
-	// LastRun tells us the time the last restore job started
+
+	// LastRun tells us the time the last restore job started.
 	LastRun *metav1.Time `json:"lastRun,omitempty"`
 }
 
@@ -365,7 +420,7 @@ type CouchbaseBucketSpec struct {
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
 
 	// Replicas defines how many copies of documents Couchbase server maintains.  This directly
-	// affects how fault toleratnt a Couchbase cluster is.  With a single repica, the cluster
+	// affects how fault tolerant a Couchbase cluster is.  With a single replica, the cluster
 	// can tolerate one data pod going down and still service requests without data loss.  The
 	// number of replicas also affect memory use.  With a single replica, the effective memory
 	// quota for documents is halved, with two replicas it is one third.  The number of replicas
@@ -397,7 +452,7 @@ type CouchbaseBucketSpec struct {
 	// +kubebuilder:default="seqno"
 	ConflictResolution CouchbaseBucketConflictResolution `json:"conflictResolution,omitempty"`
 
-	// EnableFlush defines whether a client can delete all docuements in a bucket.
+	// EnableFlush defines whether a client can delete all documents in a bucket.
 	// This field defaults to false.
 	EnableFlush bool `json:"enableFlush,omitempty"`
 
@@ -409,7 +464,7 @@ type CouchbaseBucketSpec struct {
 	// off, documents are stored in memory, and transferred to the client uncompressed.
 	// When passive, documents are stored compressed in memory, and transferred to the
 	// client compressed when requested.  When active, documents are stored compresses
-	// in memory and when tranferred to the client.  This field must be "off", "passive"
+	// in memory and when transferred to the client.  This field must be "off", "passive"
 	// or "active", defaulting to "passive".  Be aware "off" in YAML 1.2 is a boolean, so
 	// must be quoted as a string in configuration files.
 	// +kubebuilder:default="passive"
@@ -431,7 +486,7 @@ type CouchbaseBucketSpec struct {
 
 	// MaxTTL defines how long a document is permitted to exist for, without
 	// modification, until it is automatically deleted.  This is a default and maximum
-	// time-to-live and may be set to a lower value by the client.  If the client specifes
+	// time-to-live and may be set to a lower value by the client.  If the client specifies
 	// a higher value, then it is truncated to the maximum durability.  Documents are
 	// removed by Couchbase, after they have expired, when either accessed, the expiry
 	// pager is run, or the bucket is compacted.  When set to 0, then documents are not
@@ -493,7 +548,7 @@ type CouchbaseEphemeralBucketSpec struct {
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
 
 	// Replicas defines how many copies of documents Couchbase server maintains.  This directly
-	// affects how fault toleratnt a Couchbase cluster is.  With a single repica, the cluster
+	// affects how fault tolerant a Couchbase cluster is.  With a single replica, the cluster
 	// can tolerate one data pod going down and still service requests without data loss.  The
 	// number of replicas also affect memory use.  With a single replica, the effective memory
 	// quota for documents is halved, with two replicas it is one third.  The number of replicas
@@ -525,7 +580,7 @@ type CouchbaseEphemeralBucketSpec struct {
 	// +kubebuilder:default="seqno"
 	ConflictResolution CouchbaseBucketConflictResolution `json:"conflictResolution,omitempty"`
 
-	// EnableFlush defines whether a client can delete all docuements in a bucket.
+	// EnableFlush defines whether a client can delete all documents in a bucket.
 	// This field defaults to false.
 	EnableFlush bool `json:"enableFlush,omitempty"`
 
@@ -533,7 +588,7 @@ type CouchbaseEphemeralBucketSpec struct {
 	// off, documents are stored in memory, and transferred to the client uncompressed.
 	// When passive, documents are stored compressed in memory, and transferred to the
 	// client compressed when requested.  When active, documents are stored compresses
-	// in memory and when tranferred to the client.  This field must be "off", "passive"
+	// in memory and when transferred to the client.  This field must be "off", "passive"
 	// or "active", defaulting to "passive".  Be aware "off" in YAML 1.2 is a boolean, so
 	// must be quoted as a string in configuration files.
 	// +kubebuilder:default="passive"
@@ -550,7 +605,7 @@ type CouchbaseEphemeralBucketSpec struct {
 
 	// MaxTTL defines how long a document is permitted to exist for, without
 	// modification, until it is automatically deleted.  This is a default and maximum
-	// time-to-live and may be set to a lower value by the client.  If the client specifes
+	// time-to-live and may be set to a lower value by the client.  If the client specifies
 	// a higher value, then it is truncated to the maximum durability.  Documents are
 	// removed by Couchbase, after they have expired, when either accessed, the expiry
 	// pager is run, or the bucket is compacted.  When set to 0, then documents are not
@@ -605,7 +660,7 @@ type CouchbaseMemcachedBucketSpec struct {
 	// +kubebuilder:validation:Type=string
 	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
 
-	// EnableFlush defines whether a client can delete all docuements in a bucket.
+	// EnableFlush defines whether a client can delete all documents in a bucket.
 	// This field defaults to false.
 	EnableFlush bool `json:"enableFlush,omitempty"`
 }
@@ -687,6 +742,7 @@ type CouchbaseReplicationList struct {
 	Items           []CouchbaseReplication `json:"items"`
 }
 
+// CouchbaseUser allows the automation of Couchbase user management.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -704,13 +760,16 @@ const (
 	LDAPAuthDomain     AuthDomain = "external"
 )
 
+// CouchbaseUserSpec allows the specification of Couchbase user configuration.
 type CouchbaseUserSpec struct {
-	// (Optional) Full Name of Couchbase user
+	// Full Name of Couchbase user.
 	FullName string `json:"fullName,omitempty"`
-	// The domain which provides user auth
+
+	// The domain which provides user authentication.
 	// +kubebuilder:validation:Enum=local;external
 	AuthDomain AuthDomain `json:"authDomain"`
-	// Name of kubernetes secret with password for couchbase domain
+
+	// Name of Kubernetes secret with password for Couchbase domain.
 	AuthSecret string `json:"authSecret,omitempty"`
 }
 
@@ -722,6 +781,7 @@ type CouchbaseUserList struct {
 	Items           []CouchbaseUser `json:"items"`
 }
 
+// CouchbaseGroup allows the automation of Couchbase group management.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -732,10 +792,12 @@ type CouchbaseGroup struct {
 	Spec              CouchbaseGroupSpec `json:"spec"`
 }
 
+// CouchbaseGroupSpec allows the specification of Couchbase group configuration.
 type CouchbaseGroupSpec struct {
-	// role identifier
+	// Roles is a list of roles that this group is granted.
 	Roles []Role `json:"roles"`
-	// optional reference to LDAP group
+
+	// LDAPGroupRef is a reference to an LDAP group.
 	LDAPGroupRef string `json:"ldapGroupRef,omitempty"`
 }
 
@@ -772,10 +834,12 @@ const (
 )
 
 type Role struct {
-	// name of role
+	// Name of role.
 	// +kubebuilder:validation:Enum=admin;cluster_admin;security_admin;ro_admin;replication_admin;query_external_access;query_system_catalog;analytics_reader;bucket_admin;views_admin;fts_admin;bucket_full_access;data_reader;data_writer;data_dcp_reader;data_backup;data_monitoring;replication_target;analytics_manager;views_reader;fts_searcher;query_select;query_update;query_insert;query_delete;query_manage_index
 	Name RoleName `json:"name"`
-	// optional bucket name for bucket admin roles
+
+	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped
+	// to a specific bucket, the role will apply to all buckets in the cluster.
 	// +kubebuilder:validation:Pattern="^\\*$|^[a-zA-Z0-9-_%\\.]+$"
 	Bucket string `json:"bucket,omitempty"`
 }
@@ -788,6 +852,7 @@ type CouchbaseGroupList struct {
 	Items           []CouchbaseGroup `json:"items"`
 }
 
+// CouchbaseRoleBinding allows association of Couchbase users with groups.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -798,13 +863,17 @@ type CouchbaseRoleBinding struct {
 	Spec              CouchbaseRoleBindingSpec `json:"spec"`
 }
 
+// CouchbaseRoleBindingSpec defines the group of subjects i.e. users, and the
+// role i.e. group they are a member of.
 type CouchbaseRoleBindingSpec struct {
-	//  List of users to bind a role to
+	// List of users to bind a role to.
 	Subjects []CouchbaseRoleBindingSubject `json:"subjects"`
-	// CouchbaseGroup being bound to subjects
+
+	// CouchbaseGroup being bound to subjects.
 	RoleRef CouchbaseRoleBindingRef `json:"roleRef"`
 }
 
+// +kubebuilder:validation:Enum=CouchbaseUser
 type RoleBindingSubjectType string
 
 const (
@@ -812,6 +881,7 @@ const (
 	RoleBindingSubjectTypeUser RoleBindingSubjectType = "CouchbaseUser"
 )
 
+// +kubebuilder:validation:Enum=CouchbaseGroup
 type RoleBindingReferenceType string
 
 const (
@@ -820,16 +890,18 @@ const (
 )
 
 type CouchbaseRoleBindingSubject struct {
-	// Couchbase user/group kind
+	// Couchbase user/group kind.
 	Kind RoleBindingSubjectType `json:"kind"`
-	// Name of Couchbase user resource
+
+	// Name of Couchbase user resource.
 	Name string `json:"name"`
 }
 
 type CouchbaseRoleBindingRef struct {
-	// Kind of role to use for binding
+	// Kind of role to use for binding.
 	Kind RoleBindingReferenceType `json:"kind"`
-	// Name of role resource to use for binding
+
+	// Name of role resource to use for binding.
 	Name string `json:"name"`
 }
 
@@ -841,6 +913,9 @@ type CouchbaseRoleBindingList struct {
 	Items           []CouchbaseRoleBinding `json:"items"`
 }
 
+// CouchbaseAutoscaler provides an interface for the Kubernetes Horizontal Pod Autoscaler
+// to interactive with the Couchbase cluster and provide autoscaling.  This resource is
+// not defined by the end user, and is managed by the Operator.
 // +genclient
 // +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/autoscaling/v1.Scale
 // +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
@@ -859,15 +934,25 @@ type CouchbaseAutoscaler struct {
 	Status            CouchbaseAutoscalerStatus `json:"status,omitempty"`
 }
 
+// CouchbaseAutoscalerSpec allows control over an autoscaling group.
 type CouchbaseAutoscalerSpec struct {
+	// Servers specifies the server group that this autoscaler belongs to.
 	// +kubebuilder:validation:MinLength=1
 	Servers string `json:"servers"`
+
+	// Size allows the server group to be dynamically scaled.
 	// +kubebuilder:validation:Minimum=0
 	Size int `json:"size"`
 }
 
+// CouchbaseAutoscalerStatus provides information to the HPA to assist with scaling
+// server groups.
 type CouchbaseAutoscalerStatus struct {
+	// LabelSelector allows the HPA to select resources to monitor for resource
+	// utilization in order to trigger scaling.
 	LabelSelector string `json:"labelSelector"`
+
+	// Size is the current size of the server group.
 	// +kubebuilder:validation:Minimum=0
 	Size int `json:"size"`
 }
@@ -889,7 +974,7 @@ type CouchbaseClusterList struct {
 }
 
 // The CouchbaseCluster resource represents a Couchbase cluster.  It allows configuration
-// of cluster tolopogy, networking, storage and security options.
+// of cluster topology, networking, storage and security options.
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
@@ -1005,7 +1090,7 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Pattern="^(.*?(:\\d+)?/)?.*?/.*?(:.*?\\d+\\.\\d+\\.\\d+.*|@sha256:[0-9a-f]{64})$"
 	Image string `json:"image"`
 
-	// Paused is to pause the control of the operator for the couchbase cluster.
+	// Paused is to pause the control of the operator for the Couchbase cluster.
 	// This does not pause the cluster itself, instead stopping the operator from
 	// taking any action.
 	Paused bool `json:"paused,omitempty"`
@@ -1043,7 +1128,7 @@ type ClusterSpec struct {
 	// production clusters.
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
-	// ClusterSettings define Couchbsae cluster-wide settings such as memory allocation,
+	// ClusterSettings define Couchbase cluster-wide settings such as memory allocation,
 	// failover characteristics and index settings.
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
@@ -1074,7 +1159,7 @@ type ClusterSpec struct {
 	// SecurityContext allows the configuration of the security context for all
 	// Couchbase server pods.  When using persistent volumes you may need to set
 	// the fsGroup field in order to write to the volume.  For non-root clusters
-	// you must also set runAsUser to 1000, corresponding to the couchbase user
+	// you must also set runAsUser to 1000, corresponding to the Couchbase user
 	// in official container images.  More info:
 	// https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
@@ -1151,7 +1236,7 @@ type Backup struct {
 	// Tolerations specifies all backup pod tolerations.
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 	// ImagePullSecrets allow you to use an image from private
-	// repos and non-dockerhub ones.
+	// repositories and non-dockerhub ones.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 	// S3Secret contains the region and credentials for operating backups in S3
 	S3Secret string `json:"s3Secret,omitempty"`
@@ -1169,10 +1254,10 @@ const (
 
 // LDAP Spec
 type CouchbaseClusterLDAPSpec struct {
-	// BindSecret is the name of a kubernetes secret to use containing password for LDAP user binding
+	// BindSecret is the name of a Kubernetes secret to use containing password for LDAP user binding
 	BindSecret string `json:"bindSecret"`
 
-	// TLSSecret is the name of a kubernetes secret to use for LDAP ca cert.
+	// TLSSecret is the name of a Kubernetes secret to use for LDAP ca cert.
 	TLSSecret string `json:"tlsSecret,omitempty"`
 
 	// Enables using LDAP to authenticate users.
@@ -1221,12 +1306,17 @@ type CouchbaseClusterLDAPSpec struct {
 }
 
 type LDAPUserDNMapping struct {
+	// This field specifies list of templates to use for providing username to DN mapping.
+	// The template may contain a placeholder specified as `%u` to represent the Couchbase
+	// user who is attempting to gain access.
 	Template string `json:"template,omitempty"`
-	Query    string `json:"query,omitempty"`
+
+	// Query is the LDAP query to run to map from Couchbase user to LDAP distinguished name.
+	Query string `json:"query,omitempty"`
 }
 
 type CouchbaseClusterSecuritySpec struct {
-	// AdminSecret is the name of a kubernetes secret to use for administrator authentication.
+	// AdminSecret is the name of a Kubernetes secret to use for administrator authentication.
 	AdminSecret string `json:"adminSecret"`
 	// Couchbase RBAC Users
 	RBAC RBAC `json:"rbac,omitempty"`
@@ -1378,7 +1468,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// e.g. 10.0.0.0/16.
 	LoadBalancerSourceRanges IPV4PrefixList `json:"loadBalancerSourceRanges,omitempty"`
 
-	// NetworkPlatform is used to enable support for vairous netwokring
+	// NetworkPlatform is used to enable support for various networking
 	// technologies.  This field must be one of "Istio".
 	NetworkPlatform *NetworkPlatform `json:"networkPlatform,omitempty"`
 
@@ -1406,7 +1496,7 @@ type DNS struct {
 	// Domain is the domain to create pods in.  When populated the Operator
 	// will annotate the admin console and per-pod services with the key
 	// "external-dns.alpha.kubernetes.io/hostname".  These annotations can
-	// be used directly by a Kubernetes External-DNS controler to replicate
+	// be used directly by a Kubernetes External-DNS controller to replicate
 	// load balancer service IP addresses into a public DNS server.
 	Domain string `json:"domain,omitempty"`
 }
@@ -1557,7 +1647,7 @@ type CouchbaseClusterIndexerSettings struct {
 	MaxRollbackPoints int `json:"maxRollbackPoints,omitempty"`
 
 	// MemorySnapshotInterval controls when memory indexes should be snapshotted.
-	// This defaults to 200ms, and must be greater than or eqaul to 1ms.
+	// This defaults to 200ms, and must be greater than or equal to 1ms.
 	// +kubebuilder:default="200ms"
 	MemorySnapshotInterval *metav1.Duration `json:"memorySnapshotInterval,omitempty"`
 
@@ -1612,7 +1702,7 @@ type TimeWindow struct {
 	// +kubebuilder:validation:Pattern="^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$"
 	Start string `json:"start,omitempty"`
 
-	// End is a wallclock time, in the form HH:MM, when a compaction shold stop.
+	// End is a wallclock time, in the form HH:MM, when a compaction should stop.
 	// +kubebuilder:validation:Pattern="^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$"
 	End string `json:"end,omitempty"`
 
@@ -1773,7 +1863,7 @@ type ServerConfig struct {
 	// Pod defines a template used to create pod for each Couchbase server
 	// instance.  Modifying pod metadata such as labels and annotations will
 	// update the pod in-place.  Any other modification will result in a cluster
-	// upgrade in order to fulfil the request. The Operator reserves the right
+	// upgrade in order to fulfill the request. The Operator reserves the right
 	// to modify or replace any field.  More info:
 	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#pod-v1-core
 	Pod *PodTemplate `json:"pod,omitempty"`
@@ -1829,7 +1919,7 @@ type VolumeMounts struct {
 	// claim template name as defined in "spec.volumeClaimTemplates".
 	DataClaim string `json:"data,omitempty"`
 
-	// IndexClaim s a persistent volume that encompasses index storage asscociated
+	// IndexClaim s a persistent volume that encompasses index storage associated
 	// with the index service.  The index claim can only be used on server classes running
 	// the index service, and must be used in conjunction with the default claim.  This
 	// field allows the index service to use different storage media (e.g. SSD) to
@@ -1837,7 +1927,7 @@ type VolumeMounts struct {
 	// claim template name as defined in "spec.volumeClaimTemplates".
 	IndexClaim string `json:"index,omitempty"`
 
-	// AnalyticsClaims are persistent volumes that encompass analytics storage asscociated
+	// AnalyticsClaims are persistent volumes that encompass analytics storage associated
 	// with the analytics service.  Analytics claims can only be used on server classes
 	// running the analytics service, and must be used in conjunction with the default claim.
 	// This field allows the analytics service to use different storage media (e.g. SSD), and
@@ -1880,7 +1970,7 @@ const (
 	TLS12 TLSVersion = "TLS1.2"
 )
 
-// TLSPolicy defines the TLS policy of an couchbase cluster
+// TLSPolicy defines the TLS policy of an Couchbase cluster
 type TLSPolicy struct {
 	// Static enables user to generate static x509 certificates and keys,
 	// put them into Kubernetes secrets, and specify them here.  Static secrets
@@ -1922,8 +2012,8 @@ type TLSPolicy struct {
 }
 
 type StaticTLS struct {
-	// ServerSecret is a secret name containing TLS certs used by each couchbase member pod
-	// for the communication between couchbase server and its clients.  The secret must
+	// ServerSecret is a secret name containing TLS certs used by each Couchbase member pod
+	// for the communication between Couchbase server and its clients.  The secret must
 	// contain a certificate chain (data key "couchbase-operator.crt") and a private
 	// key (data key "couchbase-operator.key").  The private key must be in the PKCS#1 RSA
 	// format.  The certificate chain must have a required set of X.509v3 subject alternative
@@ -2018,7 +2108,7 @@ const (
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.
 type ClusterStatus struct {
-	// ControlPaused indicates if the Operator has acknowldged and paused the
+	// ControlPaused indicates if the Operator has acknowledged and paused the
 	// control of the cluster.
 	ControlPaused bool `json:"controlPaused,omitempty"`
 
@@ -2034,7 +2124,7 @@ type ClusterStatus struct {
 	// pod status conditions are listed in the members status.
 	Size int `json:"size"`
 
-	// Members are the couchbase members in the cluster.
+	// Members are the Couchbase members in the cluster.
 	Members *MembersStatus `json:"members,omitempty"`
 
 	// CurrentVersion is the current Couchbase version.  This reflects the
@@ -2111,28 +2201,52 @@ type ServerClassStatus struct {
 }
 
 type BucketStatus struct {
-	BucketName         string `json:"name"`
-	BucketType         string `json:"type"`
-	BucketMemoryQuota  int64  `json:"memoryQuota"`
-	BucketReplicas     int    `json:"replicas"`
-	IoPriority         string `json:"ioPriority"`
-	EvictionPolicy     string `json:"evictionPolicy"`
+	// BucketName is the full name of the bucket.
+	BucketName string `json:"name"`
+
+	// BucketType is the type of the bucket.
+	BucketType string `json:"type"`
+
+	// BucketMemoryQuota is the bucket memory quota in megabytes.
+	BucketMemoryQuota int64 `json:"memoryQuota"`
+
+	// BucketReplicas is the number of data replicas.
+	BucketReplicas int `json:"replicas"`
+
+	// IoPriority is `low` or `high` depending on the number of threads
+	// spawned for data processing.
+	IoPriority string `json:"ioPriority"`
+
+	// EvictionPolicy is relevant for `couchbase` and `ephemeral` bucket types
+	// and indicates how documents are evicted from memory when it is exhausted.
+	EvictionPolicy string `json:"evictionPolicy"`
+
+	// ConflictResolution is relevant for `couchbase` and `ephemeral` bucket types
+	// and indicates how to resolve conflicts when using multi-master XDCR.
 	ConflictResolution string `json:"conflictResolution"`
-	EnableFlush        bool   `json:"enableFlush"`
-	EnableIndexReplica bool   `json:"enableIndexReplica"`
-	BucketPassword     string `json:"password"`
-	CompressionMode    string `json:"compressionMode"`
+
+	// EnableFlush is whether a client can delete all documents in a bucket.
+	EnableFlush bool `json:"enableFlush"`
+
+	// EnableIndexReplica is whether indexes against bucket documents are replicated.
+	EnableIndexReplica bool `json:"enableIndexReplica"`
+
+	// BucketPassword will never be populated.
+	BucketPassword string `json:"password"`
+
+	// CompressionMode defines how documents are compressed.
+	CompressionMode string `json:"compressionMode"`
 }
 
 type MemberStatusList []string
 
 type MembersStatus struct {
-	// Ready are the couchbase members that are clustered and ready to serve
-	// client requests.  The member names are the same as the couchbase pod names.
+	// Ready are the Couchbase members that are clustered and ready to serve
+	// client requests.  The member names are the same as the Couchbase pod names.
 	Ready MemberStatusList `json:"ready,omitempty"`
 
-	// Unready are the couchbase members not clustered or unready to serve
-	// client requests.  The member names are the same as the couchbase pod names.
+	// Unready are the Couchbase members not clustered or unready to serve
+	// client requests.  The member names are the same as the Couchbase pod names.
 	Unready MemberStatusList `json:"unready,omitempty"`
 }
 
@@ -2148,6 +2262,7 @@ const (
 )
 
 type CouchbaseClusterMonitoringSpec struct {
+	// Prometheus provides integration with Prometheus monitoring.
 	Prometheus *CouchbaseClusterMonitoringPrometheusSpec `json:"prometheus,omitempty"`
 }
 

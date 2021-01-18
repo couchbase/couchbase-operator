@@ -59,10 +59,10 @@ The memory quotas from the configuration above are the defaults that the Autonom
 The defaults are the lowest allowed and almost certainly will need modification for your specific workload.
 ====
 
-In this configuration, `couchbaseclusters.spec.cluster.dataServiceMemoryQuota` is set to `256Mi`, resulting in 256 MB of RAM being reserved for the Data service on each node, for a total of 768 MB across the whole cluster.
+In this configuration, xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-cluster-dataservicememoryquota[`couchbaseclusters.spec.cluster.dataServiceMemoryQuota`] is set to `256Mi`, resulting in 256 MB of RAM being reserved for the Data service on each node, for a total of 768 MB across the whole cluster.
 
 As the cluster is horizontally scaled, so is the amount of memory allocated across the cluster.
-If you were to scale this cluster by changing `couchbaseclusters.spec.servers.size` to `4`, it would yield 1 GB of memory available to the Data service.
+If you were to scale this cluster by changing xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-size[`couchbaseclusters.spec.servers.size`] to `4`, it would yield 1 GB of memory available to the Data service.
 
 Homogeneous clusters like this one aren't recommended in production for several reasons.
 One of the main reasons is that they don't scale well horizontally.
@@ -74,7 +74,7 @@ This kind of over-provisioning increases administrative overheads, as well as co
 === Bucket Memory Quotas
 
 Bucket memory, like service memory, is also allocated _per node_.
-The value you specify for `couchbasebuckets.spec.memoryQuota` will be reserved on each Couchbase Server node that runs the Data service.
+The value you specify for xref:resource/couchbasebucket.adoc#couchbasebuckets-spec-memoryquota[`couchbasebuckets.spec.memoryQuota`] will be reserved on each Couchbase Server node that runs the Data service.
 However, buckets reserve their memory as a portion of the Data service quota.
 This means that after you add together the memory quotas of all `CouchbaseBucket` resources, they cannot exceed the cluster's `dataServiceMemoryQuota` in the `CouchbaseCluster` configuration.
 You can think of the `dataServiceMemoryQuota` as the budget, and the memory quota of each `CouchbaseBucket` resource gets deducted from that budget.
@@ -159,12 +159,12 @@ However, since the application's memory requirements can vary by workload, it's 
 When a Couchbase cluster is deployed by the Autonomous Operator, each server Pod is scheduled onto its own dedicated Kubernetes node (recommended), or onto a shared Kubernetes node with other Pods.
 Depending on whether your Kubernetes nodes are dedicated or shared, there are slightly different considerations for when you go about setting memory quotas for Couchbase Pods.
 
-For shared nodes, you'll be using pod resource requests with the `couchbaseclusters.spec.servers.resources` attribute for each server in the `CouchbaseCluster` configuration.
+For shared nodes, you'll be using pod resource requests with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-resources[`couchbaseclusters.spec.servers.resources`] attribute for each server in the `CouchbaseCluster` configuration.
 These settings provide _hints_ for the Kubernetes scheduler to use when picking appropriate nodes to run the server Pods.
 The memory value under `requests` defines the minimum amount of memory the server Pod will reserve.
 This value needs to be the total of all memory quotas for the services in the server specification, _plus_ 25% overhead for the Couchbase Server application.
 Using the server specification from <<image-cluster-homogeneous-service-distribution>> as an example, you would add together the memory quota of all the services (256 + 256 + 256 + 1024 = 2048 MB), add 25% for application overhead, to get a total of 2560 MB.
-Specifying a value of `2560Mi` or greater for `couchbaseclusters.spec.servers.resources.requests.memory` will ensure that the server pod does not get evicted for using up too much memory.
+Specifying a value of `2560Mi` or greater for xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-resources[`couchbaseclusters.spec.servers.resources.requests.memory`] will ensure that the server pod does not get evicted for using up too much memory.
 
 The same memory requirements that apply to shared nodes (total of all service memory quotas in the server specification, plus 25% overhead for the Couchbase Server application) also apply to dedicated nodes.
 However, instead of using resource requests/limits to ensure server Pods have enough memory to satisfy quotas, you may be using things like labels, node selectors, and taints/tolerations to ensure that server Pods get xref:concept-scheduling[scheduled] onto Kubernetes nodes that you know for sure have enough memory.
@@ -183,7 +183,7 @@ Modification of memory allocation will cause an upgrade of the affected pods.
 
 == Interactive Memory Allocation kbd:[operator 2.1]
 
-The Operator provides memory allocation status information in your `CouchbaseCluster` resources with the `couchbaseclusters.status.allocations` attribute.
+The Operator provides memory allocation status information in your `CouchbaseCluster` resources with the xref:resource/couchbasecluster.adoc#couchbaseclusters-status-allocations[`couchbaseclusters.status.allocations`] attribute.
 This provides direct feedback about your memory configuration, and makes applying the rules--previously discussed--more intuitive to understand and apply.
 
 Consider the following server specification:

@@ -1,0 +1,62 @@
+////
+The tagged regions in this file determine the page aliases for the auto-generated reference docs.
+Each tagged region in this file must correspond to an auto-generated reference page.
+Tags must use the file name (without the extension) of the corresponding reference page.
+Note that a tagged region in this file is REQUIRED for each auto-generated reference page, even if the reference page has no page aliases.
+Otherwise, the include statement in each auto-generated page will fail to resolve.
+So if a reference page has no page aliases, its corresponding tagged region in this file should be left empty.
+
+How this file is invoked:
+The auto-generation pipeline creates an include statement that targets this file and adds it to the header of each generated reference page.
+The auto-generation pipeline sets the `tags` attribute in each include statement, and assigns it the file name of the generated reference page.
+When the documentation is built, each tagged region in this file gets included in the header of the appropriate page.
+
+Refer to the following links for additional information:
+Include statements -- https://docs.antora.org/antora/latest/page/include-a-partial/
+Tags -- https://docs.asciidoctor.org/asciidoc/latest/directives/include-tagged-regions/
+Page aliases -- https://docs.antora.org/antora/latest/page/page-aliases/
+////
+
+// tag::couchbaseautoscaler[]
+:page-aliases: reference-couchbaseautoscaler.adoc
+// end::couchbaseautoscaler[]
+
+// tag::couchbasebackup[]
+:page-aliases: reference-couchbasebackup.adoc, reference-couchbasebackup-status.adoc
+// end::couchbasebackup[]
+
+// tag::couchbasebackuprestore[]
+:page-aliases: reference-couchbasebackuprestore.adoc
+// end::couchbasebackuprestore[]
+
+// tag::couchbasebucket[]
+:page-aliases: reference-couchbasebucket.adoc
+// end::couchbasebucket[]
+
+// tag::couchbasecluster[]
+:page-aliases: reference-couchbasecluster.adoc, couchbase-cluster-config.adoc, reference-couchbasecluster-status.adoc, cluster-status-guide.adoc
+// end::couchbasecluster[]
+
+// tag::couchbaseephemeralbucket[]
+:page-aliases: reference-couchbaseephemeralbucket.adoc
+// end::couchbaseephemeralbucket[]
+
+// tag::couchbasegroup[]
+:page-aliases: reference-couchbasegroup.adoc
+// end::couchbasegroup[]
+
+// tag::couchbasememcachedbucket[]
+:page-aliases: reference-couchbasememcachedbucket.adoc
+// end::couchbasememcachedbucket[]
+
+// tag::couchbasereplication[]
+:page-aliases: reference-couchbasereplication.adoc
+// end::couchbasereplication[]
+
+// tag::couchbaserolebinding[]
+:page-aliases: reference-couchbaserolebinding.adoc
+// end::couchbaserolebinding[]
+
+// tag::couchbaseuser[]
+:page-aliases: reference-couchbaseuser.adoc
+// end::couchbaseuser[]

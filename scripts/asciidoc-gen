@@ -7,10 +7,13 @@ asciidoc-gen generates asciidoc reference documentation from the CRDs.
 # pylint: disable=invalid-name
 # pylint: disable=too-many-branches
 # pylint: disable=too-many-locals
+# pylint: disable=too-many-statements
 
 import argparse
 import logging
+import os
 import re
+import shutil
 import sys
 import yaml
 
@@ -21,6 +24,7 @@ NATIVE_TYPES = [
     'couchbaseclusters.spec.backup.nodeSelector',
     'couchbaseclusters.spec.backup.resources',
     'couchbaseclusters.spec.backup.selector',
+    'couchbaseclusters.spec.monitoring.prometheus.resources',
     'couchbaseclusters.spec.networking.adminConsoleServiceTemplate',
     'couchbaseclusters.spec.networking.exposedFeatureServiceTemplate',
     'couchbaseclusters.spec.security.rbac.selector',
@@ -52,6 +56,8 @@ MAXIMUM_ITEMS_LABEL = 'Maximum Items'
 ENUMERATIONS_LABEL = 'Enumerations'
 PATTERN_LABEL = 'Pattern (Regular Expression)'
 
+# Asciidoc directory layout.
+AUTOGEN_DIR = 'resource'
 
 def escape_attributes(attribute):
     """
@@ -180,10 +186,10 @@ def generate_metadata(content, depth, path):
     generate_flag(content, REQUIRED_LABEL, True)
     generate_constraint(content, TYPE_LABEL, 'object')
     generate_heading(content, depth + 1, DESCRIPTION_HEADING)
-    generate_description(content, 'Standard object metadata as defined for all Kubernetes types.')
+    generate_description(content, 'Standard object metadata as defined for all Kubernetes types.  For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].')
 
 
-def generate_schema(content, path, schema, required):
+def generate_schema(content, names, path, schema, required):
     """
     Generate ASCII documentation from a JSON schema object.
     Valid keyword arguments are:
@@ -212,18 +218,24 @@ def generate_schema(content, path, schema, required):
         description = schema['description']
         typ = schema['type']
     except KeyError:
-        logging.error('unable to extract schema metadata at %s', path)
-        return
+        logging.error('schema lacks documentation (description/type) at %s', path)
+        sys.exit(1)
 
     # Arrays a special in that array items only get interrogated if they are
     # an object.  Therefore do a look-ahead and see if it's a scalar and handle
     # it slightly differently.
     display_type = typ
     array_type = None
+    map_type = None
 
     if typ == 'array':
         array_type = schema['items']['type']
         display_type = '[]{}'.format(array_type)
+
+    # Maps are special too...
+    if typ == 'object' and 'additionalProperties' in schema:
+        map_type = schema['additionalProperties']['type']
+        display_type = 'map[string]{}'.format(map_type)
 
     # Every schema can have an optional default.
     default = None
@@ -231,8 +243,13 @@ def generate_schema(content, path, schema, required):
     if 'default' in schema:
         default = schema['default']
 
-    # Every attribute gets a heading.
-    generate_heading(content, depth, path)
+    # Every attribute gets a heading.  The main root element is special...
+    if depth == ROOT_DEPTH:
+        content.append('= {} Resource'.format(names['kind']))
+        content.append('include::partial$autogen-reference-aliases.adoc[tags={}]'.format(names['singular']))
+        content.append('')
+    else:
+        generate_heading(content, depth, path)
 
     # Every attribute has a set of constraints.  For certain types they may have a
     # further set of constraints.
@@ -252,18 +269,18 @@ def generate_schema(content, path, schema, required):
 
     # For objects, recursively descend into each property.
     if typ == 'object':
-        try:
+        if 'properties' in schema:
             properties = schema['properties']
-        except KeyError:
-            logging.error('unable to extract object properites at %s', path)
-            return
 
-        required = []
-        if 'required' in schema:
-            required = schema['required']
+            required = []
+            if 'required' in schema:
+                required = schema['required']
 
-        for property_name, property_schema in properties.items():
-            generate_schema(content, '{}.{}'.format(path, property_name), property_schema, property_name in required)
+            for property_name, property_schema in properties.items():
+                generate_schema(content, names, '{}.{}'.format(path, property_name), property_schema, property_name in required)
+        elif 'additionalProperties' in schema:
+            if map_type in ['array', 'object']:
+                raise RuntimeError('map of {} detected, this is bad, sort your life out'.format(map_type))
 
     # Arrays are--obviously--special... Arrays of scalars have already been handled
     # due to look-ahead, so we only need concern ourselves with arrays of objects.  Arrays
@@ -274,14 +291,14 @@ def generate_schema(content, path, schema, required):
             properties = items['properties']
         except KeyError:
             logging.error('unable to extract array item properties at %s', path)
-            return
+            sys.exit(1)
 
         required = []
         if 'required' in items:
             required = items['required']
 
         for property_name, property_schema in properties.items():
-            generate_schema(content, '{}.{}'.format(path, property_name), property_schema, property_name in required)
+            generate_schema(content, names, '{}.{}'.format(path, property_name), property_schema, property_name in required)
 
 
 def generate(args, crd, content):
@@ -292,10 +309,11 @@ def generate(args, crd, content):
     try:
         kind = crd['spec']['names']['kind']
         plural = crd['spec']['names']['plural']
+        singular = crd['spec']['names']['singular']
         versions = crd['spec']['versions']
     except KeyError:
         logging.error('unable to extract CRD metadata')
-        return ''
+        sys.exit(1)
 
     for version in versions:
         try:
@@ -308,9 +326,17 @@ def generate(args, crd, content):
         if name != args.version:
             continue
 
-        generate_schema(content, plural, schema, False)
+        names = {
+            'plural': plural,
+            'singular': singular,
+            'kind': kind,
+        }
 
-    return plural
+        generate_schema(content, names, plural, schema, False)
+
+        break
+
+    return names
 
 
 def main():
@@ -337,27 +363,38 @@ def main():
 
     crds = yaml.load_all(crd_data, Loader=yaml.SafeLoader)
 
-    generated_docs = {}
+    adoc_autogen_dir = 'docs/user/modules/ROOT/pages/{}'.format(AUTOGEN_DIR)
+
+    # Remove the old autogen directory and start afresh, this handles files being
+    # deleted.
+    shutil.rmtree(adoc_autogen_dir)
+    os.makedirs(adoc_autogen_dir)
+
+    generated_docs = []
 
     for crd in crds:
-        content = []
+        content = ["// THIS FILE IS AUTO-GENERATED - DO NOT EDIT"]
 
-        plural = generate(args, crd, content)
+        names = generate(args, crd, content)
 
         if args.dry_run:
             continue
 
-        adoc_file_name = 'autogenerated-reference-{}.adoc'.format(plural)
-        adoc_file_path = 'docs/user/modules/ROOT/pages/{}'.format(adoc_file_name)
+        adoc_file_name = '{}.adoc'.format(names['singular'])
+        adoc_file_path = '{}/{}'.format(adoc_autogen_dir, adoc_file_name)
 
         with open(adoc_file_path, 'w') as adoc_file:
             adoc_file.write("\n".join(content))
 
-        generated_docs[plural] = adoc_file_name
+        generated_docs.append({
+            'names': names,
+            'xref': '{}/{}'.format(AUTOGEN_DIR, adoc_file_name),
+        })
 
-    with open('docs/user/modules/ROOT/partials/auto-reference.adoc', 'w') as nav_file:
-        for plural, generated_doc in generated_docs.items():
-            nav_file.write("** xref:{}[{}]\n".format(generated_doc, plural))
+    with open('docs/user/modules/ROOT/partials/autogen-reference.adoc', 'w') as nav_file:
+        nav_file.write("// THIS FILE IS AUTO-GENERATED - DO NOT EDIT\n")
+        for generated_doc in generated_docs:
+            nav_file.write("** xref:{}[{} Resource]\n".format(generated_doc['xref'], generated_doc['names']['kind']))
 
 
 if __name__ == '__main__':

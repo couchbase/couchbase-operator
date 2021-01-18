@@ -1,0 +1,90 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseUser Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbaseuser]
+
+CouchbaseUser allows the automation of Couchbase user management.
+
+== couchbaseusers.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbaseusers.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+== couchbaseusers.metadata
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+Standard object metadata as defined for all Kubernetes types.
+For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+
+== couchbaseusers.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseUserSpec allows the specification of Couchbase user configuration.
+
+=== couchbaseusers.spec.authDomain
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Enumerations*: `local, external`
+
+==== Description
+
+The domain which provides user authentication.
+
+=== couchbaseusers.spec.authSecret
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of Kubernetes secret with password for Couchbase domain.
+
+=== couchbaseusers.spec.fullName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Full Name of Couchbase user.

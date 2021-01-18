@@ -1,0 +1,134 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseRoleBinding Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbaserolebinding]
+
+CouchbaseRoleBinding allows association of Couchbase users with groups.
+
+== couchbaserolebindings.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbaserolebindings.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+== couchbaserolebindings.metadata
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+Standard object metadata as defined for all Kubernetes types.
+For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+
+== couchbaserolebindings.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseRoleBindingSpec defines the group of subjects i.e.
+users, and the role i.e.
+group they are a member of.
+
+=== couchbaserolebindings.spec.roleRef
+
+==== Constraints
+
+*Required*
+
+*Type*: `object`
+
+==== Description
+
+CouchbaseGroup being bound to subjects.
+
+=== couchbaserolebindings.spec.roleRef.kind
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Enumerations*: `CouchbaseGroup`
+
+==== Description
+
+Kind of role to use for binding.
+
+=== couchbaserolebindings.spec.roleRef.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name of role resource to use for binding.
+
+=== couchbaserolebindings.spec.subjects
+
+==== Constraints
+
+*Required*
+
+*Type*: `[]object`
+
+==== Description
+
+List of users to bind a role to.
+
+=== couchbaserolebindings.spec.subjects.kind
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Enumerations*: `CouchbaseUser`
+
+==== Description
+
+Couchbase user/group kind.
+
+=== couchbaserolebindings.spec.subjects.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name of Couchbase user resource.

@@ -18,3 +18,8 @@ test/e2e/*.xml
 test/e2e/*.zip
 test/e2e/*.tar.gz
 e2e.test
+
+# These are for CI/CD shizzle.
+/go/
+/venv/
+/node-*/

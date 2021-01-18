@@ -66,17 +66,17 @@ spec:
         delimiter: @
 ----
 
-<.> `couchbaseclusters.spec.networking.tls.secretSource.serverSecretName` defines a secret that will be mounted to all Couchbase Server pods.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-serversecretname[`couchbaseclusters.spec.networking.tls.secretSource.serverSecretName`] defines a secret that will be mounted to all Couchbase Server pods.
 It contains the server wildcard certificate and it's private key.
 As the private key is securely mounted to the pod by Kubernetes it is never exposed over the network.
 
-<.> `couchbaseclusters.spec.networking.tls.secretSource.clientSecretName` defines a secret containing client related certificates.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-clientsecretname[`couchbaseclusters.spec.networking.tls.secretSource.clientSecretName`] defines a secret containing client related certificates.
 The client certificate contains a subject common name e.g. `Administrator`.
-The administrator user `Administrator` is configured by the `couchbaseclusters.spec.security.adminSecret`.
+The administrator user `Administrator` is configured by the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-security-adminsecret[`couchbaseclusters.spec.security.adminSecret`].
 
-<.> `couchbaseclusters.spec.networking.tls.clientCertificatePolicy` is set to mandatory meaning all clients will need to provide a valid client certificate in order to authenticate against the cluster.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-clientcertificatepolicy[`couchbaseclusters.spec.networking.tls.clientCertificatePolicy`] is set to mandatory meaning all clients will need to provide a valid client certificate in order to authenticate against the cluster.
 
-<.> `couchbaseclusters.spec.networking.tls.clientCertificatePaths` defines a path that is able to correctly parse and extract the Operator's `Administrator` use from the client certificate.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-clientcertificatepaths[`couchbaseclusters.spec.networking.tls.clientCertificatePaths`] defines a path that is able to correctly parse and extract the Operator's `Administrator` use from the client certificate.
 In this example all we need to specify is that the user name is explicitly encoded in the certificate's subject common name.
 This covers the base requirements in order for the Operator to be able to connect to the cluster.
 +

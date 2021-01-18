@@ -1,0 +1,105 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseGroup Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbasegroup]
+
+CouchbaseGroup allows the automation of Couchbase group management.
+
+== couchbasegroups.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbasegroups.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+== couchbasegroups.metadata
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+Standard object metadata as defined for all Kubernetes types.
+For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+
+== couchbasegroups.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseGroupSpec allows the specification of Couchbase group configuration.
+
+=== couchbasegroups.spec.ldapGroupRef
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LDAPGroupRef is a reference to an LDAP group.
+
+=== couchbasegroups.spec.roles
+
+==== Constraints
+
+*Required*
+
+*Type*: `[]object`
+
+==== Description
+
+Roles is a list of roles that this group is granted.
+
+=== couchbasegroups.spec.roles.bucket
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^\\*$|^[a-zA-Z0-9-\_%\.]+$`
+
+==== Description
+
+Bucket name for bucket admin roles.
+When not specified for a role that can be scoped to a specific bucket, the role will apply to all buckets in the cluster.
+
+=== couchbasegroups.spec.roles.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Enumerations*: `admin, cluster\_admin, security\_admin, ro\_admin, replication\_admin, query\_external\_access, query\_system\_catalog, analytics\_reader, bucket\_admin, views\_admin, fts\_admin, bucket\_full\_access, data\_reader, data\_writer, data\_dcp\_reader, data\_backup, data\_monitoring, replication\_target, analytics\_manager, views\_reader, fts\_searcher, query\_select, query\_update, query\_insert, query\_delete, query\_manage\_index`
+
+==== Description
+
+Name of role.

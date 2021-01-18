@@ -34,22 +34,22 @@ spec:
         serverSecretName: my-server-secret # <.>
 ----
 
-<.> `couchbaseclusters.spec.networking.exposeAdminConsole` is enabled to allow the creation of a service pointing to the Couchbase admin port.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposeadminconsole[`couchbaseclusters.spec.networking.exposeAdminConsole`] is enabled to allow the creation of a service pointing to the Couchbase admin port.
 
-<.> `couchbaseclusters.spec.networking.adminConsoleServiceTemplate` type is set to `LoadBalancer` causing the admin console service to use a load balancer.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-adminconsoleservicetemplate[`couchbaseclusters.spec.networking.adminConsoleServiceTemplate`] type is set to `LoadBalancer` causing the admin console service to use a load balancer.
 Combining the two attributes means a client can connect to a stable and highly-available public DNS endpoint that is load balanced across the entire cluster.
 
-<.> `couchbaseclusters.spec.networking.exposedFeatures` defines the `client` feature set, meaning all enabled services are exposed.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposedfeatures[`couchbaseclusters.spec.networking.exposedFeatures`] defines the `client` feature set, meaning all enabled services are exposed.
 This also causes a per-pod service to be created allowing direct access by a client to each pod as required.
 
-<.> `couchbaseclusters.spec.networking.exposedFeatureServiceTemplate` type is set to `LoadBalanacer` meaning each per-pod service is created with a load balancer and allocated a public IP address.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposedfeatureservicetemplate[`couchbaseclusters.spec.networking.exposedFeatureServiceTemplate`] type is set to `LoadBalanacer` meaning each per-pod service is created with a load balancer and allocated a public IP address.
 
-<.> `couchbaseclusters.spec.networking.dns.domain` defines the domain DDNS entries will be created under.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-dns-domain[`couchbaseclusters.spec.networking.dns.domain`] defines the domain DDNS entries will be created under.
 A separate https://github.com/kubernetes-sigs/external-dns[External DNS^] service needs to be created to actually replicate DNS names and IP addresses into a public DDNS server.
 The Operator will create annotations for the admin console as `console.my-cluster.example.com` for example.
 Annotations are attached to the admin console and per-pod services.
 The External DNS controller needs to create DNS A records for these service endpoints.
 
-<.> `couchbaseclusters.spec.networking.tls.secretSource.serverSecretName` specifies the Couchbase server certificate.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-serversecretname[`couchbaseclusters.spec.networking.tls.secretSource.serverSecretName`] specifies the Couchbase server certificate.
 Mandatory subject alternative names (SANs) are described in the xref:tutorial-tls.adoc[TLS certificate tutorial].
 An additional SAN is required for the public DNS names, in this case `DNS:*.my-cluster.example.com`.

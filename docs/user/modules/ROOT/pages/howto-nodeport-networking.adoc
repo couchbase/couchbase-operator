@@ -26,9 +26,9 @@ spec:
         type: NodePort
 ----
 
-<.> `couchbaseclusters.spec.networking.exposeAdminConsole` is enabled to allow the creation of a service pointing to the Couchbase admin port.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposeadminconsole[`couchbaseclusters.spec.networking.exposeAdminConsole`] is enabled to allow the creation of a service pointing to the Couchbase admin port.
 The node port can be accessed on any Kubernetes node and will provide a degree of high-availability to a client connecting to it.
 However as node IP addresses may vary during the life cycle of a Kubernetes cluster it is considered unstable and may cause clients to fail.
 
-<.> `couchbaseclusters.spec.networking.exposedFeatures` defines the `client` feature set, meaning all enabled services are exposed.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposedfeatures[`couchbaseclusters.spec.networking.exposedFeatures`] defines the `client` feature set, meaning all enabled services are exposed.
 This also causes a per-pod service to be created allowing direct access by a client to each pod as required.

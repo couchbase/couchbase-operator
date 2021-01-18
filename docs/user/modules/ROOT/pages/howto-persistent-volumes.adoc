@@ -34,15 +34,15 @@ spec:
           storage: 1Gi
 ----
 
-<.> `couchbaseclusters.spec.servers.volumeMounts.default` tells the Operator to provision a default persistent volume claim and attach it to a pod of that server class.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-volumemounts-default[`couchbaseclusters.spec.servers.volumeMounts.default`] tells the Operator to provision a default persistent volume claim and attach it to a pod of that server class.
 
-<.> `couchbaseclusters.spec.volumeClaimTemplates`] defines a list of templates related to storage.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-volumeclaimtemplates[`couchbaseclusters.spec.volumeClaimTemplates`] defines a list of templates related to storage.
 These will be used to create Kubernetes persistent volume claims and therefore have the same data structure.
 However the Operator is only concerned with the following parameters, any others are ignored.
 
-<.> `couchbaseclusters.spec.volumeClaimTemplates.metadata.name` is a unique identifier for a persistent volume template.
-It is referred to by attributes in the `couchbaseclusters.spec.servers.volumeMounts` object.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-volumeclaimtemplates[`couchbaseclusters.spec.volumeClaimTemplates.metadata.name`] is a unique identifier for a persistent volume template.
+It is referred to by attributes in the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-volumemounts[`couchbaseclusters.spec.servers.volumeMounts`] object.
 
-<.> `couchbaseclusters.spec.volumeClaimTemplates.spec.storageClassName` refers to a dynamically allocated storage class defined on the platform.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-volumeclaimtemplates[`couchbaseclusters.spec.volumeClaimTemplates.spec.storageClassName`] refers to a dynamically allocated storage class defined on the platform.
 
-<.> `couchbaseclusters.spec.volumeClaimTemplates.spec.resources` defines the size of the volume that will be allocated.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-volumeclaimtemplates[`couchbaseclusters.spec.volumeClaimTemplates.spec.resources`] defines the size of the volume that will be allocated.

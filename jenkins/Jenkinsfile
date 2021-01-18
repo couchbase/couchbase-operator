@@ -54,7 +54,7 @@ pipeline {
     }
     stage('Documentation') {
       steps {
-        sh 'make docs'
+        sh 'make docs-lint'
       }
     }
   }

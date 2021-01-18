@@ -41,6 +41,6 @@ spec:
         serverSecretName: couchbase-server-tls # <.>
 ----
 
-<.> `couchbaseclusters.spec.networking.tls.secretSource.serverSecretName` defines a secret that will be mounted to all Couchbase Server pods.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-serversecretname[`couchbaseclusters.spec.networking.tls.secretSource.serverSecretName`] defines a secret that will be mounted to all Couchbase Server pods.
 It contains the server wildcard certificate and its private key.
 As the private key is securely mounted to the pod by Kubernetes it is never exposed over the network.
