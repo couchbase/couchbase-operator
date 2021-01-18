@@ -45,10 +45,10 @@ spec:
       targetPort: 4984
   type: "NodePort"
   selector:
-    name: sync-gateway
+    app: sync-gateway
 ----
 
-This specification creates a new Service object named `sync-gateway-service`, which targets TCP port 4984 on any Pod with the `app=sync-gateway label`.
+This specification creates a new Service object named `sync-gateway-service`, which targets TCP port 4984 on any Pod with the `app=sync-gateway` label.
 Port 4984 is the default public port of Sync Gateway. You can map any incoming `port` to a `targetPort`. For  convenience, the `targetPort` is set to the same value as the `port` field.
 
 
