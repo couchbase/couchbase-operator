@@ -131,7 +131,7 @@ On your target cluster, first list pods associated with your Couchbase cluster, 
 
 [source,console]
 ----
-$ kubectl list pods -l couchbase_cluster=foo
+$ kubectl get pods -l couchbase_cluster=foo
 ----
 
 Select any pod that is returned e.g. `foo-0000`.
@@ -144,7 +144,7 @@ On your target cluster, first list pods associated with your Couchbase cluster, 
 
 [source,console]
 ----
-$ kubectl list pods -l couchbase_cluster=foo
+$ kubectl get pods -l couchbase_cluster=foo
 ----
 
 Select any pod that is returned e.g. `foo-0000`.
