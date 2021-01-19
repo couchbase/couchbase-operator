@@ -1947,10 +1947,11 @@ func (c *Cluster) reconcileXDCR() error {
 		}
 
 		requested := couchbaseutil.RemoteCluster{
-			Name:     cluster.Name,
-			UUID:     cluster.UUID,
-			Hostname: hostname,
-			Network:  connectionString.Query().Get("network"),
+			Name:       cluster.Name,
+			UUID:       cluster.UUID,
+			Hostname:   hostname,
+			Network:    connectionString.Query().Get("network"),
+			SecureType: couchbaseutil.RemoteClusterSecurityNone,
 		}
 
 		if cluster.AuthenticationSecret != nil {
@@ -1975,7 +1976,7 @@ func (c *Cluster) reconcileXDCR() error {
 				}
 
 				// No, we will never support any other type!
-				requested.SecureType = "full"
+				requested.SecureType = couchbaseutil.RemoteClusterSecurityTLS
 
 				// While we should pass through the raw []byte, it makes life simpler for the client
 				// library if we pass it as a string.
@@ -2041,6 +2042,93 @@ CreateNextCluster:
 
 		for _, current := range *currentClusters {
 			if current.Name == requested.Name {
+				// Load up the configuration that changes... OMG!!
+				hostname, err := c.state.Get(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRHostname))
+				if err != nil {
+					return err
+				}
+
+				current.Hostname = hostname
+
+				// Load up configuration that is written to the API but not returned.
+				password, err := c.state.Get(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRPassword))
+				if err != nil {
+					if !goerrors.Is(err, persistence.ErrKeyError) {
+						return err
+					}
+				} else {
+					current.Password = password
+				}
+
+				key, err := c.state.Get(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientKey))
+				if err != nil {
+					if !goerrors.Is(err, persistence.ErrKeyError) {
+						return err
+					}
+				} else {
+					current.Key = key
+				}
+
+				certificate, err := c.state.Get(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientCertificate))
+				if err != nil {
+					if !goerrors.Is(err, persistence.ErrKeyError) {
+						return err
+					}
+				} else {
+					current.Certificate = certificate
+				}
+
+				// AGGGGGGHHHHH... I set to "external", it comes back blank.  This is a joke!
+				// For now just ignore this, I'm not persisting it.
+				current.Network = requested.Network
+
+				// Diff, this is safe it doesn't have any slices in it...
+				if reflect.DeepEqual(current, requested) {
+					continue CreateNextCluster
+				}
+
+				log.Info("Updating XDCR remote cluster", "cluster", c.namespacedName(), "remote", requested.Name)
+				log.V(2).Info("XDCR connection state", "cluster", c.namespacedName(), "requested", requested, "current", current)
+
+				if err := couchbaseutil.UpdateRemoteCluster(&requested).On(c.api, c.readyMembers()); err != nil {
+					return err
+				}
+
+				c.raiseEvent(k8sutil.RemoteClusterUpdatedEvent(c.cluster, requested.Name))
+
+				// Remove any existing persistent items associated with the connection.
+				// I can imagine someone will try changing from username/password to
+				// mTLS at some point and we can't leave the old stuff behind as it will
+				// come back from the dead next time around.
+				if err := c.state.DeleteXDCR(requested.Name); err != nil {
+					return err
+				}
+
+				// Save any updatable parameters that will not be returned by a GET from the
+				// API.  We will use these to detect and trigger updates.
+				if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRHostname), requested.Hostname); err != nil {
+					return err
+				}
+
+				if requested.Password != "" {
+					if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRPassword), requested.Password); err != nil {
+						return err
+					}
+				}
+
+				if requested.Key != "" {
+					if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientKey), requested.Key); err != nil {
+						return err
+					}
+				}
+
+				if requested.Certificate != "" {
+					if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientCertificate), requested.Certificate); err != nil {
+						return err
+					}
+				}
+
+				// On to the next!
 				continue CreateNextCluster
 			}
 		}
@@ -2051,6 +2139,30 @@ CreateNextCluster:
 		}
 
 		c.raiseEvent(k8sutil.RemoteClusterAddedEvent(c.cluster, requested.Name))
+
+		// Save any updatable parameters that will not be returned by a GET from the
+		// API.  We will use these to detect and trigger updates.
+		if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRHostname), requested.Hostname); err != nil {
+			return err
+		}
+
+		if requested.Password != "" {
+			if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRPassword), requested.Password); err != nil {
+				return err
+			}
+		}
+
+		if requested.Key != "" {
+			if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientKey), requested.Key); err != nil {
+				return err
+			}
+		}
+
+		if requested.Certificate != "" {
+			if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientCertificate), requested.Certificate); err != nil {
+				return err
+			}
+		}
 	}
 
 	// Create/update any replications...
@@ -2131,6 +2243,10 @@ DeleteNextCluster:
 		}
 
 		c.raiseEvent(k8sutil.RemoteClusterRemovedEvent(c.cluster, current.Name))
+
+		if err := c.state.DeleteXDCR(current.Name); err != nil {
+			return err
+		}
 	}
 
 	return nil

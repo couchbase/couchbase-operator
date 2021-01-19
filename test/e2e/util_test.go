@@ -167,6 +167,7 @@ var (
 		"TestXdcrCreateClusterRemoteMandatoryMutualTLS": TestXdcrCreateClusterRemoteMandatoryMutualTLS,
 		"TestXDCRDeleteReplication":                     TestXDCRDeleteReplication,
 		"TestXDCRFilterExp":                             TestXDCRFilterExp,
+		"TestXDCRRotatePassword":                        TestXDCRRotatePassword,
 
 		// SGW tests
 		"TestSyncGatewayCreateLocal":                    TestSyncGatewayCreateLocal,

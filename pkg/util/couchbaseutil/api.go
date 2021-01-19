@@ -532,6 +532,16 @@ func CreateRemoteCluster(r *RemoteCluster) *Request {
 	return NewRequest((*Client).Post, "/pools/default/remoteClusters", data, nil)
 }
 
+// UpdateRemoteCluster updates an existing XDCR remote cluster.
+func UpdateRemoteCluster(r *RemoteCluster) *Request {
+	data, err := urlencoding.Marshal(r)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, fmt.Sprintf("/pools/default/remoteClusters/%s", r.Name), data, nil)
+}
+
 // DeleteRemoteCluster deletes an XDCR remote cluster.
 func DeleteRemoteCluster(r *RemoteCluster) *Request {
 	return NewRequest((*Client).Delete, fmt.Sprintf("/pools/default/remoteClusters/%s", r.Name), nil, nil)

@@ -82,6 +82,7 @@ testcases:
 - TestXdcrSourceNodeDown
 - TestXdcrSourceNodeAdd
 - TestXdcrTargetNodeServiceDelete
+- TestXDCRRotatePassword
 
 # Sync Gateway Intra-Cluster Tests
 - TestSyncGatewayCreateLocal

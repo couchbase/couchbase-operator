@@ -796,3 +796,49 @@ func TestXDCRFilterExp(t *testing.T) {
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
+
+// TestXDCRRotatePassword tests that when the password is rotated on the XDCR target cluster
+// it can also be updated on the source cluster without having to teardown and recreate
+// the connection.
+func TestXDCRRotatePassword(t *testing.T) {
+	// Platform configuration.
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the clusters.
+	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+
+	// When ready, establish the XDCR connection.
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+
+	e2eutil.MustRotateClusterPassword(t, k8s2)
+	e2eutil.MustRotateXDCRReplicationPassword(t, k8s1, k8s2, xdcrCluster2)
+
+	expectedEvents1 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonAdminPasswordChanged},
+	}
+
+	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
+	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+}

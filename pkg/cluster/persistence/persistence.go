@@ -4,6 +4,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -45,6 +46,37 @@ const (
 	ClientKey PersistentKind = "clientKey"
 )
 
+// PersistentKindXDCR is a type for XDCR persistence keys.  These are defined on
+// a per-connection basis.
+type PersistentKindXDCR string
+
+const (
+	// XDCRHostname records the hostname of the connection because XDCR actuall mutates
+	// it and breaks the read/modify/write contract.
+	XDCRHostname PersistentKindXDCR = "hostname"
+
+	// XDCRPassword records the password so we can compare it against the secret
+	// in Kubernetes.  This is not returned by a HTTP GET.
+	XDCRPassword PersistentKindXDCR = "password"
+
+	// XDCRClientKey records the client key so we can compare it against the secret
+	// in Kubernetes.  This is not returned by a HTTP GET.
+	XDCRClientKey PersistentKindXDCR = "clientKey"
+
+	// XDCRClientCertificate records the client cert so we can compare it against the secret
+	// in Kubernetes.  This is not returned by a HTTP GET.
+	XDCRClientCertificate PersistentKindXDCR = "clientCertificate"
+)
+
+func getPersistentKindPrefixXDCR(connectionName string) string {
+	return fmt.Sprintf("xdcr-connection-%s", connectionName)
+}
+
+// GetPersistentKindXDCR generates a unique key for XDCR connection parameters.
+func GetPersistentKindXDCR(connectionName string, kind PersistentKindXDCR) PersistentKind {
+	return PersistentKind(fmt.Sprintf("%s-%s", getPersistentKindPrefixXDCR(connectionName), string(kind)))
+}
+
 // PersistentStorage defines a very simple key value store for persisting data,
 // all operations are atomic.
 type PersistentStorage interface {
@@ -56,6 +88,8 @@ type PersistentStorage interface {
 	Update(PersistentKind, string) error
 	// Delete a key, if it already exists.
 	Delete(PersistentKind) error
+	// DeleteXDCR deletes all keys associated with this connection.
+	DeleteXDCR(string) error
 	// Get a value.
 	Get(PersistentKind) (string, error)
 	// Clear clears persistent storage (e.g. ephemeral disaster recovery)
@@ -211,6 +245,29 @@ func (p *persistentStorageImpl) Delete(kind PersistentKind) error {
 	delete(p.secret.Data, string(kind))
 
 	return p.flush()
+}
+
+// DeleteXDCR deletes all keys associated with this connection.
+func (p *persistentStorageImpl) DeleteXDCR(connectionName string) error {
+	prefix := getPersistentKindPrefixXDCR(connectionName)
+
+	update := false
+
+	for key := range p.secret.Data {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+
+		delete(p.secret.Data, key)
+
+		update = true
+	}
+
+	if update {
+		return p.flush()
+	}
+
+	return nil
 }
 
 // Get a value.

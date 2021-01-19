@@ -841,20 +841,32 @@ type AutoCompactionSettings struct {
 // RemoteClusters is returned by /pools/default/remoteClusters.
 type RemoteClusters []RemoteCluster
 
+// RemoteClusterSecurity indicates the authentication method.
+// There is a 'half', but we don't do half-arsed here.
+type RemoteClusterSecurity string
+
+const (
+	// Username & password.
+	RemoteClusterSecurityNone RemoteClusterSecurity = "none"
+
+	// Full TLS/mTLS.
+	RemoteClusterSecurityTLS RemoteClusterSecurity = "full"
+)
+
 // RemoteCluster describes an XDCR remote cluster.
 type RemoteCluster struct {
-	Name       string `json:"name" url:"name"`
-	Hostname   string `json:"hostname"  url:"hostname"`
-	Username   string `json:"username"  url:"username"`
-	Password   string `json:"password"  url:"password"`
-	UUID       string `json:"uuid"  url:"uuid"`
-	Deleted    bool   `json:"deleted"`
-	SecureType string `json:"secureType" url:"secureType,omitempty"`
-	Network    string `json:"network_type" url:"network_type,omitempty"`
+	Name       string                `json:"name" url:"name"`
+	Hostname   string                `json:"hostname"  url:"hostname"`
+	Username   string                `json:"username"  url:"username"`
+	Password   string                `json:"password"  url:"password"`
+	UUID       string                `json:"uuid"  url:"uuid"`
+	Deleted    bool                  `json:"deleted"`
+	SecureType RemoteClusterSecurity `json:"secureType" url:"secureType,omitempty"`
+	Network    string                `json:"network_type" url:"network_type,omitempty"`
+	CA         string                `json:"certificate" url:"certificate,omitempty"`
 
 	// These are here for convenience and should only be populated
 	// after comparison as they are not supplied by the API.
-	CA          string `json:"-" url:"certificate,omitempty"`
 	Certificate string `json:"-" url:"clientCertificate,omitempty"`
 	Key         string `json:"-" url:"clientKey,omitempty"`
 }

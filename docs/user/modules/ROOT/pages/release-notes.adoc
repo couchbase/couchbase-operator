@@ -49,6 +49,14 @@ This release allows the availability zones to be modified, excluding the failed 
 
 All server group migration operations use a shortest-path algorithm in order to minimize disruption.
 
+==== Improved XDCR Connection Support
+
+Prior to this release, any updates to XDCR remote clusters would be silently ignored.
+In order to modify any setting, the remote cluster and all replications would have to be deleted and recreated from scratch.
+
+This release adds the ability to modify remote cluster identification and authentication settings.
+This provides the ability to rotate passwords and certificates on the remote cluster, or even replace the remote cluster entirely.
+
 [#release-v210]
 == Release 2.1.0
 

@@ -62,6 +62,7 @@ const (
 
 	// XDCR lifecycle.
 	EventReasonRemoteClusterAdded   = "RemoteClusterAdded"
+	EventReasonRemoteClusterUpdated = "RemoteClusterUpdated"
 	EventReasonRemoteClusterRemoved = "RemoteClusterRemoved"
 	EventReasonReplicationAdded     = "ReplicationAdded"
 	EventReasonReplicationRemoved   = "ReplicationRemoved"
@@ -464,6 +465,15 @@ func RemoteClusterAddedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRemoteClusterAdded
 	event.Message = fmt.Sprintf("XDCR remote cluster %s added", name)
+
+	return event
+}
+
+func RemoteClusterUpdatedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonRemoteClusterUpdated
+	event.Message = fmt.Sprintf("XDCR remote cluster %s updated", name)
 
 	return event
 }
