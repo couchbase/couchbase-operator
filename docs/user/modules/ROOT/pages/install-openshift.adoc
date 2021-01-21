@@ -53,7 +53,7 @@ This command uses 3rd party resources and is subject to change.
 Consult the documentation provided by Red Hat for up to date instructions.
 ====
 
-The following command will install both the DAC and the Operator:
+The following command will install both the DAC and the Operator in the `default` namespace:
 
 [source,console]
 ----
@@ -67,16 +67,14 @@ Alternatively, you may wish to install just the DAC in the `camelot` namespace:
 
 [source,console]
 ----
-$ oc project camelot
-$ bin/cbopcfg generate admission --image-pull-secret rh-catalog | oc create -f -
+$ bin/cbopcfg generate admission --namespace camelot --image-pull-secret rh-catalog | oc create -f -
 ----
 
 And then install just the Operator into the `asgard` namespace:
 
 [source,console]
 ----
-$ oc project asgard
-$ bin/cbopcfg generate operator --image-pull-secret rh-catalog | oc create -f -
+$ bin/cbopcfg generate operator --namespace asgard --image-pull-secret rh-catalog | oc create -f -
 ----
 
 For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
