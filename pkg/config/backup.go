@@ -4,6 +4,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/spf13/cobra"
 )
@@ -15,15 +16,12 @@ const (
 
 // generateBackupOptions defines options for generating backup resources.
 type generateBackupOptions struct {
-	// namespace is the namespace into which the resources should be generated.
-	namespace string
-
 	// file defines whether or not to output to a file.
 	file bool
 }
 
 // getGenerateBackupCommand creates YAML capable of creating backup job prerequisites.
-func getGenerateBackupCommand() *cobra.Command {
+func getGenerateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &generateBackupOptions{}
 
 	cmd := &cobra.Command{
@@ -31,27 +29,31 @@ func getGenerateBackupCommand() *cobra.Command {
 		Short: "Generates YAML for backup jobs",
 		Long:  "Generates YAML for backup jobs, these require Kubernetes roles to be bound to the job",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return o.generate()
+			return o.generate(flags)
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.namespace, "namespace", "n", "default", "Namespace to generate resources in.")
 	cmd.Flags().BoolVar(&o.file, "file", false, "Generate files rather than printing to the console")
 
 	return cmd
 }
 
 // generate dumps all operator resources to standard out.
-func (o *generateBackupOptions) generate() error {
-	if err := DumpYAML(o.file, "backup-service-account", GetBackupServiceAccount(o.namespace)); err != nil {
+func (o *generateBackupOptions) generate(flags *genericclioptions.ConfigFlags) error {
+	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "backup-role", GetBackupRole(o.namespace)); err != nil {
+	if err := DumpYAML(o.file, "backup-service-account", GetBackupServiceAccount(namespace)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "backup-role-binding", GetBackupRoleBinding(o.namespace)); err != nil {
+	if err := DumpYAML(o.file, "backup-role", GetBackupRole(namespace)); err != nil {
+		return err
+	}
+
+	if err := DumpYAML(o.file, "backup-role-binding", GetBackupRoleBinding(namespace)); err != nil {
 		return err
 	}
 

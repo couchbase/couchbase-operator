@@ -8,6 +8,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/spf13/cobra"
 )
@@ -75,6 +76,8 @@ func validateScope(s string) error {
 
 // ParseArgs parses command line arguments into a Config struct and executes the command.
 func Execute() {
+	flags := genericclioptions.NewConfigFlags(true)
+
 	// 'cbopcfg version' prints out the Operator version this binary belongs to.
 	version := &cobra.Command{
 		Use:   "version",
@@ -92,14 +95,16 @@ func Execute() {
 		Long:  "Generates YAML manifests for various Operator components",
 	}
 
-	generate.AddCommand(getGenerateOperatorCommand())
-	generate.AddCommand(getGenerateAdmissionCommand())
-	generate.AddCommand(getGenerateBackupCommand())
+	generate.AddCommand(getGenerateOperatorCommand(flags))
+	generate.AddCommand(getGenerateAdmissionCommand(flags))
+	generate.AddCommand(getGenerateBackupCommand(flags))
 
 	// 'cbopcfg' is the top level command.
 	root := &cobra.Command{
 		Use: "cbopcfg",
 	}
+
+	flags.AddFlags(root.PersistentFlags())
 
 	root.AddCommand(version)
 	root.AddCommand(generate)

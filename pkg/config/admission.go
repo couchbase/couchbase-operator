@@ -15,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/spf13/cobra"
 )
@@ -26,9 +27,6 @@ const (
 
 // generateAdmissionOptions defines options for creating the admission controller.
 type generateAdmissionOptions struct {
-	// namespace is the namespace into which the resources should be generated.
-	namespace string
-
 	// image is the admission controller image name.
 	image string
 
@@ -47,7 +45,7 @@ type generateAdmissionOptions struct {
 }
 
 // getGenerateAdmissionCommand creates YAML capable of creating the dynamic admission controller.
-func getGenerateAdmissionCommand() *cobra.Command {
+func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &generateAdmissionOptions{}
 
 	cmd := &cobra.Command{
@@ -59,14 +57,13 @@ func getGenerateAdmissionCommand() *cobra.Command {
 				return err
 			}
 
-			return o.generate()
+			return o.generate(flags)
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.scope, "scope", "s", "cluster", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
-	cmd.Flags().StringVarP(&o.namespace, "namespace", "n", "default", "Namespace to generate resources in.")
-	cmd.Flags().StringVarP(&o.image, "image", "i", admissionImageDefault, "Operator image to use")
-	cmd.Flags().StringVarP(&o.imagePullSecret, "image-pull-secret", "p", "", "Image pull secret to allow access to the operator image")
+	cmd.Flags().StringVar(&o.scope, "scope", "cluster", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
+	cmd.Flags().StringVar(&o.imagePullSecret, "image-pull-secret", "", "Image pull secret to allow access to the operator image")
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 	cmd.Flags().BoolVar(&o.file, "file", false, "Generate files rather than printing to the console")
 
@@ -87,7 +84,12 @@ func (o *generateAdmissionOptions) validate() error {
 }
 
 // generate dumps all admission controller resources to standard out.
-func (o *generateAdmissionOptions) generate() error {
+func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags) error {
+	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
 	// Generate TLS configuration for the dynamic admission controller.
 	validFrom := time.Now()
 	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)
@@ -102,7 +104,7 @@ func (o *generateAdmissionOptions) generate() error {
 				CommonName: AdmissionResourceName,
 			},
 			DNSNames: []string{
-				AdmissionResourceName + "." + o.namespace + ".svc",
+				AdmissionResourceName + "." + namespace + ".svc",
 			},
 		},
 	}
@@ -117,35 +119,35 @@ func (o *generateAdmissionOptions) generate() error {
 	}
 
 	// Create resources.
-	if err := DumpYAML(o.file, "admission-service-account", GetAdmissionServiceAccount(o.namespace)); err != nil {
+	if err := DumpYAML(o.file, "admission-service-account", GetAdmissionServiceAccount(namespace)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "admission-cluster-role", GetAdmissionRole(o.namespace, o.scope == scopeCluster)); err != nil {
+	if err := DumpYAML(o.file, "admission-cluster-role", GetAdmissionRole(namespace, o.scope == scopeCluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "admission-cluster-role-binding", GetAdmissionRoleBinding(o.namespace, o.scope == scopeCluster)); err != nil {
+	if err := DumpYAML(o.file, "admission-cluster-role-binding", GetAdmissionRoleBinding(namespace, o.scope == scopeCluster)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "admission-secret", GetAdmissionSecret(o.namespace, key, cert)); err != nil {
+	if err := DumpYAML(o.file, "admission-secret", GetAdmissionSecret(namespace, key, cert)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "admission-deployment", GetAdmissionDeployment(o.namespace, o.image, imagePullSecrets)); err != nil {
+	if err := DumpYAML(o.file, "admission-deployment", GetAdmissionDeployment(namespace, o.image, imagePullSecrets)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "admission-service", GetAdmissionService(o.namespace)); err != nil {
+	if err := DumpYAML(o.file, "admission-service", GetAdmissionService(namespace)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "admission-mutating-webhook", GetAdmissionMutatingWebhook(o.namespace, ca.Certificate, o.scope == scopeCluster, o.namespaceSelector.LabelSelector)); err != nil {
+	if err := DumpYAML(o.file, "admission-mutating-webhook", GetAdmissionMutatingWebhook(namespace, ca.Certificate, o.scope == scopeCluster, o.namespaceSelector.LabelSelector)); err != nil {
 		return err
 	}
 
-	if err := DumpYAML(o.file, "admission-validating-webhook", GetAdmissionValidatingWebhook(o.namespace, ca.Certificate, o.scope == scopeCluster, o.namespaceSelector.LabelSelector)); err != nil {
+	if err := DumpYAML(o.file, "admission-validating-webhook", GetAdmissionValidatingWebhook(namespace, ca.Certificate, o.scope == scopeCluster, o.namespaceSelector.LabelSelector)); err != nil {
 		return err
 	}
 
