@@ -576,6 +576,7 @@ spec:
 ----
 
 And finally, the S3 bucket that we wish to hold backups needs to be specified in the desired `CouchbaseBackup` and `CouchbaseBackupRestore` CRDs.
+Note that the `s3://` prefix is required, otherwise the Admission Controller will not allow the creation of the CRD.
 
 [source,yaml]
 ----
@@ -590,7 +591,7 @@ spec:
   incremental:
     schedule: "0 3 * * 1-6"
   size: 20Gi
-  s3bucket: my-backup-bucket
+  s3bucket: s3://my-backup-bucket
 ----
 
 [source,yaml]
@@ -605,7 +606,7 @@ spec:
     str: oldest
   end:
     str: latest
-  s3bucket: my-backup-bucket
+  s3bucket: s3://my-backup-bucket
 ----
 
 Please note that operations involving S3 take more time to complete in comparison to regular backup to PVCs so please bear this in mind when configuring your automated backup schedules.
