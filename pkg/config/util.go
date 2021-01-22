@@ -1,36 +1,204 @@
 package config
 
 import (
+	"context"
 	"fmt"
-	"os"
+	"strings"
 
 	"github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
-// DumpYAML takes a tagged struct and dumps it to standard out as YAML.
-func DumpYAML(toFile bool, name string, object interface{}) error {
-	data, err := yaml.Marshal(object)
+// getDynamicClient returns the bits required for dynamic client operations, the client
+// itself and a mapper to transform from GVK to GVR for API operations.
+func getDynamicClient(flags *genericclioptions.ConfigFlags) (dynamic.Interface, meta.RESTMapper, error) {
+	config, err := flags.ToRESTConfig()
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to get client config: %w", err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to create dynamic client: %w", err)
+	}
+
+	restMapper, err := flags.ToRESTMapper()
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to get REST mapper: %w", err)
+	}
+
+	return dynamicClient, restMapper, nil
+}
+
+// convertToUnstructured takes a bunch of abstract resources and converts them into
+// unstructured JSON.  In doing so it maps from type to group/kind implicitly using
+// the scheme.  This allows the output to be used for both YAML generation and dynamic
+// client creation/deletion.
+func convertToUnstructured(objects []runtime.Object) ([]*unstructured.Unstructured, error) {
+	resources := make([]*unstructured.Unstructured, len(objects))
+
+	for i, object := range objects {
+		gvk, unversioned, err := scheme.Scheme.ObjectKinds(object)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get GVK for resource: %w", err)
+		}
+
+		if unversioned || len(gvk) != 1 {
+			return nil, fmt.Errorf("converting type to GVK")
+		}
+
+		raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
+		if err != nil {
+			return nil, fmt.Errorf("unable to convert resource to nustructured: %w", err)
+		}
+
+		u := &unstructured.Unstructured{
+			Object: raw,
+		}
+
+		u.GetObjectKind().SetGroupVersionKind(gvk[0])
+
+		unstructured.RemoveNestedField(u.Object, "status")
+
+		resources[i] = u
+	}
+
+	return resources, nil
+}
+
+// dumpResources prints the resources to the console.
+func dumpResources(objects []runtime.Object) error {
+	resources, err := convertToUnstructured(objects)
 	if err != nil {
 		return err
 	}
 
-	if toFile {
-		file, err := os.Create(name + ".yaml")
+	datas := make([]string, len(resources))
+
+	for i, resource := range resources {
+		data, err := yaml.Marshal(resource)
 		if err != nil {
 			return err
 		}
 
-		defer file.Close()
-
-		if _, err := file.Write(data); err != nil {
-			return err
-		}
-
-		return nil
+		datas[i] = string(data)
 	}
 
-	fmt.Println("---")
-	fmt.Println(string(data))
+	fmt.Println(strings.Join(datas, "---\n"))
 
 	return nil
+}
+
+// createResources takes a list of unstructured resources and creates them
+// against the Kubernetes cluster and namespace as configured in your
+// kubeconfig.
+func createResources(flags *genericclioptions.ConfigFlags, objects []runtime.Object) error {
+	resources, err := convertToUnstructured(objects)
+	if err != nil {
+		return err
+	}
+
+	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	client, mapper, err := getDynamicClient(flags)
+	if err != nil {
+		return err
+	}
+
+	for _, resource := range resources {
+		gvk := resource.GroupVersionKind()
+
+		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return fmt.Errorf("unable to get rest mapping for kind %s: %w", gvk.GroupKind(), err)
+		}
+
+		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			if _, err := client.Resource(mapping.Resource).Create(context.Background(), resource, metav1.CreateOptions{}); err != nil {
+				fmt.Println(err)
+
+				continue
+			}
+		} else {
+			if _, err := client.Resource(mapping.Resource).Namespace(namespace).Create(context.Background(), resource, metav1.CreateOptions{}); err != nil {
+				fmt.Println(err)
+
+				continue
+			}
+		}
+
+		fmt.Printf("%s/%s created\n", mapping.Resource.Resource, resource.GetName())
+	}
+
+	return nil
+}
+
+// deleteResources takes a list of unstructured resources and deletes them
+// against the Kubernetes cluster and namespace as configured in your
+// kubeconfig.
+func deleteResources(flags *genericclioptions.ConfigFlags, objects []runtime.Object) error {
+	resources, err := convertToUnstructured(objects)
+	if err != nil {
+		return err
+	}
+
+	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	client, mapper, err := getDynamicClient(flags)
+	if err != nil {
+		return err
+	}
+
+	for _, resource := range resources {
+		gvk := resource.GroupVersionKind()
+
+		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return fmt.Errorf("unable to get rest mapping for kind %s: %w", gvk.GroupKind(), err)
+		}
+
+		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			if err := client.Resource(mapping.Resource).Delete(context.Background(), resource.GetName(), metav1.DeleteOptions{}); err != nil {
+				fmt.Println(err)
+
+				continue
+			}
+		} else {
+			if err := client.Resource(mapping.Resource).Namespace(namespace).Delete(context.Background(), resource.GetName(), metav1.DeleteOptions{}); err != nil {
+				fmt.Println(err)
+
+				continue
+			}
+		}
+
+		fmt.Printf("%s/%s deleted\n", mapping.Resource.Resource, resource.GetName())
+	}
+
+	return nil
+}
+
+// normalize takes a blob of text and prepares it for use as a long description or
+// and example for a command.
+func normalize(s string) string {
+	s = strings.TrimSpace(s)
+
+	formatted := []string{}
+
+	for _, line := range strings.Split(s, "\n") {
+		formatted = append(formatted, "  "+strings.TrimSpace(line))
+	}
+
+	return strings.Join(formatted, "\n")
 }

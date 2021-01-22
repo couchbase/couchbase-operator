@@ -142,7 +142,7 @@ func recreateRoles(k8s *types.Cluster, roleName string) error {
 		return err
 	}
 
-	roleObject := config.GetOperatorRole(k8s.Namespace, false)
+	roleObject := config.GetOperatorRole(false)
 
 	roleSpec, ok := roleObject.(*rbacv1.Role)
 	if !ok {
@@ -174,7 +174,7 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 	}
 
 	// Create service account given by the name
-	serviceAccount := config.GetOperatorServiceAccount(k8s.Namespace)
+	serviceAccount := config.GetOperatorServiceAccount()
 	serviceAccount.Name = serviceAccountName
 
 	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{})

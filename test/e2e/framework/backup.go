@@ -10,7 +10,7 @@ import (
 )
 
 func CreateBackupRole(k8s *types.Cluster) error {
-	backupRole := config.GetBackupRole(k8s.Namespace)
+	backupRole := config.GetBackupRole()
 
 	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(context.Background(), backupRole, metav1.CreateOptions{})
 	if err != nil {
@@ -21,7 +21,7 @@ func CreateBackupRole(k8s *types.Cluster) error {
 }
 
 func CreateBackupServiceAccount(k8s *types.Cluster) error {
-	backupServiceAccount := config.GetBackupServiceAccount(k8s.Namespace)
+	backupServiceAccount := config.GetBackupServiceAccount()
 
 	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(context.Background(), backupServiceAccount, metav1.CreateOptions{})
 	if err != nil {

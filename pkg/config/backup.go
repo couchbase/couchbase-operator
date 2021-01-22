@@ -4,6 +4,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/spf13/cobra"
@@ -16,8 +17,6 @@ const (
 
 // generateBackupOptions defines options for generating backup resources.
 type generateBackupOptions struct {
-	// file defines whether or not to output to a file.
-	file bool
 }
 
 // getGenerateBackupCommand creates YAML capable of creating backup job prerequisites.
@@ -26,49 +25,96 @@ func getGenerateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Comma
 
 	cmd := &cobra.Command{
 		Use:   "backup",
-		Short: "Generates YAML for backup jobs",
-		Long:  "Generates YAML for backup jobs, these require Kubernetes roles to be bound to the job",
+		Short: "Generates YAML for backup jobs.",
+		Long:  "Generates YAML for backup jobs.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return o.generate(flags)
+			resources, err := o.generate(flags)
+			if err != nil {
+				return err
+			}
+
+			if err := dumpResources(resources); err != nil {
+				return err
+			}
+
+			return nil
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.file, "file", false, "Generate files rather than printing to the console")
+	return cmd
+}
+
+// getCreateBackupCommand creates backup job prerequisites.
+func getCreateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+	o := &generateBackupOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "backup",
+		Short: "Creates backup roles.",
+		Long:  "Creates backup roles.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			resources, err := o.generate(flags)
+			if err != nil {
+				return err
+			}
+
+			if err := createResources(flags, resources); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+// getDeleteBackupCommand deletes backup job prerequisites.
+func getDeleteBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+	o := &generateBackupOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "backup",
+		Short: "Deletes backup roles.",
+		Long:  "Deletes backup roles.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			resources, err := o.generate(flags)
+			if err != nil {
+				return err
+			}
+
+			if err := deleteResources(flags, resources); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
 
 	return cmd
 }
 
 // generate dumps all operator resources to standard out.
-func (o *generateBackupOptions) generate(flags *genericclioptions.ConfigFlags) error {
+func (o *generateBackupOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.Object, error) {
 	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := DumpYAML(o.file, "backup-service-account", GetBackupServiceAccount(namespace)); err != nil {
-		return err
+	resources := []runtime.Object{
+		GetBackupServiceAccount(),
+		GetBackupRole(),
+		GetBackupRoleBinding(namespace),
 	}
 
-	if err := DumpYAML(o.file, "backup-role", GetBackupRole(namespace)); err != nil {
-		return err
-	}
-
-	if err := DumpYAML(o.file, "backup-role-binding", GetBackupRoleBinding(namespace)); err != nil {
-		return err
-	}
-
-	return nil
+	return resources, nil
 }
 
-func GetBackupRole(namespace string) *rbacv1.Role {
+// GetBackupRole returns the role required for the backup script to function correctly.
+func GetBackupRole() *rbacv1.Role {
 	return &rbacv1.Role{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "rbac.authorization.k8s.io/v1",
-			Kind:       "Role",
-		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      BackupResourceName,
-			Namespace: namespace,
+			Name: BackupResourceName,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -127,28 +173,20 @@ func GetBackupRole(namespace string) *rbacv1.Role {
 	}
 }
 
-func GetBackupServiceAccount(namespace string) *v1.ServiceAccount {
+// GetBackupServiceAccount returns a service account for the backup script to run as.
+func GetBackupServiceAccount() *v1.ServiceAccount {
 	return &v1.ServiceAccount{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ServiceAccount",
-		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      BackupResourceName,
-			Namespace: namespace,
+			Name: BackupResourceName,
 		},
 	}
 }
 
+// GetBackupRoleBinding returns a role binding linking the backup service account to its role.
 func GetBackupRoleBinding(namespace string) *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "rbac.authorization.k8s.io/v1",
-			Kind:       "RoleBinding",
-		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      BackupResourceName,
-			Namespace: namespace,
+			Name: BackupResourceName,
 		},
 		Subjects: []rbacv1.Subject{
 			{

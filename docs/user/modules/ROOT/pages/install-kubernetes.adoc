@@ -41,8 +41,8 @@ The following command will install both the DAC and the Operator into the `defau
 
 [source,console]
 ----
-$ bin/cbopcfg generate admission | kubectl create -f -
-$ bin/cbopcfg generate operator | kubectl create -f -
+$ bin/cbopcfg create admission
+$ bin/cbopcfg create operator
 ----
 
 === Custom Installation
@@ -51,14 +51,14 @@ Alternatively, you may wish to install just the DAC in the `camelot` namespace:
 
 [source,console]
 ----
-$ bin/cbopcfg generate admission --namespace camelot | kubectl create -f -
+$ bin/cbopcfg create admission --namespace camelot
 ----
 
 And then install just the Operator into the `asgard` namespace:
 
 [source,console]
 ----
-$ bin/cbopcfg generate operator --namespace asgard | kubectl create -f -
+$ bin/cbopcfg create operator --namespace asgard
 ----
 
 For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
@@ -112,8 +112,8 @@ Failure to do so will result in the deletion of all Couchbase clusters.
 
 [source,console]
 ----
-$ bin/cbopcfg generate operator | kubectl delete -f -
-$ bin/cbopcfg generate admission | kubectl delete -f -
+$ bin/cbopcfg delete operator
+$ bin/cbopcfg delete admission
 $ kubectl delete -f crd.yaml
 ----
 

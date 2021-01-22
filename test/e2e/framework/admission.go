@@ -42,12 +42,12 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 	})
 	key, cert, _ := req.Generate(ca, validFrom, validTo)
 
-	serviceAccount := config.GetAdmissionServiceAccount(admissionNamespace)
+	serviceAccount := config.GetAdmissionServiceAccount()
 	if _, err := k8s.KubeClient.CoreV1().ServiceAccounts(admissionNamespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
-	roleObject := config.GetAdmissionRole(admissionNamespace, true)
+	roleObject := config.GetAdmissionRole(true)
 
 	clusterRole, ok := roleObject.(*rbacv1.ClusterRole)
 	if !ok {
@@ -69,18 +69,17 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		return err
 	}
 
-	secret := config.GetAdmissionSecret(admissionNamespace, key, cert)
+	secret := config.GetAdmissionSecret(key, cert)
 	if _, err := k8s.KubeClient.CoreV1().Secrets(admissionNamespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
-	deployment := config.GetAdmissionDeployment(admissionNamespace, runtimeParams.AdmissionControllerImage, pullSecrets, "-v", "1")
-
+	deployment := config.GetAdmissionDeployment(runtimeParams.AdmissionControllerImage, pullSecrets, "-v", "1")
 	if _, err := k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Create(context.Background(), deployment, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
-	service := config.GetAdmissionService(admissionNamespace)
+	service := config.GetAdmissionService()
 	if _, err := k8s.KubeClient.CoreV1().Services(admissionNamespace).Create(context.Background(), service, metav1.CreateOptions{}); err != nil {
 		return err
 	}
@@ -94,6 +93,9 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 	if _, err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.Background(), validatingWebhook, metav1.CreateOptions{}); err != nil {
 		return err
 	}
+
+	// Update the deployment, the wait code expects the namespace to be filled in by the API.
+	deployment.Namespace = admissionNamespace
 
 	if err := waitAdmissionController(k8s, deployment); err != nil {
 		return err

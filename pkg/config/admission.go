@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -31,7 +32,7 @@ type generateAdmissionOptions struct {
 	image string
 
 	// scope is the scope with which to generate the admission controller.
-	scope string
+	scope scopeVar
 
 	// imagePullSecret is the name of an image pull secret for authenticating image pulls.
 	imagePullSecret string
@@ -39,44 +40,169 @@ type generateAdmissionOptions struct {
 	// namespaceSelector defines the namespace selector to apply API webhooks to when
 	// using the admission controller in namespace scope.
 	namespaceSelector LabelSelectorVar
-
-	// file defines whether or not to output to a file.
-	file bool
 }
 
 // getGenerateAdmissionCommand creates YAML capable of creating the dynamic admission controller.
 func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
-	o := &generateAdmissionOptions{}
+	o := &generateAdmissionOptions{
+		scope: newScopeVar(scopeCluster),
+	}
 
 	cmd := &cobra.Command{
 		Use:   "admission",
-		Short: "Generates YAML for the dynamic admission controller",
-		Long:  "Generates YAML for the dynamic admission controller",
+		Short: "Generates YAML for the dynamic admission controller.",
+		Long: normalize(`
+			Generates YAML for the dynamic admission controller.
+
+			The DAC is designed to be deployed at the cluster scope (default).
+			It monitors Couchbase resources as they are created and modified,
+			accepting, or rejecting them, before they are persisted in etcd.
+
+			Use of the DAC is encouraged as it will report any configuration
+			errors that are specific to deployment of Couchbase resources that
+			aren't available by default in the Kubernetes API.  For example,
+			this includes validating memory quotas are satisfyable, TLS
+			certificates are correctly configured, and any resources referenced
+			actually exist.
+		`),
+		Example: normalize(`
+			# Create admission controller (recommended).
+			cbopcfg generate admission
+
+			# Create admission controller scoped to a namespace.
+			cbopcfg generate admission --scope namespace --namespace-selector key=value
+
+			# Create admission controller with custom image and secure image registry.
+			cbopcfg generate admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := o.validate(); err != nil {
 				return err
 			}
 
-			return o.generate(flags)
+			resources, err := o.generate(flags)
+			if err != nil {
+				return err
+			}
+
+			if err := dumpResources(resources); err != nil {
+				return err
+			}
+
+			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&o.scope, "scope", "cluster", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
 	cmd.Flags().StringVar(&o.imagePullSecret, "image-pull-secret", "", "Image pull secret to allow access to the operator image")
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
-	cmd.Flags().BoolVar(&o.file, "file", false, "Generate files rather than printing to the console")
+
+	return cmd
+}
+
+// getCreateAdmissionCommand creates the admission controller.
+func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+	o := &generateAdmissionOptions{
+		scope: newScopeVar(scopeCluster),
+	}
+
+	cmd := &cobra.Command{
+		Use:   "admission",
+		Short: "Creates the dynamic admission controller.",
+		Long: normalize(`
+			Creates the dynamic admission controller.
+
+                        The DAC is designed to be deployed at the cluster scope (default).
+                        It monitors Couchbase resources as they are created and modified,
+                        accepting, or rejecting them, before they are persisted in etcd.
+
+                        Use of the DAC is encouraged as it will report any configuration
+                        errors that are specific to deployment of Couchbase resources that
+                        aren't available by default in the Kubernetes API.  For example,
+                        this includes validating memory quotas are satisfyable, TLS
+                        certificates are correctly configured, and any resources referenced
+                        actually exist.
+		`),
+		Example: normalize(`
+                        # Create admission controller (recommended).
+                        cbopcfg create admission
+
+                        # Create admission controller scoped to a namespace.
+                        cbopcfg create admission --scope namespace --namespace-selector key=value
+
+                        # Create admission controller with custom image and secure image registry.
+                        cbopcfg create admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
+                `),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := o.validate(); err != nil {
+				return err
+			}
+
+			resources, err := o.generate(flags)
+			if err != nil {
+				return err
+			}
+
+			if err := createResources(flags, resources); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
+	cmd.Flags().StringVar(&o.imagePullSecret, "image-pull-secret", "", "Image pull secret to allow access to the operator image")
+	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
+
+	return cmd
+}
+
+// getDeleteAdmissionCommand deletes the admission controller.
+func getDeleteAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+	o := &generateAdmissionOptions{
+		scope: newScopeVar(scopeCluster),
+	}
+
+	cmd := &cobra.Command{
+		Use:   "admission",
+		Short: "Deletes the dynamic admission controller.",
+		Long:  "Deletes the dynamic admission controller.",
+		Example: normalize(`
+			# Delete admission controller (recommended).
+			cbopcfg delete admission
+
+			# Delete admission controller scoped to a namespace.
+			cbopcfg delete admission --scope namespace
+		`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := o.validate(); err != nil {
+				return err
+			}
+
+			resources, err := o.generate(flags)
+			if err != nil {
+				return err
+			}
+
+			if err := deleteResources(flags, resources); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 
 	return cmd
 }
 
 // validate performs any validation that cobra doesn't on options.
 func (o *generateAdmissionOptions) validate() error {
-	if err := validateScope(o.scope); err != nil {
-		return err
-	}
-
-	if o.scope == scopeNamespace && o.namespaceSelector.LabelSelector == nil {
+	if o.scope.value.isNamespaceScope() && o.namespaceSelector.LabelSelector == nil {
 		return fmt.Errorf("dynamic admission controller with namespace scope requires the --namespace-selector flag")
 	}
 
@@ -84,16 +210,21 @@ func (o *generateAdmissionOptions) validate() error {
 }
 
 // generate dumps all admission controller resources to standard out.
-func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags) error {
+func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.Object, error) {
 	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Generate TLS configuration for the dynamic admission controller.
 	validFrom := time.Now()
 	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)
-	ca, _ := util_x509.NewCertificateAuthority(util_x509.KeyTypeRSA, AdmissionResourceName+" CA", validFrom, validTo, util_x509.CertTypeCA)
+
+	ca, err := util_x509.NewCertificateAuthority(util_x509.KeyTypeRSA, AdmissionResourceName+" CA", validFrom, validTo, util_x509.CertTypeCA)
+	if err != nil {
+		return nil, err
+	}
+
 	req := util_x509.KeyPairRequest{
 		KeyType:   util_x509.KeyTypeRSA,
 		CertType:  util_x509.CertTypeServer,
@@ -108,7 +239,11 @@ func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags
 			},
 		},
 	}
-	key, cert, _ := req.Generate(ca)
+
+	key, cert, err := req.Generate(ca)
+	if err != nil {
+		return nil, err
+	}
 
 	var imagePullSecrets []string
 
@@ -118,47 +253,24 @@ func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags
 		}
 	}
 
-	// Create resources.
-	if err := DumpYAML(o.file, "admission-service-account", GetAdmissionServiceAccount(namespace)); err != nil {
-		return err
+	resources := []runtime.Object{
+		GetAdmissionServiceAccount(),
+		GetAdmissionRole(o.scope.value.isClusterScope()),
+		GetAdmissionRoleBinding(namespace, o.scope.value.isClusterScope()),
+		GetAdmissionSecret(key, cert),
+		GetAdmissionDeployment(o.image, imagePullSecrets),
+		GetAdmissionService(),
+		GetAdmissionMutatingWebhook(namespace, ca.Certificate, o.scope.value.isClusterScope(), o.namespaceSelector.LabelSelector),
+		GetAdmissionValidatingWebhook(namespace, ca.Certificate, o.scope.value.isClusterScope(), o.namespaceSelector.LabelSelector),
 	}
 
-	if err := DumpYAML(o.file, "admission-cluster-role", GetAdmissionRole(namespace, o.scope == scopeCluster)); err != nil {
-		return err
-	}
-
-	if err := DumpYAML(o.file, "admission-cluster-role-binding", GetAdmissionRoleBinding(namespace, o.scope == scopeCluster)); err != nil {
-		return err
-	}
-
-	if err := DumpYAML(o.file, "admission-secret", GetAdmissionSecret(namespace, key, cert)); err != nil {
-		return err
-	}
-
-	if err := DumpYAML(o.file, "admission-deployment", GetAdmissionDeployment(namespace, o.image, imagePullSecrets)); err != nil {
-		return err
-	}
-
-	if err := DumpYAML(o.file, "admission-service", GetAdmissionService(namespace)); err != nil {
-		return err
-	}
-
-	if err := DumpYAML(o.file, "admission-mutating-webhook", GetAdmissionMutatingWebhook(namespace, ca.Certificate, o.scope == scopeCluster, o.namespaceSelector.LabelSelector)); err != nil {
-		return err
-	}
-
-	if err := DumpYAML(o.file, "admission-validating-webhook", GetAdmissionValidatingWebhook(namespace, ca.Certificate, o.scope == scopeCluster, o.namespaceSelector.LabelSelector)); err != nil {
-		return err
-	}
-
-	return nil
+	return resources, nil
 }
 
 // GetAdmissionRole return the (cluster) role to run with.
-func GetAdmissionRole(namespace string, cluster bool) metav1.Object {
+func GetAdmissionRole(cluster bool) runtime.Object {
 	metadata := metav1.ObjectMeta{
-		Name:      AdmissionResourceName,
-		Namespace: namespace,
+		Name: AdmissionResourceName,
 	}
 
 	rules := []rbacv1.PolicyRule{
@@ -225,44 +337,30 @@ func GetAdmissionRole(namespace string, cluster bool) metav1.Object {
 		rules = append(rules, clusterRules...)
 
 		return &rbacv1.ClusterRole{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "rbac.authorization.k8s.io/v1",
-				Kind:       "ClusterRole",
-			},
 			ObjectMeta: metadata,
 			Rules:      rules,
 		}
 	}
 
 	return &rbacv1.Role{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "rbac.authorization.k8s.io/v1",
-			Kind:       "Role",
-		},
 		ObjectMeta: metadata,
 		Rules:      rules,
 	}
 }
 
 // GetAdmissionServiceAccount get the service account to run as.
-func GetAdmissionServiceAccount(namespace string) *corev1.ServiceAccount {
+func GetAdmissionServiceAccount() *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ServiceAccount",
-		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      AdmissionResourceName,
-			Namespace: namespace,
+			Name: AdmissionResourceName,
 		},
 	}
 }
 
 // GetAdmissionRoleBinding generates the (cluster) role binding linking the role to the service account.
-func GetAdmissionRoleBinding(namespace string, cluster bool) metav1.Object {
+func GetAdmissionRoleBinding(namespace string, cluster bool) runtime.Object {
 	metadata := metav1.ObjectMeta{
-		Name:      AdmissionResourceName,
-		Namespace: namespace,
+		Name: AdmissionResourceName,
 	}
 
 	subjects := []rbacv1.Subject{
@@ -275,10 +373,6 @@ func GetAdmissionRoleBinding(namespace string, cluster bool) metav1.Object {
 
 	if cluster {
 		return &rbacv1.ClusterRoleBinding{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "rbac.authorization.k8s.io/v1",
-				Kind:       "ClusterRoleBinding",
-			},
 			ObjectMeta: metadata,
 			Subjects:   subjects,
 			RoleRef: rbacv1.RoleRef{
@@ -290,10 +384,6 @@ func GetAdmissionRoleBinding(namespace string, cluster bool) metav1.Object {
 	}
 
 	return &rbacv1.RoleBinding{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "rbac.authorization.k8s.io/v1",
-			Kind:       "RoleBinding",
-		},
 		ObjectMeta: metadata,
 		Subjects:   subjects,
 		RoleRef: rbacv1.RoleRef{
@@ -305,15 +395,10 @@ func GetAdmissionRoleBinding(namespace string, cluster bool) metav1.Object {
 }
 
 // GetAdmissionSecret generates the TLS secret providing server certificates.
-func GetAdmissionSecret(namespace string, key, cert []byte) *corev1.Secret {
+func GetAdmissionSecret(key, cert []byte) *corev1.Secret {
 	return &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      AdmissionResourceName,
-			Namespace: namespace,
+			Name: AdmissionResourceName,
 		},
 		Data: map[string][]byte{
 			"tls-cert-file":        cert,
@@ -323,16 +408,11 @@ func GetAdmissionSecret(namespace string, key, cert []byte) *corev1.Secret {
 }
 
 // GetAdmissionDeployment returns the canonical deployment for the admission controller.
-func GetAdmissionDeployment(namespace, image string, imagePullSecrets []string, extraArgs ...string) *appsv1.Deployment {
+func GetAdmissionDeployment(image string, imagePullSecrets []string, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
 	deployment := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1",
-			Kind:       "Deployment",
-		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      AdmissionResourceName,
-			Namespace: namespace,
+			Name: AdmissionResourceName,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -413,15 +493,10 @@ func GetAdmissionDeployment(namespace, image string, imagePullSecrets []string, 
 }
 
 // GetAdmissionService returns a cluster service definition for the admission controller.
-func GetAdmissionService(namespace string) *corev1.Service {
+func GetAdmissionService() *corev1.Service {
 	return &corev1.Service{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Service",
-		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      AdmissionResourceName,
-			Namespace: namespace,
+			Name: AdmissionResourceName,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
@@ -456,10 +531,6 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 	sideEffectClass := admissionregistrationv1.SideEffectClassNone
 
 	webhook := &admissionregistrationv1.MutatingWebhookConfiguration{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "admissionregistration.k8s.io/v1",
-			Kind:       "MutatingWebhookConfiguration",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -540,10 +611,6 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, na
 	sideEffectClass := admissionregistrationv1.SideEffectClassNone
 
 	webhook := &admissionregistrationv1.ValidatingWebhookConfiguration{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "admissionregistration.k8s.io/v1",
-			Kind:       "ValidatingWebhookConfiguration",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},

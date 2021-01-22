@@ -3,76 +3,13 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/spf13/cobra"
 )
-
-// LabelSelectorVar allows parsing of a label selector from the CLI.
-type LabelSelectorVar struct {
-	LabelSelector *metav1.LabelSelector
-}
-
-// String returns the default label selector: none.
-func (v *LabelSelectorVar) String() string {
-	return ""
-}
-
-// Set parses a label selector in the form k=v,k=v.
-func (v *LabelSelectorVar) Set(value string) error {
-	if value == "" {
-		return nil
-	}
-
-	pairs := strings.Split(value, ",")
-
-	for _, pair := range pairs {
-		kv := strings.Split(pair, "=")
-
-		if len(kv) != 2 {
-			return fmt.Errorf(`label selector "%s" not formatted as string=string`, pair)
-		}
-
-		if v.LabelSelector == nil {
-			v.LabelSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{},
-			}
-		}
-
-		v.LabelSelector.MatchLabels[kv[0]] = kv[1]
-	}
-
-	return nil
-}
-
-// Type returns the variable type.
-func (v *LabelSelectorVar) Type() string {
-	return "labelSelector"
-}
-
-const (
-	// scopeNamespace tells the command to generate application YAML that operates
-	// the the namespace scope (e.g Roles and RoleBindings).
-	scopeNamespace = "namespace"
-
-	// scopeCluster tells the command to generate application YAML that operates
-	// the the cluster scope (e.g ClusterRoles and ClusterRoleBindings).
-	scopeCluster = "cluster"
-)
-
-// validateScope checks that the scope enumeration is valid.
-func validateScope(s string) error {
-	if s != scopeNamespace && s != scopeCluster {
-		return fmt.Errorf(`invalid scope "%s", must be one of ["%s", "%s"]`, s, scopeNamespace, scopeCluster)
-	}
-
-	return nil
-}
 
 // ParseArgs parses command line arguments into a Config struct and executes the command.
 func Execute() {
@@ -99,6 +36,28 @@ func Execute() {
 	generate.AddCommand(getGenerateAdmissionCommand(flags))
 	generate.AddCommand(getGenerateBackupCommand(flags))
 
+	// 'cbopcfg create' actually creates resources.
+	create := &cobra.Command{
+		Use:   "create",
+		Short: "Creates Couchbase Autonomous Operator components",
+		Long:  "Creates Couchbase Autonomous Operator components",
+	}
+
+	create.AddCommand(getCreateOperatorCommand(flags))
+	create.AddCommand(getCreateAdmissionCommand(flags))
+	create.AddCommand(getCreateBackupCommand(flags))
+
+	// 'cbopcfg create' actually deletes resources.
+	deleteCmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Deletes Couchbase Autonomous Operator components",
+		Long:  "Deletes Couchbase Autonomous Operator components",
+	}
+
+	deleteCmd.AddCommand(getDeleteOperatorCommand(flags))
+	deleteCmd.AddCommand(getDeleteAdmissionCommand(flags))
+	deleteCmd.AddCommand(getDeleteBackupCommand(flags))
+
 	// 'cbopcfg' is the top level command.
 	root := &cobra.Command{
 		Use: "cbopcfg",
@@ -108,6 +67,8 @@ func Execute() {
 
 	root.AddCommand(version)
 	root.AddCommand(generate)
+	root.AddCommand(create)
+	root.AddCommand(deleteCmd)
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)

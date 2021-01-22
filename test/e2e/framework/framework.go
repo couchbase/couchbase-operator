@@ -368,7 +368,7 @@ func GetDuration(timeoutStr string) time.Duration {
 }
 
 func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
-	deployment := config.GetOperatorDeployment(k8s.Namespace, operatorImage, k8s.PullSecrets, false, podCreateTimeout, "--zap-level", "debug")
+	deployment := config.GetOperatorDeployment(operatorImage, k8s.PullSecrets, false, podCreateTimeout, "debug")
 
 	return deployment
 }
@@ -925,6 +925,10 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 	// Create the operator.
 	if !optionSet(o, NoOperator) {
 		cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout)
+
+		// Most API operations expect the resource to have been put through the API
+		// first, so things like namespace and name are populated.
+		cluster.OperatorDeployment.Namespace = namespace.Name
 
 		if err := RecreateServiceAccount(cluster, cluster.OperatorDeployment.Name); err != nil {
 			e2eutil.Die(t, err)
