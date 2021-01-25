@@ -68,6 +68,40 @@ AntiAffinity forces the Operator to schedule different Couchbase server pods on 
 Anti-affinity reduces the likelihood of unrecoverable failure in the event of a node issue.
 Use of anti-affinity is highly recommended for production clusters.
 
+=== couchbaseclusters.spec.autoResourceAllocation
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+AutoResourceAllocation populates pod resource requests based on the services running on that pod.
+When enabled, this feature will calculate the memory request as the total of service allocations defined in `spec.cluster`, plus an overhead defined by `spec.autoResourceAllocation.overheadPercent`.Changing individual allocations for a service will cause a cluster upgrade as allocations are modified in the underlying pods.
+
+=== couchbaseclusters.spec.autoResourceAllocation.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled defines whether auto-resource allocation is enabled.
+
+=== couchbaseclusters.spec.autoResourceAllocation.overheadPercent
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `25`
+
+==== Description
+
+OverheadPercent defines the amount of memory above that required for individual services on a pod.
+For Couchbase Server this should be approximately 25%.
+
 === couchbaseclusters.spec.backup
 
 ==== Constraints
@@ -756,6 +790,20 @@ The field must be one of "memory_optimized" or "plasma", defaulting to "memory_o
 Threads controls the number of processor threads to use for indexing.
 A value of 0 means 1 per CPU.
 This attribute must be greater than or equal to 0, defaulting to 0.
+
+=== couchbaseclusters.spec.cluster.queryServiceMemoryQuota
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+QueryServiceMemQuota is a dummy field.
+By default, Couchbase server provides no memory resource constrints for the query service, so this has no effect on Couchbase server.
+It is, however, used when the spec.autoResourceAllocation feature is enabled, and is used to define the amount of memory reserved by the query service for use with Kubernetes resource scheduling.
 
 === couchbaseclusters.spec.cluster.searchServiceMemoryQuota
 
@@ -1718,7 +1766,7 @@ More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#
 ==== Description
 
 Resources are the resource requirements for the Couchbase server container.
-If not specified, or missing the requests.memory field, then the Operator will automatically populate memory requests by calculating the total memory requirements for each service enabled for this class, then scaling by an overhead.
+This field overrides any automatic allocation as defined by `spec.autoResourceAllocation`.
 
 === couchbaseclusters.spec.servers.serverGroups
 

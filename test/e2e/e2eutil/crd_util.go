@@ -18,6 +18,12 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 	// guaranteed to apply the correct pod policy mutations here before every creation.
 	e2espec.ApplyImagePullSecret(cl, k8s.PullSecrets)
 
+	// Enable resource management for everything, it's far easier to see and understand
+	// scheduler errors, rather than see random OOM killing.
+	cl.Spec.AutoResourceAllocation = &couchbasev2.AutoResourceAllocation{
+		Enabled: true,
+	}
+
 	cl.Namespace = k8s.Namespace
 
 	res, err := CreateCouchbaseCluster(k8s.CRClient, cl)

@@ -785,16 +785,22 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 
 	c.Env = config.Env
 	c.EnvFrom = config.EnvFrom
+	c.Resources = config.Resources
 
 	// Automatically configure resource memory requests, mainly for lazy users,
-	// but also to prevent memory starvation and random OOM killings.
-	resources := config.Resources.DeepCopy()
+	// but also to prevent memory starvation and random OOM killings.  It must
+	// be manually enabled to maintain current behaviour...
+	autoAllocation := cluster.Spec.AutoResourceAllocation != nil && cluster.Spec.AutoResourceAllocation.Enabled
 
-	if resources.Requests == nil {
-		resources.Requests = v1.ResourceList{}
+	// ...and only allowed when not manually overridden at the pod spec level
+	// as this gives support a get-out-of-jail-free card.
+	if autoAllocation && c.Resources.Requests != nil {
+		if _, ok := c.Resources.Requests[v1.ResourceMemory]; ok {
+			autoAllocation = false
+		}
 	}
 
-	if _, ok := resources.Requests[v1.ResourceMemory]; !ok {
+	if autoAllocation {
 		memoryRequests := resource.Quantity{}
 
 		for _, service := range config.Services {
@@ -803,6 +809,10 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 				memoryRequests.Add(*cluster.Spec.ClusterSettings.DataServiceMemQuota)
 			case couchbasev2.IndexService:
 				memoryRequests.Add(*cluster.Spec.ClusterSettings.IndexServiceMemQuota)
+			case couchbasev2.QueryService:
+				if cluster.Spec.ClusterSettings.QueryServiceMemQuota != nil {
+					memoryRequests.Add(*cluster.Spec.ClusterSettings.QueryServiceMemQuota)
+				}
 			case couchbasev2.SearchService:
 				memoryRequests.Add(*cluster.Spec.ClusterSettings.SearchServiceMemQuota)
 			case couchbasev2.EventingService:
@@ -812,14 +822,16 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 			}
 		}
 
-		overhead := resource.NewQuantity(memoryRequests.Value()/4, resource.BinarySI)
+		overhead := resource.NewQuantity((memoryRequests.Value()*int64(cluster.Spec.AutoResourceAllocation.OverheadPercent))/100, resource.BinarySI)
 
 		memoryRequests.Add(*overhead)
 
-		resources.Requests[v1.ResourceMemory] = memoryRequests
-	}
+		if c.Resources.Requests == nil {
+			c.Resources.Requests = v1.ResourceList{}
+		}
 
-	c.Resources = *resources
+		c.Resources.Requests[v1.ResourceMemory] = memoryRequests
+	}
 
 	return c
 }

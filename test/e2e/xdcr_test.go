@@ -463,6 +463,7 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 	e2eutil.MustKillPodForMember(t, k8s1, xdcrCluster1, nodeToKill, true)
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustWaitForClusterEvent(t, k8s1, xdcrCluster1, e2eutil.RebalanceStartedEvent(xdcrCluster1), 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, k8s1, xdcrCluster1, 5*time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 

@@ -133,7 +133,7 @@ func TestEditClusterSettings(t *testing.T) {
 		Test("/DataMemoryQuotaMB", int64(257)).
 		Test("/IndexMemoryQuotaMB", int64(257)).
 		Test("/SearchMemoryQuotaMB", int64(257))
-	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, validationPatches, time.Minute)
+	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, validationPatches, 5*time.Minute)
 
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", e2espec.NewDurationS(31)), time.Minute)
 	e2eutil.MustPatchAutoFailoverInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Timeout", int64(31)), time.Minute)

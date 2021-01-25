@@ -1122,6 +1122,14 @@ type ClusterSpec struct {
 	// to "RollingUpgrade".
 	UpgradeStrategy *UpgradeStrategy `json:"upgradeStrategy,omitempty"`
 
+	// AutoResourceAllocation populates pod resource requests based on the services running
+	// on that pod.  When enabled, this feature will calculate the memory request as the
+	// total of service allocations defined in `spec.cluster`, plus an overhead defined
+	// by `spec.autoResourceAllocation.overheadPercent`.Changing individual allocations for
+	// a service will cause a cluster upgrade as allocations are modified in the underlying
+	// pods.
+	AutoResourceAllocation *AutoResourceAllocation `json:"autoResourceAllocation,omitempty"`
+
 	// AntiAffinity forces the Operator to schedule different Couchbase server pods on
 	// different Kubernetes nodes.  Anti-affinity reduces the likelihood of unrecoverable
 	// failure in the event of a node issue.  Use of anti-affinity is highly recommended for
@@ -1501,6 +1509,18 @@ type DNS struct {
 	Domain string `json:"domain,omitempty"`
 }
 
+// AutoResourceAllocation automatically populates Kubernetes resource requests.
+type AutoResourceAllocation struct {
+	// Enabled defines whether auto-resource allocation is enabled.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// OverheadPercent defines the amount of memory above that required for individual
+	// services on a pod.  For Couchbase Server this should be approximately 25%.
+	// +kubebuilder:default=25
+	// +kubebuilder:validation:Minimum=0
+	OverheadPercent int `json:"overheadPercent,omitempty"`
+}
+
 // CouchbaseClusterIndexStorageSetting describes the allowed storage engines for
 // databsae indexes.
 // +kubebuilder:validation:Enum=memory_optimized;plasma
@@ -1537,6 +1557,14 @@ type ClusterConfig struct {
 	// +kubebuilder:default="256Mi"
 	// +kubebuilder:validation:Type=string
 	IndexServiceMemQuota *resource.Quantity `json:"indexServiceMemoryQuota,omitempty"`
+
+	// QueryServiceMemQuota is a dummy field.  By default, Couchbase server provides no
+	// memory resource constrints for the query service, so this has no effect on Couchbase
+	// server.  It is, however, used when the spec.autoResourceAllocation feature is enabled,
+	// and is used to define the amount of memory reserved by the query service for use with
+	// Kubernetes resource scheduling.
+	// +kubebuilder:validation:Type=string
+	QueryServiceMemQuota *resource.Quantity `json:"queryServiceMemoryQuota,omitempty"`
 
 	// SearchServiceMemQuota is the amount of memory that should be allocated to the search service.
 	// This value is per-pod, and only applicable to pods belonging to server classes running
@@ -1872,10 +1900,8 @@ type ServerConfig struct {
 	VolumeMounts *VolumeMounts `json:"volumeMounts,omitempty"`
 
 	// Resources are the resource requirements for the Couchbase server container.
-	// If not specified, or missing the requests.memory field, then the Operator
-	// will automatically populate memory requests by calculating the total memory
-	// requirements for each service enabled for this class, then scaling by an
-	// overhead.
+	// This field overrides any automatic allocation as defined by
+	// `spec.autoResourceAllocation`.
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 
 	// Env allows the setting of environment variables in the Couchbase server container.
