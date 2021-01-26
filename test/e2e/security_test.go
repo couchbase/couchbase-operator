@@ -89,6 +89,7 @@ func testRotateAdminPasswordAndRestart(t *testing.T, kubernetes *types.Cluster, 
 	// scaling operation so we can observe the operator actually being able
 	// to talk to server.
 	e2eutil.MustRotateClusterPassword(t, kubernetes)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.EventReasonAdminPasswordChangedEvent(cluster), time.Minute)
 	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
