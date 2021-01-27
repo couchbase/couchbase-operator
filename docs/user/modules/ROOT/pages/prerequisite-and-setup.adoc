@@ -23,7 +23,7 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| Certified 6.5, 6.6
+| Certified 6.5.1, 6.6
 
 _Unless otherwise stated, maintenance/patch releases (x.x**.X**) inherit the same support level._
 |===
@@ -40,9 +40,9 @@ _Unless otherwise stated, maintenance/patch releases (x.x**.X**) inherit the sam
 Supported 1.15, 1.16, 1.19
 
 | Red Hat OpenShift Container Platform
-| Certified 4.4
+| Certified 4.4, 4.5, 4.6
 
-Supported 4.3, 4.5, 4.6
+Supported 4.3
 |===
 
 [IMPORTANT]
