@@ -283,6 +283,12 @@ spec:
         - eventing
       volumeMounts:
         default: couchbase
+      pod:
+        metadata:
+          labels:
+            mickey: mouse
+        spec:
+          nodeName: tiny_tina
     - size: 1
       name: statefull_services
       services:

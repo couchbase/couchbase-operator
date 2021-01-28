@@ -73,6 +73,16 @@ While it is possible, it is not easy relying on a node receiving traffic from th
 .Overlay Network Architecture
 image:NetworkDocsRouted-Overlay.png["Overlay network architecture"]
 
+== Service Mesh Support
+
+Istio is currently the only supported service mesh.
+
+Use of service meshes should, for the most part, be transparent to the Autonomous Operator and Couchbase cluster, however there are a few things to be aware of:
+
+* You cannot enable/disable a service mesh in a namespace where an Autonomous Operator deployment is already running.
+The service mesh must be enabled in the namespace before you install the Autonomous Operator and provision any Couchbase clusters.
+* You should not configure the Autonomous Operator to use TLS if the service mesh is already providing an mTLS transport.
+
 == Inter-Kubernetes Networking
 
 Regardless of the network technology you deploy there are a number of rules to be aware of when forming connections between Kubernetes clusters.
