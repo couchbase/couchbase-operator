@@ -1,0 +1,44 @@
+= `CouchbaseCluster` Services
+:page-aliases: services
+
+When creating a Couchbase cluster the Operator is responsible for creating services to allow various functionality.  This documents what they are and what they are used for.
+
+The service names are based on the cluster name.  For the purposes of demonstration we will use the cluster name `couchbase` throughout this document.
+
+== `couchbase`
+
+The first service that is created, it creates endpoints for every Couchbase node in the cluster on administration ports 8091 and 18091.  It is a headless service so doesn't create a virtual IP or offer any load balancing.
+
+It is responsible for generating stable DNS names which can persist across pod failure and recreation in the case where persistent volumes are being used.  These DNS names are also the method the Operator uses to access Couchbase APIs for cluster management purposes.
+
+DNS addresses are in the form `couchbase-0000.couchbase.default.srv.cluster.local.` where the first element is the name of a Couchbase node, the second is the cluster name, the third is the name space, with the suffix telling you this is a service in the domain of the Kubernetes cluster.
+
+TIP: Pods will be created with the `cluster.local` suffix in the search path, so you may use the short form `couchbase-0000.couchbase.default.srv` to reference individual pods.
+
+== `couchbase-srv`
+
+This service is similar to the previous in that it creates endpoints for the admin ports and is headless.  The key difference however is that this service is restricted to only the Couchbase nodes with the data service enabled.
+
+This is the service that should be used for service discovery when boot-strapping Couchbase clients.  The Couchbase client libraries have two possible ways of getting the cluster map (describing where the nodes are and vBucket mappings); one is via the admin service the other via the data service.  The former is preferred as boot-strapping against a non-data node may fail.
+
+The SRV record used in a Couchbase client is in the form `_couchbase._tcp.couchbase.default.srv.cluster.local.` or `_couchbases._tcp.couchbase.default.srv.cluster.local.` if using the TLS scheme.  Again this allows you to access a specific Couchbase cluster in a specific name space.
+
+NOTE: For further information on connecting clients please refer to the xref:howto-client-sdks.adoc[full documentation].
+
+== `couchbase-ui`
+
+This service again references the admin ports to offer access to the admin UI.  This is a node service which allows access from the Kubernetes node network allowing access from without the pod overlay network on a randomly chosen port in the 30000+ range.  It is also load balanced to allow access even if a Couchbase node is down; simply refresh your browser session to connect to a new node.
+
+This service is optional and is enabled with the `spec.exposeAdminConsole` property of the cluster manifest.  By default it references all Couchbase nodes in the cluster, however you may choose to restrict the set of Couchbase nodes referenced by explicitly requiring the node has a specific service enabled.  This is done via the `spec.adminConsoleServices` property of the cluster manifest.  The admin port is also reported in the cluster status for convenience and can be accessed via the `kubectl describe couchbaseclusters` command.
+
+NOTE: For further information on configuring the admin console please refer to the xref:howto-ui.adoc[full documentation].
+
+== `couchbase-0000`
+
+This service is created on a per-Couchbase node basis.  It maps from a node port to an individual instance.  The traffic policy is also set to only allow access on the host Kubernetes node to avoid re-routing network traffic and affecting network latency.
+
+These services are optional and are enabled with the `spec.exposedFeatures` property of the cluster manifest.  By exposing features you add ports to the set of those which are available via the node port service.  For example enabling the `xdcr` feature will expose the admin, index and data ports.
+
+These ports are not intended for use by the end user, but rather clients who cannot route directly into the pod network, but can reach the cluster network, or those who do not have DNS resolution outside of the Kubernetes cluster.
+
+NOTE: For further information on networking and exposed features, please refer to the xref:concept-couchbase-networking.adoc[full documentation].

@@ -1,8 +1,5 @@
 #!/bin/bash
 
-set -e -o pipefail
-shopt -s inherit_errexit
-
 # FILTER allows us to pre-process the source and discard irrelevant parts.
 FILTER="sed"
 # Ignore source code blocks (contain arbitrary non-English configuration).
@@ -77,5 +74,13 @@ WARNINGS=$(node_modules/@antora/cli/bin/antora generate scripts/playbook.yaml 2>
 if [[ "${WARNINGS}" != "" ]]; then
   echo "Asciidoc markup contains errors"
   echo "${WARNINGS}" | sed 's/^/    /g'
+  exit 1
+fi
+
+# ... and finally any xrefs you've messed up.
+BROKEN_XREFS=$(node_modules/@antora/cli/bin/antora --generator @antora/xref-validator scripts/playbook.yaml 2>&1 | grep -v 'xref: [^:]\+:' | grep path:)
+if [[ "${BROKEN_XREFS}" != "" ]]; then
+  echo "Asciidoc xrefs broken"
+  echo "${BROKEN_XREFS}"
   exit 1
 fi

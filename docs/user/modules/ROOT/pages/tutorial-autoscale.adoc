@@ -94,7 +94,7 @@ The Couchbase servers within this configuration are stateless since they contain
 [NOTE]
 ====
 In order to autoscale stateful services such as data and index, along with non-ephemeral buckets, `enablePreviewScaling` must be set to `true`.
-Also be aware that this configuration is unsupported, see xref:concep-couchbase-autoscaling.adoc[Couchbase Autoscaling] conceptual documentation.
+Also be aware that this configuration is unsupported, see xref:concept-couchbase-autoscaling.adoc[Couchbase Autoscaling] conceptual documentation.
 ====
 
 === Verify Installation
@@ -212,7 +212,7 @@ EOF
 <.> `AverageValue` type means that the metric will be averaged across all of the Pods.
 <.> Setting *7* queries at 1000ms as an operational baseline.
 
-Details about how sizing decisions are made are discussed in the xref:concep-couchbase-autoscaling.adoc[Couchbase Autoscaling] conceptual documentation.
+Details about how sizing decisions are made are discussed in the xref:concept-couchbase-autoscaling.adoc[Couchbase Autoscaling] conceptual documentation.
 
 === Verify `HorizontalPodAutoscaler` status
 
