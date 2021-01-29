@@ -162,57 +162,77 @@ func (c *Cluster) namespacedName() string {
 
 // New is called when we first observe a CouchbaseCluster resource.  This may be due to
 // creation or recovery after an Operator restart.
-func New(config Config, cl *couchbasev2.CouchbaseCluster) (*Cluster, error) {
+func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
 		config:          config,
-		cluster:         cl,
+		cluster:         cluster,
 		eventCache:      lru.New(1024),
 		recoveryTime:    map[string]time.Time{},
 		members:         couchbaseutil.MemberSet{},
 		callableMembers: couchbaseutil.MemberSet{},
-		generation:      cl.Generation,
+		generation:      cluster.Generation,
 	}
+
+	log.Info("Watching new cluster", "cluster", c.namespacedName())
 
 	// Cancel is used to abort the go routine when the operator is deleted
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 
-	// Initialize Kubernetes clients and caches.
 	var err error
 
+	// Initialize Kubernetes clients.
 	c.k8s, err = client.NewClient(c.ctx, c.cluster.Namespace, labels.SelectorFromSet(k8sutil.LabelsForCluster(c.cluster)))
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a new persistence layer to store and retrieve state.  Add in
-	// defaults if they don't exist.
-	if c.state, err = persistence.New(c.k8s.KubeClient, cl); err != nil {
-		return nil, err
-	}
+	// Once the client is setup, everything goes though this creation function so
+	// we can catch errors and set the cluster error condition.
+	if err := c.newCluster(); err != nil {
+		c.cluster.Status.SetErrorCondition(err.Error())
 
-	log.Info("Watching new cluster", "cluster", c.namespacedName())
+		if err := c.updateCRStatus(); err != nil {
+			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
+		}
 
-	// Spawn the janitor process which monitors persistent log volumes.
-	go newJanitor(c).run()
-
-	if err := c.setupAuth(); err != nil {
-		return nil, err
-	}
-
-	if err := c.initCouchbaseClient(); err != nil {
-		return nil, err
-	}
-
-	// Perform any necessary upgrades to the cluster and kubernetes resources.
-	if err := c.operatorUpgrade(); err != nil {
 		return nil, err
 	}
 
 	log.Info("Running", "cluster", c.namespacedName())
 
+	// No reason other than it's marginally quicker than waiting for the next run!
 	c.runReconcile()
 
 	return c, nil
+}
+
+// newCluster does the bulk of cluster initialization once the cluster object is initialized.
+func (c *Cluster) newCluster() error {
+	var err error
+
+	// Create a new persistence layer to store and retrieve state.  Add in
+	// defaults if they don't exist.
+	if c.state, err = persistence.New(c.k8s.KubeClient, c.cluster); err != nil {
+		return err
+	}
+
+	// Spawn the janitor process which monitors persistent log volumes.
+	go newJanitor(c).run()
+
+	if err := c.setupAuth(); err != nil {
+		return err
+	}
+
+	if err := c.initCouchbaseClient(); err != nil {
+		return err
+	}
+
+	// Perform any necessary upgrades to the cluster and kubernetes resources.
+	if err := c.operatorUpgrade(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Cluster) Delete() {
@@ -391,6 +411,12 @@ func (c *Cluster) runReconcile() {
 	}
 
 	// Finally reconcile state according to the specification.
+	// Every reconcile should either set or clear the error condition.
+	// This lets us spot very easily any persistent error conditions from
+	// external tooling (rather than them going into a log).  For example,
+	// if I upgrade the operator, does it break?  If I start in a broken
+	// state and take some action, does it fix itself.  The other added
+	// bonus is it will show up on dashboards like a christmas tree.
 	if err := c.reconcile(); err != nil {
 		var stackTracedError *errors.StackTracedError
 
@@ -400,10 +426,22 @@ func (c *Cluster) runReconcile() {
 			log.Error(err, "Reconciliation failed", "cluster", c.namespacedName())
 		}
 
+		c.cluster.Status.SetErrorCondition(err.Error())
+
+		if err := c.updateCRStatus(); err != nil {
+			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
+		}
+
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
 		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 
 		return
+	}
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
+
+	if err := c.updateCRStatus(); err != nil {
+		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
 
 	reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "success").Inc()

@@ -554,6 +554,7 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 		resourceConditionExists(string(couchbasev2.ClusterConditionBalanced), string(v1.ConditionTrue)),
 		resourceConditionNotExists(string(couchbasev2.ClusterConditionScaling)),
 		resourceConditionNotExists(string(couchbasev2.ClusterConditionUpgrading)),
+		resourceConditionNotExists(string(couchbasev2.ClusterConditionError)),
 	}
 
 	return retryutil.RetryFor(timeout, ResourceConstraints(k8s, cluster, constraints...))

@@ -527,6 +527,11 @@ func (cs *ClusterStatus) SetHibernatingCondition(message string) {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetErrorCondition(message string) {
+	c := newClusterCondition(ClusterConditionError, v1.ConditionTrue, "ErrorEncountered", message)
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	for index, condition := range cs.Conditions {
 		if condition.Type == t {

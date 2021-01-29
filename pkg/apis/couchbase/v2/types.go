@@ -2094,7 +2094,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;Upgrading;Hibernating
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;Upgrading;Hibernating;Error
 type ClusterConditionType string
 
 const (
@@ -2104,6 +2104,7 @@ const (
 	ClusterConditionScaling      ClusterConditionType = "Scaling"
 	ClusterConditionUpgrading    ClusterConditionType = "Upgrading"
 	ClusterConditionHibernating  ClusterConditionType = "Hibernating"
+	ClusterConditionError        ClusterConditionType = "Error"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.
