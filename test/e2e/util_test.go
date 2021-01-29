@@ -414,6 +414,9 @@ var (
 		"TestPodReadiness":             TestPodReadiness,
 		"TestKubernetesRollingUpgrade": TestKubernetesRollingUpgrade,
 
+		// Kubernetes Scheduling Tests
+		"TestScheduleEvacuateAllPersistent": TestScheduleEvacuateAllPersistent,
+
 		// SDK testing
 		"TestSDK": TestSDK,
 

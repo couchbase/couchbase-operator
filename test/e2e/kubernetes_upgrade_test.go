@@ -67,10 +67,7 @@ func TestKubernetesRollingUpgrade(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Ensure the nodes are cleaned up afterwards whatever happens.
-	cleanupTaints := func() {
-		_ = f.RemoveK8SNodeTaints(kubernetes.KubeClient)
-	}
-	defer cleanupTaints()
+	defer e2eutil.MustUntaintAll(t, kubernetes)
 
 	// Perform the upgrade.
 	// If you are lucky eveictions happen clusterSize times, if not then the size of the

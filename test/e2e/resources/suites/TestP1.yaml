@@ -159,3 +159,6 @@ testcases:
 - TestAutoscaleDownMandatoryMutualTLS
 - TestAutoscaleMultiConfigs
 #- TestAutoscaleConflict
+
+# Scheduling Tests
+- TestScheduleEvacuateAllPersistent

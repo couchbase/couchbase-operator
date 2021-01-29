@@ -613,27 +613,6 @@ func recreateCRDs(k8s *types.Cluster) error {
 	return nil
 }
 
-func (f *Framework) RemoveK8SNodeTaints(kubeClient kubernetes.Interface) error {
-	logrus.Info("Marking all nodes as schedulable")
-
-	return retryutil.RetryFor(time.Minute, func() error {
-		nodeTaintList := []v1.Taint{}
-
-		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to get node list: %w", err)
-		}
-
-		for nodeIndex := range k8sNodeList.Items {
-			if err := e2eutil.SetNodeTaintAndSchedulableProperty(kubeClient, false, nodeTaintList, nodeIndex); err != nil {
-				return fmt.Errorf("failed to update node taint: %w", err)
-			}
-		}
-
-		return nil
-	})
-}
-
 const (
 	// namespacePrefix is used to denote namespaces owned by this application.
 	namespacePrefix = "test-"
@@ -641,7 +620,9 @@ const (
 
 // tells us if the underlying physical cluster on a host exists.
 func (f *Framework) SetupFramework(k8s *types.Cluster) error {
-	if err := f.RemoveK8SNodeTaints(k8s.KubeClient); err != nil {
+	logrus.Info("Removing node taints")
+
+	if err := e2eutil.UntaintAll(k8s); err != nil {
 		return err
 	}
 

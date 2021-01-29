@@ -11,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1 "k8s.io/api/core/v1"
@@ -59,24 +60,66 @@ func GetCouchbaseEvents(kubeCli kubernetes.Interface, couchbase *couchbasev2.Cou
 	return events, nil
 }
 
-// Updates K8S nodes with given Unschedulable and Taint values.
-func SetNodeTaintAndSchedulableProperty(kubeClient kubernetes.Interface, isUnschedulable bool, podTaintList []v1.Taint, nodeIndex int) (err error) {
-	for retryCount := 0; retryCount < 3; retryCount++ {
-		k8sNodeList, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+func UntaintAll(k8s *types.Cluster) error {
+	callback := func() error {
+		nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
+			return fmt.Errorf("failed to get node list: %w", err)
+		}
+
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+
+			node.Spec.Unschedulable = false
+			node.Spec.Taints = nil
+
+			if _, err := k8s.KubeClient.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{}); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return retryutil.RetryFor(time.Minute, callback)
+}
+
+func MustUntaintAll(t *testing.T, k8s *types.Cluster) {
+	if err := UntaintAll(k8s); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustEvacuateZone cleans out an availability zone.
+func MustEvacuateZone(t *testing.T, k8s *types.Cluster, zone string) {
+	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	for _, n := range nodes.Items {
+		if n.Labels[constants.FailureDomainZoneLabel] != zone {
 			continue
 		}
 
-		nodeToTaint := k8sNodeList.Items[nodeIndex]
-		nodeToTaint.Spec.Unschedulable = isUnschedulable
-		nodeToTaint.Spec.Taints = podTaintList
+		// Reload the node, the statuses are liable to change as we kick stuff off.
+		node, err := k8s.KubeClient.CoreV1().Nodes().Get(context.Background(), n.Name, metav1.GetOptions{})
+		if err != nil {
+			Die(t, err)
+		}
 
-		if _, err = kubeClient.CoreV1().Nodes().Update(context.Background(), &nodeToTaint, metav1.UpdateOptions{}); err == nil {
-			break
+		node.Spec.Taints = []v1.Taint{
+			{
+				Key:    "couchbase-qe",
+				Value:  "rocks",
+				Effect: v1.TaintEffectNoExecute,
+			},
+		}
+
+		if _, err = k8s.KubeClient.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{}); err != nil {
+			Die(t, err)
 		}
 	}
-
-	return err
 }
 
 // MustRollingUpgrade simulates a Kubernetes rolling upgrade.

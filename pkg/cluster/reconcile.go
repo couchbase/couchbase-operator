@@ -103,6 +103,15 @@ func (c *Cluster) reconcile() error {
 	// first, there would actually be a pod, but the initial condition would be none
 	// and weird could happen.
 	if len(pods) == 0 {
+		// Change to an unhealthy condition as soon as we detect it, otherwise
+		// to the ourside world, we will look available and balanced until we
+		// hit the node topology code.
+		c.cluster.Status.SetCreatingCondition()
+
+		if err := c.updateCRStatus(); err != nil {
+			return err
+		}
+
 		// Always return, this allows the member and callable member set to be
 		// correctly populated, whereas if we continued here, then the member
 		// set wouldn't know about any ephemeral pods in the cluster, that
@@ -294,34 +303,36 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 		return nil, err
 	}
 
-	// Prepare to delete member Pod if any errors
-	// occur during creation or configuration
+	// Decrement the member number on error (probably don't need to actually do this
+	// any more, or even generate names for that matter, let Kubernetes do it, that said
+	// it makes event coalesing actually possible, perhaps we could generate a name from
+	// a member hash or something?)
 	defer func() {
 		if err != nil {
 			_ = c.decPodIndex()
-			// Deleting volumes, even log volumes
-			// if node doesn't get to start
-			_ = c.removePod(newMember.Name(), true)
 		}
 	}()
 
-	if err := c.createPod(ctx, newMember, serverSpec); err != nil {
-		c.logFailedMember("Member creation failed", newMember.Name())
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
-
+	// Delete volumes on error here, they contain no data, and restarting from scratch
+	// *may* lead to success.
+	if err := c.createPod(ctx, newMember, serverSpec, true); err != nil {
 		return nil, fmt.Errorf("fail to create member's pod (%s): %w", newMember.Name(), err)
 	}
 
-	// Synchronize on pod creation and service availability
-	if err := c.waitForCreatePod(ctx, newMember); err != nil {
-		// We will delete the pod on error, so collect any ephemeral debug we can before
-		// discarding it forever.  This will capture errors such as users specifying the
-		// wrong image name (pull error), PVCs taking an age to become bound etc.
-		c.logFailedMember("Member creation failed", newMember.Name())
+	// From this point on, if something goes wrong, we blow the pod (and any volumes)
+	// away, as they are uninitialized and not clustered, hoping it will fix itself
+	// next time around.
+	defer func() {
+		if err == nil {
+			return
+		}
+
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 
-		return nil, err
-	}
+		if rerr := c.removePod(newMember.Name(), true); rerr != nil {
+			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", rerr)
+		}
+	}()
 
 	// The new node will not be part of the cluster yet  so the API calls will fail
 	// when checking the UUID, temporarily disable these checks while installing
@@ -337,13 +348,11 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	}
 
 	if !info.Enterprise {
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 		return nil, fmt.Errorf("%w: couchbase server reports community edition", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 	}
 
 	// Enable TLS if requested
 	if err := c.initMemberTLS(ctx, newMember); err != nil {
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 		return nil, err
 	}
 

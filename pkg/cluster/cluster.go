@@ -517,12 +517,35 @@ func (c *Cluster) updateCRStatus() error {
 	return nil
 }
 
-func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+// createPod is used to create EVERY Couchbase server pod, either provisioning or
+// reprovisioning them.
+func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig, deleteVolumes bool) (err error) {
 	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name(), "image", c.cluster.Spec.CouchbaseImage())
 
-	_, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec)
+	// In the event of an error, dump out all information we know about
+	// and raise an event.  Delete all resources
+	defer func() {
+		if err == nil {
+			return
+		}
 
-	return err
+		c.logFailedMember("Member creation failed", m.Name())
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(m.Name(), c.cluster))
+
+		if rerr := c.removePod(m.Name(), deleteVolumes); rerr != nil {
+			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", rerr)
+		}
+	}()
+
+	if _, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec); err != nil {
+		return err
+	}
+
+	if err := c.waitForCreatePod(ctx, m); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Remove Pod and any volumes associated with pod if requested
@@ -568,11 +591,9 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
 	defer cancel()
 
-	if err := c.createPod(ctx, m, *config); err != nil {
-		return err
-	}
-
-	if err := c.waitForCreatePod(ctx, m); err != nil {
+	// Don't delete the volumes here, we need them to recover from, and they
+	// contain precious customer data.
+	if err := c.createPod(ctx, m, *config, false); err != nil {
 		return err
 	}
 
