@@ -52,11 +52,12 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		logrus.Fatal(err.Error())
 	}
 
-	// Cheat here and just pull from the code, remember to add in the namespace
-	// Kubernetes will usually fill this in for us, but the wait code looks at
-	// the resource metadata.
-	deployment := config.GetAdmissionDeployment("", nil)
-	deployment.Namespace = admissionNamespace
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.AdmissionResourceName,
+			Namespace: admissionNamespace,
+		},
+	}
 
 	if err := waitAdmissionController(k8s, deployment); err != nil {
 		return err

@@ -177,3 +177,41 @@ func (v *imagePullSecretVar) Type() string {
 func (v *imagePullSecretVar) String() string {
 	return ""
 }
+
+// admissionLogLevelVar contains a valid Operator log level.
+type admissionLogLevelVar struct {
+	value string
+}
+
+// newAdmissionLogLevelVar constructs a new variable with a default.
+func newAdmissionLogLevelVar(value string) admissionLogLevelVar {
+	return admissionLogLevelVar{
+		value: value,
+	}
+}
+
+// Set sets the variable from CLI input.
+func (v *admissionLogLevelVar) Set(s string) error {
+	switch s {
+	case "info":
+		v.value = "0"
+	case "debug":
+		v.value = "1"
+	case "0", "1":
+		v.value = s
+	default:
+		return fmt.Errorf("log level must be one of [info, 0, debug, 1]")
+	}
+
+	return nil
+}
+
+// Type returns the variable type.
+func (v *admissionLogLevelVar) Type() string {
+	return "string"
+}
+
+// String returns the default value.
+func (v *admissionLogLevelVar) String() string {
+	return v.value
+}

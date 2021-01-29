@@ -96,7 +96,7 @@ func (c *Cluster) operatorUpgrade() error {
 		return err
 	}
 
-	v := validator.New(c.k8s.KubeClient, c.k8s.CouchbaseClient)
+	v := validator.New(c.k8s.KubeClient, c.k8s.CouchbaseClient, nil)
 	if patches := validator.ApplyDefaults(v, unstructuredCluster); patches != nil {
 		log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", cluster.Kind, "name", cluster.Name, "version", version.Version, "patch", patches)
 

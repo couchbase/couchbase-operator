@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
+	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -90,9 +91,20 @@ func configTLS(config *Config) *tls.Config {
 
 // Config contains the server (the webhook) cert and key.
 type Config struct {
-	Addr     string
+	// Addr is the address to listen on.
+	Addr string
+
+	// CertFile is the certificate, and any intermediate CAs, to serve up.
 	CertFile string
-	KeyFile  string
+
+	// KeyFile is the private key for the certificate.
+	KeyFile string
+
+	// ValidateSecrets allows opt-in to read/validate secrets.
+	ValidateSecrets bool
+
+	// ValidateStorageClasses allows opt-in to read/validate secrets.
+	ValidateStorageClasses bool
 }
 
 // addFlags parses command line parameters and adds them to a Config object.
@@ -104,6 +116,10 @@ func (c *Config) AddFlags() {
 		"after server cert).")
 	flag.StringVar(&c.KeyFile, "tls-private-key-file", c.KeyFile, ""+
 		"File containing the default x509 private key matching --tls-cert-file.")
+	flag.BoolVar(&c.ValidateSecrets, "validate-secrets", true, ""+
+		"Validate referenced secrets")
+	flag.BoolVar(&c.ValidateStorageClasses, "validate-storage-classes", true, ""+
+		"Validate referenced storage classes")
 }
 
 // errorResponse takes an error and creates an admission response.
@@ -142,7 +158,7 @@ func decodeObject(ar admissionv1.AdmissionReview, raw runtime.RawExtension) (run
 
 // couchbaseClustersValidate validates a CouchbaseCluster object will work with the
 // operator.  This is for things which cannot be achieved with JSON schema v3 only.
-func couchbaseClustersValidate(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
+func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	glog.Infof("Validating resource: %v %v %v/%v",
 		ar.Request.Operation,
 		ar.Request.Kind,
@@ -178,8 +194,13 @@ func couchbaseClustersValidate(ar admissionv1.AdmissionReview) *admissionv1.Admi
 		}
 	}
 
+	options := &types.ValidatorOptions{
+		ValidateSecrets:        config.ValidateSecrets,
+		ValidateStorageClasses: config.ValidateStorageClasses,
+	}
+
 	// Check that the CouchbaseCluster is correctly configured
-	if err := validator.CheckConstraints(validator.New(getClient(), getCouchbaseClient()), couchbaseCluster); err != nil {
+	if err := validator.CheckConstraints(validator.New(getClient(), getCouchbaseClient(), options), couchbaseCluster); err != nil {
 		glog.Errorf("Rejecting resource: %v", err)
 		return errorResponse(err)
 	}
@@ -189,7 +210,7 @@ func couchbaseClustersValidate(ar admissionv1.AdmissionReview) *admissionv1.Admi
 
 // couchbaseClustersMutate mutates a CouchbaseCluster object before validation.  This allows
 // us to set sensible default values for various properties.
-func couchbaseClustersMutate(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
+func couchbaseClustersMutate(config *Config, ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	glog.Infof("Mutating resource: %v %v %v/%v",
 		ar.Request.Operation,
 		ar.Request.Kind,
@@ -211,7 +232,12 @@ func couchbaseClustersMutate(ar admissionv1.AdmissionReview) *admissionv1.Admiss
 		Allowed: true,
 	}
 
-	patch := validator.ApplyDefaults(validator.New(getClient(), getCouchbaseClient()), object)
+	options := &types.ValidatorOptions{
+		ValidateSecrets:        config.ValidateSecrets,
+		ValidateStorageClasses: config.ValidateStorageClasses,
+	}
+
+	patch := validator.ApplyDefaults(validator.New(getClient(), getCouchbaseClient(), options), object)
 	if patch != nil {
 		data, err := json.Marshal(patch)
 		if err != nil {
@@ -229,12 +255,12 @@ func couchbaseClustersMutate(ar admissionv1.AdmissionReview) *admissionv1.Admiss
 }
 
 // admitFunc defines a callback function which accepts an admission review and returns a response.
-type admitFunc func(admissionv1.AdmissionReview) *admissionv1.AdmissionResponse
+type admitFunc func(*Config, admissionv1.AdmissionReview) *admissionv1.AdmissionResponse
 
 // serve is the top level handler for all admission requests.  It decodes an admission review
 // from the raw JSON and dispatches it to a specific handler.  The handler returns a response
 // which is then marshalled back to JSON and sent back to the client.
-func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
+func serve(config *Config, w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	// Read the POST body content
 	var body []byte
 
@@ -263,7 +289,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 		glog.Error(err)
 		response = errorResponse(err)
 	} else {
-		response = admit(ar)
+		response = admit(config, ar)
 	}
 
 	// Create the admission review response
@@ -303,13 +329,17 @@ func serveReadiness(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveCouchbaseClustersValidate handles CouchbaseCluster validation requests.
-func serveCouchbaseClustersValidate(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, couchbaseClustersValidate)
+func serveCouchbaseClustersValidate(config *Config) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		serve(config, w, r, couchbaseClustersValidate)
+	}
 }
 
 // serveCouchbaseClustersValidate handles CouchbaseCluster mutation requests.
-func serveCouchbaseClustersMutate(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, couchbaseClustersMutate)
+func serveCouchbaseClustersMutate(config *Config) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		serve(config, w, r, couchbaseClustersMutate)
+	}
 }
 
 // main initializes the system then starts a HTTPS server to process requests.
@@ -323,8 +353,8 @@ func Serve(config *Config) {
 
 	http.HandleFunc("/", serveDefault)
 	http.HandleFunc("/readyz", serveReadiness)
-	http.HandleFunc("/couchbaseclusters/validate", serveCouchbaseClustersValidate)
-	http.HandleFunc("/couchbaseclusters/mutate", serveCouchbaseClustersMutate)
+	http.HandleFunc("/couchbaseclusters/validate", serveCouchbaseClustersValidate(config))
+	http.HandleFunc("/couchbaseclusters/mutate", serveCouchbaseClustersMutate(config))
 
 	server := &http.Server{
 		Addr:      ":8443",

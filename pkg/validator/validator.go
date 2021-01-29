@@ -12,8 +12,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func New(client kubernetes.Interface, couchbaseClient versioned.Interface) *types.Validator {
-	return types.New(client, couchbaseClient)
+func New(client kubernetes.Interface, couchbaseClient versioned.Interface, options *types.ValidatorOptions) *types.Validator {
+	return types.New(client, couchbaseClient, options)
 }
 
 func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {

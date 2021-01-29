@@ -189,20 +189,40 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBackupRestores(namespace string, sele
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackupRestores(namespace).List(context.Background(), listOpts)
 }
 
+// ValidatorOptions are configurable, as opposed to required, bits of the
+// validator.
+type ValidatorOptions struct {
+	// Check whether referenced secrets exist, potentially whether the keys
+	// are defined correctly, and certs/keys are valid in the case of TLS.
+	ValidateSecrets bool
+
+	// Check whether referenced storage classes exist.
+	ValidateStorageClasses bool
+}
+
 // Validator is an abstraction layer for communicating with kubernetes
 // to sanity check resources.
 type Validator struct {
 	Abstraction KubeAbstraction
+
+	Options *ValidatorOptions
 }
 
 // New instantiates a new Validator with kubeAbstractionImpl.
-func New(client kubernetes.Interface, couchbaseClient versioned.Interface) *Validator {
+func New(client kubernetes.Interface, couchbaseClient versioned.Interface, options *ValidatorOptions) *Validator {
 	abs := kubeAbstractionImpl{
 		client:          client,
 		couchbaseClient: couchbaseClient,
 	}
 
+	// The main validator code expects this to be populated in order to
+	// avoid mad levels of control flow.
+	if options == nil {
+		options = &ValidatorOptions{}
+	}
+
 	return &Validator{
 		Abstraction: &abs,
+		Options:     options,
 	}
 }

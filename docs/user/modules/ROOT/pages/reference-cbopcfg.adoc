@@ -127,6 +127,19 @@ Then finally reference it in your DAC configuration:
 $ cbopcfg generate admission --scope namespace --namespace-selector namespace-name=foo
 ----
 
+--validate-secrets | --validate-secrets=<bool>::
+If specified, this controls whether secrets referenced by Couchbase resources are checked for existence, and correct formatting.
+For TLS secrets, the key and certificate are also validated for correctness for use with Couchbase server.
++
+This flag defaults to `true`.
+When set to `false` this also removes secret access from the DAC role/cluster role.
+
+--validate-storage-classes | --validate-storage-classes=<bool>::
+If specified, this controls whether storage classes referenced by Couchbase resources are checked for existence.
++
+This flag defaults to `true`.
+When set to `false` this also removes storage class access from the DAC role/cluster role.
+
 === cbopcfg create admission
 
 This command shares all the same options as `cbopcfg generate admission`, but creates them against the Kubernetes API after generation.

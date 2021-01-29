@@ -267,28 +267,26 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 
 	// Referenced object validation
-	if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret); err != nil {
-		// Silently ignore permissions errors, some users may not want us seeing these resources.
-		if !apierrors.IsForbidden(err) {
+	if v.Options.ValidateSecrets {
+		if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret); err != nil {
 			errs = append(errs, err)
+		} else if secret == nil {
+			errs = append(errs, fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", customResource.Spec.Security.AdminSecret))
 		}
-	} else if secret == nil {
-		errs = append(errs, fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", customResource.Spec.Security.AdminSecret))
 	}
 
 	// Referenced object validation
 	if customResource.Spec.Monitoring != nil && customResource.Spec.Monitoring.Prometheus != nil {
-		authSecret := customResource.Spec.Monitoring.Prometheus.AuthorizationSecret
-		if authSecret != nil {
-			if secret, err := v.Abstraction.GetSecret(customResource.Namespace, *authSecret); err != nil {
-				// Silently ignore permissions errors, some users may not want us seeing these resources.
-				if !apierrors.IsForbidden(err) {
+		if v.Options.ValidateSecrets {
+			authSecret := customResource.Spec.Monitoring.Prometheus.AuthorizationSecret
+			if authSecret != nil {
+				if secret, err := v.Abstraction.GetSecret(customResource.Namespace, *authSecret); err != nil {
 					errs = append(errs, err)
+				} else if secret == nil {
+					errs = append(errs, fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", *customResource.Spec.Monitoring.Prometheus.AuthorizationSecret))
+				} else if _, ok := secret.Data["token"]; !ok {
+					errs = append(errs, fmt.Errorf("monitoring authorization secret %s must contain key 'token'", *authSecret))
 				}
-			} else if secret == nil {
-				errs = append(errs, fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", *customResource.Spec.Monitoring.Prometheus.AuthorizationSecret))
-			} else if _, ok := secret.Data["token"]; !ok {
-				errs = append(errs, fmt.Errorf("monitoring authorization secret %s must contain key 'token'", *authSecret))
 			}
 		}
 	}
@@ -296,13 +294,12 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	if customResource.Spec.XDCR.Managed {
 		for i, remoteCluster := range customResource.Spec.XDCR.RemoteClusters {
 			if remoteCluster.AuthenticationSecret != nil {
-				if secret, err := v.Abstraction.GetSecret(customResource.Namespace, *remoteCluster.AuthenticationSecret); err != nil {
-					// Silently ignore permissions errors, some users may not want us seeing these resources.
-					if !apierrors.IsForbidden(err) {
+				if v.Options.ValidateSecrets {
+					if secret, err := v.Abstraction.GetSecret(customResource.Namespace, *remoteCluster.AuthenticationSecret); err != nil {
 						errs = append(errs, err)
+					} else if secret == nil {
+						errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", *remoteCluster.AuthenticationSecret, i))
 					}
-				} else if secret == nil {
-					errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", *remoteCluster.AuthenticationSecret, i))
 				}
 			}
 
@@ -493,13 +490,10 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		}
 
 		// Ensure storageClass exists
-		if pvc.Spec.StorageClassName != nil {
+		if pvc.Spec.StorageClassName != nil && v.Options.ValidateStorageClasses {
 			storageClass, err := v.Abstraction.GetStorageClass(*pvc.Spec.StorageClassName)
 			if err != nil {
-				// Silently ignore permissions errors, some users may not want us seeing these resources.
-				if !apierrors.IsForbidden(err) {
-					errs = append(errs, err)
-				}
+				errs = append(errs, err)
 			} else if storageClass == nil {
 				errs = append(errs, fmt.Errorf("storage class %s must exist", *pvc.Spec.StorageClassName))
 			}
@@ -599,18 +593,15 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			}
 
 			// secret containing ldap ca must exist
-			tlsSecret, err := v.Abstraction.GetSecret(customResource.Namespace, tlsSecretName)
-			if err != nil {
-				// Silently ignore permissions errors, some users may not want us seeing these resources.
-				if apierrors.IsForbidden(err) {
-					return nil
+			if v.Options.ValidateSecrets {
+				tlsSecret, err := v.Abstraction.GetSecret(customResource.Namespace, tlsSecretName)
+				if err != nil {
+					errs = append(errs, err)
+				} else if tlsSecret == nil {
+					errs = append(errs, fmt.Errorf("secret %s referenced by security.ldap.tlsSecret must exist", tlsSecretName))
+				} else if _, ok := tlsSecret.Data["ca.crt"]; !ok {
+					errs = append(errs, fmt.Errorf("ldap tls secret %s must contain key 'ca.crt'", tlsSecretName))
 				}
-
-				errs = append(errs, err)
-			} else if tlsSecret == nil {
-				errs = append(errs, fmt.Errorf("secret %s referenced by security.ldap.tlsSecret must exist", tlsSecretName))
-			} else if _, ok := tlsSecret.Data["ca.crt"]; !ok {
-				errs = append(errs, fmt.Errorf("ldap tls secret %s must contain key 'ca.crt'", tlsSecretName))
 			}
 		}
 
@@ -729,15 +720,10 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 		if authSecretName == "" {
 			emsg := fmt.Sprintf("spec.authSecret for `%s` domain", domain)
 			errs = append(errs, errors.Required(emsg, user.Name))
-		} else {
+		} else if v.Options.ValidateSecrets {
 			// Check the ldap auth secret exists and has the correct keys
 			authSecret, err := v.Abstraction.GetSecret(user.Namespace, authSecretName)
 			if err != nil {
-				// Silently ignore permissions errors, some users may not want us seeing these resources.
-				if apierrors.IsForbidden(err) {
-					return nil
-				}
-
 				errs = append(errs, err)
 			} else if authSecret == nil {
 				errs = append(errs, fmt.Errorf("secret %s referenced by user.spec.authSecret for `%s` must exist", authSecretName, user.Name))
@@ -869,10 +855,6 @@ func getCA(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, b
 
 	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {
-		if apierrors.IsForbidden(err) {
-			return nil, false, nil
-		}
-
 		return nil, false, err
 	}
 
@@ -912,10 +894,6 @@ func getServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 
 	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {
-		if apierrors.IsForbidden(err) {
-			return nil, nil, false, nil
-		}
-
 		return nil, nil, false, err
 	}
 
@@ -960,10 +938,6 @@ func getClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 
 	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {
-		if apierrors.IsForbidden(err) {
-			return nil, nil, false, nil
-		}
-
 		return nil, nil, false, err
 	}
 
@@ -993,7 +967,7 @@ func getClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 //   * have the correct attributes
 // * leaf certificate has the correct SANs.
 func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subjectAltNames []string) []error {
-	if !cluster.IsTLSEnabled() {
+	if !cluster.IsTLSEnabled() || !v.Options.ValidateSecrets {
 		return nil
 	}
 
@@ -1048,6 +1022,10 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 // * if set the secret must exist
 // * if set the secret must contain a CA.
 func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) (errs []error) {
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
 	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
 		if remoteCluster.TLS == nil {
 			continue
@@ -1056,11 +1034,6 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 		if remoteCluster.TLS.Secret != nil {
 			secret, err := v.Abstraction.GetSecret(cluster.Namespace, *remoteCluster.TLS.Secret)
 			if err != nil {
-				// Silently ignore permissions errors, some users may not want us seeing these resources.
-				if apierrors.IsForbidden(err) {
-					return
-				}
-
 				errs = append(errs, err)
 
 				continue

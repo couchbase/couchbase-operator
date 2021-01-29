@@ -52,8 +52,10 @@ Additionally the mutating and validating webhooks affect the Kubernetes API, so 
 ====
 By default the DAC will check that Kubernetes secrets and storage classes exist and have not been misconfigured.
 This is important because the validity of things like TLS certificates can be checked before attempting to create the cluster.
-If the required permissions are too permissive for your environment then you can remove them.
-The DAC will ignore permissions errors when polling for resources.
+If the required permissions are too permissive for your environment then you can selectively remove them with the xref:reference-cbopcfg.adoc[`cbopcfg`] installer tool.
+
+You may also use this opt-out feature to avoid the DAC rejecting configuration when the ordering of resource creation cannot be guaranteed, for example secrets are created after the Couchbase cluster resource.
+This is however not recommended as any configuration errors are reflected in resource status conditions and logs, not immediately reported to the console.
 ====
 
 == Dynamic Admission Controller Architecture
