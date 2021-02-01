@@ -2,9 +2,8 @@ package framework
 
 import (
 	"context"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"fmt"
+	"os/exec"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -13,9 +12,9 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	"github.com/sirupsen/logrus"
+
 	appsv1 "k8s.io/api/apps/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,72 +28,34 @@ const (
 // createAdmissionController creates all the necessary resources to deploy the
 // admission controller.
 func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
-	validFrom := time.Now()
-	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)
-	ca, _ := e2eutil.NewCertificateAuthority(e2eutil.KeyTypeRSA, config.AdmissionResourceName+" CA", validFrom, validTo, e2eutil.CertTypeCA)
-	req := e2eutil.CreateKeyPairReqData(e2eutil.KeyTypeRSA, e2eutil.KeyEncodingPKCS8, e2eutil.CertTypeServer, &x509.CertificateRequest{
-		Subject: pkix.Name{
-			CommonName: config.AdmissionResourceName,
-		},
-		DNSNames: []string{
-			config.AdmissionResourceName + "." + admissionNamespace + ".svc",
-		},
-	})
-	key, cert, _ := req.Generate(ca, validFrom, validTo)
-
-	serviceAccount := config.GetAdmissionServiceAccount()
-	if _, err := k8s.KubeClient.CoreV1().ServiceAccounts(admissionNamespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{}); err != nil {
-		return err
+	// This is as close to the documentation as we can be e.g. validate what we
+	// document.
+	args := []string{
+		"create",
+		"admission",
+		"--image=" + runtimeParams.AdmissionControllerImage,
+		"--namespace=" + admissionNamespace,
+		"--kubeconfig=" + k8s.KubeConfPath,
 	}
 
-	roleObject := config.GetAdmissionRole(true)
-
-	clusterRole, ok := roleObject.(*rbacv1.ClusterRole)
-	if !ok {
-		return fmt.Errorf("DAC role is not cluster scoped")
+	if k8s.Context != "" {
+		args = append(args, "--context="+k8s.Context)
 	}
 
-	if _, err := k8s.KubeClient.RbacV1().ClusterRoles().Create(context.Background(), clusterRole, metav1.CreateOptions{}); err != nil {
-		return err
+	for _, secret := range pullSecrets {
+		args = append(args, "--image-pull-secret="+secret)
 	}
 
-	roleBindingObject := config.GetAdmissionRoleBinding(admissionNamespace, true)
-
-	clusterRoleBinding, ok := roleBindingObject.(*rbacv1.ClusterRoleBinding)
-	if !ok {
-		return fmt.Errorf("DAC role binding is not cluster scoped")
+	output, err := exec.Command("../../build/bin/cbopcfg", args...).CombinedOutput()
+	if err != nil {
+		logrus.Info(string(output))
+		logrus.Fatal(err.Error())
 	}
 
-	if _, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().Create(context.Background(), clusterRoleBinding, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-
-	secret := config.GetAdmissionSecret(key, cert)
-	if _, err := k8s.KubeClient.CoreV1().Secrets(admissionNamespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-
-	deployment := config.GetAdmissionDeployment(runtimeParams.AdmissionControllerImage, pullSecrets, "-v", "1")
-	if _, err := k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Create(context.Background(), deployment, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-
-	service := config.GetAdmissionService()
-	if _, err := k8s.KubeClient.CoreV1().Services(admissionNamespace).Create(context.Background(), service, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-
-	mutatingWebhook := config.GetAdmissionMutatingWebhook(admissionNamespace, ca.Certificate, true, nil)
-	if _, err := k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.Background(), mutatingWebhook, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-
-	validatingWebhook := config.GetAdmissionValidatingWebhook(admissionNamespace, ca.Certificate, true, nil)
-	if _, err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.Background(), validatingWebhook, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-
-	// Update the deployment, the wait code expects the namespace to be filled in by the API.
+	// Cheat here and just pull from the code, remember to add in the namespace
+	// Kubernetes will usually fill this in for us, but the wait code looks at
+	// the resource metadata.
+	deployment := config.GetAdmissionDeployment("", nil)
 	deployment.Namespace = admissionNamespace
 
 	if err := waitAdmissionController(k8s, deployment); err != nil {
@@ -108,43 +69,28 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 // this unconditionally rather than having to check whether it exists or not which is a lot
 // of boiler plate zzz.
 func deleteAdmissionController(k8s *types.Cluster) error {
-	if err := k8s.KubeClient.CoreV1().ServiceAccounts(admissionNamespace).Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
+	// This is as close to the documentation as we can be e.g. validate what we
+	// document.
+	args := []string{
+		"delete",
+		"admission",
+		"--namespace=" + admissionNamespace,
+		"--kubeconfig=" + k8s.KubeConfPath,
 	}
 
-	if err := k8s.KubeClient.RbacV1().ClusterRoles().Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
+	if k8s.Context != "" {
+		args = append(args, "--context="+k8s.Context)
 	}
 
-	if err := k8s.KubeClient.RbacV1().ClusterRoleBindings().Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if err := k8s.KubeClient.CoreV1().Secrets(admissionNamespace).Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if err := k8s.KubeClient.AppsV1().Deployments(admissionNamespace).Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if err := k8s.KubeClient.CoreV1().Services(admissionNamespace).Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if err := k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	if err := k8s.KubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.Background(), config.AdmissionResourceName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
+	output, err := exec.Command("../../build/bin/cbopcfg", args...).CombinedOutput()
+	if err != nil {
+		logrus.Info(string(output))
+		logrus.Fatal(err.Error())
 	}
 
 	return nil
 }
 
-// waitAdmissionController polls the Kubernetes API for the admission controller deployment
-// and waits for it to become ready.
 func waitAdmissionController(k8s *types.Cluster, deployment *appsv1.Deployment) error {
 	if err := retryutil.RetryFor(5*time.Minute, e2eutil.ResourceCondition(k8s, deployment, "Available", "True")); err != nil {
 		return err

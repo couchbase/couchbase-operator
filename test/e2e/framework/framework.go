@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -697,14 +698,6 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	return nil
 }
 
-func (f *Framework) SetupCouchbaseOperator(k8s *types.Cluster) error {
-	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(context.Background(), k8s.OperatorDeployment, metav1.CreateOptions{}); err != nil {
-		return err
-	}
-
-	return e2eutil.WaitUntilOperatorReady(k8s, 5*time.Minute)
-}
-
 func (f *Framework) GetOperatorRestartCount(k8s *types.Cluster) (int32, error) {
 	operatorPodName, err := e2eutil.GetOperatorName(k8s)
 	if err != nil {
@@ -924,25 +917,39 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 
 	// Create the operator.
 	if !optionSet(o, NoOperator) {
+		args := []string{
+			"create",
+			"operator",
+			"--image=" + f.OpImage,
+			"--pod-creation-timeout=" + f.PodCreateTimeout.String(),
+			"--log-level=debug",
+			"--namespace=" + cluster.Namespace,
+			"--kubeconfig=" + cluster.KubeConfPath,
+		}
+
+		if cluster.Context != "" {
+			args = append(args, "--context="+cluster.Context)
+		}
+
+		for _, secret := range secrets {
+			args = append(args, "--image-pull-secret="+secret)
+		}
+
+		if _, err := exec.Command("../../build/bin/cbopcfg", args...).CombinedOutput(); err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		// For waiting and for re-creation, cache the deployment by calling directly
+		// into the configuration code.  Remember to populate the namespace too as
+		// that's what the framework uses.
 		cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout)
+		cluster.OperatorDeployment.Namespace = cluster.Namespace
 
-		// Most API operations expect the resource to have been put through the API
-		// first, so things like namespace and name are populated.
-		cluster.OperatorDeployment.Namespace = namespace.Name
-
-		if err := RecreateServiceAccount(cluster, cluster.OperatorDeployment.Name); err != nil {
+		if err := e2eutil.WaitUntilOperatorReady(cluster, 5*time.Minute); err != nil {
 			e2eutil.Die(t, err)
 		}
 
-		if err := recreateRoles(cluster, cluster.OperatorDeployment.Name); err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		if err := recreateRoleBindings(cluster); err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		if err := f.SetupCouchbaseOperator(cluster); err != nil {
+		if err := CreateBackupStuff(cluster); err != nil {
 			e2eutil.Die(t, err)
 		}
 	}

@@ -31,7 +31,7 @@ type generateOperatorOptions struct {
 	scope scopeVar
 
 	// imagePullSecret is the name of an image pull secret for authenticating image pulls.
-	imagePullSecret string
+	imagePullSecret imagePullSecretVar
 
 	// logLevel is the level to emit docs at.
 	logLevel operatorLogLevelVar
@@ -91,7 +91,7 @@ func getGenerateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", operatorImageDefault, "Operator image to use.")
-	cmd.Flags().StringVar(&o.imagePullSecret, "image-pull-secret", "", "Image pull secret to allow access to the operator image.")
+	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image.")
 	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
 	cmd.Flags().Var(&o.podCreationTimeout, "pod-creation-timeout", "How long to wait before declaring an error when provisioning a pod.")
 
@@ -149,7 +149,7 @@ func getCreateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Comma
 
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", operatorImageDefault, "Operator image to use")
-	cmd.Flags().StringVar(&o.imagePullSecret, "image-pull-secret", "", "Image pull secret to allow access to the operator image")
+	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
 	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
 	cmd.Flags().Var(&o.podCreationTimeout, "pod-creation-timeout", "How long to wait before declaring an error when provisioning a pod.")
 
@@ -199,19 +199,11 @@ func (o *generateOperatorOptions) generate(flags *genericclioptions.ConfigFlags)
 		return nil, err
 	}
 
-	var imagePullSecrets []string
-
-	if o.imagePullSecret != "" {
-		imagePullSecrets = []string{
-			o.imagePullSecret,
-		}
-	}
-
 	resources := []runtime.Object{
 		GetOperatorServiceAccount(),
 		GetOperatorRole(o.scope.value.isClusterScope()),
 		GetOperatorRoleBinding(namespace, o.scope.value.isClusterScope()),
-		GetOperatorDeployment(o.image, imagePullSecrets, o.scope.value.isClusterScope(), o.podCreationTimeout.value, o.logLevel.value),
+		GetOperatorDeployment(o.image, o.imagePullSecret.imagePullSecrets, o.scope.value.isClusterScope(), o.podCreationTimeout.value, o.logLevel.value),
 		GenerateOperatorService(),
 	}
 

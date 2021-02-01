@@ -1,41 +1,24 @@
 package framework
 
 import (
-	"context"
+	"os/exec"
 
-	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateBackupRole(k8s *types.Cluster) error {
-	backupRole := config.GetBackupRole()
-
-	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(context.Background(), backupRole, metav1.CreateOptions{})
-	if err != nil {
-		return err
+func CreateBackupStuff(k8s *types.Cluster) error {
+	args := []string{
+		"create",
+		"backup",
+		"--namespace=" + k8s.Namespace,
+		"--kubeconfig=" + k8s.KubeConfPath,
 	}
 
-	return nil
-}
-
-func CreateBackupServiceAccount(k8s *types.Cluster) error {
-	backupServiceAccount := config.GetBackupServiceAccount()
-
-	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(context.Background(), backupServiceAccount, metav1.CreateOptions{})
-	if err != nil {
-		return err
+	if k8s.Context != "" {
+		args = append(args, "--context="+k8s.Context)
 	}
 
-	return nil
-}
-
-func CreateBackupRoleBinding(k8s *types.Cluster) error {
-	backupRoleBinding := config.GetBackupRoleBinding(k8s.Namespace)
-
-	_, err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Create(context.Background(), backupRoleBinding, metav1.CreateOptions{})
-	if err != nil {
+	if _, err := exec.Command("../../build/bin/cbopcfg", args...).CombinedOutput(); err != nil {
 		return err
 	}
 

@@ -12,8 +12,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,14 +46,6 @@ func getSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
 	}
 
 	return
-}
-
-func removeRole(k8s *types.Cluster, roleName string) error {
-	if err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Delete(context.Background(), roleName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	return nil
 }
 
 func RemoveServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
@@ -129,33 +119,6 @@ func recreateDockerAuthSecret(k8s *types.Cluster, namespace string) ([]string, e
 	return pullSecrets, nil
 }
 
-func recreateRoles(k8s *types.Cluster, roleName string) error {
-	if err := removeRole(k8s, config.OperatorResourceName); err != nil {
-		return nil
-	}
-
-	if err := removeRole(k8s, config.BackupResourceName); err != nil {
-		return nil
-	}
-
-	if err := CreateBackupRole(k8s); err != nil {
-		return err
-	}
-
-	roleObject := config.GetOperatorRole(false)
-
-	roleSpec, ok := roleObject.(*rbacv1.Role)
-	if !ok {
-		return fmt.Errorf("operator role is not namspace scoped")
-	}
-
-	roleSpec.Name = roleName
-
-	_, err := k8s.KubeClient.RbacV1().Roles(k8s.Namespace).Create(context.Background(), roleSpec, metav1.CreateOptions{})
-
-	return err
-}
-
 func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
 	if err := RemoveServiceAccount(k8s, serviceAccountName); err != nil {
 		return err
@@ -169,10 +132,6 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 		return err
 	}
 
-	if err := CreateBackupServiceAccount(k8s); err != nil {
-		return err
-	}
-
 	// Create service account given by the name
 	serviceAccount := config.GetOperatorServiceAccount()
 	serviceAccount.Name = serviceAccountName
@@ -180,39 +139,6 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{})
 
 	return err
-}
-
-func recreateRoleBindings(k8s *types.Cluster) error {
-	if err := removeRoleBinding(k8s, config.OperatorResourceName); err != nil {
-		return err
-	}
-
-	if err := removeRoleBinding(k8s, config.BackupResourceName); err != nil {
-		return err
-	}
-
-	if err := CreateBackupRoleBinding(k8s); err != nil {
-		return err
-	}
-
-	roleBindingObject := config.GetOperatorRoleBinding(k8s.Namespace, false)
-
-	clusterRoleBindingSpec, ok := roleBindingObject.(*rbacv1.RoleBinding)
-	if !ok {
-		return fmt.Errorf("operator role binding is not namespace scoped")
-	}
-
-	_, err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Create(context.Background(), clusterRoleBindingSpec, metav1.CreateOptions{})
-
-	return err
-}
-
-func removeRoleBinding(k8s *types.Cluster, roleBindingName string) error {
-	if err := k8s.KubeClient.RbacV1().RoleBindings(k8s.Namespace).Delete(context.Background(), roleBindingName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-
-	return nil
 }
 
 func waitForServiceAccountDeleted(k8s *types.Cluster, serviceAccountName string, waitTimeInSec int) error {

@@ -35,7 +35,7 @@ type generateAdmissionOptions struct {
 	scope scopeVar
 
 	// imagePullSecret is the name of an image pull secret for authenticating image pulls.
-	imagePullSecret string
+	imagePullSecret imagePullSecretVar
 
 	// namespaceSelector defines the namespace selector to apply API webhooks to when
 	// using the admission controller in namespace scope.
@@ -95,7 +95,7 @@ func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Co
 
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
-	cmd.Flags().StringVar(&o.imagePullSecret, "image-pull-secret", "", "Image pull secret to allow access to the operator image")
+	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 
 	return cmd
@@ -154,7 +154,7 @@ func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
 
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
-	cmd.Flags().StringVar(&o.imagePullSecret, "image-pull-secret", "", "Image pull secret to allow access to the operator image")
+	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 
 	return cmd
@@ -245,20 +245,12 @@ func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags
 		return nil, err
 	}
 
-	var imagePullSecrets []string
-
-	if o.imagePullSecret != "" {
-		imagePullSecrets = []string{
-			o.imagePullSecret,
-		}
-	}
-
 	resources := []runtime.Object{
 		GetAdmissionServiceAccount(),
 		GetAdmissionRole(o.scope.value.isClusterScope()),
 		GetAdmissionRoleBinding(namespace, o.scope.value.isClusterScope()),
 		GetAdmissionSecret(key, cert),
-		GetAdmissionDeployment(o.image, imagePullSecrets),
+		GetAdmissionDeployment(o.image, o.imagePullSecret.imagePullSecrets),
 		GetAdmissionService(),
 		GetAdmissionMutatingWebhook(namespace, ca.Certificate, o.scope.value.isClusterScope(), o.namespaceSelector.LabelSelector),
 		GetAdmissionValidatingWebhook(namespace, ca.Certificate, o.scope.value.isClusterScope(), o.namespaceSelector.LabelSelector),

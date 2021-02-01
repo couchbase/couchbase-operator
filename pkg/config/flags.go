@@ -151,3 +151,29 @@ func (v *operatorLogLevelVar) Type() string {
 func (v *operatorLogLevelVar) String() string {
 	return v.value
 }
+
+// imagePullSecretVar contains image pull secret names.
+type imagePullSecretVar struct {
+	imagePullSecrets []string
+}
+
+// Set sets the variable from CLI input.
+func (v *imagePullSecretVar) Set(s string) error {
+	if v.imagePullSecrets == nil {
+		v.imagePullSecrets = []string{}
+	}
+
+	v.imagePullSecrets = append(v.imagePullSecrets, s)
+
+	return nil
+}
+
+// Type returns the variable type.
+func (v *imagePullSecretVar) Type() string {
+	return "string"
+}
+
+// String returns the default value.
+func (v *imagePullSecretVar) String() string {
+	return ""
+}
