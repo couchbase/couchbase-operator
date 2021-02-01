@@ -23,7 +23,7 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| Certified 6.5, 6.6
+| Certified 6.5.1, 6.6
 
 _Unless otherwise stated, maintenance/patch releases (x.x**.X**) inherit the same support level._
 |===
@@ -35,24 +35,15 @@ _Unless otherwise stated, maintenance/patch releases (x.x**.X**) inherit the sam
 | Platform | Version
 
 | Open Source Kubernetes
-| Certified 1.17, 1.18
+| Certified 1.19
 
-Supported 1.19
+Supported 1.17, 1.18, 1.20
 
 | Red Hat OpenShift Container Platform
-| Certified 4.4
+| Certified 4.6
 
-Supported 4.5, 4.6
+Supported 4.4, 4.5, 4.7
 |===
-
-[IMPORTANT]
-====
-The Operator can function on Kubernetes 1.20, however custom resource definitions (CRDs) will have a `NonStructuralSchema` condition associated with them.
-This can be ignored, and does not affect functionality.
-
-We recommend that Kubernetes 1.20 not be used for production workloads, only proof-of-concept work.
-Full support for Kubernetes 1.20 will be provided in Operator 2.2.
-====
 
 === Public Kubernetes Service Compatibility
 
