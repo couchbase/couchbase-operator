@@ -127,6 +127,8 @@ func TestEditClusterSettings(t *testing.T) {
 		Replace("/spec/cluster/searchServiceMemoryQuota", e2espec.NewResourceQuantityMi(257))
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patches, time.Minute)
 
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.UpgradeFinishedEvent(testCouchbase), 5*time.Minute)
+
 	validationPatches := jsonpatch.NewPatchSet().
 		Test("/DataMemoryQuotaMB", int64(257)).
 		Test("/IndexMemoryQuotaMB", int64(257)).
