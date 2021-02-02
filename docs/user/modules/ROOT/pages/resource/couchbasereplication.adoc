@@ -1,6 +1,9 @@
 // THIS FILE IS AUTO-GENERATED - DO NOT EDIT
 = CouchbaseReplication Resource
 include::partial$autogen-reference-aliases.adoc[tags=couchbasereplication]
+:resource-name-singular: couchbasereplication
+:resource-name-plural: couchbasereplications
+:resource-name-kind: CouchbaseReplication
 
 The CouchbaseReplication resource represents a Couchbase-to-Couchbase, XDCR replication stream from a source bucket to a destination bucket.
 This provides off-site backup, migration, and disaster recovery.
@@ -31,18 +34,7 @@ Cannot be updated.
 In CamelCase.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
 
-== couchbasereplications.metadata
-
-=== Constraints
-
-*Required*
-
-*Type*: `object`
-
-=== Description
-
-Standard object metadata as defined for all Kubernetes types.
-For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasereplication]
 
 == couchbasereplications.spec
 

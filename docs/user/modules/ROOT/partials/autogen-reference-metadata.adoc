@@ -1,0 +1,103 @@
+== {resource-name-plural}.metadata
+////
+Dummy tags, as asciidoctor will raise warnings if they don't exist.
+
+Now what you can do here, is if there is any special significance
+about a particular metadata item in relation to a Couchbase type, is
+include context specific inforamtion by inserting a tagged region into
+the body of this template.  DRY combined with specialization, that's
+magic Debbie!
+////
+// tag::couchbaseautoscaler[]
+// end::couchbaseautoscaler[]
+// tag::couchbasebackup[]
+// end::couchbasebackup[]
+// tag::couchbasebackuprestore[]
+// end::couchbasebackuprestore[]
+// tag::couchbasebucket[]
+// end::couchbasebucket[]
+// tag::couchbasecluster[]
+// end::couchbasecluster[]
+// tag::couchbaseephemeralbucket[]
+// end::couchbaseephemeralbucket[]
+// tag::couchbasegroup[]
+// end::couchbasegroup[]
+// tag::couchbasememcachedbucket[]
+// end::couchbasememcachedbucket[]
+// tag::couchbasereplication[]
+// end::couchbasereplication[]
+// tag::couchbaserolebinding[]
+// end::couchbaserolebinding[]
+// tag::couchbaseuser[]
+// end::couchbaseuser[]
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+Standard object metadata as defined for all Kubernetes types.
+
+For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+
+=== {resource-name-plural}.metadata.name
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The name of a resource.
+This must be unique for the kind of resource within the namespace.
+
+All resources must have a name.
+The name may be omitted and `metadata.generateName` used instead to generate a unique resource name.
+
+For additional details on resource names, see the https://kubernetes.io/docs/concepts/overview/working-with-objects/names/[Kubernetes reference documentation^].
+
+=== {resource-name-plural}.metadata.namespace
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The namespace the resource resides in.
+All resources reside in a namespace.
+
+The namespace is optional and may be specified in YAML configuration to override the namespace supplied by `kubectl`.
+
+For additional details on namespaces, see the https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[Kubernetes reference documentation^].
+
+=== {resource-name-plural}.metadata.labels
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+Labels allow resources to be labeled with key/value pairs of data.
+Labels are indexed and allow resources to be selected based upon specified labels.
+
+Labels are relevant for certain types when using xref:concept-label-selection.adoc[label selection] within your resources.
+
+For additional details on labels and selectors, see the https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[Kubernetes reference documentation^].
+
+=== {resource-name-plural}.metadata.annotations
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+Annotations allow resources to be annotated with key/value pairs of data.
+Annotations are arbitrary, and not indexed, so cannot be used to select resources, however may be used to add context or accounting to your resources.
+
+For additional details on annotations, see the https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/[Kubernetes reference documentation^].

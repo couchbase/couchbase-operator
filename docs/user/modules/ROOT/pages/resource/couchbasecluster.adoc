@@ -1,6 +1,9 @@
 // THIS FILE IS AUTO-GENERATED - DO NOT EDIT
 = CouchbaseCluster Resource
 include::partial$autogen-reference-aliases.adoc[tags=couchbasecluster]
+:resource-name-singular: couchbasecluster
+:resource-name-plural: couchbaseclusters
+:resource-name-kind: CouchbaseCluster
 
 The CouchbaseCluster resource represents a Couchbase cluster.
 It allows configuration of cluster topology, networking, storage and security options.
@@ -31,18 +34,7 @@ Cannot be updated.
 In CamelCase.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
 
-== couchbaseclusters.metadata
-
-=== Constraints
-
-*Required*
-
-*Type*: `object`
-
-=== Description
-
-Standard object metadata as defined for all Kubernetes types.
-For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasecluster]
 
 == couchbaseclusters.spec
 

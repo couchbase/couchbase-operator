@@ -1,6 +1,9 @@
 // THIS FILE IS AUTO-GENERATED - DO NOT EDIT
 = CouchbaseRoleBinding Resource
 include::partial$autogen-reference-aliases.adoc[tags=couchbaserolebinding]
+:resource-name-singular: couchbaserolebinding
+:resource-name-plural: couchbaserolebindings
+:resource-name-kind: CouchbaseRoleBinding
 
 CouchbaseRoleBinding allows association of Couchbase users with groups.
 
@@ -30,18 +33,7 @@ Cannot be updated.
 In CamelCase.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
 
-== couchbaserolebindings.metadata
-
-=== Constraints
-
-*Required*
-
-*Type*: `object`
-
-=== Description
-
-Standard object metadata as defined for all Kubernetes types.
-For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbaserolebinding]
 
 == couchbaserolebindings.spec
 

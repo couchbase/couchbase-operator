@@ -176,17 +176,15 @@ def generate_description(content, description):
     content.append('')
 
 
-def generate_metadata(content, depth, path):
+def generate_metadata(content, names):
     """
-    Inject boilerplate documentation for resource type metadata
+    Inject boilerplate documentation for resource type metadata.
+    The content is defined as a partial, the headings are type specific
+    and are generated so that xref linking works.
     """
 
-    generate_heading(content, depth, path)
-    generate_heading(content, depth + 1, CONSTRAINTS_HEADING)
-    generate_flag(content, REQUIRED_LABEL, True)
-    generate_constraint(content, TYPE_LABEL, 'object')
-    generate_heading(content, depth + 1, DESCRIPTION_HEADING)
-    generate_description(content, 'Standard object metadata as defined for all Kubernetes types.  For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].')
+    content.append('include::partial$autogen-reference-metadata.adoc[tags=**;!*;{}]'.format(names['singular']))
+    content.append('')
 
 
 def generate_schema(content, names, path, schema, required):
@@ -209,7 +207,7 @@ def generate_schema(content, names, path, schema, required):
     # Metadata is not documented in the CRD by default, so catch that and
     # treat it specially.
     if re.match(r'[\w\d]+\.metadata', path):
-        generate_metadata(content, depth, path)
+        generate_metadata(content, names)
         return
 
     # If the schema doesn't have a description, then it must do.  The only
@@ -247,6 +245,9 @@ def generate_schema(content, names, path, schema, required):
     if depth == ROOT_DEPTH:
         content.append('= {} Resource'.format(names['kind']))
         content.append('include::partial$autogen-reference-aliases.adoc[tags={}]'.format(names['singular']))
+        content.append(':resource-name-singular: {}'.format(names['singular']))
+        content.append(':resource-name-plural: {}'.format(names['plural']))
+        content.append(':resource-name-kind: {}'.format(names['kind']))
         content.append('')
     else:
         generate_heading(content, depth, path)

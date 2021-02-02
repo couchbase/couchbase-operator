@@ -1,6 +1,9 @@
 // THIS FILE IS AUTO-GENERATED - DO NOT EDIT
 = CouchbaseGroup Resource
 include::partial$autogen-reference-aliases.adoc[tags=couchbasegroup]
+:resource-name-singular: couchbasegroup
+:resource-name-plural: couchbasegroups
+:resource-name-kind: CouchbaseGroup
 
 CouchbaseGroup allows the automation of Couchbase group management.
 
@@ -30,18 +33,7 @@ Cannot be updated.
 In CamelCase.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
 
-== couchbasegroups.metadata
-
-=== Constraints
-
-*Required*
-
-*Type*: `object`
-
-=== Description
-
-Standard object metadata as defined for all Kubernetes types.
-For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasegroup]
 
 == couchbasegroups.spec
 

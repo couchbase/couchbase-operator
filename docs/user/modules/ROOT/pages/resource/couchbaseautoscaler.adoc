@@ -1,6 +1,9 @@
 // THIS FILE IS AUTO-GENERATED - DO NOT EDIT
 = CouchbaseAutoscaler Resource
 include::partial$autogen-reference-aliases.adoc[tags=couchbaseautoscaler]
+:resource-name-singular: couchbaseautoscaler
+:resource-name-plural: couchbaseautoscalers
+:resource-name-kind: CouchbaseAutoscaler
 
 CouchbaseAutoscaler provides an interface for the Kubernetes Horizontal Pod Autoscaler to interactive with the Couchbase cluster and provide autoscaling.
 This resource is not defined by the end user, and is managed by the Operator.
@@ -31,18 +34,7 @@ Cannot be updated.
 In CamelCase.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
 
-== couchbaseautoscalers.metadata
-
-=== Constraints
-
-*Required*
-
-*Type*: `object`
-
-=== Description
-
-Standard object metadata as defined for all Kubernetes types.
-For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbaseautoscaler]
 
 == couchbaseautoscalers.spec
 

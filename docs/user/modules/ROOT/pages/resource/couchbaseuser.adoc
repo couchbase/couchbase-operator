@@ -1,6 +1,9 @@
 // THIS FILE IS AUTO-GENERATED - DO NOT EDIT
 = CouchbaseUser Resource
 include::partial$autogen-reference-aliases.adoc[tags=couchbaseuser]
+:resource-name-singular: couchbaseuser
+:resource-name-plural: couchbaseusers
+:resource-name-kind: CouchbaseUser
 
 CouchbaseUser allows the automation of Couchbase user management.
 
@@ -30,18 +33,7 @@ Cannot be updated.
 In CamelCase.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
 
-== couchbaseusers.metadata
-
-=== Constraints
-
-*Required*
-
-*Type*: `object`
-
-=== Description
-
-Standard object metadata as defined for all Kubernetes types.
-For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbaseuser]
 
 == couchbaseusers.spec
 

@@ -1,6 +1,9 @@
 // THIS FILE IS AUTO-GENERATED - DO NOT EDIT
 = CouchbaseEphemeralBucket Resource
 include::partial$autogen-reference-aliases.adoc[tags=couchbaseephemeralbucket]
+:resource-name-singular: couchbaseephemeralbucket
+:resource-name-plural: couchbaseephemeralbuckets
+:resource-name-kind: CouchbaseEphemeralBucket
 
 The CouchbaseEphemeralBucket resource defines a set of documents in Couchbase server.
 A Couchbase client connects to and operates on a bucket, which provides independent management of a set documents and a security boundary for role based access control.
@@ -32,18 +35,7 @@ Cannot be updated.
 In CamelCase.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
 
-== couchbaseephemeralbuckets.metadata
-
-=== Constraints
-
-*Required*
-
-*Type*: `object`
-
-=== Description
-
-Standard object metadata as defined for all Kubernetes types.
-For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbaseephemeralbucket]
 
 == couchbaseephemeralbuckets.spec
 

@@ -1,6 +1,9 @@
 // THIS FILE IS AUTO-GENERATED - DO NOT EDIT
 = CouchbaseBackupRestore Resource
 include::partial$autogen-reference-aliases.adoc[tags=couchbasebackuprestore]
+:resource-name-singular: couchbasebackuprestore
+:resource-name-plural: couchbasebackuprestores
+:resource-name-kind: CouchbaseBackupRestore
 
 CouchbaseBackupRestore allows the restoration of all Couchbase cluster data from a CouchbaseBackup resource.
 
@@ -30,18 +33,7 @@ Cannot be updated.
 In CamelCase.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
 
-== couchbasebackuprestores.metadata
-
-=== Constraints
-
-*Required*
-
-*Type*: `object`
-
-=== Description
-
-Standard object metadata as defined for all Kubernetes types.
-For additional details see the https://kubernetes.io/docs/concepts/overview/working-with-objects/[Kubernetes reference documentation^].
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasebackuprestore]
 
 == couchbasebackuprestores.spec
 
