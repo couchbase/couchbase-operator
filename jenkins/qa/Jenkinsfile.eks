@@ -297,6 +297,7 @@ pipeline {
   post {
     always {
       dir("./test/e2e/resources/provisioners/eks") {
+        sh "terraform refresh -no-color"
         sh "terraform destroy -var peering=true -var kubernetes-version=\"${params.kubernetes_version}\" -auto-approve -no-color"
       }
       cleanWs()
