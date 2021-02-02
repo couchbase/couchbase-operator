@@ -57,8 +57,8 @@ pipeline {
   environment {
     GOVERSION = '1.13.3'
     GOROOT = "${env.WORKSPACE}/go"
-    KUBECTL_DIR = "${WORKSPACE}/kubectl"
-    PATH = "${WORKSPACE}/kubectl:${env.WORKSPACE}/go/bin:$PATH"
+    KUBECTL_DIR = "${env.WORKSPACE}/kubectl"
+    PATH = "${env.WORKSPACE}/kubectl:${env.WORKSPACE}/go/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
     S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
@@ -97,11 +97,24 @@ pipeline {
       }
     }
 
+    stage('Install Terraform') {
+      steps {
+        sh "mkdir -p ${env.WORKSPACE}/bin"
+        sh 'wget -q https://releases.hashicorp.com/terraform/0.14.4/terraform_0.14.4_linux_amd64.zip'
+        sh 'unzip terraform_0.14.4_linux_amd64.zip'
+        sh "mv terraform ${env.WORKSPACE}/bin"
+      }
+    }
+
     stage('EKS Provisioning') {
       steps {
-        sh "./test/e2e/resources/provisioners/eks/eks_setup start arn:aws:iam::516524556673:role/eksServiceRole --name ${env.NAME} --two True -k ${params.kubernetes_version}"
-        sh "aws eks update-kubeconfig --name ${env.NAME}1 --kubeconfig ${env.WORKSPACE}/config1"
-        sh "aws eks update-kubeconfig --name ${env.NAME}2 --kubeconfig ${env.WORKSPACE}/config2"
+        dir("./test/e2e/resources/provisioners/eks") {
+          sh 'terraform init -no-color -input=false'
+          sh "terraform apply -var kubernetes-version=\"${params.kubernetes_version}\" -auto-approve -no-color"
+          sh "terraform apply -var kubernetes-version=\"${params.kubernetes_version}\" -var peering=true -auto-approve -no-color"
+          sh "terraform output -raw kubeconfig1 > ${env.WORKSPACE}/config1"
+          sh "terraform output -raw kubeconfig2 > ${env.WORKSPACE}/config2"
+        }
       }
     }
 
@@ -284,7 +297,10 @@ pipeline {
 
   post {
     always {
-      sh "./test/e2e/resources/provisioners/eks/eks_setup stop arn:aws:iam::516524556673:role/eksServiceRole --name ${env.NAME} --two True -k ${params.kubernetes_version}"
+      dir("./test/e2e/resources/provisioners/eks") {
+        sh "terraform refresh -no-color"
+        sh "terraform destroy -var peering=true -var kubernetes-version=\"${params.kubernetes_version}\" -auto-approve -no-color"
+      }
       cleanWs()
     }
   }

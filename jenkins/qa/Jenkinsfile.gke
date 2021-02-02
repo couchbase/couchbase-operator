@@ -38,7 +38,7 @@ pipeline {
     string(name: 'exporter_image_upgrade', defaultValue: 'registry.gitlab.com/cb-vanilla/exporter:1.0.3-102')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.7.3-enterprise')
     string(name: 'platform', defaultValue: 'kubernetes')
-    string(name: 'kubernetes_version', defaultValue: '1.17.12-gke.1501')
+    string(name: 'kubernetes_version', defaultValue: '1.17')
     string(name: 'storage_class', defaultValue: 'dynamic-bound')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
