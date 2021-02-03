@@ -68,6 +68,9 @@ func Execute() {
 	// 'cbopcfg' is the top level command.
 	root := &cobra.Command{
 		Use: "cbopcfg",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return checkAPIVersions(flags)
+		},
 	}
 
 	flags.AddFlags(root.PersistentFlags())

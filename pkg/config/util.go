@@ -3,9 +3,10 @@ package config
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/couchbase/couchbase-operator/pkg/version"
+	cbversion "github.com/couchbase/couchbase-operator/pkg/version"
 
 	"github.com/ghodss/yaml"
 
@@ -13,9 +14,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+)
+
+const (
+	// matrixLink help users self heal...
+	matrixLink = "https://docs.couchbase.com/operator/current/prerequisite-and-setup.html"
 )
 
 // getDynamicClient returns the bits required for dynamic client operations, the client
@@ -75,7 +82,7 @@ func convertToUnstructured(objects []runtime.Object) ([]*unstructured.Unstructur
 			annotations = map[string]string{}
 		}
 
-		annotations[versionAnnotation] = version.Version
+		annotations[versionAnnotation] = cbversion.Version
 
 		u.SetAnnotations(annotations)
 
@@ -218,4 +225,121 @@ func normalize(s string) string {
 	}
 
 	return strings.Join(formatted, "\n")
+}
+
+// extractVersion gets major/minor version information from the API.
+func extractVersion(v *version.Info) (int, int, error) {
+	major, err := strconv.Atoi(v.Major)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	minor, err := strconv.Atoi(v.Minor)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return major, minor, nil
+}
+
+// versionLessThan tests if a version is less than a target.
+func versionLessThan(target, actual *version.Info) (bool, error) {
+	// These chords play a magical unicorn tune...
+	amaj, amin, err := extractVersion(actual)
+	if err != nil {
+		return false, err
+	}
+
+	tmaj, tmin, err := extractVersion(target)
+	if err != nil {
+		return false, err
+	}
+
+	if amaj < tmaj {
+		return true, nil
+	}
+
+	if amaj > tmaj {
+		return false, nil
+	}
+
+	return amin < tmin, nil
+}
+
+// versionGreaterThan tests if a version is greater than a target.
+func versionGreaterThan(target, actual *version.Info) (bool, error) {
+	// These chords play a magical unicorn tune...
+	amaj, amin, err := extractVersion(actual)
+	if err != nil {
+		return false, err
+	}
+
+	tmaj, tmin, err := extractVersion(target)
+	if err != nil {
+		return false, err
+	}
+
+	if amaj > tmaj {
+		return true, nil
+	}
+
+	if amaj < tmaj {
+		return false, nil
+	}
+
+	return amin > tmin, nil
+}
+
+// checkAPIVersions checks supportaiblity of the cluster now we have access to the API.
+func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
+	discovery, err := flags.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+
+	v, err := discovery.ServerVersion()
+	if err != nil {
+		return err
+	}
+
+	// Note: these should be updated every release.
+	technicalLowerBound := &version.Info{Major: "1", Minor: "17"}
+	supportedLowerBound := &version.Info{Major: "1", Minor: "17"}
+	supportedUpperBound := &version.Info{Major: "1", Minor: "20"}
+
+	// You shall not pass!!  AKA don't waste our time.
+	ok, err := versionLessThan(technicalLowerBound, v)
+	if err != nil {
+		// Ignore errors, we don't want to stop people from doing things if it doesn't work.
+		return nil
+	}
+
+	if ok {
+		return fmt.Errorf("platform version %s too old to run Operator version", v)
+	}
+
+	// You're doing something risky!! Do it by all means, but if support see it...
+	ok, err = versionLessThan(supportedLowerBound, v)
+	if err != nil {
+		// Ignore errors, we don't want to stop people from doing things if it doesn't work.
+		return nil
+	}
+
+	if ok {
+		// https://en.wikipedia.org/wiki/ANSI_escape_code
+		fmt.Println("\033[1;33mWarning\033[0m: platform version", v, "is unsupported (too old), check", matrixLink, "for current support and versioning information")
+	}
+
+	ok, err = versionGreaterThan(supportedUpperBound, v)
+	if err != nil {
+		// Ignore errors, we don't want to stop people from doing things if it doesn't work.
+		return nil
+	}
+
+	if ok {
+		// https://en.wikipedia.org/wiki/ANSI_escape_code
+		fmt.Println("\033[1;33mWarning\033[0m: platform version", v, "is unsupported (too new), check", matrixLink, "current support and versioning information")
+	}
+
+	return nil
 }
