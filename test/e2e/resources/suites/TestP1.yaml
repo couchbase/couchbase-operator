@@ -38,17 +38,22 @@ testcases:
 - TestNegPodResourcesBasic
 
 # TLS Tests
-- TestTlsRemoveOperatorCertificateAndAddBack
-- TestTlsRemoveClusterCertificateAndAddBack
-- TestTlsRemoveOperatorCertificateAndResizeCluster
-- TestTlsRemoveClusterCertificateAndResizeCluster
-- TestTlsNegRSACertificateDnsName
-- TestTlsCertificateExpiry
-- TestTlsNegCertificateExpiredBeforeDeployment
-- TestTlsCertificateDeployedBeforeValidity
-- TestTlsGenerateWrongCACertType
+- TestTLSRemoveOperatorCertificateAndAddBack
+- TestTLSRemoveClusterCertificateAndAddBack
+- TestTLSRemoveOperatorCertificateAndResizeCluster
+- TestTLSRemoveClusterCertificateAndResizeCluster
+- TestTLSNegRSACertificateDnsName
+- TestTLSCertificateExpiry
+- TestTLSNegCertificateExpiredBeforeDeployment
+- TestTLSCertificateDeployedBeforeValidity
+- TestTLSGenerateWrongCACertType
 - TestTLSRotateCAAndScale
 - TestTLSRotateCAAndKillOperator
+- TestTLSRotateWithShadowing
+- TestTLSRotateCAWithShadowing
+- TestMutualTLSCreateClusterWithShadowing
+- TestMutualTLSRotateClientWithShadowing
+- TestMutualTLSRotateCAWithShadowing
 
 # Supportable TLS Tests
 - TestTLSRotateCAKillPodAndKillOperator

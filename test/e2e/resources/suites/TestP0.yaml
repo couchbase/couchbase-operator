@@ -46,8 +46,8 @@ testcases:
 - TestKillOperatorAndUpdateClusterConfig
 
 # TLS Tests
-- TestTlsKillClusterNode
-- TestTlsResizeCluster
+- TestTLSKillClusterNode
+- TestTLSResizeCluster
 - TestTLSRotate
 - TestTLSRotateChain
 - TestTLSRotateCA

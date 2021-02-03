@@ -20,7 +20,7 @@ import (
 
 // Create couchbase cluster over TLS certificates
 // Check TLS handshake is successful with all nodes.
-func TestTlsCreateCluster(t *testing.T) {
+func TestTLSCreateCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -83,7 +83,7 @@ func TestTLSCreateClusterWithShadowing(t *testing.T) {
 // node goes down immediately after the add & before the rebalance.
 // Expects: autofailover of down node occurs and a replacement node is added
 // Check TLS handshake is successful with all nodes.
-func TestTlsKillClusterNode(t *testing.T) {
+func TestTLSKillClusterNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -135,7 +135,7 @@ func TestTlsKillClusterNode(t *testing.T) {
 // Create Couchbase cluster using certificates.
 // Resize cluster to different sizes in loop.
 // Check TLS handshake is successful with all cluster nodes.
-func TestTlsResizeCluster(t *testing.T) {
+func TestTLSResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -177,7 +177,7 @@ func TestTlsResizeCluster(t *testing.T) {
 // Delete the operator secret and kill a node from cluster.  The cluster should
 // raise an invalid TLS event.
 // Add the operator certificate back and check new node addition is successful.
-func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
+func TestTLSRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -223,10 +223,10 @@ func TestTlsRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestTlsRemoveOperatorCertificateAndResizeCluster removes the CA certificate
+// TestTLSRemoveOperatorCertificateAndResizeCluster removes the CA certificate
 // expects the operator to raise an invalid TLS error and be able to provision
 // new pods once the CA cert is restorred.
-func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
+func TestTLSRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -273,7 +273,7 @@ func TestTlsRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 // Deploy cluster using valid TLS certificates.
 // Remove the cluster certificate from the cluster and kill one of the cluster pod.
 // The cluster should raise a TLS invalid event, then reconcile once the valid cluster certificate is available.
-func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
+func TestTLSRemoveClusterCertificateAndAddBack(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -320,7 +320,7 @@ func TestTlsRemoveClusterCertificateAndAddBack(t *testing.T) {
 
 // Deploy cluster using valid TLS certificates.
 // Remove the cluster certificate from the cluster and scale up the cluster.
-func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
+func TestTLSRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -366,7 +366,7 @@ func TestTlsRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 
 // Deploy cluster using invalid DNS name value in the certificate.
 // Cluster creation should fail due to the invalid DNS value.
-func TestTlsNegRSACertificateDnsName(t *testing.T) {
+func TestTLSNegRSACertificateDnsName(t *testing.T) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
@@ -388,7 +388,7 @@ func TestTlsNegRSACertificateDnsName(t *testing.T) {
 // Cluster creation will be successful.
 // Wait for certificate to expire and try to scale up the cluster.
 // Cluster scaling will fail due to new pod creation failure.
-func TestTlsCertificateExpiry(t *testing.T) {
+func TestTLSCertificateExpiry(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -427,7 +427,7 @@ func TestTlsCertificateExpiry(t *testing.T) {
 
 // Deploy a couchbase cluster using a expired TLS certificate.
 // Cluster creation should fail.
-func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
+func TestTLSNegCertificateExpiredBeforeDeployment(t *testing.T) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
@@ -449,7 +449,7 @@ func TestTlsNegCertificateExpiredBeforeDeployment(t *testing.T) {
 
 // Deploy the cluster using the certificate which is not yet valid.
 // Cluster creation should not happen until the validity time crosses the current time.
-func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
+func TestTLSCertificateDeployedBeforeValidity(t *testing.T) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
@@ -467,7 +467,7 @@ func TestTlsCertificateDeployedBeforeValidity(t *testing.T) {
 
 // Create a couchbase cluster using the wrong CA certificate type.
 // Cluster deployment should fail.
-func TestTlsGenerateWrongCACertType(t *testing.T) {
+func TestTLSGenerateWrongCACertType(t *testing.T) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
@@ -486,7 +486,7 @@ func TestTlsGenerateWrongCACertType(t *testing.T) {
 
 // Create a couchbase cluster using the wrong certificate type.
 // Cluster deployment should fail.
-func TestTlsGenerateWrongCertType(t *testing.T) {
+func TestTLSGenerateWrongCertType(t *testing.T) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
@@ -504,7 +504,7 @@ func TestTlsGenerateWrongCertType(t *testing.T) {
 
 // TestTLSRotate tests a certificate can be reissued by a CA.
 // * Ensures new certifcate is loaded from the inbox on update.
-func TestTLSRotate(t *testing.T) {
+func testTLSRotate(t *testing.T, opts *e2eutil.TLSOpts) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -515,7 +515,7 @@ func TestTLSRotate(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, clusterSize, ctx)
 
 	// When the cluster is ready, swap out the old certificate for a new one and verify
@@ -535,6 +535,16 @@ func TestTLSRotate(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestTLSRotate(t *testing.T) {
+	testTLSRotate(t, &e2eutil.TLSOpts{})
+}
+
+func TestTLSRotateWithShadowing(t *testing.T) {
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+
+	testTLSRotate(t, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
 }
 
 // TestTLSRotateChain tests a certificate can be reissued by a CA with a new sub-CA.
@@ -575,7 +585,7 @@ func TestTLSRotateChain(t *testing.T) {
 
 // TestTLSRotateCA tests a certificate and CA can be reissued.
 // * Ensures a new PKI is loaded from the inbox and the cluster CA updated.
-func TestTLSRotateCA(t *testing.T) {
+func testTLSRotateCA(t *testing.T, opts *e2eutil.TLSOpts) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -586,7 +596,7 @@ func TestTLSRotateCA(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster with a valid 1 deep certificate chain.
-	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 
 	cluster := e2eutil.MustNewTLSClusterBasic(t, kubernetes, clusterSize, ctx)
 
@@ -613,6 +623,16 @@ func TestTLSRotateCA(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestTLSRotateCA(t *testing.T) {
+	testTLSRotateCA(t, &e2eutil.TLSOpts{})
+}
+
+func TestTLSRotateCAWithShadowing(t *testing.T) {
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+
+	testTLSRotateCA(t, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
 }
 
 // TestTLSRotateCAAndScale tests the operator can talk to a cluster after
@@ -836,7 +856,7 @@ func skipMutualTLSCheck(t *testing.T) {
 }
 
 // testMutualTLSCreateCluster ensures a cluster can be created with mTLS enabled.
-func testMutualTLSCreateCluster(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
+func testMutualTLSCreateCluster(t *testing.T, policy couchbasev2.ClientCertificatePolicy, opts *e2eutil.TLSOpts) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -849,7 +869,7 @@ func testMutualTLSCreateCluster(t *testing.T, policy couchbasev2.ClientCertifica
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 	cluster := e2eutil.MustNewMutualTLSClusterBasic(t, kubernetes, clusterSize, ctx, policy)
 
 	// When the cluster is healthy, check the TLS is correctly configured.
@@ -865,11 +885,19 @@ func testMutualTLSCreateCluster(t *testing.T, policy couchbasev2.ClientCertifica
 }
 
 func TestMutualTLSCreateCluster(t *testing.T) {
-	testMutualTLSCreateCluster(t, couchbasev2.ClientCertificatePolicyEnable)
+	testMutualTLSCreateCluster(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{})
 }
 
 func TestMandatoryMutualTLSCreateCluster(t *testing.T) {
-	testMutualTLSCreateCluster(t, couchbasev2.ClientCertificatePolicyMandatory)
+	testMutualTLSCreateCluster(t, couchbasev2.ClientCertificatePolicyMandatory, &e2eutil.TLSOpts{})
+}
+
+// TestMutualTLSCreateClusterWithShadowing tests deploying a cluster with standard names
+// in the TLS secret, using mutual TLS.
+func TestMutualTLSCreateClusterWithShadowing(t *testing.T) {
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+
+	testMutualTLSCreateCluster(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
 }
 
 // testMutualTLSEnable tests mTLS can be enabled on a TLS cluster.
@@ -975,7 +1003,7 @@ func TestMandatoryMutualTLSDisable(t *testing.T) {
 }
 
 // testMutualTLSRotateClient ensures we can rotate the operator client certificate.
-func testMutualTLSRotateClient(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
+func testMutualTLSRotateClient(t *testing.T, policy couchbasev2.ClientCertificatePolicy, opts *e2eutil.TLSOpts) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -988,7 +1016,7 @@ func testMutualTLSRotateClient(t *testing.T, policy couchbasev2.ClientCertificat
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 	cluster := e2eutil.MustNewMutualTLSClusterBasic(t, kubernetes, clusterSize, ctx, policy)
 
 	// Rotate the certificate and ensure the cluster still works.
@@ -1011,11 +1039,17 @@ func testMutualTLSRotateClient(t *testing.T, policy couchbasev2.ClientCertificat
 }
 
 func TestMutualTLSRotateClient(t *testing.T) {
-	testMutualTLSRotateClient(t, couchbasev2.ClientCertificatePolicyEnable)
+	testMutualTLSRotateClient(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{})
 }
 
 func TestMandatoryMutualTLSRotateClient(t *testing.T) {
-	testMutualTLSRotateClient(t, couchbasev2.ClientCertificatePolicyMandatory)
+	testMutualTLSRotateClient(t, couchbasev2.ClientCertificatePolicyMandatory, &e2eutil.TLSOpts{})
+}
+
+func TestMutualTLSRotateClientWithShadowing(t *testing.T) {
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+
+	testMutualTLSRotateClient(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
 }
 
 // testMutualTLSRotateClientChain ensure we can rotate operator client certificate and
@@ -1064,7 +1098,7 @@ func TestMandatoryMutualTLSRotateClientChain(t *testing.T) {
 }
 
 // testMutualTLSRotateCA ensures we can rotate eveything.
-func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePolicy) {
+func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePolicy, opts *e2eutil.TLSOpts) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -1077,7 +1111,7 @@ func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePol
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 	cluster := e2eutil.MustNewMutualTLSClusterBasic(t, kubernetes, clusterSize, ctx, policy)
 
 	// Rotate the certificate and ensure the cluster still works.
@@ -1110,11 +1144,17 @@ func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePol
 }
 
 func TestMutualTLSRotateCA(t *testing.T) {
-	testMutualTLSRotateCA(t, couchbasev2.ClientCertificatePolicyEnable)
+	testMutualTLSRotateCA(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{})
 }
 
 func TestMandatoryMutualTLSRotateCA(t *testing.T) {
-	testMutualTLSRotateCA(t, couchbasev2.ClientCertificatePolicyMandatory)
+	testMutualTLSRotateCA(t, couchbasev2.ClientCertificatePolicyMandatory, &e2eutil.TLSOpts{})
+}
+
+func TestMutualTLSRotateCAWithShadowing(t *testing.T) {
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+
+	testMutualTLSRotateCA(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
 }
 
 // testMutualTLSRotateClientChain ensure we can rotate operator client certificate and

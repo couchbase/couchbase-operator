@@ -33,8 +33,8 @@ testcases:
 # RecoveryTests
 - TestRecoveryAfterOnePodFailureNoBucket
 
-# TlsTests
-- TestTlsCreateCluster
+# TLSTests
+- TestTLSCreateCluster
 
 # XdcrTests
 - TestXdcrCreateCluster
@@ -69,7 +69,7 @@ testcases:
 - TestKillOperatorAndUpdateClusterConfig
 
 # TLS case
-- TestTlsResizeCluster
+- TestTLSResizeCluster
 - TestTLSRotateCA
 - TestMutualTLSCreateCluster
 - TestMutualTLSEnable
@@ -130,8 +130,8 @@ testcases:
 # RecoveryTests
 - TestNodeRecoveryAfterMemberAdd
 
-# TlsTests
-- TestTlsRemoveOperatorCertificateAndAddBack
+# TLSTests
+- TestTLSRemoveOperatorCertificateAndAddBack
 - TestTLSRotateCAAndKillOperator
 
 # XdcrCases

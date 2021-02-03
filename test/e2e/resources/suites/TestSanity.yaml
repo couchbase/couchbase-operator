@@ -21,8 +21,8 @@ testcases:
 - TestAntiAffinityOn
 - TestPodResourcesBasic
 
-# TlsTests
-- TestTlsCreateCluster
+# TLSTests
+- TestTLSCreateCluster
 - TestMutualTLSCreateCluster
 
 # XdcrTests
