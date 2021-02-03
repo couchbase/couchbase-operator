@@ -274,10 +274,28 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 
 	// Referenced object validation
 	if v.Options.ValidateSecrets {
-		if secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret); err != nil {
+		secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret)
+
+		switch {
+		case err != nil:
 			errs = append(errs, err)
-		} else if secret == nil {
+		case secret == nil:
 			errs = append(errs, fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", customResource.Spec.Security.AdminSecret))
+		default:
+			if _, ok := secret.Data["username"]; !ok {
+				errs = append(errs, fmt.Errorf("spec.security.adminSecret must contain \"username\" key"))
+			}
+
+			if value, ok := secret.Data["password"]; !ok {
+				errs = append(errs, fmt.Errorf("spec.security.adminSecret must contain \"password\" key"))
+			} else {
+				if len(value) < 6 {
+					errs = append(errs, errors.TooShort("password", "spec.security.adminSecret", 6))
+				}
+				if strings.ContainsAny(string(value), `()<>,;:\"/[]?={}`) {
+					errs = append(errs, fmt.Errorf(`password in spec.security.adminSecret must not contain any of the following characters ()<>,;:\"/[]?={}`))
+				}
+			}
 		}
 	}
 

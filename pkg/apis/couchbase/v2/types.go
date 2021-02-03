@@ -1325,9 +1325,14 @@ type LDAPUserDNMapping struct {
 
 type CouchbaseClusterSecuritySpec struct {
 	// AdminSecret is the name of a Kubernetes secret to use for administrator authentication.
+	// The admin secret must contain the keys "username" and "password".  The password data
+	// must be at least 6 characters in length, and not contain the any of the characters
+	// `()<>,;:\"/[]?={}`.
 	AdminSecret string `json:"adminSecret"`
+
 	// Couchbase RBAC Users
 	RBAC RBAC `json:"rbac,omitempty"`
+
 	// LDAP Settings
 	LDAP *CouchbaseClusterLDAPSpec `json:"ldap,omitempty"`
 }
