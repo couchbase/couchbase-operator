@@ -42,37 +42,43 @@ var (
 func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
 	var patch jsonpatch.PatchList
 
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
-	}
+	// SM: This may not actually be needed any more on OCP.  I say may, as I don't trust
+	// customers, however, I think it prudent to make this behaviour optional so support
+	// can turn it off if it becomes a problem.  It has certainly prevented a lot of
+	// support cases in the past few years!
+	if v.Options.DefaultFileSystemGroup {
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
+		}
 
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
-		fsgroup := defaultFSGroup
+		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
+			fsgroup := defaultFSGroup
 
-		// OCP specific hack, set the fsGroup to that defined in the namespace.
-		// Otherwise default to the default for the dockerhub container.
-		namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
-		if !apierrors.IsForbidden(err) {
-			if namespace.Annotations != nil {
-				if groups, ok := namespace.Annotations["openshift.io/sa.scc.supplemental-groups"]; ok {
-					// This may either look like 1000140000/10000
-					// or 1000140000-1000150000, just pick the first
-					// group.
-					i := strings.Index(groups, "-")
-					if i == -1 {
-						i = strings.Index(groups, "/")
-					}
+			// OCP specific hack, set the fsGroup to that defined in the namespace.
+			// Otherwise default to the default for the dockerhub container.
+			namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
+			if !apierrors.IsForbidden(err) {
+				if namespace.Annotations != nil {
+					if groups, ok := namespace.Annotations["openshift.io/sa.scc.supplemental-groups"]; ok {
+						// This may either look like 1000140000/10000
+						// or 1000140000-1000150000, just pick the first
+						// group.
+						i := strings.Index(groups, "-")
+						if i == -1 {
+							i = strings.Index(groups, "/")
+						}
 
-					if i != -1 {
-						if val, err := strconv.Atoi(groups[:i]); err == nil {
-							fsgroup = val
+						if i != -1 {
+							if val, err := strconv.Atoi(groups[:i]); err == nil {
+								fsgroup = val
+							}
 						}
 					}
 				}
 			}
-		}
 
-		patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: fsgroup})
+			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: fsgroup})
+		}
 	}
 
 	if managedBackup, found, _ := unstructured.NestedBool(object.Object, "spec", "backup", "managed"); found && managedBackup {

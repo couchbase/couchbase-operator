@@ -105,6 +105,9 @@ type Config struct {
 
 	// ValidateStorageClasses allows opt-in to read/validate secrets.
 	ValidateStorageClasses bool
+
+	// DefaultFileSystemGroup allows opt-in to fs group defaulting.
+	DefaultFileSystemGroup bool
 }
 
 // addFlags parses command line parameters and adds them to a Config object.
@@ -120,6 +123,8 @@ func (c *Config) AddFlags() {
 		"Validate referenced secrets")
 	flag.BoolVar(&c.ValidateStorageClasses, "validate-storage-classes", true, ""+
 		"Validate referenced storage classes")
+	flag.BoolVar(&c.DefaultFileSystemGroup, "default-file-system-group", true, ""+
+		"Default file system group information")
 }
 
 // errorResponse takes an error and creates an admission response.
@@ -197,6 +202,7 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 	options := &types.ValidatorOptions{
 		ValidateSecrets:        config.ValidateSecrets,
 		ValidateStorageClasses: config.ValidateStorageClasses,
+		DefaultFileSystemGroup: config.DefaultFileSystemGroup,
 	}
 
 	// Check that the CouchbaseCluster is correctly configured
@@ -235,6 +241,7 @@ func couchbaseClustersMutate(config *Config, ar admissionv1.AdmissionReview) *ad
 	options := &types.ValidatorOptions{
 		ValidateSecrets:        config.ValidateSecrets,
 		ValidateStorageClasses: config.ValidateStorageClasses,
+		DefaultFileSystemGroup: config.DefaultFileSystemGroup,
 	}
 
 	patch := validator.ApplyDefaults(validator.New(getClient(), getCouchbaseClient(), options), object)

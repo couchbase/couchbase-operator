@@ -51,6 +51,9 @@ type generateAdmissionOptions struct {
 	// validateStorageClasses causes the validation of storage classes.
 	validateStorageClasses bool
 
+	// defaultFileSystemGroup causes the fsGroup to be filled in.
+	defaultFileSystemGroup bool
+
 	// logLevel allows the setting of the logging level.
 	logLevel admissionLogLevelVar
 }
@@ -120,6 +123,7 @@ func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Co
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
 	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
+	cmd.Flags().BoolVar(&o.defaultFileSystemGroup, "default-file-system-group", true, "Fills in default file system group information on Couchbase volumes")
 
 	return cmd
 }
@@ -189,6 +193,7 @@ func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
 	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
+	cmd.Flags().BoolVar(&o.defaultFileSystemGroup, "default-file-system-group", true, "Fills in default file system group information on Couchbase volumes")
 
 	return cmd
 }
@@ -239,6 +244,15 @@ func (o *generateAdmissionOptions) validate() error {
 		return fmt.Errorf("dynamic admission controller with namespace scope requires the --namespace-selector flag")
 	}
 
+	// When namespaced, we cannot access namespaces or storage classes
+	// (or any cluster scoped resource for that matter) so force these
+	// to false to cause the role to never be added, and the DAC not to
+	// bother checking them.
+	if o.scope.value.isNamespaceScope() {
+		o.validateStorageClasses = false
+		o.defaultFileSystemGroup = false
+	}
+
 	return nil
 }
 
@@ -280,10 +294,10 @@ func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags
 
 	resources := []runtime.Object{
 		GetAdmissionServiceAccount(),
-		GetAdmissionRole(o.scope.value.isClusterScope(), o.validateSecrets, o.validateStorageClasses),
+		GetAdmissionRole(o.scope.value.isClusterScope(), o.validateSecrets, o.validateStorageClasses, o.defaultFileSystemGroup),
 		GetAdmissionRoleBinding(namespace, o.scope.value.isClusterScope()),
 		GetAdmissionSecret(key, cert),
-		GetAdmissionDeployment(o.image, o.imagePullSecret.imagePullSecrets, o.validateSecrets, o.validateStorageClasses, o.logLevel.value),
+		GetAdmissionDeployment(o.image, o.imagePullSecret.imagePullSecrets, o.validateSecrets, o.validateStorageClasses, o.defaultFileSystemGroup, o.logLevel.value),
 		GetAdmissionService(),
 		GetAdmissionMutatingWebhook(namespace, ca.Certificate, o.scope.value.isClusterScope(), o.namespaceSelector.LabelSelector),
 		GetAdmissionValidatingWebhook(namespace, ca.Certificate, o.scope.value.isClusterScope(), o.namespaceSelector.LabelSelector),
@@ -293,7 +307,7 @@ func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags
 }
 
 // GetAdmissionRole return the (cluster) role to run with.
-func GetAdmissionRole(cluster, validateSecrets, validateStorageClasses bool) runtime.Object {
+func GetAdmissionRole(cluster, validateSecrets, validateStorageClasses, defaultFileSystemGroup bool) runtime.Object {
 	metadata := metav1.ObjectMeta{
 		Name: AdmissionResourceName,
 	}
@@ -337,17 +351,19 @@ func GetAdmissionRole(cluster, validateSecrets, validateStorageClasses bool) run
 	}
 
 	if cluster {
-		rules = append(rules, rbacv1.PolicyRule{
-			APIGroups: []string{
-				"",
-			},
-			Resources: []string{
-				"namespaces",
-			},
-			Verbs: []string{
-				"get",
-			},
-		})
+		if defaultFileSystemGroup {
+			rules = append(rules, rbacv1.PolicyRule{
+				APIGroups: []string{
+					"",
+				},
+				Resources: []string{
+					"namespaces",
+				},
+				Verbs: []string{
+					"get",
+				},
+			})
+		}
 
 		if validateStorageClasses {
 			rules = append(rules, rbacv1.PolicyRule{
@@ -435,7 +451,7 @@ func GetAdmissionSecret(key, cert []byte) *corev1.Secret {
 }
 
 // GetAdmissionDeployment returns the canonical deployment for the admission controller.
-func GetAdmissionDeployment(image string, imagePullSecrets []string, validateSecrets, validateStorageClasses bool, logLevel string, extraArgs ...string) *appsv1.Deployment {
+func GetAdmissionDeployment(image string, imagePullSecrets []string, validateSecrets, validateStorageClasses, defaultFileSystemGroup bool, logLevel string, extraArgs ...string) *appsv1.Deployment {
 	replicas := int32(1)
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -471,6 +487,7 @@ func GetAdmissionDeployment(image string, imagePullSecrets []string, validateSec
 								"-tls-private-key-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-private-key-file",
 								"-validate-secrets=" + strconv.FormatBool(validateSecrets),
 								"-validate-storage-classes=" + strconv.FormatBool(validateStorageClasses),
+								"-default-file-system-group=" + strconv.FormatBool(defaultFileSystemGroup),
 							},
 							Ports: []corev1.ContainerPort{
 								{

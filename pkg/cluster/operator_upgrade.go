@@ -1,18 +1,7 @@
 package cluster
 
 import (
-	"context"
-	"encoding/json"
-
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/validator"
-	"github.com/couchbase/couchbase-operator/pkg/version"
-
-	jsonpatch "github.com/evanphx/json-patch"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // upgradeRange specifies the range of versions to apply an upgrade action to.
@@ -72,64 +61,10 @@ type upgradableResource interface {
 // it iterates through each discoverred item attempting to apply upgrade actions.  Once
 // complete it will commit upgraded items back to Kubernetes to persist the upgrades.
 func (c *Cluster) operatorUpgrade() error {
-	// Get the most up to date version, we may have updated something since starting...
-	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(context.Background(), c.cluster.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	// If we go to/from JSON space for patching, then we need to add in explicit
-	// type information so the scheme can be determined.
-	cluster.TypeMeta = metav1.TypeMeta{
-		APIVersion: couchbasev2.Group,
-		Kind:       couchbasev2.ClusterCRDResourceKind,
-	}
-
-	// Check first whether any new defaults need applying to the existing cluster.
-	data, err := json.Marshal(cluster)
-	if err != nil {
-		return err
-	}
-
-	unstructuredCluster := &unstructured.Unstructured{}
-	if err := json.Unmarshal(data, unstructuredCluster); err != nil {
-		return err
-	}
-
-	v := validator.New(c.k8s.KubeClient, c.k8s.CouchbaseClient, nil)
-	if patches := validator.ApplyDefaults(v, unstructuredCluster); patches != nil {
-		log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", cluster.Kind, "name", cluster.Name, "version", version.Version, "patch", patches)
-
-		patchRaw, err := json.Marshal(patches)
-		if err != nil {
-			return err
-		}
-
-		patch, err := jsonpatch.DecodePatch(patchRaw)
-		if err != nil {
-			return err
-		}
-
-		patchedData, err := patch.Apply(data)
-		if err != nil {
-			return err
-		}
-
-		cluster := &couchbasev2.CouchbaseCluster{}
-		if err := json.Unmarshal(patchedData, cluster); err != nil {
-			return err
-		}
-
-		if cluster, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), cluster, metav1.UpdateOptions{}); err != nil {
-			return err
-		}
-
-		c.cluster = cluster
-	}
-
 	resources := []upgradableResource{
 		newPodUpgradableResource(c),
 	}
+
 	for _, resource := range resources {
 		if err := resource.fetch(); err != nil {
 			return err

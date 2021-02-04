@@ -198,6 +198,10 @@ type ValidatorOptions struct {
 
 	// Check whether referenced storage classes exist.
 	ValidateStorageClasses bool
+
+	// Fill in the default fs group for a pod in order to write persistent
+	// volumes.
+	DefaultFileSystemGroup bool
 }
 
 // Validator is an abstraction layer for communicating with kubernetes
