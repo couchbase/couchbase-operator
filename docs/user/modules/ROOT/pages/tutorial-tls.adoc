@@ -123,3 +123,7 @@ $ ./easyrsa build-client-full Administrator nopass
 
 The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `couchbase-operator.key` and `couchbase-operator.crt` respectively when specifying the `CouchbaseCluster` `spec.networking.tls.static.operatorSecret`.
 
+== Further reading
+
+* xref:howto-tls.adoc[How to configure TLS]
+
