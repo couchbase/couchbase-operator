@@ -11,6 +11,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	// versionAnnotation is used to flag who created resources e.g. us, and
+	// for what version.  This gives use the ability in future to reason about
+	// what needs doing to upgrade the operator...
+	versionAnnotation = "config.couchbase.com/version"
+)
+
 // ParseArgs parses command line arguments into a Config struct and executes the command.
 func Execute() {
 	flags := genericclioptions.NewConfigFlags(true)
