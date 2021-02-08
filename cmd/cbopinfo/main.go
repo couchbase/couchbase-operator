@@ -55,7 +55,7 @@ var (
 		{Resource: &corev1.Secret{}, Scope: resource.ScopeAll},
 		{Resource: &corev1.Service{}, Scope: resource.ScopeCluster},
 		{Resource: &corev1.ServiceAccount{}, Scope: resource.ScopeAll},
-		{Resource: &appsv1.Deployment{}, Scope: resource.ScopeAll},
+		{Resource: &appsv1.Deployment{}, Scope: resource.ScopeOperatorDeployment},
 		{Resource: &rbacv1.ClusterRole{}, Scope: resource.ScopeAll},
 		{Resource: &rbacv1.ClusterRoleBinding{}, Scope: resource.ScopeAll},
 		{Resource: &rbacv1.Role{}, Scope: resource.ScopeAll},

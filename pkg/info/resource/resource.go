@@ -97,6 +97,9 @@ const (
 
 	// ScopeCouchbaseGroup collects all, but filters on the resource name.
 	ScopeCouchbaseGroup Scope = "group"
+
+	// ScopeOperatorDeployment collects only the Operator deployment based on image name.
+	ScopeOperatorDeployment Scope = "operator"
 )
 
 // Collector defines types to collect and how to collect them.
@@ -194,6 +197,39 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 				}
 			case ScopeCouchbaseGroup:
 				if !strings.Contains(o.GetName(), "couchbase.com") {
+					continue NextObject
+				}
+			case ScopeOperatorDeployment:
+				// This scoping is a little more complex (ripe for deletion!).
+				// This scope should only be applied to deployments.  It will
+				// extract the containers from the pod template and only collect
+				// the resource if this container name matches that specified
+				// as a CLI flag.
+				containers, ok, _ := unstructured.NestedSlice(o.Object, "spec", "template", "spec", "containers")
+				if !ok {
+					continue NextObject
+				}
+
+				match := false
+
+				for _, c := range containers {
+					container, ok := c.(map[string]interface{})
+					if !ok {
+						continue NextObject
+					}
+
+					value, ok, _ := unstructured.NestedString(container, "image")
+					if !ok {
+						continue NextObject
+					}
+
+					if value == context.Config.OperatorImage {
+						match = true
+						break
+					}
+				}
+
+				if !match {
 					continue NextObject
 				}
 			}
