@@ -55,7 +55,7 @@ pipeline {
   environment {
     GOVERSION = '1.13.3'
     GOROOT = "${env.WORKSPACE}/go"
-    PATH = "${env.WORKSPACE}/go/bin:$PATH"
+    PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
     KUBECONFIG1 = credentials('openshift-cluster-1')
@@ -72,6 +72,15 @@ pipeline {
       }
     }
 
+    stage('Install  jq') {
+      steps {
+        sh "mkdir -p ${env.WORKSPACE}/bin"
+        sh 'wget -q https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
+        sh 'chmod +x jq-linux64'
+        sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
+      }
+    }
+
     stage('Set Build Description') {
       steps {
         script {
@@ -80,6 +89,14 @@ pipeline {
       }
     }
 
+    stage('Set Build Number') {
+      steps {
+        sh "docker pull ${params.operator_image}"
+        sh "docker run -i ${params.operator_image} /usr/local/bin/couchbase-operator --version 2>&1 | jq -c {version:'.version'}"
+        sh "docker rmi -f ${params.operator_image}"
+      }
+    }
+    
     stage('Post Checkout') {
       steps {
         sh 'make touch-generated'

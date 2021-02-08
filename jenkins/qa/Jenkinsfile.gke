@@ -59,7 +59,7 @@ pipeline {
     GOVERSION = '1.13.3'
     GOROOT = "${env.WORKSPACE}/go"
     KUBECTL_DIR = "${env.WORKSPACE}/kubectl"
-    PATH = "${env.WORKSPACE}/kubectl:${env.WORKSPACE}/google-cloud-sdk/bin:${env.WORKSPACE}/go/bin:$PATH"
+    PATH = "${env.WORKSPACE}/kubectl:${env.WORKSPACE}/bin:${env.WORKSPACE}/google-cloud-sdk/bin:${env.WORKSPACE}/go/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
     S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
@@ -80,6 +80,15 @@ pipeline {
           sh "wget -q https://storage.googleapis.com/kubernetes-release/release/v${params.kubectl_version}/bin/linux/amd64/kubectl"
           sh "chmod +x kubectl"
         }
+      }
+    }
+
+    stage('Install  jq') {
+      steps {
+        sh "mkdir -p ${env.WORKSPACE}/bin"
+        sh 'wget -q https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
+        sh 'chmod +x jq-linux64'
+        sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
       }
     }
 
@@ -112,6 +121,14 @@ pipeline {
       }
     }
 
+    stage('Set Build Number') {
+      steps {
+        sh "docker pull ${params.operator_image}"
+        sh "docker run -i ${params.operator_image} /usr/local/bin/couchbase-operator --version 2>&1 | jq -c {version:'.version'}"
+        sh "docker rmi -f ${params.operator_image}"
+      }
+    }
+    
     stage('Post Checkout') {
       steps {
         sh 'make touch-generated'

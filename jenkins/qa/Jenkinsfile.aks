@@ -110,6 +110,15 @@ pipeline {
         }
       }
     }
+
+    stage('Set Build Number') {
+      steps {
+        sh "docker pull ${params.operator_image}"
+        sh "docker run -i ${params.operator_image} /usr/local/bin/couchbase-operator --version 2>&1 | jq -c {version:'.version'}"
+        sh "docker rmi -f ${params.operator_image}"
+      }
+    }
+    
     stage('Post Checkout') {
       steps {
         sh 'make touch-generated'
