@@ -219,11 +219,10 @@ func (c *Cluster) newCluster() error {
 	// Spawn the janitor process which monitors persistent log volumes.
 	go newJanitor(c).run()
 
-	if err := c.setupAuth(); err != nil {
-		return err
-	}
-
-	if err := c.initCouchbaseClient(); err != nil {
+	// Load the most recent username, password and TLS data from either
+	// peristence, or the underlying secrets, and initialize a client for
+	// connection to Couchbase server.
+	if err := c.initClients(); err != nil {
 		return err
 	}
 
@@ -254,6 +253,10 @@ func (c *Cluster) create() error {
 	// Clear the persistent state for a new cluster, it may be doing DR and we need
 	// to go off the spec, not what is in memory.
 	if err := c.state.Clear(); err != nil {
+		return err
+	}
+
+	if err := c.initClients(); err != nil {
 		return err
 	}
 
@@ -313,13 +316,28 @@ func (c *Cluster) create() error {
 	// Notify that we have added a new member, this makes it callable.
 	c.clusterAddMember(m)
 
+	// Setup passwords, defaults, that kind of stuff.  It's unlikely that this
+	// can go wrong, you've probably bypassed the admission controller (naughty)...
+	if err := c.initMember(m, c.cluster.Spec.Servers[idx]); err != nil {
+		// ... if we fail to initialize the cluster, then chances are we won't be
+		// able to contact it and get stuck.  Like all pod creation/recreation code
+		// we should clean up and let retries potentially work, either as transient
+		// errors clear up, or the user unbreaks their bad configuration.
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(m.Name(), c.cluster))
+
+		// Remove the volumes too, we want to recreate them in case they are the
+		// problem.  They contain no data at this point.
+		if err := c.removePod(m.Name(), true); err != nil {
+			// Unlikely, print the error in scope, propagate the outer error.
+			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", err)
+		}
+
+		return err
+	}
+
 	log.Info("Operator added member", "cluster", c.namespacedName(), "name", m.Name())
 
 	c.raiseEvent(k8sutil.MemberAddEvent(m.Name(), c.cluster))
-
-	if err := c.initMember(m, c.cluster.Spec.Servers[idx]); err != nil {
-		return err
-	}
 
 	// This takes a while to get set, yawn...
 	var uuid string
@@ -765,6 +783,23 @@ func (c *Cluster) updateMemberStatusWithClusterInfo(ready, unready couchbaseutil
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
+}
+
+// initClients sets up communication with the Couchbase cluster.
+// This needs to be done on start up for existing clusters (loading the
+// most recent good credentials from the persistent secret), and every
+// time we attempt to recreate the cluster, as the password is cached
+// it needs to be refereshed incase it is updated.
+func (c *Cluster) initClients() error {
+	if err := c.setupAuth(); err != nil {
+		return err
+	}
+
+	if err := c.initCouchbaseClient(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Use username and password from secret store.
