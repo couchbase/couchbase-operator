@@ -4,9 +4,9 @@ These instructions describe how to setup a Kubernetes cluster on CentOS.
 
 == Overview
 
-Kubernetes is a cluster and orchestration engine for docker containers. In other words Kubernetes is  an open source software or tool which is used to orchestrate and manage docker containers in cluster environment. Kubernetes is also known as k8s and it was developed by Google and donated to "`Cloud Native Computing foundation`"
+Kubernetes is a cluster and orchestration engine for https://opencontainers.org/[OCI-compliant^] containers. In other words Kubernetes is an open source software or tool which is used to orchestrate and manage containers in a cluster environment. Kubernetes is also known as k8s and it was developed by Google and donated to "`Cloud Native Computing foundation`"
 
-In Kubernetes setup we have one master node and multiple nodes. Cluster nodes is known as worker node or Minion. From the master node we manage the cluster and its nodes using '`kubeadm`' and '`kubectl`'  command.
+In Kubernetes setup we have one or more master nodes and multiple other nodes. Cluster nodes are known as worker nodes or minions. From the master nodes we manage the cluster and its nodes using '`kubeadm`' and '`kubectl`'  command.
 
 Kubernetes can be installed and deployed using following methods:
 
@@ -14,7 +14,7 @@ Kubernetes can be installed and deployed using following methods:
 * Kops ( Multi node kubernetes setup into AWS )
 * Kubeadm ( Multi Node Cluster in our own premises)
 
-In this guide we will install latest version of Kubernetes on CentOS 7 / RHEL 7 with kubeadm utility. In my setup I am taking three CentOS 7 servers with minimal installation. One server will acts master node and rest two servers will be minion or worker nodes.
+In this guide we will install latest version of Kubernetes on CentOS 7 / RHEL 7 with kubeadm utility. In this setup we are taking three CentOS 7 servers with minimal installation. One server will act as a master node and the other two servers will be minion or worker nodes. The container runtime used will be docker.
 
 == The following components will be installed on the master node
 
@@ -26,9 +26,9 @@ etcd -- It is a Key value pair data base. It stores configuration data of cluste
 
 == The following components will be installed on the worker nodes
 
-* Kubelet -- It is an agent which runs on every worker node, it connects to docker  and takes care of creating, starting, deleting containers.
+* Kubelet -- It is an agent which runs on every worker node, it connects to the container runtime and takes care of creating, starting, deleting containers.
 * Kube-Proxy -- It routes the traffic to appropriate containers based on ip address and port number of the incoming request. In other words we can say it is used for port translation.
-* Pod -- Pod can be defined as a multi-tier or group of containers that are deployed on a single worker node or docker host.
+* Pod -- Pod can be defined as a multi-tier or group of containers that are deployed on a single worker node or container host.
 
 == Installations Steps of Kubernetes 1.7 on CentOS 7 / RHEL 7
 

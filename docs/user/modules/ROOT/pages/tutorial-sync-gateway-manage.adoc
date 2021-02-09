@@ -36,7 +36,7 @@ $ kubectl logs -f <pod_id>
 == Using `sgcollect_info`
 xref:sync-gateway::sgcollect_info.adoc[`sgcollect_info`] is a command line utility with detailed statistics for a specific Sync Gateway node.
 This tool must be run on each node individually.
-The `sgcollect_info` tool is bundled as part of the Sync Gateway docker image.
+The `sgcollect_info` tool is bundled as part of the Sync Gateway container image.
 You have two options on how to retrieve the logs from the Sync Gateway pods.
 
 === Option 1
@@ -113,7 +113,7 @@ $ kubectl cp <pod-id>:/home/sync_gateway/logs/* .
 This option is less secure than the option discussed in the previous section as it uses `kubectl exec` to trigger the execution of
 xref:sync-gateway::sgcollect_info.adoc[`sgcollect_info`] for a specific Sync Gateway node.
 This tool must be run on each Sync Gateway node individually.
-The `sgcollect_info` tool is bundled as part of the Sync Gateway docker image.
+The `sgcollect_info` tool is bundled as part of the Sync Gateway container image.
 
 ==== Collecting logs on a pod
 

@@ -24,7 +24,7 @@ With this done, you can follow the instructions in xref:operations-guide.adoc[op
 
 == Azure Container Instances (ACI)
 
-https://azure.microsoft.com/en-us/blog/announcing-azure-container-instances/[Azure Container Instances (ACI)] are serverless Docker containers on Azure.  The https://github.com/Azure/aci-connector-k8s[ACI connector] enables Kubernetes clusters to make use of ACI.
+https://azure.microsoft.com/en-us/blog/announcing-azure-container-instances/[Azure Container Instances (ACI)] are serverless containers on Azure.  The https://github.com/Azure/aci-connector-k8s[ACI connector] enables Kubernetes clusters to make use of ACI.
 
 To setup ACI run:
 

@@ -15,7 +15,7 @@ NOTE: Although not needed, we recommend 4 VCPUs and 8 GiB of RAM.  When running 
 
 == Running on MiniKube
 
-To run this operator on minikube you first need to build a docker image which can be deployed into the Kubernetes environment. Normally you would need to push your docker image to a Docker Repository and then pull it into Kubernetes, but since you are using MiniKube you can build the image using the same Docker host as the Minikube VM. That way the images are automatically present. To do this, make sure you are using the Minikube Docker daemon:
+To run this operator on minikube you first need to build a container image which can be deployed into the Kubernetes environment. Normally you would need to push your container image to a container registry (e.g. DockerHub) and then pull it into Kubernetes, but since you are using MiniKube you can build the image using the same container host as the Minikube VM. That way the images are automatically present. To do this, make sure you are using the Minikube Docker daemon:
 
 [source,bash]
 ----
@@ -85,7 +85,7 @@ wrap for you e.g. vim.
 
 == Building the Operator
 
-Run make command to build the docker image.
+Run make command to build the container image.
 
 [source,bash]
 ----
@@ -114,7 +114,7 @@ gcr.io/k8s-minikube/storage-provisioner               v1.8.1              468908
 busybox                                               1.27                6ad733544a63        10 months ago       1.13MB
 ----
 
-NOTE: Make sure you tag your Docker image with something other than '`latest`' and use that tag while you pull the image. Otherwise, if you do not specify version of your image, it will be assumed as :latest, with pull image policy of Always correspondingly, which may eventually result in ErrImagePull as you may not have any versions of your Docker image out there in the default docker registry (usually DockerHub) yet.
+NOTE: Make sure you tag your container image with something other than '`latest`' and use that tag while you pull the image. Otherwise, if you do not specify version of your image, it will be assumed as :latest, with pull image policy of Always correspondingly, which may eventually result in ErrImagePull as you may not have any versions of your container image out there in the default container registry (usually DockerHub) yet.
 
 == Adding Dependencies
 
