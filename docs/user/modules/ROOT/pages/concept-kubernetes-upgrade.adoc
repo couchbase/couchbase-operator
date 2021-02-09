@@ -61,9 +61,8 @@ The `PodDisruptionBudget` specifies that at least the cluster size minus one nod
 This constraint allows, at most, one node to be evicted at a time.
 As a result, it's recommended that to support an automatic Kubernetes upgrade, the cluster be deployed with anti-affinity enabled to guarantee only a single eviction at a time.
 
-To ensure Couchbase Server nodes report that they are ready once they are added to the cluster and balanced in, the Couchbase server pods are created with an _exec_-based https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#define-readiness-probes[readiness probe^].
-The probe simply polls a file on the pod's file system.
-The file is created by the Operator only when all of the pods are balanced in and the cluster is in a stable condition.
+To ensure Couchbase Server nodes report that they are ready once they are added to the cluster and balanced in, the Kubernetes Pods are created with a https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-readiness-gate[readiness gate^].
+The readiness gate is only set once all of the Couchbase Server nodes are balanced into the cluster and the cluster is in a stable condition that can tolerate the loss of a Pod without losing data.
 
 === Manual Upgrade
 

@@ -46,12 +46,6 @@ The Operator locally caches these resources, so needs to list them to get an ini
 +
 _Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
-pods/exec::
-The operator needs access to execute commands on Couchbase Server pods in order to flag that the pod is ready.
-This allows orchestration of xref:concept-kubernetes-upgrade.adoc[automatic Kubernetes upgrades].
-+
-_Required Permissions_: `create`
-
 services::
 The Operator needs to create services in order to generate DNS names that are used to address pods, as well as create SRV records for service discovery.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
