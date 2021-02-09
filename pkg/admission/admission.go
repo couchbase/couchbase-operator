@@ -1,11 +1,14 @@
 package admission
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
 	"net/http"
+	"reflect"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -349,6 +352,46 @@ func serveCouchbaseClustersMutate(config *Config) func(http.ResponseWriter, *htt
 	}
 }
 
+// Server wraps up a HTTP server and gives it restart capabilities.
+type Server struct {
+	// server is the server instance, it is replaced each time the server
+	// is restarted.
+	server *http.Server
+
+	// err is used to communicate the error condition asynchronously back from
+	// the server instance.
+	err chan error
+}
+
+// Start launches the server in its own routine as it's a blocking call.
+func (s *Server) Start(tlsConfig *tls.Config) {
+	s.server = &http.Server{
+		Addr:      ":8443",
+		TLSConfig: tlsConfig,
+	}
+
+	s.err = make(chan error)
+
+	go func() {
+		s.err <- s.server.ListenAndServeTLS("", "")
+	}()
+}
+
+// Restart restarts the server so it picks up new configuration.
+func (s *Server) Restart(tlsConfig *tls.Config) {
+	glog.Info("configuration modified, restarting server")
+
+	if err := s.server.Shutdown(context.TODO()); err != nil {
+		glog.Error(err)
+	} else {
+		// Wait for the old server to stop.  You do get an error
+		// condition on shutdown, so just ignore the value.
+		<-s.err
+
+		s.Start(tlsConfig)
+	}
+}
+
 // main initializes the system then starts a HTTPS server to process requests.
 func Serve(config *Config) {
 	glog.Infof("couchbase-operator-admission %s (%s)", version.WithBuildNumber(), revision.Revision())
@@ -363,11 +406,33 @@ func Serve(config *Config) {
 	http.HandleFunc("/couchbaseclusters/validate", serveCouchbaseClustersValidate(config))
 	http.HandleFunc("/couchbaseclusters/mutate", serveCouchbaseClustersMutate(config))
 
-	server := &http.Server{
-		Addr:      ":8443",
-		TLSConfig: configTLS(config),
-	}
-	if err := server.ListenAndServeTLS("", ""); err != nil {
-		glog.Error(err)
+	tlsConfig := configTLS(config)
+
+	server := &Server{}
+	server.Start(tlsConfig)
+
+	for {
+		// Periodically poll the TLS configuration...
+		select {
+		case err := <-server.err:
+			// Something went wrong with the server, start it up again.
+			glog.Error(err)
+
+			server.Start(tlsConfig)
+		case <-time.After(time.Minute):
+		}
+
+		// ... check if the TLS has updated, if so, restart the server.
+		// Given the config can be modified by other calls (caching etc.)
+		// we only consider the certificate.
+		newTLSConfig := configTLS(config)
+
+		if reflect.DeepEqual(tlsConfig.Certificates, newTLSConfig.Certificates) {
+			continue
+		}
+
+		tlsConfig = newTLSConfig
+
+		server.Restart(tlsConfig)
 	}
 }
