@@ -260,8 +260,13 @@ func GetReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseReplicati
 
 	return replication
 }
+
 func NewResourceQuantityMi(value int64) *resource.Quantity {
 	return resource.NewQuantity(value<<20, resource.BinarySI)
+}
+
+func NewResourceQuantityGi(value int64) *resource.Quantity {
+	return NewResourceQuantityMi(value * 1024)
 }
 
 func NewDurationS(value uint64) *metav1.Duration {

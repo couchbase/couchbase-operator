@@ -1278,6 +1278,19 @@ type ClusterSpec struct {
 
 	// EnablePreviewScaling enables autoscaling for stateful services and buckets.
 	EnablePreviewScaling bool `json:"enablePreviewScaling,omitempty"`
+
+	// EnableOnlineVolumeExpansion enables online expansion of Persistent Volumes.
+	// You can only expand a PVC if its storage class's "allowVolumeExpansion" field is set to true.
+	// Additionally, Kubernetes feature "ExpandInUsePersistentVolumes" must be enabled in order to
+	// expand the volumes which are actively bound to Pods.
+	// Volumes can only be expanded and not reduced to a smaller size.
+	// See: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#resizing-an-in-use-persistentvolumeclaim
+	//
+	// If "EnableOnlineVolumeExpansion" is enabled for use within an evironment that does
+	// not actually support online volume and file system expansion then the cluster will fallback to
+	// rolling upgrade procedure to create a new set of Pods for use with resized Volumes.
+	// More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims
+	EnableOnlineVolumeExpansion bool `json:"enableOnlineVolumeExpansion,omitempty"`
 }
 
 type PersistentVolumeClaimTemplate struct {

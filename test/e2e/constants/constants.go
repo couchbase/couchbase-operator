@@ -20,6 +20,8 @@ var (
 	CouchbaseServerClusterKey  = "couchbase_cluster"
 	CouchbaseServerPodLabelStr = CouchbaseLabel + "," + CouchbaseServerClusterKey + "="
 	CouchbaseServerConfig      = "test_config_1"
+	CouchbaseNodeLabel         = "couchbase_node"
+	CouchbaseVolumeLabel       = "couchbase_volume"
 
 	// List of Couchbase-cluster services.
 	StatefulCbServiceList = couchbasev2.ServiceList{

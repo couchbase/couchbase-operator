@@ -86,6 +86,10 @@ testcases:
 - TestPersistentVolumeRzaNodesKilledUnbalanced
 - TestPersistentVolumeRzaFailover
 - TestPersistentVolumeResizeCluster
+- TestOnlinePersistentVolumeResize
+- TestOnlinePersistentVolumeResizeMDS
+- TestOnlinePersistentVolumeResizeMixedClaims
+- TestOnlinePersistentVolumeResizeNop
 
 # May be fixed in 6.0.4+
 # Analytics Tests

@@ -44,6 +44,9 @@ const (
 
 	// ClientKey is the last known good client key.
 	ClientKey PersistentKind = "clientKey"
+
+	// VolumeExpansion is flagged when an volume expansion task starts and removed on termination.
+	VolumeExpansion PersistentKind = "volumeExpansion"
 )
 
 // PersistentKindXDCR is a type for XDCR persistence keys.  These are defined on

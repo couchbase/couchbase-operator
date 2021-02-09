@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-openapi/errors"
 
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -521,16 +522,21 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	for i, pvc := range customResource.Spec.VolumeClaimTemplates {
 		hasStorageQuantity := false
 
-		if quantity, ok := pvc.Spec.Resources.Requests["storage"]; ok {
-			hasStorageQuantity = hasStorageQuantity || !quantity.IsZero()
+		// Request quantity cannot be negative or zero
+		if quantity, ok := pvc.Spec.Resources.Requests[v1.ResourceStorage]; ok {
+			hasStorageQuantity = hasStorageQuantity || (quantity.Sign() == 1)
 		}
 
-		if quantity, ok := pvc.Spec.Resources.Limits["storage"]; ok {
-			hasStorageQuantity = hasStorageQuantity || !quantity.IsZero()
+		// There is no such thing as a limit in regard to storage request
+		// but the k8s api allows a value here since it is a Resource kind.
+		// It's not an error to provide this, but it cannot be standalone
+		// since the volume capacity only requires a request value.
+		if quantity, ok := pvc.Spec.Resources.Limits[v1.ResourceStorage]; ok {
+			hasStorageQuantity = hasStorageQuantity && (quantity.Sign() == 1)
 		}
 
 		if !hasStorageQuantity {
-			err := errors.Required(`"storage"`, "spec.volumeClaimTemplates[*].resources.requests|limits")
+			err := errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates[*].resources.requests|limits")
 			errs = append(errs, err)
 		}
 
@@ -545,10 +551,22 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		// Ensure storageClass exists
 		if pvc.Spec.StorageClassName != nil && v.Options.ValidateStorageClasses {
 			storageClass, err := v.Abstraction.GetStorageClass(*pvc.Spec.StorageClassName)
-			if err != nil {
+
+			switch {
+			case err != nil:
 				errs = append(errs, err)
-			} else if storageClass == nil {
-				errs = append(errs, fmt.Errorf("storage class %s must exist", *pvc.Spec.StorageClassName))
+			case storageClass == nil:
+				errs = append(errs, fmt.Errorf("storage class %q must exist", *pvc.Spec.StorageClassName))
+			case customResource.Spec.EnableOnlineVolumeExpansion:
+				// StorageClass must allow volume expansion when feature is enabled
+				volumeExpansionAllowed := false
+				if val := storageClass.AllowVolumeExpansion; val != nil {
+					volumeExpansionAllowed = *val
+				}
+
+				if !volumeExpansionAllowed {
+					errs = append(errs, fmt.Errorf("spec.cluster.enableOnlineVolumeExpansion cannot be enabled since storage class %q does not specify `allowVolumeExpansion=true`", *pvc.Spec.StorageClassName))
+				}
 			}
 		}
 	}
@@ -1478,6 +1496,26 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 	if upgradeCondition != nil && currentVersion != updatedVersion {
 		if updatedVersion != current.Status.CurrentVersion {
 			errs = append(errs, util.NewUpdateError("spec.version", "body"))
+		}
+	}
+
+	if updated.Spec.EnableOnlineVolumeExpansion {
+		// Online Persistent Volumes cannot be down-scaled since the current
+		// action is provided by a Filesystem 'expansion' storage driver
+		for _, updatedClaimTemplate := range updated.Spec.VolumeClaimTemplates {
+			currentClaimTemplate := current.Spec.GetVolumeClaimTemplate(updatedClaimTemplate.ObjectMeta.Name)
+			if currentClaimTemplate == nil {
+				// Claim is being added
+				continue
+			}
+
+			// Compare storage requests
+			currentQuantity, cOk := currentClaimTemplate.Spec.Resources.Requests[v1.ResourceStorage]
+			updatedQuantity, uOk := updatedClaimTemplate.Spec.Resources.Requests[v1.ResourceStorage]
+
+			if cOk && uOk && updatedQuantity.Cmp(currentQuantity) == -1 {
+				errs = append(errs, fmt.Errorf("spec.volumeClaimTemplates[*].resources.requests[storage] in body can not be less than previous value %s", currentQuantity.String()))
+			}
 		}
 	}
 

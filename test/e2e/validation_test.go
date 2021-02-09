@@ -595,6 +595,20 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.rollingUpgrade.maxUpgradablePercent`},
 		},
+		{
+			name: "TestValidateVolumeClaimTemplatesNegRejected",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", "0")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.volumeClaimTemplates[*].resources.requests"},
+		},
+		{
+			name: "TestValidateVolumeClaimTemplatesNegRejected",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", "-1")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.volumeClaimTemplates[*].resources.requests"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -805,7 +819,7 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 			name:           "TestValidateVolumeClaimTemplatesStorageClassMustExist",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/storageClassName", &unavailableStorageClass)},
 			shouldFail:     true,
-			expectedErrors: []string{"storage class unavailableStorageClass must exist"},
+			expectedErrors: []string{"storage class"},
 		},
 		{
 			name:       "TestValidateVolumeClaimTemplateMustExist",
@@ -915,7 +929,6 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 		expectedErrors: []string{"spec.servers[0].volumeMounts"},
 	}
 	testDefs = append(testDefs, testCase)
-
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
@@ -1755,6 +1768,14 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy"},
+		},
+		{
+			name: "TestValidateVolumeClaimTemplatesShrinkRejected",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/enableOnlineVolumeExpansion", true).
+				Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", "1Gi")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.volumeClaimTemplates[*].resources.requests"},
 		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})

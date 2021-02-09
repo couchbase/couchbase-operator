@@ -18,17 +18,20 @@ import (
 
 const (
 	// Member lifecycle.
-	EventReasonMemberCreationFailed = "MemberCreationFailed"
-	EventReasonNewMemberAdded       = "NewMemberAdded"
-	EventReasonFailedAddNode        = "FailedAddNode"
-	EventReasonFailedAddBackNode    = "FailedAddBackNode"
-	EventReasonMemberRemoved        = "MemberRemoved"
-	EventReasonMemberDown           = "MemberDown"
-	EventReasonMemberRecovered      = "MemberRecovered"
-	EventReasonMemberFailedOver     = "MemberFailedOver"
-	EventReasonRebalanceStarted     = "RebalanceStarted"
-	EventReasonRebalanceIncomplete  = "RebalanceIncomplete"
-	EventReasonRebalanceCompleted   = "RebalanceCompleted"
+	EventReasonMemberCreationFailed  = "MemberCreationFailed"
+	EventReasonNewMemberAdded        = "NewMemberAdded"
+	EventReasonFailedAddNode         = "FailedAddNode"
+	EventReasonFailedAddBackNode     = "FailedAddBackNode"
+	EventReasonMemberRemoved         = "MemberRemoved"
+	EventReasonMemberDown            = "MemberDown"
+	EventReasonMemberRecovered       = "MemberRecovered"
+	EventReasonMemberFailedOver      = "MemberFailedOver"
+	EventReasonRebalanceStarted      = "RebalanceStarted"
+	EventReasonRebalanceIncomplete   = "RebalanceIncomplete"
+	EventReasonRebalanceCompleted    = "RebalanceCompleted"
+	EventReasonExpandVolumeStarted   = "ExpandVolumeStarted"
+	EventReasonExpandVolumeFallback  = "ExpandVolumeFallback"
+	EventReasonExpandVolumeSucceeded = "ExpandVolumeSucceeded"
 
 	// Bucket lifecycle.
 	EventReasonBucketCreated = "BucketCreated"
@@ -178,6 +181,33 @@ func RebalanceCompletedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonRebalanceCompleted
 	event.Message = "A rebalance has completed"
+
+	return event
+}
+
+func ExpandVolumeStartedEvent(volumeName string, fromSize string, toSize string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonExpandVolumeStarted
+	event.Message = fmt.Sprintf("Expanding Volume %s from %s to %s", volumeName, fromSize, toSize)
+
+	return event
+}
+
+func ExpandVolumeSucceededEvent(volumeName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonExpandVolumeSucceeded
+	event.Message = fmt.Sprintf("Successfully expanded volume %s", volumeName)
+
+	return event
+}
+
+func ExpandVolumeFallbackEvent(volumeName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonExpandVolumeFallback
+	event.Message = fmt.Sprintf("Volume %s cannot be expanded in-place, falling back to rolling upgrade", volumeName)
 
 	return event
 }

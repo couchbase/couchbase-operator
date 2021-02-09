@@ -1076,6 +1076,36 @@ func waitForLoggingSidecarReady(k8s *types.Cluster, couchbase *couchbasev2.Couch
 	})
 }
 
+// waitForPodVolumeSize monitors status of a PersistentVolumeClaim
+// until requested size matches specified quantity.
+func waitForPodVolumeSize(k8s *types.Cluster, memberName string, claimName string, requestedQuantity *resource.Quantity, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		// Get state of persistent volumes
+		selector := map[string]string{
+			constants.CouchbaseNodeLabel:   memberName,
+			constants.CouchbaseVolumeLabel: claimName,
+		}
+		labels.FormatLabels(selector)
+		listOptions := metav1.ListOptions{
+			LabelSelector: labels.FormatLabels(selector),
+		}
+
+		// Fetch Persistent Volumes and verify resized
+		pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+		for _, pvc := range pvcList.Items {
+			existingQuantity := pvc.Status.Capacity[v1.ResourceStorage]
+			if !requestedQuantity.Equal(existingQuantity) {
+				return fmt.Errorf("existing Quantity: %s != Requested Quantity: %s", existingQuantity.String(), requestedQuantity.String())
+			}
+		}
+
+		return nil
+	})
+}
+
 // MustWaitForLoggingSidecarReady waits for the duration to confirm that the sidecar is running.
 func MustWaitForLoggingSidecarReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	err := waitForLoggingSidecarReady(k8s, couchbase, timeout)
@@ -1093,6 +1123,13 @@ func MustWaitForPendingPod(t *testing.T, k8s *types.Cluster, name string, timeou
 	}
 
 	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, pod, string(v1.PodScheduled), string(v1.ConditionFalse))); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustWaitForPodVolumeSize(t *testing.T, k8s *types.Cluster, memberName string, claimName string, quantity *resource.Quantity, timeout time.Duration) {
+	err := waitForPodVolumeSize(k8s, memberName, claimName, quantity, timeout)
+	if err != nil {
 		Die(t, err)
 	}
 }

@@ -121,6 +121,20 @@ func AutoscaleDownEvent(cl *couchbasev2.CouchbaseCluster, configName string, fro
 	return k8sutil.AutoscaleDownEvent(cl, configName, from, to)
 }
 
+func NewVolumeExpandStartedEvent(volumeName string, from string, to string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	return k8sutil.ExpandVolumeStartedEvent(volumeName, from, to, cl)
+}
+
+//  VolumeExpansionSuccessSequence combines the successful series of events associated with expanding persistent volumes.
+func VolumeExpansionSuccessSequence() eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
+		},
+	}
+}
+
 // ClusterCreateSequence is a common function for generating cluster creation events.
 func ClusterCreateSequence(size int) eventschema.Validatable {
 	if size == 1 {

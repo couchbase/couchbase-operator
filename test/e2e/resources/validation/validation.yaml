@@ -347,9 +347,9 @@ spec:
         storageClassName: standard
         resources:
           requests:
-            storage: 1Gi
-          limits:
             storage: 2Gi
+          limits:
+            storage: 4Gi
     - metadata:
         name: couchbase-log-pv
       spec:

@@ -3,6 +3,7 @@ package k8sutil
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -120,6 +121,12 @@ type PersistentVolumeClaimState struct {
 	// update is a list of PVCs that need updating.
 	update []*v1.PersistentVolumeClaim
 
+	// PVCs that are currently expanding.
+	expanding []*v1.PersistentVolumeClaim
+
+	// PVCs that are currently in failed resize state.
+	resizeFailed []*v1.PersistentVolumeClaim
+
 	// volumes is an ordered list of volumes to attach to the pod.
 	volumes []v1.Volume
 
@@ -134,13 +141,54 @@ type PersistentVolumeClaimState struct {
 }
 
 // NeedsUpdate indicates whether any PVCs need updating.
+// A PVC is an update candidate if its requested spec
+// differs from currently deployed spec.
 func (p *PersistentVolumeClaimState) NeedsUpdate() bool {
-	return len(p.update) != 0 || len(p.create) != 0
+	return len(p.update) != 0 || len(p.create) != 0 || len(p.expanding) != 0 || len(p.resizeFailed) != 0
+}
+
+// IsUpdated indicates whether specific PVC spec has been updated.
+func (p *PersistentVolumeClaimState) IsUpdated(name string) bool {
+	return p.lookup(name, p.update) != nil
+}
+
+// IsExpanding indicates whether PVC is expanding.
+func (p *PersistentVolumeClaimState) IsExpanding(name string) bool {
+	return p.lookup(name, p.expanding) != nil
+}
+
+// IsResizeFailed indicates whether PVC failed to resize.
+func (p *PersistentVolumeClaimState) IsResizeFailed(name string) bool {
+	return p.lookup(name, p.resizeFailed) != nil
+}
+
+// Update fetches updated version of PVC and applies change.
+func (p *PersistentVolumeClaimState) Update(client *client.Client, name string) (*v1.PersistentVolumeClaim, error) {
+	if claim := p.lookup(name, p.update); claim != nil {
+		return updatePersistentVolumeClaim(client, claim)
+	}
+
+	return nil, fmt.Errorf("%w: refusing to update claim (%s) since it does not exist", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), name)
+}
+
+func (p *PersistentVolumeClaimState) lookup(name string, pvcs []*v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
+	for _, pvc := range pvcs {
+		if pvc.Name == name {
+			return pvc
+		}
+	}
+
+	return nil
 }
 
 // Diff returns a diff of changes when PVCs are created or updated.
 func (p *PersistentVolumeClaimState) Diff() string {
 	return p.diff
+}
+
+// List returns list of PersistentVolumeClaims.
+func (p *PersistentVolumeClaimState) List() []*v1.PersistentVolumeClaim {
+	return p.pvcs
 }
 
 // Add a persistent volume to the pod spec for each volumeMount.
@@ -237,12 +285,55 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 				}
 			}
 
+			// Determine if volume is in one of the following states.
+			// update: due to mis-match between requested and existing specs.
+			// expanding: due to mis-match between requested and existing status.
+			// resizeFailed: volume is reporting resize failure events.
 			if !reflect.DeepEqual(existingSpec, required.Spec) {
-				state.update = append(state.update, pvc)
+				// Applying required attributes to list of update PVC's to allow in place updates.
+				updatedClaim := pvc.DeepCopy()
+				updatedClaim.Spec.Resources = required.Spec.Resources
+				updatedClaim.Annotations = required.Annotations
+				state.update = append(state.update, updatedClaim)
 
 				d, err := diff.Diff(existingSpec, required.Spec)
 				if err == nil {
 					state.diff += d
+				}
+			} else {
+				// Even when the annotations of existingSpec and required spec are the same,
+				// it is possible that the requested storage capacity is not yet applied either
+				// due to expansion being in progress, or user manually changing pvc request.
+				actualSize := pvc.Status.Capacity[v1.ResourceStorage]
+				requestedSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+				sizesMatch := actualSize.Equal(requestedSize)
+				if !sizesMatch {
+					resizeFailed := false
+					if err := checkVolumeResizeFailure(client, pvc); err != nil {
+						if goerrors.Is(err, errors.ErrVolumeResizeError) {
+							resizeFailed = true
+						} else {
+							return state, err
+						}
+					}
+
+					if resizeFailed {
+						state.resizeFailed = append(state.resizeFailed, pvc)
+					} else {
+						// failure event isn't reported so volume is still expanding
+						state.expanding = append(state.expanding, required)
+					}
+
+					// apply actual size to deployed spec and requestedSized to required spec
+					// so it's clear that volumes are still in an upgrade state because
+					// required size isn't reached
+					actualPVC := pvc.DeepCopy()
+					actualPVC.Spec.Resources.Requests[v1.ResourceStorage] = actualSize
+					required.Spec.Resources.Requests[v1.ResourceStorage] = requestedSize
+					d, err := diff.Diff(actualPVC.Spec, required.Spec)
+					if err == nil {
+						state.diff += d
+					}
 				}
 			}
 		}
@@ -370,6 +461,19 @@ func createPersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolu
 	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 
 	pvc, err := client.KubeClient.CoreV1().PersistentVolumeClaims(namespace).Create(context.Background(), claim, metav1.CreateOptions{})
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	return pvc, nil
+}
+
+// Updates existing PersistentVolumeClaim from required Spec.
+func updatePersistentVolumeClaim(client *client.Client, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	// Only resources attribute of PersistentVolumeClaimSpec can be updated
+	claim.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+
+	pvc, err := client.KubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.Background(), claim, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, errors.NewStackTracedError(err)
 	}
@@ -1266,6 +1370,55 @@ func IsLogPVC(pvc *v1.PersistentVolumeClaim) bool {
 	}
 
 	return path == CouchbaseVolumeMountLogsDir
+}
+
+// CheckVolumeExpansionEvents checks PVC events for successful resize
+// event to determine status when an expansion has occurred.
+func checkVolumeResizeFailure(client *client.Client, claim *v1.PersistentVolumeClaim) error {
+	// Check if Volume Claim to has "Resize" condition set
+	var expansionTimestamp metav1.Time
+
+	for _, condition := range claim.Status.Conditions {
+		if condition.Type == v1.PersistentVolumeClaimResizing || condition.Type == v1.PersistentVolumeClaimFileSystemResizePending {
+			if condition.Status == v1.ConditionTrue {
+				expansionTimestamp = condition.LastTransitionTime
+				break
+			}
+		}
+	}
+
+	// The volume is not yet have resize condition set
+	if expansionTimestamp.IsZero() {
+		return nil
+	}
+
+	events, err := GetEventsForResource(client.KubeClient, claim.Namespace, "PersistentVolumeClaim", claim.Name)
+	if err != nil {
+		return err
+	}
+
+	for _, event := range events {
+		// Only consider events which occur after the resize condition is presented
+		if expansionTimestamp.Before(&event.LastTimestamp) {
+			if event.Reason == "VolumeResizeFailed" {
+				return errors.ErrVolumeResizeError
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetVolumeStorageSize returns requested storage size of a volume claim.
+func GetVolumeStorageSize(claim *v1.PersistentVolumeClaim) string {
+	// In the event that storage key does not exist an empty string is returned,
+	// so caller should check against what is expected if necessary.
+	var size string
+	if val, ok := claim.Spec.Resources.Requests[v1.ResourceStorage]; ok {
+		size = val.String()
+	}
+
+	return size
 }
 
 // FlagPodReady adds a readiness gate to the pod so we can have explicit control over

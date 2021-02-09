@@ -49,6 +49,9 @@ var (
 	// ErrKubernetesError is raised when not handled by one of the resource errors e.g.
 	// some validation steps fail.
 	ErrKubernetesError = errors.New("unexpected kubernetes error")
+
+	// ErrVolumeResizeError is raised when a request to resize a Persistent Volume fails.
+	ErrVolumeResizeError = errors.New("volume resize failed")
 )
 
 // Couchbase server specific errors.

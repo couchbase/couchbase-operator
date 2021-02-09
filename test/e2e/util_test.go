@@ -277,6 +277,10 @@ var (
 		"TestPersistentVolumeRzaNodesKilledUnbalanced": TestPersistentVolumeRzaNodesKilledUnbalanced,
 		"TestPersistentVolumeRzaFailover":              TestPersistentVolumeRzaFailover,
 		"TestPersistentVolumeResizeCluster":            TestPersistentVolumeResizeCluster,
+		"TestOnlinePersistentVolumeResize":             TestOnlinePersistentVolumeResize,
+		"TestOnlinePersistentVolumeResizeMDS":          TestOnlinePersistentVolumeResizeMDS,
+		"TestOnlinePersistentVolumeResizeMixedClaims":  TestOnlinePersistentVolumeResizeMixedClaims,
+		"TestOnlinePersistentVolumeResizeNop":          TestOnlinePersistentVolumeResizeNop,
 
 		// Supportability cases
 		"TestLogCollectValidateArguments": TestLogCollectValidateArguments,
