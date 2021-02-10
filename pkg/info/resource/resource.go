@@ -200,6 +200,12 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 					continue NextObject
 				}
 			case ScopeOperatorDeployment:
+				// Collect everything if we are told to, this is useful
+				// for getting system logs.
+				if context.Config.All {
+					break
+				}
+
 				// This scoping is a little more complex (ripe for deletion!).
 				// This scope should only be applied to deployments.  It will
 				// extract the containers from the pod template and only collect
