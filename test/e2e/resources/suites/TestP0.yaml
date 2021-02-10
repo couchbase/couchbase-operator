@@ -69,18 +69,18 @@ testcases:
 - TestTLSCreateClusterWithShadowing
 
 # XDCR Intra-Cluster Tests
-- TestXdcrCreateClusterLocal
-- TestXdcrCreateClusterLocalTLS
-- TestXdcrCreateClusterLocalMutualTLS
-- TestXdcrCreateClusterLocalMandatoryMutualTLS
+- TestXDCRCreateClusterLocal
+- TestXDCRCreateClusterLocalTLS
+- TestXDCRCreateClusterLocalMutualTLS
+- TestXDCRCreateClusterLocalMandatoryMutualTLS
 
 # XDCR Inter-Cluster Tests
-- TestXdcrCreateClusterRemoteTLS
-- TestXdcrCreateClusterRemoteMutualTLS
-- TestXdcrCreateClusterRemoteMandatoryMutualTLS
-- TestXdcrSourceNodeDown
-- TestXdcrSourceNodeAdd
-- TestXdcrTargetNodeServiceDelete
+- TestXDCRCreateClusterRemoteTLS
+- TestXDCRCreateClusterRemoteMutualTLS
+- TestXDCRCreateClusterRemoteMandatoryMutualTLS
+- TestXDCRSourceNodeDown
+- TestXDCRSourceNodeAdd
+- TestXDCRTargetNodeServiceDelete
 - TestXDCRRotatePassword
 
 # Sync Gateway Intra-Cluster Tests

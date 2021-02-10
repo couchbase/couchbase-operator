@@ -474,6 +474,23 @@ func MustRotateXDCRReplicationPassword(t *testing.T, src *types.Cluster, dst *ty
 	}
 }
 
+func MustRotateXDCRReplicationTLS(t *testing.T, src *types.Cluster, dst *types.Cluster, target *couchbasev2.CouchbaseCluster, tls *TLSContext) {
+	xdcrSecret := fmt.Sprintf("%s-xdcr-tls", target.Name)
+
+	srcSecret, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Get(context.Background(), xdcrSecret, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	srcSecret.Data[couchbasev2.RemoteClusterTLSCA] = tls.CA.Certificate
+	srcSecret.Data[couchbasev2.RemoteClusterTLSCertificate] = tls.ClientCert
+	srcSecret.Data[couchbasev2.RemoteClusterTLSKey] = tls.ClientKey
+
+	if _, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Update(context.Background(), srcSecret, metav1.UpdateOptions{}); err != nil {
+		Die(t, err)
+	}
+}
+
 func DeleteXDCRReplication(k8s *types.Cluster, source *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Delete(context.Background(), replication.Name, metav1.DeleteOptions{}); err != nil {

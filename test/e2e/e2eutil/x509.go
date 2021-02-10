@@ -781,6 +781,9 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 		Die(t, err)
 	}
 
+	ctx.ClientKey = operatorKey
+	ctx.ClientCert = operatorCert
+
 	// Update the existing client secret
 	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
 	if err != nil {

@@ -61,14 +61,18 @@ testcases:
 
 # XDCR Tests
 - TestXDCRPauseReplication
-- TestXdcrRebalanceOutSourceClusterNodes
-- TestXdcrRebalanceOutTargetClusterNodes
-- TestXdcrRemoveSourceClusterNodes
-- TestXdcrRemoveTargetClusterNodes
-- TestXdcrResizedOutSourceClusterNodes
-- TestXdcrResizedOutTargetClusterNodes
+- TestXDCRRebalanceOutSourceClusterNodes
+- TestXDCRRebalanceOutTargetClusterNodes
+- TestXDCRRemoveSourceClusterNodes
+- TestXDCRRemoveTargetClusterNodes
+- TestXDCRResizedOutSourceClusterNodes
+- TestXDCRResizedOutTargetClusterNodes
 - TestXDCRDeleteReplication
 - TestXDCRFilterExp
+- TestXDCRRotateClientMutualTLS
+- TestXDCRRotateCAMutualTLS
+- TestXDCRRotateClientMandatoryMutualTLS
+- TestXDCRRotateCAMandatoryMutualTLS
 
 # Server Groups Tests
 - TestRzaAntiAffinityOn

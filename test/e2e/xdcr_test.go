@@ -106,6 +106,24 @@ const (
 	xdcrOperationScaleDown xdcrOperation = iota
 )
 
+func XDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, clusterSize int) (xdcrCluster1 *couchbasev2.CouchbaseCluster, xdcrCluster2 *couchbasev2.CouchbaseCluster, bucket metav1.Object, replication *couchbasev2.CouchbaseReplication) {
+	// Create the clusters.
+	// The k8s1 cluster optionally uses a custom DNS service to address the k8s2 cluster.
+	// The k8s2 cluster optionally has TLS set.
+	bucket = mustCreateXDCRBuckets(t, k8s1, k8s2)
+	xdcrCluster1 = e2eutil.MustNewXDCRCluster(t, k8s1, clusterSize, dns, nil, nil)
+	xdcrCluster2 = e2eutil.MustNewXDCRCluster(t, k8s2, clusterSize, nil, tls, policy)
+	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+
+	// When ready, establish the XDCR connection.
+	replication = e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+
+	e2eutil.MustEstablishXDCRReplication(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication, tls)
+
+	return xdcrCluster1, xdcrCluster2, bucket, replication
+}
+
 // xdcrClusterRemoveNode removes nodes from the selected cluster in numerous
 // nefarious ways.
 func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcrCluster, operation xdcrOperation) {
@@ -195,20 +213,7 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 	clusterSize := constants.Size3
 	numOfDocs := framework.Global.DocsCount
 
-	// Create the clusters.
-	// The k8s1 cluster optionally uses a custom DNS service to address the k8s2 cluster.
-	// The k8s2 cluster optionally has TLS set.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRCluster(t, k8s1, clusterSize, dns, nil, nil)
-	xdcrCluster2 := e2eutil.MustNewXDCRCluster(t, k8s2, clusterSize, nil, tls, policy)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
-
-	// When ready, establish the XDCR connection, add some documents and
-	// verify they have been replicated.
-	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
-
-	e2eutil.MustEstablishXDCRReplication(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication, tls)
+	xdcrCluster1, xdcrCluster2, bucket, _ := XDCRCreateCluster(t, k8s1, k8s2, dns, tls, policy, clusterSize)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
@@ -234,16 +239,16 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
 
-// TestXdcrCreateClusterLocal tests establishing an XDCR connection within the same cluster.
-func TestXdcrCreateClusterLocal(t *testing.T) {
+// TestXDCRCreateClusterLocal tests establishing an XDCR connection within the same cluster.
+func TestXDCRCreateClusterLocal(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, nil, nil)
 }
 
-// TestXdcrCreateClusterLocalTLS tests establishing a TLS XDCR connection within the same cluster.
-func TestXdcrCreateClusterLocalTLS(t *testing.T) {
+// TestXDCRCreateClusterLocalTLS tests establishing a TLS XDCR connection within the same cluster.
+func TestXDCRCreateClusterLocalTLS(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
@@ -252,8 +257,8 @@ func TestXdcrCreateClusterLocalTLS(t *testing.T) {
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, nil)
 }
 
-// TestXdcrCreateClusterLocalMutualTLS tests establishing an mTLS XDCR connection within the same cluster.
-func TestXdcrCreateClusterLocalMutualTLS(t *testing.T) {
+// TestXDCRCreateClusterLocalMutualTLS tests establishing an mTLS XDCR connection within the same cluster.
+func TestXDCRCreateClusterLocalMutualTLS(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
@@ -263,8 +268,8 @@ func TestXdcrCreateClusterLocalMutualTLS(t *testing.T) {
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, &policy)
 }
 
-// TestXdcrCreateClusterLocalMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection within the same cluster.
-func TestXdcrCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
+// TestXDCRCreateClusterLocalMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection within the same cluster.
+func TestXDCRCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
@@ -274,8 +279,8 @@ func TestXdcrCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, &policy)
 }
 
-// TestXdcrCreateClusterRemote tests establishing an XDCR connection to a k8s2 cluster.
-func TestXdcrCreateClusterRemote(t *testing.T) {
+// TestXDCRCreateClusterRemote tests establishing an XDCR connection to a k8s2 cluster.
+func TestXDCRCreateClusterRemote(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -284,8 +289,8 @@ func TestXdcrCreateClusterRemote(t *testing.T) {
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, nil, nil)
 }
 
-// TestXdcrCreateClusterRemoteTLS tests establishing a TLS XDCR connection to a k8s2 cluster.
-func TestXdcrCreateClusterRemoteTLS(t *testing.T) {
+// TestXDCRCreateClusterRemoteTLS tests establishing a TLS XDCR connection to a k8s2 cluster.
+func TestXDCRCreateClusterRemoteTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -296,8 +301,8 @@ func TestXdcrCreateClusterRemoteTLS(t *testing.T) {
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, nil)
 }
 
-// TestXdcrCreateClusterRemoteMutualTLS tests establishing an mTLS XDCR connection to a k8s2 cluster.
-func TestXdcrCreateClusterRemoteMutualTLS(t *testing.T) {
+// TestXDCRCreateClusterRemoteMutualTLS tests establishing an mTLS XDCR connection to a k8s2 cluster.
+func TestXDCRCreateClusterRemoteMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -309,8 +314,8 @@ func TestXdcrCreateClusterRemoteMutualTLS(t *testing.T) {
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, &policy)
 }
 
-// TestXdcrCreateClusterRemoteMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection to a k8s2 cluster.
-func TestXdcrCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
+// TestXDCRCreateClusterRemoteMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection to a k8s2 cluster.
+func TestXDCRCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -322,8 +327,8 @@ func TestXdcrCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, &policy)
 }
 
-// TestXdcrCreateCluster tests establishing an XDCR connection.
-func TestXdcrCreateCluster(t *testing.T) {
+// TestXDCRCreateCluster tests establishing an XDCR connection.
+func TestXDCRCreateCluster(t *testing.T) {
 	// Platform configuration.
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
@@ -395,7 +400,7 @@ func TestXDCRPauseReplication(t *testing.T) {
 	// pause.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	replication = e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
 	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
@@ -430,9 +435,9 @@ func TestXDCRPauseReplication(t *testing.T) {
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
 
-// TestXdcrSourceNodeDown tests killing a node in the source cluster of an
+// TestXDCRSourceNodeDown tests killing a node in the source cluster of an
 // XDCR replication.
-func TestXdcrSourceNodeDown(t *testing.T) {
+func TestXDCRSourceNodeDown(t *testing.T) {
 	// Platform configuration.
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
@@ -440,15 +445,14 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
 
 	// Static configuration.
-	xdcrCluster1Size := constants.Size5
-	xdcrCluster2Size := constants.Size2
+	clusterSize := 3
 	nodeToKill := 1
 	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, xdcrCluster1Size)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, xdcrCluster2Size)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -473,7 +477,7 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	// * Source recovers after a pod is taken down
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(xdcrCluster1Size, couchbasev2.FeatureXDCR),
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
@@ -481,7 +485,7 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(xdcrCluster2Size, couchbasev2.FeatureXDCR),
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
@@ -489,9 +493,9 @@ func TestXdcrSourceNodeDown(t *testing.T) {
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
 
-// TestXdcrSourceNodeAdd tests adding a node into the source cluster of an XDCR
+// TestXDCRSourceNodeAdd tests adding a node into the source cluster of an XDCR
 // replication.
-func TestXdcrSourceNodeAdd(t *testing.T) {
+func TestXDCRSourceNodeAdd(t *testing.T) {
 	// Platform configuration.
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
@@ -545,9 +549,9 @@ func TestXdcrSourceNodeAdd(t *testing.T) {
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
 }
 
-// TestXdcrTargetNodeServiceDelete tests deleting the node-port services of the
+// TestXDCRTargetNodeServiceDelete tests deleting the node-port services of the
 // target cluster required by an XDCR replication.
-func TestXdcrTargetNodeServiceDelete(t *testing.T) {
+func TestXDCRTargetNodeServiceDelete(t *testing.T) {
 	// Platform configuration.
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
@@ -603,7 +607,7 @@ func TestXdcrTargetNodeServiceDelete(t *testing.T) {
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the source bucket cluster are rebalanced out.
 // one by one until there is only one node in cluster.
-func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
+func TestXDCRRebalanceOutSourceClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -613,7 +617,7 @@ func TestXdcrRebalanceOutSourceClusterNodes(t *testing.T) {
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the destination bucket cluster are rebalanced out.
 // one by one until there is only one node in cluster.
-func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
+func TestXDCRRebalanceOutTargetClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -623,7 +627,7 @@ func TestXdcrRebalanceOutTargetClusterNodes(t *testing.T) {
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the source bucket cluster are killed one by one.
 // At the end all nodes are replaced by new nodes in the cluster.
-func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
+func TestXDCRRemoveSourceClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -633,7 +637,7 @@ func TestXdcrRemoveSourceClusterNodes(t *testing.T) {
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the destination bucket cluster are killed one by one.
 // At the end all nodes are replaced by new nodes in the cluster.
-func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
+func TestXDCRRemoveTargetClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -642,7 +646,7 @@ func TestXdcrRemoveTargetClusterNodes(t *testing.T) {
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes of source bucket cluster is resized to single node cluster.
-func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
+func TestXDCRResizedOutSourceClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -651,7 +655,7 @@ func TestXdcrResizedOutSourceClusterNodes(t *testing.T) {
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes of destination bucket cluster is resized to single node cluster.
-func TestXdcrResizedOutTargetClusterNodes(t *testing.T) {
+func TestXDCRResizedOutTargetClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
@@ -818,12 +822,21 @@ func TestXDCRRotatePassword(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
-	// When ready, establish the XDCR connection.
+	// When ready, establish the XDCR connection, add some documents and
+	// verify they have been replicated.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+
+	numOfDocs := framework.Global.DocsCount
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	e2eutil.MustRotateClusterPassword(t, k8s2)
 	e2eutil.MustRotateXDCRReplicationPassword(t, k8s1, k8s2, xdcrCluster2)
+
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
@@ -842,4 +855,140 @@ func TestXDCRRotatePassword(t *testing.T) {
 
 	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
 	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+}
+
+func testXDCRRotateClient(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
+	clusterSize := 1
+
+	xdcrCluster1, xdcrCluster2, bucket, _ := XDCRCreateCluster(t, k8s1, k8s2, dns, tls, policy, clusterSize)
+
+	numOfDocs := framework.Global.DocsCount
+
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
+
+	e2eutil.MustRotateClientCertificate(t, tls)
+	e2eutil.MustWaitForClusterEvent(t, k8s2, xdcrCluster2, k8sutil.ClientTLSUpdatedEvent(xdcrCluster2, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 5*time.Minute)
+	e2eutil.MustRotateXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster2, tls)
+
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+
+	expectedEvents1 := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
+	}
+
+	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
+	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+}
+
+// TestXDCRRotateClientMutualTLS rotates the client certificate while using mutual TLS on the
+// XDCR target cluster, and ensures that the source cluster's cert is updated too (without recreating).
+func TestXDCRRotateClientMutualTLS(t *testing.T) {
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	policy := couchbasev2.ClientCertificatePolicyEnable
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+
+	testXDCRRotateClient(t, k8s1, k8s2, dns, tls, &policy)
+}
+
+// TestXDCRRotateClientMandatoryMutualTLS rotates the client certificate while using mandatory mutual
+// TLS on the XDCR target cluster, and ensures that the source cluster's cert is updated too (without recreating).
+func TestXDCRRotateClientMandatoryMutualTLS(t *testing.T) {
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+
+	testXDCRRotateClient(t, k8s1, k8s2, dns, tls, &policy)
+}
+
+func testXDCRRotateCA(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
+	clusterSize := 1
+
+	xdcrCluster1, xdcrCluster2, bucket, _ := XDCRCreateCluster(t, k8s1, k8s2, dns, tls, policy, clusterSize)
+
+	numOfDocs := framework.Global.DocsCount
+
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
+
+	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, tls)
+	e2eutil.MustWaitForClusterEvent(t, k8s2, xdcrCluster2, k8sutil.ClientTLSUpdatedEvent(xdcrCluster2, k8sutil.ClientTLSUpdateReasonUpdateCA), 5*time.Minute)
+	e2eutil.MustRotateXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster2, tls)
+
+	e2eutil.MustPopulateBucket(t, k8s1, xdcrCluster1, bucket.GetName(), numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+
+	expectedEvents1 := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		// Race condition updating secrets.
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
+	}
+
+	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
+	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+}
+
+// TestXDCRRotateCAMandatoryMutualTLS rotates the CA while using mandatory mutual TLS on the
+// XDCR target cluster, and ensures that the source cluster's CA is updated too (without recreating).
+func TestXDCRRotateCAMandatoryMutualTLS(t *testing.T) {
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+
+	testXDCRRotateCA(t, k8s1, k8s2, dns, tls, &policy)
+}
+
+// TestXDCRRotateCAMutualTLS rotates the CA while using mutual TLS on the
+// XDCR target cluster, and ensures that the source cluster's CA is updated too (without recreating).
+func TestXDCRRotateCAMutualTLS(t *testing.T) {
+	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+
+	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	policy := couchbasev2.ClientCertificatePolicyEnable
+	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+
+	testXDCRRotateCA(t, k8s1, k8s2, dns, tls, &policy)
 }

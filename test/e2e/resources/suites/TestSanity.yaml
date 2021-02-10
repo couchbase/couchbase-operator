@@ -25,9 +25,9 @@ testcases:
 - TestTLSCreateCluster
 - TestMutualTLSCreateCluster
 
-# XdcrTests
-- TestXdcrCreateCluster
-- TestXdcrCreateClusterRemote
+# XDCRTests
+- TestXDCRCreateCluster
+- TestXDCRCreateClusterRemote
 
 # ServerGroupTests
 - TestRzaCreateClusterWithStaticConfig

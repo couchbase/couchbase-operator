@@ -36,8 +36,8 @@ testcases:
 # TLSTests
 - TestTLSCreateCluster
 
-# XdcrTests
-- TestXdcrCreateCluster
+# XDCRTests
+- TestXDCRCreateCluster
 
 # PersistentVolumeTests
 - TestPersistentVolumeCreateCluster
@@ -79,13 +79,13 @@ testcases:
 - TestMandatoryMutualTLSDisable
 - TestMandatoryMutualTLSRotateCA
 
-# XdcrCasesIntraCluster
-- TestXdcrCreateClusterLocalTLS
+# XDCRCasesIntraCluster
+- TestXDCRCreateClusterLocalTLS
 
-# XdcrCases
-- TestXdcrCreateClusterRemote
-- TestXdcrCreateClusterRemoteTLS
-- TestXdcrSourceNodeAdd
+# XDCRCases
+- TestXDCRCreateClusterRemote
+- TestXDCRCreateClusterRemoteTLS
+- TestXDCRSourceNodeAdd
 
 # SyncGatewayIntraCluster
 - TestSyncGatewayCreateLocal
@@ -134,8 +134,8 @@ testcases:
 - TestTLSRemoveOperatorCertificateAndAddBack
 - TestTLSRotateCAAndKillOperator
 
-# XdcrCases
-- TestXdcrRebalanceOutSourceClusterNodes
+# XDCRCases
+- TestXDCRRebalanceOutSourceClusterNodes
 - TestXDCRDeleteReplication
 
 # PersistentVolumeTests

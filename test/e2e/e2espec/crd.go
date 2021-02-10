@@ -483,9 +483,9 @@ func NewSupportableCluster(size int) *couchbasev2.CouchbaseCluster {
 	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
 }
 
-// basic 3 node cluster with Xdcr cluster
+// basic 3 node cluster with XDCR cluster
 // TODO: This doesn't appear to do anything special any more.
-func NewBasicXdcrCluster(size int) *couchbasev2.CouchbaseCluster {
+func NewBasicXDCRCluster(size int) *couchbasev2.CouchbaseCluster {
 	spec := couchbasev2.ClusterSpec{
 		Image: e2e_constants.CouchbaseServerImage,
 		Security: couchbasev2.CouchbaseClusterSecuritySpec{

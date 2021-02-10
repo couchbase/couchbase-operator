@@ -214,7 +214,7 @@ func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *
 
 // NewXDCRrClusterGeneric creates a cluster for use with generic, IP-based networking (DEPRECATED).
 func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXdcrCluster(size)
+	clusterSpec := e2espec.NewBasicXDCRCluster(size)
 	clusterSpec.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
 		ExposeAdminConsole: true,
 		ExposedFeatures: couchbasev2.ExposedFeatureList{
@@ -246,7 +246,7 @@ func MustNewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, size int) *couc
 // The TLS configuration is optional.
 // The TLS policy is optional.
 func NewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXdcrCluster(size)
+	clusterSpec := e2espec.NewBasicXDCRCluster(size)
 
 	// If DNS is explicitly stated, then add it to the pod templates.
 	if dns != nil {
