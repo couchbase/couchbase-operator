@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
+	"net"
 	"net/url"
 	"reflect"
 	"sort"
@@ -339,6 +340,28 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	// TLS configuration
 	// c.api.SetUUID("")
 	// defer c.api.SetUUID(c.cluster.Status.ClusterID)
+
+	// Explicitly change the network mode before doing anything else.
+	if c.cluster.Spec.Networking.AddressFamily != nil {
+		var family couchbaseutil.AddressFamily
+
+		switch *c.cluster.Spec.Networking.AddressFamily {
+		case couchbasev2.AFInet:
+			family = couchbaseutil.AddressFamilyIPV4
+		case couchbasev2.AFInet6:
+			family = couchbaseutil.AddressFamilyIPV6
+		default:
+			return nil, fmt.Errorf("%w: unexpected address family %v", errors.NewStackTracedError(errors.ErrInternalError), family)
+		}
+
+		config := &couchbaseutil.NodeNetworkConfiguration{
+			AddressFamily: family,
+		}
+
+		if err := couchbaseutil.SetNodeNetworkConfiguration(config).InPlaintext().RetryFor(time.Minute).On(c.api, newMember); err != nil {
+			return nil, err
+		}
+	}
 
 	// Check the pod is EE.  DNS should be working (as checked by the wait above), but
 	// it has been observed that this may still need a retry.
@@ -1146,7 +1169,17 @@ func waitAlternateAddressReachable(addresses *couchbaseutil.AlternateAddressesEx
 		port = int(addresses.Ports.AdminServicePortTLS)
 	}
 
-	return netutil.WaitForHostPort(ctx, fmt.Sprintf("%s:%d", addresses.Hostname, port))
+	// If the address is IPv6, wrap it in brackets as per https://golang.org/pkg/net/#Dial.
+	hostname := addresses.Hostname
+
+	ip := net.ParseIP(hostname)
+	if ip != nil {
+		if strings.Contains(ip.String(), ":") {
+			hostname = fmt.Sprintf("[%s]", ip.String())
+		}
+	}
+
+	return netutil.WaitForHostPort(ctx, fmt.Sprintf("%s:%d", hostname, port))
 }
 
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate

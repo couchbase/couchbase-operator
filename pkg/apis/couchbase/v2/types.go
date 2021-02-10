@@ -1396,7 +1396,24 @@ const (
 	NetworkPlatformIstio NetworkPlatform = "Istio"
 )
 
+// AddressFamily allows you to select the IP protocol version.
+// +kubebuilder:validation:Enum=IPv4;IPv6
+type AddressFamily string
+
+const (
+	AFInet AddressFamily = "IPv4"
+
+	AFInet6 AddressFamily = "IPv6"
+)
+
 type CouchbaseClusterNetworkingSpec struct {
+	// DEVELOPER PREVIEW - this feature is not for production use.
+	// AddressFamily allows the manual selection of the address family to use.
+	// Couchbase server will default to "IPv4" regardless of underlying network
+	// configuration, so this must be manually set to enable use on an "IPv6"
+	// only network.  This field is immutable and cannot be changed once set.
+	AddressFamily *AddressFamily `json:"addressFamily,omitempty"`
+
 	// ExposeAdminConsole creates a service referencing the admin console.
 	// The service is configured by the adminConsoleServiceTemplate field.
 	ExposeAdminConsole bool `json:"exposeAdminConsole,omitempty"`

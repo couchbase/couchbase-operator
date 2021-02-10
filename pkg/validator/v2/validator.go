@@ -3,6 +3,7 @@ package v2
 import (
 	"crypto/x509"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -1272,6 +1273,10 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 	if current.Spec.Security.AdminSecret != updated.Spec.Security.AdminSecret {
 		err := util.NewUpdateError("spec.authSecret", "body")
 		errs = append(errs, err)
+	}
+
+	if !reflect.DeepEqual(current.Spec.Networking.AddressFamily, updated.Spec.Networking.AddressFamily) {
+		errs = append(errs, util.NewUpdateError(`spec.networking.addressFamily`, `body`))
 	}
 
 	for _, cur := range current.Spec.Servers {

@@ -969,6 +969,22 @@ Will be populated by defaults if not specified.
 
 Networking defines Couchbase cluster networking options such as network topology, TLS and DDNS settings.
 
+=== couchbaseclusters.spec.networking.addressFamily
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `IPv4, IPv6`
+
+==== Description
+
+*DEVELOPER PREVIEW* - this feature is not for production use.
+
+AddressFamily allows the manual selection of the address family to use.
+Couchbase server will default to "IPv4" regardless of underlying network configuration, so this must be manually set to enable use on an "IPv6" only network.
+This field is immutable and cannot be changed once set.
+
 === couchbaseclusters.spec.networking.adminConsoleServiceTemplate
 
 ==== Constraints

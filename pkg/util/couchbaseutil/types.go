@@ -1069,7 +1069,7 @@ type NodeNetworkConfiguration struct {
 	AddressFamily AddressFamily `json:"afamiliy" url:"afamily,omitempty"`
 
 	// NodeEncryption is whether encyryption is enabled for a node.
-	NodeEncryption OnOrOff `json:"nodeEncryption" url:"nodeEncryption"`
+	NodeEncryption OnOrOff `json:"nodeEncryption" url:"nodeEncryption,omitempty"`
 }
 
 // Client certificate authentication prefixes, used to extract the user name

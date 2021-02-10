@@ -199,6 +199,7 @@ spec:
       nestedGroupsMaxDepth: 10
       cacheValueLifetime: 300000
   networking:
+    addressFamily: IPv4
     exposeAdminConsole: false
     adminConsoleServices:
       - data

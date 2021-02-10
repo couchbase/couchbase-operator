@@ -169,6 +169,10 @@ def generate_description(content, description):
             line = re.sub('DEPRECATED', '*DEPRECATED*', line)
             line_break = True
 
+        if 'DEVELOPER PREVIEW' in line:
+            line = re.sub('DEVELOPER PREVIEW', '*DEVELOPER PREVIEW*', line)
+            line_break = True
+
         content.append(line)
         if line_break:
             content.append('')

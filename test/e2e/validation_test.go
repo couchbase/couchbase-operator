@@ -1756,6 +1756,12 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			expectedErrors: []string{"spec.filterExpression"},
 		},
 		// Poor po!
+		{
+			name:           "TestValidateNetworkAddressFamilyImmutable",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/addressFamily", couchbasev2.AFInet6)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.networking.addressFamily`},
+		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
