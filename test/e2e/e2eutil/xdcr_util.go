@@ -355,7 +355,7 @@ func EstablishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	if err = waitForResourceEventFromNow(ctx, srcK8s, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
+	if err = waitForResourceEventFromNow(ctx, nil, srcK8s, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
 		return
 	}
 
@@ -452,7 +452,7 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	if err = waitForResourceEventFromNow(ctx, srcK8s, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
+	if err = waitForResourceEventFromNow(ctx, nil, srcK8s, source, k8sutil.ReplicationAddedEvent(source, name)); err != nil {
 		return
 	}
 

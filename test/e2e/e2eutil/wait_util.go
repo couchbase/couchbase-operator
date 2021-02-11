@@ -207,8 +207,25 @@ func ResourceCondition(k8s *types.Cluster, resource runtime.Object, conditionTyp
 }
 
 // waitForResourceEvent watches event streams for a given resource and returns when the requested
-// event has been seen.
-func waitForResourceEvent(ctx context.Context, k8s *types.Cluster, resource runtime.Object, event *v1.Event, epoch time.Time) error {
+// event has been seen.  The context allows for timeouts (everything should have one that does this),
+// the ready channel, if not nil, is closed when the routine is up and running, or on error, so it can
+// unblock a caller that needs to wait until this is running before continuing.
+func waitForResourceEvent(ctx context.Context, ready chan struct{}, k8s *types.Cluster, resource runtime.Object, event *v1.Event, epoch time.Time) error {
+	// If the ready channel is valid, and we've not closed it, do so.
+	// This will occur if some error happened before the point where we
+	// normally close to indicate we're watching, and unblock the caller.
+	defer func() {
+		if ready == nil {
+			return
+		}
+
+		select {
+		case <-ready:
+		default:
+			close(ready)
+		}
+	}()
+
 	// Map from object to dynamic API mapping... "e.g. couchbase.com/v2/couchbaseclusters"
 	kinds, _, err := scheme.Scheme.ObjectKinds(resource)
 	if err != nil {
@@ -249,6 +266,10 @@ func waitForResourceEvent(ctx context.Context, k8s *types.Cluster, resource runt
 
 	resultChan := watch.ResultChan()
 
+	if ready != nil {
+		close(ready)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -270,14 +291,14 @@ func waitForResourceEvent(ctx context.Context, k8s *types.Cluster, resource runt
 	}
 }
 
-func waitForResourceEventFromNow(ctx context.Context, k8s *types.Cluster, resource runtime.Object, event *v1.Event) error {
-	return waitForResourceEvent(ctx, k8s, resource, event, time.Now())
+func waitForResourceEventFromNow(ctx context.Context, ready chan struct{}, k8s *types.Cluster, resource runtime.Object, event *v1.Event) error {
+	return waitForResourceEvent(ctx, ready, k8s, resource, event, time.Now())
 }
 
 func waitForResourceEventEver(ctx context.Context, k8s *types.Cluster, resource runtime.Object, event *v1.Event) error {
 	// Tonight we're gonna party like it's 1999... you must have royally screwed up if this
 	// isn't far enough in the past to see every event!
-	return waitForResourceEvent(ctx, k8s, resource, event, time.Date(1999, time.December, 31, 23, 59, 59, 0, time.UTC))
+	return waitForResourceEvent(ctx, nil, k8s, resource, event, time.Date(1999, time.December, 31, 23, 59, 59, 0, time.UTC))
 }
 
 // mustWaitForResourceEventFromNow watches event streams for a given resource and returns when the requested
@@ -286,7 +307,7 @@ func mustWaitForResourceEventFromNow(t *testing.T, k8s *types.Cluster, resource 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	if err := waitForResourceEventFromNow(ctx, k8s, resource, event); err != nil {
+	if err := waitForResourceEventFromNow(ctx, nil, k8s, resource, event); err != nil {
 		Die(t, err)
 	}
 }
@@ -803,10 +824,16 @@ func NewAsyncOperationWithTimeout(timeout time.Duration) *AsyncOperation {
 }
 
 // Run executes the specified function with the operation's cancellable context.
-func (a *AsyncOperation) Run(f func(context.Context) error) {
+func (a *AsyncOperation) Run(f func(context.Context, chan struct{}) error) {
+	ready := make(chan struct{})
+
 	go func() {
-		a.err <- f(a.ctx)
+		a.err <- f(a.ctx, ready)
 	}()
+
+	// All async operations must indicate that they have started to do what they
+	// are meant to do (or errored), before we continue on our merry way.
+	<-ready
 }
 
 // WaitForCompletion blocks waiting for the operation to complete.
@@ -836,8 +863,8 @@ func (a *AsyncOperation) Cancel() {
 // WaitForPendingClusterEvent returns a channel to be
 // populated with result of a pending cluster event.
 func WaitForPendingClusterEvent(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) *AsyncOperation {
-	f := func(ctx context.Context) error {
-		return waitForResourceEventFromNow(ctx, k8s, cl, event)
+	f := func(ctx context.Context, ready chan struct{}) error {
+		return waitForResourceEventFromNow(ctx, ready, k8s, cl, event)
 	}
 
 	op := NewAsyncOperationWithTimeout(timeout)
