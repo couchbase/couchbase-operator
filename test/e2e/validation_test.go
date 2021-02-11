@@ -1161,6 +1161,18 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.maxTTL`},
 		},
+		{
+			name:           "TestValidateBucketMetadataNameCollision",
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/metadata/name", "bucket0")},
+			shouldFail:     true,
+			expectedErrors: []string{`bucket0`},
+		},
+		{
+			name:           "TestValidateBucketSpecNameCollision",
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/name", "bucket0")},
+			shouldFail:     true,
+			expectedErrors: []string{`bucket0`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

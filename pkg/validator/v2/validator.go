@@ -20,6 +20,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -564,6 +565,10 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		}
 	}
 
+	if err := validateBucketNameConstraints(v, customResource); err != nil {
+		errs = append(errs, err)
+	}
+
 	if err := validateMemoryConstraints(v, customResource); err != nil {
 		errs = append(errs, err)
 	}
@@ -666,6 +671,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		}
 	}
 
+	if err := validateBucketNameConstraints(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
 	if err := validateMemoryConstraints(v, bucket); err != nil {
 		errs = append(errs, err)
 	}
@@ -698,6 +707,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 		}
 	}
 
+	if err := validateBucketNameConstraints(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
 	if err := validateMemoryConstraints(v, bucket); err != nil {
 		errs = append(errs, err)
 	}
@@ -716,6 +729,10 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
 		}
+	}
+
+	if err := validateBucketNameConstraints(v, bucket); err != nil {
+		errs = append(errs, err)
 	}
 
 	if err := validateMemoryConstraints(v, bucket); err != nil {
@@ -1079,6 +1096,102 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 	return
 }
 
+// getClusterBuckets returns all abstract buckets for a cluster as per its scoping rules.
+func getClusterBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]couchbasev2.AbstractBucket, error) {
+	// Collect all the buckets referenced by the cluster using the same
+	// scoping rules as defined for the cluster.
+	buckets := []couchbasev2.AbstractBucket{}
+
+	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range couchbaseBuckets.Items {
+		buckets = append(buckets, &couchbaseBuckets.Items[i])
+	}
+
+	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range ephemeralBuckets.Items {
+		buckets = append(buckets, &ephemeralBuckets.Items[i])
+	}
+
+	memcachedBuckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range memcachedBuckets.Items {
+		buckets = append(buckets, &memcachedBuckets.Items[i])
+	}
+
+	return buckets, nil
+}
+
+// validateBucketNameConstraints takes a cluster and finds all buckets, or
+// a bucket and finds all clusters referencing it, checking that bucket names
+// are not reused.
+func validateBucketNameConstraints(v *types.Validator, object runtime.Object) error {
+	// Gather the clusters affected by this change (either adding a cluster or
+	// a bucket -- bucket names are immutable).
+	clusters := []*couchbasev2.CouchbaseCluster{}
+
+	switch t := object.(type) {
+	case *couchbasev2.CouchbaseBucket, *couchbasev2.CouchbaseEphemeralBucket, *couchbasev2.CouchbaseMemcachedBucket:
+		bucket, ok := object.(metav1.Object)
+		if !ok {
+			return fmt.Errorf("failed to type assert bucket to meta object")
+		}
+
+		namespacedClusters, err := v.Abstraction.GetCouchbaseClusters(bucket.GetNamespace())
+		if err != nil {
+			return err
+		}
+
+		for i := range namespacedClusters.Items {
+			clusters = append(clusters, &namespacedClusters.Items[i])
+		}
+	case *couchbasev2.CouchbaseCluster:
+		clusters = append(clusters, t)
+	default:
+		return fmt.Errorf("validate bucket names: unsupported type")
+	}
+
+	// Check each cluster affected by this operation...
+	for _, cluster := range clusters {
+		// Buckets aren't managed, you are on your own!
+		if !cluster.Spec.Buckets.Managed {
+			continue
+		}
+
+		// Collect all the buckets referenced by the cluster using the same
+		// scoping rules as defined for the cluster.
+		buckets, err := getClusterBuckets(v, cluster)
+		if err != nil {
+			return err
+		}
+
+		// Gather the names in an associative array (a set essentially) and look for duplicates.
+		names := map[string]interface{}{}
+
+		for _, bucket := range buckets {
+			name := bucket.GetName()
+
+			if _, ok := names[name]; ok {
+				return fmt.Errorf("bucket name %s defined multiple times for cluster %s", name, cluster.Name)
+			}
+
+			names[name] = nil
+		}
+	}
+
+	return nil
+}
+
 // validateMemoryConstraints works in two different ways:
 // * If a cluster is specified we are creating or updating cluster. Look up all buckets selected by it
 // and ensure the total memory requirements do not surpass the data service memory quota.
@@ -1125,39 +1238,19 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 		return nil
 	}
 
-	buckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	// Collect all the buckets referenced by the cluster using the same
+	// scoping rules as defined for the cluster.
+	buckets, err := getClusterBuckets(v, cluster)
 	if err != nil {
 		return err
 	}
 
-	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
-	if err != nil {
-		return err
-	}
-
-	memcachedBuckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
-	if err != nil {
-		return err
-	}
-
+	// Accumulate the per-node bucket memory quota, and reject it if greater than
+	// that defined for the data service.
 	allocated := resource.NewQuantity(0, resource.BinarySI)
 
-	for _, bucket := range buckets.Items {
-		if bucket.Spec.MemoryQuota != nil {
-			allocated.Add(*bucket.Spec.MemoryQuota)
-		}
-	}
-
-	for _, bucket := range ephemeralBuckets.Items {
-		if bucket.Spec.MemoryQuota != nil {
-			allocated.Add(*bucket.Spec.MemoryQuota)
-		}
-	}
-
-	for _, bucket := range memcachedBuckets.Items {
-		if bucket.Spec.MemoryQuota != nil {
-			allocated.Add(*bucket.Spec.MemoryQuota)
-		}
+	for _, bucket := range buckets {
+		allocated.Add(*bucket.GetMemoryQuota())
 	}
 
 	if cluster.Spec.ClusterSettings.DataServiceMemQuota != nil {

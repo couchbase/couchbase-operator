@@ -11,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -718,4 +719,57 @@ func (b *CouchbaseEphemeralBucket) GetMinimumDurability() CouchbaseEphemeralBuck
 	}
 
 	return CouchbaseEphemeralBucketMinimumDurabilityNone
+}
+
+// AbstractBucket give a bit of commonality to buckets!!
+type AbstractBucket interface {
+	// GetName returns the Couchbase bucket name, either from the metadata
+	// or overridden by the spec name (which is more flexible and not tied
+	// to DNS names).
+	GetName() string
+
+	// GetMemoryQuota simply returns the buckets resource allocation.
+	GetMemoryQuota() *resource.Quantity
+}
+
+func (b *CouchbaseBucket) GetName() string {
+	name := b.Name
+
+	if b.Spec.Name != "" {
+		name = b.Spec.Name
+	}
+
+	return name
+}
+
+func (b *CouchbaseBucket) GetMemoryQuota() *resource.Quantity {
+	return b.Spec.MemoryQuota
+}
+
+func (b *CouchbaseEphemeralBucket) GetName() string {
+	name := b.Name
+
+	if b.Spec.Name != "" {
+		name = b.Spec.Name
+	}
+
+	return name
+}
+
+func (b *CouchbaseEphemeralBucket) GetMemoryQuota() *resource.Quantity {
+	return b.Spec.MemoryQuota
+}
+
+func (b *CouchbaseMemcachedBucket) GetName() string {
+	name := b.Name
+
+	if b.Spec.Name != "" {
+		name = b.Spec.Name
+	}
+
+	return name
+}
+
+func (b *CouchbaseMemcachedBucket) GetMemoryQuota() *resource.Quantity {
+	return b.Spec.MemoryQuota
 }
