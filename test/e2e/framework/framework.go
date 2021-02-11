@@ -200,6 +200,7 @@ func readYamlData() (err error) {
 	flag.Var(&tests, "test", "Individual test to run")
 	flag.BoolVar(&util.UseANSIColor, "color", false, "Prettify output")
 	flag.IntVar(&params.DocsCount, "docs", 10, "The amount of Documents created during tests")
+	flag.StringVar(&params.LogLevel, "log-level", "debug", "Log Level to use")
 
 	// File based configuration (meat-space friendly)
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
@@ -368,8 +369,8 @@ func GetDuration(timeoutStr string) time.Duration {
 	return durationToReturn
 }
 
-func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout fmt.Stringer) *appsv1.Deployment {
-	deployment := config.GetOperatorDeployment(operatorImage, k8s.PullSecrets, false, podCreateTimeout, "debug")
+func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout fmt.Stringer, logLevel string) *appsv1.Deployment {
+	deployment := config.GetOperatorDeployment(operatorImage, k8s.PullSecrets, false, podCreateTimeout, logLevel)
 
 	return deployment
 }
@@ -399,6 +400,7 @@ func Setup() (err error) {
 		S3AccessKey:                   runtimeParams.S3AccessKey,
 		S3SecretID:                    runtimeParams.S3SecretID,
 		DocsCount:                     runtimeParams.DocsCount,
+		LogLevel:                      runtimeParams.LogLevel,
 	}
 
 	if runtimeParams.StorageClassName != "" {
@@ -456,6 +458,7 @@ func Setup() (err error) {
 	logrus.Info(" →  Compression Mode: " + runtimeParams.CompressionMode)
 	logrus.Info(" →  S3 Bucket: " + runtimeParams.S3Bucket)
 	logrus.Info(" →  Documents: " + strconv.Itoa(runtimeParams.DocsCount))
+	logrus.Info(" →  Logging Level: " + runtimeParams.LogLevel)
 
 	logrus.Info(util.PrettyHeading("Clusters"))
 
@@ -903,7 +906,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 			"operator",
 			"--image=" + f.OpImage,
 			"--pod-creation-timeout=" + f.PodCreateTimeout.String(),
-			"--log-level=debug",
+			"--log-level=" + f.LogLevel,
 			"--namespace=" + cluster.Namespace,
 			"--kubeconfig=" + cluster.KubeConfPath,
 		}
@@ -923,7 +926,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 		// For waiting and for re-creation, cache the deployment by calling directly
 		// into the configuration code.  Remember to populate the namespace too as
 		// that's what the framework uses.
-		cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout)
+		cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout, f.LogLevel)
 		cluster.OperatorDeployment.Namespace = cluster.Namespace
 
 		if err := e2eutil.WaitUntilOperatorReady(cluster, 5*time.Minute); err != nil {
