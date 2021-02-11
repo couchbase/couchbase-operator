@@ -21,6 +21,8 @@ NATIVE_TYPES = [
     'couchbaseclusters.spec.backup.nodeSelector',
     'couchbaseclusters.spec.backup.resources',
     'couchbaseclusters.spec.backup.selector',
+    'couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.resources',
+    'couchbaseclusters.spec.logging.server.sidecar.resources',
     'couchbaseclusters.spec.monitoring.prometheus.resources',
     'couchbaseclusters.spec.networking.adminConsoleServiceTemplate',
     'couchbaseclusters.spec.networking.exposedFeatureServiceTemplate',

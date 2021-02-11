@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,20 +27,22 @@ import (
 )
 
 const (
-	couchbaseTLSVolumeMountDir      = "/opt/couchbase/var/lib/couchbase/inbox"
-	couchbaseVolumeDefaultConfigDir = "/opt/couchbase/var/lib/couchbase"
-	CouchbaseVolumeMountLogsDir     = "/opt/couchbase/var/lib/couchbase/logs"
-	couchbaseVolumeDefaultEtcDir    = "/opt/couchbase/etc"
-	CouchbaseVolumeMountDataDir     = "/mnt/data"
-	CouchbaseVolumeMountIndexDir    = "/mnt/index"
-	defaultSubPathName              = "default"
-	etcSubPathName                  = "etc"
-	prometheusPort                  = 9091
-	serverSecretMountPath           = "/var/run/secrets/couchbase.com/couchbase-server-tls"
-	operatorSecretMountPath         = "/var/run/secrets/couchbase.com/couchbase-operator-tls"
-	metricsTokenMountPath           = "/var/run/secrets/couchbase.com/metrics-token"
-	MetricsContainerName            = "metrics"
-	podReadinessCondition           = v1.PodConditionType("pod.couchbase.com/readiness")
+	couchbaseTLSVolumeMountDir                = "/opt/couchbase/var/lib/couchbase/inbox"
+	couchbaseVolumeDefaultConfigDir           = "/opt/couchbase/var/lib/couchbase"
+	CouchbaseVolumeMountLogsDir               = "/opt/couchbase/var/lib/couchbase/logs"
+	couchbaseVolumeDefaultEtcDir              = "/opt/couchbase/etc"
+	CouchbaseVolumeMountDataDir               = "/mnt/data"
+	CouchbaseVolumeMountIndexDir              = "/mnt/index"
+	defaultSubPathName                        = "default"
+	etcSubPathName                            = "etc"
+	prometheusPort                            = 9091
+	serverSecretMountPath                     = "/var/run/secrets/couchbase.com/couchbase-server-tls"
+	operatorSecretMountPath                   = "/var/run/secrets/couchbase.com/couchbase-operator-tls"
+	metricsTokenMountPath                     = "/var/run/secrets/couchbase.com/metrics-token"
+	MetricsContainerName                      = "metrics"
+	podReadinessCondition                     = v1.PodConditionType("pod.couchbase.com/readiness")
+	CouchbaseLogSidecarContainerName          = "logging"
+	CouchbaseAuditCleanupSidecarContainerName = "audit-cleanup"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -527,6 +530,149 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		{
 			ConditionType: podReadinessCondition,
 		},
+	}
+
+	// Add the logging side car container if enabled and we have pvcState available
+	fbs := cluster.Spec.Logging.Server
+	if fbs != nil && fbs.Enabled {
+		// Iterate over mounts to find the one we need for logs
+		// Use the container.VolumeMounts to handle pvcState == nil as this is already checked above
+		for _, mount := range container.VolumeMounts {
+			// Only need to cope with a mutually exclusive set of mount paths
+			if mount.MountPath == CouchbaseVolumeMountLogsDir || mount.MountPath == couchbaseVolumeDefaultConfigDir {
+				// This should be always present as defaulted if not provided
+				sidecarConfig := fbs.Sidecar
+
+				// Set up the volume containing the Secret contents to configure the sidecar
+				configVolumeMount := v1.VolumeMount{
+					Name:      fbs.ConfigurationName,
+					MountPath: sidecarConfig.ConfigurationMountPath,
+					ReadOnly:  true,
+				}
+
+				// Set up a duplicate volume mount but make sure to set it read-only
+				readonlyLogsMount := mount.DeepCopy()
+				readonlyLogsMount.ReadOnly = true
+
+				// If we have the default mount then extend further to only provide the logs sub-path
+				if mount.MountPath == couchbaseVolumeDefaultConfigDir {
+					readonlyLogsMount.SubPath = defaultSubPathName + "/logs"
+					readonlyLogsMount.MountPath = CouchbaseVolumeMountLogsDir
+				}
+
+				// Optional resource requirements - either left nil or set to what is provided.
+				var loggingResources v1.ResourceRequirements
+				if sidecarConfig.Resources != nil {
+					loggingResources = *sidecarConfig.Resources
+				}
+
+				// Create a side car container to retrieve the logs.
+				logging := v1.Container{
+					Name:  CouchbaseLogSidecarContainerName,
+					Image: sidecarConfig.Image,
+					VolumeMounts: []v1.VolumeMount{
+						*readonlyLogsMount,
+						configVolumeMount,
+					},
+					Env: []v1.EnvVar{
+						{
+							Name:  "COUCHBASE_LOGS",
+							Value: CouchbaseVolumeMountLogsDir,
+						},
+					},
+					Resources: loggingResources,
+				}
+
+				// Make sure we include the volume for the Secret as well
+				pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+					Name: fbs.ConfigurationName,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName: fbs.ConfigurationName,
+						},
+					},
+				})
+
+				pod.Spec.Containers = append(pod.Spec.Containers, logging)
+
+				// Deal with audit log cleanup if both auditing is enabled and then GC is also enabled.
+				// Disgusting solution to remove all rotated audit logs after configurable amount of timeand output those deleted to stdout for reference.
+				acs := cluster.Spec.Logging.Audit
+				if acs != nil && acs.Enabled {
+					// We may disable this GC later once the server handles cleanup of rotated logs properly.
+					if acs.GarbageCollection != nil {
+						// Determine if GC is enabled
+						gc := acs.GarbageCollection.Sidecar
+						if gc != nil && gc.Enabled {
+							// Convert & truncate age to mmin units to handle more granularity than days with mtime
+							age := int64(gc.Age.Duration.Minutes())
+							if age < 0 {
+								age = 0
+							}
+
+							// Now we want the interval to sleep for between runs
+							interval := int64(gc.Interval.Duration.Seconds())
+							if interval < 0 {
+								interval = 0
+							}
+
+							var auditResources v1.ResourceRequirements
+							if gc.Resources != nil {
+								auditResources = *gc.Resources
+							}
+
+							auditMount := mount.DeepCopy()
+
+							// This is a significant security concern but is required to delete
+							auditMount.ReadOnly = false
+
+							// If we have the default mount then extend further to only provide the logs sub-path.
+							// An attempt at mitigating some security concerns with full access to a volume from an arbitrary shell.
+							if mount.MountPath == couchbaseVolumeDefaultConfigDir {
+								auditMount.SubPath = defaultSubPathName + "/logs"
+							}
+
+							auditcleaner := v1.Container{
+								Name:  CouchbaseAuditCleanupSidecarContainerName,
+								Image: gc.Image,
+								VolumeMounts: []v1.VolumeMount{
+									*auditMount,
+								},
+								Command: []string{
+									"/bin/sh",
+								},
+								// Note that no support for relocation of audit logs - this should not ever be done with the operator.
+								// We also provide the env vars for the various intervals in case someone wants to override things in the future.
+								Env: []v1.EnvVar{
+									{
+										Name:  "AUDIT_LOG_DIR",
+										Value: mount.MountPath,
+									},
+									{
+										Name:  "AUDIT_CLEANUP_INTERVAL",
+										Value: strconv.FormatInt(interval, 10),
+									},
+									{
+										Name:  "AUDIT_CLEANUP_AGE",
+										Value: strconv.FormatInt(age, 10),
+									},
+								},
+								Args: []string{
+									"-c",
+									"while true; do sleep ${AUDIT_CLEANUP_INTERVAL} ; echo \"Cleaning audit logs every ${AUDIT_CLEANUP_INTERVAL}s, files older than ${AUDIT_CLEANUP_AGE}\"; find ${AUDIT_LOG_DIR} -mmin ${AUDIT_CLEANUP_AGE} -type f -name \"*-audit.log\" -delete -print; done",
+								},
+								Resources: auditResources,
+							}
+
+							pod.Spec.Containers = append(pod.Spec.Containers, auditcleaner)
+						}
+					}
+				}
+
+				// Once we have found one of the mounts there are no other options - they're mutually exclusive
+				break
+			}
+		}
 	}
 
 	// If we are in istio mode, add in DNS configuration to avoid hairpinning

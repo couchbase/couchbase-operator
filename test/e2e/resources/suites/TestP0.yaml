@@ -244,3 +244,8 @@ testcases:
 - TestPreviewModeEnabledAllowsStatefulMutualTLS
 - TestPreviewModeEnabledAllowsStatefulMandatoryMutualTLS
 
+# Logging tests
+- TestLoggingAndAuditingDefaults
+- TestAuditingNoLogging
+- TestCustomLogging
+- TestChangeLogShipperImage

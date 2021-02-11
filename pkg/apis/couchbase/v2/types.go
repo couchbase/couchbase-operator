@@ -1555,6 +1555,12 @@ type CouchbaseClusterLoggingSpec struct {
 	// LogRetentionCount gives the number of persistent log PVCs to keep.
 	// +kubebuilder:validation:Minimum=0
 	LogRetentionCount int `json:"logRetentionCount,omitempty"`
+
+	// Specification of all logging configuration required to manage the sidecar containers in each pod.
+	Server *CouchbaseClusterLoggingConfigurationSpec `json:"server,omitempty"`
+
+	// Used to manage the audit configuration directly
+	Audit *CouchbaseClusterAuditLoggingSpec `json:"audit,omitempty"`
 }
 
 // DNS contains information for Dynamic DNS support.
@@ -2384,14 +2390,133 @@ type CouchbaseClusterMonitoringPrometheusSpec struct {
 	Enabled bool `json:"enabled,omitempty"`
 
 	// Image is the metrics image to be used to collect metrics.
-	// +kubebuilder:validation:Pattern="^[\\w_\\.\\-/]+:([\\w\\d]+-)?\\d+\\.\\d+.\\d+(-[\\w\\d]+)?$"
+	// No validation is carried out as this can be any arbitrary repo and tag.
 	Image string `json:"image,omitempty"`
 
 	// Resources is the resource requirements for the metrics container.
-	// Will be populated by defaults if not specified.
+	// Will be populated by Kubernetes defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 
 	// AuthorizationSecret is the name of a Kubernetes secret that contains a
 	// bearer token to authorize GET requests to the metrics endpoint
 	AuthorizationSecret *string `json:"authorizationSecret,omitempty"`
+}
+
+type CouchbaseClusterLoggingConfigurationSpec struct {
+	// Enabled is a boolean that enables the logging sidecar container.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// A boolean which indicates whether the operator should manage the configuration or not.
+	// If omitted then this defaults to true which means the operator will attempt to reconcile it to default values.
+	// To use a custom configuration make sure to set this to false.
+	// +kubebuilder:default=true
+	ManageConfiguration *bool `json:"manageConfiguration,omitempty"`
+
+	// ConfigurationName is the name of the Secret to use holding the logging configuration in the namespace.
+	// A Secret is used to ensure we can safely store credentials but this can be populated from plaintext if acceptable too.
+	// If it does not exist then one will be created with defaults in the namespace so it can be easily updated whilst running.
+	// +kubebuilder:default="fluent-bit-config"
+	ConfigurationName string `json:"configurationName,omitempty"`
+
+	// Any specific logging sidecar container configuration.
+	// +kubebuilder:default="x-couchbase-object"
+	Sidecar *LogShipperSidecarSpec `json:"sidecar,omitempty"`
+}
+
+type LogShipperSidecarSpec struct {
+	// Image is the image to be used to deal with logging as a sidecar.
+	// No validation is carried out as this can be any arbitrary repo and tag.
+	// It will default to the latest supported version of Fluent Bit.
+	// +kubebuilder:default="fluent/fluent-bit:1.7"
+	Image string `json:"image,omitempty"`
+
+	// ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
+	// This defaults to the usual Fluent Bit mount path.
+	// If another log shipping image is used that needs a different mount then modify this.
+	// +kubebuilder:default="/fluent-bit/etc/"
+	ConfigurationMountPath string `json:"configurationMountPath,omitempty"`
+
+	// Resources is the resource requirements for the sidecar container.
+	// Will be populated by Kubernetes defaults if not specified.
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// The AuditDisabledUser is actually a compound string intended to feed a two-element struct.
+// Its value may be:
+// 1. A local user, specified in the form localusername/local.
+// 2. An external user, specified in the form externalusername/external.
+// 3. An internal user, specified in the form @internalusername/local.
+// We add a quick validation check to make sure these match and prevent being rejected by the API later.
+// This is just a sanity check, the REST API may still reject the user for other reasons.
+// +kubebuilder:validation:Pattern="^.+/(local|external)$"
+type AuditDisabledUser string
+
+// The CouchbaseClusterAuditLoggingSpec structure is primarily based on the needs of the Audit REST API.
+// An overview of auditing can be found here: https://docs.couchbase.com/server/current/learn/security/auditing.html
+// More details on the REST API can be found here: https://docs.couchbase.com/server/current/rest-api/rest-auditing.html
+type CouchbaseClusterAuditLoggingSpec struct {
+	// Enabled is a boolean that enables the audit capabilities.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// The list of event ids to disable for auditing purposes.
+	// This is passed to the REST API with no verification by the operator.
+	// Refer to the documentation for details:
+	// https://docs.couchbase.com/server/current/audit-event-reference/audit-event-reference.html
+	DisabledEvents []int `json:"disabledEvents,omitempty"`
+
+	// The list of users to ignore for auditing purposes.
+	// This is passed to the REST API with minimal validation it meets an acceptable regex pattern.
+	// Refer to the documentation for full details on how to configure this:
+	// https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html#ignoring-events-by-user
+	DisabledUsers []AuditDisabledUser `json:"disabledUsers,omitempty"`
+
+	// The interval to optionally rotate the audit log.
+	// This is passed to the REST API, see here for details:
+	// https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html
+	Rotation *CouchbaseClusterLogRotationSpec `json:"rotation,omitempty"`
+
+	// Handle all optional garbage collection (GC) configuration for the audit functionality.
+	// This is not part of the audit REST API, it is intended to handle GC automatically for the audit logs.
+	// By default the Couchbase Server rotates the audit logs but does not clean up the rotated logs.
+	// This is left as an operation for the cluster administrator to manage, the operator allows for us to automate this:
+	// https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html
+	GarbageCollection *CouchbaseClusterAuditGarbageCollectionSpec `json:"garbageCollection,omitempty"`
+}
+
+type CouchbaseClusterLogRotationSpec struct {
+	// The interval at which to rotate log files, defaults to 15 minutes.
+	// +kubebuilder:default="15m"
+	Interval *metav1.Duration `json:"interval,omitempty"`
+
+	// Size allows the specification of a rotation size for the log, defaults to 20Mi.
+	// +kubebuilder:default="20Mi"
+	// +kubebuilder:validation:Type=string
+	Size *resource.Quantity `json:"size,omitempty"`
+}
+
+type CouchbaseClusterAuditGarbageCollectionSpec struct {
+	// Provide the sidecar configuration required (if so desired) to automatically clean up audit logs.
+	Sidecar *CouchbaseClusterAuditCleanupSidecarSpec `json:"sidecar,omitempty"`
+}
+
+type CouchbaseClusterAuditCleanupSidecarSpec struct {
+	// Enable this sidecar by setting to true, defaults to being disabled.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Image is the image to be used to run the audit sidecar helper.
+	// No validation is carried out as this can be any arbitrary repo and tag.
+	// +kubebuilder:default="busybox:1.32.1"
+	Image string `json:"image,omitempty"`
+
+	// The minimum age of rotated log files to remove, defaults to one hour.
+	// +kubebuilder:default="1h"
+	Age *metav1.Duration `json:"age,omitempty"`
+
+	// The interval at which to check for rotated log files to remove, defaults to 20 minutes.
+	// +kubebuilder:default="20m"
+	Interval *metav1.Duration `json:"interval,omitempty"`
+
+	// Resources is the resource requirements for the cleanup container.
+	// Will be populated by Kubernetes defaults if not specified.
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 }

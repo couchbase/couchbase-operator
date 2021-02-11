@@ -400,6 +400,69 @@ func SetIndexSettings(settings *IndexSettings) *Request {
 	return NewRequest((*Client).Post, "/settings/indexes", data, nil)
 }
 
+// GetAuditSettings retrieves the audit settings, shockingly.
+func GetAuditSettings(settings *AuditSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/audit", nil, settings)
+}
+
+// SetAuditSettings sets audit settings.
+func SetAuditSettings(settings AuditSettings) *Request {
+	// Audit REST API is a PITA so we use a custom marshalling method to cope with it.
+	// It requires the use of an empty key, not an empty array for the disabled settings if you want to disable all ids/users.
+	// This fails, the default JSON encoding for an empty array without omit empty (which just removes the key entirely):
+	// curl ... settings/audit \
+	// 	-d auditdEnabled=true \
+	// 	-d rotateSize=1024 \
+	// 	-d disabled="[]" | jq
+	// {
+	// 	"errors": {
+	// 		"disabled": "All event id's must be integers"
+	// 	}
+	// }
+	// This is correct:
+	// 	curl ... settings/audit \
+	// 		-d auditdEnabled=true \
+	// 		-d rotateSize=1024 \
+	// 		-d disabled= | jq
+	// Similarly the arrays have to be non-JSON ones and CSVs so no [] delimiters
+	// For users it is even worse, the POST request requires a CSV string but the GET response provides an array of structs:
+	// curl ... POST ... \
+	// -d disabledUsers=@eventing/local
+	// curl ... GET ...
+	// {..."disabledUsers":[{"name":"@eventing","domain":"local"}],...}
+	data := url.Values{}
+	data.Set("auditdEnabled", BoolAsStr(settings.Enabled))
+	data.Set("logPath", settings.LogPath)
+	data.Set("rotateInterval", IntToStr(settings.RotateInterval))
+	data.Set("rotateSize", IntToStr(settings.RotateSize))
+
+	// Deal with the non-standard CSV nonsense required by the audit REST API
+	eventsCSV := ""
+	for _, i := range settings.DisabledEvents {
+		if eventsCSV != "" {
+			eventsCSV += ","
+		}
+
+		eventsCSV += strconv.Itoa(i)
+	}
+
+	data.Set("disabled", eventsCSV)
+
+	// And now the custom struct array to a CSV
+	usersCSV := ""
+	for _, u := range settings.DisabledUsers {
+		if usersCSV != "" {
+			usersCSV += ","
+		}
+
+		usersCSV += u.Name + "/" + u.Domain
+	}
+
+	data.Set("disabledUsers", usersCSV)
+
+	return NewRequest((*Client).Post, "/settings/audit", []byte(data.Encode()), nil)
+}
+
 // GetNodesSelf returns information about the called node.
 func GetNodesSelf(node *NodeInfo) *Request {
 	return NewRequest((*Client).Get, "/nodes/self", nil, node)

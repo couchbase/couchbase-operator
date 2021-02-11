@@ -1,0 +1,681 @@
+= Log shipping from Couchbase =
+
+[abstract]
+Enable and setup log shipping to other tools for the Couchbase Autonomous Operator.
+
+include::partial$tutorial.adoc[]
+
+This guide walks through an example of enabling and configuring log shipping to Elasticsearch for the Couchbase Server pods.
+It also shows how to target Azure blob storage and Amazon S3 storage for the audit logs.
+
+== Log configuration
+
+The Couchbase server images currently log to various files in a volume per pod rather than standard output as is typical in Kubernetes environments. 
+However there is now support for a log shipper sidecar using Fluent Bit. 
+This can be enabled in the CRD, if not specified it defaults to disabled to maintain existing behavior.
+
+The Couchbase Autonomous Operator provides a default configuration via a `Secret`. 
+The name of this `Secret` is specified by the CRD and defaults to `fluent-bit-config`. 
+The purpose of the `Secret` is to provide the various configuration files as a volume to the logging sidecar. 
+This means you can add any configuration supported by Fluent Bit as a custom version of the `Secret` and the operator will use it in preference.
+
+The easiest way to do this is create the `Secret` prior to the cluster to guarantee it is used, again make sure it is in the right namespace.
+Here is an example that configures the logging sidecar to grab more logs and also send them to the Elasticsearch instance we configured previously.
+
+The `manageConfiguration` field in the CRD must be set to `false` to use a custom configuration, otherwise the operator will overwrite the `Secret` with its own version.
+
+Here is an example configuration that includes some other logs as well as audit:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fluent-bit-config
+stringData:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+  fluent-bit.conf: |
+    [SERVICE]
+        flush        1
+        daemon       Off
+        log_level    warn
+        parsers_file parsers.conf
+
+    # Add information for this container as standard keys: https://docs.fluentbit.io/manual/pipeline/filters/modify
+    # This is required to simplify downstream parsing to filter the different pod logs
+    [FILTER]
+        Name modify
+        Match *
+        Add pod ${HOSTNAME}
+        Add logshipper couchbase.sidecar.fluentbit
+    
+    @include output.conf
+    @include input.conf
+
+  input.conf: |
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/audit.log
+        Parser auditdb_log
+        # Read from the start of the file when you start up
+        Read_from_Head On
+        Path_Key filename
+        Tag couchbase.log.audit
+
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/indexer.log
+        Parser simple_log
+        Read_from_Head On
+        Path_Key filename
+        Tag couchbase.log.indexer
+    # Note this logger seems to not use a common case for level strings, i.e. info, Info and INFO are all provided. 
+    # We can manage with some Lua scripting here or leave to downstream fluentd, etc. to deal with.
+    # https://github.com/shunwen/fluent-plugin-rename-key/issues/19#issuecomment-528027457
+
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/memcached.log.000000.txt
+        # Make sure we only grab the latest version, not any rotated ones
+        Parser simple_log
+        Read_from_Head On
+        Path_Key filename
+        Tag couchbase.log.memcached
+
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/babysitter.log,${COUCHBASE_LOGS}/couchdb.log
+        Multiline On
+        Parser_Firstline erlang_multiline
+        Read_from_Head On
+        Path_Key filename
+        Skip_Long_Lines On
+        # We want to tag with the name of the log so we can easily send named logs to different output destinations.
+        # This requires a bit of regex to extract the info we want.
+        Tag couchbase.log.<logname>
+        Tag_Regex ${COUCHBASE_LOGS}/(?<logname>[^.]+).log$
+
+    # For completeness, capture anything else that might appear but do not output it by default
+    [INPUT]
+        Name tail
+        Path \${COUCHBASE_LOGS}/*.log
+        Exclude_Path *audit.log,couchdb.log,babysitter.log,indexer.log
+        Path_Key filename
+        Read_from_Head On
+        Skip_Long_Lines On
+        # Filter out by using the .raw prefix
+        Tag couchbase.raw.log.<logname>
+        Tag_Regex ${COUCHBASE_LOGS}/(?<logname>[^.]+).log$
+    
+  parsers.conf: |
+    [PARSER]
+        Name         auditdb_log
+        Format       json
+        Time_Key     timestamp
+        Time_Format  %Y-%m-%dT%H:%M:%S.%L
+
+    [PARSER]
+        Name simple_log
+        Format regex
+        Regex ^(?<time>\d+-\d+-\d+T\d+:\d+:\d+.\d+(\+|-)\d+:\d+)\s+\[(?<level>\w+)\](?<message>.*)$
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    [PARSER]
+        Name erlang_multiline
+        Format regex
+        Regex ^\[(?<logger>\w+):(?<level>\w+),(?<time>\d+-\d+-\d+T\d+:\d+:\d+.\d+Z).*](?<message>.*)$
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L   
+        
+  output.conf: |
+    # Output all parsed logs by default
+    [OUTPUT]
+        name  stdout
+        match couchbase.log.*
+----
+
+Be careful with formatting, Fluent Bit is very particular in that files must all follow the same indentation.
+
+== Cluster configuration
+
+Here is an example cluster configuration with a single bucket configuration and other non-production defaults.
+The main thing it demonstrates is how to ensure we can provide a custom log configuration by setting `manageConfiguration: false`.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cb-example-auth
+type: Opaque
+data:
+  username: QWRtaW5pc3RyYXRvcg== # Administrator
+  password: cGFzc3dvcmQ=         # password
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: default
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  logging:
+    audit:
+      enabled: true
+      garbageCollection:
+        sidecar:
+          enabled: true
+    server:
+      enabled: true
+      manageConfiguration: false # This is vital to ensure we use a custom configuration provided
+  image: couchbase/server:6.6.0
+  security:
+    adminSecret: cb-example-auth
+  buckets:
+    managed: true
+  servers:
+  - size: 3
+    name: all_services
+    services:
+    - data
+    - index
+    - query
+    - search
+    - eventing
+    - analytics
+    volumeMounts:
+      default: couchbase 
+  volumeClaimTemplates: 
+  - metadata:
+      name: couchbase 
+    spec:
+      storageClassName: standard 
+      resources: 
+        requests:
+          storage: 1Gi
+----
+
+The key components here are the enabling of the logger sidecar (and also the sidecar to cleanup rotated audit logs):
+
+[source,yaml]
+----
+spec:
+  logging:
+    audit:
+      enabled: true
+      garbageCollection:
+        sidecar:
+          enabled: true
+    server:
+      enabled: true
+      manageConfiguration: false
+----
+
+With this deployed, the logs will be available on the standard output of the `logging` container in the pods:
+
+[source,bash]
+----
+kubectl logs cb-example-0000 logging
+----
+
+[IMPORTANT]
+====
+Currently Fluent Bit does not support dynamic reload of its configuration: https://github.com/fluent/fluent-bit/issues/365 
+
+This means that any changes to log configuration will not be picked up until a pod is (re-)started.
+
+A workaround is to ship the logs to something first that does support dynamic reload, e.g. Fluentd. 
+This may be necessary to handle credential rotation for example.
+
+There is also a https://github.com/kubesphere/fluent-bit[forked^] version that supports watching for changes and then restarts Fluent Bit inside the container.
+====
+
+== Loki example
+
+A simple approach to deploy a full logging and monitoring solution is to use the Loki stack.
+This stack can provide a Fluent Bit `daemonset` (node logs), Prometheus, Loki and Grafana deployments so provides a nice and simple integrated solution for monitoring and logging.
+A Helm chart deployment can be used to push this out: https://grafana.com/docs/loki/latest/installation/helm/#deploy-loki-stack-loki-fluent-bit-grafana-prometheus
+Full details are on that page to then use Grafana and configure the stack how you might want in your cluster.
+
+As a simple example using the default namespace:
+[source,bash]
+----
+helm repo add grafana https://grafana.github.io/helm-charts
+helm upgrade --install loki grafana/loki-stack \
+--set fluent-bit.enabled=true,promtail.enabled=false,grafana.enabled=true,prometheus.enabled=true,prometheus.alertmanager.persistentVolume.enabled=false,prometheus.server.persistentVolume.enabled=false
+----
+
+Once it is deployed, you can retrieve the Grafana admin secret and do any port forwarding or similar required:
+[source,bash]
+----
+kubectl get secret loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+kubectl port-forward service/loki-grafana 3000:80 
+----
+
+Refer to the https://grafana.com/docs/loki/latest/overview/[official Loki documentation^] for up-to-date information and any more details.
+
+== Elasticsearch example
+
+An Elasticsearch deployment or stateful set is required and likely a Kibana instance too. 
+An example instance is shown below although this is a basic example with a single replica.
+
+[source,yaml]
+----
+kind: Service
+apiVersion: v1
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+spec:
+  selector:
+    app: elasticsearch
+  clusterIP: None
+  ports:
+    - port: 9200
+      name: rest
+    - port: 9300
+      name: inter-node
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: es-cluster
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.2.0
+        resources:
+            limits:
+              cpu: 1000m
+            requests:
+              cpu: 100m
+        ports:
+        - containerPort: 9200
+          name: rest
+          protocol: TCP
+        - containerPort: 9300
+          name: inter-node
+          protocol: TCP
+        env:
+          - name: cluster.name
+            value: k8s-logs
+          - name: node.name
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: discovery.seed_hosts
+            value: "es-cluster-0.elasticsearch"
+          - name: cluster.initial_master_nodes
+            value: "es-cluster-0"
+          - name: ES_JAVA_OPTS
+            value: "-Xms512m -Xmx512m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  labels:
+    app: kibana
+spec:
+  ports:
+  - port: 5601
+  selector:
+    app: kibana
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  labels:
+    app: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:7.2.0
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        env:
+          - name: ELASTICSEARCH_URL
+            value: http://elasticsearch:9200
+        ports:
+        - containerPort: 5601
+----
+
+This needs to be deployed in the same namespace as the Couchbase cluster or the service URL will need to be explicit in the log configuration.
+
+Once this is in place we can configure Fluent Bit, the main area to manage is the output plugin configuration with the rest being the same as above:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fluent-bit-config
+stringData:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+  fluent-bit.conf: |
+    [SERVICE]
+        flush        1
+        daemon       Off
+        log_level    warn
+        parsers_file parsers.conf
+
+    # Add information for this container as standard keys: https://docs.fluentbit.io/manual/pipeline/filters/modify
+    # This is required to simplify downstream parsing to filter the different pod logs
+    [FILTER]
+        Name modify
+        Match *
+        Add pod ${HOSTNAME}
+        Add logshipper couchbase.sidecar.fluentbit
+    
+    @include output.conf
+    @include input.conf
+
+  input.conf: |
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/audit.log
+        Parser auditdb_log
+        # Read from the start of the file when you start up
+        Read_from_Head On
+        Path_Key filename
+        Tag couchbase.log.audit
+
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/indexer.log
+        Parser simple_log
+        Read_from_Head On
+        Path_Key filename
+        Tag couchbase.log.indexer
+    # Note this logger seems to not use a common case for level strings, i.e. info, Info and INFO are all provided. 
+    # We can manage with some Lua scripting here or leave to downstream fluentd, etc. to deal with.
+    # https://github.com/shunwen/fluent-plugin-rename-key/issues/19#issuecomment-528027457
+
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/memcached.log.000000.txt
+        # Make sure we only grab the latest version, not any rotated ones
+        Parser simple_log
+        Read_from_Head On
+        Path_Key filename
+        Tag couchbase.log.memcached
+
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/babysitter.log,${COUCHBASE_LOGS}/couchdb.log
+        Multiline On
+        Parser_Firstline erlang_multiline
+        Read_from_Head On
+        Path_Key filename
+        Skip_Long_Lines On
+        # We want to tag with the name of the log so we can easily send named logs to different output destinations.
+        # This requires a bit of regex to extract the info we want.
+        Tag couchbase.log.<logname>
+        Tag_Regex ${COUCHBASE_LOGS}/(?<logname>[^.]+).log$
+
+    # For completeness, capture anything else that might appear but do not output it by default
+    [INPUT]
+        Name tail
+        Path \${COUCHBASE_LOGS}/*.log
+        Exclude_Path *audit.log,couchdb.log,babysitter.log,indexer.log
+        Path_Key filename
+        Read_from_Head On
+        Skip_Long_Lines On
+        # Filter out by using the .raw prefix
+        Tag couchbase.raw.log.<logname>
+        Tag_Regex ${COUCHBASE_LOGS}/(?<logname>[^.]+).log$
+    
+  parsers.conf: |
+    [PARSER]
+        Name         auditdb_log
+        Format       json
+        Time_Key     timestamp
+        Time_Format  %Y-%m-%dT%H:%M:%S.%L
+
+    [PARSER]
+        Name simple_log
+        Format regex
+        Regex ^(?<time>\d+-\d+-\d+T\d+:\d+:\d+.\d+(\+|-)\d+:\d+)\s+\[(?<level>\w+)\](?<message>.*)$
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    [PARSER]
+        Name erlang_multiline
+        Format regex
+        Regex ^\[(?<logger>\w+):(?<level>\w+),(?<time>\d+-\d+-\d+T\d+:\d+:\d+.\d+Z).*](?<message>.*)$
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L   
+        
+  output.conf: |
+    # Output all parsed logs by default
+    [OUTPUT]
+        name  stdout
+        match couchbase.log.*
+
+    # Output to Elasticsearch
+    [OUTPUT]
+        name  es
+        match couchbase.log.*
+        Logstash_Format On 
+        Include_Tag_Key On
+        Tag_Key FluentBit-Key
+        Host elasticsearch
+        Port 9200
+----
+
+In this case we send all logs to Elasticsearch via a regex match.
+
+If the Elasticsearch instance is in another namespace then the `Host` must be updated to include the namespace according to the usual Kubernetes syntax `<service>.<namespace>`.
+Similarly if it is external then the correct URL needs to be provided and resolved correctly.
+
+== Azure Blob Storage example
+
+Full details are on the Fluent Bit documentation https://docs.fluentbit.io/manual/pipeline/outputs/azure_blob[page^].
+This example shows you how to reconfigure the default sidecar to ship the audit logs to an Azure endpoint and builds on the previous example.
+
+The important steps to cover are:
+1. CRD configuration - make sure logging is enabled but the `manageConfiguration: false` field is set so the operator does not reconcile our log configuration.
+2. Fluent Bit configuration - as the operator is not providing it, we now must provide a custom configuration to use.
+
+For CRD configuration we will use the custom example xref:tutorial-couchbase-logging.adoc#Cluster_Configuration[above].
+
+To configure Fluent Bit, the main area to manage is the output plugin configuration with the rest being the same as above:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fluent-bit-config
+stringData:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+...
+  output.conf: |
+    # Output only audit log by default
+    [OUTPUT]
+        name                  azure_blob
+        match                 couchbase.log.audit
+        account_name          YOUR_ACCOUNT_NAME
+        shared_key            YOUR_SHARED_KEY
+        path                  kubernetes
+        container_name        logs
+        auto_create_container on
+        tls                   on
+----
+
+Be aware of setting the `YOUR_*` variables above for `account_name` and `shared_key` along with things like the `container_name` and `path`.
+The Fluent Bit documentation describes all the various options.
+
+To simplify testing, the https://github.com/Azure/Azurite[Azurite^] emulator can be used.
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: azurite
+  labels:
+    app: azurite
+spec:
+  ports:
+  - port: 10000
+  selector:
+    app: azurite
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azurite-deployment
+  labels:
+    app: azurite
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azurite
+  template:
+    metadata:
+      labels:
+        app: azurite
+    spec:
+      containers:
+      - name: azurite
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+        - containerPort: 10000
+----
+
+The log configuration then becomes:
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fluent-bit-config
+stringData:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+  fluent-bit.conf: |
+    [SERVICE]
+        flush        1
+        daemon       Off
+        log_level    warn
+        parsers_file parsers.conf
+    
+    @include output.conf
+    @include input.conf
+
+  input.conf: |
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/audit.log
+        Parser auditdb_log
+        Path_Key filename
+        Tag couchbase.log.audit
+    
+  parsers.conf: |
+    [PARSER]
+        Name         auditdb_log
+        Format       json
+        Time_Key     timestamp
+        Time_Format  %Y-%m-%dT%H:%M:%S.%L
+
+output.conf: |
+    # Output only audit log by default
+    [OUTPUT]
+        name                  azure_blob
+        match                 couchbase.log.audit
+        account_name          devstoreaccount1
+        shared_key            Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+        path                  kubernetes
+        container_name        logs
+        auto_create_container on
+        tls                   off
+        emulator_mode         on
+        endpoint              azurite:10000
+----
+
+== Amazon S3 example
+
+Again, all the details are on the Fluent Bit documentation https://docs.fluentbit.io/manual/pipeline/outputs/s3[page^].
+`role_arn` is an important setting to specify if not using something like instance roles.
+
+The log configuration then becomes:
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fluent-bit-config
+stringData:
+  # Configuration files: server, input, filters and output
+  # ======================================================
+  fluent-bit.conf: |
+    [SERVICE]
+        flush        1
+        daemon       Off
+        log_level    warn
+        parsers_file parsers.conf
+    
+    @include output.conf
+    @include input.conf
+
+  input.conf: |
+    [INPUT]
+        Name tail
+        Path ${COUCHBASE_LOGS}/audit.log
+        Parser auditdb_log
+        Path_Key filename
+        Tag couchbase.log.audit
+    
+  parsers.conf: |
+    [PARSER]
+        Name         auditdb_log
+        Format       json
+        Time_Key     timestamp
+        Time_Format  %Y-%m-%dT%H:%M:%S.%L
+
+output.conf: |
+    # Output only audit log by default
+    [OUTPUT]
+        Name                         s3
+        Match                        couchbase.log.audit
+        bucket                       my-bucket
+        region                       us-west-2
+        total_file_size              250M
+        s3_key_format                $TAG[2]/$TAG[0]/%Y/%m/%d/%H/%M/%S
+        s3_key_format_tag_delimiters .-
+----
+
+Refer to the Fluent Bit documentation as this also links out to the https://github.com/aws/aws-for-fluent-bit[AWS packaged Fluent-Bit image^] for example which may be a better option to use for your sidecar.

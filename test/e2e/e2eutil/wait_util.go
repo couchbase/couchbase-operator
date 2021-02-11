@@ -989,3 +989,46 @@ func MustWaitForStableResourceVersion(t *testing.T, k8s *types.Cluster, resource
 		Die(t, err)
 	}
 }
+
+func waitForLoggingSidecarReady(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		listOptions := metav1.ListOptions{
+			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+		}
+
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range pods.Items {
+			found := false
+
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.Name != k8sutil.CouchbaseLogSidecarContainerName {
+					continue
+				}
+
+				if !status.Ready {
+					return fmt.Errorf("logging sidecar not ready on pod %s", pod.Name)
+				}
+
+				found = true
+			}
+
+			if !found {
+				return fmt.Errorf("unable to find logging sidecar container status in pod %s", pod.Name)
+			}
+		}
+
+		return nil
+	})
+}
+
+// MustWaitForLoggingSidecarReady waits for the duration to confirm that the sidecar is running.
+func MustWaitForLoggingSidecarReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	err := waitForLoggingSidecarReady(k8s, couchbase, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+}

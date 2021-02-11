@@ -317,6 +317,32 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		}
 	}
 
+	if customResource.Spec.Logging.Server != nil && customResource.Spec.Logging.Server.Enabled {
+		// If we want to use the sidecars then a PV must be present to use.
+		// See separate PV validation but if any server class has a log volume or a default volume they all should.
+		// Just checking the first server with some extra nil pointer checks
+		// No checks are required for empty strings for configurationName, configurationMountPath or image as this will be omitted and defaulted then.
+		if len(customResource.Spec.Servers) == 0 {
+			errs = append(errs, fmt.Errorf("spec.logging.server requires spec.servers to be populated to enable logging sidecar"))
+		} else {
+			mounts := customResource.Spec.Servers[0].VolumeMounts
+			if mounts == nil || (mounts.DefaultClaim == "" && mounts.LogsClaim == "") {
+				errs = append(errs, fmt.Errorf("spec.logging.server requires a default or logs volume to enable logging sidecar"))
+			}
+		}
+	} else {
+		// Checks for server logging being disabled (not enabled) and any that require it (audit).
+		// Ignore any settings if audit not enabled.
+		auditSettings := customResource.Spec.Logging.Audit
+		if auditSettings != nil && auditSettings.Enabled {
+			// We are not allowing audit garbage collection without some form of server log shipping.
+			gc := auditSettings.GarbageCollection
+			if gc != nil && gc.Sidecar != nil && gc.Sidecar.Enabled {
+				errs = append(errs, fmt.Errorf("spec.logging.audit.garbageCollection.sidecar.enabled requires spec.logging.server configured for log shipping"))
+			}
+		}
+	}
+
 	if customResource.Spec.XDCR.Managed {
 		for i, remoteCluster := range customResource.Spec.XDCR.RemoteClusters {
 			if remoteCluster.AuthenticationSecret != nil {
@@ -816,7 +842,7 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 	errs := []error{}
 
 	if len(restore.Spec.Backup) == 0 && len(restore.Spec.Repo) == 0 {
-		errs = append(errs, fmt.Errorf("both Spec.Backup and Spec.Repo fields are empty. Please supply a value for at least one"))
+		errs = append(errs, fmt.Errorf("both spec.backup and spec.repo fields are empty. Please supply a value for at least one"))
 	}
 
 	// start is required

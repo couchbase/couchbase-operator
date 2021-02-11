@@ -26,6 +26,7 @@ type Framework struct {
 	CouchbaseExporterImage        string
 	CouchbaseExporterImageUpgrade string
 	CouchbaseBackupImage          string
+	CouchbaseLoggingImage         string
 	BucketType                    string
 	CompressionMode               string
 	EnableIstio                   bool
@@ -89,6 +90,7 @@ type TestRunParam struct {
 	CouchbaseExporterImage        string `yaml:"couchbase-exporter-image"`
 	CouchbaseExporterImageUpgrade string `yaml:"couchbase-exporter-image-upgrade"`
 	CouchbaseBackupImage          string `yaml:"couchbase-backup-image"`
+	CouchbaseLoggingImage         string `yaml:"couchbase-logging-image"`
 	SuiteToRun                    string `yaml:"suite"`
 	BucketType                    string `yaml:"bucket-type"`
 	CompressionMode               string `yaml:"compression-mode"`

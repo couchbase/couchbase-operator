@@ -1,0 +1,7 @@
+---
+testcases:
+- TestNoLogOrAuditConfig
+- TestLoggingAndAuditingDefaults
+- TestAuditingNoLogging
+- TestCustomLogging
+- TestChangeLogShipperImage

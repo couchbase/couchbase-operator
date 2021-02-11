@@ -83,7 +83,6 @@ var (
 		"TestNegValidationCreateCouchbaseClusterSettings":              TestNegValidationCreateCouchbaseClusterSettings,
 		"TestNegValidationCreateCouchbaseClusterSecurity":              TestNegValidationCreateCouchbaseClusterSecurity,
 		"TestNegValidationCreateCouchbaseClusterXDCR":                  TestNegValidationCreateCouchbaseClusterXDCR,
-		"TestNegValidationCreateCouchbaseClusterMonitoring":            TestNegValidationCreateCouchbaseClusterMonitoring,
 		"TestNegValidationCreateCouchbaseBucket":                       TestNegValidationCreateCouchbaseBucket,
 		"TestNegValidationCreateCouchbaseEphemeralBucket":              TestNegValidationCreateCouchbaseEphemeralBucket,
 		"TestNegValidationCreateCouchbaseMemcachedBucket":              TestNegValidationCreateCouchbaseMemcachedBucket,
@@ -448,6 +447,13 @@ var (
 		// Expiry tests
 		"TestBucketTTL":       TestBucketTTL,
 		"TestBucketTTLUpdate": TestBucketTTLUpdate,
+
+		// Logging tests
+		"TestNoLogOrAuditConfig":         TestNoLogOrAuditConfig,
+		"TestLoggingAndAuditingDefaults": TestLoggingAndAuditingDefaults,
+		"TestAuditingNoLogging":          TestAuditingNoLogging,
+		"TestCustomLogging":              TestCustomLogging,
+		"TestChangeLogShipperImage":      TestChangeLogShipperImage,
 	}
 )
 

@@ -18,6 +18,7 @@ test/e2e/*.xml
 test/e2e/*.zip
 test/e2e/*.tar.gz
 e2e.test
+example-logs/
 
 # These are for CI/CD shizzle.
 /go/
@@ -25,3 +26,4 @@ e2e.test
 /node-*/
 
 *terraform.*
+package-lock.json

@@ -1099,3 +1099,24 @@ type QuerySettings struct {
 	// anything else is a size in MiB.
 	TemporarySpaceSize int64 `json:"queryTmpSpaceSize" url:"queryTmpSpaceSize"`
 }
+
+// All these settings are passed through with minimal or no verification.
+type AuditSettings struct {
+	// Whether to enable or disable auditing
+	Enabled bool `json:"auditdEnabled" url:"auditdEnabled"`
+	// The list of events ignored for auditing, note this must be marshalled if it is empty as we may want to say no events are disabled.
+	DisabledEvents []int `json:"disabled" url:"disabled"`
+	// The list of users to ignore for auditing, note this must be marshalled if it is empty as we may want to say no users are disabled.
+	DisabledUsers []AuditUser `json:"disabledUsers" url:"disabledUsers"`
+	// Rotation interval is the time in minutes for rotation
+	RotateInterval int `json:"rotateInterval" url:"rotateInterval"`
+	// The size in bytes of the audit log before it is rotated
+	RotateSize int `json:"rotateSize" url:"rotateSize"`
+	// Not to be set ever but we do have to make sure we default it correctly in case someone else sets it
+	LogPath string `json:"logPath" url:"logPath"`
+}
+
+type AuditUser struct {
+	Name   string `json:"name"`
+	Domain string `json:"domain"`
+}

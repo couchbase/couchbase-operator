@@ -921,6 +921,170 @@ Updating this field will cause an automatic upgrade of the cluster.
 
 Logging defines Operator logging options.
 
+=== couchbaseclusters.spec.logging.audit
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Used to manage the audit configuration directly.
+
+=== couchbaseclusters.spec.logging.audit.disabledEvents
+
+==== Constraints
+
+*Type*: `[]integer`
+
+==== Description
+
+The list of event ids to disable for auditing purposes.
+This is passed to the REST API with no verification by the operator.
+Refer to the documentation for details: https://docs.couchbase.com/server/current/audit-event-reference/audit-event-reference.html.
+
+=== couchbaseclusters.spec.logging.audit.disabledUsers
+
+==== Constraints
+
+*Type*: `[]string`
+
+*Pattern (Regular Expression)*: `^.+/(local|external)$`
+
+==== Description
+
+The list of users to ignore for auditing purposes.
+This is passed to the REST API with minimal validation it meets an acceptable regex pattern.
+Refer to the documentation for full details on how to configure this: https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html#ignoring-events-by-user.
+
+=== couchbaseclusters.spec.logging.audit.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled is a boolean that enables the audit capabilities.
+
+=== couchbaseclusters.spec.logging.audit.garbageCollection
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Handle all optional garbage collection (GC) configuration for the audit functionality.
+This is not part of the audit REST API, it is intended to handle GC automatically for the audit logs.
+By default the Couchbase Server rotates the audit logs but does not clean up the rotated logs.
+This is left as an operation for the cluster administrator to manage, the operator allows for us to automate this: https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html.
+
+=== couchbaseclusters.spec.logging.audit.garbageCollection.sidecar
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Provide the sidecar configuration required (if so desired) to automatically clean up audit logs.
+
+=== couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.age
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `1h`
+
+==== Description
+
+The minimum age of rotated log files to remove, defaults to one hour.
+
+=== couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enable this sidecar by setting to true, defaults to being disabled.
+
+=== couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.image
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `busybox:1.32.1`
+
+==== Description
+
+Image is the image to be used to run the audit sidecar helper.
+No validation is carried out as this can be any arbitrary repo and tag.
+
+=== couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.interval
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `20m`
+
+==== Description
+
+The interval at which to check for rotated log files to remove, defaults to 20 minutes.
+
+=== couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.resources
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Resources is the resource requirements for the cleanup container.
+Will be populated by Kubernetes defaults if not specified.
+
+=== couchbaseclusters.spec.logging.audit.rotation
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The interval to optionally rotate the audit log.
+This is passed to the REST API, see here for details: https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html.
+
+=== couchbaseclusters.spec.logging.audit.rotation.interval
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `15m`
+
+==== Description
+
+The interval at which to rotate log files, defaults to 15 minutes.
+
+=== couchbaseclusters.spec.logging.audit.rotation.size
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `20Mi`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+Size allows the specification of a rotation size for the log, defaults to 20Mi.
+
 === couchbaseclusters.spec.logging.logRetentionCount
 
 ==== Constraints
@@ -942,6 +1106,105 @@ LogRetentionCount gives the number of persistent log PVCs to keep.
 ==== Description
 
 LogRetentionTime gives the time to keep persistent log PVCs alive for.
+
+=== couchbaseclusters.spec.logging.server
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Specification of all logging configuration required to manage the sidecar containers in each pod.
+
+=== couchbaseclusters.spec.logging.server.configurationName
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `fluent-bit-config`
+
+==== Description
+
+ConfigurationName is the name of the Secret to use holding the logging configuration in the namespace.
+A Secret is used to ensure we can safely store credentials but this can be populated from plaintext if acceptable too.
+If it does not exist then one will be created with defaults in the namespace so it can be easily updated whilst running.
+
+=== couchbaseclusters.spec.logging.server.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled is a boolean that enables the logging sidecar container.
+
+=== couchbaseclusters.spec.logging.server.manageConfiguration
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+A boolean which indicates whether the operator should manage the configuration or not.
+If omitted then this defaults to true which means the operator will attempt to reconcile it to default values.
+To use a custom configuration make sure to set this to false.
+
+=== couchbaseclusters.spec.logging.server.sidecar
+
+==== Constraints
+
+*Type*: `object`
+
+*Default*: `{}`
+
+==== Description
+
+Any specific logging sidecar container configuration.
+
+=== couchbaseclusters.spec.logging.server.sidecar.configurationMountPath
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `/fluent-bit/etc/`
+
+==== Description
+
+ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
+This defaults to the usual Fluent Bit mount path.
+If another log shipping image is used that needs a different mount then modify this.
+
+=== couchbaseclusters.spec.logging.server.sidecar.image
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `fluent/fluent-bit:1.7`
+
+==== Description
+
+Image is the image to be used to deal with logging as a sidecar.
+No validation is carried out as this can be any arbitrary repo and tag.
+It will default to the latest supported version of Fluent Bit.
+
+=== couchbaseclusters.spec.logging.server.sidecar.resources
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Resources is the resource requirements for the sidecar container.
+Will be populated by Kubernetes defaults if not specified.
 
 === couchbaseclusters.spec.monitoring
 
@@ -989,11 +1252,10 @@ Enabled is a boolean that enables/disables the metrics sidecar container.
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^[\w\_\.\-/]+:([\w\d]+-)?\d+\.\d+.\d+(-[\w\d]+)?$`
-
 ==== Description
 
 Image is the metrics image to be used to collect metrics.
+No validation is carried out as this can be any arbitrary repo and tag.
 
 === couchbaseclusters.spec.monitoring.prometheus.resources
 
@@ -1004,7 +1266,7 @@ Image is the metrics image to be used to collect metrics.
 ==== Description
 
 Resources is the resource requirements for the metrics container.
-Will be populated by defaults if not specified.
+Will be populated by Kubernetes defaults if not specified.
 
 === couchbaseclusters.spec.networking
 

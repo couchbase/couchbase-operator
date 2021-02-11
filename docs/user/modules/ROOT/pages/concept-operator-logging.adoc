@@ -18,8 +18,13 @@ Detailed instructions on how to configure logging can be found in the xref:refer
 
 [IMPORTANT]
 ====
-Couchbase server logs cannot be collected from the pod's standard output as is typical in Kubernetes environments.
-Furthermore Couchbase server pods do not feature any integration with 3rd party log collection technologies so cannot be collected in real time.
+Couchbase server logs cannot be collected by default from the pod's standard output as is typical in Kubernetes environments.
 
 The xref:reference-cbopinfo.adoc[`cbopinfo`] support tool can be used to collect a log archive at any time, as can the Couchbase web console.
+
+A logging sidecar is now optionally available to stream logs from the volume used by Couchbase server. 
+This is not enabled by default but see xref:reference-server-logging.adoc[Server logging reference] for full details on specifying this.
+
+This will stream Couchbase server audit logs by default to standard output using a Fluent Bit sidecar which can be customized with any supported configuration required to send information to other technologies. 
+Refer to the Fluent Bit https://docs.fluentbit.io/manual/pipeline/outputs[documentation^] for the full configuration and supported options.
 ====

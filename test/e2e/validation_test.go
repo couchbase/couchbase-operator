@@ -933,6 +933,65 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.logging.logRetentionCount"},
 		},
+		{
+			name: "TestValidateLoggingFailsForNoPersistentVolume",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/logging/server", &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+					Enabled: true,
+				}).Remove("/spec/servers/0/volumeMounts")}, // only need to remove first as we validate only on that
+			shouldFail:     true,
+			expectedErrors: []string{"spec.logging.server"},
+		},
+		{
+			name: "TestValidateLoggingIgnoresGCWithNoAudit",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+					Enabled: false,
+					GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+						Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
+							Enabled: true,
+						},
+					},
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateLoggingFailsAuditGCWithNoServerLogging",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+					Enabled: true,
+					GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+						Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
+							Enabled: true,
+						},
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.logging.audit.garbageCollection.sidecar.enabled"},
+		},
+		{
+			name: "TestValidateLoggingFailsForInvalidAuditUser",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+					DisabledUsers: []couchbasev2.AuditDisabledUser{
+						"Cthulu",
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.logging.audit.disabledUsers"},
+		},
+		{
+			name: "TestValidateLoggingAllowsAuditUser",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+					DisabledUsers: []couchbasev2.AuditDisabledUser{
+						"localusername/local",
+						"externalusername/external",
+						"@internalusername/local",
+					},
+				})},
+			shouldFail: false,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1109,19 +1168,6 @@ func TestNegValidationCreateCouchbaseClusterXDCR(t *testing.T) {
 			mutations:      patchMap{"xdcr-tls-secret": jsonpatch.NewPatchSet().Remove("/data/ca")},
 			shouldFail:     true,
 			expectedErrors: []string{`xdcr tls secret xdcr-tls-secret for remote cluster starsky must contain key 'ca'`},
-		},
-	}
-
-	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
-}
-
-func TestNegValidationCreateCouchbaseClusterMonitoring(t *testing.T) {
-	testDefs := []testDef{
-		{
-			name:           "TestValidateMonitoringInvalidImage",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/monitoring/prometheus/image", "mr-tickle")},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.monitoring.prometheus.image`},
 		},
 	}
 

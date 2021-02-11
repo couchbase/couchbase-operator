@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -97,6 +98,11 @@ func (c *Cluster) reconcile() error {
 
 	// Ensure any resources required by pods are in place.
 	if err := c.refreshTLSShadowSecret(); err != nil {
+		return err
+	}
+
+	// Set up any log cofiguration required
+	if err := c.reconcileLogConfig(c.k8s); err != nil {
 		return err
 	}
 
@@ -1281,6 +1287,10 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
+	if err := c.reconcileAuditSettings(); err != nil {
+		return err
+	}
+
 	if err := c.reconcileAutoCompactionSettings(); err != nil {
 		return err
 	}
@@ -1500,6 +1510,102 @@ func (c *Cluster) reconcileQuerySettings() error {
 
 	log.Info("Query settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("query service", c.cluster))
+
+	return nil
+}
+
+// Compare cluster audit settings with spec, reconcile if necessary.
+func (c *Cluster) reconcileAuditSettings() error {
+	// If auditing is not controlled by CRD then ignore
+	auditSettings := c.cluster.Spec.Logging.Audit
+	if auditSettings == nil {
+		return nil
+	}
+
+	// Retrieve the current values to reconcile against (and pick up defaults)
+	current := couchbaseutil.AuditSettings{}
+	if err := couchbaseutil.GetAuditSettings(&current).On(c.api, c.readyMembers()); err != nil {
+		log.Error(err, "Audit settings collection failed", "cluster", c.namespacedName())
+		return err
+	}
+
+	// Copy over the current settings to maintain any defaults set by CB server.
+	// No need for a deep copy as the arrays are explicitly always set again later.
+	requested := current
+	// Log path should never be set, we do not support relocation
+	requested.LogPath = k8sutil.CouchbaseVolumeMountLogsDir
+
+	// If auditing is explicitly configured then it can be set to disabled
+	requested.Enabled = auditSettings.Enabled
+
+	// For DeepEquals to work, we need to make sure the array is not nil but empty
+	if auditSettings.DisabledEvents != nil {
+		requested.DisabledEvents = auditSettings.DisabledEvents
+	} else {
+		requested.DisabledEvents = []int{}
+	}
+
+	// Deal with the conversion between two quite different arrays: JSON array of structs and CSV string
+	requested.DisabledUsers = []couchbaseutil.AuditUser{}
+
+	// The users are actually a compound string intended to feed a two-element struct (which is returned!)
+	// The disabledUsers parameter disables filterable-event auditing on a per user basis.
+	// Its value must be a list of users, specified as a comma-separated list, with no spaces. Each user may be:
+	// 1. A local user, specified in the form localusername/local.
+	// 2. An external user, specified in the form externalusername/external.
+	// 3. An internal user, specified in the form @internalusername/local.
+	//
+	// We add a quick validation check to make sure these match and prevent being rejected by the API later: https://regex101.com/r/ubrkyg/2
+	userValidator := regexp.MustCompile("^.+/(local|external)$")
+
+	for _, s := range auditSettings.DisabledUsers {
+		// Usage in a loop prefers a compiled regex
+		stringValue := string(s)
+
+		valid := userValidator.MatchString(stringValue)
+		if !valid {
+			err := fmt.Errorf("%w: audit defaults invalid user: %s", errors.NewStackTracedError(errors.ErrConfigurationInvalid), s)
+			return err
+		}
+
+		splitValues := strings.Split(stringValue, "/")
+		numberOfSplits := len(splitValues)
+
+		// At this point must have a string with a slash in it but we may have more with some weirdness matching the regex
+		if numberOfSplits == 2 {
+			requested.DisabledUsers = append(requested.DisabledUsers, couchbaseutil.AuditUser{
+				Name:   splitValues[0],
+				Domain: splitValues[1],
+			})
+		} else {
+			err := fmt.Errorf("%w: audit defaults invalid split (%d) of user: %s", errors.NewStackTracedError(errors.ErrConfigurationInvalid), numberOfSplits, s)
+			return err
+		}
+	}
+
+	if auditSettings.Rotation != nil {
+		if auditSettings.Rotation.Interval != nil {
+			requested.RotateInterval = int(auditSettings.Rotation.Interval.Seconds())
+		}
+
+		if auditSettings.Rotation.Size != nil {
+			requested.RotateSize = int(auditSettings.Rotation.Size.Value())
+		}
+	}
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetAuditSettings(requested).On(c.api, c.readyMembers()); err != nil {
+		log.Error(err, "Audit settings update failed", "cluster", c.namespacedName(), "old", current, "new", requested)
+		c.cluster.Status.SetConfigRejectedCondition(fmt.Sprintf("Unable to set audit settings: %v", err.Error()))
+
+		return err
+	}
+
+	log.Info("Audit settings updated", "cluster", c.namespacedName(), "old", current, "new", requested)
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("audit", c.cluster))
 
 	return nil
 }
