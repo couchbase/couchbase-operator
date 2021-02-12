@@ -134,6 +134,7 @@ testcases:
 - TestUpgradeSupportableKillStatefulPodOnCreate
 - TestUpgradeSupportableKillStatefulPodOnRebalance
 - TestUpgradeImmediate
+- TestUpgradeConstrained
 - TestUpgradeBucketDurability
 
 # Networking Tests

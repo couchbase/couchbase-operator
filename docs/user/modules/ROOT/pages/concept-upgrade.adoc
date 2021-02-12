@@ -10,7 +10,7 @@ The Couchbase Server version can be xref:howto-couchbase-upgrade.adoc[upgraded] 
 
 Upgrades may be performed using one of a number of different strategies as specified by xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-upgradestrategy[`couchbaseclusters.spec.upgradeStrategy`] in the `CouchbaseCluster` resource:
 
-* Rolling upgrades upgrade one pod at a time
+* Rolling upgrades upgrade one, or more, pods at a time
 * Immediate upgrades upgrade all pods at the same time
 
 This process is as follows:
@@ -25,6 +25,9 @@ A rolling upgrade requires the least network and compute overhead, so will affec
 
 When using immediate upgrades, there is a greater risk, and requires greater resource during the upgrade, however the operation itself is significantly faster.
 Immediate upgrades may have an undesired affect on client performance as all pods in the cluster are undergoing upgrade at the same time.
+
+You can balance time against risk by tailoring rolling upgrades with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] configuration parameter.
+This allows rolling upgrades to upgrade 2 pods at a time, or 20% of the cluster at a time, for example.
 
 [IMPORTANT]
 ====

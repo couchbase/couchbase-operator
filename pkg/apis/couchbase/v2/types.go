@@ -1070,6 +1070,31 @@ const (
 	ImmediateUpgrade UpgradeStrategy = "ImmediateUpgrade"
 )
 
+// RollingUpgradeConstraints allows the upgrade to be constrained.
+type RollingUpgradeConstraints struct {
+	// MaxUpgradablePercent allows the number of pods affected by an upgrade at any
+	// one time to be increased.  By default a rolling upgrade will
+	// upgrade one pod at a time.  This field allows that limit to be removed.
+	// This field must be an integer percentage, e.g. "10%", in the range 1% to 100%.
+	// Percentages are relative to the total cluster size, and rounded down to
+	// the nearest whole number, with a minimum of 1.  For example, a 10 pod
+	// cluster, and 25% allowed to upgrade, would yield 2.5 pods per iteration,
+	// rounded down to 2.
+	// The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if
+	// both are defined.
+	// +kubebuilder:validation:Pattern="^(100|[1-9][0-9]|[1-9])%$"
+	MaxUpgradablePercent string `json:"maxUpgradablePercent,omitempty"`
+
+	// MaxUpgradable allows the number of pods affected by an upgrade at any
+	// one time to be increased.  By default a rolling upgrade will
+	// upgrade one pod at a time.  This field allows that limit to be removed.
+	// This field must be greater than zero.
+	// The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if
+	// both are defined.
+	// +kubebuilder:validation:Minimum=1
+	MaxUpgradable int `json:"maxUpgradable,omitempty"`
+}
+
 // HibernationStrategy defines how aggressive to be when putting a cluster to sleep.
 // +kubebuilder:validation:Enum=Immediate
 type HibernationStrategy string
@@ -1121,6 +1146,10 @@ type ClusterSpec struct {
 	// disruptive.  This field must be either "RollingUpgrade" or "ImmediateUpgrade", defaulting
 	// to "RollingUpgrade".
 	UpgradeStrategy *UpgradeStrategy `json:"upgradeStrategy,omitempty"`
+
+	// When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod
+	// at a time.  If this field is specified then that number can be increased.
+	RollingUpgrade *RollingUpgradeConstraints `json:"rollingUpgrade,omitempty"`
 
 	// AutoResourceAllocation populates pod resource requests based on the services running
 	// on that pod.  When enabled, this feature will calculate the memory request as the

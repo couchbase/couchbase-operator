@@ -252,7 +252,7 @@ func (s *state) clone() *state {
 func (s *state) score() (min, max int, unschedulable bool) {
 	// Initaalize the minimum to the largest possible integer, so we are
 	// guaranteed everything else real will be smaller than it.
-	min = int(^uint(0) >> 1)
+	min = constants.IntMax
 
 	for _, serverGroup := range s.ServerGroups {
 		// Ignore the size for unschedulable groups, as this shouldn't

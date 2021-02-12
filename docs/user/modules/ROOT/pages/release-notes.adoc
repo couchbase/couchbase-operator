@@ -68,6 +68,21 @@ When in use, pods will have their resource requests automatically populated depe
 Updating quotas will cause the cluster to upgrade as pod resource requests are updated.
 A new dummy memory quota for the query service is introduced to allow management of memory resource requests, even though Couchbase itself does not provide the ability to constrain this service.
 
+==== Improved Upgrade Behavior
+
+Prior to this release, the Operator allowed two types of upgrade -- a one pod at a time rolling upgrade, and a whole cluster upgrade.
+
+This release allows rolling upgrades to be extended to upgrade either a fixed number of pods, or a percentage of the cluster size.
+Both values can be set, and both will be considered, the Operator selecting the one resulting in the fewest number of pods being upgraded at a time.
+
+Rolling upgrades can be configured with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] parameter.
+
+[NOTE]
+====
+A whole cluster "immediate" upgrade is now synonymous with a rolling upgrade set to upgrade 100% of the cluster at a time.
+Immediate upgrades may be removed at some point in the future as it duplicates functionality.
+====
+
 == Feedback
 
 You can have a big impact on future versions of the Operator (and its documentation) by providing Couchbase with your direct feedback and observations. Please feel free to post your questions and comments to the https://forums.couchbase.com/c/couchbase-server/Kubernetes[Couchbase Forums].

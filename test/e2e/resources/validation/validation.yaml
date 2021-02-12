@@ -175,6 +175,9 @@ spec:
   antiAffinity: false
   paused: false
   upgradePolicy: RollingUpgrade
+  rollingUpgrade:
+    maxUpgradable: 5
+    maxUpgradablePercent: 75%
   recoveryPolicy: PrioritizeDataIntegrity
   hibernationStrategy: Immediate
   security:

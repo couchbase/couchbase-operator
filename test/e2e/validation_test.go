@@ -577,6 +577,24 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.hibernationStrategy`},
 		},
+		{
+			name:           "TestValidateRollingUpgradeMaxUpgradableUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/rollingUpgrade/maxUpgradable", 0)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.rollingUpgrade.maxUpgradable`},
+		},
+		{
+			name:           "TestValidateRollingUpgradeMaxUpgradablePercentUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/rollingUpgrade/maxUpgradablePercent", "0%")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.rollingUpgrade.maxUpgradablePercent`},
+		},
+		{
+			name:           "TestValidateRollingUpgradeMaxUpgradablePercentOverflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/rollingUpgrade/maxUpgradablePercent", "9001%")}, // OVER 9000!!!
+			shouldFail:     true,
+			expectedErrors: []string{`spec.rollingUpgrade.maxUpgradablePercent`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

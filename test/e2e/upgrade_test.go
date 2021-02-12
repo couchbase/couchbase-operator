@@ -38,18 +38,37 @@ var (
 	}
 )
 
-// immediateUpgradeSequence is what to expect when a cluster is upgraded all at once.
-func immediateUpgradeSequence(clusterSize int) eventschema.Validatable {
-	return eventschema.Sequence{
+// rollingUpgradeSequence is what to expect when a cluster is upgraded all at once.
+func rollingUpgradeSequence(clusterSize, maxNumber int) eventschema.Validatable {
+	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-			eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-			eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 		},
 	}
+
+	for clusterSize > 0 {
+		times := maxNumber
+		if clusterSize < maxNumber {
+			times = clusterSize
+		}
+
+		clusterSize -= times
+
+		upgrade := eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Repeat{Times: times, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Repeat{Times: times, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+
+		schema.Validators = append(schema.Validators, upgrade)
+	}
+
+	schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+
+	return schema
 }
 
 // upgradeFailedAddRecoverableSequence is a common sequence for generating events for a new
@@ -935,7 +954,56 @@ func TestUpgradeImmediate(t *testing.T) {
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		immediateUpgradeSequence(clusterSize),
+		rollingUpgradeSequence(clusterSize, clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpgradeConstrained tests a rolling upgrade, but limited to a
+// certain percentage.
+func TestUpgradeConstrained(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Skip if not correctly configured
+	skipUpgrade(t)
+
+	// Static configuration.
+	clusterSize := 3
+	upgradablePercent := "67%"
+	upgradeChunkSize := 2
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
+	upgradeStrategy := couchbasev2.RollingUpgrade
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster.Spec.UpgradeStrategy = &upgradeStrategy
+	cluster.Spec.RollingUpgrade = &couchbasev2.RollingUpgradeConstraints{
+		MaxUpgradablePercent: upgradablePercent,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
+	// then the cluster to become healthy after upgrade has completed.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		rollingUpgradeSequence(clusterSize, upgradeChunkSize),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

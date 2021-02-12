@@ -11,6 +11,10 @@ const (
 	AuthSecretPasswordKey   = "password"
 )
 
+const (
+	IntMax = int(^uint(0) >> 1)
+)
+
 var (
 	BucketTypeCouchbase = "couchbase"
 	BucketTypeEphemeral = "ephemeral"

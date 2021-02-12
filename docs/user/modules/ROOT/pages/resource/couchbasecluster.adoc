@@ -1422,6 +1422,50 @@ When PrioritizeUptime, the Operator will wait for a period after the expected au
 This may cause data loss, and is only expected to be used on clusters with ephemeral data, where the loss of the pod means that the data is known to be unrecoverable.
 This field must be either "PrioritizeDataIntegrity" or "PrioritizeUptime", defaulting to "PrioritizeDataIntegrity".
 
+=== couchbaseclusters.spec.rollingUpgrade
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod at a time.
+If this field is specified then that number can be increased.
+
+=== couchbaseclusters.spec.rollingUpgrade.maxUpgradable
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+MaxUpgradable allows the number of pods affected by an upgrade at any one time to be increased.
+By default a rolling upgrade will upgrade one pod at a time.
+This field allows that limit to be removed.
+This field must be greater than zero.
+The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if both are defined.
+
+=== couchbaseclusters.spec.rollingUpgrade.maxUpgradablePercent
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(100|[1-9][0-9]|[1-9])%$`
+
+==== Description
+
+MaxUpgradablePercent allows the number of pods affected by an upgrade at any one time to be increased.
+By default a rolling upgrade will upgrade one pod at a time.
+This field allows that limit to be removed.
+This field must be an integer percentage, e.g.
+"10%", in the range 1% to 100%.
+Percentages are relative to the total cluster size, and rounded down to the nearest whole number, with a minimum of 1.
+For example, a 10 pod cluster, and 25% allowed to upgrade, would yield 2.5 pods per iteration, rounded down to 2.
+The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if both are defined.
+
 === couchbaseclusters.spec.security
 
 ==== Constraints
