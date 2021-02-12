@@ -154,7 +154,7 @@ testcases:
 
 # LDAP Tests
 - TestLDAPCreateAdminUser
-- TestLDAPCDeleteUser
+- TestLDAPDeleteUser
 - TestLDAPDeleteRole
 - TestLDAPUpdateRole
 

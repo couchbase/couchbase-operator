@@ -646,7 +646,7 @@ func SetLDAPSettings(settings *LDAPSettings) *Request {
 func GetLDAPConnectivityStatus(status *LDAPStatus) *Request {
 	data := url.Values{}
 
-	return NewRequest((*Client).PostJSON, "/settings/ldap/validate/connectivity", []byte(data.Encode()), status)
+	return NewRequest((*Client).Post, "/settings/ldap/validate/connectivity", []byte(data.Encode()), status)
 }
 
 // GetSecuritySettings gets the cluster security settings.

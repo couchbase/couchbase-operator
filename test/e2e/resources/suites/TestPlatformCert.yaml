@@ -114,7 +114,7 @@ testcases:
 
 # LDAPTests
 - TestLDAPCreateAdminUser
-- TestLDAPCDeleteUser
+- TestLDAPDeleteUser
 
 # AutomatedBackupTests
 - TestFullIncremental

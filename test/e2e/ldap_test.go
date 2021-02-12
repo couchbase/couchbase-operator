@@ -104,7 +104,7 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 }
 
 // TestRBACDeleteUser verifies basic user deletion.
-func TestLDAPCDeleteUser(t *testing.T) {
+func TestLDAPDeleteUser(t *testing.T) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)

@@ -199,7 +199,7 @@ var (
 
 		// LDAP cases
 		"TestLDAPCreateAdminUser":       TestLDAPCreateAdminUser,
-		"TestLDAPCDeleteUser":           TestLDAPCDeleteUser,
+		"TestLDAPDeleteUser":            TestLDAPDeleteUser,
 		"TestLDAPDeleteRole":            TestLDAPDeleteRole,
 		"TestLDAPUpdateRole":            TestLDAPUpdateRole,
 		"TestLDAPRemoveUserFromBinding": TestLDAPRemoveUserFromBinding,

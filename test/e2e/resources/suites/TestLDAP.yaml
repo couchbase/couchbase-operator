@@ -2,7 +2,7 @@
 timeout: 4h
 testcases:
 - TestLDAPCreateAdminUser
-- TestLDAPCDeleteUser
+- TestLDAPDeleteUser
 - TestLDAPDeleteRole
 - TestLDAPUpdateRole
 - TestLDAPRemoveUserFromBinding
