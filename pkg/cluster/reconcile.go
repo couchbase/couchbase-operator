@@ -875,7 +875,9 @@ func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec couchbasev2.Serv
 
 	securitySettings.TLSMinVersion = couchbaseutil.TLS12
 
-	if err := couchbaseutil.SetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
+	// This needs a retry, server doesn't gracefully shutdown and give us a response,
+	// it may just slam the door shut and give us an EOF.
+	if err := couchbaseutil.SetSecuritySettings(securitySettings).RetryFor(time.Minute).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
