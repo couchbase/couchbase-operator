@@ -125,6 +125,7 @@ testcases:
 - TestLogCollectListJson
 - TestCollectLogFromEphemeralPodsUsingLogPV
 - TestLogCollectWithDefaultRetentionAndSize
+- TestLogsMetadata
 
 # Upgrade Tests
 - TestUpgradeInvalidDowngrade

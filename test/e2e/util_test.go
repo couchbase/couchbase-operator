@@ -283,6 +283,7 @@ var (
 		"TestLogCollectInvalid":                            TestLogCollectInvalid,
 		"TestExtendedDebugKillOperatorDuringLogCollection": TestExtendedDebugKillOperatorDuringLogCollection,
 		"TestLogCollectListJson":                           TestLogCollectListJson,
+		"TestLogsMetadata":                                 TestLogsMetadata,
 
 		// Log collection from Ephmeral pods
 		"TestCollectLogFromEphemeralPodsUsingLogPV":                    TestCollectLogFromEphemeralPodsUsingLogPV,

@@ -3,12 +3,12 @@ package k8s
 import (
 	ctx "context"
 	"fmt"
+	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
-	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -72,15 +72,15 @@ func InitContext(context *context.Context) error {
 
 // GetPod takes a resource reference and returns a pod from which we are able to collect logs,
 // For collections such as deployments it simply picks one.
-func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod, error) {
+func GetPod(context *context.Context, kind, name string) (*corev1.Pod, error) {
 	// Inspect the resource kind and perform type specific processing
-	switch resource.Kind() {
+	switch kind {
 	case "Pod":
-		return context.KubeClient.CoreV1().Pods(context.Namespace()).Get(ctx.Background(), resource.Name(), metav1.GetOptions{})
+		return context.KubeClient.CoreV1().Pods(context.Namespace()).Get(ctx.Background(), name, metav1.GetOptions{})
 
 	case "Deployment":
 		// Grab the deployment
-		deployment, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).Get(ctx.Background(), resource.Name(), metav1.GetOptions{})
+		deployment, err := context.KubeClient.AppsV1().Deployments(context.Namespace()).Get(ctx.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +98,7 @@ func GetPod(context *context.Context, resource resource.Reference) (*corev1.Pod,
 
 		// Select just one instance
 		if len(pods.Items) == 0 {
-			return nil, fmt.Errorf("%w: no pods delected for Deployment %s", errors.ErrResourceRequired, resource.Name())
+			return nil, fmt.Errorf("%w: no pods delected for Deployment %s", errors.ErrResourceRequired, name)
 		}
 
 		return &pods.Items[0], nil
@@ -117,22 +117,44 @@ func GetDeployments(context *context.Context) (*appsv1.DeploymentList, error) {
 	return deployments, nil
 }
 
-// GetOperatorDeployment returns the Couchbase Operator deployment in the namespace.
-func GetOperatorDeployment(context *context.Context) (*appsv1.Deployment, error) {
-	deployments, err := GetDeployments(context)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, deployment := range deployments.Items {
-		for _, container := range deployment.Spec.Template.Spec.Containers {
-			if container.Image == context.Config.OperatorImage {
-				return &deployment, nil
-			}
+// IsOperatorDeployment does a best effort guess of whether a deployment is that of the operator.
+// By default the tooling is hardcoded to the current release's container image, but this can
+// be explcitily set by the user.  If any container in a deployment's image matches, then we
+// have a high probability of this being the operator.  If that doesn't work, we guess, because
+// having some logs in the event a user has changed the image name and not specified it, is better
+// than none.  We look for "couchbase" and "operator", which covers "couchbase/operator" (public)
+// and couchbase/couchbase-operator (internal).
+func IsOperatorDeployment(context *context.Context, deployment *appsv1.Deployment) bool {
+	// First check, does the deployment explicitly contain the official
+	// image name?
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		if container.Image == context.Config.OperatorImage {
+			return true
 		}
 	}
 
-	return nil, nil
+	// Next, guess :D Chances are the name will be useful...
+	if strings.Contains(deployment.Name, "couchbase") && strings.Contains(deployment.Name, "operator") && !strings.Contains(deployment.Name, "admission") {
+		return true
+	}
+
+	return false
+}
+
+// HasOperatorDeployment returns the Couchbase Operator deployment in the namespace.
+func HasOperatorDeployment(context *context.Context) (bool, error) {
+	deployments, err := GetDeployments(context)
+	if err != nil {
+		return false, err
+	}
+
+	for i := range deployments.Items {
+		if IsOperatorDeployment(context, &deployments.Items[i]) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // GetCouchbaseClusters returns all Couchbase Clusters in the namespace.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
+	log_meta "github.com/couchbase/couchbase-operator/pkg/info/meta"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
@@ -68,6 +69,12 @@ func (r *eventCollector) Write(b backend.Backend) error {
 	data, err := yaml.Marshal(r.events)
 	if err != nil {
 		return err
+	}
+
+	path := util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), "events.yaml")
+
+	if r.resource.Kind() == "CouchbaseCluster" {
+		log_meta.SetClusterEvents(r.resource.Name(), path)
 	}
 
 	_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), "events.yaml"), string(data))

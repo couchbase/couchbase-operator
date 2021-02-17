@@ -8,6 +8,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/k8s"
+	log_meta "github.com/couchbase/couchbase-operator/pkg/info/meta"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
@@ -37,7 +38,7 @@ func (r *logCollector) Kind() string {
 // Fetch collects all logs as defined for the resource.
 func (r *logCollector) Fetch(resource resource.Reference) error {
 	// Get a pod from the resource kind
-	pod, err := k8s.GetPod(r.context, resource)
+	pod, err := k8s.GetPod(r.context, resource.Kind(), resource.Name())
 	if err != nil {
 		return err
 	}
@@ -82,8 +83,18 @@ func (r *logCollector) Fetch(resource resource.Reference) error {
 }
 
 func (r *logCollector) Write(b backend.Backend) error {
+	var operatorLogsSet bool
+
 	for name, logs := range r.logs {
-		_ = b.WriteFile(util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), name+".log"), logs.String())
+		path := util.ArchivePath(r.context.Namespace(), r.resource.Kind(), r.resource.Name(), name+".log")
+
+		if r.resource.IsOperator() && !operatorLogsSet {
+			log_meta.SetOperatorLogPath(path)
+
+			operatorLogsSet = true
+		}
+
+		_ = b.WriteFile(path, logs.String())
 	}
 
 	return nil

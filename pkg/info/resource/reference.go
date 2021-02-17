@@ -1,8 +1,9 @@
 package resource
 
 type referenceImpl struct {
-	kind string
-	name string
+	kind       string
+	name       string
+	isOperator bool
 }
 
 func NewReference(kind, name string) Reference {
@@ -18,4 +19,12 @@ func (r referenceImpl) Kind() string {
 
 func (r referenceImpl) Name() string {
 	return r.name
+}
+
+func (r referenceImpl) IsOperator() bool {
+	return r.isOperator
+}
+
+func (r *referenceImpl) SetIsOperator() {
+	r.isOperator = true
 }

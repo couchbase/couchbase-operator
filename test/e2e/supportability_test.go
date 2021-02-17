@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	log_meta "github.com/couchbase/couchbase-operator/pkg/info/meta"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -124,6 +126,121 @@ func isIgnroableResource(path string) bool {
 	}
 
 	return false
+}
+
+func hasPath(path string, paths []string) bool {
+	for _, p := range paths {
+		if p == path {
+			return true
+		}
+	}
+
+	return false
+}
+
+// mustVerifyArchiveMetadata checks the behaviour of metadata collection for
+// support integration with nutshell.  Ensure it behaves nicely in various
+// situations, the actual contents are irrelevant.
+func mustVerifyArchiveMetadata(t *testing.T, archive string, withOperator bool, clusters ...*couchbasev2.CouchbaseCluster) {
+	// Open the archive file.
+	file, err := os.OpenFile(archive, os.O_RDONLY, 0444)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	defer func() { _ = file.Close() }()
+
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	defer func() { _ = gzipReader.Close() }()
+
+	// Go through the archive, accumulating all file names, and also the contents
+	// of the metadata, if we find it.
+	tarReader := tar.NewReader(gzipReader)
+
+	var buf []byte
+
+	var paths []string
+
+	for {
+		hdr, err := tarReader.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			e2eutil.Die(t, err)
+		}
+
+		paths = append(paths, hdr.Name)
+
+		if !strings.HasSuffix(hdr.Name, "/metadata.json") {
+			continue
+		}
+
+		if buf, err = ioutil.ReadAll(tarReader); err != nil {
+			e2eutil.Die(t, err)
+		}
+	}
+
+	metadata := &log_meta.LogsMetadata{}
+	if err := json.Unmarshal(buf, metadata); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// If we have an operator, expect that section to be populated, and the paths
+	// pointing to something that exists.  If not, then it shouldn't be there.
+	if withOperator {
+		if metadata.Operator == nil {
+			e2eutil.Die(t, fmt.Errorf("metadata lacks operator attribute"))
+		}
+
+		if metadata.Operator.Image != framework.Global.OpImage {
+			e2eutil.Die(t, fmt.Errorf("operator image metadata wrong, got %s, expected %s", metadata.Operator.Image, framework.Global.OpImage))
+		}
+
+		if !hasPath(metadata.Operator.LogPath, paths) {
+			e2eutil.Die(t, fmt.Errorf("operator logs path mssing"))
+		}
+	} else if metadata.Operator != nil {
+		e2eutil.Die(t, fmt.Errorf("metadata includes operator attribute"))
+	}
+
+	// Ensure all clusters we know about exist.
+	if len(clusters) != len(metadata.Clusters) {
+		e2eutil.Die(t, fmt.Errorf("clusters length mismatch, got %d, expected %d", len(metadata.Clusters), len(clusters)))
+	}
+
+	for _, cluster := range clusters {
+		if len(metadata.Clusters) == 0 {
+			e2eutil.Die(t, fmt.Errorf("metadata lacks clusters attribute"))
+		}
+
+		var clusterMetadata *log_meta.ClusterMetadata
+
+		for i := range metadata.Clusters {
+			if cluster.Name == metadata.Clusters[i].Name {
+				clusterMetadata = &metadata.Clusters[i]
+			}
+		}
+
+		if clusterMetadata == nil {
+			e2eutil.Die(t, fmt.Errorf("unable to locate cluster metadata for %s", cluster.Name))
+		}
+
+		// nolint:staticcheck
+		if !hasPath(clusterMetadata.ResourcePath, paths) {
+			e2eutil.Die(t, fmt.Errorf("cluster resource path mssing for %s", cluster.Name))
+		}
+
+		// nolint:staticcheck
+		if !hasPath(clusterMetadata.EventsPath, paths) {
+			e2eutil.Die(t, fmt.Errorf("cluster events path mssing for %s", cluster.Name))
+		}
+	}
 }
 
 // mustVerifyArchiveContents examines a TGZ archive and errors if expected files
@@ -354,7 +471,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 
 	// These are files that will always exist
 	files := []string{
-		fmt.Sprintf("%s/cmdline", base),
+		fmt.Sprintf("%s/metadata.json", base),
 	}
 
 	// Gather cluster scoped resources.
@@ -1870,4 +1987,54 @@ func TestLogCollectListJson(t *testing.T) {
 	if testHasErrors {
 		e2eutil.Die(t, fmt.Errorf("test has errors"))
 	}
+}
+
+// TestLogsMetadata checks that the metadata we generate for a log collection run
+// isn't total garbage, and things are only filled out when they are relevant.
+func TestLogsMetadata(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	args := e2eutil.ArgumentList{}
+	args.AddClusterDefaults(kubernetes)
+	args.AddEnvironmentDefaults(f.OpImage)
+
+	t.Run("OperatorOnly", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		archive, clean := cbopinfo(t, args)
+		defer clean()
+
+		mustVerifyArchiveMetadata(t, archive, true)
+	})
+
+	// Create Couchbase clusters
+	cluster1 := e2eutil.MustNewClusterBasic(t, kubernetes, 1)
+	cluster2 := e2eutil.MustNewClusterBasic(t, kubernetes, 1)
+
+	t.Run("OperatorAndClusters", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		archive, clean := cbopinfo(t, args)
+		defer clean()
+
+		mustVerifyArchiveMetadata(t, archive, true, cluster1, cluster2)
+	})
+
+	// Kill the operator, leaving only clusters.
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
+
+	t.Run("ClustersOnly", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		archive, clean := cbopinfo(t, args)
+		defer clean()
+
+		mustVerifyArchiveMetadata(t, archive, false, cluster1, cluster2)
+	})
 }

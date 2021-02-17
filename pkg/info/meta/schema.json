@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "description": "Operator logs metadata format (Version 1)",
+  "type": "object",
+  "required": [
+    "version"
+  ],
+  "parameters": {
+    "version": {
+      "description": "Schema version this data structure conforms to",
+      "type": "string"
+    },
+    "platformVersion": {
+      "description": "Kubernetes version.  Operator versions are supported only on a range of Kubernetes releases.",
+      "type": "string"
+    },
+    "namespace": {
+      "description": "Namespace collected.  All operator and cluster logs come from the same namespace.",
+      "type": "string"
+    },
+    "toolVersion": {
+      "description": "Version of tooling (cbopinfo) used to collect the logs.",
+      "type": "string"
+    },
+    "commandLine": {
+      "description": "Command line arguments used to collect the logs.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "operator": {
+      "description": "Operator information.",
+      "type": "object",
+      "parameters": {
+        "image": {
+          "description": "The container image the operator is using.",
+          "type": "string"
+        },
+        "logPath": {
+          "description": "The path to the operator logs, relative to the archive root.",
+          "type": "string"
+        }
+      }
+    },
+    "clusters": {
+      "description": "A list of all Couchbase cluster resources that were collected.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "parameters": {
+          "name": {
+            "description": "The name of the cluster, this is the metadata name of the resource, not necessarily the Couchbase cluster name.",
+            "type": "string"
+          },
+          "image": {
+            "description": "The container image the cluster is using, should contain the Couchbase version.  Certain versions are valid only for certain operator versions.",
+            "type": "string"
+          },
+          "resourcePath": {
+            "description": "The path to the Couchbase cluster YAML specification, relative to the archive root.",
+            "type": "string"
+          },
+          "eventsPath": {
+            "description": "The path to the Couchbase cluster events YAML, relative to the archive root.  This contains a list of Kubernetes events, that can be sorted by the JSON pointer /metadata/creationTimestamp.",
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

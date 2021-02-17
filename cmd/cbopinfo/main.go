@@ -4,7 +4,6 @@ import (
 	ctx "context"
 	"fmt"
 	"os"
-	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
@@ -13,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/k8s"
 	"github.com/couchbase/couchbase-operator/pkg/info/logs"
+	log_meta "github.com/couchbase/couchbase-operator/pkg/info/meta"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
@@ -117,8 +117,9 @@ func main() {
 
 	// Before we do anything further ensure we've been correctly configured.
 	// Check basic connectivity via the discovery API.  This is plain text.
-	// TODO: Use the resource list to filter the resources we gather.
-	if _, _, err := context.KubeClient.Discovery().ServerGroupsAndResources(); err != nil {
+	// Use the simplest possible call here, the discovery API has a tendency
+	// to crap out if some aggregated controller is not working.
+	if _, err := context.KubeClient.Discovery().ServerVersion(); err != nil {
 		fmt.Println("unable to connect to kubernetes cluster:", err)
 		os.Exit(1)
 	}
@@ -162,13 +163,13 @@ func main() {
 	}
 
 	// Check that there is an operator deployment running.
-	deployment, err := k8s.GetOperatorDeployment(context)
+	hasOperator, err := k8s.HasOperatorDeployment(context)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	if deployment == nil {
+	if !hasOperator {
 		fmt.Println("no Couchbase Operator Deployment resource discovered in name space (check the -operator-image flag is correctly set)", context.Namespace())
 	} else {
 		anythingToCollect = true
@@ -177,6 +178,11 @@ func main() {
 	// Bomb out if there is nothing of interest to collect from.
 	if !anythingToCollect {
 		fmt.Println("nothing to collect in name space", context.Namespace())
+		os.Exit(1)
+	}
+
+	if err := log_meta.Init(context, os.Args); err != nil {
+		fmt.Println("unable to initialize logs metadata", err)
 		os.Exit(1)
 	}
 
@@ -197,13 +203,16 @@ func main() {
 
 	defer backend.Close()
 
-	// Store the arguments used to invoke the command.
-	if err := backend.WriteFile(util.ArchiveName()+"/cmdline", strings.Join(os.Args, " ")); err != nil {
-		fmt.Println("failed to archive:", err)
-	}
-
 	references := resource.Collect(context, backend, resources)
 	harvestSub(context, backend, references)
+
+	// Store the logs metadata
+	metadata, err := log_meta.ToJSON()
+	if err != nil {
+		fmt.Println("warning: unable to add logs metadata:", err)
+	} else if err := backend.WriteFile(util.ArchiveName()+"/metadata.json", metadata); err != nil {
+		fmt.Println("failed to archive:", err)
+	}
 
 	// If system collections are allowed harvest from explicitly from that namespace.
 	if context.Config.System {

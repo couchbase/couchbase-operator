@@ -90,12 +90,12 @@ func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, path
 // Fetch collects all operator data as defined for the resource.
 func (r *operatorCollector) Fetch(resource resource.Reference) error {
 	// Will match both deployments and pods without this.
-	if resource.Kind() != "Deployment" {
+	if !resource.IsOperator() {
 		return nil
 	}
 
 	// Get a pod from the resource kind
-	pod, err := k8s.GetPod(r.context, resource)
+	pod, err := k8s.GetPod(r.context, resource.Kind(), resource.Name())
 	if err != nil {
 		return err
 	}

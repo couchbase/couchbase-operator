@@ -5,14 +5,18 @@ import (
 	"fmt"
 	"strings"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
 	"github.com/couchbase/couchbase-operator/pkg/info/config"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
+	"github.com/couchbase/couchbase-operator/pkg/info/k8s"
+	log_meta "github.com/couchbase/couchbase-operator/pkg/info/meta"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	"github.com/ghodss/yaml"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -29,6 +33,10 @@ type Reference interface {
 	Kind() string
 	// Name is the name of the resource
 	Name() string
+	// IsOperator is a flag to say this resource is the operator deployment.
+	IsOperator() bool
+	// SetIsOperator set this as the operator deployment.
+	SetIsOperator()
 }
 
 // getResourceSelector returns a label selector which will scope the resources we
@@ -166,6 +174,14 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 
 	NextObject:
 		for _, o := range objects.Items {
+			// Watch out for the operator, we need to flag this for special
+			// handling down the line.
+			var isOperatorDeployment bool
+
+			// At this level we get access to the full resource, and the Operator
+			// image name.
+			operatorImage := context.Config.OperatorImage
+
 			// Perform any post list filtering.  If we are filtering based on cluster
 			// name then reject any resources that don't match a named cluster.  If we
 			// are filtering based on namespace name, then reject any resources that
@@ -196,46 +212,30 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 					continue NextObject
 				}
 			case ScopeCouchbaseGroup:
-				if !strings.Contains(o.GetName(), "couchbase.com") {
+				if !strings.Contains(o.GetName(), couchbasev2.GroupName) {
 					continue NextObject
 				}
 			case ScopeOperatorDeployment:
-				// Collect everything if we are told to, this is useful
-				// for getting system logs.
-				if context.Config.All {
-					break
-				}
-
-				// This scoping is a little more complex (ripe for deletion!).
-				// This scope should only be applied to deployments.  It will
-				// extract the containers from the pod template and only collect
-				// the resource if this container name matches that specified
-				// as a CLI flag.
-				containers, ok, _ := unstructured.NestedSlice(o.Object, "spec", "template", "spec", "containers")
-				if !ok {
+				// We need to interrogate all deployments, and work out if this
+				// deployment refers to the Operator.  Doing this in typed land
+				// is a lot easier...
+				deployment := &appsv1.Deployment{}
+				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(o.Object, deployment); err != nil {
 					continue NextObject
 				}
 
-				match := false
-
-				for _, c := range containers {
-					container, ok := c.(map[string]interface{})
-					if !ok {
-						continue NextObject
-					}
-
-					value, ok, _ := unstructured.NestedString(container, "image")
-					if !ok {
-						continue NextObject
-					}
-
-					if value == context.Config.OperatorImage {
-						match = true
-						break
-					}
+				// Determine whether the deployment is the operator and needs
+				// further scrutiny.
+				if k8s.IsOperatorDeployment(context, deployment) {
+					isOperatorDeployment = true
+					operatorImage = deployment.Spec.Template.Spec.Containers[0].Image
 				}
 
-				if !match {
+				// Filter out non-operator deployments to limit the scope of our
+				// collection efforts, we don't need to see, nor do customers want
+				// us to see all the things (this is meaningless, we collect all the
+				// secrets as is...)
+				if !context.Config.All && !isOperatorDeployment {
 					continue NextObject
 				}
 			}
@@ -257,7 +257,27 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 
 			_ = backend.WriteFile(path, string(data))
 
-			references = append(references, NewReference(gvk.Kind, o.GetName()))
+			reference := NewReference(gvk.Kind, o.GetName())
+
+			// Metadata collation, used by support for automation.
+			switch gvk.Kind {
+			case "CouchbaseCluster":
+				// The image will be part of the cluster, it's guaranteed by CRD
+				// validation.  Events however, we cannot guess at whether there are
+				// any at this point in the process, so just fill in the path that we
+				// expect, and support can deal with the missing file.
+				image, _, _ := unstructured.NestedString(o.Object, "spec", "image")
+
+				log_meta.SetCluster(o.GetName(), image, path)
+			case "Deployment":
+				if isOperatorDeployment {
+					reference.SetIsOperator()
+
+					log_meta.SetOperator(operatorImage)
+				}
+			}
+
+			references = append(references, reference)
 		}
 	}
 
