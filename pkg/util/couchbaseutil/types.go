@@ -1088,3 +1088,17 @@ type ClientCertAuth struct {
 	// Maximum of 10
 	Prefixes []ClientCertAuthPrefix `json:"prefixes"`
 }
+
+const (
+	// See QuerySettings.TemporarySpaceSize.
+	QueryTemporarySpaceSizBackfillDisabled = 0
+	QueryTemporarySpaceSizeUnlimited       = -1
+)
+
+// QuerySettings allow the query service to be tweaked.
+type QuerySettings struct {
+	// TemporarySpaceSize is another classic bit of API design, where 0 means turn backfill
+	//  off -- literally nothing to do with the size of something. -1 means unlimted, and
+	// anything else is a size in MiB.
+	TemporarySpaceSize int64 `json:"queryTmpSpaceSize" url:"queryTmpSpaceSize"`
+}

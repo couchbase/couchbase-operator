@@ -1662,6 +1662,9 @@ type ClusterConfig struct {
 	// Indexer allows the indexer to be configured.
 	Indexer *CouchbaseClusterIndexerSettings `json:"indexer,omitempty"`
 
+	// Query allows the query service to be configured.
+	Query *CouchbaseClusterQuerySettings `json:"query,omitempty"`
+
 	// AutoFailoverTimeout defines how long Couchbase server will wait between a pod
 	// being witnessed as down, until when it will failover the pod.  Couchbase server
 	// will only failover pods if it deems it safe to do so, and not result in data
@@ -1748,6 +1751,26 @@ type CouchbaseClusterIndexerSettings struct {
 	// defaulting to "memory_optimized".
 	// +kubebuilder:default="memory_optimized"
 	StorageMode CouchbaseClusterIndexStorageSetting `json:"storageMode,omitempty"`
+}
+
+// CouchbaseClusterQuerySettings allow query tweaks.
+type CouchbaseClusterQuerySettings struct {
+	// BackfillEnabled allows the query service to backfill.
+	// +kubebuilder:default=true
+	BackfillEnabled *bool `json:"backfillEnabled,omitempty"`
+
+	// TemporarySpace allows the temporary storage used by the query
+	// service backfill, per-pod, to be modified.  This field requires
+	// `backfillEnabled` to be set to true in order to have any effect.
+	// +kubebuilder:default="5Gi"
+	// +kubebuilder:validation:Type=string
+	TemporarySpace *resource.Quantity `json:"temporarySpace,omitempty"`
+
+	// TemporarySpaceUnlimited allows the temporary storage used by
+	// the query service backfill, per-pod, to be unconstrainend.  This field
+	// requires `backfillEnabled` to be set to true in order to have any effect.
+	// This field overrides `temporarySpace`.
+	TemporarySpaceUnlimited bool `json:"temporarySpaceUnlimited,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

@@ -782,6 +782,55 @@ Threads controls the number of processor threads to use for indexing.
 A value of 0 means 1 per CPU.
 This attribute must be greater than or equal to 0, defaulting to 0.
 
+=== couchbaseclusters.spec.cluster.query
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Query allows the query service to be configured.
+
+=== couchbaseclusters.spec.cluster.query.backfillEnabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+BackfillEnabled allows the query service to backfill.
+
+=== couchbaseclusters.spec.cluster.query.temporarySpace
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `5Gi`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+TemporarySpace allows the temporary storage used by the query service backfill, per-pod, to be modified.
+This field requires `backfillEnabled` to be set to true in order to have any effect.
+
+=== couchbaseclusters.spec.cluster.query.temporarySpaceUnlimited
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+TemporarySpaceUnlimited allows the temporary storage used by the query service backfill, per-pod, to be unconstrainend.
+This field requires `backfillEnabled` to be set to true in order to have any effect.
+This field overrides `temporarySpace`.
+
 === couchbaseclusters.spec.cluster.queryServiceMemoryQuota
 
 ==== Constraints

@@ -718,3 +718,18 @@ func ChangePassword(password string) *Request {
 
 	return NewRequest((*Client).Post, "/controller/changePassword", []byte(data.Encode()), nil)
 }
+
+// GetQuerySettings returns settings for the query service.
+func GetQuerySettings(settings *QuerySettings) *Request {
+	return NewRequest((*Client).Get, "/settings/querySettings", nil, settings)
+}
+
+// SetQuerySettings sets settings for the query service.
+func SetQuerySettings(settings *QuerySettings) *Request {
+	data, err := urlencoding.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/settings/querySettings", data, nil)
+}

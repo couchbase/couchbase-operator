@@ -197,6 +197,43 @@ func TestIndexerSettings(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
+// TestQuerySettings tests that query setting updates are accepted by the Couchbase API
+// and the necessary events are raised.
+func TestQuerySettings(t *testing.T) {
+	// Platform configuration.
+	targetKube, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the cluster.
+	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase.Spec.ClusterSettings.Query = &couchbasev2.CouchbaseClusterQuerySettings{}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	// Play with the settings and ensure events are raised.
+	op := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("query service", testCouchbase), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpace", "2Gi"), time.Minute)
+	e2eutil.MustReceiveErrorValue(t, op)
+
+	op = e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("query service", testCouchbase), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpaceUnlimited", true), time.Minute)
+	e2eutil.MustReceiveErrorValue(t, op)
+
+	op = e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("query service", testCouchbase), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/backfillEnabled", false), time.Minute)
+	e2eutil.MustReceiveErrorValue(t, op)
+
+	// Check that the user can see the cluster being edited.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
 // TestInvalidBaseImage tests cluster with invalid image repos fail.
 func TestInvalidBaseImage(t *testing.T) {
 	f := framework.Global

@@ -29,6 +29,7 @@ var (
 		"TestResizeCluster":                                   TestResizeCluster,
 		"TestEditClusterSettings":                             TestEditClusterSettings,
 		"TestIndexerSettings":                                 TestIndexerSettings,
+		"TestQuerySettings":                                   TestQuerySettings,
 		"TestRecoveryAfterOnePodFailureNoBucket":              TestRecoveryAfterOnePodFailureNoBucket,
 		"TestAntiAffinityOn":                                  TestAntiAffinityOn,
 		"TestPodResourcesBasic":                               TestPodResourcesBasic,

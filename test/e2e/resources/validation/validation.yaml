@@ -264,6 +264,10 @@ spec:
       memorySnapshotInterval: 200ms
       stableSnapshotInterval: 5s
       storageMode: memory_optimized
+    query:
+      backfillEnabled: true
+      temporarySpace: 5Gi
+      temporarySpaceUnlimited: true
   buckets:
     managed: true
   xdcr:

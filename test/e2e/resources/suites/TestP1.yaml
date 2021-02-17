@@ -6,6 +6,7 @@ testcases:
 - TestInvalidVersion
 - TestManageMultipleClusters
 - TestIndexerSettings
+- TestQuerySettings
 
 # Node Tests
 - TestNodeUnschedulable

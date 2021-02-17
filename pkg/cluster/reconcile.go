@@ -1277,6 +1277,10 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
+	if err := c.reconcileQuerySettings(); err != nil {
+		return err
+	}
+
 	if err := c.reconcileAutoCompactionSettings(); err != nil {
 		return err
 	}
@@ -1452,6 +1456,50 @@ func (c *Cluster) reconcileIndexSettings() error {
 
 	log.Info("Index storage settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
+
+	return nil
+}
+
+// reconcileQuerySettings updates anything query related.
+func (c *Cluster) reconcileQuerySettings() error {
+	// If we aren't managing the endpoint, then leave it alone.
+	apiSettings := c.cluster.Spec.ClusterSettings.Query
+	if apiSettings == nil {
+		return nil
+	}
+
+	current := &couchbaseutil.QuerySettings{}
+	if err := couchbaseutil.GetQuerySettings(current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	// Do a shallow copy here, for now, we don't need to copy and pointers.
+	requested := *current
+
+	// Hide away the magic numbers with some proper API design.  You explicitly
+	// specify whether backfilling is enabled.  If it is, then either set to unlimited
+	// or the requested size (in order of precedence).  The size should always be populated
+	// with CRD defaulting.
+	if apiSettings.BackfillEnabled != nil && *apiSettings.BackfillEnabled {
+		if apiSettings.TemporarySpaceUnlimited {
+			requested.TemporarySpaceSize = couchbaseutil.QueryTemporarySpaceSizeUnlimited
+		} else if apiSettings.TemporarySpace != nil {
+			requested.TemporarySpaceSize = k8sutil.Megabytes(apiSettings.TemporarySpace)
+		}
+	} else {
+		requested.TemporarySpaceSize = couchbaseutil.QueryTemporarySpaceSizBackfillDisabled
+	}
+
+	if reflect.DeepEqual(current, &requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetQuerySettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	log.Info("Query settings updated", "cluster", c.namespacedName())
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("query service", c.cluster))
 
 	return nil
 }
