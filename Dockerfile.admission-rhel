@@ -1,15 +1,10 @@
-FROM registry.access.redhat.com/rhel7
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
-MAINTAINER Couchbase Docker Team <docker@couchbase.com>
+LABEL maintainer="docker@couchbase.com"
 
-# Install latest security updates
-RUN yum repolist --disablerepo="*" && \
-    yum-config-manager --enable rhel-7-server-rpms rhel-7-server-rt-rpms && \
-    yum-config-manager --enable rhel-7-server-optional-rpms \
-        rhel-7-server-extras-rpms rhel-server-rhscl-7-rpms && \
-    yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical \
-        --setopt=tsflags=nodocs \
-    yum clean all
+# ubi-minimal updates frequently and has very few packages installed,
+# so no need for a "security-only" update.
+RUN microdnf update && microdnf clean all
 
 # Add licenses and help file
 RUN mkdir /license
@@ -23,7 +18,7 @@ ARG OPERATOR_BUILD
 # Install Couchbase Operator Admission Controller
 ADD build/bin/couchbase-operator-admission /usr/local/bin/
 
-LABEL name="rhel7/couchbase-operator-admission" \
+LABEL name="couchbase/admission-controller" \
       vendor="Couchbase" \
       version="${PROD_VERSION}" \
       openshift_build="${OS_BUILD}" \
