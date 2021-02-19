@@ -241,7 +241,7 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 			}
 
 			// Finally marshal to YAML and add to the backend archive.
-			data, err := yaml.Marshal(o)
+			data, err := yaml.Marshal(o.Object)
 			if err != nil {
 				fmt.Println("failed to marshal data:", err)
 				continue
