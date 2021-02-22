@@ -50,7 +50,7 @@ resource "azurerm_kubernetes_cluster" "qe-auto-cluster1" {
   default_node_pool {
     name                = "nodepool1"
     node_count          = 3
-    vm_size             = "Standard_D8s_v3"
+    vm_size             = "Standard_D4s_v4"
     availability_zones  = ["1", "2", "3"]
     os_disk_size_gb     = 30
     vnet_subnet_id      = azurerm_subnet.qe-auto-vnet1-subnet.id
@@ -106,7 +106,7 @@ resource "azurerm_kubernetes_cluster" "qe-auto-cluster2" {
   default_node_pool {
     name                = "nodepool2"
     node_count          = 3
-    vm_size             = "Standard_D8s_v3"
+    vm_size             = "Standard_D4s_v4"
     availability_zones  = ["1", "2", "3"]
     os_disk_size_gb     = 30
     vnet_subnet_id      = azurerm_subnet.qe-auto-vnet2-subnet.id
