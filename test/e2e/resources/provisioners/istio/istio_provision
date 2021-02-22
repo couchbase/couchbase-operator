@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""
+istio_provision
+
+Description:
+    This install istio with the desired version
+    on the kubernetes cluster specified and then verifies the
+    installation process
+
+Usage:
+    istio_provision start
+
+Options:
+    --kubeconfig KUBECONFIG         Specifies the kubeconfig string of the cluster
+                                    on which istio needs to be installed
+"""
+
+import argparse
+import subprocess
+import sys
+
+def istioctl(*cmd):
+    """Runs a istioctl command raising an exception on error"""
+    try:
+        return subprocess.check_output(['istioctl'] + list(cmd)).decode().strip()
+    except subprocess.CalledProcessError as err:
+        raise RuntimeError("command '{}' failed".format(err.cmd)) from err
+
+def start(args):
+    """
+    Run istioctl command with required parameters
+    """
+    istioctl('install', '-y', '--kubeconfig' , args.kubeconfig)
+    istioctl('verify-install', '--kubeconfig' , args.kubeconfig)
+
+def main():
+    """Main entry point"""
+
+    # Parse CLI arguments.
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command')
+    parser.add_argument('-c', '--kubeconfig', required=True)
+
+    args = parser.parse_args()
+
+    if args.command == 'start' and not args.kubeconfig:
+        print('istio provision error: cluster config file')
+        sys.exit(1)
+
+    if args.command == 'start':
+        start(args)
+    else:
+        print('invalid command {}'.format(args.command))
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

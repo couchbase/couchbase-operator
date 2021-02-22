@@ -9,7 +9,6 @@ import (
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -87,43 +86,6 @@ func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool) *corev1.Se
 	return secret
 }
 
-// Check backup configuration is correct before running any backup tests.
-func skipBackup(t *testing.T, s3 bool) {
-	f := framework.Global
-
-	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	version, err := couchbaseutil.NewVersion(versionStr)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	if version.Semver() != "6.6.0" && s3 {
-		t.Skip("Backup to S3 is a 6.6.0 feature")
-	}
-
-	versionStr, err = k8sutil.CouchbaseVersion(f.CouchbaseBackupImage)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	version, err = couchbaseutil.NewVersion(versionStr)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	if version.Major() >= 6 && version.Minor() <= 5 && s3 {
-		t.Skip("S3 supported with 6.6.0 images only")
-	}
-
-	if (f.S3Bucket == "" || f.S3AccessKey == "" || f.S3SecretID == "") && s3 {
-		t.Skip("Either of S3 Bucket/AccessKey/SecretId missing")
-	}
-}
-
 func testFullIncremental(t *testing.T, s3 bool) {
 	f := framework.Global
 
@@ -132,7 +94,9 @@ func testFullIncremental(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -190,7 +154,9 @@ func testFullOnly(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -248,7 +214,9 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -339,7 +307,9 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -419,7 +389,9 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -505,7 +477,9 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -585,7 +559,9 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	fullFreq := 2
 	targetBucketName := "bucketty-mcbuccketface"
@@ -705,7 +681,9 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Create a normal cluster.
 	clusterSize := constants.Size3
@@ -773,7 +751,9 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	clusterSize := constants.Size3
 	// Create a normal cluster.
@@ -843,7 +823,9 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	clusterSize := constants.Size3
 	// Create the cluster.
@@ -906,7 +888,9 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Create the cluster.
 	clusterSize := constants.Size3
@@ -997,7 +981,9 @@ func testBackupRetention(t *testing.T, s3 bool) {
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Static configuration.
 	clusterSize := 3
@@ -1045,7 +1031,9 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	skipBackup(t, s3)
+	if s3 {
+		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
+	}
 
 	// Static configuration.
 	clusterSize := 3

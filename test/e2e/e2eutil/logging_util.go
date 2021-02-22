@@ -128,9 +128,17 @@ func checkLoggingSidecarCount(k8s *types.Cluster, couchbase *couchbasev2.Couchba
 		return err
 	}
 
+	containerCount := 0
+
 	for _, pod := range pods.Items {
-		if len(pod.Spec.Containers) != expectedCount+1 {
-			return NewErrContainerCountInvalid(len(pod.Spec.Containers), expectedCount+1, pod.Name)
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == k8sutil.CouchbaseLogSidecarContainerName || status.Name == k8sutil.CouchbaseAuditCleanupSidecarContainerName {
+				containerCount++
+			}
+		}
+
+		if containerCount != expectedCount {
+			return NewErrContainerCountInvalid(containerCount, expectedCount, pod.Name)
 		}
 	}
 

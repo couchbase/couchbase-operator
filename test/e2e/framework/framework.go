@@ -1082,6 +1082,15 @@ func (r *TestRequirement) NotVersion(v ...string) *TestRequirement {
 	return r
 }
 
+// HasS3Parameters skips the S3 tests if S3 parameters are not provided.
+func (r *TestRequirement) HasS3Parameters() *TestRequirement {
+	if Global.S3Bucket == "" || Global.S3AccessKey == "" || Global.S3SecretID == "" {
+		r.t.Skip("S3 parameters are not provided")
+	}
+
+	return r
+}
+
 // AtLeastVersion skips the test for Couchbase versions before this threshold.
 func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseServerImage, ":")
@@ -1100,7 +1109,35 @@ func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase server image version not supported (geriatric)")
+		r.t.Skip("Couchbase Server Image version not supported (geriatric)")
+	}
+
+	return r
+}
+
+// AtLeastBackupVersion skips the test for Couchbase versions before this threshold.
+func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
+	parts := strings.Split(Global.CouchbaseBackupImage, ":")
+	if len(parts) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed Backup image: %v", Global.CouchbaseBackupImage))
+	}
+
+	if parts[1] == "latest" {
+		return r
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed Backup version: %s: %v", parts[1], err))
+	}
+
+	v2, err := couchbaseutil.NewVersion(v)
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed backup version: %s: %v", v, err))
+	}
+
+	if v1.Less(v2) {
+		r.t.Skip("Couchbase Backup Image version not supported (geriatric)")
 	}
 
 	return r
