@@ -1700,7 +1700,7 @@ type ClusterConfig struct {
 }
 
 // IndexerLogLevel controls the verbosity of indexer logs.
-// +kubebuilder:validation:Enum=slient;fatal;error;warn;info;verbose;timing;debug;trace
+// +kubebuilder:validation:Enum=silent;fatal;error;warn;info;verbose;timing;debug;trace
 type IndexerLogLevel string
 
 const (

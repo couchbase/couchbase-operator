@@ -708,7 +708,7 @@ Indexer allows the indexer to be configured.
 
 *Default*: `info`
 
-*Enumerations*: `slient, fatal, error, warn, info, verbose, timing, debug, trace`
+*Enumerations*: `silent, fatal, error, warn, info, verbose, timing, debug, trace`
 
 ==== Description
 
