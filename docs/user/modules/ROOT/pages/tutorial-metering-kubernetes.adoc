@@ -36,7 +36,7 @@ The helm chart can be used to quickly get started with installing a Couchbase Cl
 Install the Operator Helm Chart with the following overrides:
 [source,console]
 ----
-$ helm install demo --set cluster.monitoring.prometheus.enabled=true couchbase/couchbase-operator
+$ helm install demo --set cluster.monitoring.prometheus.enabled=true --set buckets.default.name=travel-sample couchbase/couchbase-operator
 ----
 
 === Add The Monitoring Stack
