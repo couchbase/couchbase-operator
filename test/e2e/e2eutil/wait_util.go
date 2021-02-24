@@ -16,7 +16,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -155,34 +154,12 @@ func couchbaseClusterScaled(resource *unstructured.Unstructured, lookupError err
 func ResourceConstraints(k8s *types.Cluster, resource runtime.Object, constraints ...resourceCheckFunc) func() error {
 	return func() error {
 		// Map from object to dynamic API mapping... "e.g. couchbase.com/v2/couchbaseclusters"
-		kinds, _, err := scheme.Scheme.ObjectKinds(resource)
+		mapping, err := getRESTMapping(k8s, resource)
 		if err != nil {
 			return err
 		}
 
-		gvk := kinds[0]
-
-		mapping, err := k8s.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return err
-		}
-
-		// Up cast the resource into a meta object so we can interrogate name and namespace.
-		metaResource, ok := resource.(metav1.Object)
-		if !ok {
-			return fmt.Errorf("unable to convert from runtime to meta resource")
-		}
-
-		var unstructuredResource *unstructured.Unstructured
-
-		var lookupError error
-
-		// Lookup the resource.
-		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			unstructuredResource, lookupError = k8s.DynamicClient.Resource(mapping.Resource).Get(context.Background(), metaResource.GetName(), metav1.GetOptions{})
-		} else {
-			unstructuredResource, lookupError = k8s.DynamicClient.Resource(mapping.Resource).Namespace(metaResource.GetNamespace()).Get(context.Background(), metaResource.GetName(), metav1.GetOptions{})
-		}
+		unstructuredResource, lookupError := metaGet(k8s, mapping, resource)
 
 		// Check all constraints return with no error.
 		for _, constraint := range constraints {
@@ -957,6 +934,58 @@ func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.Couchbase
 func MustWaitForPrometheusReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	err := WaitForPrometheusReady(k8s, couchbase, timeout)
 	if err != nil {
+		Die(t, err)
+	}
+}
+
+// MustWaitForStableResourceVersion checks the resource's resource version.  It expects this to
+// remain stable for the given period.  If this fails, the risk is the DAC running all the time
+// and flooding the API with requests (scaling linearly...)
+func MustWaitForStableResourceVersion(t *testing.T, k8s *types.Cluster, resource runtime.Object, period, timeout time.Duration) {
+	mapping, err := getRESTMapping(k8s, resource)
+	if err != nil {
+		Die(t, err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// The outer retry loop loads up the current resource and reads out its generation...
+	callback := func() error {
+		resource, err := metaGet(k8s, mapping, resource)
+		if err != nil {
+			return err
+		}
+
+		version := resource.GetResourceVersion()
+
+		// The inner retry loop checks that it doesn't change for the duration of the
+		callback := func() error {
+			resource, err := metaGet(k8s, mapping, resource)
+			if err != nil {
+				return err
+			}
+
+			currentVersion := resource.GetResourceVersion()
+
+			if currentVersion != version {
+				return fmt.Errorf("resource version mismatch %v vs %v", currentVersion, version)
+			}
+
+			return nil
+		}
+
+		innerCtx, cancel := context.WithTimeout(ctx, period)
+		defer cancel()
+
+		if err := retryutil.Assert(innerCtx, time.Second, callback); err != nil {
+			return fmt.Errorf("resource version is unstable")
+		}
+
+		return nil
+	}
+
+	if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
 		Die(t, err)
 	}
 }

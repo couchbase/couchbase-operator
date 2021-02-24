@@ -335,7 +335,8 @@ var (
 		"TestLoadBalancerSourceRanges":           TestLoadBalancerSourceRanges,
 
 		// Status tests
-		"TestStatusRecovery": TestStatusRecovery,
+		"TestStatusRecovery":  TestStatusRecovery,
+		"TestStatusStability": TestStatusStability,
 
 		// Monitoring tests
 		"TestPrometheusMetrics":                         TestPrometheusMetrics,

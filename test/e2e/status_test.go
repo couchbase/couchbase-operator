@@ -54,3 +54,24 @@ func TestStatusRecovery(t *testing.T) {
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, tests, time.Minute)
 }
+
+// TestStatusStability this guards against the status constantly updating and causing writes to
+// the API.  The fallout from this probably involves all clusters in the system calling the DAC
+// constantly and owning the API.
+func TestStatusStability(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+
+	// Ensure that the resource version stays stable for at least a minute, this means
+	// in mnormal operation we're not spamming the API with status updates.
+	e2eutil.MustWaitForStableResourceVersion(t, kubernetes, cluster, time.Minute, 5*time.Minute)
+}

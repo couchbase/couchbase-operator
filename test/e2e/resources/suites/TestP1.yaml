@@ -116,6 +116,7 @@ testcases:
 
 # Status Tests
 - TestStatusRecovery
+- TestStatusStability
 
 # RBAC Tests
 - TestRBACRemoveUserFromBinding
