@@ -33,7 +33,7 @@ provider "aws" {
 
 module "vpc1" {
   source          = "terraform-aws-modules/vpc/aws"
-  name            = "qe-auto-vpc1"
+  name            = "qe-auto-vpc1-2_1_x"
   cidr            = "10.0.0.0/16"
   azs             = ["us-west-2a", "us-west-2b", "us-west-2c"]
   public_subnets  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
@@ -63,7 +63,7 @@ module "vpc1" {
 }
 
 resource "aws_security_group" "securitygroup1" {
-  name    = "qe-auto-securitygroup1"
+  name    = "qe-auto-securitygroup1-2_1_x"
   vpc_id  = module.vpc1.vpc_id
 
   ingress {
@@ -85,7 +85,7 @@ resource "aws_security_group" "securitygroup1" {
 
 module "vpc2" {
   source          = "terraform-aws-modules/vpc/aws"
-  name            = "qe-auto-vpc2"
+  name            = "qe-auto-vpc2-2_1_x"
   cidr            = "192.168.0.0/16"
   azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
   public_subnets  = ["192.168.1.0/24", "192.168.2.0/24", "192.168.3.0/24"]
@@ -119,7 +119,7 @@ module "vpc2" {
 }
 
 resource "aws_security_group" "securitygroup2" {
-  name      = "qe-auto-securitygroup2"
+  name      = "qe-auto-securitygroup2-2_1_x"
   provider  = aws.east
   vpc_id    = module.vpc2.vpc_id
 
@@ -150,7 +150,7 @@ data "aws_eks_cluster_auth" "cluster1" {
 
 module "cluster1" {
   source          = "terraform-aws-modules/eks/aws"
-  cluster_name    = "qe-auto-cluster1"
+  cluster_name    = "qe-auto-cluster1-2_1_x"
   cluster_version = var.kubernetes-version
   subnets         = module.vpc1.public_subnets
   vpc_id          = module.vpc1.vpc_id
@@ -160,7 +160,7 @@ module "cluster1" {
 
   worker_groups = [
     {
-      instance_type         = "t3.medium"
+      instance_type         = "m5.xlarge"
       asg_min_size          = 2
       asg_desired_capacity  = 3
       asg_max_size          = 4
@@ -184,7 +184,7 @@ data "aws_eks_cluster_auth" "cluster2" {
 
 module "cluster2" {
   source          = "terraform-aws-modules/eks/aws"
-  cluster_name    = "qe-auto-cluster2"
+  cluster_name    = "qe-auto-cluster2-2_1_x"
   cluster_version = var.kubernetes-version
   subnets         = module.vpc2.public_subnets
   vpc_id          = module.vpc2.vpc_id
@@ -194,7 +194,7 @@ module "cluster2" {
 
   worker_groups = [
     {
-      instance_type         = "t3.medium"
+      instance_type         = "m5.xlarge"
       asg_min_size          = 2
       asg_desired_capacity  = 3
       asg_max_size          = 4

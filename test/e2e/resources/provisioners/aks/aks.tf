@@ -18,14 +18,14 @@ provider "azurerm" {
 
 # Create resource group
 resource "azurerm_resource_group" "qe-auto" {
-  name     = "qe-auto"
+  name     = "qe-auto-21x"
   location = "East US 2"
 }
 
 
 # Create VNet 1
 resource "azurerm_virtual_network" "qe-auto-vnet1" {
-  name                = "qe-auto-vnet1"
+  name                = "qe-auto-vnet1-21x"
   location            = "East US 2"
   resource_group_name = azurerm_resource_group.qe-auto.name
   address_space       = ["10.0.0.0/12"]
@@ -33,7 +33,7 @@ resource "azurerm_virtual_network" "qe-auto-vnet1" {
 
 # Create Subnet for VNet 1
 resource "azurerm_subnet" "qe-auto-vnet1-subnet" {
-  name                  = "qe-auto-vnet1-subnet"
+  name                  = "qe-auto-vnet1-subnet-21x"
   resource_group_name   = azurerm_resource_group.qe-auto.name
   virtual_network_name  = azurerm_virtual_network.qe-auto-vnet1.name
   address_prefixes      = ["10.8.0.0/16"]
@@ -41,16 +41,16 @@ resource "azurerm_subnet" "qe-auto-vnet1-subnet" {
 
 # Create Cluster 1
 resource "azurerm_kubernetes_cluster" "qe-auto-cluster1" {
-  name                = "qe-auto-cluster1"
+  name                = "qe-auto-cluster1-21x"
   location            = "East US 2"
   resource_group_name = azurerm_resource_group.qe-auto.name
-  dns_prefix          = "qe-auto-cluster1"
+  dns_prefix          = "qe-auto-cluster1-21x"
   kubernetes_version  = var.kubernetes-version
 
   default_node_pool {
-    name                = "nodepool1"
+    name                = "nodepool21x1"
     node_count          = 3
-    vm_size             = "Standard_D8s_v3"
+    vm_size             = "Standard_D4s_v4"
     availability_zones  = ["1", "2", "3"]
     os_disk_size_gb     = 30
     vnet_subnet_id      = azurerm_subnet.qe-auto-vnet1-subnet.id
@@ -80,7 +80,7 @@ resource "azurerm_kubernetes_cluster" "qe-auto-cluster1" {
 
 # Create VNet 2
 resource "azurerm_virtual_network" "qe-auto-vnet2" {
-  name                = "qe-auto-vnet2"
+  name                = "qe-auto-vnet2-21x"
   location            = "West US 2"
   resource_group_name = azurerm_resource_group.qe-auto.name
   address_space       = ["10.16.0.0/12"]
@@ -88,7 +88,7 @@ resource "azurerm_virtual_network" "qe-auto-vnet2" {
 
 # Create Subnet for VNet 2
 resource "azurerm_subnet" "qe-auto-vnet2-subnet" {
-  name                  = "qe-auto-vnet2-subnet"
+  name                  = "qe-auto-vnet2-subnet-21x"
   resource_group_name   = azurerm_resource_group.qe-auto.name
   virtual_network_name  = azurerm_virtual_network.qe-auto-vnet2.name
   address_prefixes      = ["10.24.0.0/16"]
@@ -97,16 +97,16 @@ resource "azurerm_subnet" "qe-auto-vnet2-subnet" {
 
 # Create Cluster 2
 resource "azurerm_kubernetes_cluster" "qe-auto-cluster2" {
-  name                = "qe-auto-cluster2"
+  name                = "qe-auto-cluster2-21x"
   location            = "West US 2"
   resource_group_name = azurerm_resource_group.qe-auto.name
-  dns_prefix          = "qe-auto-cluster2"
+  dns_prefix          = "qe-auto-cluster2-21x"
   kubernetes_version  = var.kubernetes-version
 
   default_node_pool {
-    name                = "nodepool2"
+    name                = "nodepool21x2"
     node_count          = 3
-    vm_size             = "Standard_D8s_v3"
+    vm_size             = "Standard_D4s_v4"
     availability_zones  = ["1", "2", "3"]
     os_disk_size_gb     = 30
     vnet_subnet_id      = azurerm_subnet.qe-auto-vnet2-subnet.id
