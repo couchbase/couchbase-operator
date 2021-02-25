@@ -25,7 +25,7 @@ func TestStatusRecovery(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 
 	// Runtime configuration.
 	uuid := e2eutil.MustGetUUID(t, kubernetes, cluster, time.Minute)
@@ -69,7 +69,7 @@ func TestStatusStability(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 
 	// Ensure that the resource version stays stable for at least a minute, this means
 	// in mnormal operation we're not spamming the API with status updates.

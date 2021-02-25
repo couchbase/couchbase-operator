@@ -64,7 +64,7 @@ func TestScheduleEvacuateAllPersistent(t *testing.T) {
 
 	// Create the cluster.  Place all pods in the same availability zone.  We will
 	// evacuate this, and leave the Operator running in another.
-	cluster := e2espec.NewSupportableCluster(mdsSize)
+	cluster := e2espec.NewSupportableCluster(clusterOptions(mdsSize))
 	cluster.Spec.RecoveryPolicy = &recoveryPolicy
 	cluster.Spec.ServerGroups = []string{
 		victim,

@@ -179,10 +179,10 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.OperatorImage, "operator-image", "couchbase/couchbase-operator:v1", "Docker image to use for the operator")
 	flag.StringVar(&params.AdmissionControllerImage, "admission-image", "couchbase/couchbase-operator-admission:v1", "Docker image to use for the admission controller")
 	flag.StringVar(&params.SyncGatewayImage, "mobile-image", "couchbase/sync-gateway:2.8.0-enterprise", "Docker image to use for couchbase mobile")
-	flag.StringVar(&params.CouchbaseServerImage, "server-image", "couchbase/server:6.6.0", "Docker image to use for couchbase server")
-	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade", "couchbase/server:6.6.1", "Docker image to use for couchbase server upgrades")
+	flag.StringVar(&params.CouchbaseServerImage, "server-image", "couchbase/server:6.6.1", "Docker image to use for couchbase server")
+	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade", "couchbase/server:6.6.0", "Docker image to use for couchbase server upgrades to upgrade from")
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.3", "Docker image to use for the couchbase exporter")
-	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.3", "Docker image to use for couchbase exporter upgrades")
+	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.3", "Docker image to use for couchbase exporter upgrades to upgrade from")
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:6.6.0-100", "Docker image to use for couchbase backup")
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
@@ -401,10 +401,8 @@ func Setup() (err error) {
 		S3SecretID:                    runtimeParams.S3SecretID,
 		DocsCount:                     runtimeParams.DocsCount,
 		LogLevel:                      runtimeParams.LogLevel,
-	}
-
-	if runtimeParams.StorageClassName != "" {
-		Global.StorageClassName = &runtimeParams.StorageClassName
+		Platform:                      runtimeParams.Platform,
+		StorageClassName:              runtimeParams.StorageClassName,
 	}
 
 	Global.LogDir, err = makeLogDir()
@@ -427,13 +425,6 @@ func Setup() (err error) {
 	if Global.SyncGatewayImage == "" {
 		Global.SyncGatewayImage = "couchbase/sync-gateway:2.7.0-enterprise"
 	}
-
-	// Setting required spec values from test_config yaml
-	e2espec.SetStorageClassName(Global.StorageClassName)
-	e2espec.SetCouchbaseServerImage(runtimeParams.CouchbaseServerImage)
-	e2espec.SetCouchbaseExporterImage(runtimeParams.CouchbaseExporterImage)
-	e2espec.SetPlatform(runtimeParams.Platform)
-	e2espec.SetIstio(runtimeParams.EnableIstio)
 
 	logrus.Info(util.PrettyHeading("Docker Registries"))
 

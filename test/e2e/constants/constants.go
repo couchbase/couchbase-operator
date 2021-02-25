@@ -12,12 +12,6 @@ const (
 	CommunityEditionImage = "couchbase/server:community-6.0.4"
 )
 
-// These values can be updated from e2espec/crd.go.
-var (
-	CouchbaseServerImage   = "couchbase/server:enterprise-6.0.4"
-	CouchbaseExporterImage = "couchbase/exporter:1.0.2"
-)
-
 // Couchbase cluster.
 var (
 	ClusterNamePrefix          = "test-couchbase-"

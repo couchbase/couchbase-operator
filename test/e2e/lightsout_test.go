@@ -24,7 +24,7 @@ func TestLightsOutEphemeral(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 
 	// Once the cluster is up and running, stop the operator and terminate all the
 	// pods (e.g. turn the datacenter off).  Restart the operator and expect it to
@@ -62,7 +62,7 @@ func TestLightsOutPersistent(t *testing.T) {
 	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
 	// Set an aggressive recovery policy so that the two failed query nodes get
 	// kicked out.
-	cluster := e2espec.NewSupportableCluster(mdsGroupSize)
+	cluster := e2espec.NewSupportableCluster(clusterOptions(mdsGroupSize))
 	cluster.Spec.RecoveryPolicy = &recoveryPolicy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 

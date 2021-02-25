@@ -33,7 +33,7 @@ func testSDK(t *testing.T, local, remote *types.Cluster, config sdkConfig) {
 	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, remote, bucket)
 
-	cluster := e2eutil.MustNewXDCRCluster(t, remote, clusterSize, nil, tls, nil)
+	cluster := e2eutil.MustNewXDCRCluster(t, remote, clusterOptions(clusterSize), nil, tls, nil)
 	e2eutil.MustWaitUntilBucketExists(t, remote, cluster, bucket, time.Minute)
 
 	// When ready run the tests!

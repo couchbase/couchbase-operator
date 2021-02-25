@@ -26,11 +26,11 @@ pipeline {
 
   parameters {
     string(name: 'refspec', defaultValue: 'refs/heads/master', description: 'Gerrit ref spec of your source tree')
-    string(name: 'server_image', defaultValue: 'couchbase/server:6.6.0', , description: 'Version of Couchbase to test')
-    string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.1', description: 'Version of Couchbase to upgrade to')
+    string(name: 'server_image', defaultValue: 'couchbase/server:6.6.1', , description: 'Version of Couchbase to test')
+    string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.0', description: 'Version of Couchbase to upgrade from')
     string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:6.6.0-100', description: 'Version of the Couchbase backup image to test')
     string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.3', description: 'Version of the Prometheus exporter to test')
-    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.3', description: 'Version of the Prometheus exporter to upgrade to')
+    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.3', description: 'Version of the Prometheus exporter to upgrade from')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.0-enterprise', description: 'Version of Sync-Gateway to test')
     choice(name: 'bucket_type', choices: ['couchbase', 'ephemeral', 'memcached'], description: 'Bucket type to test with, for tests where bucket type is dynamic')
     choice(name: 'compression_mode', choices: ['passive', 'active', 'off'], description: 'Bucket compression to test with, for tests where compression is dynamic')

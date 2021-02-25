@@ -47,7 +47,7 @@ func testPrometheusMetrics(t *testing.T, targetKube *types.Cluster, tls *e2eutil
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewPrometheusTLSClusterBasic(t, targetKube, clusterSize, tls, policy, enabled)
+	testCouchbase := e2eutil.MustNewPrometheusTLSClusterBasic(t, targetKube, clusterOptions(clusterSize), tls, policy, enabled)
 	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -266,7 +266,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	}
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -362,7 +362,7 @@ func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptionsUpgradeMonitoring(clusterSize))
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -380,7 +380,7 @@ func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
 
 	// Upgrade the cluster with new exporter image and check again if the monitoring is enabled.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/monitoring/prometheus/image", f.CouchbaseExporterImageUpgrade), time.Minute)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/monitoring/prometheus/image", f.CouchbaseExporterImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
 

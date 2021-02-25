@@ -111,8 +111,8 @@ func XDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Serv
 	// The k8s1 cluster optionally uses a custom DNS service to address the k8s2 cluster.
 	// The k8s2 cluster optionally has TLS set.
 	bucket = mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 = e2eutil.MustNewXDCRCluster(t, k8s1, clusterSize, dns, nil, nil)
-	xdcrCluster2 = e2eutil.MustNewXDCRCluster(t, k8s2, clusterSize, nil, tls, policy)
+	xdcrCluster1 = e2eutil.MustNewXDCRCluster(t, k8s1, clusterOptions(clusterSize), dns, nil, nil)
+	xdcrCluster2 = e2eutil.MustNewXDCRCluster(t, k8s2, clusterOptions(clusterSize), nil, tls, policy)
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -136,8 +136,8 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -341,8 +341,8 @@ func TestXDCRCreateCluster(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -389,8 +389,8 @@ func TestXDCRPauseReplication(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -451,8 +451,8 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -509,8 +509,8 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -564,8 +564,8 @@ func TestXDCRTargetNodeServiceDelete(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -676,8 +676,8 @@ func TestXDCRDeleteReplication(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -740,8 +740,8 @@ func TestXDCRFilterExp(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
@@ -817,8 +817,8 @@ func TestXDCRRotatePassword(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterSize)
-	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterSize)
+	xdcrCluster1 := e2eutil.MustNewXDCRClusterGeneric(t, k8s1, clusterOptions(clusterSize))
+	xdcrCluster2 := e2eutil.MustNewXDCRClusterGeneric(t, k8s2, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 

@@ -66,7 +66,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
@@ -125,7 +125,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
@@ -205,7 +205,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
@@ -291,7 +291,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{

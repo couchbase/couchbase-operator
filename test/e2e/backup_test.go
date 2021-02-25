@@ -37,9 +37,12 @@ func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule st
 			Full: &v2.CouchbaseBackupSchedule{
 				Schedule: fullSchedule,
 			},
-			Size:             e2espec.NewResourceQuantityMi(2048),
-			StorageClassName: framework.Global.StorageClassName,
+			Size: e2espec.NewResourceQuantityMi(2048),
 		},
+	}
+
+	if framework.Global.StorageClassName != "" {
+		backup.Spec.StorageClassName = &framework.Global.StorageClassName
 	}
 
 	if s3 {
@@ -136,7 +139,7 @@ func testFullIncremental(t *testing.T, s3 bool) {
 	s3secret := createS3Secret(t, targetKube, s3)
 
 	// Create a normal cluster.
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -192,7 +195,7 @@ func testFullOnly(t *testing.T, s3 bool) {
 	s3secret := createS3Secret(t, targetKube, s3)
 
 	// Create a normal cluster.
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -244,15 +247,12 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
-	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
 	// Create cluster.
 	numOfDocs := f.DocsCount
-	testCouchbase := e2espec.NewSupportableCluster(mdsGroupSize)
-	testCouchbase.Name = clusterName
-	testCouchbase.Spec.Backup.Managed = true
+	testCouchbase := e2espec.NewSupportableCluster(clusterOptions(mdsGroupSize))
 
 	if s3secret != nil {
 		testCouchbase.Spec.Backup.S3Secret = s3secret.Name
@@ -338,7 +338,7 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -416,7 +416,7 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -500,7 +500,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -579,7 +579,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -681,7 +681,7 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -746,7 +746,7 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
@@ -817,15 +817,7 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := e2espec.NewBackupCluster(clusterSize, f.CouchbaseBackupImage, s3secret)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &v2.TLSPolicy{
-		Static: &v2.StaticTLS{
-			ServerSecret:   ctx.ClusterSecretName,
-			OperatorSecret: ctx.OperatorSecretName,
-		},
-	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	testCouchbase := e2eutil.MustNewBackupClusterTLS(t, targetKube, clusterOptions(clusterSize), ctx, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -886,15 +878,7 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := e2espec.NewBackupCluster(clusterSize, f.CouchbaseBackupImage, s3secret)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &v2.TLSPolicy{
-		Static: &v2.StaticTLS{
-			ServerSecret:   ctx.ClusterSecretName,
-			OperatorSecret: ctx.OperatorSecretName,
-		},
-	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	testCouchbase := e2eutil.MustNewBackupClusterTLS(t, targetKube, clusterOptions(clusterSize), ctx, s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -954,7 +938,7 @@ func testBackupRetention(t *testing.T, s3 bool) {
 
 	s3secret := createS3Secret(t, kubernetes, s3)
 
-	cluster := e2eutil.MustNewBackupCluster(t, kubernetes, clusterSize, f.CouchbaseBackupImage, s3secret)
+	cluster := e2eutil.MustNewBackupCluster(t, kubernetes, clusterOptions(clusterSize), s3secret)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// Trigger a full backup.
@@ -999,7 +983,7 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	numOfDocs := 100
 
 	s3secret := createS3Secret(t, targetKube, s3)
-	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterSize, f.CouchbaseBackupImage, s3secret)
+	testCouchbase := e2eutil.MustNewBackupCluster(t, targetKube, clusterOptions(clusterSize), s3secret)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)

@@ -38,7 +38,7 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	purgeIntervalInternal := purgeIntervalBase.Hours() / 24.0
 
 	// Create the cluster.
-	couchbase := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	couchbase := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 
 	// Twiddle the knobs, and ensure the server settings are changed.
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", &thresholdPercent), time.Minute)

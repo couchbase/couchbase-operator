@@ -75,13 +75,13 @@ func RandomString(length int) string {
 	return suffix
 }
 
-// newClusterFromSpec creates a cluster and waits for various ready conditions.
+// MustNewClusterFromSpec creates a cluster and waits for various ready conditions.
 // Performs retries and garbage collection in the event of transient failure.
-func newClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
 	// Create the cluster.
 	cluster, err := CreateCluster(t, k8s, clusterSpec)
 	if err != nil {
-		return nil, err
+		Die(t, err)
 	}
 
 	MustWaitClusterStatusHealthy(t, k8s, cluster, 15*time.Minute)
@@ -90,33 +90,14 @@ func newClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbase
 	// name is auto-generated.
 	updatedCluster, err := getClusterCRD(k8s.CRClient, cluster)
 	if err != nil {
-		return cluster, err
-	}
-
-	return updatedCluster, nil
-}
-
-func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
-	cluster, err := newClusterFromSpec(t, k8s, clusterSpec)
-	if err != nil {
 		Die(t, err)
 	}
 
-	return cluster
-}
-
-func NewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
-	// Create the cluster
-	cluster, err := CreateCluster(t, k8s, clusterSpec)
-	if err != nil {
-		return nil, err
-	}
-
-	return cluster, nil
+	return updatedCluster
 }
 
 func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewClusterFromSpecAsync(t, k8s, clusterSpec)
+	cluster, err := CreateCluster(t, k8s, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -124,97 +105,108 @@ func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *
 	return cluster
 }
 
-// NewClusterBasic creates a basic cluster, retrying if an error is encountered and
-// performing garbage collection.
-func NewClusterBasic(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(size)
-
-	return newClusterFromSpec(t, k8s, clusterSpec)
-}
-
-func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewClusterBasic(t, k8s, size)
-	if err != nil {
-		Die(t, err)
+// applyTLS optionally layers on server side TLS support to a cluster.
+func applyTLS(cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext) {
+	if ctx == nil {
+		return
 	}
 
-	return cluster
-}
+	// Add the explicit name generated for the cluster, and encoded in the TLS
+	// certificates.  Also clear out the generate name that will most likely
+	// have been implicitly filled in.
+	cluster.Name = ctx.ClusterName
+	cluster.GenerateName = ""
 
-func newTLSCluster(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext, policy *couchbasev2.TLSPolicy) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(size)
-	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.Networking.TLS = policy
+	// All TLS is handled at this level, purely as an artifact of x509.go living
+	// in this model.  As such this will not be filled in by the underlying
+	// generators.
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{}
 
 	if ctx.LegacyTLS() {
-		clusterSpec.Spec.Networking.TLS.Static = &couchbasev2.StaticTLS{
+		cluster.Spec.Networking.TLS.Static = &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		}
 	} else {
-		clusterSpec.Spec.Networking.TLS.SecretSource = &couchbasev2.TLSSecretSource{
+		cluster.Spec.Networking.TLS.SecretSource = &couchbasev2.TLSSecretSource{
 			ServerSecretName: ctx.ClusterSecretName,
 			ClientSecretName: ctx.OperatorSecretName,
 		}
 	}
-
-	return newClusterFromSpec(t, k8s, clusterSpec)
 }
 
-// NewTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered.
-func NewTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
-	return newTLSCluster(t, k8s, size, ctx, &couchbasev2.TLSPolicy{})
-}
-
-func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewTLSClusterBasic(t, k8s, size, ctx)
-	if err != nil {
-		Die(t, err)
+// applyMTLS optionally layers on client side TLS support to a cluster.
+func applyMTLS(cluster *couchbasev2.CouchbaseCluster, policy *couchbasev2.ClientCertificatePolicy) {
+	if policy == nil {
+		return
 	}
 
-	return cluster
+	cluster.Spec.Networking.TLS.ClientCertificatePolicy = policy
+	cluster.Spec.Networking.TLS.ClientCertificatePaths = []couchbasev2.ClientCertificatePath{
+		{
+			Path: "subject.cn",
+		},
+	}
 }
 
-func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
-	cluster, err := newTLSCluster(t, k8s, size, ctx, &couchbasev2.TLSPolicy{
-		ClientCertificatePolicy: &policy,
-		ClientCertificatePaths: []couchbasev2.ClientCertificatePath{
-			{
-				Path: "subject.cn",
+// applyDNS optionally applies a custom DNS server to cluster pods.
+func applyDNS(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, service *v1.Service) {
+	if service == nil {
+		return
+	}
+
+	for index := range cluster.Spec.Servers {
+		if cluster.Spec.Servers[index].Pod == nil {
+			cluster.Spec.Servers[index].Pod = &couchbasev2.PodTemplate{}
+		}
+
+		cluster.Spec.Servers[index].Pod.Spec.DNSPolicy = v1.DNSNone
+		cluster.Spec.Servers[index].Pod.Spec.DNSConfig = &v1.PodDNSConfig{
+			Nameservers: []string{
+				service.Spec.ClusterIP,
 			},
-		},
-	})
-	if err != nil {
-		Die(t, err)
+			Searches: getSearchDomains(k8s),
+		}
 	}
-
-	return cluster
 }
 
-// NewTLSClusterBasicNoWait creates a new TLS enabled basic cluster asynchronously.
-func NewTLSClusterBasicNoWait(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(size)
-	clusterSpec.Name = ctx.ClusterName
-	clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-		Static: &couchbasev2.StaticTLS{
-			ServerSecret:   ctx.ClusterSecretName,
-			OperatorSecret: ctx.OperatorSecretName,
-		},
-	}
+// MustNewClusterBasic creates a basic cluster.
+func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
+	clusterSpec := e2espec.NewBasicCluster(options)
 
-	return CreateCluster(t, k8s, clusterSpec)
+	return MustNewClusterFromSpec(t, k8s, clusterSpec)
+}
+
+// MustNewTLSClusterBasic creates a new TLS enabled basic cluster.
+func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
+	cluster := e2espec.NewBasicCluster(options)
+	applyTLS(cluster, ctx)
+
+	return MustNewClusterFromSpec(t, k8s, cluster)
+}
+
+// MustNewMutualTLSClusterBasic creates a new mTLS enabled basic cluster.
+func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+	cluster := e2espec.NewBasicCluster(options)
+	applyTLS(cluster, ctx)
+	applyMTLS(cluster, &policy)
+
+	return MustNewClusterFromSpec(t, k8s, cluster)
 }
 
 // MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification.
-func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) {
-	if _, err := NewTLSClusterBasicNoWait(t, k8s, size, ctx); err == nil {
+func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, ctx *TLSContext) {
+	cluster := e2espec.NewBasicCluster(options)
+	applyTLS(cluster, ctx)
+
+	if _, err := CreateCluster(t, k8s, cluster); err == nil {
 		Die(t, fmt.Errorf("cluster created unexpectedly"))
 	}
 }
 
-// NewXDCRrClusterGeneric creates a cluster for use with generic, IP-based networking (DEPRECATED).
-func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXDCRCluster(size)
+// MustNewXDCRClusterGeneric creates a cluster for use with generic, IP-based networking (DEPRECATED).
+func MustNewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
+	clusterSpec := e2espec.NewBasicCluster(options)
 	clusterSpec.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
 		ExposeAdminConsole: true,
 		ExposedFeatures: couchbasev2.ExposedFeatureList{
@@ -222,212 +214,91 @@ func NewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, size int) (*couchba
 		},
 	}
 
-	cluster, err := newClusterFromSpec(t, k8s, clusterSpec)
-	if err != nil {
-		Die(t, err)
-	}
-
-	MustWaitClusterStatusHealthy(t, k8s, cluster, 5*time.Minute)
-
-	return cluster, err
+	return MustNewClusterFromSpec(t, k8s, clusterSpec)
 }
 
-func MustNewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewXDCRClusterGeneric(t, k8s, size)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return cluster
-}
-
-// NewXDCRCluster creates a cluster for use with DNS based networking.
+// MustNewXDCRCluster creates a cluster for use with DNS based networking.
 // The DNS configuration is optional for XDCR within the same Kubernetes cluster.
 // The TLS configuration is optional.
 // The TLS policy is optional.
-func NewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicXDCRCluster(size)
+func MustNewXDCRCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, dns *v1.Service, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+	cluster := e2espec.NewBasicCluster(options)
 
-	// If DNS is explicitly stated, then add it to the pod templates.
-	if dns != nil {
-		for index := range clusterSpec.Spec.Servers {
-			if clusterSpec.Spec.Servers[index].Pod == nil {
-				clusterSpec.Spec.Servers[index].Pod = &couchbasev2.PodTemplate{}
-			}
+	applyDNS(k8s, cluster, dns)
+	applyTLS(cluster, tls)
+	applyMTLS(cluster, policy)
 
-			clusterSpec.Spec.Servers[index].Pod.Spec.DNSPolicy = v1.DNSNone
-			clusterSpec.Spec.Servers[index].Pod.Spec.DNSConfig = &v1.PodDNSConfig{
-				Nameservers: []string{
-					dns.Spec.ClusterIP,
-				},
-				Searches: getSearchDomains(k8s),
-			}
-		}
-	}
-
-	// If TLS is explcitly stated, then add it to the pod configuration.
-	if tls != nil {
-		clusterSpec.Name = tls.ClusterName
-		clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-			Static: &couchbasev2.StaticTLS{
-				ServerSecret:   tls.ClusterSecretName,
-				OperatorSecret: tls.OperatorSecretName,
-			},
-		}
-
-		if policy != nil {
-			clusterSpec.Spec.Networking.TLS.ClientCertificatePolicy = policy
-			clusterSpec.Spec.Networking.TLS.ClientCertificatePaths = []couchbasev2.ClientCertificatePath{
-				{
-					Path: "subject.cn",
-				},
-			}
-		}
-	}
-
-	cluster, err := newClusterFromSpec(t, k8s, clusterSpec)
-	if err != nil {
-		Die(t, err)
-	}
-
-	MustWaitClusterStatusHealthy(t, k8s, cluster, 5*time.Minute)
-
-	return cluster, err
+	return MustNewClusterFromSpec(t, k8s, cluster)
 }
 
-func MustNewXDCRCluster(t *testing.T, k8s *types.Cluster, size int, dns *v1.Service, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewXDCRCluster(t, k8s, size, dns, tls, policy)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return cluster
-}
-
-func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(size)
+func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) (*couchbasev2.CouchbaseCluster, error) {
+	clusterSpec := e2espec.NewBasicCluster(options)
 	return CreateCluster(t, k8s, clusterSpec)
 }
 
-// NewStatefulCluster creates a cluster with persistent block storage, retrying if an
+// MustNewStatefulCluster creates a cluster with persistent block storage, retrying if an
 // error is encountered and performing garbage collection.
-func NewStatefulCluster(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewStatefulCluster(size)
-	return newClusterFromSpec(t, k8s, clusterSpec)
+func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
+	clusterSpec := e2espec.NewStatefulCluster(options)
+	return MustNewClusterFromSpec(t, k8s, clusterSpec)
 }
 
-func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewStatefulCluster(t, k8s, size)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return cluster
-}
-
-// NewSupportableCluster creates a cluster with two MDS groups of 'size'.  The first is
+// MustNewSupportableCluster creates a cluster with two MDS groups of 'size'.  The first is
 // a stateful group with data and index enabled.  The second is a stateless group with
 // query enabled.
-func NewSupportableCluster(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
-	spec := e2espec.NewSupportableCluster(size)
-	return newClusterFromSpec(t, k8s, spec)
+func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
+	spec := e2espec.NewSupportableCluster(options)
+	return MustNewClusterFromSpec(t, k8s, spec)
 }
 
-// MustNewSupportableCluster creates a supportable cluster as described by NewSupportableCluster
-// but dies on error.
-func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewSupportableCluster(t, k8s, size)
-	if err != nil {
-		Die(t, err)
+func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, secret *v1.Secret) *couchbasev2.CouchbaseCluster {
+	cluster := e2espec.NewBasicCluster(options)
+
+	if secret != nil {
+		cluster.Spec.Backup.S3Secret = secret.Name
 	}
 
-	return cluster
+	return MustNewClusterFromSpec(t, k8s, cluster)
 }
 
-func NewBackupCluster(t *testing.T, k8s *types.Cluster, size int, imageName string, secret *v1.Secret) (*couchbasev2.CouchbaseCluster, error) {
-	spec := e2espec.NewBackupCluster(size, imageName, secret)
-	return newClusterFromSpec(t, k8s, spec)
-}
+func MustNewBackupClusterTLS(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, tls *TLSContext, secret *v1.Secret) *couchbasev2.CouchbaseCluster {
+	cluster := e2espec.NewBasicCluster(options)
+	applyTLS(cluster, tls)
 
-func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, size int, imageName string, secret *v1.Secret) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewBackupCluster(t, k8s, size, imageName, secret)
-	if err != nil {
-		Die(t, err)
+	if secret != nil {
+		cluster.Spec.Backup.S3Secret = secret.Name
 	}
 
-	return cluster
+	return MustNewClusterFromSpec(t, k8s, cluster)
 }
 
-// NewSupportableTLSCluster creates a cluster with two MDS groups of 'size'.  The first is
+// MustNewSupportableTLSCluster creates a cluster with two MDS groups of 'size'.  The first is
 // a stateful group with data and index enabled.  The second is a stateless group with
 // query enabled.
-func NewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) (*couchbasev2.CouchbaseCluster, error) {
-	cluster := e2espec.NewClusterCRD("", e2espec.NewSupportableClusterSpec(size))
-	cluster.Name = ctx.ClusterName
-	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-		Static: &couchbasev2.StaticTLS{
-			ServerSecret:   ctx.ClusterSecretName,
-			OperatorSecret: ctx.OperatorSecretName,
-		},
-	}
+func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
+	cluster := e2espec.NewSupportableCluster(options)
+	applyTLS(cluster, ctx)
 
-	return newClusterFromSpec(t, k8s, cluster)
+	return MustNewClusterFromSpec(t, k8s, cluster)
 }
 
-// MustNewSupportableTLSCluster creates a supportable cluster as described by NewSupportableTLSCluster
-// but dies on error.
-func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, size int, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewSupportableTLSCluster(t, k8s, size, ctx)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return cluster
-}
-
-// NewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered.
-func NewPrometheusTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy, enabled bool) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(size)
-	clusterSpec.GenerateName = "test-couchbase-"
+// MustNewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered.
+func MustNewPrometheusTLSClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy, enabled bool) *couchbasev2.CouchbaseCluster {
+	cluster := e2espec.NewBasicCluster(options)
 
 	if enabled {
-		clusterSpec.Spec.Monitoring = &couchbasev2.CouchbaseClusterMonitoringSpec{
+		cluster.Spec.Monitoring = &couchbasev2.CouchbaseClusterMonitoringSpec{
 			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
 				Enabled: true,
-				Image:   constants.CouchbaseExporterImage,
+				Image:   options.MonitoringImage,
 			},
 		}
 	}
 
-	if tls != nil {
-		clusterSpec.Name = tls.ClusterName
-		clusterSpec.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-			Static: &couchbasev2.StaticTLS{
-				ServerSecret:   tls.ClusterSecretName,
-				OperatorSecret: tls.OperatorSecretName,
-			},
-		}
-	}
+	applyTLS(cluster, tls)
+	applyMTLS(cluster, policy)
 
-	if policy != nil {
-		clusterSpec.Spec.Networking.TLS.ClientCertificatePolicy = policy
-		clusterSpec.Spec.Networking.TLS.ClientCertificatePaths = []couchbasev2.ClientCertificatePath{
-			{
-				Path: "subject.cn",
-			},
-		}
-	}
-
-	return newClusterFromSpec(t, k8s, clusterSpec)
-}
-
-func MustNewPrometheusTLSClusterBasic(t *testing.T, k8s *types.Cluster, size int, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy, enabled bool) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewPrometheusTLSClusterBasic(t, k8s, size, tls, policy, enabled)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return cluster
+	return MustNewClusterFromSpec(t, k8s, cluster)
 }
 
 // NewBucket creates a bucket.

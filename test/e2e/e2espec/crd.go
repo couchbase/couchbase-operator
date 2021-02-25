@@ -2,7 +2,6 @@ package e2espec
 
 import (
 	"strconv"
-	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -14,6 +13,34 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// ClusterOptions allows things about a cluster to be modified.
+type ClusterOptions struct {
+	// Couchbase Server container image to use.
+	Image string
+
+	// Cluster size for single class clusters.
+	Size int
+
+	// Autofailver timeout.  Smaller means faster, but also means
+	// more race conditions.
+	AutoFailoverTimeout *metav1.Duration
+
+	// Prometheus exporter container image to use.
+	MonitoringImage string
+
+	// Backup image name.
+	BackupImage string
+
+	// Storage class to use.
+	StorageClass string
+
+	// Platform type.
+	Platform couchbasev2.PlatformType
+
+	// Istio support.
+	Istio bool
+}
 
 // bucket settings.
 var (
@@ -125,34 +152,6 @@ func NewResourceQuantityMi(value int64) *resource.Quantity {
 
 func NewDurationS(value uint64) *metav1.Duration {
 	return &metav1.Duration{Duration: time.Duration(value) * time.Second}
-}
-
-func SetCouchbaseServerImage(imageName string) {
-	if imageName = strings.TrimSpace(imageName); imageName != "" {
-		e2e_constants.CouchbaseServerImage = imageName
-	}
-}
-
-func SetCouchbaseExporterImage(imageName string) {
-	e2e_constants.CouchbaseExporterImage = imageName
-}
-
-var storageClassName *string
-
-func SetStorageClassName(storageClassNameIn *string) {
-	storageClassName = storageClassNameIn
-}
-
-var platform couchbasev2.PlatformType
-
-func SetPlatform(p couchbasev2.PlatformType) {
-	platform = p
-}
-
-var istioEnable bool
-
-func SetIstio(istio bool) {
-	istioEnable = istio
 }
 
 func GenerateValidBucketSettings(bucketTypes []string) []metav1.Object {
@@ -310,226 +309,113 @@ func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster, imagePullSecret
 	cluster.Spec.Backup.ImagePullSecrets = references
 }
 
-// basic 3 node cluster.
-func NewBasicCluster(size int) *couchbasev2.CouchbaseCluster {
-	spec := couchbasev2.ClusterSpec{
-		Image: e2e_constants.CouchbaseServerImage,
-		Security: couchbasev2.CouchbaseClusterSecuritySpec{
-			AdminSecret: e2e_constants.KubeTestSecretName,
-			RBAC: couchbasev2.RBAC{
+// Create a very basic cluster with rbac and buckets managed, a single server
+// class with data/query/index enabled.
+func NewBasicCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
+	cluster := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: e2e_constants.ClusterNamePrefix,
+		},
+		Spec: couchbasev2.ClusterSpec{
+			Image: options.Image,
+			Security: couchbasev2.CouchbaseClusterSecuritySpec{
+				AdminSecret: e2e_constants.KubeTestSecretName,
+				RBAC: couchbasev2.RBAC{
+					Managed: true,
+				},
+			},
+			ClusterSettings: couchbasev2.ClusterConfig{
+				AutoFailoverTimeout: options.AutoFailoverTimeout,
+			},
+			Buckets: couchbasev2.Buckets{
 				Managed: true,
 			},
-		},
-		Buckets: couchbasev2.Buckets{
-			Managed: true,
-		},
-		Servers: []couchbasev2.ServerConfig{
-			{
-				Size: size,
-				Name: e2e_constants.CouchbaseServerConfig,
-				Services: couchbasev2.ServiceList{
-					couchbasev2.DataService,
-					couchbasev2.QueryService,
-					couchbasev2.IndexService,
+			Servers: []couchbasev2.ServerConfig{
+				{
+					Size: options.Size,
+					Name: e2e_constants.CouchbaseServerConfig,
+					Services: couchbasev2.ServiceList{
+						couchbasev2.DataService,
+						couchbasev2.QueryService,
+						couchbasev2.IndexService,
+					},
 				},
+			},
+			Platform: options.Platform,
+			Backup: couchbasev2.Backup{
+				Managed:        true,
+				Image:          options.BackupImage,
+				ServiceAccount: config.BackupResourceName,
 			},
 		},
 	}
 
-	if platform != "" {
-		spec.Platform = platform
+	if options.Istio {
+		platform := couchbasev2.NetworkPlatformIstio
+		cluster.Spec.Networking.NetworkPlatform = &platform
 	}
 
-	if istioEnable {
-		networkPlatform := couchbasev2.NetworkPlatformIstio
-		spec.Networking.NetworkPlatform = &networkPlatform
-	}
-
-	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
-
-	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
+	return cluster
 }
 
-func NewBasicClusterSpec(size int) *couchbasev2.CouchbaseCluster {
-	spec := couchbasev2.ClusterSpec{
-		Image: e2e_constants.CouchbaseServerImage,
-		Security: couchbasev2.CouchbaseClusterSecuritySpec{
-			AdminSecret: e2e_constants.KubeTestSecretName,
-		},
-		Buckets: couchbasev2.Buckets{
-			Managed: true,
-		},
-		Servers: []couchbasev2.ServerConfig{
-			{
-				Size: size,
-				Name: e2e_constants.CouchbaseServerConfig,
-				Services: couchbasev2.ServiceList{
-					couchbasev2.DataService,
-					couchbasev2.QueryService,
-					couchbasev2.IndexService,
-				},
-			},
-		},
-	}
-
-	if platform != "" {
-		spec.Platform = platform
-	}
-
-	if istioEnable {
-		networkPlatform := couchbasev2.NetworkPlatformIstio
-		spec.Networking.NetworkPlatform = &networkPlatform
-	}
-
-	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
-
-	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
-}
-
-// NewSupportableClusterSpec returns a basic supportable cluster spec with a stateful and stateless
+// NewSupportableCluster returns a basic supportable cluster with a stateful and stateless
 // MDS groups of the defined size.  They use default and logs volume mounts respectively.
-func NewSupportableClusterSpec(size int) couchbasev2.ClusterSpec {
-	spec := couchbasev2.ClusterSpec{
-		Image: e2e_constants.CouchbaseServerImage,
-		Security: couchbasev2.CouchbaseClusterSecuritySpec{
-			AdminSecret: e2e_constants.KubeTestSecretName,
-		},
-		Buckets: couchbasev2.Buckets{
-			Managed: true,
-		},
-		Servers: []couchbasev2.ServerConfig{
-			{
-				Name: "stateful",
-				Size: size,
-				Services: couchbasev2.ServiceList{
-					couchbasev2.DataService,
-					couchbasev2.IndexService,
-				},
-				VolumeMounts: &couchbasev2.VolumeMounts{
-					DefaultClaim: "couchbase",
-				},
+func NewSupportableCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
+	cluster := NewBasicCluster(options)
+
+	cluster.Spec.Servers = []couchbasev2.ServerConfig{
+		{
+			Name: "stateful",
+			Size: options.Size,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
 			},
-			{
-				Name: "stateless",
-				Size: size,
-				Services: couchbasev2.ServiceList{
-					couchbasev2.QueryService,
-					// Eventing is not technically necessary here, however some tests rely on
-					// synchronization events before proceeding.  Eventing causes a rebalance
-					// when the Couchbase server process goes down so we can tell when it's
-					// back in the cluster.
-					couchbasev2.EventingService,
-				},
-				VolumeMounts: &couchbasev2.VolumeMounts{
-					LogsClaim: "couchbase",
-				},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "couchbase",
 			},
 		},
-		VolumeClaimTemplates: []couchbasev2.PersistentVolumeClaimTemplate{
-			{
-				ObjectMeta: couchbasev2.NamedObjectMeta{
-					Name:        "couchbase",
-					Annotations: map[string]string{},
-				},
-				Spec: v1.PersistentVolumeClaimSpec{
-					StorageClassName: storageClassName,
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{
-							v1.ResourceStorage: *NewResourceQuantityMi(1024),
-						},
+		{
+			Name: "stateless",
+			Size: options.Size,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.QueryService,
+				// Eventing is not technically necessary here, however some tests rely on
+				// synchronization events before proceeding.  Eventing causes a rebalance
+				// when the Couchbase server process goes down so we can tell when it's
+				// back in the cluster.
+				couchbasev2.EventingService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				LogsClaim: "couchbase",
+			},
+		},
+	}
+
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+		{
+			ObjectMeta: couchbasev2.NamedObjectMeta{
+				Name:        "couchbase",
+				Annotations: map[string]string{},
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				StorageClassName: &options.StorageClass,
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceStorage: *NewResourceQuantityMi(1024),
 					},
 				},
 			},
 		},
 	}
 
-	// The defaults are too aggressive.  When killing a pod during a rebalance the operator
-	// may hang for ~30 seconds due to network retries. During this period we may or may not
-	// observe a failover leading to non-determinism.
-	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
-
-	if platform != "" {
-		spec.Platform = platform
-	}
-
-	if istioEnable {
-		networkPlatform := couchbasev2.NetworkPlatformIstio
-		spec.Networking.NetworkPlatform = &networkPlatform
-	}
-
-	return spec
-}
-
-func NewBackupCluster(size int, imageName string, s3ecret *v1.Secret) *couchbasev2.CouchbaseCluster {
-	spec := NewBasicClusterSpec(size)
-	spec.Spec.Backup.Managed = true
-	spec.Spec.Backup.ServiceAccount = config.BackupResourceName
-
-	if s3ecret != nil {
-		spec.Spec.Backup.S3Secret = s3ecret.Name
-	}
-
-	if imageName = strings.TrimSpace(imageName); imageName != "" {
-		spec.Spec.Backup.Image = imageName
-	}
-
-	return spec
-}
-
-// NewSupportableCluster returns a basic supportable cluster with a stateful and stateless
-// MDS groups of the defined size.  They use default and logs volume mounts respectively.
-func NewSupportableCluster(size int) *couchbasev2.CouchbaseCluster {
-	spec := NewSupportableClusterSpec(size)
-	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
-}
-
-// basic 3 node cluster with XDCR cluster
-// TODO: This doesn't appear to do anything special any more.
-func NewBasicXDCRCluster(size int) *couchbasev2.CouchbaseCluster {
-	spec := couchbasev2.ClusterSpec{
-		Image: e2e_constants.CouchbaseServerImage,
-		Security: couchbasev2.CouchbaseClusterSecuritySpec{
-			AdminSecret: e2e_constants.KubeTestSecretName,
-		},
-		Buckets: couchbasev2.Buckets{
-			Managed: true,
-		},
-		Servers: []couchbasev2.ServerConfig{
-			{
-				Size: size,
-				Name: e2e_constants.CouchbaseServerConfig,
-				Services: couchbasev2.ServiceList{
-					couchbasev2.DataService,
-					couchbasev2.QueryService,
-					couchbasev2.IndexService,
-				},
-			},
-		},
-	}
-
-	spec.ClusterSettings.AutoFailoverTimeout = NewDurationS(30)
-	spec.ClusterSettings.AutoFailoverMaxCount = 3
-
-	if platform != "" {
-		spec.Platform = platform
-	}
-
-	if istioEnable {
-		networkPlatform := couchbasev2.NetworkPlatformIstio
-		spec.Networking.NetworkPlatform = &networkPlatform
-	}
-
-	return NewClusterCRD(e2e_constants.ClusterNamePrefix, spec)
-}
-
-func CreateClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
-	return NewClusterCRD(genName, spec)
+	return cluster
 }
 
 // Stateful 3 node cluster with a single volume.
 // Spec will request 1Gb of storage (minikube default is 5gb).
-func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
-	crd := NewBasicCluster(size)
+func NewStatefulCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
+	crd := NewBasicCluster(options)
 	couchbase := "couchbase"
 
 	crd.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
@@ -543,7 +429,7 @@ func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			StorageClassName: storageClassName,
+			StorageClassName: &options.StorageClass,
 			Resources:        resources,
 		},
 	}
@@ -551,23 +437,6 @@ func NewStatefulCluster(size int) *couchbasev2.CouchbaseCluster {
 	crd.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{claim}
 
 	return crd
-}
-
-// NewClusterCRD creates a new Couchbase cluster CRD and associates the specified
-// specification with it.  The cluster name may be dynamically generated by the
-// K8S manager or explicitly defined where we need to know it ahead of time e.g.
-// TLS.  TLS policy is also applied based on global settings.
-func NewClusterCRD(genName string, spec couchbasev2.ClusterSpec) *couchbasev2.CouchbaseCluster {
-	return &couchbasev2.CouchbaseCluster{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       couchbasev2.ClusterCRDResourceKind,
-			APIVersion: couchbasev2.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: genName,
-		},
-		Spec: spec,
-	}
 }
 
 // Create Pod Policy with memory limit and requests in MB.

@@ -27,7 +27,7 @@ func TestPodReadiness(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// Wait for the other members to come up, expecting the pod to stay unready
@@ -62,7 +62,7 @@ func TestKubernetesRollingUpgrade(t *testing.T) {
 	}
 
 	// Create the cluster.
-	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	cluster.Spec.AntiAffinity = true
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 

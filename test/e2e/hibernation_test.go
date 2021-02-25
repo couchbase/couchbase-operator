@@ -30,7 +30,7 @@ func TestHibernateEphemeralImmediate(t *testing.T) {
 	hibernationStrategy := couchbasev2.ImmediateHibernation
 
 	// Create the cluster.
-	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	cluster.Spec.HibernationStrategy = &hibernationStrategy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -70,7 +70,7 @@ func TestHibernateSupportableImmediate(t *testing.T) {
 	recoveryStrategy := couchbasev2.PrioritizeUptime
 
 	// Create the cluster.
-	cluster := e2espec.NewSupportableCluster(mdsGroupSize)
+	cluster := e2espec.NewSupportableCluster(clusterOptions(mdsGroupSize))
 	cluster.Spec.HibernationStrategy = &hibernationStrategy
 	cluster.Spec.RecoveryPolicy = &recoveryStrategy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)

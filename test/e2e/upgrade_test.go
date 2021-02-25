@@ -206,7 +206,7 @@ func skipUpgrade(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	if version.GreaterEqual(upgrade) {
+	if upgrade.GreaterEqual(version) {
 		t.Skip("Upgrade base version greater than or equal to upgrade version")
 	}
 }
@@ -224,15 +224,15 @@ func TestUpgrade(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
@@ -268,15 +268,15 @@ func TestUpgradeRollback(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point revert.  The cluster will
 	// healthy after rollback has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
 	// Check the events match what we expect:
@@ -317,7 +317,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -325,7 +325,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
@@ -364,7 +364,7 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
 
 	// When the cluster is ready, start the upgrade.  Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -386,7 +386,7 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
 
 	// When the cluster is ready, start the downgrade.  Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -408,13 +408,13 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point try rollabck to an illegal version.
 	// Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", targetVersionIllegalDowngrade))
 }
@@ -438,12 +438,12 @@ func TestUpgradeSupportable(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
 
@@ -485,7 +485,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -493,7 +493,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
@@ -540,7 +540,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -548,7 +548,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
@@ -596,7 +596,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -604,7 +604,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 20*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
@@ -651,7 +651,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -659,7 +659,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 20*time.Minute)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
@@ -698,7 +698,7 @@ func TestUpgradeEnv(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster without TLS.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 
 	// Once up and running modify the pod policy.
 	env := []v1.EnvVar{
@@ -739,7 +739,7 @@ func TestUpgradeToSupportable(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster without PVs.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 
 	// Once up and running add in PV support.
 	templates := []couchbasev2.PersistentVolumeClaimTemplate{
@@ -749,7 +749,6 @@ func TestUpgradeToSupportable(t *testing.T) {
 				Annotations: map[string]string{},
 			},
 			Spec: v1.PersistentVolumeClaimSpec{
-				StorageClassName: f.StorageClassName,
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceStorage: *e2espec.NewResourceQuantityMi(1024),
@@ -758,6 +757,11 @@ func TestUpgradeToSupportable(t *testing.T) {
 			},
 		},
 	}
+
+	if f.StorageClassName != "" {
+		templates[0].Spec.StorageClassName = &f.StorageClassName
+	}
+
 	mounts := &couchbasev2.VolumeMounts{
 		DefaultClaim: "couchbase",
 	}
@@ -795,7 +799,7 @@ func TestUpgradeToTLS(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster without TLS.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 
 	// When ready create the required TLS secrets and patch them into the running
 	// cluster.
@@ -841,7 +845,7 @@ func TestUpgradeToMandatoryMutualTLS(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster without TLS.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 
 	// When ready create the required TLS secrets and patch them into the running
 	// cluster.
@@ -895,7 +899,7 @@ func TestUpgradePVC(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, mdsGroupSize)
+	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptions(mdsGroupSize))
 
 	// Update the PVC template size from 1Gi to 2GI
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests", v1.ResourceList{v1.ResourceStorage: *e2espec.NewResourceQuantityMi(2048)}), time.Minute)
@@ -930,18 +934,18 @@ func TestUpgradeImmediate(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
 	upgradeStrategy := couchbasev2.ImmediateUpgrade
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster := e2espec.NewBasicCluster(clusterOptionsUpgrade(clusterSize))
 	cluster.Spec.UpgradeStrategy = &upgradeStrategy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
@@ -976,11 +980,11 @@ func TestUpgradeConstrained(t *testing.T) {
 	clusterSize := 3
 	upgradablePercent := "67%"
 	upgradeChunkSize := 2
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
 	upgradeStrategy := couchbasev2.RollingUpgrade
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2espec.NewBasicCluster(clusterSize)
+	cluster := e2espec.NewBasicCluster(clusterOptionsUpgrade(clusterSize))
 	cluster.Spec.UpgradeStrategy = &upgradeStrategy
 	cluster.Spec.RollingUpgrade = &couchbasev2.RollingUpgradeConstraints{
 		MaxUpgradablePercent: upgradablePercent,
@@ -990,7 +994,7 @@ func TestUpgradeConstrained(t *testing.T) {
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
@@ -1018,17 +1022,17 @@ func TestUpgradeBucketDurability(t *testing.T) {
 
 	// Skip if not correctly configured
 	skipUpgrade(t)
-	e2eutil.SkipVersionsBefore(t, framework.Global.CouchbaseServerImageUpgrade, "6.6.0")
+	e2eutil.SkipVersionsBefore(t, framework.Global.CouchbaseServerImage, "6.6.0")
 
 	// Static Config
 	clusterSize := 3
 	numOfDocs := f.DocsCount
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
 
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
@@ -1037,7 +1041,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)

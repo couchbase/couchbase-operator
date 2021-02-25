@@ -279,8 +279,8 @@ func patchResources(resources resourceList, patches patchMap) error {
 func getStorageClass(t *testing.T, cluster *types.Cluster) string {
 	f := framework.Global
 
-	if f.StorageClassName != nil {
-		return *f.StorageClassName
+	if f.StorageClassName != "" {
+		return f.StorageClassName
 	}
 
 	scs, err := cluster.KubeClient.StorageV1().StorageClasses().List(context.Background(), metav1.ListOptions{})

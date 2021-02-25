@@ -40,7 +40,7 @@ func TestExposedFeatureIP(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
 	}
@@ -79,7 +79,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
@@ -130,7 +130,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
@@ -188,7 +188,7 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureClient,
@@ -239,7 +239,7 @@ func TestConsoleServiceDNS(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
 	testCouchbase.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
@@ -288,7 +288,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
 	testCouchbase.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
@@ -344,7 +344,7 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
 	testCouchbase.Spec.Networking.AdminConsoleServices = couchbasev2.ServiceList{
@@ -383,7 +383,7 @@ func TestExposedFeatureTrafficPolicyCluster(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureAdmin,
 	}
@@ -429,7 +429,7 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tlsOptions)
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket())
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Name = clusterName
 	testCouchbase.Spec.Networking.ExposeAdminConsole = true
 	testCouchbase.Spec.Networking.AdminConsoleServiceTemplate = &couchbasev2.ServiceTemplateSpec{

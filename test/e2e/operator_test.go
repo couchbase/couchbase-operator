@@ -25,7 +25,7 @@ func TestPauseOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
 
 	// Pause the operator, kill a pod, ensure nothing comes back from the dead, then reenable the operator.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
@@ -58,7 +58,7 @@ func TestKillOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
 
 	// Kill the operator, wait for recovery and make sure nothing bad happened to the cluster.
 	e2eutil.MustKillOperatorAndWaitForRecovery(t, targetKube)
@@ -88,7 +88,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// When the cluster is ready, pause the operator, and await aknowledgement.  Manually update the bucket, then kill

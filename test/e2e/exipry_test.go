@@ -32,7 +32,7 @@ func TestBucketTTL(t *testing.T) {
 	e2eutil.MustSetBucketTTL(t, bucket, time.Minute)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Insert some docs into the bucket and verify, then expect them to be deleted
@@ -66,7 +66,7 @@ func TestBucketTTLUpdate(t *testing.T) {
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterSize)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Add TTL and verify, update the TTL and verify, delete the TTL and verify.

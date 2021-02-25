@@ -10,7 +10,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -97,7 +96,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		},
 	}
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -139,7 +138,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
 
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 
@@ -189,7 +188,7 @@ func TestEditBucket(t *testing.T) {
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(1))
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Create a direct connection to a couchbase node.
@@ -254,7 +253,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, constants.Size1)
+	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(1))
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
@@ -296,7 +295,7 @@ func TestBucketUnmanaged(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	// Create a cluster with buckets unmanaged.
-	couchbase := e2espec.NewBasicCluster(clusterSize)
+	couchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	couchbase.Spec.Buckets.Managed = false
 	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
 
@@ -338,7 +337,7 @@ func TestBucketSelection(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	// Create a cluster that selects only labelled buckets.
-	couchbase := e2espec.NewBasicCluster(clusterSize)
+	couchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	couchbase.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
@@ -380,7 +379,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterSize)
+	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
@@ -433,7 +432,7 @@ func TestBucketWithExplicitName(t *testing.T) {
 	bucketTyped := e2espec.DefaultBucket()
 	bucketTyped.Spec.Name = bucketName
 	e2eutil.MustNewBucket(t, kubernetes, bucketTyped)
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, constants.Size1)
+	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucketTyped, time.Minute)
 
 	// Check the events match what we expect:
@@ -477,7 +476,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 
 	bucketUntyped1 = e2eutil.MustNewBucket(t, kubernetes, bucketUntyped1)
 
-	cluster1 := e2espec.NewBasicCluster(clusterSize)
+	cluster1 := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	cluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels1,
 	}
@@ -496,7 +495,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 
 	bucketUntyped2 = e2eutil.MustNewBucket(t, kubernetes, bucketUntyped2)
 
-	cluster2 := e2espec.NewBasicCluster(clusterSize)
+	cluster2 := e2espec.NewBasicCluster(clusterOptions(clusterSize))
 	cluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels2,
 	}

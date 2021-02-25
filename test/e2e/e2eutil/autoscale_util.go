@@ -13,30 +13,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewAutoscaleCluster creates a new Autoscale enabled
+// MustNewAutoscaleCluster creates a new Autoscale enabled
 // basic cluster, retrying if an error is encountered.
-func NewAutoscaleCluster(t *testing.T, k8s *types.Cluster, size int) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(size)
+func MustNewAutoscaleCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
+	clusterSpec := e2espec.NewBasicCluster(options)
 	clusterSpec.Spec.Servers[0].AutoscaleEnabled = true
 	clusterSpec.Spec.EnablePreviewScaling = true
 
-	return newClusterFromSpec(t, k8s, clusterSpec)
+	return MustNewClusterFromSpec(t, k8s, clusterSpec)
 }
 
-func MustNewAutoscaleCluster(t *testing.T, k8s *types.Cluster, size int) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewAutoscaleCluster(t, k8s, size)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return cluster
-}
-
-// NewAutoscaleClusterMDS creates new Autoscale enabled
+// MustNewAutoscaleClusterMDS creates new Autoscale enabled
 // cluster with scaling enabled for specific servers.
-func NewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, configName string, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) (*couchbasev2.CouchbaseCluster, error) {
+func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, configName string, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
 	// select only query config for autoscaling
-	cluster := e2espec.NewBasicCluster(size)
+	cluster := e2espec.NewBasicCluster(options)
 
 	// If TLS is explcitly stated, then add it to the pod configuration.
 	if tls != nil {
@@ -60,23 +51,14 @@ func NewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, configNa
 
 	// add query only config with autoscale enabled
 	queryConfig := couchbasev2.ServerConfig{
-		Size:             size,
+		Size:             options.Size,
 		Name:             configName,
 		Services:         couchbasev2.ServiceList{couchbasev2.QueryService},
 		AutoscaleEnabled: true,
 	}
 	cluster.Spec.Servers = append(cluster.Spec.Servers, queryConfig)
 
-	return newClusterFromSpec(t, k8s, cluster)
-}
-
-func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, size int, configName string, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
-	cluster, err := NewAutoscaleClusterMDS(t, k8s, size, configName, tls, policy)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return cluster
+	return MustNewClusterFromSpec(t, k8s, cluster)
 }
 
 // MustDeleteCouchbaseAutoscaler requires successful deletion of autoscaler cr.

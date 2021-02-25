@@ -9,6 +9,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -484,4 +485,37 @@ func skipEnterpriseOnlyPlatform(t *testing.T) {
 	if framework.Global.KubeType == "openshift" {
 		t.Skip("unsupported on platform")
 	}
+}
+
+// clusterOptions collates options from the CLI and bundles them up to be propagated
+// to the CR generation stuff.
+func clusterOptions(size int) *e2espec.ClusterOptions {
+	return &e2espec.ClusterOptions{
+		Image:               framework.Global.CouchbaseServerImage,
+		Size:                size,
+		AutoFailoverTimeout: e2espec.NewDurationS(30),
+		MonitoringImage:     framework.Global.CouchbaseExporterImage,
+		BackupImage:         framework.Global.CouchbaseBackupImage,
+		StorageClass:        framework.Global.StorageClassName,
+		Platform:            framework.Global.Platform,
+		Istio:               framework.Global.EnableIstio,
+	}
+}
+
+// clusterOptionsUpgrade does the same as above, but replaces the default image
+// with the one to upgrade from.
+func clusterOptionsUpgrade(size int) *e2espec.ClusterOptions {
+	options := clusterOptions(size)
+	options.Image = framework.Global.CouchbaseServerImageUpgrade
+
+	return options
+}
+
+// clusterOptionsUpgrade does the same as above, but replaces the default image
+// with the one to upgrade from.
+func clusterOptionsUpgradeMonitoring(size int) *e2espec.ClusterOptions {
+	options := clusterOptions(size)
+	options.MonitoringImage = framework.Global.CouchbaseExporterImageUpgrade
+
+	return options
 }
