@@ -56,7 +56,7 @@ func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule st
 // highly recommended that this be at least 2 minutes to give things a chance
 // to become created.
 func cronScheduleOnceIn(duration time.Duration) string {
-	when := time.Now().Add(duration)
+	when := time.Now().UTC().Add(duration)
 	return fmt.Sprintf("%d * * * *", when.Minute())
 }
 
