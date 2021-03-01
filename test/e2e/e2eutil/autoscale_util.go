@@ -28,30 +28,12 @@ func MustNewAutoscaleCluster(t *testing.T, k8s *types.Cluster, options *e2espec.
 func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, configName string, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
 	// select only query config for autoscaling
 	cluster := e2espec.NewBasicCluster(options)
-
-	// If TLS is explcitly stated, then add it to the pod configuration.
-	if tls != nil {
-		cluster.Name = tls.ClusterName
-		cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
-			Static: &couchbasev2.StaticTLS{
-				ServerSecret:   tls.ClusterSecretName,
-				OperatorSecret: tls.OperatorSecretName,
-			},
-		}
-
-		if policy != nil {
-			cluster.Spec.Networking.TLS.ClientCertificatePolicy = policy
-			cluster.Spec.Networking.TLS.ClientCertificatePaths = []couchbasev2.ClientCertificatePath{
-				{
-					Path: "subject.cn",
-				},
-			}
-		}
-	}
+	applyTLS(cluster, tls)
+	applyMTLS(cluster, policy)
 
 	// add query only config with autoscale enabled
 	queryConfig := couchbasev2.ServerConfig{
-		Size:             options.Size,
+		Size:             options.Topology[0].Size,
 		Name:             configName,
 		Services:         couchbasev2.ServiceList{couchbasev2.QueryService},
 		AutoscaleEnabled: true,

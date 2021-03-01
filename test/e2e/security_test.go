@@ -19,7 +19,7 @@ func testRotateAdminPassword(t *testing.T, kubernetes *types.Cluster, tls *e2eut
 	clusterSize := 3
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewXDCRCluster(t, kubernetes, clusterOptions(clusterSize), nil, tls, policy)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, policy).MustCreate(t, kubernetes)
 
 	// Rotate the password.
 	e2eutil.MustRotateClusterPassword(t, kubernetes)
@@ -83,7 +83,7 @@ func testRotateAdminPasswordAndRestart(t *testing.T, kubernetes *types.Cluster, 
 	clusterSize := 3
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewXDCRCluster(t, kubernetes, clusterOptions(clusterSize), nil, tls, policy)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, policy).MustCreate(t, kubernetes)
 
 	// Rotate the password and restart the operator.  We perform a simple
 	// scaling operation so we can observe the operator actually being able
@@ -152,7 +152,7 @@ func testRotateAdminPasswordDuringRestart(t *testing.T, kubernetes *types.Cluste
 	clusterSize := 3
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewXDCRCluster(t, kubernetes, clusterOptions(clusterSize), nil, tls, policy)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, policy).MustCreate(t, kubernetes)
 
 	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	e2eutil.MustRotateClusterPassword(t, kubernetes)

@@ -43,7 +43,7 @@ func TestRBACCreateAdminUser(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Create user
 	user, _, _ := mustCreateBoundUser(t, targetKube)
@@ -73,7 +73,7 @@ func TestRBACDeleteUser(t *testing.T) {
 
 	// Create Cluster
 	clusterSize := 1
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Expect user delete event eventually to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
@@ -115,7 +115,7 @@ func TestRBACDeleteRole(t *testing.T) {
 
 	// Create Cluster
 	clusterSize := 1
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Expect user delete event to occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
@@ -159,7 +159,7 @@ func TestRBACUpdateRole(t *testing.T) {
 
 	// Cluster
 	clusterSize := 1
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// User
 	user, group, _ := mustCreateBoundUser(t, targetKube)
@@ -199,7 +199,7 @@ func TestRBACRemoveUserFromBinding(t *testing.T) {
 
 	// Cluster
 	clusterSize := 1
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// User
 	user, _, binding := mustCreateBoundUser(t, targetKube)
@@ -260,7 +260,7 @@ func TestRBACDeleteBinding(t *testing.T) {
 
 	// Create Cluster
 	clusterSize := 1
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Expect user delete event to eventually occur
 	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseUserName, testCouchbase)
@@ -317,7 +317,7 @@ func TestRBACWithLDAPAuth(t *testing.T) {
 	_ = e2eutil.MustNewLDAPServer(t, targetKube, pod)
 
 	// Create a cluster with LDAP Auth
-	testCouchbase := e2espec.NewLDAPClusterBasic(clusterOptions(clusterSize), targetKube.Namespace, ctx.ClusterSecretName, targetKube.DefaultSecret.Name)
+	testCouchbase := e2espec.NewLDAPClusterBasic(clusterOptions().WithEphemeralTopology(clusterSize).Options, targetKube.Namespace, ctx.ClusterSecretName, targetKube.DefaultSecret.Name)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
@@ -368,7 +368,7 @@ func TestRBACSelection(t *testing.T) {
 	e2eutil.MustPatchRoleBinding(t, targetKube, binding, jsonpatch.NewPatchSet().Add("/spec/subjects/-", subject), time.Minute)
 
 	// Create a cluster that selects only labelled users.
-	couchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	couchbase.Spec.Security.RBAC.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}

@@ -10,7 +10,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -64,7 +63,7 @@ func TestScheduleEvacuateAllPersistent(t *testing.T) {
 
 	// Create the cluster.  Place all pods in the same availability zone.  We will
 	// evacuate this, and leave the Operator running in another.
-	cluster := e2espec.NewSupportableCluster(clusterOptions(mdsSize))
+	cluster := clusterOptions().WithMixedTopology(mdsSize).Generate(kubernetes)
 	cluster.Spec.RecoveryPolicy = &recoveryPolicy
 	cluster.Spec.ServerGroups = []string{
 		victim,

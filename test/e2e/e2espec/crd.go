@@ -14,13 +14,127 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// PersistenceType indicates the type of volume to attach to a server class.
+type PersistenceType string
+
+const (
+	// PersistData means all data and logs are persisted (the pod can be
+	// recovered).
+	PersistData PersistenceType = "data"
+
+	// PersistLogs means only logs are persisted, the pod needs to be recreated
+	// (this was a huge and stupid mistake that needs to be removed).
+	PersistLogs PersistenceType = "logs"
+)
+
+// ServerClass is an abstract representation of a server class.
+type ServerClass struct {
+	// Name is the name of the class and must be unique within the cluster.
+	Name string
+
+	// Size is the number of pods that this class should contain.
+	Size int
+
+	// Services is the list of Couchbase services that should be provisioned.
+	Services []couchbasev2.Service
+
+	// Persistence indicates whether we want persisitent volumes.
+	Persistence PersistenceType
+
+	// VolumeSize defines the size of the volumes to create when using
+	// persistence.
+	VolumeSize string
+}
+
+// ClusterTopology defines what the cluster should look like.
+type ClusterTopology []ServerClass
+
+// DeepCopy clones each use of a topology to keep them immuatable.
+func (t ClusterTopology) DeepCopy() ClusterTopology {
+	o := make(ClusterTopology, len(t))
+
+	for i, class := range t {
+		services := make([]couchbasev2.Service, len(class.Services))
+
+		for j, service := range class.Services {
+			services[j] = service
+		}
+
+		o[i] = ServerClass{
+			Name:        class.Name,
+			Size:        class.Size,
+			Services:    services,
+			Persistence: class.Persistence,
+			VolumeSize:  class.VolumeSize,
+		}
+	}
+
+	return o
+}
+
+var (
+	// EphemeralTopology is a simple ephemeral cluster, useful for testing
+	// basic configuration settings.
+	EphemeralTopology = ClusterTopology{
+		{
+			Name: "default",
+			Services: []couchbasev2.Service{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+				couchbasev2.QueryService,
+			},
+		},
+	}
+
+	// PersistentTopology is a persistent volume backed cluster, this is
+	// what we expect customers to use.
+	PersistentTopology = ClusterTopology{
+		{
+			Name: "default",
+			Services: []couchbasev2.Service{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+			},
+			Persistence: PersistData,
+			VolumeSize:  "1Gi",
+		},
+	}
+
+	// MixedTopology is a more complex (aka we messed up) topology
+	// that allows recoverable data nodes, but ephemeral query ones.
+	MixedTopology = ClusterTopology{
+		{
+			Name: "stateful",
+			Services: []couchbasev2.Service{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+			},
+			Persistence: PersistData,
+			VolumeSize:  "1Gi",
+		},
+		{
+			Name: "stateless",
+			Services: []couchbasev2.Service{
+				couchbasev2.QueryService,
+				// Eventing is not technically necessary here, however some tests rely on
+				// synchronization events before proceeding.  Eventing causes a rebalance
+				// when the Couchbase server process goes down so we can tell when it's
+				// back in the cluster.
+				couchbasev2.EventingService,
+			},
+			Persistence: PersistLogs,
+			VolumeSize:  "1Gi",
+		},
+	}
+)
+
 // ClusterOptions allows things about a cluster to be modified.
 type ClusterOptions struct {
 	// Couchbase Server container image to use.
 	Image string
 
-	// Cluster size for single class clusters.
-	Size int
+	// Cluster topology (shape and size).
+	Topology ClusterTopology
 
 	// Autofailver timeout.  Smaller means faster, but also means
 	// more race conditions.
@@ -309,8 +423,8 @@ func ApplyImagePullSecret(cluster *couchbasev2.CouchbaseCluster, imagePullSecret
 	cluster.Spec.Backup.ImagePullSecrets = references
 }
 
-// Create a very basic cluster with rbac and buckets managed, a single server
-// class with data/query/index enabled.
+// Create a basic clusters with rbac and buckets managed.  Server classes are
+// dynamically generated.
 func NewBasicCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
 	cluster := &couchbasev2.CouchbaseCluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -330,18 +444,9 @@ func NewBasicCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
 			Buckets: couchbasev2.Buckets{
 				Managed: true,
 			},
-			Servers: []couchbasev2.ServerConfig{
-				{
-					Size: options.Size,
-					Name: e2e_constants.CouchbaseServerConfig,
-					Services: couchbasev2.ServiceList{
-						couchbasev2.DataService,
-						couchbasev2.QueryService,
-						couchbasev2.IndexService,
-					},
-				},
-			},
-			Platform: options.Platform,
+			Servers:              []couchbasev2.ServerConfig{},
+			VolumeClaimTemplates: []couchbasev2.PersistentVolumeClaimTemplate{},
+			Platform:             options.Platform,
 			Backup: couchbasev2.Backup{
 				Managed:        true,
 				Image:          options.BackupImage,
@@ -350,93 +455,54 @@ func NewBasicCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
 		},
 	}
 
+	for _, class := range options.Topology {
+		config := couchbasev2.ServerConfig{
+			Name:     class.Name,
+			Size:     class.Size,
+			Services: class.Services,
+		}
+
+		if class.Persistence != "" {
+			pvc := couchbasev2.PersistentVolumeClaimTemplate{
+				ObjectMeta: couchbasev2.NamedObjectMeta{
+					Name: class.Name,
+				},
+				Spec: v1.PersistentVolumeClaimSpec{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"storage": resource.MustParse(class.VolumeSize),
+						},
+					},
+				},
+			}
+
+			switch class.Persistence {
+			case PersistData:
+				config.VolumeMounts = &couchbasev2.VolumeMounts{
+					DefaultClaim: class.Name,
+				}
+			case PersistLogs:
+				config.VolumeMounts = &couchbasev2.VolumeMounts{
+					LogsClaim: class.Name,
+				}
+			}
+
+			if options.StorageClass != "" {
+				pvc.Spec.StorageClassName = &options.StorageClass
+			}
+
+			cluster.Spec.VolumeClaimTemplates = append(cluster.Spec.VolumeClaimTemplates, pvc)
+		}
+
+		cluster.Spec.Servers = append(cluster.Spec.Servers, config)
+	}
+
 	if options.Istio {
 		platform := couchbasev2.NetworkPlatformIstio
 		cluster.Spec.Networking.NetworkPlatform = &platform
 	}
 
 	return cluster
-}
-
-// NewSupportableCluster returns a basic supportable cluster with a stateful and stateless
-// MDS groups of the defined size.  They use default and logs volume mounts respectively.
-func NewSupportableCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
-	cluster := NewBasicCluster(options)
-
-	cluster.Spec.Servers = []couchbasev2.ServerConfig{
-		{
-			Name: "stateful",
-			Size: options.Size,
-			Services: couchbasev2.ServiceList{
-				couchbasev2.DataService,
-				couchbasev2.IndexService,
-			},
-			VolumeMounts: &couchbasev2.VolumeMounts{
-				DefaultClaim: "couchbase",
-			},
-		},
-		{
-			Name: "stateless",
-			Size: options.Size,
-			Services: couchbasev2.ServiceList{
-				couchbasev2.QueryService,
-				// Eventing is not technically necessary here, however some tests rely on
-				// synchronization events before proceeding.  Eventing causes a rebalance
-				// when the Couchbase server process goes down so we can tell when it's
-				// back in the cluster.
-				couchbasev2.EventingService,
-			},
-			VolumeMounts: &couchbasev2.VolumeMounts{
-				LogsClaim: "couchbase",
-			},
-		},
-	}
-
-	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		{
-			ObjectMeta: couchbasev2.NamedObjectMeta{
-				Name:        "couchbase",
-				Annotations: map[string]string{},
-			},
-			Spec: v1.PersistentVolumeClaimSpec{
-				StorageClassName: &options.StorageClass,
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceStorage: *NewResourceQuantityMi(1024),
-					},
-				},
-			},
-		},
-	}
-
-	return cluster
-}
-
-// Stateful 3 node cluster with a single volume.
-// Spec will request 1Gb of storage (minikube default is 5gb).
-func NewStatefulCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
-	crd := NewBasicCluster(options)
-	couchbase := "couchbase"
-
-	crd.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
-		DefaultClaim: couchbase,
-	}
-
-	resources := CreateResources(v1.ResourceStorage, 1, 1, "Gi")
-	claim := couchbasev2.PersistentVolumeClaimTemplate{
-		ObjectMeta: couchbasev2.NamedObjectMeta{
-			Name: "couchbase",
-		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			StorageClassName: &options.StorageClass,
-			Resources:        resources,
-		},
-	}
-
-	crd.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{claim}
-
-	return crd
 }
 
 // Create Pod Policy with memory limit and requests in MB.

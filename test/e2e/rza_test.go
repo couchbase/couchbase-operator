@@ -14,7 +14,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -144,7 +143,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -186,7 +185,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(class1Size))
+	testCouchbase := clusterOptions().Generate(targetKube)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
@@ -251,7 +250,7 @@ func TestRzaResizeCluster(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -301,7 +300,7 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	class := 0
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.AntiAffinity = true
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
@@ -343,7 +342,7 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 	class := 0
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.ServerGroups = availableServerGroups
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -381,7 +380,7 @@ func TestServerGroupEnable(t *testing.T) {
 	clusterSize := len(availableServerGroups)
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Enable server groups, expecting an upgrade as the pods specification
 	// is augmented with scheduling information.
@@ -419,7 +418,7 @@ func TestServerGroupDisable(t *testing.T) {
 	clusterSize := len(availableServerGroups)
 
 	// Create the cluster.
-	cluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ServerGroups = availableServerGroups
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -457,7 +456,7 @@ func TestServerGroupAddGroup(t *testing.T) {
 	clusterSize := len(availableServerGroups)
 
 	// Create the cluster.
-	cluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ServerGroups = initialServerGroups
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -500,7 +499,7 @@ func TestServerGroupRemoveGroup(t *testing.T) {
 	clusterSize := len(availableServerGroups)
 
 	// Create the cluster.
-	cluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ServerGroups = availableServerGroups
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -544,7 +543,7 @@ func TestServerGroupReplaceGroup(t *testing.T) {
 	clusterSize := len(initialServerGroups)
 
 	// Create the cluster.
-	cluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ServerGroups = initialServerGroups
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 

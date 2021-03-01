@@ -170,135 +170,150 @@ func applyDNS(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, service
 	}
 }
 
-// MustNewClusterBasic creates a basic cluster.
-func MustNewClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
-	clusterSpec := e2espec.NewBasicCluster(options)
+// applyS3 optionally applies S3 credentials to the backup configuration.
+func applyS3(cluster *couchbasev2.CouchbaseCluster, secret *v1.Secret) {
+	if secret == nil {
+		return
+	}
 
-	return MustNewClusterFromSpec(t, k8s, clusterSpec)
+	cluster.Spec.Backup.S3Secret = secret.Name
 }
 
-// MustNewTLSClusterBasic creates a new TLS enabled basic cluster.
-func MustNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
-	cluster := e2espec.NewBasicCluster(options)
-	applyTLS(cluster, ctx)
+// applyGenericNetworking optionally applies generic networking to the cluster, this
+// exposes the admin console to provide a HTTP load-balanced endpoint, giving HA
+// service discovery, albeit with unstable IP based addressing, and exposed features,
+// in this case XDCR only because they are legacy tests and should be taken out back
+// and shot.
+func applyGenericNetworking(cluster *couchbasev2.CouchbaseCluster, genericNetworking bool) {
+	if !genericNetworking {
+		return
+	}
 
-	return MustNewClusterFromSpec(t, k8s, cluster)
+	cluster.Spec.Networking.ExposeAdminConsole = true
+	cluster.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
+		couchbasev2.FeatureXDCR,
+	}
 }
 
-// MustNewMutualTLSClusterBasic creates a new mTLS enabled basic cluster.
-func MustNewMutualTLSClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, ctx *TLSContext, policy couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
-	cluster := e2espec.NewBasicCluster(options)
-	applyTLS(cluster, ctx)
-	applyMTLS(cluster, &policy)
+// ClusterOptions is used to generate or create all Couchbase clusters by the framework.
+// The key observation is all clusters are ostensibly the same, with features layered on
+// top.  We use the builder pattern to declare those features, so they are onlt defined
+// in a single place.  You can still generate a cluster (as opposed to create one) in
+// order to add more esoteric configuration that isn't quite generic enough to warrant
+// a build step.
+type ClusterOptions struct {
+	Options *e2espec.ClusterOptions
 
-	return MustNewClusterFromSpec(t, k8s, cluster)
+	TLS *TLSContext
+
+	TLSPolicy *couchbasev2.ClientCertificatePolicy
+
+	DNS *v1.Service
+
+	S3Credentials *v1.Secret
+
+	GenericNetworking bool
 }
 
-// MustNotNewTLSClusterBasic ensures that a cluster is not created given the specification.
-func MustNotNewTLSClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, ctx *TLSContext) {
-	cluster := e2espec.NewBasicCluster(options)
-	applyTLS(cluster, ctx)
+// WithEphemeralTopology defines a cluster as being ephemeral (no volumes).
+// It has one server class with data/index/query enabled and of the specified
+// size.
+func (o *ClusterOptions) WithEphemeralTopology(size int) *ClusterOptions {
+	topology := e2espec.EphemeralTopology.DeepCopy()
+	topology[0].Size = size
 
-	if _, err := CreateCluster(t, k8s, cluster); err == nil {
+	o.Options.Topology = topology
+
+	return o
+}
+
+// WithPersisitentTopology defines a cluster as having persistent volumes.
+// Is has one server class with data/index enabled and of the specified size.
+func (o *ClusterOptions) WithPersisitentTopology(size int) *ClusterOptions {
+	topology := e2espec.PersistentTopology.DeepCopy()
+	topology[0].Size = size
+
+	o.Options.Topology = topology
+
+	return o
+}
+
+// WithMixedTopology defines a cluster as having persistent volumes for
+// data, where pertinent, and logs elsewhere.  It has two server classes --
+// stateful and stateless -- with data/index and query/eventing enabled
+// respectively.  Each server class is of the specified size.
+func (o *ClusterOptions) WithMixedTopology(size int) *ClusterOptions {
+	topology := e2espec.MixedTopology.DeepCopy()
+	topology[0].Size = size
+	topology[1].Size = size
+
+	o.Options.Topology = topology
+
+	return o
+}
+
+// WithTLS sets the cluster as having TLS configured.
+func (o *ClusterOptions) WithTLS(tls *TLSContext) *ClusterOptions {
+	o.TLS = tls
+
+	return o
+}
+
+// WithMutualTLS sets the cluster as having mTLS configured.
+func (o *ClusterOptions) WithMutualTLS(tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *ClusterOptions {
+	o.TLS = tls
+	o.TLSPolicy = policy
+
+	return o
+}
+
+// WithDNS sets the cluster as having a custom DNS server.
+func (o *ClusterOptions) WithDNS(dns *v1.Service) *ClusterOptions {
+	o.DNS = dns
+
+	return o
+}
+
+// WithS3 set the cluster as using S3 for backups.
+func (o *ClusterOptions) WithS3(s3 *v1.Secret) *ClusterOptions {
+	o.S3Credentials = s3
+
+	return o
+}
+
+// WithGenericNetworking enables Satan's insecure, unstable, shit show of a network mode.
+func (o *ClusterOptions) WithGenericNetworking() *ClusterOptions {
+	o.GenericNetworking = true
+
+	return o
+}
+
+// Generate generates the basic cluster based on options and applies
+// and features.
+func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
+	cluster := e2espec.NewBasicCluster(o.Options)
+
+	applyTLS(cluster, o.TLS)
+	applyMTLS(cluster, o.TLSPolicy)
+	applyDNS(k8s, cluster, o.DNS)
+	applyS3(cluster, o.S3Credentials)
+	applyGenericNetworking(cluster, o.GenericNetworking)
+
+	return cluster
+}
+
+// MustCreate calls Generate then creates the cluster in Kubernetes, dying
+// on error.
+func (o *ClusterOptions) MustCreate(t *testing.T, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
+	return MustNewClusterFromSpec(t, k8s, o.Generate(k8s))
+}
+
+// MustNotCreate calls Generate then creates the cluster in Kubernetes, dying
+// on success.
+func (o *ClusterOptions) MustNotCreate(t *testing.T, k8s *types.Cluster) {
+	if _, err := CreateCluster(t, k8s, o.Generate(k8s)); err == nil {
 		Die(t, fmt.Errorf("cluster created unexpectedly"))
 	}
-}
-
-// MustNewXDCRClusterGeneric creates a cluster for use with generic, IP-based networking (DEPRECATED).
-func MustNewXDCRClusterGeneric(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
-	clusterSpec := e2espec.NewBasicCluster(options)
-	clusterSpec.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
-		ExposeAdminConsole: true,
-		ExposedFeatures: couchbasev2.ExposedFeatureList{
-			couchbasev2.FeatureXDCR,
-		},
-	}
-
-	return MustNewClusterFromSpec(t, k8s, clusterSpec)
-}
-
-// MustNewXDCRCluster creates a cluster for use with DNS based networking.
-// The DNS configuration is optional for XDCR within the same Kubernetes cluster.
-// The TLS configuration is optional.
-// The TLS policy is optional.
-func MustNewXDCRCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, dns *v1.Service, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
-	cluster := e2espec.NewBasicCluster(options)
-
-	applyDNS(k8s, cluster, dns)
-	applyTLS(cluster, tls)
-	applyMTLS(cluster, policy)
-
-	return MustNewClusterFromSpec(t, k8s, cluster)
-}
-
-func NewClusterBasicNoWait(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) (*couchbasev2.CouchbaseCluster, error) {
-	clusterSpec := e2espec.NewBasicCluster(options)
-	return CreateCluster(t, k8s, clusterSpec)
-}
-
-// MustNewStatefulCluster creates a cluster with persistent block storage, retrying if an
-// error is encountered and performing garbage collection.
-func MustNewStatefulCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
-	clusterSpec := e2espec.NewStatefulCluster(options)
-	return MustNewClusterFromSpec(t, k8s, clusterSpec)
-}
-
-// MustNewSupportableCluster creates a cluster with two MDS groups of 'size'.  The first is
-// a stateful group with data and index enabled.  The second is a stateless group with
-// query enabled.
-func MustNewSupportableCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
-	spec := e2espec.NewSupportableCluster(options)
-	return MustNewClusterFromSpec(t, k8s, spec)
-}
-
-func MustNewBackupCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, secret *v1.Secret) *couchbasev2.CouchbaseCluster {
-	cluster := e2espec.NewBasicCluster(options)
-
-	if secret != nil {
-		cluster.Spec.Backup.S3Secret = secret.Name
-	}
-
-	return MustNewClusterFromSpec(t, k8s, cluster)
-}
-
-func MustNewBackupClusterTLS(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, tls *TLSContext, secret *v1.Secret) *couchbasev2.CouchbaseCluster {
-	cluster := e2espec.NewBasicCluster(options)
-	applyTLS(cluster, tls)
-
-	if secret != nil {
-		cluster.Spec.Backup.S3Secret = secret.Name
-	}
-
-	return MustNewClusterFromSpec(t, k8s, cluster)
-}
-
-// MustNewSupportableTLSCluster creates a cluster with two MDS groups of 'size'.  The first is
-// a stateful group with data and index enabled.  The second is a stateless group with
-// query enabled.
-func MustNewSupportableTLSCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, ctx *TLSContext) *couchbasev2.CouchbaseCluster {
-	cluster := e2espec.NewSupportableCluster(options)
-	applyTLS(cluster, ctx)
-
-	return MustNewClusterFromSpec(t, k8s, cluster)
-}
-
-// MustNewMutualTLSClusterBasic creates a new TLS enabled basic cluster, retrying if an error is encountered.
-func MustNewPrometheusTLSClusterBasic(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy, enabled bool) *couchbasev2.CouchbaseCluster {
-	cluster := e2espec.NewBasicCluster(options)
-
-	if enabled {
-		cluster.Spec.Monitoring = &couchbasev2.CouchbaseClusterMonitoringSpec{
-			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-				Enabled: true,
-				Image:   options.MonitoringImage,
-			},
-		}
-	}
-
-	applyTLS(cluster, tls)
-	applyMTLS(cluster, policy)
-
-	return MustNewClusterFromSpec(t, k8s, cluster)
 }
 
 // NewBucket creates a bucket.

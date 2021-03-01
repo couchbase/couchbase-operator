@@ -31,7 +31,7 @@ func TestDenyCommunityEdition(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.Image = constants.CommunityEditionImage
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
 
@@ -53,7 +53,7 @@ func TestEditServiceConfig(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// When ready update the server class size and wait for the cluster to be scaled.
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", clusterSize+1), time.Minute)
@@ -89,7 +89,7 @@ func TestNodeManualFailover(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Generate workload during the operation.
@@ -131,7 +131,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Generate workload during the operation.
@@ -189,7 +189,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Generate workload during the operation.
@@ -247,7 +247,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Generate workload during the operation.
@@ -320,7 +320,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Generate workload during the operation.
@@ -367,8 +367,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Kill a single pod and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
@@ -410,7 +409,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	victimIndex2 := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Kill a two pods and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
@@ -458,7 +457,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Generate workload during the operation.
@@ -508,7 +507,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Generate workload during the operation.
@@ -559,7 +558,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 
 	// Kill a single pod and wait for the cluster to recover.
@@ -604,7 +603,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 
 	// Generate workload during the operation.
@@ -653,7 +652,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// Generate workload during the operation.
@@ -718,7 +717,7 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.RecoveryPolicy = &recoveryPolicy
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 

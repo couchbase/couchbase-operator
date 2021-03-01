@@ -861,7 +861,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	}
 
 	// Deploy cb server for cbopinfo validation
-	e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(1))
+	clusterOptions().WithEphemeralTopology(1).MustCreate(t, targetKube)
 
 	for i := range validArgumentList {
 		arg := validArgumentList[i]
@@ -1032,9 +1032,9 @@ func TestLogCollect(t *testing.T) {
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	cluster1 := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(cluster1Size))
-	cluster2 := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(cluster2Size))
-	cluster3 := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(cluster3Size))
+	cluster1 := clusterOptions().WithEphemeralTopology(cluster1Size).MustCreate(t, targetKube)
+	cluster2 := clusterOptions().WithEphemeralTopology(cluster2Size).MustCreate(t, targetKube)
+	cluster3 := clusterOptions().WithEphemeralTopology(cluster3Size).MustCreate(t, targetKube)
 
 	commonArgs := e2eutil.ArgumentList{}
 	commonArgs.AddClusterDefaults(targetKube)
@@ -1171,7 +1171,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	defer cleanup()
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(1))
+	cluster := clusterOptions().WithEphemeralTopology(1).MustCreate(t, targetKube)
 
 	// Create a service account with no permissions.
 	if err := framework.RecreateServiceAccount(targetKube, cluster.Name); err != nil {
@@ -1312,7 +1312,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	}
 
 	// Create Couchbase cluster
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	cbCluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Collect logs
 	args.Add(cbCluster.Name, "")
@@ -1379,7 +1379,7 @@ func TestLogCollectInvalid(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create Couchbase cluster
-	e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Collect logs with invalid operator-image-name
 	t.Run("TestLogCollectInvalidOperatorImage", func(t *testing.T) {
@@ -1427,7 +1427,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create Couchbase cluster
-	e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	args := e2eutil.ArgumentList{}
 	args.AddClusterDefaults(targetKube)
@@ -1463,7 +1463,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	victims := []int{2, 3}
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, clusterOptions(mdsGroupSize))
+	cbCluster := clusterOptions().WithMixedTopology(mdsGroupSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, cbCluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 
 	// To cross check number of persistent vol claims matches the defined spec
@@ -1536,7 +1536,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 
 	// Create the cluster (3 stateful nodes, 3 stateless nodes)
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	cbCluster := e2eutil.MustNewSupportableCluster(t, targetKube, clusterOptions(mdsGroupSize))
+	cbCluster := clusterOptions().WithMixedTopology(mdsGroupSize).MustCreate(t, targetKube)
 
 	// When ready, ensure the persistent volumes are allocated as expected.
 	mustVerifyPvcMappingForPods(t, targetKube, map[string]int{
@@ -1656,7 +1656,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 
 	// Create the cluster (3 stateful and 3 stateless)
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	cbCluster := e2espec.NewSupportableCluster(clusterOptions(mdsGroupSize))
+	cbCluster := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(targetKube)
 	cbCluster.Spec.Logging.LogRetentionCount = 3
 	cbCluster = e2eutil.MustNewClusterFromSpec(t, targetKube, cbCluster)
 
@@ -1730,7 +1730,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptions(mdsGroupSize))
+	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Cross check number of persistent vol claims matches the defined spec.
@@ -1786,7 +1786,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2espec.NewSupportableCluster(clusterOptions(mdsGroupSize))
+	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(kubernetes)
 	cluster.Spec.Logging.LogRetentionTime = "15m"
 	cluster.Spec.Logging.LogRetentionCount = maxLogCount
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -1846,7 +1846,7 @@ func TestLogRedactionVerify(t *testing.T) {
 
 	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(3))
+	clusterOptions().WithEphemeralTopology(3).MustCreate(t, targetKube)
 
 	// Collect logs
 	args := e2eutil.ArgumentList{}
@@ -1884,7 +1884,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
 
-	cbCluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	cbCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	cbCluster.Spec.Servers[0].Services = append(cbCluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	cbCluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
@@ -1929,8 +1929,8 @@ func TestLogRetentionMultiCluster(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create two clusters.
-	cluster1 := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptions(mdsGroupSize))
-	cluster2 := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptions(mdsGroupSize))
+	cluster1 := clusterOptions().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster2 := clusterOptions().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Ensure cluster 1 is healthy and update the retention period to be 1m.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, 2*time.Minute)
@@ -1964,7 +1964,7 @@ func TestLogCollectListJson(t *testing.T) {
 
 	// Create Couchbase cluster
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	cbCluster := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(3))
+	cbCluster := clusterOptions().WithEphemeralTopology(3).MustCreate(t, targetKube)
 
 	// Collect logs
 	args := e2eutil.ArgumentList{}
@@ -2018,8 +2018,8 @@ func TestLogsMetadata(t *testing.T) {
 	})
 
 	// Create Couchbase clusters
-	cluster1 := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(1))
-	cluster2 := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(1))
+	cluster1 := clusterOptions().WithEphemeralTopology(1).MustCreate(t, kubernetes)
+	cluster2 := clusterOptions().WithEphemeralTopology(1).MustCreate(t, kubernetes)
 
 	t.Run("OperatorAndClusters", func(t *testing.T) {
 		cleanup := f.SetupSubTest(t)

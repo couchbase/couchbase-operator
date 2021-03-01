@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -30,7 +29,7 @@ func TestHibernateEphemeralImmediate(t *testing.T) {
 	hibernationStrategy := couchbasev2.ImmediateHibernation
 
 	// Create the cluster.
-	cluster := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.HibernationStrategy = &hibernationStrategy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -70,7 +69,7 @@ func TestHibernateSupportableImmediate(t *testing.T) {
 	recoveryStrategy := couchbasev2.PrioritizeUptime
 
 	// Create the cluster.
-	cluster := e2espec.NewSupportableCluster(clusterOptions(mdsGroupSize))
+	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(kubernetes)
 	cluster.Spec.HibernationStrategy = &hibernationStrategy
 	cluster.Spec.RecoveryPolicy = &recoveryStrategy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)

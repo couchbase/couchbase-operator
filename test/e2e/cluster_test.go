@@ -35,7 +35,7 @@ func TestResizeCluster(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
 	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
@@ -77,7 +77,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
@@ -117,7 +117,7 @@ func TestEditClusterSettings(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.
@@ -167,7 +167,7 @@ func TestIndexerSettings(t *testing.T) {
 	// Create the cluster.  Use an empty inderer settings to get the DAC to fill in
 	// the defaults for us.  Also remove the index service, the storage mode cannot be
 	// modified if any nodes are running the index service (lol really?)
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.ClusterSettings.Indexer = &couchbasev2.CouchbaseClusterIndexerSettings{}
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
@@ -208,7 +208,7 @@ func TestQuerySettings(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.ClusterSettings.Query = &couchbasev2.CouchbaseClusterQuerySettings{}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
@@ -242,7 +242,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	defer cleanup()
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(1))
+	testCouchbase := clusterOptions().WithEphemeralTopology(1).Generate(targetKube)
 	testCouchbase.Spec.Image = "basecouch/123:enterprise-6.0.4"
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
 
@@ -267,7 +267,7 @@ func TestInvalidVersion(t *testing.T) {
 	defer cleanup()
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(1))
+	testCouchbase := clusterOptions().WithEphemeralTopology(1).Generate(targetKube)
 	testCouchbase.Spec.Image = "couchbase/server:enterprise-9.9.9"
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
 
@@ -302,7 +302,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	allocatableMemory := e2eutil.MustGetMinNodeMem(t, targetKube)
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(1))
+	testCouchbase := clusterOptions().WithEphemeralTopology(1).Generate(targetKube)
 	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse(strconv.Itoa(int(allocatableMemory*0.7)) + "Mi"),
@@ -358,7 +358,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	// Create the cluster
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Runtime configuration
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -402,7 +402,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
@@ -458,7 +458,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	// create 2 node cluster with admin console
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// pause operator
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
@@ -501,7 +501,7 @@ func TestBasicMDSScaling(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
@@ -643,7 +643,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
@@ -736,7 +736,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	clusterSize := mdsGroup1Size + mdsGroup2Size
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(mdsGroup1Size))
+	testCouchbase := clusterOptions().Generate(targetKube)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
@@ -787,7 +787,7 @@ func TestRemoveLastDataService(t *testing.T) {
 	clusterSize := mdsGroup1Size + mdsGroup2Size
 
 	// Create the cluster.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(mdsGroup1Size))
+	testCouchbase := clusterOptions().Generate(targetKube)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
@@ -848,7 +848,7 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	clusterSize := mdsGroupSize1 + mdsGroupSize2
 
 	// Create the cluster with two server classes, and exposed features.
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(0))
+	testCouchbase := clusterOptions().Generate(targetKube)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "data",
@@ -905,7 +905,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 
 	for index := 0; index < 3; index++ {
-		clusters = append(clusters, e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize)))
+		clusters = append(clusters, clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube))
 	}
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)

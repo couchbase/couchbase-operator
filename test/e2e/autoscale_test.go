@@ -50,7 +50,7 @@ func TestAutoscaleEnabled(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions().WithEphemeralTopology(clusterSize).Options)
 
 	// Check autoscaler was created
 	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
@@ -82,7 +82,7 @@ func TestAutoscaleDisabled(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions().WithEphemeralTopology(clusterSize).Options)
 
 	// Check autoscaler was created
 	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
@@ -117,7 +117,7 @@ func TestAutoscalerDeleted(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions().WithEphemeralTopology(clusterSize).Options)
 
 	// Check autoscaler was created
 	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
@@ -155,7 +155,7 @@ func TestAutoscaleSelectiveMDS(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions(sizePerConfig), queryConfigName, nil, nil)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, queryConfigName, nil, nil)
 
 	// Check autoscaler was created only for query config
 	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
@@ -177,7 +177,7 @@ func testAutoscale(t *testing.T, targetKube *types.Cluster, metricName string, m
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster with autoscaling with desired value of tls and it's policy
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions(sizePerConfig), queryConfigName, tls, policy)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, queryConfigName, tls, policy)
 
 	if tls != nil {
 		// When the cluster is healthy, check the TLS is correctly configured.
@@ -352,7 +352,7 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions(sizePerConfig), queryConfigName, nil, nil)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, queryConfigName, nil, nil)
 	// explicitly enabling autoscaling for data config
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/enablePreviewScaling", true), time.Minute)
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/servers/0/autoscaleEnabled", true), time.Minute)
@@ -407,7 +407,7 @@ func TestAutoscaleConflict(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions(sizePerConfig), queryConfigName, nil, nil)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, queryConfigName, nil, nil)
 
 	// Check autoscaler was created only for query config
 	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
@@ -464,7 +464,7 @@ func TestAutoScalingDisabledOnData(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions(sizePerConfig), queryConfigName, nil, nil)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, queryConfigName, nil, nil)
 
 	// Expect query config(1) to be created
 	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
@@ -512,7 +512,7 @@ func TestAutoScalingDisabledOnCouchbaseBucket(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions(sizePerConfig), queryConfigName, nil, nil)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, queryConfigName, nil, nil)
 
 	// Set autoscale enable on data config even though it should not be able to scale
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/servers/0/autoscaleEnabled", true), time.Minute)
@@ -555,7 +555,7 @@ func testPreviewMode(t *testing.T, targetKube *types.Cluster, stateful bool, tls
 	}
 
 	// Create the cluster
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions(sizePerConfig), queryConfigName, tls, policy)
+	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, queryConfigName, tls, policy)
 	// Set autoscale enable on data config even though it should not be able to scale
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/servers/0/autoscaleEnabled", true), time.Minute)
 

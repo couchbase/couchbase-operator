@@ -489,33 +489,34 @@ func skipEnterpriseOnlyPlatform(t *testing.T) {
 
 // clusterOptions collates options from the CLI and bundles them up to be propagated
 // to the CR generation stuff.
-func clusterOptions(size int) *e2espec.ClusterOptions {
-	return &e2espec.ClusterOptions{
-		Image:               framework.Global.CouchbaseServerImage,
-		Size:                size,
-		AutoFailoverTimeout: e2espec.NewDurationS(30),
-		MonitoringImage:     framework.Global.CouchbaseExporterImage,
-		BackupImage:         framework.Global.CouchbaseBackupImage,
-		StorageClass:        framework.Global.StorageClassName,
-		Platform:            framework.Global.Platform,
-		Istio:               framework.Global.EnableIstio,
+func clusterOptions() *e2eutil.ClusterOptions {
+	return &e2eutil.ClusterOptions{
+		Options: &e2espec.ClusterOptions{
+			Image:               framework.Global.CouchbaseServerImage,
+			AutoFailoverTimeout: e2espec.NewDurationS(30),
+			MonitoringImage:     framework.Global.CouchbaseExporterImage,
+			BackupImage:         framework.Global.CouchbaseBackupImage,
+			StorageClass:        framework.Global.StorageClassName,
+			Platform:            framework.Global.Platform,
+			Istio:               framework.Global.EnableIstio,
+		},
 	}
 }
 
 // clusterOptionsUpgrade does the same as above, but replaces the default image
 // with the one to upgrade from.
-func clusterOptionsUpgrade(size int) *e2espec.ClusterOptions {
-	options := clusterOptions(size)
-	options.Image = framework.Global.CouchbaseServerImageUpgrade
+func clusterOptionsUpgrade() *e2eutil.ClusterOptions {
+	options := clusterOptions()
+	options.Options.Image = framework.Global.CouchbaseServerImageUpgrade
 
 	return options
 }
 
 // clusterOptionsUpgrade does the same as above, but replaces the default image
 // with the one to upgrade from.
-func clusterOptionsUpgradeMonitoring(size int) *e2espec.ClusterOptions {
-	options := clusterOptions(size)
-	options.MonitoringImage = framework.Global.CouchbaseExporterImageUpgrade
+func clusterOptionsUpgradeMonitoring() *e2eutil.ClusterOptions {
+	options := clusterOptions()
+	options.Options.MonitoringImage = framework.Global.CouchbaseExporterImageUpgrade
 
 	return options
 }

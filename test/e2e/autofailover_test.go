@@ -37,7 +37,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
@@ -99,7 +99,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	autoFailoverTimeout := 10 * time.Second
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketThreeReplicas())
-	testCouchbase := e2espec.NewBasicCluster(clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = &metav1.Duration{Duration: autoFailoverTimeout}
 	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)

@@ -32,7 +32,7 @@ func TestCreateDurableBucket(t *testing.T) {
 	bucket := e2eutil.GetDurableBucket(f.BucketType, f.CompressionMode, couchbasev2.CouchbaseBucketMinimumDurabilityMajority)
 
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityMinLevel", couchbaseutil.DurabilityMajority), time.Minute)
@@ -62,7 +62,7 @@ func TestEditDurableBucket(t *testing.T) {
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
 
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
@@ -101,7 +101,7 @@ func TestLoadDurableBucket(t *testing.T) {
 	bucket := e2eutil.GetDurableBucket(f.BucketType, f.CompressionMode, couchbasev2.CouchbaseBucketMinimumDurabilityMajority)
 
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 

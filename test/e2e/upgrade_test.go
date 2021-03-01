@@ -227,7 +227,7 @@ func TestUpgrade(t *testing.T) {
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
@@ -268,7 +268,7 @@ func TestUpgradeRollback(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point revert.  The cluster will
@@ -317,7 +317,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -364,7 +364,7 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready, start the upgrade.  Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -386,7 +386,7 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready, start the downgrade.  Expect the update to be rejected.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -408,7 +408,7 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 	clusterSize := constants.Size3
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// this will happen as the first upgrade begins, at which point try rollabck to an illegal version.
@@ -438,7 +438,7 @@ func TestUpgradeSupportable(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
+	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
@@ -485,7 +485,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
+	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -540,7 +540,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
+	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -596,7 +596,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
+	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -651,7 +651,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptionsUpgrade(mdsGroupSize))
+	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -698,7 +698,7 @@ func TestUpgradeEnv(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster without TLS.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Once up and running modify the pod policy.
 	env := []v1.EnvVar{
@@ -739,7 +739,7 @@ func TestUpgradeToSupportable(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster without PVs.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Once up and running add in PV support.
 	templates := []couchbasev2.PersistentVolumeClaimTemplate{
@@ -799,7 +799,7 @@ func TestUpgradeToTLS(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster without TLS.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When ready create the required TLS secrets and patch them into the running
 	// cluster.
@@ -845,7 +845,7 @@ func TestUpgradeToMandatoryMutualTLS(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster without TLS.
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptions(clusterSize))
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When ready create the required TLS secrets and patch them into the running
 	// cluster.
@@ -899,7 +899,7 @@ func TestUpgradePVC(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create the cluster.
-	cluster := e2eutil.MustNewSupportableCluster(t, kubernetes, clusterOptions(mdsGroupSize))
+	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Update the PVC template size from 1Gi to 2GI
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests", v1.ResourceList{v1.ResourceStorage: *e2espec.NewResourceQuantityMi(2048)}), time.Minute)
@@ -909,12 +909,12 @@ func TestUpgradePVC(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Upgrade starts
-	// * Each node is upgraded
+	// * Each node in the server group is upgraded
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Repeat{Times: mdsGroupSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
@@ -938,7 +938,7 @@ func TestUpgradeImmediate(t *testing.T) {
 	upgradeStrategy := couchbasev2.ImmediateUpgrade
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2espec.NewBasicCluster(clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.UpgradeStrategy = &upgradeStrategy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -984,7 +984,7 @@ func TestUpgradeConstrained(t *testing.T) {
 	upgradeStrategy := couchbasev2.RollingUpgrade
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := e2espec.NewBasicCluster(clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.UpgradeStrategy = &upgradeStrategy
 	cluster.Spec.RollingUpgrade = &couchbasev2.RollingUpgradeConstraints{
 		MaxUpgradablePercent: upgradablePercent,
@@ -1032,7 +1032,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := e2eutil.MustNewClusterBasic(t, kubernetes, clusterOptionsUpgrade(clusterSize))
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 

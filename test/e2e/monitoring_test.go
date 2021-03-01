@@ -47,9 +47,20 @@ func testPrometheusMetrics(t *testing.T, targetKube *types.Cluster, tls *e2eutil
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewPrometheusTLSClusterBasic(t, targetKube, clusterOptions(clusterSize), tls, policy, enabled)
-	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, policy).Generate(targetKube)
 
+	if enabled {
+		testCouchbase.Spec.Monitoring = &couchbasev2.CouchbaseClusterMonitoringSpec{
+			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
+				Enabled: true,
+				Image:   framework.Global.CouchbaseExporterImage,
+			},
+		}
+	}
+
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
@@ -266,7 +277,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	}
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptions(clusterSize))
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -362,7 +373,7 @@ func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterOptionsUpgradeMonitoring(clusterSize))
+	testCouchbase := clusterOptionsUpgradeMonitoring().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
