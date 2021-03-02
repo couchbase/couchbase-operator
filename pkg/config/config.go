@@ -48,6 +48,9 @@ func Execute() {
 		Use:   "create",
 		Short: "Creates Couchbase Autonomous Operator components",
 		Long:  "Creates Couchbase Autonomous Operator components",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return checkAPIVersions(flags)
+		},
 	}
 
 	create.AddCommand(getCreateOperatorCommand(flags))
@@ -59,6 +62,9 @@ func Execute() {
 		Use:   "delete",
 		Short: "Deletes Couchbase Autonomous Operator components",
 		Long:  "Deletes Couchbase Autonomous Operator components",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return checkAPIVersions(flags)
+		},
 	}
 
 	deleteCmd.AddCommand(getDeleteOperatorCommand(flags))
@@ -68,9 +74,6 @@ func Execute() {
 	// 'cbopcfg' is the top level command.
 	root := &cobra.Command{
 		Use: "cbopcfg",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return checkAPIVersions(flags)
-		},
 	}
 
 	flags.AddFlags(root.PersistentFlags())
