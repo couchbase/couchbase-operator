@@ -109,8 +109,8 @@ spec:
 === `spec.strategy`
 
 This field defines which backup strategy to use for Automated Backup.
-Currently we only support Full Only and Full/Incremental backup strategies.
-For more info please visit [link](google.com)'
+The following backup strategies are supported: _Full Backup Only_ and _Full/Incremental_.
+For more information about these backup strategies, please refer to the xref:server:backup-restore:cbbackupmgr-strategies.adoc[`cbbackupmgr` documentation].
 
 ____
 _Field rules:_ This field is required and must be either `full_only` or `full_incremental`.
