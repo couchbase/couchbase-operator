@@ -128,3 +128,7 @@ $ ./easyrsa build-client-full Administrator nopass
 
 The created files `pki/private/Administrator.key` and `pki/issued/Administrator.crt` can be used as `tls.key` and `tls.crt` respectively when specifying the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-clientsecretname[`couchbaseclusters.spec.networking.tls.secretSource.clientSecretName`] field.
 
+== Further reading
+
+* xref:howto-tls.adoc[How to configure TLS]
+
