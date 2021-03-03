@@ -16,7 +16,7 @@ Couchbase Autonomous Operator 2.2.0 was released in 2021.
 
 ==== Improved Security Defaults
 
-The Couchbase server default minimum TLS version 1.0.
+The Couchbase Server default minimum TLS version is 1.0.
 This is insecure and easily compromised if a client downgrades to a version less than 1.2.
 Operator 2.2 makes TLS 1.2 the minimum by default, and will automatically update the TLS minimum version unless it is explicitly specified with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-tlsminimumversion[`couchbaseclusters.spec.networking.tls.tlsMinimumVersion`] parameter.
 
@@ -24,14 +24,17 @@ You can prevent this change from occurring when xref:howto-operator-upgrade.adoc
 
 ==== TLS Certificate and Key Handling
 
-Couchbase server requires that the TLS resources be called `pkey.key` and `chain.pem`, however the majority of 3rd party certificate managers generate `tls.key` and `tls.crt`.
+Couchbase Server requires that the TLS resources be called `pkey.key` and `chain.pem`, however the majority of 3rd-party certificate managers generate `tls.key` and `tls.crt`.
 This format is governed by the Kubernetes `kubernetes.io/tls` secret type.
-To provide integration with 3rd party providers, and to maintain backward compatibility with existing clusters, we provide secret shadowing.
+To provide integration with 3rd-party providers, and to maintain backward compatibility with existing clusters, the Operator now provides secret shadowing.
 
-A new TLS source -- xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource[`couchbaseclusters.spec.networking.tls.secretSource`] -- allows you to use `kubernetes.io/tls` type secrets to configure Couchbase server.
-When in shadowing mode, a shadow copy of the TLS secret is created, with the key names changed to those hard coded in Couchbase server.
-The shadow secret can then be mounted and used inside Couchbase server pods.
+A new TLS source -- xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource[`couchbaseclusters.spec.networking.tls.secretSource`] -- allows you to use `kubernetes.io/tls` type secrets to configure Couchbase Server.
+When using this new TLS source, a shadow copy of the TLS secret is created, with the key names changed to those hard coded in Couchbase Server.
+The shadow secret can then be mounted and used inside Couchbase Server pods.
 As the secret is shadowed, the Operator can reformat private keys, and therefore now supports PKCS#8 formatted private keys.
+
+3rd-party certificate managers can be used with clusters that are configured with this new TLS source.
+Refer to the tutorial xref:tutorial-cert-manager.adoc[] for an example.
 
 For existing clusters using the legacy xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-static[`couchbaseclusters.spec.networking.tls.static`] source, the Operator works as before -- directly mounting and consuming the TLS secret without a shadow secret.
 
@@ -40,7 +43,7 @@ For existing clusters using the legacy xref:resource/couchbasecluster.adoc#couch
 Prior to this release, server groups had to be enabled on cluster creation, and were immutable for the lifetime of the cluster.
 These restrictions have now been lifted.
 
-It is now possible to enable Couchbase server groups, and Operator pod scheduling, while a cluster is running.
+It is now possible to enable Couchbase Server groups, and Operator pod scheduling, while a cluster is running.
 
 It is also now possible to modify the list of server groups used for scheduling.
 Previously if an availability zone were to suffer an outage, the Operator would continually attempt to recreate failed pods in the same availability zone to maintain even balance across the requested set.

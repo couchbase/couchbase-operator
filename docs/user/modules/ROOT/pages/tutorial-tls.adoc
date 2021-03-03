@@ -90,12 +90,12 @@ The key/certificate pair can be found in `pki/private/couchbase-server.key` and 
 Password-protected keys are not supported by Couchbase Server or the Operator.
 ====
 
-=== Private Key Formatting
+=== Private Key Formatting (Legacy)
 
 Due to an https://issues.couchbase.com/browse/MB-24404[issue^] with Couchbase Server's private key handling, server keys may need to be PKCS#1 formatted.
-This is only required when using legacy TLS configuration (with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-static[`couchbaseclusters.spec.networking.tls.static`]).
+This was addressed in Autonomous Operator 2.2 (and this tutorial) with the implementation of xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource[`couchbaseclusters.spec.networking.tls.secretSource`].
 
-This can be achieved with the following commands:
+However, if you are using legacy TLS configuration with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-static[`couchbaseclusters.spec.networking.tls.static`], you will need to format the server keys in PKCS#1:
 
 [source,console]
 ----

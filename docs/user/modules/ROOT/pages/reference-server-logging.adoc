@@ -44,7 +44,7 @@ There is no need to maintain the rotated log files as these will have been alrea
 
 == Deployment
 
-Auditing and logging can be enabled using the standard CouchbaseCluster CRD. 
+Auditing and logging can be enabled using the standard `CouchbaseCluster` CRD. 
 The fields and defaults are shown below:
 
 [source,yaml]

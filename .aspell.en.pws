@@ -105,6 +105,7 @@ Elasticsearch
 Istio
 NGINX
 macOS
+Jetstack
 lifecycle
 GiB
 MiB
@@ -197,4 +198,5 @@ cbc
 runtime
 Kibana
 Fluentd
-CouchbaseCluster
+misconfiguration
+CA's
