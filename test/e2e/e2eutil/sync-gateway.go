@@ -3,6 +3,8 @@ package e2eutil
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
@@ -35,6 +37,21 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 		scheme = "couchbases"
 	}
 
+	query := url.Values{}
+
+	// We only ever test using DNS, either local or forwarded, so addresses should
+	// always be "default".  We explcitly state the network for consistency across
+	// all clients.  The only time this should be set to external is if SGW is
+	// provisioned in a different Kubernetes cluster to the Couchbase cluster, and
+	// only if we are using some form of DNAT e.g. LoadBalancer or NodePort networking.
+	query.Add("network", "default")
+
+	connstr := url.URL{
+		Scheme:   scheme,
+		Host:     fmt.Sprintf("%s-srv.%s", cluster.Name, cluster.Namespace),
+		RawQuery: query.Encode(),
+	}
+
 	username := k8s.DefaultSecret.Data[constants.SecretUsernameKey]
 	password := k8s.DefaultSecret.Data[constants.SecretPasswordKey]
 
@@ -44,7 +61,7 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 	}
 
 	databaseConfig := map[string]interface{}{
-		"server":   scheme + "://" + cluster.Name + "-srv." + cluster.Namespace,
+		"server":   connstr.String(),
 		"bucket":   bucket,
 		"username": string(username),
 		"password": string(password),

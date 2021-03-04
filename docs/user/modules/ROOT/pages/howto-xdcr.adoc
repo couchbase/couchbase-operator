@@ -73,7 +73,7 @@ spec:
     remoteClusters:
     - name: remote-cluster # <.>
       uuid: 611e50b21e333a56e3d6d3570309d7e3 # <.>
-      hostname: couchbases://my-remote-cluster.my-remote-namespace # <.>
+      hostname: couchbases://my-remote-cluster.my-remote-namespace?network=default # <.>
       authenticationSecret: my-xdcr-secret # <.>
       tls:
         secret: my-xdcr-tls-secret # <.>

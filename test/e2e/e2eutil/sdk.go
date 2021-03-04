@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -56,11 +57,33 @@ func createSDKJob(t *testing.T, local, remote *types.Cluster, cluster *couchbase
 		scheme = "couchbases"
 	}
 
-	connstr := fmt.Sprintf("%s://%s.%s", scheme, service, remote.Namespace)
+	query := url.Values{}
+
+	// Handle networks.  We want to default to the default network wherever
+	// possible as it is quicker.  The only time we want to use external addresses
+	// is when we are using exposed features, as this means there will be a DNAT
+	// due to a LoadBalancer or NodePort, and only if we aren't in the same cluster
+	// and thus cannot use local addressing.  Only use explicit network selection
+	// for "v3" SDKs that support GCCCP.
+	if !cccp {
+		network := "default"
+
+		if local != remote && cluster.Spec.HasExposedFeatures() {
+			network = "external"
+		}
+
+		query.Add("network", network)
+	}
+
+	connstr := url.URL{
+		Scheme:   scheme,
+		Host:     fmt.Sprintf("%s.%s", service, remote.Namespace),
+		RawQuery: query.Encode(),
+	}
 
 	// This is the expected interface for an SDK test.  TLS is optional.
 	args := []string{
-		fmt.Sprintf("-connection=%s", connstr),
+		fmt.Sprintf("-connection=%s", connstr.String()),
 		fmt.Sprintf("-username=%s", string(remote.DefaultSecret.Data["username"])),
 		fmt.Sprintf("-password=%s", string(remote.DefaultSecret.Data["password"])),
 		fmt.Sprintf("-bucket=%s", bucket.GetName()),

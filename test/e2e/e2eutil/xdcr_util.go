@@ -300,7 +300,7 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 	}
 
 	// Use an SRV lookup.
-	return uuid, fmt.Sprintf("%s://%s-srv.%s", scheme, cluster.Name, cluster.Namespace), nil
+	return uuid, fmt.Sprintf("%s://%s-srv.%s?network=default", scheme, cluster.Name, cluster.Namespace), nil
 }
 
 // EstablishXDCRReplicationGeneric creates a remote cluster in the source, and a replication from the source bucket to the destination

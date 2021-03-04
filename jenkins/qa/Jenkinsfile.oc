@@ -36,7 +36,7 @@ pipeline {
     string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-rhcc/operator-backup:6.6.0-100')
     string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-rhcc/exporter:1.0.3-103')
     string(name: 'exporter_image_upgrade', defaultValue: 'registry.gitlab.com/cb-rhcc/exporter:1.0.3-103')
-    string(name: 'mobile_image', defaultValue: 'registry.connect.redhat.com/couchbase/sync-gateway:2.8.0-1')
+    string(name: 'mobile_image', defaultValue: 'registry.connect.redhat.com/couchbase/sync-gateway:2.8.2-1')
     string(name: 'platform', defaultValue: 'openshift')
     string(name: 'openshift_version', defaultValue: '4.4')
     string(name: 'storage_class', defaultValue: 'gp2')

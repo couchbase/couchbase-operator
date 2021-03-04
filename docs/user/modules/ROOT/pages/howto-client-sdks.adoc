@@ -16,6 +16,36 @@ This how-to documents how to calculate the required connection string based on y
 While we discuss client SDKs, these configurations also apply to Couchbase Connectors and Couchbase Mobile.
 ====
 
+.Client Explicit Network Selection
+****
+Various Couchbase clients behave differently from one another in the way they perform automatic network selection when using alternate addressing, with some clients selecting the wrong network in certain circumstances.
+This inconsistent behavior is avoided by specifying a network selection flag in the connection string that is used by the client to connect to the Couchbase cluster.
+This is known as _explicit network selection_.
+
+The connection string examples throughout the Autonomous Operator documentation use explicit network selection to help avoid undesirable client behavior.
+Connection strings for internally-networked clients use `network=default`, while externally-networked clients use `network=external`.
+
+One important caveat is that explicit network selection is not supported by older Couchbase clients.
+If you happen to be using a client that doesn't support explicit network selection, make sure to remove the `network` query from any example connection string you copy from the documentation.
+
+.Clients Without Explicit Network Support
+[#table-non-explicit-clients,cols="1,2",options="header"]
+|===
+| Client | Version
+
+| Couchbase Server (XDCR)
+| < 6.6.0
+
+| Couchbase Sync Gateway
+| < 2.8.1
+
+| Couchbase SDKs
+| < 3.x (Java, .NET, C, Node.js, PHP, Python, Ruby)
+
+< 2.x (Go) 
+|===
+****
+
 == DNS Based Addressing
 
 DNS based addressing is the simplest form of connecting a client to a Couchbase cluster.
@@ -36,12 +66,12 @@ Due to domain search rules within Kubernetes you may use `$\{scheme}://$\{cluste
 Clients running outside of Kubernetes will have to use the fully-qualified domain name.
 Given our example cluster and namespace names:
 
-* To connect to the cluster using plain text, in the same namespace, use the connection string `couchbase://my-cluster-srv`.
-* To connect to the cluster using plain text, in the same or a different namespace, use the connection string `couchbase://my-cluster-srv.my-namespace`.
-* To connect to the cluster using plain text, from anywhere, use the connection string `couchbase://my-cluster-srv.my-namespace.svc.cluster.local`.
-* To connect to the cluster using TLS, in the same namespace, use the connection string `couchbases://my-cluster-srv`.
-* To connect to the cluster using TLS, in the same or a different namespace, use the connection string `couchbases://my-cluster-srv.my-namespace`.
-* To connect to the cluster using TLS, from anywhere, use the connection string `couchbases://my-cluster-srv.my-namespace.svc.cluster.local`.
+* To connect to the cluster using plain text, in the same namespace, use the connection string `couchbase://my-cluster-srv?network=default`.
+* To connect to the cluster using plain text, in the same or a different namespace, use the connection string `couchbase://my-cluster-srv.my-namespace?network=default``.
+* To connect to the cluster using plain text, from anywhere, use the connection string `couchbase://my-cluster-srv.my-namespace.svc.cluster.local?network=default``.
+* To connect to the cluster using TLS, in the same namespace, use the connection string `couchbases://my-cluster-srv?network=default``.
+* To connect to the cluster using TLS, in the same or a different namespace, use the connection string `couchbases://my-cluster-srv.my-namespace?network=default``.
+* To connect to the cluster using TLS, from anywhere, use the connection string `couchbases://my-cluster-srv.my-namespace.svc.cluster.local?network=default``.
 
 == DNS Based Addressing with External DNS
 
