@@ -83,6 +83,11 @@ A whole cluster "immediate" upgrade is now synonymous with a rolling upgrade set
 Immediate upgrades may be removed at some point in the future as it duplicates functionality.
 ====
 
+==== Other Notable Changes
+
+* The dynamic admission controller (DAC) now allows xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-volumeMounts-index[couchbaseclusters.spec.servers.volumeMounts.index] to be configured for server classes that include the Search Service and that don't include the Index Service.
+Previously, the DAC would reject configurations that specified the index volume mount unless the Index Service was also included in the server class.
+
 == Feedback
 
 You can have a big impact on future versions of the Operator (and its documentation) by providing Couchbase with your direct feedback and observations. Please feel free to post your questions and comments to the https://forums.couchbase.com/c/couchbase-server/Kubernetes[Couchbase Forums].

@@ -396,6 +396,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			} else if couchbasev2.ServiceList(class.Services).ContainsAny(couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.AnalyticsService) && class.VolumeMounts.DefaultClaim == "" {
 				// These stateful services must have a "default" mount
 				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
+				// Note that we don't test for search here but we do allow the Index mount to be used for it later though for performance reasons.
 			}
 		}
 	}
@@ -428,8 +429,8 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.data requires the data service to be enabled", index))
 			}
 
-			if mounts.IndexClaim != "" && !couchbasev2.ServiceList(config.Services).Contains(couchbasev2.IndexService) {
-				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.index requires the index service to be enabled", index))
+			if mounts.IndexClaim != "" && !couchbasev2.ServiceList(config.Services).ContainsAny(couchbasev2.IndexService, couchbasev2.SearchService) {
+				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.index requires the index or search service to be enabled", index))
 			}
 
 			if mounts.AnalyticsClaims != nil && !couchbasev2.ServiceList(config.Services).Contains(couchbasev2.AnalyticsService) {

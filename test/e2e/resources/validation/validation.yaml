@@ -303,6 +303,7 @@ spec:
         - data
         - index
         - analytics
+        - search
       volumeMounts:
         default: couchbase
         data: couchbase

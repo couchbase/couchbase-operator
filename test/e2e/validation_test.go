@@ -848,9 +848,14 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 		},
 		{
 			name:           "TestValidateServerServiceRequiredForVolumeMountIndex",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/1")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/3").Remove("/spec/servers/1/services/1")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers[1].volumeMounts.index`},
+		},
+		{
+			name:       "TestValidateServerServiceRequiredForVolumeMountIndexSearchOnly",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/1")},
+			shouldFail: false,
 		},
 		{
 			name:           "TestValidateServerServiceRequiredForVolumeMountAnalytics",

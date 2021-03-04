@@ -1972,11 +1972,12 @@ This field references a volume claim template name as defined in "spec.volumeCla
 
 ==== Description
 
-IndexClaim s a persistent volume that encompasses index storage associated with the index service.
-The index claim can only be used on server classes running the index service, and must be used in conjunction with the default claim.
-This field allows the index service to use different storage media (e.g.
+IndexClaim s a persistent volume that encompasses index storage associated with the index and search services.
+The index claim can only be used on server classes running the index or search services, and must be used in conjunction with the default claim.
+This field allows the index and/or search service to use different storage media (e.g.
 SSD) to improve performance of this service.
 This field references a volume claim template name as defined in "spec.volumeClaimTemplates".
+Whilst this references index primarily, note that the full text search (FTS) service also uses this same mount.
 
 === couchbaseclusters.spec.servers.volumeMounts.logs
 
@@ -1987,9 +1988,11 @@ This field references a volume claim template name as defined in "spec.volumeCla
 ==== Description
 
 LogsClaim is a persistent volume that encompasses only Couchbase server logs to aid with supporting the product.
-The logs claim can only be used on server classes running stateless services: query, search & eventing.
+The logs claim can only be used on server classes running the following services: query, search & eventing.
 The logs claim cannot be used at the same time as the default claim within the same server class.
 This field references a volume claim template name as defined in "spec.volumeClaimTemplates".
+Whilst the logs claim can be used with the search service, the recommendation is to use the default claim for these.
+The reason for this is that a failure of these nodes will require indexes to be rebuilt and subsequent performance impact.
 
 === couchbaseclusters.spec.softwareUpdateNotifications
 
