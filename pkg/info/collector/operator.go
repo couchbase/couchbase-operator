@@ -108,11 +108,6 @@ func (r *operatorCollector) Fetch(resource resource.Reference) error {
 		return fmt.Errorf("pod %s for resource %s/%s contains no containers", pod.Name, resource.Kind(), resource.Name())
 	}
 
-	// Filter out anything that isn't the operator rather than being very intrusive
-	if pod.Spec.Containers[0].Image != r.context.Config.OperatorImage {
-		return nil
-	}
-
 	// Collect pprof data.  Technically these are available via /debug/pprof but that returns
 	// HTML, which we aren't touching without some sane Xpath support.
 	err = r.collectHTTP(pod, r.context.Config.OperatorRestPort, map[string]string{

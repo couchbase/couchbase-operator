@@ -459,7 +459,7 @@ func verifyLogCollectListJSON(k8s *types.Cluster, cbClusterName, collectInfoList
 }
 
 // mustGetFileList lists all resources that should be collected by cbopinfo.
-func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string, all, pprof, metrics bool, clusters ...string) []string {
+func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, operatorImage string, all, pprof, metrics bool, clusters ...string) []string {
 	// The base file path will have a top level directory named the same as the archive.
 	base := strings.TrimSuffix(filepath.Base(archive), ".tar.gz")
 
@@ -597,7 +597,8 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 		files = append(files, fmt.Sprintf("%s/namespace/%s/serviceaccount/%s/%s.yaml", base, namespace, serviceaccount.Name, serviceaccount.Name))
 	}
 
-	// Deployments are special, we only collect them if the image matches the operator image.
+	// Deployments are special, we only collect them if the image matches the operator image,
+	// or look suitably like and operator...
 	// It also has a collector that will pull out pprof and metrics if they are reachable.
 	deployments, err := k8s.KubeClient.AppsV1().Deployments(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
@@ -605,7 +606,20 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive string
 	}
 
 	for _, deployment := range deployments.Items {
-		operator := deployment.Spec.Template.Spec.Containers[0].Image == framework.Global.OpImage
+		operator := func() bool {
+			for _, container := range deployment.Spec.Template.Spec.Containers {
+				if container.Image == operatorImage {
+					return true
+				}
+			}
+
+			if strings.Contains(deployment.Name, "couchbase") && strings.Contains(deployment.Name, "operator") && !strings.Contains(deployment.Name, "admission") {
+				return true
+			}
+
+			return false
+		}()
+
 		if !operator && !all {
 			continue
 		}
@@ -1036,7 +1050,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true, cluster1.Name)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, false, true, true, cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1051,7 +1065,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true, cluster1.Name, cluster3.Name)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, false, true, true, cluster1.Name, cluster3.Name)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1062,7 +1076,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, commonArgs)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, false, true, true)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1077,8 +1091,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true, cluster2.Name)
-		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, true, true, true)...)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, false, true, true, cluster2.Name)
+		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, framework.Global.OpImage, true, true, true)...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1094,8 +1108,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true, cluster1.Name, cluster3.Name)
-		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, true, true, true)...)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, false, true, true, cluster1.Name, cluster3.Name)
+		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, framework.Global.OpImage, true, true, true)...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1109,8 +1123,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true)
-		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, true, true, true)...)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, false, true, true)
+		files = append(files, mustGetFileList(t, targetKube, "kube-system", archive, framework.Global.OpImage, true, true, true)...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1126,7 +1140,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true, cluster1.Name)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, false, true, true, cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
 		mustVerifyServerLogs(t, targetKube, archive, false, cluster1.Name)
 	})
@@ -1141,7 +1155,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, true, true, true)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, true, true, true)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 }
@@ -1306,7 +1320,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	archive, cleanCbopinfo := cbopinfo(t, args)
 	defer cleanCbopinfo()
 
-	files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, true, true, true)
+	files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, operatorImage, true, true, true)
 	mustVerifyArchiveContents(t, archive, files)
 	mustVerifyServerLogs(t, targetKube, archive, false)
 }
@@ -1380,16 +1394,8 @@ func TestLogCollectInvalid(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		filtered := []string{}
-
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, true, true)
-		for _, file := range files {
-			if !strings.Contains(file, "/deployment/") {
-				filtered = append(filtered, file)
-			}
-		}
-
-		mustVerifyArchiveContents(t, archive, filtered)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, invalidImgName, false, true, true)
+		mustVerifyArchiveContents(t, archive, files)
 	})
 
 	// Collect logs with invalid operator-rest-port
@@ -1405,7 +1411,7 @@ func TestLogCollectInvalid(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, false, false, true)
+		files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, false, false, true)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 }
@@ -1438,7 +1444,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	defer cleanCbopinfo()
 
 	// Verify file list
-	files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, true, true, true)
+	files := mustGetFileList(t, targetKube, targetKube.Namespace, archive, framework.Global.OpImage, true, true, true)
 	mustVerifyArchiveContents(t, archive, files)
 	mustVerifyServerLogs(t, targetKube, archive, false)
 }
