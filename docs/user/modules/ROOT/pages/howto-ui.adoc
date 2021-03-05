@@ -70,7 +70,7 @@ When using public networking the Couchbase administrative service is exposed as 
 This same service provides access to the UI.
 
 The connection string is determined by the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-dns-domain[`couchbaseclusters.spec.networking.dns.domain`] cluster parameter.
-The connection string is in the form `\https://console.$\{dns-domain}`.
+The connection string is in the form `\https://console._<dns-domain>_`.
 Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS use the connection string `\https://console.my-cluster.acme.org:18091`.
 
 == Configuring an Ingress

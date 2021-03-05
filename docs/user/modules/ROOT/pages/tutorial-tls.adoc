@@ -39,37 +39,41 @@ $ ./easyrsa build-ca
 == Creating a Couchbase Cluster Server Certificate
 
 You need to create a server wildcard certificate and key to be used on Couchbase Server pods.
-The Operator will access pods using Kubernetes endpoint records e.g. `\https://cb-example-0000.cb-example.default.svc`.
-Clients will access the cluster using Kubernetes service discovery records e.g. `couchbases://cb-example.default`.
+The Operator will access pods using Kubernetes endpoint records, e.g. `\https://cb-example-0000.cb-example.default.svc`.
+Clients will access the cluster using Kubernetes service discovery records, e.g. `couchbases://cb-example.default`.
 UI access will be with port-forwarding using `localhost`.
 
-In general, the required set of DNS subject alternative names (SANs) is:
+The following list contains the required set of DNS subject alternative names (SANs) that you will need to include in the Couchbase cluster certificate.
+The Operator dynamic admission controller enforces the presence of all of these SANs.
 
-* `DNS:*.$\{cluster}`
-* `DNS:*.$\{cluster}.$\{namespace}`
-* `DNS:*.$\{cluster}.$\{namespace}.svc`
-* `DNS:*.$\{cluster}.$\{namespace}.svc.cluster.local`
-* `DNS:$\{cluster}-srv`
-* `DNS:$\{cluster}-srv.$\{namespace}`
-* `DNS:$\{cluster}-srv.$\{namespace}.svc`
-* `DNS:*.$\{cluster}-srv.$\{namespace}.svc.cluster.local`
-* `DNS:localhost`
+.Required SANs
+[source#required-sans,console]
+----
+DNS:*.<cluster>
+DNS:*.<cluster>.<namespace>
+DNS:*.<cluster>.<namespace>.svc
+DNS:*.<cluster>.<namespace>.svc.cluster.local
+DNS:<cluster>.-srv
+DNS:<cluster>-srv.<namespace>
+DNS:<cluster>-srv.<namespace>.svc
+DNS:*.<cluster>-srv.<namespace>.svc.cluster.local
+DNS:localhost
+#DNS:*.<couchbaseclusters.spec.networking.dns.domain> // <.>
+----
 
+<.> If you plan to configure xref:tutorial-public-addressability.adoc[public networking] for the cluster, then you must add the wildcard SAN `DNS:*._<xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-dns-domain[couchbaseclusters.spec.networking.dns.domain]>_` to handle all of the public DNS names for the cluster.
+This will commonly be a subdomain of your public DNS domain, e.g. `*.subdomain.dns-domain.com`.
+
+.Search Domains
 [NOTE]
 ====
-This set of SANs depends on search domains configured for your stub resolver.
-By default Kubernetes will do this for you.
-
-If you use the xref:concept-couchbase-networking.adoc#inter-kubernetes-networking-with-forwarded-dns[inter-Kubernetes networking with forwarded DNS] networking model for connecting your clients, then you will need to configure this yourself.
+SANs depend on search domains being configured for your stub resolver.
+By default, Kubernetes will do this for you.
+However, if you use the xref:concept-couchbase-networking.adoc#inter-kubernetes-networking-with-forwarded-dns[inter-Kubernetes networking with forwarded DNS] networking model for connecting your clients, then you will need to configure this yourself.
 
 For example, the FQDN for a Couchbase pod would be similar to `cb-0000.cb.default.svc.cluster.local`, however a client will communicate with `cb-0000.cb.default.svc`.
 In order for a client to match the `*.cb.default.svc` SAN, and resolve the pod address, a search domain would need to be configured for `cluster.local`.
 Likewise, if your clients used the short form hostname `cb-0000.cb`, a search domain would need to configured for `default.svc.cluster.local`.
-====
-
-[IMPORTANT]
-====
-The Operator dynamic admission controller enforces the presence of all of these SANs, and they must be present.
 ====
 
 To generate a certificate for the cluster `cb-example` in the `default` namespace:
@@ -109,7 +113,7 @@ This section is only relevant if you wish to manually deploy the dynamic admissi
 Most users should use `cbopcfg` to automatically install the DAC.
 
 To create a server certificate that can be used by the dynamic admission controller, simply specify the service name that the Kubernetes API webhooks will connect to.
-This is in the form `$\{service}.$\{namespace}.svc`, so if our service is called `couchbase-operator-admission` and we were deploying it in the `operator-admission` namespace, run the following:
+This is in the form `_<service>_._<namespace>_.svc`, so if our service is called `couchbase-operator-admission` and we were deploying it in the `operator-admission` namespace, run the following:
 
 [source,console]
 ----
