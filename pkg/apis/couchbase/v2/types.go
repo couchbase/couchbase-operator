@@ -187,6 +187,11 @@ type CouchbaseBackupSpec struct {
 
 	// Name of S3 bucket to backup to. If non-empty this overrides local backup.
 	S3Bucket string `json:"s3bucket,omitempty"`
+
+	// How many threads to use during the backup.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	Threads int `json:"threads,omitempty"`
 }
 
 type CouchbaseBackupAutoScaling struct {
@@ -345,6 +350,83 @@ type CouchbaseBackupRestoreSpec struct {
 
 	// Name of S3 bucket to restore from. If non-empty this overrides local backup.
 	S3Bucket string `json:"s3bucket,omitempty"`
+
+	// Specific buckets can be explicitly included or excluded in the restore,
+	// as well as bucket mappings.
+	// +kubebuilder:default="x-couchbase-object"
+	Buckets *CouchbaseBackupRestoreBuckets `json:"buckets,omitempty"`
+
+	// This list accepts a certain set of parameters that will disable that data and prevent it being restored.
+	// +kubebuilder:default="x-couchbase-object"
+	Services CouchbaseBackupRestoreServices `json:"services,omitempty"`
+
+	// How many threads to use during the restore.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	Threads int `json:"threads,omitempty"`
+}
+
+// Specify which buckets to include and exclude in the restore.
+// If empty we default to restoring all buckets with a 1-1 exact name mapping.
+type CouchbaseBackupRestoreBuckets struct {
+
+	// Restore the buckets in the following list of strings.
+	Include []string `json:"include,omitempty"`
+
+	// Exclude the buckets in the following list of strings
+	Exclude []string `json:"exclude,omitempty"`
+
+	// Maps a backup bucket to a destination bucket that has a different name than
+	// the bucket that was originally backed up.
+	// This parameter takes a list of mappings since multiple buckets may be restored at the same time.
+	// Each bucket mapping is separated by an "="
+	// If we have two buckets, bucket-1 and bucket-2, and we want to restore them to renamed-1 and renamed-2 then we
+	// would denote the mapping as "bucket-1=renamed-1,bucket-2=renamed-2".
+	// This option will only restore data to the Data service and will not restore the metadata for any other service.
+	// +listType=map
+	// +listMapKey=source
+	BucketMap []BucketMapping `json:"bucketMap,omitempty"`
+}
+
+type BucketMapping struct {
+	// Source is the source bucket name in the backup.
+	Source string `json:"source"`
+
+	// Destination is the destination bucket name in the Couchbase cluster.
+	Destination string `json:"destination"`
+}
+
+type CouchbaseBackupRestoreServices struct {
+	// BucketConfig maps to cbbackupmgr option --enable-bucket-config.
+	BucketConfig bool `json:"bucketConfig,omitempty"`
+
+	// View maps to cbbackupmgr option --disable-views.
+	// +kubebuilder:default=true
+	Views *bool `json:"views,omitempty"`
+
+	// GSIIndex maps to cbbackupmgr option --disable-gsi-indexes.
+	// +kubebuilder:default=true
+	GSIIndex *bool `json:"gsiIndex,omitempty"`
+
+	// FTIndex maps to cbbackupmgr option --disable-ft-indexes.
+	// +kubebuilder:default=true
+	FTIndex *bool `json:"ftIndex,omitempty"`
+
+	// FTAlias maps to cbbackupmgr option --disable-ft-alias.
+	// +kubebuilder:default=true
+	FTAlias *bool `json:"ftAlias,omitempty"`
+
+	// Data maps to cbbackupmgr option --disable-data.
+	// +kubebuilder:default=true
+	Data *bool `json:"data,omitempty"`
+
+	// Analytics maps to cbbackupmgr option --disable-analytics.
+	// +kubebuilder:default=true
+	Analytics *bool `json:"analytics,omitempty"`
+
+	// Eventing maps to cbbackupmgr option --disable-eventing.
+	// +kubebuilder:default=true
+	Eventing *bool `json:"eventing,omitempty"`
 }
 
 // struct we use in CouchbaseBackupRestoreSpec to enforce type-safeness

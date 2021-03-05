@@ -102,6 +102,19 @@ When not specified, volumes can grow indefinitely.
 
 In order to use any resize capability, your backups must be using a storage class where volume expansion is enabled.
 
+==== Improved Backup and Restore
+
+By default, both of these operations would execute with only a single thread of execution.
+This led to poor performance.
+You can now specify the number of threads to use.
+This will typically be dictated by the CPU resource allocated to the backup job.
+
+Restores were also inflexible, all data that was backed up, was also restored.
+This release introduces filters, so that you can control exactly what is restored from a backup.
+You can choose to include or exclude specific buckets, restore data for a particular service, and even restore to a different bucket name when restoring documents.
+
+This release requires you to upgrade your backup image to at least `couchbase/operator-backup:6.6.0-XXX`.
+
 ==== Other Notable Changes
 
 * The dynamic admission controller (DAC) now allows xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-volumeMounts-index[couchbaseclusters.spec.servers.volumeMounts.index] to be configured for server classes that include the Search Service and that don't include the Index Service.

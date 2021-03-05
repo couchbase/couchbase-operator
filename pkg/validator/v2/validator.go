@@ -175,18 +175,6 @@ func ApplyGroupDefaults(v *types.Validator, object *unstructured.Unstructured) j
 	return patch
 }
 
-func ApplyBackupRestoreDefaults(object *unstructured.Unstructured) jsonpatch.PatchList {
-	var patch jsonpatch.PatchList
-
-	if start, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "start"); found {
-		if _, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "end"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/end", Value: start})
-		}
-	}
-
-	return patch
-}
-
 func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseCluster) error {
 	errs := []error{}
 
@@ -893,6 +881,28 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 			if start.Int != nil && end.Int != nil {
 				if *start.Int > *end.Int {
 					errs = append(errs, fmt.Errorf("start integer cannot be larger than end integer"))
+				}
+			}
+		}
+	}
+
+	if len(restore.Spec.Buckets.Exclude) != 0 {
+	outer:
+		for _, b := range restore.Spec.Buckets.Exclude {
+			if len(restore.Spec.Buckets.Include) != 0 {
+				for _, b1 := range restore.Spec.Buckets.Include {
+					if strings.TrimSpace(b1) == strings.TrimSpace(b) {
+						errs = append(errs, fmt.Errorf("bucket to be excluded cannot also be in bucket include list"))
+						break outer
+					}
+				}
+			}
+			if len(restore.Spec.Buckets.BucketMap) != 0 {
+				for _, m := range restore.Spec.Buckets.BucketMap {
+					if strings.TrimSpace(m.Source) == strings.TrimSpace(b) {
+						errs = append(errs, fmt.Errorf("bucket to be excluded cannot also be in a source field of the bucketMap"))
+						break outer
+					}
 				}
 			}
 		}

@@ -72,6 +72,75 @@ Number of times the restore job should try to execute.
 
 The backup resource name associated with this restore, or the backup PVC we want to restore from.
 
+=== couchbasebackuprestores.spec.buckets
+
+==== Constraints
+
+*Type*: `object`
+
+*Default*: `{}`
+
+==== Description
+
+Specific buckets can be explicitly included or excluded in the restore, as well as bucket mappings.
+
+=== couchbasebackuprestores.spec.buckets.bucketMap
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Maps a backup bucket to a destination bucket that has a different name than the bucket that was originally backed up.
+This parameter takes a list of mappings since multiple buckets may be restored at the same time.
+Each bucket mapping is separated by an "=" If we have two buckets, bucket-1 and bucket-2, and we want to restore them to renamed-1 and renamed-2 then we would denote the mapping as "bucket-1=renamed-1,bucket-2=renamed-2".
+This option will only restore data to the Data service and will not restore the metadata for any other service.
+
+=== couchbasebackuprestores.spec.buckets.bucketMap.destination
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Destination is the destination bucket name in the Couchbase cluster.
+
+=== couchbasebackuprestores.spec.buckets.bucketMap.source
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Source is the source bucket name in the backup.
+
+=== couchbasebackuprestores.spec.buckets.exclude
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Exclude the buckets in the following list of strings.
+
+=== couchbasebackuprestores.spec.buckets.include
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Restore the buckets in the following list of strings.
+
 === couchbasebackuprestores.spec.end
 
 ==== Constraints
@@ -138,6 +207,112 @@ Repo is the backup folder to restore from.
 Name of S3 bucket to restore from.
 If non-empty this overrides local backup.
 
+=== couchbasebackuprestores.spec.services
+
+==== Constraints
+
+*Type*: `object`
+
+*Default*: `{}`
+
+==== Description
+
+This list accepts a certain set of parameters that will disable that data and prevent it being restored.
+
+=== couchbasebackuprestores.spec.services.analytics
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+Analytics maps to cbbackupmgr option --disable-analytics.
+
+=== couchbasebackuprestores.spec.services.bucketConfig
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+BucketConfig maps to cbbackupmgr option --enable-bucket-config.
+
+=== couchbasebackuprestores.spec.services.data
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+Data maps to cbbackupmgr option --disable-data.
+
+=== couchbasebackuprestores.spec.services.eventing
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+Eventing maps to cbbackupmgr option --disable-eventing.
+
+=== couchbasebackuprestores.spec.services.ftAlias
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+FTAlias maps to cbbackupmgr option --disable-ft-alias.
+
+=== couchbasebackuprestores.spec.services.ftIndex
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+FTIndex maps to cbbackupmgr option --disable-ft-indexes.
+
+=== couchbasebackuprestores.spec.services.gsiIndex
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+GSIIndex maps to cbbackupmgr option --disable-gsi-indexes.
+
+=== couchbasebackuprestores.spec.services.views
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+View maps to cbbackupmgr option --disable-views.
+
 === couchbasebackuprestores.spec.start
 
 ==== Constraints
@@ -171,6 +346,20 @@ Int references a relative backup by index.
 ==== Description
 
 Str references an absolute backup by name.
+
+=== couchbasebackuprestores.spec.threads
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `1`
+
+*Minimum*: `1`
+
+==== Description
+
+How many threads to use during the restore.
 
 == couchbasebackuprestores.status
 

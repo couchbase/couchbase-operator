@@ -242,6 +242,11 @@ func (c *Cluster) generateBackupContainer(containerName string, spec couchbasev2
 		c.cluster.Name,
 	}
 
+	// Old resources won't have this set until written.
+	if spec.Threads != 0 {
+		command = append(command, "--threads", strconv.Itoa(spec.Threads))
+	}
+
 	container := corev1.Container{
 		Name:  containerName,
 		Image: c.cluster.Spec.BackupImage(),
@@ -279,18 +284,20 @@ func (c *Cluster) generateBackupContainer(containerName string, spec couchbasev2
 func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore) (*batchv1.Job, error) {
 	var start string
 
-	var end string
-
 	if restore.Spec.Start.Int != nil {
 		start = strconv.Itoa(*restore.Spec.Start.Int)
 	} else {
 		start = *restore.Spec.Start.Str
 	}
 
-	if restore.Spec.End.Int != nil {
-		end = strconv.Itoa(*restore.Spec.End.Int)
-	} else {
-		end = *restore.Spec.End.Str
+	end := start
+
+	if restore.Spec.End != nil {
+		if restore.Spec.End.Int != nil {
+			end = strconv.Itoa(*restore.Spec.End.Int)
+		} else {
+			end = *restore.Spec.End.Str
+		}
 	}
 
 	restorejob := &batchv1.Job{
@@ -375,6 +382,64 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 		"--start", start, "--end", end,
 		"--log-ret", fmt.Sprintf("%.2f", spec.LogRetention.Hours()),
 		c.cluster.Name,
+	}
+
+	// Old resources won't have this set until written.
+	if spec.Threads != 0 {
+		command = append(command, "--threads", strconv.Itoa(spec.Threads))
+	}
+
+	// check if any bucket config has been defined
+	if spec.Buckets != nil {
+		if len(spec.Buckets.Include) != 0 {
+			command = append(command, "--include-buckets", strings.Join(spec.Buckets.Include, ","))
+		}
+
+		if len(spec.Buckets.Exclude) != 0 {
+			command = append(command, "--exclude-buckets", strings.Join(spec.Buckets.Exclude, ","))
+		}
+
+		if len(spec.Buckets.BucketMap) != 0 {
+			var buckets []string
+
+			for _, m := range spec.Buckets.BucketMap {
+				buckets = append(buckets, m.Source+"="+m.Destination)
+			}
+
+			command = append(command, "--map-buckets", strings.Join(buckets, ","))
+		}
+	}
+
+	if spec.Services.BucketConfig {
+		command = append(command, "--enable-bucket-config")
+	}
+
+	if !*spec.Services.Views {
+		command = append(command, "--disable-views")
+	}
+
+	if !*spec.Services.GSIIndex {
+		command = append(command, "--disable-gsi-indexes")
+	}
+
+	if !*spec.Services.FTIndex {
+		command = append(command, "--disable-ft-indexes")
+	}
+
+	if !*spec.Services.FTAlias {
+		command = append(command, "--disable-ft-alias")
+	}
+
+	if !*spec.Services.Data {
+		command = append(command, "--disable-data")
+	}
+
+	if !*spec.Services.Analytics {
+		command = append(command, "--disable-analytics")
+	}
+
+	if !*spec.Services.Eventing {
+		command = append(command, "--disable-eventing")
 	}
 
 	container := corev1.Container{

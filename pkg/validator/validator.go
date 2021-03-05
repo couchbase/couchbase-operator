@@ -21,8 +21,6 @@ func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpa
 		switch object.GetKind() {
 		case couchbasev2.ClusterCRDResourceKind:
 			return validationv2.ApplyDefaults(v, object)
-		case couchbasev2.BackupRestoreCRDResourceKind:
-			return validationv2.ApplyBackupRestoreDefaults(object)
 		case couchbasev2.GroupCRDResourceKind:
 			return validationv2.ApplyGroupDefaults(v, object)
 		}

@@ -585,6 +585,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	skipBackup(t, s3)
 
 	fullFreq := 2
+	targetBucketName := "bucketty-mcbuccketface"
 
 	// Create a normal cluster.
 	clusterSize := constants.Size3
@@ -628,6 +629,15 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 			Start: &v2.StrOrInt{
 				Str: &latest,
 			},
+			Threads: 4,
+			Buckets: &v2.CouchbaseBackupRestoreBuckets{
+				BucketMap: []v2.BucketMapping{
+					{
+						Source:      bucket.GetName(),
+						Destination: targetBucketName,
+					},
+				},
+			},
 		},
 	}
 
@@ -641,6 +651,10 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+
+	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket.SetName(targetBucketName)
+
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 5*time.Minute)
 
@@ -648,7 +662,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	e2eutil.MustNewBackupRestore(t, targetKube, restore)
 
 	// restore job is too fast, just validate bucket item count
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, targetBucketName, numOfDocs, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
