@@ -7,25 +7,19 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"strconv"
 
 	"github.com/couchbase/couchbase-operator/pkg/apis"
 	"github.com/couchbase/couchbase-operator/pkg/chaos"
 	"github.com/couchbase/couchbase-operator/pkg/controller"
+	"github.com/couchbase/couchbase-operator/pkg/logging"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
-	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
 	"github.com/spf13/pflag"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	zapf "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -41,59 +35,11 @@ var (
 	metricsPort int32 = 8383
 )
 
-// This is done for us by controller runtime v0.8.0, however the changes to
-// the v0.18.0 client libraries are quite large, so do it manually for now.
-type logLevel struct {
-	level zapcore.Level
-}
-
-func (l *logLevel) Type() string {
-	return "logLevel"
-}
-
-func (l *logLevel) String() string {
-	return l.level.String()
-}
-
-func (l *logLevel) Set(s string) error {
-	switch s {
-	case "debug":
-		l.level = zapcore.DebugLevel
-	case "info":
-		l.level = zapcore.InfoLevel
-	case "error":
-		l.level = zapcore.ErrorLevel
-	default:
-		i, err := strconv.Atoi(s)
-		if err != nil {
-			return err
-		}
-
-		l.level = zapcore.Level(-i)
-	}
-
-	return nil
-}
-
-// newLogger creates a zap logger.
-func newLogger(l zapcore.Level) logr.Logger {
-	encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
-
-	level := zap.NewAtomicLevelAt(l)
-
-	stacktraceLevel := zap.NewAtomicLevelAt(zap.ErrorLevel)
-
-	// Note that we don't use the controller-runtime version, that adds a
-	// sampler by default that causes a panic when we use debug levels lower
-	// than -1 (e.g. log.V(1))
-	return zapr.NewLogger(zap.New(zapcore.NewCore(&zapf.KubeAwareEncoder{Encoder: encoder}, os.Stderr, level)).WithOptions(zap.AddStacktrace(stacktraceLevel)))
-}
-
 var log = logf.Log.WithName("main")
 
 // create controller from initialised config.
 func main() {
-	var level logLevel
+	var level logging.LogLevel
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
@@ -105,7 +51,7 @@ func main() {
 	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
 	pflag.Parse()
 
-	logf.SetLogger(newLogger(level.level))
+	logf.SetLogger(logging.New(level.Level))
 
 	// Some 3rd party libraries try to write to a file on error, which it cannot do
 	// when using scratch containers, so route those errors to standard error.  Not

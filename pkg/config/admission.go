@@ -55,14 +55,14 @@ type generateAdmissionOptions struct {
 	defaultFileSystemGroup bool
 
 	// logLevel allows the setting of the logging level.
-	logLevel admissionLogLevelVar
+	logLevel zapLogLevelVar
 }
 
 // getGenerateAdmissionCommand creates YAML capable of creating the dynamic admission controller.
 func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &generateAdmissionOptions{
 		scope:    newScopeVar(scopeCluster),
-		logLevel: newAdmissionLogLevelVar(admissionDefaultLogLevel),
+		logLevel: newZapLogLevelVar(admissionDefaultLogLevel),
 	}
 
 	cmd := &cobra.Command{
@@ -119,7 +119,7 @@ func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Co
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
 	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
-	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls.")
+	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information.")
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
 	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
@@ -132,7 +132,7 @@ func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Co
 func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &generateAdmissionOptions{
 		scope:    newScopeVar(scopeCluster),
-		logLevel: newAdmissionLogLevelVar(admissionDefaultLogLevel),
+		logLevel: newZapLogLevelVar(admissionDefaultLogLevel),
 	}
 
 	cmd := &cobra.Command{
@@ -189,7 +189,7 @@ func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
 	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
-	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls.")
+	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information.")
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
 	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
@@ -480,9 +480,7 @@ func GetAdmissionDeployment(image string, imagePullSecrets []string, validateSec
 								"couchbase-operator-admission",
 							},
 							Args: []string{
-								"-logtostderr",
-								"-stderrthreshold=" + logLevel,
-								"-v=" + logLevel,
+								"-zap-level=" + logLevel,
 								"-tls-cert-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-cert-file",
 								"-tls-private-key-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-private-key-file",
 								"-validate-secrets=" + strconv.FormatBool(validateSecrets),

@@ -105,6 +105,11 @@ When using the `namespace` scope, then the dynamic admission controller will be 
 This limits the ability of the admission controller for security reasons, while maintaining full functionality.
 When deployed with the `namespace` scope, you must also specify the `--namepsace-selector` option.
 
+--log-level <string>::
+If specified, this will override the default log level `info`.
+Level `info`/`0` is for basic logging.
+Level `debug`/`1` is for extended logging.
+
 --namespace-selector <string>::
 If specified, this configures admission webhooks to select a DAC instance in a specific namespace.
 This flag is required when `--cluster` is not set and `--no-admission` is not set e.g. you are creating a namespaced DAC.

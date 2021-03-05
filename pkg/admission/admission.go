@@ -5,15 +5,16 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
-
 	"github.com/couchbase/couchbase-operator/pkg/apis"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/logging"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
@@ -28,7 +29,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var log = logf.Log.WithName("main")
 
 var (
 	// scheme contains versioned resource types.
@@ -54,12 +58,14 @@ func addToScheme(scheme *runtime.Scheme) error {
 func getClient() kubernetes.Interface {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		glog.Fatal(err)
+		log.Error(err, "Kubernetes configuration load failed")
+		os.Exit(1)
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatal(err)
+		log.Error(err, "Kubernetes client failed")
+		os.Exit(1)
 	}
 
 	return clientset
@@ -69,12 +75,14 @@ func getClient() kubernetes.Interface {
 func getCouchbaseClient() versioned.Interface {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		glog.Fatal(err)
+		log.Error(err, "Kubernetes configuration failed")
+		os.Exit(1)
 	}
 
 	clientset, err := versioned.NewForConfig(config)
 	if err != nil {
-		glog.Fatal(err)
+		log.Error(err, "Kubernetes couchbase client failed")
+		os.Exit(1)
 	}
 
 	return clientset
@@ -84,7 +92,8 @@ func getCouchbaseClient() versioned.Interface {
 func configTLS(config *Config) *tls.Config {
 	cert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 	if err != nil {
-		glog.Fatal(err)
+		log.Error(err, "TLS load failed")
+		os.Exit(1)
 	}
 
 	return &tls.Config{
@@ -111,6 +120,9 @@ type Config struct {
 
 	// DefaultFileSystemGroup allows opt-in to fs group defaulting.
 	DefaultFileSystemGroup bool
+
+	// level is the log level.
+	Level logging.LogLevel
 }
 
 // addFlags parses command line parameters and adds them to a Config object.
@@ -128,6 +140,8 @@ func (c *Config) AddFlags() {
 		"Validate referenced storage classes")
 	flag.BoolVar(&c.DefaultFileSystemGroup, "default-file-system-group", true, ""+
 		"Default file system group information")
+	flag.Var(&c.Level, "zap-level", ""+
+		"The log level ('info', 'error', 'debug' or an integer >= 0)")
 }
 
 // errorResponse takes an error and creates an admission response.
@@ -167,17 +181,23 @@ func decodeObject(ar admissionv1.AdmissionReview, raw runtime.RawExtension) (run
 // couchbaseClustersValidate validates a CouchbaseCluster object will work with the
 // operator.  This is for things which cannot be achieved with JSON schema v3 only.
 func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
-	glog.Infof("Validating resource: %v %v %v/%v",
-		ar.Request.Operation,
-		ar.Request.Kind,
-		ar.Request.Namespace,
-		ar.Request.Name)
-	glog.V(1).Infof("Validating resource: %s", string(ar.Request.Object.Raw))
+	fields := []interface{}{
+		"operation", ar.Request.Operation,
+		"kind", ar.Request.Kind,
+		"namespace", ar.Request.Namespace,
+		"name", ar.Request.Name,
+	}
+
+	if log.V(1).Enabled() {
+		fields = append(fields, "resource", ar.Request.Object)
+	}
+
+	log.Info("Validating resource", fields...)
 
 	// Decode the CouchbaseCluster object
 	couchbaseCluster, err := decodeObject(ar, ar.Request.Object)
 	if err != nil {
-		glog.Error(err)
+		log.Error(err, "Resource decode failed")
 		return errorResponse(err)
 	}
 
@@ -191,13 +211,13 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 		// Ignore errors here as we could be upgrading from v1 to v2.  In this scenario
 		// all CRDs served by the API will appear as v2 regardless of what's actually
 		// on disk.
-		glog.V(1).Infof("Previous resource: %s", string(ar.Request.OldObject.Raw))
+		log.V(1).Info("Previous resource", "resource", ar.Request.OldObject)
 
 		existingCouchbaseCluser, err := decodeObject(ar, ar.Request.OldObject)
 		if err != nil {
-			glog.Error(err)
+			log.Error(err, "Resource decode failed")
 		} else if err := validator.CheckImmutableFields(existingCouchbaseCluser, couchbaseCluster); err != nil {
-			glog.Errorf("Rejecting resource: %v", err)
+			log.Error(err, "Rejecting resource")
 			return errorResponse(err)
 		}
 	}
@@ -210,7 +230,7 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 
 	// Check that the CouchbaseCluster is correctly configured
 	if err := validator.CheckConstraints(validator.New(getClient(), getCouchbaseClient(), options), couchbaseCluster); err != nil {
-		glog.Errorf("Rejecting resource: %v", err)
+		log.Error(err, "Rejecting resource")
 		return errorResponse(err)
 	}
 
@@ -220,18 +240,24 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 // couchbaseClustersMutate mutates a CouchbaseCluster object before validation.  This allows
 // us to set sensible default values for various properties.
 func couchbaseClustersMutate(config *Config, ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
-	glog.Infof("Mutating resource: %v %v %v/%v",
-		ar.Request.Operation,
-		ar.Request.Kind,
-		ar.Request.Namespace,
-		ar.Request.Name)
-	glog.V(1).Infof("Mutating resource: %s", string(ar.Request.Object.Raw))
+	fields := []interface{}{
+		"operation", ar.Request.Operation,
+		"kind", ar.Request.Kind,
+		"namespace", ar.Request.Namespace,
+		"name", ar.Request.Name,
+	}
+
+	if log.V(1).Enabled() {
+		fields = append(fields, "resource", ar.Request.Object)
+	}
+
+	log.Info("Mutating resource", fields...)
 
 	// Decode the object as an unstructured data type.  Defaulting happens before
 	// schema validation, so we mustn't try decode until this occurs.
 	object := &unstructured.Unstructured{}
 	if err := json.Unmarshal(ar.Request.Object.Raw, object); err != nil {
-		glog.Error(err)
+		log.Error(err, "Resource decode failed")
 		return errorResponse(err)
 	}
 
@@ -249,13 +275,13 @@ func couchbaseClustersMutate(config *Config, ar admissionv1.AdmissionReview) *ad
 
 	patch := validator.ApplyDefaults(validator.New(getClient(), getCouchbaseClient(), options), object)
 	if patch != nil {
+		log.V(1).Info("Applying patch", "patch", patch)
+
 		data, err := json.Marshal(patch)
 		if err != nil {
-			glog.Error(err)
+			log.Error(err, "Patch encode failed")
 			return errorResponse(err)
 		}
-
-		glog.V(1).Infof("Applying patch: %v", string(data))
 
 		reviewResponse.PatchType = &pt
 		reviewResponse.Patch = data
@@ -283,7 +309,7 @@ func serve(config *Config, w http.ResponseWriter, r *http.Request, admit admitFu
 	// Ensure the content is JSON before docoding it
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/json" {
-		glog.Errorf("contentType=%s, expected application/json", contentType)
+		log.Error(fmt.Errorf("media error"), "content-type", contentType)
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 
 		return
@@ -296,7 +322,7 @@ func serve(config *Config, w http.ResponseWriter, r *http.Request, admit admitFu
 
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
-		glog.Error(err)
+		log.Error(err, "Admission review decode failed")
 		response = errorResponse(err)
 	} else {
 		response = admit(config, ar)
@@ -316,20 +342,20 @@ func serve(config *Config, w http.ResponseWriter, r *http.Request, admit admitFu
 	// Marshal to JSON and write the response
 	resp, err := json.Marshal(review)
 	if err != nil {
-		glog.Error(err)
+		log.Error(err, "Admission review encode failed")
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 
 	if _, err := w.Write(resp); err != nil {
-		glog.Error(err)
+		log.Error(err, "Admission response reply failed")
 	}
 }
 
 // serveDefault is the default handler which logs the request URI and returns
 // a 404 back to the client.
 func serveDefault(w http.ResponseWriter, r *http.Request) {
-	glog.Errorf("Unexpected request %s", r.URL.String())
+	log.Error(fmt.Errorf("unexpected request"), "Unexpected request", "path", r.URL.String())
 	w.WriteHeader(http.StatusNotFound)
 }
 
@@ -379,10 +405,10 @@ func (s *Server) Start(tlsConfig *tls.Config) {
 
 // Restart restarts the server so it picks up new configuration.
 func (s *Server) Restart(tlsConfig *tls.Config) {
-	glog.Info("configuration modified, restarting server")
+	log.Info("configuration modified, restarting server")
 
 	if err := s.server.Shutdown(context.TODO()); err != nil {
-		glog.Error(err)
+		log.Error(err, "Server shutdown failed")
 	} else {
 		// Wait for the old server to stop.  You do get an error
 		// condition on shutdown, so just ignore the value.
@@ -394,10 +420,12 @@ func (s *Server) Restart(tlsConfig *tls.Config) {
 
 // main initializes the system then starts a HTTPS server to process requests.
 func Serve(config *Config) {
-	glog.Infof("couchbase-operator-admission %s (%s)", version.WithBuildNumber(), revision.Revision())
+	logf.SetLogger(logging.New(config.Level.Level))
+
+	log.Info(version.Application+"-admission-controller", "version", version.WithBuildNumber(), "revision", revision.Revision())
 
 	if err := addToScheme(scheme); err != nil {
-		glog.Error(err)
+		log.Error(err, "Kubernetes resource scheme update failed")
 		return
 	}
 
@@ -416,7 +444,7 @@ func Serve(config *Config) {
 		select {
 		case err := <-server.err:
 			// Something went wrong with the server, start it up again.
-			glog.Error(err)
+			log.Error(err, "Server failed unexpectedly")
 
 			server.Start(tlsConfig)
 		case <-time.After(time.Minute):

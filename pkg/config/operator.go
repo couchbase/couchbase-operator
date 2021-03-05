@@ -40,7 +40,7 @@ type generateOperatorOptions struct {
 	imagePullSecret imagePullSecretVar
 
 	// logLevel is the level to emit docs at.
-	logLevel operatorLogLevelVar
+	logLevel zapLogLevelVar
 
 	// podCreationTimeout is the time to wait before declaring pod creation failed.
 	podCreationTimeout durationVar
@@ -50,7 +50,7 @@ type generateOperatorOptions struct {
 func getGenerateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &generateOperatorOptions{
 		scope:              newScopeVar(scopeNamespace),
-		logLevel:           newOperatorLogLevelVar(operatorDefaultLogLevel),
+		logLevel:           newZapLogLevelVar(operatorDefaultLogLevel),
 		podCreationTimeout: newDurationVar(operatorDefaultPodCreationTimout),
 	}
 
@@ -108,7 +108,7 @@ func getGenerateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 func getCreateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &generateOperatorOptions{
 		scope:              newScopeVar(scopeNamespace),
-		logLevel:           newOperatorLogLevelVar(operatorDefaultLogLevel),
+		logLevel:           newZapLogLevelVar(operatorDefaultLogLevel),
 		podCreationTimeout: newDurationVar(operatorDefaultPodCreationTimout),
 	}
 
