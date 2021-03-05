@@ -2795,9 +2795,7 @@ func (c *Cluster) reconcileAdminPassword() error {
 
 // hibernate puts the cluster to sleep, zzzz.
 func (c *Cluster) hibernate() error {
-	pods := c.k8s.Pods.List()
-
-	for _, pod := range pods {
+	for _, pod := range c.getClusterPods() {
 		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", pod.Name)
 
 		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
@@ -2889,7 +2887,7 @@ func (c *Cluster) reconcileAutoscalers() error {
 			// update status subresource to actual ready pods from group
 			configPods := 0
 
-			for _, pod := range c.k8s.Pods.List() {
+			for _, pod := range c.getClusterPods() {
 				if config.Name == pod.Labels[constants.LabelNodeConf] {
 					configPods++
 				}

@@ -51,7 +51,7 @@ func (r *podUpgradableResource) name(item int) string {
 }
 
 func (r *podUpgradableResource) fetch() error {
-	r.pods = r.cluster.k8s.Pods.List()
+	r.pods = r.cluster.getClusterPods()
 	return nil
 }
 
