@@ -9,7 +9,7 @@ FILTER="${FILTER} -e /^ifdef/,/^endif/d"
 # Ignore inline literals and attributes (contain arbitrary non-English configuration).
 FILTER="${FILTER} -e s/\`[^\`]*\`//g"
 FILTER="${FILTER} -e s/{[^}]*}//g"
-# Ignore defintiion lists (contain arbitrary non-English configuration).
+# Ignore definition lists (contain arbitrary non-English configuration).
 FILTER="${FILTER} -e s/^.*::$//g"
 # Ignore hyperlinks (not our problem).
 FILTER="${FILTER} -e s/http:[[^\[]//g"

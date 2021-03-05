@@ -38,7 +38,7 @@ type ServerClass struct {
 	// Services is the list of Couchbase services that should be provisioned.
 	Services []couchbasev2.Service
 
-	// Persistence indicates whether we want persisitent volumes.
+	// Persistence indicates whether we want persistent volumes.
 	Persistence PersistenceType
 
 	// VolumeSize defines the size of the volumes to create when using
@@ -145,6 +145,9 @@ type ClusterOptions struct {
 
 	// Backup image name.
 	BackupImage string
+
+	// Log shipping image name
+	LoggingImage string
 
 	// Storage class to use.
 	StorageClass string

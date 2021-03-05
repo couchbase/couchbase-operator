@@ -55,59 +55,16 @@ func (c *Cluster) reconcileLogConfig(client *client.Client) error {
 				c.cluster.AsOwner(),
 			},
 		},
+		// Whilst the container contains a default configuration we want to mount the whole directory - if you use sub-paths then it will not auto-update.
+		// https://github.com/kubernetes/kubernetes/issues/50345
+		// We allow for just specifying some config and reusing parser definitions by using two directories in the image: this configuration directory
+		// and then common stuff all in /fluent-bit/etc/.
 		Data: map[string][]byte{
-			// The formatting of the file is very important so using space & newlines to control rather than multi-line strings
-			// Do not use tabs
-			// Configure fluent bit to also include the pod name and some helper keys
-			"fluent-bit.conf": []byte("[SERVICE]\n" +
-				"    flush        	1\n" +
-				"    daemon       	Off\n" +
-				"    log_level    	warn\n" +
-				"    parsers_file 	parsers.conf\n" +
-				"# This is required to simplify downstream parsing to filter the different pod logs\n" +
-				"[FILTER]\n" +
-				"    Name           modify\n" +
-				"    Match          *\n" +
-				"    Add            pod        ${HOSTNAME}\n" +
-				"    Add            logshipper fluentbit-sidecar\n" +
-				"@include output.conf\n" +
-				"@include input.conf\n"),
+			// Just include the default configuration now
+			"fluent-bit.conf": []byte("@include /fluent-bit/etc/fluent-bit.conf\n"),
 
-			// Default to only reading the audit log in default location
-			"input.conf": []byte("[INPUT]\n" +
-				"    Name           tail\n" +
-				"    Path           ${COUCHBASE_LOGS}/audit.log\n" +
-				"    Parser         auditdb_log\n" +
-				"    Path_Key       filename\n" +
-				"    Tag            couchbase.log.audit\n"),
-
-			// Default to only sending to stdout
-			"output.conf": []byte("[OUTPUT]\n" +
-				"    name           stdout\n" +
-				"    match          couchbase.log.*\n"),
-
-			// Parsers provided for audit log, a general erlang one that copes with multiline messages and
-			// the simple_log copes with indexer.log or similar TIME LEVEL MESSAGE log formats. In each case
-			// we only 'parse' the time, level and message fields - no further decoding is done.
-			"parsers.conf": []byte("[PARSER]\n" +
-				"    Name           auditdb_log\n" +
-				"    Format       	json\n" +
-				"    Time_Key     	timestamp\n" +
-				"    Time_Format  	%Y-%m-%dT%H:%M:%S.%L\n\n" +
-
-				"[PARSER]\n" +
-				"    Name           simple_log\n" +
-				"    Format         regex\n" +
-				"    Regex          ^(?<time>\\d+-\\d+-\\d+T\\d+:\\d+:\\d+.\\d+(\\+|-)\\d+:\\d+)\\s+\\[(?<level>\\w+)\\](?<message>.*)$\n" +
-				"    Time_Key       time\n" +
-				"    Time_Format    %Y-%m-%dT%H:%M:%S.%L%z\n\n" +
-
-				"[PARSER]\n" +
-				"    Name           erlang_multiline\n" +
-				"    Format         regex\n" +
-				"    Regex          ^\\[(?<logger>\\w+):(?<level>\\w+),(?<time>\\d+-\\d+-\\d+T\\d+:\\d+:\\d+.\\d+Z).*](?<message>.*)$\n" +
-				"    Time_Key       time\n" +
-				"    Time_Format    %Y-%m-%dT%H:%M:%S.%L\n"),
+			// Redaction salt if required using default of cluster name
+			"redaction.salt": []byte(c.cluster.ClusterName),
 		},
 	}
 

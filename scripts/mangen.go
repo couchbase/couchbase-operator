@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 
@@ -73,7 +74,14 @@ func generateDocumentation(file io.StringWriter, command *cobra.Command) {
 			write(file, "+")
 
 			if flag.DefValue != "" {
-				r := regexp.MustCompile("^/home/[^/]+")
+				// Need to get the value of the HOME variable for MacOS
+				homeValue, _ := os.UserHomeDir()
+				if homeValue == "" {
+					homeValue = "/home"
+				}
+				homeValue = path.Clean(homeValue)
+
+				r := regexp.MustCompile("^" + homeValue)
 				def := r.ReplaceAllLiteralString(flag.DefValue, "$HOME")
 
 				write(file, "*Default*: %s", def)

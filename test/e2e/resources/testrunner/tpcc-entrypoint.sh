@@ -104,7 +104,7 @@ curl -XPOST -u Administrator:password http://${podIpArray[0]}:8091/controller/ad
 curl -XPOST -u Administrator:password http://${podIpArray[0]}:8091/controller/addNode -d hostname=${podIpArray[2]} -d user=Administrator -d password=password
 curl -XPOST -u Administrator:password http://${podIpArray[0]}:8091/controller/addNode -d hostname=${podIpArray[3]} -d user=Administrator -d password=password
 
-echo "Do Rebalance Opertion"
+echo "Do Rebalance Operation"
 echo "curl -XPOST -u Administrator:password http://${podIpArray[0]}:8091/controller/rebalance -d knownNodes='ns_1@'${podIpArray[0]},'ns_1@'${podIpArray[1]},'ns_1@'${podIpArray[2]},'ns_1@'${podIpArray[3]} -d ejectedNodes="
 curl -XPOST -u Administrator:password http://${podIpArray[0]}:8091/controller/rebalance -d knownNodes='ns_1@'${podIpArray[0]},'ns_1@'${podIpArray[1]},'ns_1@'${podIpArray[2]},'ns_1@'${podIpArray[3]} -d ejectedNodes=
 

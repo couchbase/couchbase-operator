@@ -1,0 +1,45 @@
+= Couchbase Server Logging
+
+[abstract]
+Couchbase Server generates logs that can be used for auditing and troubleshooting purposes.
+
+Couchbase Server produces a xref:server:manage:manage-logging/manage-logging.adoc#log-file-listing[variety] of log files.
+A robust solution for storing and accessing Couchbase Server logs is required for a cluster to be considered xref:best-practices.adoc#table-pv-requirements-for-cluster-supportability[supportable].
+
+[[default-logging]]
+== Default Logging
+
+By default, Couchbase cluster deployments process logs within the Couchbase Server container.
+When a Couchbase cluster deployment is configured to use xref:concept-persistent-volumes.adoc[persistent volumes] -- as is xref:best-practices.adoc#storage[recommended] for all production deployments -- log files are written to either the `default` or `logs` volume.
+
+When using default logging, logs cannot be collected from the pod's standard output (`stdout`), as is https://kubernetes.io/docs/concepts/cluster-administration/logging/[typical^] in Kubernetes environments.
+Instead, the Autonomous Operator is distributed with a support tool -- xref:tools/cbopinfo.adoc[`cbopinfo`] -- which can be used to collect a log snapshot at any time.
+This tool is often used for collecting resources, logs, and events from the Kubernetes cluster for use in Couchbase Support requests. 
+It is also capable of collecting logs from Couchbase Server instances via its xref:tools/cbopinfo.adoc#options[`--collectinfo`] option.
+
+The xref:tools/cbopinfo.adoc[`cbopinfo`] tool only captures a snapshot of the current logs at the time it was run, and is not intended to capture 100% of all logs at all times (rotated log files are not included in the snapshot).
+In addition, the tool requires `pods/exec` permissions in order to execute log collection scripts and run the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster, which may not be desirable for security and performance reasons. 
+To avoid these limitations, you can choose to configure <<log-streaming,log streaming>> as an alternative method for logging.
+
+.Learn More
+* xref:howto-manage-couchbase-logging.adoc[]
+
+[[log-streaming]]
+== Log Streaming
+
+Log streaming can be used in addition to, or as a complete alternative for, <<default-logging,default logging>>.
+Log streaming requires that Couchbase Server logs be written to a persistent volume.
+However, the logs are then read from that volume and streamed over standard console output (`stdout`), thus allowing for https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/#examine-pod-logs[simple debugging^] and standardized integration with centralized log management systems.
+
+Log streaming is fundamentally provided by a Couchbase-supplied container image -- `operator-logging` -- which is based on https://fluentbit.io/[Fluent Bit^].
+The container runs as a sidecar on Couchbase Server pods, and its purpose is to read the log files from the volume used by Couchbase Server, and stream the logs to `stdout`.
+
+.Simplified Illustration of Log Streaming Architecture
+image::logging-sidecar-overview.png[]
+
+Log streaming is disabled by default.
+When log streaming is enabled, the Autonomous Operator uses the Couchbase-supplied container image (`operator-logging`) by default, and supplies it with a default configuration that streams the logs to the standard output of the sidecar container.
+
+.Learn More
+* xref:howto-couchbase-log-streaming.adoc[]
+* xref:tutorial-couchbase-logging.adoc[]

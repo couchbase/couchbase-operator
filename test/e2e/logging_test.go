@@ -1,8 +1,6 @@
 package e2e
 
 import (
-	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -13,171 +11,11 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"github.com/couchbase/couchbase-operator/test/e2e/types"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	clusterSize int    = 1
-	pvcName     string = "couchbase"
+	clusterSize int = 1
 )
-
-func enableAuditing(withGC bool) *v2.CouchbaseClusterAuditLoggingSpec {
-	spec := v2.CouchbaseClusterAuditLoggingSpec{
-		Enabled:        true,
-		DisabledEvents: []int{},
-		DisabledUsers:  []v2.AuditDisabledUser{},
-		Rotation: &v2.CouchbaseClusterLogRotationSpec{
-			Size: k8sutil.NewResourceQuantityMi(1),
-		},
-	}
-
-	if withGC {
-		spec.GarbageCollection = &v2.CouchbaseClusterAuditGarbageCollectionSpec{
-			Sidecar: &v2.CouchbaseClusterAuditCleanupSidecarSpec{
-				Enabled:  true,
-				Interval: k8sutil.NewDurationS(30),
-			},
-		}
-	}
-
-	return &spec
-}
-
-func enableLogging(f *framework.Framework) *v2.CouchbaseClusterLoggingConfigurationSpec {
-	spec := v2.CouchbaseClusterLoggingConfigurationSpec{
-		Enabled:           true,
-		ConfigurationName: "fluent-bit-config",
-		Sidecar: &v2.LogShipperSidecarSpec{
-			Image: "fluent/fluent-bit:1.7",
-		},
-	}
-
-	if imageName := strings.TrimSpace(f.CouchbaseLoggingImage); imageName != "" {
-		spec.Sidecar.Image = imageName
-	}
-
-	return &spec
-}
-
-func createValidCustomLogConfig(t *testing.T, targetKube *types.Cluster, testCouchbase *v2.CouchbaseCluster) {
-	// Make sure we clear out any existing config maps just in case to ensure a clean run
-	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(context.Background(), testCouchbase.Spec.Logging.Server.ConfigurationName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		e2eutil.Die(t, err)
-	}
-
-	if testCouchbase.Spec.Logging.Server.ManageConfiguration == nil || (*testCouchbase.Spec.Logging.Server.ManageConfiguration) {
-		err := fmt.Errorf("incorrectly specified cluster - need to disable management of configuration")
-		e2eutil.Die(t, err)
-	}
-
-	// Set up a valid custom default
-	defaultConfig := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: testCouchbase.Spec.Logging.Server.ConfigurationName,
-		},
-		StringData: map[string]string{
-			// The formatting of the file is very important so using space & newlines to control rather than multi-line strings
-			// Do not use tabs
-			// Configure fluent bit to also include the pod name and some helper keys
-			"fluent-bit.conf": "[SERVICE]\n" +
-				"    flush        	1\n" +
-				"    daemon       	Off\n" +
-				"    log_level    	warn\n" +
-				"    parsers_file 	parsers.conf\n" +
-				"# This is required to simplify downstream parsing to filter the different pod logs\n" +
-				"[FILTER]\n" +
-				"    Name           modify\n" +
-				"    Match          *\n" +
-				"    Add            pod        ${HOSTNAME}\n" +
-				"    Add            logshipper fluentbit-sidecar\n" +
-				"@include output.conf\n" +
-				"@include input.conf\n",
-
-			// CUSTOMISATION
-			"input.conf": "[INPUT]\n" +
-				"    Name           tail\n" +
-				"    Path           ${COUCHBASE_LOGS}/audit.log\n" +
-				"    Parser         auditdb_log\n" +
-				"    Path_Key       filename\n" +
-				"    Tag            couchbase.log.audit\n\n" +
-
-				"[INPUT]\n" +
-				"    Name tail\n" +
-				"    Path ${COUCHBASE_LOGS}/indexer.log\n" +
-				"    Parser simple_log\n" +
-				"    Path_Key filename\n" +
-				"    Tag couchbase.log.lookforme\n\n" +
-
-				"[INPUT]\n" +
-				"    Name tail\n" +
-				"    Path ${COUCHBASE_LOGS}/memcached.log.000000.txt\n" +
-				"    Parser simple_log\n" +
-				"    Path_Key filename\n" +
-				"    Tag couchbase.log.memcached\n\n" +
-
-				"[INPUT]\n" +
-				"    Name tail\n" +
-				"    Path ${COUCHBASE_LOGS}/babysitter.log,${COUCHBASE_LOGS}/couchdb.log\n" +
-				"    Multiline On\n" +
-				"    Parser_Firstline erlang_multiline\n" +
-				"    Path_Key filename\n" +
-				"    Skip_Long_Lines On\n" +
-				"    Tag couchbase.log.<logname>\n" +
-				"    Tag_Regex ${COUCHBASE_LOGS}/(?<logname>[^.]+).log$\n\n",
-
-			// Default to only sending to stdout
-			"output.conf": "[OUTPUT]\n" +
-				"    name           stdout\n" +
-				"    match          couchbase.log.*\n",
-
-			// Parsers provided for audit log, a general erlang one that copes with multiline messages and
-			// the simple_log copes with indexer.log or similar TIME LEVEL MESSAGE log formats. In each case
-			// we only 'parse' the time, level and message fields - no further decoding is done.
-			"parsers.conf": "[PARSER]\n" +
-				"    Name           auditdb_log\n" +
-				"    Format       	json\n" +
-				"    Time_Key     	timestamp\n" +
-				"    Time_Format  	%Y-%m-%dT%H:%M:%S.%L\n\n" +
-
-				"[PARSER]\n" +
-				"    Name           simple_log\n" +
-				"    Format         regex\n" +
-				"    Regex          ^(?<time>\\d+-\\d+-\\d+T\\d+:\\d+:\\d+.\\d+(\\+|-)\\d+:\\d+)\\s+\\[(?<level>\\w+)\\](?<message>.*)$\n" +
-				"    Time_Key       time\n" +
-				"    Time_Format    %Y-%m-%dT%H:%M:%S.%L%z\n\n" +
-
-				"[PARSER]\n" +
-				"    Name           erlang_multiline\n" +
-				"    Format         regex\n" +
-				"    Regex          ^\\[(?<logger>\\w+):(?<level>\\w+),(?<time>\\d+-\\d+-\\d+T\\d+:\\d+:\\d+.\\d+Z).*](?<message>.*)$\n" +
-				"    Time_Key       time\n" +
-				"    Time_Format    %Y-%m-%dT%H:%M:%S.%L\n",
-		},
-	}
-
-	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(context.Background(), defaultConfig, metav1.CreateOptions{}); err != nil {
-		e2eutil.Die(t, err)
-	}
-}
-
-func createInvalidLogConfig(t *testing.T, targetKube *types.Cluster, testCouchbase *v2.CouchbaseCluster) {
-	// Make sure we clear out any existing config maps just in case to ensure a clean run
-	if err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Delete(context.Background(), testCouchbase.Spec.Logging.Server.ConfigurationName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-		e2eutil.Die(t, err)
-	}
-	// Set up a invalid custom default - right name, just nothing in it but indicate it is operator managed
-	defaultConfig := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: testCouchbase.Spec.Logging.Server.ConfigurationName,
-		},
-	}
-	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(context.Background(), defaultConfig, metav1.CreateOptions{}); err != nil {
-		e2eutil.Die(t, err)
-	}
-}
 
 // Audit configuration reconciled (CRD = disabled, manually enabled and then reset back to disabled).
 func TestNoLogOrAuditConfig(t *testing.T) {
@@ -225,18 +63,10 @@ func TestLoggingAndAuditingDefaults(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithPersisitentTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].VolumeMounts = &v2.VolumeMounts{
-		DefaultClaim: pvcName,
-	}
-	testCouchbase.Spec.VolumeClaimTemplates = []v2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 1),
-	}
-	testCouchbase.Spec.Logging.Audit = enableAuditing(true)
-	testCouchbase.Spec.Logging.Server = enableLogging(f)
+	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithAuditing(true).WithDefaultLogStreaming().Generate(targetKube)
 
 	// Create a dodgy log config to prove it is reconciled correctly later
-	createInvalidLogConfig(t, targetKube, testCouchbase)
+	e2eutil.SetInvalidLogStreamingConfig(t, targetKube, testCouchbase.Spec.Logging.Server.ConfigurationName)
 	e2eutil.MustFailLoggingConfig(t, targetKube, testCouchbase)
 
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
@@ -269,18 +99,8 @@ func TestAuditingNoLogging(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].VolumeMounts = &v2.VolumeMounts{
-		DefaultClaim: pvcName,
-	}
-	testCouchbase.Spec.VolumeClaimTemplates = []v2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 1),
-	}
-
 	// GC is not supported without logging - tested by validation - so disable here.
-	testCouchbase.Spec.Logging.Audit = enableAuditing(false)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithAuditing(false).MustCreate(t, targetKube)
 
 	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
 	// Check no extra sidecars
@@ -288,10 +108,15 @@ func TestAuditingNoLogging(t *testing.T) {
 
 	// Patch in some deltas to configuration and check it is in place now
 	// The REST API for audit is particularly difficult/non-standard so testing each of the fields as a sanity check
-	newConfig := enableAuditing(false)
-	// Single element arrays seem troublesome for Erlang to parse
-	newConfig.DisabledEvents = []int{8243}
-	newConfig.DisabledUsers = []v2.AuditDisabledUser{"@eventing/local", "@cbq-engine/local"}
+	newConfig := &v2.CouchbaseClusterAuditLoggingSpec{
+		Enabled: true,
+		// Single element arrays seem troublesome for Erlang to parse so explicitly test
+		DisabledEvents: []int{8243},
+		DisabledUsers:  []v2.AuditDisabledUser{"@eventing/local", "@cbq-engine/local"},
+		Rotation: &v2.CouchbaseClusterLogRotationSpec{
+			Size: k8sutil.NewResourceQuantityMi(1),
+		},
+	}
 
 	// Apply the new configuration
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", newConfig), time.Minute)
@@ -315,22 +140,62 @@ func TestCustomLogging(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithPersisitentTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].VolumeMounts = &v2.VolumeMounts{
-		DefaultClaim: pvcName,
-	}
-	testCouchbase.Spec.VolumeClaimTemplates = []v2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 1),
-	}
-
 	// Do not enable auditing so no logging will be enabled unless we have a custom configuration
-	testCouchbase.Spec.Logging.Server = &v2.CouchbaseClusterLoggingConfigurationSpec{
-		Enabled:             true,
-		ManageConfiguration: &[]bool{false}[0],          // Optional *bool so fun to set false
-		ConfigurationName:   "custom-fluent-bit-config", // Use custom name for config map too
+	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(targetKube)
+
+	config := map[string]string{
+		"fluent-bit.conf": "[SERVICE]\n" +
+			"    flush        	1\n" +
+			"    daemon       	Off\n" +
+			"    log_level    	warn\n" +
+			"    parsers_file 	parsers.conf\n" +
+			"# This is required to simplify downstream parsing to filter the different pod logs\n" +
+			"[FILTER]\n" +
+			"    Name           modify\n" +
+			"    Match          *\n" +
+			"    Add            pod        ${HOSTNAME}\n" +
+			"    Add            logshipper fluentbit-sidecar\n" +
+			"@include output.conf\n" +
+			"@include input.conf\n",
+
+		// CUSTOMISATION
+		"input.conf": "[INPUT]\n" +
+			"    Name           tail\n" +
+			"    Path           ${COUCHBASE_LOGS}/audit.log\n" +
+			"    Parser         auditdb_log\n" +
+			"    Path_Key       filename\n" +
+			"    Tag            couchbase.log.audit\n\n" +
+
+			"[INPUT]\n" +
+			"    Name tail\n" +
+			"    Path ${COUCHBASE_LOGS}/indexer.log\n" +
+			"    Parser simple_log\n" +
+			"    Path_Key filename\n" +
+			"    Tag couchbase.log.lookforme\n",
+
+		// Default to only sending to stdout
+		"output.conf": "[OUTPUT]\n" +
+			"    name           stdout\n" +
+			"    match          couchbase.log.*\n",
+
+		// Parsers provided for audit log, a general erlang one that copes with multiline messages and
+		// the simple_log copes with indexer.log or similar TIME LEVEL MESSAGE log formats. In each case
+		// we only 'parse' the time, level and message fields - no further decoding is done.
+		"parsers.conf": "[PARSER]\n" +
+			"    Name           auditdb_log\n" +
+			"    Format       	json\n" +
+			"    Time_Key     	timestamp\n" +
+			"    Time_Format  	%Y-%m-%dT%H:%M:%S.%L\n\n" +
+
+			"[PARSER]\n" +
+			"    Name           simple_log\n" +
+			"    Format         regex\n" +
+			"    Regex          ^(?<time>\\d+-\\d+-\\d+T\\d+:\\d+:\\d+.\\d+(\\+|-)\\d+:\\d+)\\s+\\[(?<level>\\w+)\\](?<message>.*)$\n" +
+			"    Time_Key       time\n" +
+			"    Time_Format    %Y-%m-%dT%H:%M:%S.%L%z\n",
 	}
 
-	createValidCustomLogConfig(t, targetKube, testCouchbase)
+	e2eutil.SetLogStreamingConfig(t, targetKube, testCouchbase, config, false)
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
@@ -349,7 +214,7 @@ func TestCustomLogging(t *testing.T) {
 	e2eutil.MustCheckLoggingSidecarsCount(t, targetKube, testCouchbase, 1)
 
 	// Ensure we can mess up the custom config and it is not reconciled and pods are not restarted
-	createInvalidLogConfig(t, targetKube, testCouchbase)
+	e2eutil.SetInvalidLogStreamingConfig(t, targetKube, testCouchbase.Spec.Logging.Server.ConfigurationName)
 	e2eutil.MustFailLoggingConfig(t, targetKube, testCouchbase)
 
 	// Check that the user can not see the cluster settings being edited as they're custom.
@@ -366,18 +231,10 @@ func TestChangeLogShipperImage(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithPersisitentTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].VolumeMounts = &v2.VolumeMounts{
-		DefaultClaim: pvcName,
-	}
-	testCouchbase.Spec.VolumeClaimTemplates = []v2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 1),
-	}
-	testCouchbase.Spec.Logging.Server = enableLogging(f)
-	testCouchbase.Spec.Logging.Server.Sidecar.Image = "fluent/fluent-bit:1.6.10"
+	options := clusterOptions()
+	options.Options.LoggingImage = "fluent/fluent-bit:1.6.10"
 
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	testCouchbase := options.WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, targetKube)
 
 	// Confirm that config is now correct
 	e2eutil.MustCheckLoggingConfig(t, targetKube, testCouchbase)
@@ -387,4 +244,153 @@ func TestChangeLogShipperImage(t *testing.T) {
 
 	// Check for the specific version of Fluent-bit in the logs
 	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, time.Minute, "Fluent Bit v1.6.10")
+}
+
+func TestInflightLogRedaction(t *testing.T) {
+	if strings.HasPrefix(clusterOptions().Options.LoggingImage, "fluent/fluent-bit") {
+		t.Skip("Official Fluent Bit image does not support redaction out of the box")
+	}
+
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(targetKube)
+
+	unredactedInputString := "Cats are <ud>sma#@&*+-.!!!!!rter</ud> than dogs, and <UD>sheeps</UD>"
+
+	config := map[string]string{
+		"fluent-bit.conf": "[SERVICE]\n" +
+			"    flush        	1\n" +
+			"    daemon       	Off\n" +
+			"    log_level    	warn\n" +
+			"    parsers_file 	/fluent-bit/etc/parsers-couchbase.conf\n" +
+
+			"# Simple test generator for redaction\n" +
+			"[INPUT]\n" +
+			"    Name dummy\n" +
+			"    Tag couchbase.redact.test\n" +
+			"    Dummy {\"message\": \"" + unredactedInputString + "\"}\n\n" +
+
+			"# Redaction of fields\n" +
+			"[FILTER]\n" +
+			"    Name    lua\n" +
+			"    Match   couchbase.redact.*\n" +
+			"    script  /fluent-bit/etc/redaction.lua\n" +
+			"    call    cb_sub_message\n\n" +
+
+			"# Now rewrite the tags for redacted information\n" +
+			"[FILTER]\n" +
+			"    Name rewrite_tag\n" +
+			"    Match couchbase.redact.*\n" +
+			"    Rule message .* couchbase.log.$TAG[2] false\n\n" +
+
+			"# Output all parsed logs by default\n" +
+			"[OUTPUT]\n" +
+			"    name  stdout\n" +
+			"    match couchbase.log.*\n",
+
+		// Provide an empty salt to allow for detection of actual hash
+		"redaction.salt": "",
+	}
+
+	e2eutil.SetLogStreamingConfig(t, targetKube, testCouchbase, config, false)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+
+	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
+	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Specific checks for redacted information being replaced (and not output)
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, "Cats are <ud>00b335216f27c1e7d35149b5bbfe19d4eb2d6af1</ud> than dogs, and <ud>888f807d45ff6ce47240c7ed4e884a6f9dc7b4fb</ud>")
+	e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, unredactedInputString)
+}
+
+func TestRebalanceLogProcessing(t *testing.T) {
+	if strings.HasPrefix(clusterOptions().Options.LoggingImage, "fluent/fluent-bit") {
+		t.Skip("Official Fluent Bit image does not support redaction out of the box")
+	}
+
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, targetKube)
+
+	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+2, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, "couchbase.log.rebalance")
+}
+
+func TestLoggingDynamicConfigReload(t *testing.T) {
+	if strings.HasPrefix(clusterOptions().Options.LoggingImage, "fluent/fluent-bit") {
+		t.Skip("Official Fluent Bit image does not support redaction out of the box")
+	}
+
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(targetKube)
+
+	// Start with logging with one tag then change to another and confirm the change
+	tag1 := "couchbase.log.test.original"
+	tag2 := "couchbase.log.test.updated"
+
+	config1 := map[string]string{
+		"fluent-bit.conf": "[SERVICE]\n" +
+			"    flush        	1\n" +
+			"    daemon       	Off\n" +
+			"    log_level    	warn\n\n" +
+
+			"# Simple test generator as we do not need actual logs\n" +
+			"[INPUT]\n" +
+			"    Name dummy\n" +
+			"    Tag " + tag1 + "\n" +
+			"    Dummy {\"message\": \"Testing dynamic reconfiguration - original\"}\n\n" +
+
+			"[OUTPUT]\n" +
+			"    name  stdout\n" +
+			"    match couchbase.log.*\n",
+	}
+
+	// Defined here to make it easy to compare but used later
+	config2 := map[string]string{
+		"fluent-bit.conf": "[SERVICE]\n" +
+			"    flush        	1\n" +
+			"    daemon       	Off\n" +
+			"    log_level    	warn\n\n" +
+
+			"# Simple test generator as we do not need actual logs\n" +
+			"[INPUT]\n" +
+			"    Name dummy\n" +
+			"    Tag " + tag2 + "\n" +
+			"    Dummy {\"message\": \"Testing dynamic reconfiguration - updated\"}\n\n" +
+
+			"[OUTPUT]\n" +
+			"    name  stdout\n" +
+			"    match couchbase.log.*\n",
+	}
+
+	e2eutil.SetLogStreamingConfig(t, targetKube, testCouchbase, config1, false)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+
+	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
+	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, time.Minute, tag1)
+	e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, tag2)
+
+	// Switch config - can take a while to be applied
+	e2eutil.SetLogStreamingConfig(t, targetKube, testCouchbase, config2, true)
+
+	// Invert the check to confirm the new stuff is present
+	// Note the old tag may still be in older parts of the log so do not search for it
+	// e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, tag1)
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, tag2)
 }

@@ -461,6 +461,9 @@ var (
 		"TestAuditingNoLogging":          TestAuditingNoLogging,
 		"TestCustomLogging":              TestCustomLogging,
 		"TestChangeLogShipperImage":      TestChangeLogShipperImage,
+		"TestInflightLogRedaction":       TestInflightLogRedaction,
+		"TestRebalanceLogProcessing":     TestRebalanceLogProcessing,
+		"TestLoggingDynamicConfigReload": TestLoggingDynamicConfigReload,
 	}
 )
 
@@ -518,6 +521,7 @@ func clusterOptions() *e2eutil.ClusterOptions {
 			AutoFailoverTimeout: e2espec.NewDurationS(30),
 			MonitoringImage:     framework.Global.CouchbaseExporterImage,
 			BackupImage:         framework.Global.CouchbaseBackupImage,
+			LoggingImage:        framework.Global.CouchbaseLoggingImage,
 			StorageClass:        framework.Global.StorageClassName,
 			Platform:            framework.Global.Platform,
 			Istio:               framework.Global.EnableIstio,

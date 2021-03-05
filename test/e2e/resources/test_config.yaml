@@ -53,6 +53,9 @@ couchbase-backup-image: couchbase/operator-backup:6.5.0
 # Couchbase Exporter image to use
 couchbase-exporter-image: couchbase/exporter:1.0.1
 
+# Couchbase Log Shipping image to use
+couchbase-logging-image: couchbase/fluent-bit:1.0.0
+
 # Bucket Type
 bucket-type : couchbase
 

@@ -14,6 +14,15 @@ Couchbase Autonomous Operator 2.2.0 was released in 2021.
 [#changes-in-behavior-v220]
 === Major Behavior Changes and Enhancements
 
+==== Log Streaming and Audit Log Management
+
+Couchbase Server logs can now be xref:howto-couchbase-log-streaming.adoc[streamed] to standard output (`stdout`).
+This functionality is provided by a Couchbase-supplied container image -- `operator-logging` -- which is based on https://fluentbit.io/[Fluent Bit^].
+The container runs as a sidecar and can be configured to send Couchbase Server logging information to centralized logging systems.
+
+In addition, audit logging can now be configured via the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification, thus allowing for xref:howto-manage-couchbase-logging.adoc#configuring-audit-logging[automated audit logging].
+Audit logs are supported by the new log streaming functionality, and can now be optionally managed/expired by the Autonomous Operator.
+
 ==== Improved Security Defaults
 
 The Couchbase Server default minimum TLS version is 1.0.

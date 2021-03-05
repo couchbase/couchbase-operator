@@ -69,7 +69,7 @@ The readiness gate is only set once all of the Couchbase Server nodes are balanc
 When you drain a Kubernetes node containing a Couchbase pod, the following sequence of events will occur:
 
 * The Operator will detect that a cluster member is down.
-You should monitor this via the xref:howto-troubleshooting.adoc#operator-logs[Operator logs] or xref:howto-ui.adoc[Couchbase Web Console].
+You should monitor this via the xref:howto-manage-operator-logging.adoc[Operator logs] or xref:howto-ui.adoc[Couchbase Web Console].
 
 * The Couchbase pod will be failed over and the Operator will create a replacement pod in order to restore server class sizing.
 

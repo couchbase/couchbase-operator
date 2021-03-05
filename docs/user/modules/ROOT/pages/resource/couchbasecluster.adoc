@@ -1288,12 +1288,11 @@ Any specific logging sidecar container configuration.
 
 *Type*: `string`
 
-*Default*: `/fluent-bit/etc/`
+*Default*: `/fluent-bit/config/`
 
 ==== Description
 
 ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
-This defaults to the usual Fluent Bit mount path.
 If another log shipping image is used that needs a different mount then modify this.
 
 === couchbaseclusters.spec.logging.server.sidecar.image
@@ -1302,7 +1301,7 @@ If another log shipping image is used that needs a different mount then modify t
 
 *Type*: `string`
 
-*Default*: `fluent/fluent-bit:1.7`
+*Default*: `couchbase/fluent-bit:1.0.0`
 
 ==== Description
 

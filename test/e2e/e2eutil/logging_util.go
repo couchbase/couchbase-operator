@@ -3,10 +3,8 @@ package e2eutil
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -32,46 +30,53 @@ func checkAuditConfig(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 
 		defer cleanup()
 
-		info := &couchbaseutil.AuditSettings{}
+		info := couchbaseutil.AuditSettings{}
 
 		request := &couchbaseutil.Request{
 			Path:   "/settings/audit",
-			Result: info,
+			Result: &info,
 		}
 
 		if err := client.client.Get(request, client.host); err != nil {
 			return err
 		}
 
-		auditSpec := couchbase.Spec.Logging.Audit
-		if auditSpec != nil && auditSpec.Enabled {
-			if !info.Enabled {
-				return fmt.Errorf("auditing should be enabled")
-			}
-			if info.LogPath != k8sutil.CouchbaseVolumeMountLogsDir {
-				return fmt.Errorf("auditing log path not correct: %s != %s", info.LogPath, k8sutil.CouchbaseVolumeMountLogsDir)
-			}
-			if info.RotateInterval != int(auditSpec.Rotation.Interval.Seconds()) {
-				return fmt.Errorf("auditing rotate interval not correct: %d != %d", info.RotateSize, int(auditSpec.Rotation.Interval.Seconds()))
-			}
-			if info.RotateSize != int(auditSpec.Rotation.Size.Value()) {
-				return fmt.Errorf("auditing rotate size not correct: %d != %d", info.RotateSize, int(auditSpec.Rotation.Size.Value()))
-			}
+		return checkAuditSpec(couchbase.Spec.Logging.Audit, info)
+	})
+}
 
-			// Just check lengths
-			if len(info.DisabledEvents) != len(auditSpec.DisabledEvents) {
-				return fmt.Errorf("auditing disabled events size not correct: %d != %d", len(info.DisabledEvents), len(auditSpec.DisabledEvents))
-			}
-			if len(info.DisabledUsers) != len(auditSpec.DisabledUsers) {
-				return fmt.Errorf("auditing disabled users size not correct: %d != %d", len(info.DisabledUsers), len(auditSpec.DisabledUsers))
-			}
-		} else if info.Enabled {
-			// Auditing was not enabled in the CRD but is reported as enabled
-			return fmt.Errorf("auditing incorrectly enabled")
+func checkAuditSpec(auditSpec *couchbasev2.CouchbaseClusterAuditLoggingSpec, actualSettings couchbaseutil.AuditSettings) error {
+	if auditSpec != nil && auditSpec.Enabled {
+		if !actualSettings.Enabled {
+			return NewErrAuditNotEnabled()
 		}
 
-		return nil
-	})
+		if actualSettings.LogPath != k8sutil.CouchbaseVolumeMountLogsDir {
+			return NewErrInvalidPathCheck("auditing log path", actualSettings.LogPath, k8sutil.CouchbaseVolumeMountLogsDir)
+		}
+
+		if actualSettings.RotateInterval != int(auditSpec.Rotation.Interval.Seconds()) {
+			return NewErrInvalidIntegerCheck("auditing rotate interval", actualSettings.RotateSize, int(auditSpec.Rotation.Interval.Seconds()))
+		}
+
+		if actualSettings.RotateSize != int(auditSpec.Rotation.Size.Value()) {
+			return NewErrInvalidIntegerCheck("auditing rotate size", actualSettings.RotateSize, int(auditSpec.Rotation.Size.Value()))
+		}
+
+		// Just check lengths
+		if len(actualSettings.DisabledEvents) != len(auditSpec.DisabledEvents) {
+			return NewErrInvalidIntegerCheck("auditing disabled events length", len(actualSettings.DisabledEvents), len(auditSpec.DisabledEvents))
+		}
+
+		if len(actualSettings.DisabledUsers) != len(auditSpec.DisabledUsers) {
+			return NewErrInvalidIntegerCheck("auditing disabled users length: %d != %d", len(actualSettings.DisabledUsers), len(auditSpec.DisabledUsers))
+		}
+	} else if actualSettings.Enabled {
+		// Auditing was not enabled in the CRD but is reported as enabled
+		return NewErrAuditInvalidClusterConfig()
+	}
+
+	return nil
 }
 
 func MustCheckAuditConfiguration(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
@@ -100,11 +105,7 @@ func enableAuditLogging(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 			Body: []byte(data.Encode()),
 		}
 
-		if err := client.client.Post(request, client.host); err != nil {
-			return err
-		}
-
-		return nil
+		return client.client.Post(request, client.host)
 	})
 }
 
@@ -129,7 +130,7 @@ func checkLoggingSidecarCount(k8s *types.Cluster, couchbase *couchbasev2.Couchba
 
 	for _, pod := range pods.Items {
 		if len(pod.Spec.Containers) != expectedCount+1 {
-			return fmt.Errorf("invalid container count (%d != %d) for pod %s", len(pod.Spec.Containers), expectedCount+1, pod.Name)
+			return NewErrContainerCountInvalid(len(pod.Spec.Containers), expectedCount+1, pod.Name)
 		}
 	}
 
@@ -182,16 +183,16 @@ func checkLoggingSecret(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 	_, exists := config.Annotations[cluster.LoggingConfigurationManagedAnnotation]
 
 	if exists != managed {
-		return fmt.Errorf("invalid configuration as mismatch in config vs annotations: %s != %s", strconv.FormatBool(managed), strconv.FormatBool(exists))
+		return NewErrLogInvalidConfig(managed, exists)
 	}
 
 	// Not technically required of Secret, just set in test cases so confirming this is not an issue before using it
 	if config.Data == nil {
-		return fmt.Errorf("missing data key in secret")
+		return NewErrLogMissingConfigKey("data")
 	}
 
 	if _, configured := config.Data["fluent-bit.conf"]; !configured {
-		return fmt.Errorf("missing contents of data key in secret")
+		return NewErrLogMissingConfigKeyContents("Data")
 	}
 
 	// Check we don't have the default one if we're configuring a custom one
@@ -203,7 +204,58 @@ func checkLoggingSecret(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 				return err
 			}
 
-			return fmt.Errorf("default configuration is incorrectly present")
+			return NewErrDefaultConfigPresent()
+		}
+	}
+
+	return nil
+}
+
+func checkPodLogs(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, expected string, pod v1.Pod) error {
+	// Dump the pod's logs
+	podName := pod.Name
+
+	for _, container := range pod.Spec.Containers {
+		containerName := container.Name
+
+		switch containerName {
+		case k8sutil.CouchbaseAuditCleanupSidecarContainerName:
+			// Confirm the output of the audit cleanup sidecar shows it running
+			f := func() error {
+				log, err := getLogsOfContainerInPod(k8s, couchbase, podName, containerName)
+				if err == nil && strings.Contains(log, "Cleaning audit logs") {
+					return nil
+				}
+
+				// Back off for a retry
+				time.Sleep(10 * time.Second)
+
+				return NewErrMissingAuditCleanupLogs(podName)
+			}
+
+			// If nothing initially then wait for next cleanup cycle and recheck
+			if err := retryutil.RetryFor(timeout, f); err != nil {
+				return err
+			}
+
+		case k8sutil.CouchbaseLogSidecarContainerName:
+			// Check we don't get a Fluent Bit config error - if we get logs then we cannot do so
+			// Check we do get some logs unrelated to Fluent Bit
+			f := func() error {
+				log, err := getLogsOfContainerInPod(k8s, couchbase, podName, containerName)
+				if err == nil && strings.Contains(log, expected) {
+					return nil
+				}
+
+				time.Sleep(10 * time.Second)
+
+				return NewErrMissingLogs(expected, podName)
+			}
+
+			// If nothing initially then wait and recheck
+			if err := retryutil.RetryFor(timeout, f); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -227,51 +279,8 @@ func checkLogging(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, t
 
 	// Iterate over all pods and their containers
 	for _, pod := range pods.Items {
-		// Dump the pod's logs
-		podName := pod.Name
-
-		for _, container := range pod.Spec.Containers {
-			containerName := container.Name
-
-			switch containerName {
-			case k8sutil.CouchbaseAuditCleanupSidecarContainerName:
-				// Confirm the output of the audit cleanup sidecar shows it running
-				f := func() error {
-					log, err := getLogsOfContainerInPod(k8s, couchbase, podName, containerName)
-					if err == nil && strings.Contains(log, "Cleaning audit logs") {
-						return nil
-					}
-
-					// Back off for a retry
-					time.Sleep(10 * time.Second)
-
-					return fmt.Errorf("missing audit GC logs for pod %q", podName)
-				}
-
-				// If nothing initially then wait for next cleanup cycle and recheck
-				if err := retryutil.RetryFor(timeout, f); err != nil {
-					return err
-				}
-
-			case k8sutil.CouchbaseLogSidecarContainerName:
-				// Check we don't get a Fluent Bit config error - if we get logs then we cannot do so
-				// Check we do get some logs unrelated to Fluent Bit
-				f := func() error {
-					log, err := getLogsOfContainerInPod(k8s, couchbase, podName, containerName)
-					if err == nil && strings.Contains(log, expected) {
-						return nil
-					}
-
-					time.Sleep(10 * time.Second)
-
-					return fmt.Errorf("logs do not contain %q for pod %q", expected, podName)
-				}
-
-				// If nothing initially then wait and recheck
-				if err := retryutil.RetryFor(timeout, f); err != nil {
-					return err
-				}
-			}
+		if err := checkPodLogs(k8s, couchbase, timeout, expected, pod); err != nil {
+			return err
 		}
 	}
 
@@ -289,7 +298,7 @@ func MustCheckLoggingConfig(t *testing.T, k8s *types.Cluster, couchbase *couchba
 func MustFailLoggingConfig(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
 	err := checkLoggingSecret(k8s, couchbase)
 	if err == nil {
-		Die(t, err)
+		Die(t, NewErrUnexpectedSuccess("checking log config"))
 	}
 }
 
@@ -302,6 +311,67 @@ func MustCheckLogging(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.C
 func MustCheckLogsForString(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, expected string) {
 	err := checkLogging(k8s, couchbase, timeout, expected)
 	if err != nil {
+		Die(t, err)
+	}
+}
+
+func MustCheckLogsAreMissingString(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, unexpected string) {
+	err := checkLogging(k8s, couchbase, timeout, unexpected)
+	if err == nil {
+		Die(t, NewErrUnexpectedSuccess("logs should not contain: "+unexpected))
+	}
+}
+
+// Need to add test data for parsers we provide to confirm they function with known input.
+func SetLogStreamingConfig(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, config map[string]string, update bool) {
+	if couchbase.Spec.Logging.Server.ManageConfiguration == nil || (*couchbase.Spec.Logging.Server.ManageConfiguration) {
+		Die(t, NewErrLogInvalidClusterConfig())
+	}
+
+	// Indicate whether we should be updating an existing one or creating a new one
+	if update {
+		existing, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Get(context.Background(), couchbase.Spec.Logging.Server.ConfigurationName, metav1.GetOptions{})
+		if err != nil {
+			Die(t, err)
+		}
+
+		existing.StringData = config
+
+		if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Update(context.Background(), existing, metav1.UpdateOptions{}); err != nil {
+			Die(t, err)
+		}
+	} else {
+		// Make sure we clear out any existing config maps just in case to ensure a clean run
+		if err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(context.Background(), couchbase.Spec.Logging.Server.ConfigurationName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			Die(t, err)
+		}
+
+		// Provide a config that generates known data to test and confirm logs are parsed correctly
+		defaultConfig := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: couchbase.Spec.Logging.Server.ConfigurationName,
+			},
+			StringData: config,
+		}
+
+		if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(context.Background(), defaultConfig, metav1.CreateOptions{}); err != nil {
+			Die(t, err)
+		}
+	}
+}
+
+func SetInvalidLogStreamingConfig(t *testing.T, k8s *types.Cluster, configName string) {
+	// Make sure we clear out any existing config maps just in case to ensure a clean run
+	if err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(context.Background(), configName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		Die(t, err)
+	}
+	// Set up a invalid custom default - right name, just nothing in it but it is operator managed
+	defaultConfig := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configName,
+		},
+	}
+	if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(context.Background(), defaultConfig, metav1.CreateOptions{}); err != nil {
 		Die(t, err)
 	}
 }

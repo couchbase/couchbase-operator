@@ -1,7 +1,12 @@
-= Operator Logging
+= Autonomous Operator Log Attributes
 
-The Operator emits logs on the pod console.
-Logs are structured as JSON for simple machine parsing, however schemaless.
+[abstract]
+Autonomous Operator logs contain some fixed attributes that can be reliably used in your logging infrastructure.
+
+== Introduction
+
+The Autonomous Operator emits logs on the pod console.
+Logs are structured as JSON for simple machine parsing (though, they are schemaless).
 Logs look similar to the following:
 
 [source,json]
@@ -13,42 +18,40 @@ Logs look similar to the following:
 {"level":"info","ts":1580377226.7565176,"logger":"cluster","msg":"Creating XDCR remote cluster","cluster":"default/cb-example","remote":"remote"}
 ----
 
-The Operator uses the Uber Zap library to generate logging information.
+The Autonomous Operator uses the https://pkg.go.dev/go.uber.org/zap[zap^] library to generate logging information.
 Each entry is organized as a JSON object with key/value pairs of information.
 
 Some attributes are fixed and can be reliably used in your logging infrastructure and are documented in the following sections.
 
 == Zap Attributes
 
-level::
-This is the log level the message was emitted at.
-Valid values are `info`, `error`, `debug` and `-N` (where N is an integer value based on debug level).
-Levels that are emitted depend on xref:reference-operator-configuration.adoc[Operator configuration].
+`level`::
+This is the log level at which the message was emitted at.
+Valid values are `info`, `error`, `debug`, and `-N` (where N is an integer value based on debug level).
+Levels that are emitted depend on the level that is specified in the Autonomous Operator xref:reference-operator-configuration.adoc[deployment settings].
 
-ts::
+`ts`::
 This is the message time stamp.
 It is given in seconds since the UNIX epoch (1 Jan 1970, 00:00:00).
 
-logger::
+`logger`::
 This is the logger that generated the message.
 It gives information as to which module was responsible for generating the message.
-This attribute is of little use outside of Couchbase support requests.
+This attribute is of little use outside of Couchbase Support requests.
 
-msg::
-This is the message.
-Each entry will have a short message explaining what us being reported.
-This will not contain any contextual information about what raised the message.
-Context is provided by other key/value pairs.
+`msg`::
+This is the log message.
+Each log entry will have a short message explaining what is being reported.
+The message will not contain any contextual information about what raised the message; context is provided by other key/value pairs.
 
 == Operator Attributes
 
-cluster::
+`cluster`::
 This is the cluster that the message relates to.
-It is only present when a message relates to a specific `CouchbaseCluster` resource.
-It is formatted as `namespace/cluster-name`.
+It is only present when a message relates to a specific xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource, and is formatted as `namespace/cluster-name`.
 This attribute is useful as a label to identify and separate log streams for specific clusters.
 
 == Other Attributes
 
-Other attributes are context specific and will be relevant to a specific message.
-It is the intention that their meaning will be simple and obvious.
+Other attributes are context-specific and will be relevant to a specific message.
+The meaning of these attributes is, in most cases, intended to be simple and obvious.

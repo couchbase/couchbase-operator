@@ -3,6 +3,7 @@ package e2eutil
 // error handling for util methods.
 import (
 	"fmt"
+	"strconv"
 )
 
 func NewErrVerifyEditBucket(bucket string) error {
@@ -43,4 +44,56 @@ func NewErrEmptyNodeList() error {
 
 func NewErrConsoleNotExposed() error {
 	return fmt.Errorf("admin console is not exposed")
+}
+
+func NewErrDefaultConfigPresent() error {
+	return fmt.Errorf("default configuration is incorrectly present")
+}
+
+func NewErrLogInvalidConfig(managed, exists bool) error {
+	return fmt.Errorf("invalid configuration as mismatch in config vs annotations: %s != %s", strconv.FormatBool(managed), strconv.FormatBool(exists))
+}
+
+func NewErrLogMissingConfigKey(name string) error {
+	return fmt.Errorf("missing %q key", name)
+}
+
+func NewErrLogMissingConfigKeyContents(name string) error {
+	return fmt.Errorf("missing contents of %q key", name)
+}
+
+func NewErrContainerCountInvalid(actual, expected int, podName string) error {
+	return fmt.Errorf("invalid container count (%d != %d) for pod %s", actual, expected, podName)
+}
+
+func NewErrMissingAuditCleanupLogs(name string) error {
+	return fmt.Errorf("missing audit GC logs for pod %q", name)
+}
+
+func NewErrMissingLogs(expected, name string) error {
+	return fmt.Errorf("logs do not contain %q for pod %q", expected, name)
+}
+
+func NewErrUnexpectedSuccess(stepDescription string) error {
+	return fmt.Errorf("unexpected success %s", stepDescription)
+}
+
+func NewErrLogInvalidClusterConfig() error {
+	return fmt.Errorf("incorrectly specified cluster - need to disable management of configuration")
+}
+
+func NewErrAuditInvalidClusterConfig() error {
+	return fmt.Errorf("auditing incorrectly enabled")
+}
+
+func NewErrAuditNotEnabled() error {
+	return fmt.Errorf("auditing should be enabled")
+}
+
+func NewErrInvalidPathCheck(checkName, actual, expected string) error {
+	return fmt.Errorf("%s not correct: %q != %q", checkName, actual, expected)
+}
+
+func NewErrInvalidIntegerCheck(checkName string, actual, expected int) error {
+	return fmt.Errorf("%s not correct: %d != %d", checkName, actual, expected)
 }

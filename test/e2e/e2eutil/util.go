@@ -196,6 +196,14 @@ func applyGenericNetworking(cluster *couchbasev2.CouchbaseCluster, genericNetwor
 	}
 }
 
+func applyLogStreaming(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.CouchbaseClusterLoggingConfigurationSpec) {
+	cluster.Spec.Logging.Server = config
+}
+
+func applyAuditing(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.CouchbaseClusterAuditLoggingSpec) {
+	cluster.Spec.Logging.Audit = config
+}
+
 // ClusterOptions is used to generate or create all Couchbase clusters by the framework.
 // The key observation is all clusters are ostensibly the same, with features layered on
 // top.  We use the builder pattern to declare those features, so they are onlt defined
@@ -214,6 +222,10 @@ type ClusterOptions struct {
 	S3Credentials *v1.Secret
 
 	GenericNetworking bool
+
+	LogStreaming *couchbasev2.CouchbaseClusterLoggingConfigurationSpec
+
+	AuditConfiguration *couchbasev2.CouchbaseClusterAuditLoggingSpec
 }
 
 // WithEphemeralTopology defines a cluster as being ephemeral (no volumes).
@@ -228,9 +240,9 @@ func (o *ClusterOptions) WithEphemeralTopology(size int) *ClusterOptions {
 	return o
 }
 
-// WithPersisitentTopology defines a cluster as having persistent volumes.
+// WithPersistentTopology defines a cluster as having persistent volumes.
 // Is has one server class with data/index enabled and of the specified size.
-func (o *ClusterOptions) WithPersisitentTopology(size int) *ClusterOptions {
+func (o *ClusterOptions) WithPersistentTopology(size int) *ClusterOptions {
 	topology := e2espec.PersistentTopology.DeepCopy()
 	topology[0].Size = size
 
@@ -249,6 +261,58 @@ func (o *ClusterOptions) WithMixedTopology(size int) *ClusterOptions {
 	topology[1].Size = size
 
 	o.Options.Topology = topology
+
+	return o
+}
+
+func (o *ClusterOptions) WithDefaultLogStreaming() *ClusterOptions {
+	o.LogStreaming = &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+		Enabled:           true,
+		ConfigurationName: "fluent-bit-config",
+		Sidecar:           &couchbasev2.LogShipperSidecarSpec{},
+	}
+
+	if imageName := strings.TrimSpace(o.Options.LoggingImage); imageName != "" {
+		o.LogStreaming.Sidecar.Image = imageName
+	}
+
+	return o
+}
+
+func (o *ClusterOptions) WithCustomLogStreaming() *ClusterOptions {
+	o.LogStreaming = &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+		Enabled:             true,
+		ManageConfiguration: &[]bool{false}[0],
+		ConfigurationName:   "custom-fluent-bit-config",
+		Sidecar:             &couchbasev2.LogShipperSidecarSpec{},
+	}
+
+	if imageName := strings.TrimSpace(o.Options.LoggingImage); imageName != "" {
+		o.LogStreaming.Sidecar.Image = imageName
+	}
+
+	return o
+}
+
+// Create auditing configuration with short rotation size and cleanup interval for testing.
+func (o *ClusterOptions) WithAuditing(enableCleanup bool) *ClusterOptions {
+	o.AuditConfiguration = &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+		Enabled:        true,
+		DisabledEvents: []int{},
+		DisabledUsers:  []couchbasev2.AuditDisabledUser{},
+		Rotation: &couchbasev2.CouchbaseClusterLogRotationSpec{
+			Size: k8sutil.NewResourceQuantityMi(1),
+		},
+	}
+
+	if enableCleanup {
+		o.AuditConfiguration.GarbageCollection = &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+			Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
+				Enabled:  true,
+				Interval: k8sutil.NewDurationS(30),
+			},
+		}
+	}
 
 	return o
 }
@@ -299,6 +363,8 @@ func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseClus
 	applyDNS(k8s, cluster, o.DNS)
 	applyS3(cluster, o.S3Credentials)
 	applyGenericNetworking(cluster, o.GenericNetworking)
+	applyLogStreaming(cluster, o.LogStreaming)
+	applyAuditing(cluster, o.AuditConfiguration)
 
 	return cluster
 }

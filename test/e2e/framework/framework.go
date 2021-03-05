@@ -213,6 +213,7 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.3", "Docker image to use for the couchbase exporter")
 	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.3", "Docker image to use for couchbase exporter upgrades to upgrade from")
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:6.6.0-100", "Docker image to use for couchbase backup")
+	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image", "couchbase/fluent-bit:1.0.0", "Docker image to use for couchbase log shipping")
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
 	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
@@ -424,6 +425,7 @@ func Setup() (err error) {
 		CouchbaseExporterImage:        runtimeParams.CouchbaseExporterImage,
 		CouchbaseExporterImageUpgrade: runtimeParams.CouchbaseExporterImageUpgrade,
 		CouchbaseBackupImage:          runtimeParams.CouchbaseBackupImage,
+		CouchbaseLoggingImage:         runtimeParams.CouchbaseLoggingImage,
 		BucketType:                    runtimeParams.BucketType,
 		CompressionMode:               runtimeParams.CompressionMode,
 		EnableIstio:                   runtimeParams.EnableIstio,
@@ -475,6 +477,7 @@ func Setup() (err error) {
 	logrus.Info(" →  couchbase exporter: " + runtimeParams.CouchbaseExporterImage)
 	logrus.Info(" →  couchbase exporter upgrade: " + runtimeParams.CouchbaseExporterImageUpgrade)
 	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
+	logrus.Info(" →  couchbase logging: " + runtimeParams.CouchbaseLoggingImage)
 
 	logrus.Info(util.PrettyHeading("Framework Configuration"))
 	logrus.Info(" →  Bucket Type: " + runtimeParams.BucketType)

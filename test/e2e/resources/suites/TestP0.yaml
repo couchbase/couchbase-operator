@@ -250,3 +250,6 @@ testcases:
 - TestAuditingNoLogging
 - TestCustomLogging
 - TestChangeLogShipperImage
+- TestInflightLogRedaction
+- TestRebalanceLogProcessing
+- TestLoggingDynamicConfigReload

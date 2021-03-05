@@ -50,7 +50,8 @@ This allows for the quick recovery of a failed pod by warming up from existing d
 By having some of the pod's file system persisted, logging data can be extracted from failed pods where this would normally be lost with a fully ephemeral file system.
 It also aids in data recovery situations which cannot be rectified by the Operator.
 
-.Supportability Matrix
+.Cluster Supportability with Persistent Volumes
+[#table-pv-requirements-for-cluster-supportability,cols="2,1,2,1,1",options="header"]
 |===
 |Deployment Type |Services |Required Volume Mount(s) |Recoverable? |Supportable?
 
@@ -88,11 +89,8 @@ The `query` and `eventing` services may be deployed with this method, if they ar
 Logs are only retained in the event of a pod failure.
 They will be automatically deleted due to a user initiated action e.g. scaling the cluster down.
 
-[IMPORTANT]
-====
-Production clusters may now be deployed as combination of _Production Stateful_ and _Production Stateless_ node deployments, depending on the services running on the individual server class configurations.
+Production clusters can also be deployed as a combination of _Production Stateful_ and _Production Stateless_ node deployments, depending on the services running on the individual server class configurations.
 The `default` and `logs` mounts in the `CouchbaseCluster` configuration are mutually exclusive — if any server class is detected by the cluster validation to be supportable (e.g. `default` or `logs` is specified under `volumeMounts`), then all other server classes must also have supportable configurations in order for the validation check to pass.
-====
 
 It is also highly recommended that in cloud deployments, storage be located in the same data center as the pods that are running in that server group.
 If a data center were to suffer an outage with storage randomly distributed across a virtual private cloud, not only would you lose all the pods that are resident in the availability zone, but also any pods with backing storage provided by the availability zone.
@@ -114,12 +112,13 @@ The Operator will also fully rebuild a cluster that has had all pods deleted.
 Due to pods being ephemeral in nature, it is highly likely that data will be unrecoverable when a Couchbase server node goes down, so there is little risk in using a forced failover.
 Ephemeral clusters favor caching use-cases where the data can be repopulated by clients and does not need to be persisted.
 
-[IMPORTANT]
+[CAUTION]
 ====
-As all storage is ephemeral, this means that Couchbase Server logs are highly likely to be unavailable in the event of a crash.
-This may make support of such deployments particularly difficult, so use this deployment method with caution.
+Since fully-ephemeral Couchbase clusters only use ephemeral storage, Couchbase Server logs are highly likely to be unavailable in the event of a crash.
+This can make supporting an ephemeral cluster particularly difficult, and it is recommended that you exercise caution when using this type of deployment.
 
-Streaming of Couchbase Server logs to an aggregator is planned for a later release, and will allow server logs to be collated, and provided as a support request.
+Starting with version 2.2, the Autonomous Operator supports xref:howto-couchbase-log-streaming.adoc[streaming] Couchbase Server logs.
+However, the current implementation requires the use of a (persistent) volume.
 ====
 
 == Security

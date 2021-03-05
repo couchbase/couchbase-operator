@@ -14,8 +14,8 @@
  ** xref:concept-persistent-volumes.adoc[Persistent Volumes]
  ** xref:concept-kubernetes-upgrade.adoc[Kubernetes Automated Upgrade]
 * Operator Concepts
- ** xref:concept-operator.adoc[Couchbase Operator Architecture]
- ** xref:concept-operator-logging.adoc[Couchbase Operator Logging]
+ ** xref:concept-operator.adoc[Operator Architecture]
+ ** xref:concept-operator-logging.adoc[Operator Logging]
 * Couchbase Cluster Concepts
  ** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
  ** xref:concept-rbac.adoc[Couchbase Resource RBAC]
@@ -32,11 +32,12 @@
  ** xref:concept-server-groups.adoc[Couchbase Server Groups]
  ** xref:concept-upgrade.adoc[Couchbase Upgrades]
  ** xref:concept-hibernation.adoc[Couchbase Cluster Hibernation]
+ ** xref:concept-couchbase-logging.adoc[Couchbase Logging]
 
 .Manage
 * Operator
  ** xref:howto-operator-upgrade.adoc[Upgrade the Operator]
- ** xref:howto-troubleshooting.adoc[View Operator Logs]
+ ** xref:howto-manage-operator-logging.adoc[Manage Operator Logging]
  ** xref:howto-roll-your-own.adoc[Create Your Own Operator Images]
 * Couchbase Cluster
  ** Lifecycle
@@ -59,6 +60,8 @@
   *** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
   *** xref:howto-tls-rotation.adoc[Rotate TLS Certificates]
   *** xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection]
+  *** xref:howto-manage-couchbase-logging.adoc[Manage Couchbase Logging]
+  *** xref:howto-couchbase-log-streaming.adoc[Configure Couchbase Log Streaming]
   *** xref:howto-non-root-install.adoc[Configure Non-Root Installs]
  ** Connect
   *** xref:howto-ui.adoc[Access the Couchbase User Interface]
@@ -78,7 +81,6 @@ include::partial$autogen-reference.adoc[]
  ** xref:reference-operator-configuration.adoc[Operator Deployment Settings]
  ** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
  ** xref:reference-operator-logging.adoc[Operator Logging]
- ** xref:reference-server-logging.adoc[Couchbase Server container logging]
 * Couchbase Cluster
  ** xref:reference-couchbasecluster-events.adoc[`CouchbaseCluster` Events]
  ** xref:reference-couchbasecluster-services.adoc[`CouchbaseCluster` Services]
@@ -104,7 +106,7 @@ include::partial$autogen-reference.adoc[]
 * xref:tutorial-autoscale.adoc[Autoscaling Couchbase Stateless Services]
 * xref:tutorial-metering.adoc[Metering Couchbase Resources In OpenShift]
 * xref:tutorial-metering-kubernetes.adoc[Metering Couchbase Resources In Kubernetes]
-* xref:tutorial-couchbase-logging.adoc[Configuring Couchbase Server log shipping in Kubernetes]
+* xref:tutorial-couchbase-logging.adoc[Streaming Couchbase Logs]
 * xref:tutorial-aks.adoc[Installing AKS]
 * xref:tutorial-eks.adoc[Installing EKS]
 * xref:tutorial-gke.adoc[Installing GKE]
