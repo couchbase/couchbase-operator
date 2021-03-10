@@ -981,10 +981,7 @@ func (s *LDAPSettings) FormEncode() ([]byte, error) {
 
 	if s.AuthorizationEnabled {
 		data.Set("groupsQuery", s.GroupsQuery)
-	}
-
-	if s.NestedGroupsEnabled {
-		data.Set("nestedGroupsEnabled", BoolToStr(s.NestedGroupsEnabled))
+		data.Set("nestedGroupsEnabled", strconv.FormatBool(s.NestedGroupsEnabled))
 		data.Set("nestedGroupsMaxDepth", strconv.FormatUint(s.NestedGroupsMaxDepth, 10))
 	}
 
