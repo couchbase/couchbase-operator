@@ -133,8 +133,11 @@ func RecreateServiceAccount(k8s *types.Cluster, serviceAccountName string) error
 	}
 
 	// Create service account given by the name
-	serviceAccount := config.GetOperatorServiceAccount()
-	serviceAccount.Name = serviceAccountName
+	serviceAccount := &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceAccountName,
+		},
+	}
 
 	_, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{})
 

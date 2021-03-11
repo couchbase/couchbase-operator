@@ -27,7 +27,24 @@ const (
 	AdmissionResourceName = "couchbase-operator-admission"
 
 	// admissionDefaultLogLevel is what we expect people to use by default.
-	admissionDefaultLogLevel = "0"
+	admissionDefaultLogLevel = "info"
+
+	// admissionDefaultCPURequest is the number of CPUs to schedule for.
+	// On my laptop this is negligible.
+	admissionDefaultCPURequest = "500m"
+
+	// admissionDefaultCPULimit is the burst number of CPUs to kill the pod if exceeded.
+	admissionDefaultCPULimit = "1"
+
+	// admissionDefaultMemoryRequest is the amount of memory to schedule for.
+	// On my laptop it uses ~25000 RSS, so more than enough.
+	admissionDefaultMemoryRequest = "100Mi"
+
+	// admissionDefaultMemoryLimit is the burst amount of memory to kill the pod if exceeded.
+	admissionDefaultMemoryLimit = "200Mi"
+
+	// admissionDefaultReplicas is the number of replicas in the deployment.
+	admissionDefaultReplicas = 1
 )
 
 // generateAdmissionOptions defines options for creating the admission controller.
@@ -56,14 +73,64 @@ type generateAdmissionOptions struct {
 
 	// logLevel allows the setting of the logging level.
 	logLevel zapLogLevelVar
+
+	// replicas is the number of replicas in the deployment.
+	replicas int
+
+	// withResources allows you to add resource requests and limits.
+	withResources bool
+
+	// cpuRequest is the number of CPUs to schedule for.
+	cpuRequest quantityVar
+
+	// cpuLimit is the burst number of CPUs to kill the pod if exceeded.
+	cpuLimit quantityVar
+
+	// memoryRequest is the amount of memory to schedule for.
+	memoryRequest quantityVar
+
+	// memoryLimit is the burst amount of memory to kill the pod if exceeded.
+	memoryLimit quantityVar
+
+	// withMutation allows us to deactivate mutating webhooks on platforms
+	// that don't support them.
+	withMutation bool
+}
+
+// newGenerateAdmissionOptions returns a set of options with the defaults applied.
+func newGenerateAdmissionOptions() *generateAdmissionOptions {
+	return &generateAdmissionOptions{
+		scope:         newScopeVar(scopeCluster),
+		logLevel:      newZapLogLevelVar(admissionDefaultLogLevel),
+		cpuRequest:    newQuantityVar(admissionDefaultCPURequest),
+		cpuLimit:      newQuantityVar(admissionDefaultCPULimit),
+		memoryRequest: newQuantityVar(admissionDefaultMemoryRequest),
+		memoryLimit:   newQuantityVar(admissionDefaultMemoryLimit),
+	}
+}
+
+// registerAdmissionGenerateFlags adds generic generation flags to the provided command.
+func (o *generateAdmissionOptions) registerAdmissionGenerateFlags(cmd *cobra.Command) {
+	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
+	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
+	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information.")
+	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
+	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
+	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
+	cmd.Flags().BoolVar(&o.defaultFileSystemGroup, "default-file-system-group", true, "Fills in default file system group information on Couchbase volumes")
+	cmd.Flags().IntVar(&o.replicas, "replicas", admissionDefaultReplicas, "The number of replicas in the deployment")
+	cmd.Flags().BoolVar(&o.withResources, "with-resources", false, "Populates pod resource requests and limits")
+	cmd.Flags().Var(&o.cpuRequest, "cpu-request", "CPU requested for scheduling, only valid when used with --with-resources")
+	cmd.Flags().Var(&o.cpuLimit, "cpu-limit", "CPU limit for constraining, only valid when used with --with-resources")
+	cmd.Flags().Var(&o.memoryRequest, "memory-request", "Memory requested for scheduling, only valid when used with --with-resources")
+	cmd.Flags().Var(&o.memoryLimit, "memory-limit", "Memory limit for constraining, only valid when used with --with-resources")
+	cmd.Flags().BoolVar(&o.withMutation, "with-mutation", true, "Enables resource mutation, may not be supported on some platforms")
 }
 
 // getGenerateAdmissionCommand creates YAML capable of creating the dynamic admission controller.
 func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
-	o := &generateAdmissionOptions{
-		scope:    newScopeVar(scopeCluster),
-		logLevel: newZapLogLevelVar(admissionDefaultLogLevel),
-	}
+	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
 		Use:   "admission",
@@ -116,24 +183,14 @@ func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Co
 		},
 	}
 
-	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
-	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
-	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
-	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information.")
-	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
-	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
-	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
-	cmd.Flags().BoolVar(&o.defaultFileSystemGroup, "default-file-system-group", true, "Fills in default file system group information on Couchbase volumes")
+	o.registerAdmissionGenerateFlags(cmd)
 
 	return cmd
 }
 
 // getCreateAdmissionCommand creates the admission controller.
 func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
-	o := &generateAdmissionOptions{
-		scope:    newScopeVar(scopeCluster),
-		logLevel: newZapLogLevelVar(admissionDefaultLogLevel),
-	}
+	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
 		Use:   "admission",
@@ -186,23 +243,14 @@ func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
-	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
-	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
-	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information.")
-	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
-	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
-	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
-	cmd.Flags().BoolVar(&o.defaultFileSystemGroup, "default-file-system-group", true, "Fills in default file system group information on Couchbase volumes")
+	o.registerAdmissionGenerateFlags(cmd)
 
 	return cmd
 }
 
 // getDeleteAdmissionCommand deletes the admission controller.
 func getDeleteAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
-	o := &generateAdmissionOptions{
-		scope: newScopeVar(scopeCluster),
-	}
+	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
 		Use:   "admission",
@@ -234,6 +282,7 @@ func getDeleteAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
 	}
 
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+	cmd.Flags().BoolVar(&o.withMutation, "with-mutation", true, "Enables resource mutation, may not be supported on some platforms")
 
 	return cmd
 }
@@ -293,21 +342,24 @@ func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags
 	}
 
 	resources := []runtime.Object{
-		GetAdmissionServiceAccount(),
-		GetAdmissionRole(o.scope.value.isClusterScope(), o.validateSecrets, o.validateStorageClasses, o.defaultFileSystemGroup),
-		GetAdmissionRoleBinding(namespace, o.scope.value.isClusterScope()),
-		GetAdmissionSecret(key, cert),
-		GetAdmissionDeployment(o.image, o.imagePullSecret.imagePullSecrets, o.validateSecrets, o.validateStorageClasses, o.defaultFileSystemGroup, o.logLevel.value),
-		GetAdmissionService(),
-		GetAdmissionMutatingWebhook(namespace, ca.Certificate, o.scope.value.isClusterScope(), o.namespaceSelector.LabelSelector),
-		GetAdmissionValidatingWebhook(namespace, ca.Certificate, o.scope.value.isClusterScope(), o.namespaceSelector.LabelSelector),
+		o.getAdmissionServiceAccount(),
+		o.getAdmissionRole(),
+		o.getAdmissionRoleBinding(namespace),
+		o.getAdmissionSecret(key, cert),
+		o.getAdmissionDeployment(),
+		o.getAdmissionService(),
+		o.getAdmissionValidatingWebhook(namespace, ca.Certificate),
+	}
+
+	if o.withMutation {
+		resources = append(resources, o.getAdmissionMutatingWebhook(namespace, ca.Certificate))
 	}
 
 	return resources, nil
 }
 
-// GetAdmissionRole return the (cluster) role to run with.
-func GetAdmissionRole(cluster, validateSecrets, validateStorageClasses, defaultFileSystemGroup bool) runtime.Object {
+// getAdmissionRole return the (cluster) role to run with.
+func (o *generateAdmissionOptions) getAdmissionRole() runtime.Object {
 	metadata := metav1.ObjectMeta{
 		Name: AdmissionResourceName,
 	}
@@ -336,7 +388,7 @@ func GetAdmissionRole(cluster, validateSecrets, validateStorageClasses, defaultF
 		},
 	}
 
-	if validateSecrets {
+	if o.validateSecrets {
 		rules = append(rules, rbacv1.PolicyRule{
 			APIGroups: []string{
 				"",
@@ -350,8 +402,8 @@ func GetAdmissionRole(cluster, validateSecrets, validateStorageClasses, defaultF
 		})
 	}
 
-	if cluster {
-		if defaultFileSystemGroup {
+	if o.scope.value.isClusterScope() {
+		if o.defaultFileSystemGroup {
 			rules = append(rules, rbacv1.PolicyRule{
 				APIGroups: []string{
 					"",
@@ -365,7 +417,7 @@ func GetAdmissionRole(cluster, validateSecrets, validateStorageClasses, defaultF
 			})
 		}
 
-		if validateStorageClasses {
+		if o.validateStorageClasses {
 			rules = append(rules, rbacv1.PolicyRule{
 				APIGroups: []string{
 					"storage.k8s.io",
@@ -391,8 +443,8 @@ func GetAdmissionRole(cluster, validateSecrets, validateStorageClasses, defaultF
 	}
 }
 
-// GetAdmissionServiceAccount get the service account to run as.
-func GetAdmissionServiceAccount() *corev1.ServiceAccount {
+// getAdmissionServiceAccount get the service account to run as.
+func (o *generateAdmissionOptions) getAdmissionServiceAccount() *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: AdmissionResourceName,
@@ -400,8 +452,8 @@ func GetAdmissionServiceAccount() *corev1.ServiceAccount {
 	}
 }
 
-// GetAdmissionRoleBinding generates the (cluster) role binding linking the role to the service account.
-func GetAdmissionRoleBinding(namespace string, cluster bool) runtime.Object {
+// getAdmissionRoleBinding generates the (cluster) role binding linking the role to the service account.
+func (o *generateAdmissionOptions) getAdmissionRoleBinding(namespace string) runtime.Object {
 	metadata := metav1.ObjectMeta{
 		Name: AdmissionResourceName,
 	}
@@ -414,7 +466,7 @@ func GetAdmissionRoleBinding(namespace string, cluster bool) runtime.Object {
 		},
 	}
 
-	if cluster {
+	if o.scope.value.isClusterScope() {
 		return &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metadata,
 			Subjects:   subjects,
@@ -437,8 +489,8 @@ func GetAdmissionRoleBinding(namespace string, cluster bool) runtime.Object {
 	}
 }
 
-// GetAdmissionSecret generates the TLS secret providing server certificates.
-func GetAdmissionSecret(key, cert []byte) *corev1.Secret {
+// getAdmissionSecret generates the TLS secret providing server certificates.
+func (o *generateAdmissionOptions) getAdmissionSecret(key, cert []byte) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: AdmissionResourceName,
@@ -450,9 +502,10 @@ func GetAdmissionSecret(key, cert []byte) *corev1.Secret {
 	}
 }
 
-// GetAdmissionDeployment returns the canonical deployment for the admission controller.
-func GetAdmissionDeployment(image string, imagePullSecrets []string, validateSecrets, validateStorageClasses, defaultFileSystemGroup bool, logLevel string, extraArgs ...string) *appsv1.Deployment {
-	replicas := int32(1)
+// getAdmissionDeployment returns the canonical deployment for the admission controller.
+func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
+	replicas := int32(o.replicas)
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: AdmissionResourceName,
@@ -475,17 +528,17 @@ func GetAdmissionDeployment(image string, imagePullSecrets []string, validateSec
 					Containers: []corev1.Container{
 						{
 							Name:  AdmissionResourceName,
-							Image: image,
+							Image: o.image,
 							Command: []string{
 								"couchbase-operator-admission",
 							},
 							Args: []string{
-								"-zap-level=" + logLevel,
+								"-zap-level=" + o.logLevel.value,
 								"-tls-cert-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-cert-file",
 								"-tls-private-key-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-private-key-file",
-								"-validate-secrets=" + strconv.FormatBool(validateSecrets),
-								"-validate-storage-classes=" + strconv.FormatBool(validateStorageClasses),
-								"-default-file-system-group=" + strconv.FormatBool(defaultFileSystemGroup),
+								"-validate-secrets=" + strconv.FormatBool(o.validateSecrets),
+								"-validate-storage-classes=" + strconv.FormatBool(o.validateStorageClasses),
+								"-default-file-system-group=" + strconv.FormatBool(o.defaultFileSystemGroup),
 							},
 							Ports: []corev1.ContainerPort{
 								{
@@ -526,7 +579,20 @@ func GetAdmissionDeployment(image string, imagePullSecrets []string, validateSec
 		},
 	}
 
-	for _, secret := range imagePullSecrets {
+	if o.withResources {
+		deployment.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    o.cpuRequest.value,
+				corev1.ResourceMemory: o.memoryRequest.value,
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    o.cpuLimit.value,
+				corev1.ResourceMemory: o.memoryLimit.value,
+			},
+		}
+	}
+
+	for _, secret := range o.imagePullSecret.imagePullSecrets {
 		reference := corev1.LocalObjectReference{
 			Name: secret,
 		}
@@ -537,8 +603,8 @@ func GetAdmissionDeployment(image string, imagePullSecrets []string, validateSec
 	return deployment
 }
 
-// GetAdmissionService returns a cluster service definition for the admission controller.
-func GetAdmissionService() *corev1.Service {
+// getAdmissionService returns a cluster service definition for the admission controller.
+func (o *generateAdmissionOptions) getAdmissionService() *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: AdmissionResourceName,
@@ -558,15 +624,15 @@ func GetAdmissionService() *corev1.Service {
 	}
 }
 
-// GetAdmissionMutatingWebhook creates a mutating webhook for the admission controller.
-func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, namespaceSelector *metav1.LabelSelector) *admissionregistrationv1.MutatingWebhookConfiguration {
+// getAdmissionMutatingWebhook creates a mutating webhook for the admission controller.
+func (o *generateAdmissionOptions) getAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistrationv1.MutatingWebhookConfiguration {
 	// You need a webhook per controller when running in namespaced mode.
 	// IF we resued the same one each time, we'd need to aggregate the webhooks
 	// and act as a client doing read/modify/write.  This is complex so instead
 	// just name them deterministically (for deletion) and make many resources.
 	name := AdmissionResourceName
 
-	if !cluster {
+	if !o.scope.value.isClusterScope() {
 		name = AdmissionResourceName + "-" + namespace
 	}
 
@@ -631,22 +697,22 @@ func GetAdmissionMutatingWebhook(namespace string, ca []byte, cluster bool, name
 
 	// When in namespace scoped mode, the selector will be populated and must be
 	// added to the webhook.
-	if !cluster {
-		webhook.Webhooks[0].NamespaceSelector = namespaceSelector
+	if !o.scope.value.isClusterScope() {
+		webhook.Webhooks[0].NamespaceSelector = o.namespaceSelector.LabelSelector
 	}
 
 	return webhook
 }
 
-// GetAdmissionValidatingWebhook creates a validating webhook for the admission controller.
-func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, namespaceSelector *metav1.LabelSelector) *admissionregistrationv1.ValidatingWebhookConfiguration {
+// getAdmissionValidatingWebhook creates a validating webhook for the admission controller.
+func (o *generateAdmissionOptions) getAdmissionValidatingWebhook(namespace string, ca []byte) *admissionregistrationv1.ValidatingWebhookConfiguration {
 	// You need a webhook per controller when running in namespaced mode.
 	// IF we resued the same one each time, we'd need to aggregate the webhooks
 	// and act as a client doing read/modify/write.  This is complex so instead
 	// just name them deterministically (for deletion) and make many resources.
 	name := AdmissionResourceName
 
-	if !cluster {
+	if !o.scope.value.isClusterScope() {
 		name = AdmissionResourceName + "-" + namespace
 	}
 
@@ -711,8 +777,8 @@ func GetAdmissionValidatingWebhook(namespace string, ca []byte, cluster bool, na
 
 	// When in namespace scoped mode, the selector will be populated and must be
 	// added to the webhook.
-	if !cluster {
-		webhook.Webhooks[0].NamespaceSelector = namespaceSelector
+	if !o.scope.value.isClusterScope() {
+		webhook.Webhooks[0].NamespaceSelector = o.namespaceSelector.LabelSelector
 	}
 
 	return webhook

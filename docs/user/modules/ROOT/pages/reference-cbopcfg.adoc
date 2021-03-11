@@ -151,6 +151,51 @@ Is specified, this controls whether a default for persistent volume file system 
 This flag defaults to `true`.
 When set to `false`, this also removes namespace access from the DAC cluster role.
 
+--with-mutation | --with-mutation=<bool>::
+If specified, this controls whether or not to create a `MutationWebHookConfiguration` resource.
+The DAC contains limited functionality to modify resources, preferring to use CRD defaulting where possible.
+As such, this can be disabled on platforms that do not support resource mutation, with little loss in functionality.
++
+This flag defaults to `true`.
+When set to `false`, the `MutationWebHookConfiguration` will not be generated.
+
+--with-resources | --with-resources=<bool>::
+If specified, this will generate pods with resource requests and limits applied.
+On some platforms it is mandatory to provide these values.
++
+This flag defaults to `false`.
+When set to `true`, default CPU and memory requests and limits will be applied to pods, these can be overridden on a per value basis.
+
+--cpu-request <quantity>::
+If specified, this will override the default CPU request for pods.
+This flag is only relevant when specified with the `--with-resources` flag.
++
+This flag defaults to `500m`.
+
+--cpu-limit <quantity>::
+If specified, this will override the default CPU limits for pods.
+This flag is only relevant when specified with the `--with-resources` flag.
++
+This flag defaults to `1`.
+
+--memory-request <quantity>::
+If specified, this will override the default memory request for pods.
+This flag is only relevant when specified with the `--with-resources` flag.
++
+This flag defaults to `100Mi`.
+
+--memory-limit <quantity>::
+If specified, this will override the default memory limits for pods.
+This flag is only relevant when specified with the `--with-resources` flag.
++
+This flag defaults to `200Mi`.
+
+--replicas <int>::
+If specified, this controls the number of replicas deployed for the admission controller.
+This may be employed to make the service more reliable on platforms where Kubernetes cluster autoscaling is employed.
++
+This flag defaults to `1`
+
 === cbopcfg create admission
 
 This command shares all the same options as `cbopcfg generate admission`, but creates them against the Kubernetes API after generation.
@@ -191,6 +236,37 @@ Level `2` is for full logging with all API payloads (including passwords and key
 --pod-creation-timeout <string>::
 If specified, this will override the default pod creation timeout `10m`.
 This timeout applies to creating a Couchbase server pod and any associated persistent volumes.
+
+--with-resources | --with-resources=<bool>::
+If specified, this will generate pods with resource requests and limits applied.
+On some platforms it is mandatory to provide these values.
++
+This flag defaults to `false`.
+When set to `true`, default CPU and memory requests and limits will be applied to pods, these can be overridden on a per value basis.
+
+--cpu-request <quantity>::
+If specified, this will override the default CPU request for pods.
+This flag is only relevant when specified with the `--with-resources` flag.
++
+This flag defaults to `500m`.
+
+--cpu-limit <quantity>::
+If specified, this will override the default CPU limits for pods.
+This flag is only relevant when specified with the `--with-resources` flag.
++
+This flag defaults to `1`.
+
+--memory-request <quantity>::
+If specified, this will override the default memory request for pods.
+This flag is only relevant when specified with the `--with-resources` flag.
++
+This flag defaults to `200Mi`.
+
+--memory-limit <quantity>::
+If specified, this will override the default memory limits for pods.
+This flag is only relevant when specified with the `--with-resources` flag.
++
+This flag defaults to `400Mi`.
 
 === cbopcfg create operator
 

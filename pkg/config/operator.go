@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -26,6 +25,22 @@ const (
 
 	// operatorDefaultPodCreationTimout is the default wait before declaring creation a failure.
 	operatorDefaultPodCreationTimout = 10 * time.Minute
+
+	// operatorDefaultCPURequest is the number of CPUs to schedule for.
+	// On my laptop it's using ~2% cpu at idle, and the operator either polls or
+	// is event driven, there is no CPU heavy spining.
+	operatorDefaultCPURequest = "500m"
+
+	// operatorDefaultCPULimit is the burst number of CPUs to kill the pod if exceeded.
+	operatorDefaultCPULimit = "1"
+
+	// operatorDefaultMemoryRequest is the amount of memory to schedule for.
+	// On my laptop it's using ~45000 RSS with one cluster, there is hardly any effect
+	// when adding a second cluster.
+	operatorDefaultMemoryRequest = "200Mi"
+
+	// operatorDefaultMemoryLimit is the burst amount of memory to kill the pod if exceeded.
+	operatorDefaultMemoryLimit = "400Mi"
 )
 
 // generateOperatorOptions defines the options for creating the operator.
@@ -44,15 +59,53 @@ type generateOperatorOptions struct {
 
 	// podCreationTimeout is the time to wait before declaring pod creation failed.
 	podCreationTimeout durationVar
+
+	// withResources allows you to add resource requests and limits.
+	withResources bool
+
+	// cpuRequest is the number of CPUs to schedule for.
+	cpuRequest quantityVar
+
+	// cpuLimit is the burst number of CPUs to kill the pod if exceeded.
+	cpuLimit quantityVar
+
+	// memoryRequest is the amount of memory to schedule for.
+	memoryRequest quantityVar
+
+	// memoryLimit is the burst amount of memory to kill the pod if exceeded.
+	memoryLimit quantityVar
+}
+
+// newGenerateOperatorOptions returns a set of options with defaults applied.
+func newGenerateOperatorOptions() *generateOperatorOptions {
+	return &generateOperatorOptions{
+		scope:              newScopeVar(scopeNamespace),
+		logLevel:           newZapLogLevelVar(operatorDefaultLogLevel),
+		podCreationTimeout: newDurationVar(operatorDefaultPodCreationTimout),
+		cpuRequest:         newQuantityVar(operatorDefaultCPURequest),
+		cpuLimit:           newQuantityVar(operatorDefaultCPULimit),
+		memoryRequest:      newQuantityVar(operatorDefaultMemoryRequest),
+		memoryLimit:        newQuantityVar(operatorDefaultMemoryLimit),
+	}
+}
+
+// registerOperatorGenerateFlags adds generic generation flags to the provided command.
+func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Command) {
+	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+	cmd.Flags().StringVar(&o.image, "image", operatorImageDefault, "Operator image to use.")
+	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image.")
+	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
+	cmd.Flags().Var(&o.podCreationTimeout, "pod-creation-timeout", "How long to wait before declaring an error when provisioning a pod.")
+	cmd.Flags().BoolVar(&o.withResources, "with-resources", false, "Populates pod resource requests and limits")
+	cmd.Flags().Var(&o.cpuRequest, "cpu-request", "CPU requested for scheduling")
+	cmd.Flags().Var(&o.cpuLimit, "cpu-limit", "CPU limit for constraining")
+	cmd.Flags().Var(&o.memoryRequest, "memory-request", "Memory requested for scheduling")
+	cmd.Flags().Var(&o.memoryLimit, "memory-limit", "Memory limit for constraining")
 }
 
 // getGenerateOperatorCommand creates YAML capable of creating the Operator.
 func getGenerateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
-	o := &generateOperatorOptions{
-		scope:              newScopeVar(scopeNamespace),
-		logLevel:           newZapLogLevelVar(operatorDefaultLogLevel),
-		podCreationTimeout: newDurationVar(operatorDefaultPodCreationTimout),
-	}
+	o := newGenerateOperatorOptions()
 
 	cmd := &cobra.Command{
 		Use:   "operator",
@@ -95,22 +148,14 @@ func getGenerateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 		},
 	}
 
-	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
-	cmd.Flags().StringVar(&o.image, "image", operatorImageDefault, "Operator image to use.")
-	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image.")
-	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
-	cmd.Flags().Var(&o.podCreationTimeout, "pod-creation-timeout", "How long to wait before declaring an error when provisioning a pod.")
+	o.registerOperatorGenerateFlags(cmd)
 
 	return cmd
 }
 
 // getCreateOperatorCommand creates the Operator.
 func getCreateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
-	o := &generateOperatorOptions{
-		scope:              newScopeVar(scopeNamespace),
-		logLevel:           newZapLogLevelVar(operatorDefaultLogLevel),
-		podCreationTimeout: newDurationVar(operatorDefaultPodCreationTimout),
-	}
+	o := newGenerateOperatorOptions()
 
 	cmd := &cobra.Command{
 		Use:   "operator",
@@ -153,20 +198,14 @@ func getCreateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Comma
 		},
 	}
 
-	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
-	cmd.Flags().StringVar(&o.image, "image", operatorImageDefault, "Operator image to use")
-	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
-	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
-	cmd.Flags().Var(&o.podCreationTimeout, "pod-creation-timeout", "How long to wait before declaring an error when provisioning a pod.")
+	o.registerOperatorGenerateFlags(cmd)
 
 	return cmd
 }
 
 // getDeleteOperatorCommand deletes the Operator.
 func getDeleteOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
-	o := &generateOperatorOptions{
-		scope: newScopeVar(scopeNamespace),
-	}
+	o := newGenerateOperatorOptions()
 
 	cmd := &cobra.Command{
 		Use:   "operator",
@@ -206,18 +245,18 @@ func (o *generateOperatorOptions) generate(flags *genericclioptions.ConfigFlags)
 	}
 
 	resources := []runtime.Object{
-		GetOperatorServiceAccount(),
-		GetOperatorRole(o.scope.value.isClusterScope()),
-		GetOperatorRoleBinding(namespace, o.scope.value.isClusterScope()),
-		GetOperatorDeployment(o.image, o.imagePullSecret.imagePullSecrets, o.scope.value.isClusterScope(), o.podCreationTimeout.value, o.logLevel.value),
-		GenerateOperatorService(),
+		o.getOperatorServiceAccount(),
+		o.getOperatorRole(),
+		o.getOperatorRoleBinding(namespace),
+		o.getOperatorDeployment(),
+		o.getOperatorService(),
 	}
 
 	return resources, nil
 }
 
-// GetOperatorRole generates the cluster role to run with.
-func GetOperatorRole(cluster bool) runtime.Object {
+// getOperatorRole generates the cluster role to run with.
+func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 	metadata := metav1.ObjectMeta{
 		Name: OperatorResourceName,
 	}
@@ -392,7 +431,7 @@ func GetOperatorRole(cluster bool) runtime.Object {
 		},
 	}
 
-	if cluster {
+	if o.scope.value.isClusterScope() {
 		return &rbacv1.ClusterRole{
 			ObjectMeta: metadata,
 			Rules:      rules,
@@ -405,8 +444,8 @@ func GetOperatorRole(cluster bool) runtime.Object {
 	}
 }
 
-// GetOperatorServiceAccount generates the service account to run as.
-func GetOperatorServiceAccount() *corev1.ServiceAccount {
+// getOperatorServiceAccount generates the service account to run as.
+func (o *generateOperatorOptions) getOperatorServiceAccount() *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: OperatorResourceName,
@@ -414,8 +453,8 @@ func GetOperatorServiceAccount() *corev1.ServiceAccount {
 	}
 }
 
-// GetOperatorRoleBinding generates the cluster role binding linking the role to the service account.
-func GetOperatorRoleBinding(namespace string, cluster bool) runtime.Object {
+// getOperatorRoleBinding generates the cluster role binding linking the role to the service account.
+func (o *generateOperatorOptions) getOperatorRoleBinding(namespace string) runtime.Object {
 	metadata := metav1.ObjectMeta{
 		Name: OperatorResourceName,
 	}
@@ -428,7 +467,7 @@ func GetOperatorRoleBinding(namespace string, cluster bool) runtime.Object {
 		},
 	}
 
-	if cluster {
+	if o.scope.value.isClusterScope() {
 		return &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metadata,
 			Subjects:   subjects,
@@ -451,8 +490,8 @@ func GetOperatorRoleBinding(namespace string, cluster bool) runtime.Object {
 	}
 }
 
-// GetOperatorDeployment returns the canonical way to run the operator.
-func GetOperatorDeployment(image string, imagePullSecrets []string, cluster bool, podCreateTimeout fmt.Stringer, logLevel string) *appsv1.Deployment {
+// getOperatorDeployment returns the canonical way to run the operator.
+func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 	replicas := int32(1)
 
 	// IF we are running namespace scoped, then use the namespace metadata
@@ -462,7 +501,7 @@ func GetOperatorDeployment(image string, imagePullSecrets []string, cluster bool
 		Name: "WATCH_NAMESPACE",
 	}
 
-	if !cluster {
+	if !o.scope.value.isClusterScope() {
 		namespaceEnv.ValueFrom = &corev1.EnvVarSource{
 			FieldRef: &corev1.ObjectFieldSelector{
 				FieldPath: "metadata.namespace",
@@ -492,13 +531,13 @@ func GetOperatorDeployment(image string, imagePullSecrets []string, cluster bool
 					Containers: []corev1.Container{
 						{
 							Name:  OperatorResourceName,
-							Image: image,
+							Image: o.image,
 							Command: []string{
 								OperatorResourceName,
 							},
 							Args: []string{
-								"--pod-create-timeout=" + podCreateTimeout.String(),
-								"--zap-level=" + logLevel,
+								"--pod-create-timeout=" + o.podCreationTimeout.value.String(),
+								"--zap-level=" + o.logLevel.value,
 							},
 							Env: []corev1.EnvVar{
 								namespaceEnv,
@@ -537,7 +576,20 @@ func GetOperatorDeployment(image string, imagePullSecrets []string, cluster bool
 		},
 	}
 
-	for _, secret := range imagePullSecrets {
+	if o.withResources {
+		deployment.Spec.Template.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    o.cpuRequest.value,
+				corev1.ResourceMemory: o.memoryRequest.value,
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    o.cpuLimit.value,
+				corev1.ResourceMemory: o.memoryLimit.value,
+			},
+		}
+	}
+
+	for _, secret := range o.imagePullSecret.imagePullSecrets {
 		reference := corev1.LocalObjectReference{
 			Name: secret,
 		}
@@ -549,7 +601,7 @@ func GetOperatorDeployment(image string, imagePullSecrets []string, cluster bool
 }
 
 // Required by istio.
-func GenerateOperatorService() *corev1.Service {
+func (o *generateOperatorOptions) getOperatorService() *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: OperatorResourceName,
@@ -574,4 +626,15 @@ func GenerateOperatorService() *corev1.Service {
 			},
 		},
 	}
+}
+
+// GetOperatorDeployment is a hook for use by QE.
+func GetOperatorDeployment(image string, imagePullSecrets []string, podCreationTimeout time.Duration, logLevel string) *appsv1.Deployment {
+	o := newGenerateOperatorOptions()
+	o.image = image
+	o.imagePullSecret.imagePullSecrets = imagePullSecrets
+	o.podCreationTimeout.value = podCreationTimeout
+	o.logLevel.value = logLevel
+
+	return o.getOperatorDeployment()
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -176,4 +177,39 @@ func (v *imagePullSecretVar) Type() string {
 // String returns the default value.
 func (v *imagePullSecretVar) String() string {
 	return ""
+}
+
+// quantityVar allows the specification of quantity for platforms that
+// require requests and limits.
+type quantityVar struct {
+	value resource.Quantity
+}
+
+// newQuantityVar returns a new initialized quantity.
+func newQuantityVar(s string) quantityVar {
+	return quantityVar{
+		value: resource.MustParse(s),
+	}
+}
+
+// Set sets the variable from CLI input.
+func (v *quantityVar) Set(s string) error {
+	value, err := resource.ParseQuantity(s)
+	if err != nil {
+		return err
+	}
+
+	v.value = value
+
+	return nil
+}
+
+// Type returns the variable type.
+func (v *quantityVar) Type() string {
+	return "quantity"
+}
+
+// String returns the default value.
+func (v *quantityVar) String() string {
+	return v.value.String()
 }

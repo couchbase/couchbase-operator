@@ -369,8 +369,8 @@ func GetDuration(timeoutStr string) time.Duration {
 	return durationToReturn
 }
 
-func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout fmt.Stringer, logLevel string) *appsv1.Deployment {
-	deployment := config.GetOperatorDeployment(operatorImage, k8s.PullSecrets, false, podCreateTimeout, logLevel)
+func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout time.Duration, logLevel string) *appsv1.Deployment {
+	deployment := config.GetOperatorDeployment(operatorImage, k8s.PullSecrets, podCreateTimeout, logLevel)
 
 	return deployment
 }
