@@ -1156,7 +1156,9 @@ type ClusterSpec struct {
 	// total of service allocations defined in `spec.cluster`, plus an overhead defined
 	// by `spec.autoResourceAllocation.overheadPercent`.Changing individual allocations for
 	// a service will cause a cluster upgrade as allocations are modified in the underlying
-	// pods.
+	// pods.  This field also allows default pod CPU requests and limits to be applied.
+	// All resource allocations can be overridden by explcitly configuring them in the
+	// `spec.servers.resources` field.
 	AutoResourceAllocation *AutoResourceAllocation `json:"autoResourceAllocation,omitempty"`
 
 	// AntiAffinity forces the Operator to schedule different Couchbase server pods on
@@ -1583,6 +1585,23 @@ type AutoResourceAllocation struct {
 	// +kubebuilder:default=25
 	// +kubebuilder:validation:Minimum=0
 	OverheadPercent int `json:"overheadPercent,omitempty"`
+
+	// CPURequests automatically populates the CPU requests across all Couchbase
+	// server pods.  The default vaule of "2", is the minimum recommended number of
+	// CPUs required to run Couchbase Server.  Explicitly specifying the CPU request
+	// for a particular server class will override this value. More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// +kubebuilder:default="2"
+	// +kubebuilder:validation:Type=string
+	CPURequests *resource.Quantity `json:"cpuRequests,omitempty"`
+
+	// CPULimits automatically populates the CPU limits across all Couchbase
+	// server pods.  This field defaults to "4" CPUs.  Explicitly specifying the CPU
+	// limit for a particular server class will override this value.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// +kubebuilder:default="4"
+	// +kubebuilder:validation:Type=string
+	CPULimits *resource.Quantity `json:"cpuLimits,omitempty"`
 }
 
 // CouchbaseClusterIndexStorageSetting describes the allowed storage engines for

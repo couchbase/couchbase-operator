@@ -938,14 +938,6 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 	// be manually enabled to maintain current behaviour...
 	autoAllocation := cluster.Spec.AutoResourceAllocation != nil && cluster.Spec.AutoResourceAllocation.Enabled
 
-	// ...and only allowed when not manually overridden at the pod spec level
-	// as this gives support a get-out-of-jail-free card.
-	if autoAllocation && c.Resources.Requests != nil {
-		if _, ok := c.Resources.Requests[v1.ResourceMemory]; ok {
-			autoAllocation = false
-		}
-	}
-
 	if autoAllocation {
 		memoryRequests := resource.Quantity{}
 
@@ -972,11 +964,33 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 
 		memoryRequests.Add(*overhead)
 
+		// Add requests and limits maps if they don't exist.
 		if c.Resources.Requests == nil {
 			c.Resources.Requests = v1.ResourceList{}
 		}
 
-		c.Resources.Requests[v1.ResourceMemory] = memoryRequests
+		if c.Resources.Limits == nil {
+			c.Resources.Limits = v1.ResourceList{}
+		}
+
+		// If not already defined explicitly add in the implicit memory request.
+		if _, ok := c.Resources.Requests[v1.ResourceMemory]; !ok {
+			c.Resources.Requests[v1.ResourceMemory] = memoryRequests
+		}
+
+		// If not already defined explicitly add in the implicit cpu request.
+		if cluster.Spec.AutoResourceAllocation.CPURequests != nil {
+			if _, ok := c.Resources.Requests[v1.ResourceCPU]; !ok {
+				c.Resources.Requests[v1.ResourceCPU] = *cluster.Spec.AutoResourceAllocation.CPURequests
+			}
+		}
+
+		// If not already defined explicitly add in the implicit cpu limit.
+		if cluster.Spec.AutoResourceAllocation.CPULimits != nil {
+			if _, ok := c.Resources.Limits[v1.ResourceCPU]; !ok {
+				c.Resources.Limits[v1.ResourceCPU] = *cluster.Spec.AutoResourceAllocation.CPULimits
+			}
+		}
 	}
 
 	return c

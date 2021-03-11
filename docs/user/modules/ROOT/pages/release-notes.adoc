@@ -62,7 +62,7 @@ This provides the ability to rotate passwords and certificates on the remote clu
 Kubernetes allows pods to reserve and limit compute resources.
 Resource reservation provides Kubernetes with the ability to fairly schedule pods so that they don't complete for CPU and memory.
 
-The Operator now provides the ability to automatically manage pod memory resource requests with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoresourceallocation[`couchbaseclusters.spec.autoResourceAllocation`] field.
+The Operator now provides the ability to automatically manage pod CPU and memory resource requests with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoresourceallocation[`couchbaseclusters.spec.autoResourceAllocation`] field.
 When in use, pods will have their resource requests automatically populated depending on the services enabled on that pod, and the individual Couchbase service quotas.
 
 Updating quotas will cause the cluster to upgrade as pod resource requests are updated.

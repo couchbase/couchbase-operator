@@ -70,6 +70,42 @@ Use of anti-affinity is highly recommended for production clusters.
 
 AutoResourceAllocation populates pod resource requests based on the services running on that pod.
 When enabled, this feature will calculate the memory request as the total of service allocations defined in `spec.cluster`, plus an overhead defined by `spec.autoResourceAllocation.overheadPercent`.Changing individual allocations for a service will cause a cluster upgrade as allocations are modified in the underlying pods.
+This field also allows default pod CPU requests and limits to be applied.
+All resource allocations can be overridden by explcitly configuring them in the `spec.servers.resources` field.
+
+=== couchbaseclusters.spec.autoResourceAllocation.cpuLimits
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `4`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+CPULimits automatically populates the CPU limits across all Couchbase server pods.
+This field defaults to "4" CPUs.
+Explicitly specifying the CPU limit for a particular server class will override this value.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+
+=== couchbaseclusters.spec.autoResourceAllocation.cpuRequests
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `2`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+CPURequests automatically populates the CPU requests across all Couchbase server pods.
+The default vaule of "2", is the minimum recommended number of CPUs required to run Couchbase Server.
+Explicitly specifying the CPU request for a particular server class will override this value.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.autoResourceAllocation.enabled
 
