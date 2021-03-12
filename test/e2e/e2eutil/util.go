@@ -206,7 +206,7 @@ func applyAuditing(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.Co
 
 // ClusterOptions is used to generate or create all Couchbase clusters by the framework.
 // The key observation is all clusters are ostensibly the same, with features layered on
-// top.  We use the builder pattern to declare those features, so they are onlt defined
+// top.  We use the builder pattern to declare those features, so they are only defined
 // in a single place.  You can still generate a cluster (as opposed to create one) in
 // order to add more esoteric configuration that isn't quite generic enough to warrant
 // a build step.
@@ -234,6 +234,18 @@ type ClusterOptions struct {
 func (o *ClusterOptions) WithEphemeralTopology(size int) *ClusterOptions {
 	topology := e2espec.EphemeralTopology.DeepCopy()
 	topology[0].Size = size
+
+	o.Options.Topology = topology
+
+	return o
+}
+
+// WithMixedEphemeralTopology defines a cluster as having
+// data/index in one server class and query in the other.
+func (o *ClusterOptions) WithMixedEphemeralTopology(size int) *ClusterOptions {
+	topology := e2espec.MixedEphemeralTopology.DeepCopy()
+	topology[0].Size = size
+	topology[1].Size = size
 
 	o.Options.Topology = topology
 
@@ -356,6 +368,13 @@ func (o *ClusterOptions) WithGenericNetworking() *ClusterOptions {
 // WithDefaultStorageClass overrides the explicit storage class and uses the default.
 func (o *ClusterOptions) WithDefaultStorageClass() *ClusterOptions {
 	o.Options.StorageClass = ""
+
+	return o
+}
+
+// WithAutoscaleStabilizationPeriod insulates cluster from scale requests while scaling.
+func (o *ClusterOptions) WithAutoscaleStabilizationPeriod(seconds int) *ClusterOptions {
+	o.Options.AutoscaleStabilizationPeriod = &metav1.Duration{Duration: time.Duration(seconds) * time.Second}
 
 	return o
 }

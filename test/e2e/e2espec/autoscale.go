@@ -2,7 +2,7 @@ package e2espec
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
-	v2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -14,23 +14,131 @@ import (
 const (
 	apiServerApp      = "custom-metrics-apiserver"
 	apiRBACRoleName   = "custom-metrics-resource-reader"
-	apiServerAppImage = "tahmmee/k8s-test-metrics-adapter-amd64:latest"
+	apiServerAppImage = "tahmmee/k8s-test-metrics-adapter-amd64:v1"
 )
 
+const (
+	// Metric incrementing from 0-100 by 10.
+	TestMetricIncrement = "test-metric-increment"
+
+	// Metric decrementing from 100-0 by 10.
+	TestMetricDecrement = "test-metric-decrement"
+
+	// Default is to avoid scaling below 1.
+	defaultMinPods int32 = 1
+
+	// Default is to avoid scaling above 6.
+	defaultMaxPods int32 = 6
+
+	// Default target threshold for metrics.
+	// For incrementing metrics, scale up occurs as this value is exceeded.
+	// For decrementing metrics, scale down occurs as this value is subceed(ed).
+	DefaultMetricTarget int64 = 80
+
+	// Default for period of time required between successive scaling requests.
+	defaultPeriodSeconds int32 = 15
+
+	// Default value for native HorizontalPodAutoscaler stabilization.
+	// This defines how long HPA must wait to perform initial scaling
+	// or to allow direction changes.
+	DefaultHPAStabilizationPeriod int32 = 30
+
+	// Low HPA stabilization allows for immediate scaling in any direction.
+	LowHPAStabilizationPeriod int32 = 0
+
+	// Default value of 30 seconds for the Couchbase AutoscaleStabilizationPeriod.
+	// This defines how long after a rebalance the cluster must wait before
+	// accepting new scaling requests.
+	DefaultClusterStabilizationPeriod = 30
+
+	// Low Cluster Stabilization allows for cluster to go into
+	// maintenance mode only during rebalance without any wait after.
+	LowClusterStabilizationPeriod = 0
+)
+
+// Configuration for a HorizontalPodAutoscaler.
+type HPAConfig struct {
+
+	// Minimum number of Couchbase Pods when scaling down
+	MinSize int32
+
+	// Minimum number of Couchbase Pods when scaling up
+	MaxSize int32
+
+	// Name of metric being targeted
+	TargetMetricName string
+
+	// Target value of metric which results in scaling as
+	// stats are above/below target
+	TargetMetricValue int64
+
+	// Scale up and down behaviors for tuning the rate of autoscaling operations
+	Behavior *autoscalingv2beta2.HorizontalPodAutoscalerBehavior
+}
+
+func newHPAConfig(min int32, max int32, targetValue int64, targetName string) *HPAConfig {
+	return &HPAConfig{
+		MinSize:           min,
+		MaxSize:           max,
+		TargetMetricName:  targetName,
+		TargetMetricValue: targetValue,
+		Behavior: &autoscalingv2beta2.HorizontalPodAutoscalerBehavior{
+			ScaleUp:   &autoscalingv2beta2.HPAScalingRules{},
+			ScaleDown: &autoscalingv2beta2.HPAScalingRules{},
+		},
+	}
+}
+
+func NewIncrementingHPAConfig(targetValue int64) *HPAConfig {
+	return newHPAConfig(defaultMinPods, defaultMaxPods, targetValue, TestMetricIncrement)
+}
+
+func NewDecrementingHPAConfig(targetValue int64) *HPAConfig {
+	return newHPAConfig(defaultMinPods, defaultMaxPods, targetValue, TestMetricDecrement)
+}
+
+// Sets scaling stabilization window which controls period of time required
+// for HPA to suggest initial scale down or change direction from scale up.
+func (h *HPAConfig) WithScaleDownStabilizationWindow(period int32) *HPAConfig {
+	h.Behavior.ScaleDown.StabilizationWindowSeconds = &period
+	return h
+}
+
+// Sets scaling stabilization window which controls period of time required
+// for HPA to suggest initial scale up or change direction from scale down.
+func (h *HPAConfig) WithScaleUpStabilizationWindow(period int32) *HPAConfig {
+	h.Behavior.ScaleUp.StabilizationWindowSeconds = &period
+	return h
+}
+
+// Sets scaling in any direction to at most 1 pod.
+func (h *HPAConfig) WithSinglePodScalingPolicy() *HPAConfig {
+	policy := autoscalingv2beta2.HPAScalingPolicy{
+		Type:          autoscalingv2beta2.PodsScalingPolicy,
+		Value:         1,
+		PeriodSeconds: defaultPeriodSeconds,
+	}
+	h.Behavior.ScaleUp.Policies = []autoscalingv2beta2.HPAScalingPolicy{policy}
+	h.Behavior.ScaleDown.Policies = []autoscalingv2beta2.HPAScalingPolicy{policy}
+
+	return h
+}
+
 // NewHorizontalPodAutoscaler returns spec of an HPA resource.
-func NewHorizontalPodAutoscaler(name string, minSize int32, maxSize int32, metrics []v2beta2.MetricSpec) *v2beta2.HorizontalPodAutoscaler {
-	return &v2beta2.HorizontalPodAutoscaler{
+func NewHorizontalPodAutoscaler(name string, config *HPAConfig, metrics []autoscalingv2beta2.MetricSpec) *autoscalingv2beta2.HorizontalPodAutoscaler {
+	return &autoscalingv2beta2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v2beta2.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: v2beta2.CrossVersionObjectReference{
+		Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
 				Name:       name,
 				Kind:       "CouchbaseAutoscaler",
 				APIVersion: "couchbase.com/v2",
 			},
-			MinReplicas: &minSize,
-			MaxReplicas: maxSize,
+			Behavior:    config.Behavior,
+			MinReplicas: &config.MinSize,
+			MaxReplicas: config.MaxSize,
 			Metrics:     metrics,
 		},
 	}
@@ -38,26 +146,22 @@ func NewHorizontalPodAutoscaler(name string, minSize int32, maxSize int32, metri
 
 // NewAverageValueHPA is a HPA with a single metric
 // targeting an average value among Pods.
-func NewAverageValueHPA(name string, minSize int32, maxSize int32, metricName string, value int64) *v2beta2.HorizontalPodAutoscaler {
-	metrics := v2beta2.MetricSpec{
-		Type: v2beta2.PodsMetricSourceType,
-		Pods: &v2beta2.PodsMetricSource{
-			Metric: v2beta2.MetricIdentifier{
-				Name: metricName,
+func NewAverageValueHPA(name string, config *HPAConfig) *autoscalingv2beta2.HorizontalPodAutoscaler {
+	metrics := autoscalingv2beta2.MetricSpec{
+		Type: autoscalingv2beta2.PodsMetricSourceType,
+		Pods: &autoscalingv2beta2.PodsMetricSource{
+			Metric: autoscalingv2beta2.MetricIdentifier{
+				Name: config.TargetMetricName,
 			},
-			Target: v2beta2.MetricTarget{
-				Type:         v2beta2.AverageValueMetricType,
-				AverageValue: resource.NewQuantity(value, resource.DecimalSI),
+			Target: autoscalingv2beta2.MetricTarget{
+				Type:         autoscalingv2beta2.AverageValueMetricType,
+				AverageValue: resource.NewQuantity(config.TargetMetricValue, resource.DecimalSI),
 			},
 		},
 	}
-	hpa := NewHorizontalPodAutoscaler(name, minSize, maxSize, []v2beta2.MetricSpec{metrics})
+	hpa := NewHorizontalPodAutoscaler(name, config, []autoscalingv2beta2.MetricSpec{metrics})
 
 	return hpa
-}
-
-// TODO: in k8s 1.18 we can test HPA with scale behaviors.
-func NewBehaviorAutoscaler() {
 }
 
 // Generate service account used by custom metrics deployment.

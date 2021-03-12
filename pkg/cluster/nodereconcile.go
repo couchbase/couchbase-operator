@@ -37,6 +37,7 @@ const (
 	ReconcileAddNodes
 	ReconcileServerGroups
 	ReconcileNodeServices
+	ReconcileAutoscaleServerConfigs
 	ReconcileRebalance
 	ReconcileDeadMembers
 	ReconcileNotifyFinished
@@ -65,25 +66,26 @@ func (r reconcileFuncMap) lookup(state ReconcileState) (reconcileFunc, error) {
 
 var (
 	reconcileFunctions = reconcileFuncMap{
-		ReconcileInit:             handleInit,
-		ReconcileUnknownMembers:   handleUnknownMembers,
-		ReconcileRebalanceCheck:   handleRebalanceCheck,
-		ReconcileWarmupNodes:      handleWarmupNodes,
-		ReconcileDownNodes:        handleDownNodes,
-		ReconcileUnclusteredNodes: handleUnclusteredNodes,
-		ReconcileFailedAddNodes:   handleFailedAddNodes,
-		ReconcileAddBackNodes:     handleAddBackNodes,
-		ReconcileFailedNodes:      handleFailedNodes,
-		ReconcileServerConfigs:    handleUnknownServerConfigs,
-		ReconcileVolumeExpansion:  handleVolumeExpansion,
-		ReconcileUpgradeNode:      handleUpgradeNode,
-		ReconcileRemoveNodes:      handleRemoveNode,
-		ReconcileAddNodes:         handleAddNode,
-		ReconcileServerGroups:     handleServerGroups,
-		ReconcileNodeServices:     handleNodeServices,
-		ReconcileRebalance:        handleRebalance,
-		ReconcileDeadMembers:      handleDeadMembers,
-		ReconcileNotifyFinished:   handleNotifyFinished,
+		ReconcileInit:                   handleInit,
+		ReconcileUnknownMembers:         handleUnknownMembers,
+		ReconcileRebalanceCheck:         handleRebalanceCheck,
+		ReconcileWarmupNodes:            handleWarmupNodes,
+		ReconcileDownNodes:              handleDownNodes,
+		ReconcileUnclusteredNodes:       handleUnclusteredNodes,
+		ReconcileFailedAddNodes:         handleFailedAddNodes,
+		ReconcileAddBackNodes:           handleAddBackNodes,
+		ReconcileFailedNodes:            handleFailedNodes,
+		ReconcileServerConfigs:          handleUnknownServerConfigs,
+		ReconcileVolumeExpansion:        handleVolumeExpansion,
+		ReconcileUpgradeNode:            handleUpgradeNode,
+		ReconcileRemoveNodes:            handleRemoveNode,
+		ReconcileAddNodes:               handleAddNode,
+		ReconcileServerGroups:           handleServerGroups,
+		ReconcileNodeServices:           handleNodeServices,
+		ReconcileAutoscaleServerConfigs: handleAutoscaleServerConfigs,
+		ReconcileRebalance:              handleRebalance,
+		ReconcileDeadMembers:            handleDeadMembers,
+		ReconcileNotifyFinished:         handleNotifyFinished,
 	}
 )
 
@@ -1086,6 +1088,29 @@ func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
 
 	if err := c.reconcileMemberAlternateAddresses(); err != nil {
 		return err
+	}
+
+	r.transitionState(ReconcileAutoscaleServerConfigs)
+
+	return nil
+}
+
+// When cluster is under topology changes that are outside of
+// HorizontalPodAutoscaler or due to pending changes via restart/crash,
+// incoming requests from the HorizontalPodAutoscaler are suspended.
+func handleAutoscaleServerConfigs(r *ReconcileMachine, c *Cluster) error {
+	// Check if cluster is rebalancing (or needs to be rebalanced), and pause HPA activity
+	// by entering 'maintenance-mode' to prevent any intermediate scaling requests.
+	if c.cluster.Spec.AutoscaleStabilizationPeriod != nil {
+		if r.couchbase.IsRebalancing || r.couchbase.NeedsRebalance {
+			if err := c.startAutoscalingMaintenanceMode(); err != nil {
+				return err
+			}
+		} else {
+			if err := c.endAutoscalingMaintenanceMode(); err != nil {
+				return err
+			}
+		}
 	}
 
 	r.transitionState(ReconcileRebalance)

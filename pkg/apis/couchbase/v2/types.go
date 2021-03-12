@@ -1066,7 +1066,7 @@ type CouchbaseAutoscalerStatus struct {
 	LabelSelector string `json:"labelSelector"`
 
 	// Size is the current size of the server group.
-	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Minimum=1
 	Size int `json:"size"`
 }
 
@@ -1359,7 +1359,24 @@ type ClusterSpec struct {
 	Backup Backup `json:"backup,omitempty"`
 
 	// EnablePreviewScaling enables autoscaling for stateful services and buckets.
+	// DEPRECATED - This option only exists for backwards compatibility and no longer
+	// restricts autoscaling to ephemeral services. To be removed in future releases.
 	EnablePreviewScaling bool `json:"enablePreviewScaling,omitempty"`
+
+	// AutoscaleStabilizationPeriod defines how long after a rebalance the
+	// corresponding HorizontalPodAutoscaler should remain in maintenance mode.
+	// During maintenance mode all autoscaling is disabled since every HorizontalPodAutoscaler
+	// associated with the cluster becomes inactive.
+	// Since certain metrics can be unpredictable when Couchbase is rebalancing or upgrading,
+	// setting a stabilization period helps to prevent scaling recommendations from the
+	// HorizontalPodAutoscaler for a provided period of time.
+	//
+	// Values must be a valid Kubernetes duration of 0s or higher:
+	// https://golang.org/pkg/time/#ParseDuration
+	// A value of 0, puts the cluster in maintenance mode during rebalance but
+	// immediately exits this mode once the rebalance has completed.
+	// When undefined, the HPA is never put into maintenance mode during rebalance.
+	AutoscaleStabilizationPeriod *metav1.Duration `json:"autoscaleStabilizationPeriod,omitempty"`
 
 	// EnableOnlineVolumeExpansion enables online expansion of Persistent Volumes.
 	// You can only expand a PVC if its storage class's "allowVolumeExpansion" field is set to true.
@@ -2383,17 +2400,18 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;Upgrading;Hibernating;Error
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;Upgrading;Hibernating;Error;AutoscaleReady
 type ClusterConditionType string
 
 const (
-	ClusterConditionAvailable    ClusterConditionType = "Available"
-	ClusterConditionBalanced     ClusterConditionType = "Balanced"
-	ClusterConditionManageConfig ClusterConditionType = "ManageConfig"
-	ClusterConditionScaling      ClusterConditionType = "Scaling"
-	ClusterConditionUpgrading    ClusterConditionType = "Upgrading"
-	ClusterConditionHibernating  ClusterConditionType = "Hibernating"
-	ClusterConditionError        ClusterConditionType = "Error"
+	ClusterConditionAvailable      ClusterConditionType = "Available"
+	ClusterConditionBalanced       ClusterConditionType = "Balanced"
+	ClusterConditionManageConfig   ClusterConditionType = "ManageConfig"
+	ClusterConditionScaling        ClusterConditionType = "Scaling"
+	ClusterConditionUpgrading      ClusterConditionType = "Upgrading"
+	ClusterConditionHibernating    ClusterConditionType = "Hibernating"
+	ClusterConditionError          ClusterConditionType = "Error"
+	ClusterConditionAutoscaleReady ClusterConditionType = "AutoscaleReady"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

@@ -52,6 +52,9 @@ var (
 
 	// ErrVolumeResizeError is raised when a request to resize a Persistent Volume fails.
 	ErrVolumeResizeError = errors.New("volume resize failed")
+
+	// ErrUnknownCondition is raised when unexpectedly encountered condition with unknown status.
+	ErrUnknownCondition = errors.New("encountered unknown condition")
 )
 
 // Couchbase server specific errors.

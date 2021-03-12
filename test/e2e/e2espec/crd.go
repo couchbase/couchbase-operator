@@ -86,6 +86,24 @@ var (
 		},
 	}
 
+	// MixedEphemeralTopology separates stateful and
+	// stateless services into separate server groups.
+	MixedEphemeralTopology = ClusterTopology{
+		{
+			Name: "default",
+			Services: []couchbasev2.Service{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+			},
+		},
+		{
+			Name: "query",
+			Services: []couchbasev2.Service{
+				couchbasev2.QueryService,
+			},
+		},
+	}
+
 	// PersistentTopology is a persistent volume backed cluster, this is
 	// what we expect customers to use.
 	PersistentTopology = ClusterTopology{
@@ -157,6 +175,10 @@ type ClusterOptions struct {
 
 	// Istio support.
 	Istio bool
+
+	// Enbles maintenance mode of Autoscaler during rebalance and specifies
+	// optional duration of time to wait after before re-enabling autoscaler
+	AutoscaleStabilizationPeriod *metav1.Duration
 }
 
 // bucket settings.
@@ -459,6 +481,7 @@ func NewBasicCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
 				Image:          options.BackupImage,
 				ServiceAccount: config.BackupResourceName,
 			},
+			AutoscaleStabilizationPeriod: options.AutoscaleStabilizationPeriod,
 		},
 	}
 

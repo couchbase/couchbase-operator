@@ -2,30 +2,80 @@ package e2eutil
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// HPAManager creates a Couchbase Cluster and associates it with
+// HorizontalPodAutoscalers (HPA). A HPA will be created for each
+// couchbase config with autoscaling enable.
+type HPAManager struct {
+	CouchbaseCluster *couchbasev2.CouchbaseCluster
+
+	HorizontalPodAutoscalers []*autoscalingv2beta2.HorizontalPodAutoscaler
+
+	Cleanup func()
+}
+
+func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2espec.ClusterOptions, hpaConfigs ...*e2espec.HPAConfig) *HPAManager {
+	// Begin with basic autoscale enabled cluster
+	clusterSpec := MustNewAutoscaleCluster(t, k8s, couchbaseOptions)
+
+	// Create HPA to target specified metric
+	autoscalers := []*autoscalingv2beta2.HorizontalPodAutoscaler{}
+
+	for i, serverConfig := range clusterSpec.Spec.Servers {
+		// HPA references CouchbaseAutoscaler reference which must exist
+		autoscalerName := serverConfig.AutoscalerName(clusterSpec.Name)
+		MustWaitUntilCouchbaseAutoscalerExists(t, k8s, clusterSpec, autoscalerName, 1*time.Minute)
+
+		// HPA can be configured differently for each server config when multiple HPAConfigs are provided
+		config := hpaConfigs[0]
+		if len(hpaConfigs) > i {
+			config = hpaConfigs[i]
+		}
+
+		hpa := MustCreateAverageValueHPA(t, k8s, clusterSpec.Namespace, autoscalerName, config)
+		autoscalers = append(autoscalers, hpa)
+	}
+
+	// Create the metric server for metric generation
+	cleanup := MustCreateCustomMetricServer(t, k8s, clusterSpec.Namespace, clusterSpec.Name)
+
+	return &HPAManager{
+		CouchbaseCluster:         clusterSpec,
+		HorizontalPodAutoscalers: autoscalers,
+		Cleanup:                  cleanup,
+	}
+}
 
 // MustNewAutoscaleCluster creates a new Autoscale enabled
 // basic cluster, retrying if an error is encountered.
 func MustNewAutoscaleCluster(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions) *couchbasev2.CouchbaseCluster {
 	clusterSpec := e2espec.NewBasicCluster(options)
-	clusterSpec.Spec.Servers[0].AutoscaleEnabled = true
-	clusterSpec.Spec.EnablePreviewScaling = true
+	clusterSpec.Spec.EnablePreviewScaling = false
+
+	for i := range clusterSpec.Spec.Servers {
+		clusterSpec.Spec.Servers[i].AutoscaleEnabled = true
+	}
 
 	return MustNewClusterFromSpec(t, k8s, clusterSpec)
 }
 
 // MustNewAutoscaleClusterMDS creates new Autoscale enabled
 // cluster with scaling enabled for specific servers.
-func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, configName string, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
+func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
 	// select only query config for autoscaling
 	cluster := e2espec.NewBasicCluster(options)
 	applyTLS(cluster, tls)
@@ -34,7 +84,7 @@ func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, options *e2esp
 	// add query only config with autoscale enabled
 	queryConfig := couchbasev2.ServerConfig{
 		Size:             options.Topology[0].Size,
-		Name:             configName,
+		Name:             constants.CouchbaseServerAltConfig,
 		Services:         couchbasev2.ServiceList{couchbasev2.QueryService},
 		AutoscaleEnabled: true,
 	}
@@ -75,9 +125,9 @@ func MustDisableCouchbaseAutoscaling(t *testing.T, k8s *types.Cluster, cluster *
 	return cluster
 }
 
-// MustCreateAverageValueHPA requires successful creation of hpa resource.
-func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, minSize int32, maxSize int32, metricName string, value int64) *autoscalingv2beta2.HorizontalPodAutoscaler {
-	hpa := e2espec.NewAverageValueHPA(name, minSize, maxSize, metricName, value)
+// MustCreateAverageValueHPA uses Averaging algorithm on target metrics to determine resize activity.
+func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, config *e2espec.HPAConfig) *autoscalingv2beta2.HorizontalPodAutoscaler {
+	hpa := e2espec.NewAverageValueHPA(name, config)
 	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), hpa, metav1.CreateOptions{})
 
 	if err != nil {
@@ -177,4 +227,29 @@ func MustUpdateScale(t *testing.T, k8s *types.Cluster, namespace string, name st
 	}
 
 	return scale
+}
+
+// MustValidateAutoscaleReadyStatus requires autoscale ready status to match the provided status argument.
+func MustValidateAutoscaleReadyStatus(t *testing.T, k8s *types.Cluster, clusterNamespace string, clusterName string, status v1.ConditionStatus) {
+	cluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(clusterNamespace).Get(context.Background(), clusterName, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	readyCondition := cluster.Status.GetCondition(couchbasev2.ClusterConditionAutoscaleReady)
+	if readyCondition == nil {
+		err := fmt.Errorf("autoscale condition is undefined")
+		Die(t, err)
+	} else if readyCondition.Status != status {
+		// Condition is not immediately set, let's wait for it
+		MustWaitForClusterCondition(t, k8s, couchbasev2.ClusterConditionAutoscaleReady, status, cluster, 5*time.Minute)
+	}
+}
+
+// MustValidateAutoscalerSize requires size of autoscaler spec to match the provided size argument.
+func MustValidateAutoscalerSize(t *testing.T, k8s *types.Cluster, namespace string, name string, size int) {
+	autoscaler := MustGetCouchbaseAutoscaler(t, k8s, namespace, name)
+	if autoscaler.Spec.Size != size {
+		Die(t, fmt.Errorf("expected autoscale size to be %d, but got %d", size, autoscaler.Spec.Size))
+	}
 }

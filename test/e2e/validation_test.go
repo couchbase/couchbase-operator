@@ -2004,10 +2004,6 @@ func TestRBACValidationLDAP(t *testing.T) {
 func TestAutoscalerValidation(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:       "TestAutoscalerDefaults",
-			shouldFail: false,
-		},
-		{
 			name:           "TestAutoscalerMissingServers",
 			mutations:      patchMap{"scaler": jsonpatch.NewPatchSet().Remove("/spec/servers")},
 			expectedErrors: []string{"spec.servers"},
@@ -2017,6 +2013,12 @@ func TestAutoscalerValidation(t *testing.T) {
 			name:           "TestAutoscalerMissingSize",
 			mutations:      patchMap{"scaler": jsonpatch.NewPatchSet().Remove("/spec/size")},
 			expectedErrors: []string{"spec.size"},
+			shouldFail:     true,
+		},
+		{
+			name:           "TestAutoscalerNegStabilizationPeriod",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/autoscaleStabilizationPeriod", "-1s")},
+			expectedErrors: []string{"spec.autoscaleStabilizationPeriod"},
 			shouldFail:     true,
 		},
 	}

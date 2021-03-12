@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -495,6 +496,38 @@ func CreateCouchbaseAutoscaler(client *client.Client, cl *couchbasev2.CouchbaseC
 	autoscaler.Status.LabelSelector = selector.String()
 
 	return client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(cl.Namespace).UpdateStatus(context.Background(), autoscaler, metav1.UpdateOptions{})
+}
+
+// Fetches most recent version of autoscaler and updates spec and status with requested values.
+func UpdateAutoscaler(client *client.Client, namespace string, requestedAutoscaler *couchbasev2.CouchbaseAutoscaler) (autoscaler *couchbasev2.CouchbaseAutoscaler, err error) {
+	autoscaler, found := client.CouchbaseAutoscalers.Get(requestedAutoscaler.Name)
+	if !found {
+		return nil, fmt.Errorf("%w: unable to get autoscaler %s", errors.NewStackTracedError(errors.ErrResourceRequired), requestedAutoscaler.Name)
+	}
+
+	// update spec with size
+	if !reflect.DeepEqual(autoscaler.Spec, requestedAutoscaler.Spec) {
+		requestedAutoscaler, err = client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(namespace).Update(context.Background(), requestedAutoscaler, metav1.UpdateOptions{})
+
+		if err != nil {
+			return nil, err
+		}
+
+		autoscaler.Spec = requestedAutoscaler.Spec
+	}
+
+	// update status with phase
+	if !reflect.DeepEqual(autoscaler.Status, requestedAutoscaler.Status) {
+		requestedAutoscaler, err = client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(namespace).UpdateStatus(context.Background(), requestedAutoscaler, metav1.UpdateOptions{})
+
+		if err != nil {
+			return nil, err
+		}
+
+		autoscaler.Status = requestedAutoscaler.Status
+	}
+
+	return autoscaler, nil
 }
 
 // NewResourceQuantityMi accepts an integral value representing megabytes (2^20)

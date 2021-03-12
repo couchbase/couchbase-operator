@@ -238,16 +238,14 @@ testcases:
 - TestAutoscaleDisabled
 - TestAutoscalerDeleted
 - TestAutoscaleSelectiveMDS
-- TestAutoScalingDisabledOnData
-- TestAutoScalingDisabledOnCouchbaseBucket
-- TestPreviewModeAllowsEphemeral
-- TestPreviewModeAllowsEphemeralTLS
-- TestPreviewModeAllowsEphemeralMutualTLS
-- TestPreviewModeAllowsEphemeralMandatoryMutualTLS
-- TestPreviewModeEnabledAllowsStateful
-- TestPreviewModeEnabledAllowsStatefulTLS
-- TestPreviewModeEnabledAllowsStatefulMutualTLS
-- TestPreviewModeEnabledAllowsStatefulMandatoryMutualTLS
+- TestAutoscaleUpMandatoryMutualTLS
+- TestAutoscaleDownMandatoryMutualTLS
+- TestAutoscaleMultiConfigs
+- TestAutoscaleConflict
+- TestAutoscalerValidation
+- TestAutoscaleVerifyMaintenanceMode
+- TestAutoscaleEnabledAllowsStatefulTLS
+- TestAutoscaleManualMaintenanceMode
 
 # Logging tests
 - TestLoggingAndAuditingDefaults

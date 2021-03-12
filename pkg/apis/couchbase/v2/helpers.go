@@ -188,25 +188,6 @@ func (sc *ServerConfig) AutoscalerName(cluster string) string {
 	return name + "." + cluster
 }
 
-// Detect if cluster is stateless
-// (search is included in this definition to keep existing behaviour).
-func (sc *ServerConfig) IsStateless() bool {
-	for _, service := range sc.Services {
-		switch service {
-		case DataService:
-			return false
-		case IndexService:
-			return false
-		case AnalyticsService:
-			return false
-		case EventingService:
-			return false
-		}
-	}
-
-	return true
-}
-
 func (cs *ClusterSpec) Cleanup() {
 
 }
@@ -536,6 +517,16 @@ func (cs *ClusterStatus) SetHibernatingCondition(message string) {
 
 func (cs *ClusterStatus) SetErrorCondition(message string) {
 	c := newClusterCondition(ClusterConditionError, v1.ConditionTrue, "ErrorEncountered", message)
+	cs.setClusterCondition(c)
+}
+
+func (cs *ClusterStatus) SetAutoscalerReadyCondition(message string) {
+	c := newClusterCondition(ClusterConditionAutoscaleReady, v1.ConditionTrue, "AutoscaleReady", message)
+	cs.setClusterCondition(c)
+}
+
+func (cs *ClusterStatus) SetAutoscalerUnreadyCondition(message string) {
+	c := newClusterCondition(ClusterConditionAutoscaleReady, v1.ConditionFalse, "AutoscalePaused", message)
 	cs.setClusterCondition(c)
 }
 

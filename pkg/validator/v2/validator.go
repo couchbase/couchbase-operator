@@ -395,6 +395,11 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		errs = append(errs, err)
 	}
 
+	stabilizationPeriod := customResource.Spec.AutoscaleStabilizationPeriod
+	if stabilizationPeriod != nil && stabilizationPeriod.Duration < 0 {
+		errs = append(errs, fmt.Errorf("spec.autoscaleStabilizationPeriod cannot be a negative value"))
+	}
+
 	// Validate the cluster is supportable.
 	// 1. If any server class has a log volume or a default volume they all should.
 	// 2. Log volumes can only be used on server classes containing query, search and eventing services.
@@ -1613,6 +1618,7 @@ func CheckImmutableFieldsBackup(prev, curr *couchbasev2.CouchbaseBackup) error {
 func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler) error {
 	errs := []error{}
 
+	// Referenced server group cannot be changed
 	if prev.Spec.Servers != curr.Spec.Servers {
 		errs = append(errs, util.NewUpdateError("spec.servers", "body"))
 	}

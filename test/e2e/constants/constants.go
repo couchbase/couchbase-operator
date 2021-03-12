@@ -20,6 +20,7 @@ var (
 	CouchbaseServerClusterKey  = "couchbase_cluster"
 	CouchbaseServerPodLabelStr = CouchbaseLabel + "," + CouchbaseServerClusterKey + "="
 	CouchbaseServerConfig      = "test_config_1"
+	CouchbaseServerAltConfig   = "test_config_2"
 	CouchbaseNodeLabel         = "couchbase_node"
 	CouchbaseVolumeLabel       = "couchbase_volume"
 

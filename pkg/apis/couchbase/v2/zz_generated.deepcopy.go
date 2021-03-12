@@ -356,6 +356,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.Backup.DeepCopyInto(&out.Backup)
+	if in.AutoscaleStabilizationPeriod != nil {
+		in, out := &in.AutoscaleStabilizationPeriod, &out.AutoscaleStabilizationPeriod
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 

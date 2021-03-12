@@ -132,6 +132,20 @@ Enabled defines whether auto-resource allocation is enabled.
 OverheadPercent defines the amount of memory above that required for individual services on a pod.
 For Couchbase Server this should be approximately 25%.
 
+=== couchbaseclusters.spec.autoscaleStabilizationPeriod
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+AutoscaleStabilizationPeriod defines how long after a rebalance the corresponding HorizontalPodAutoscaler should remain in maintenance mode.
+During maintenance mode all autoscaling is disabled since every HorizontalPodAutoscaler associated with the cluster becomes inactive.
+Since certain metrics can be unpredictable when Couchbase is rebalancing or upgrading, setting a stabilization period helps to prevent scaling recommendations from the HorizontalPodAutoscaler for a provided period of time.
+Values must be a valid Kubernetes duration of 0s or higher: https://golang.org/pkg/time/#ParseDuration A value of 0, puts the cluster in maintenance mode during rebalance but immediately exits this mode once the rebalance has completed.
+When undefined, the HPA is never put into maintenance mode during rebalance.
+
 === couchbaseclusters.spec.backup
 
 ==== Constraints
@@ -985,6 +999,9 @@ More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expa
 ==== Description
 
 EnablePreviewScaling enables autoscaling for stateful services and buckets.
+*DEPRECATED* - This option only exists for backwards compatibility and no longer restricts autoscaling to ephemeral services.
+
+To be removed in future releases.
 
 === couchbaseclusters.spec.hibernate
 
@@ -2923,7 +2940,7 @@ Can be one of True, False, Unknown.
 
 *Type*: `string`
 
-*Enumerations*: `Available, Balanced, ManageConfig, Scaling, Upgrading, Hibernating, Error`
+*Enumerations*: `Available, Balanced, ManageConfig, Scaling, Upgrading, Hibernating, Error, AutoscaleReady`
 
 ==== Description
 

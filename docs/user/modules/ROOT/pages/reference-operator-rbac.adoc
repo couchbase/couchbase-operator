@@ -28,6 +28,7 @@ couchbase.com/couchbasegroups::
 couchbase.com/couchbaseroles::
 couchbase.com/couchbaserolebindings::
 couchbase.com/couchbasebackups::
+couchbase.com/couchbaseautoscalers::
 The Operator logically combines `CouchbaseCluster` resources with these resources in order to manage a Couchbase cluster.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
@@ -100,6 +101,12 @@ The operator needs to be able to create jobs in order to create a restore of a b
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
 _Required Permissions_: `list`, `watch`, `create`, `update`
+
+couchbase.com/couchbaseautoscalers::
+The operator needs to be able to create, update, and delete these resources to propagate changes received from the `HorizontalPodAutoscaler`.
+The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
++
+_Required Permissions_: `list`, `watch`, `create`, `update`, `delete`
 
 [TIP]
 ====

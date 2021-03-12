@@ -337,6 +337,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"create", // used by the operator to create resources
+				"update", // used by the operator to update scale size
 				"delete", // used to cleanup unused resources
 			},
 		},

@@ -423,3 +423,5 @@ spec:
   size: 3
 status:
   labelSelector:  "couchbase_cluster = test-couchbase-cluster"
+  phase: Ready
+  size: 3

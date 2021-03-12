@@ -106,7 +106,7 @@ LabelSelector allows the HPA to select resources to monitor for resource utiliza
 
 *Type*: `integer`
 
-*Minimum*: `0`
+*Minimum*: `1`
 
 ==== Description
 
