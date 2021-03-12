@@ -1,32 +1,32 @@
 = Connecting Sync Gateway to a Couchbase Cluster
+include::partial$constants.adoc[]
 
 [abstract]
 Connect the Couchbase Sync Gateway to a Couchbase cluster
 
 include::partial$tutorial.adoc[]
 
-Sync Gateway is a synchronization server that is responsible for secure data synchronization and routing between Couchbase Lite enabled clients and Couchbase Server.
-It is an integral component of link:https://docs.couchbase.com/sync-gateway/2.7/introduction.html[Couchbase Mobile] platform.
+Sync Gateway is a synchronization server that is responsible for secure data synchronization and routing between Couchbase Lite-enabled clients and Couchbase Server.
+It is an integral component of the xref:sync-gateway::index.adoc[Couchbase Mobile] platform.
 
 This tutorial defines best practices for deploying Sync Gateway on Kubernetes.
-It covers basic connectivity between Sync Gateway and a Couchbase Cluster deployed by the Operator.
+It covers basic connectivity between Sync Gateway and a Couchbase Cluster deployed by the Autonomous Operator.
 
 == Prerequisites
-* A Couchbase Server cluster deployed and running.
-While it is _recommended_, note that it is _not required_ that Couchbase Server be deployed with Kubernetes.
-It is possible to deploy Sync Gateway on Kubernetes and connect it to Couchbase Server cluster that is not on Kubernetes.
-The instructions herein assume that Couchbase Server is deployed using the operator.
-* This step is optional and only required if the environment is not setup DNS.
-If the Couchbase Server cluster is configured to use link:https://docs.couchbase.com/operator/1.2/couchbase-cluster-config.html#exposedfeatures[exposed features] then the value of "client" must be included in the `exposedFeatures` list.
-This is required for Sync Gateway to be able to connect to the server.
-Alternatively, remove the `exposedFeatures` section altogether in the server configuration if it is not needed.
 
-== Configuring a Sync Gateway
+* A Couchbase Server cluster deployed and running.
+While it is _recommended_ that Couchbase Server is deployed on Kubernetes, it is _not required_.
+It is possible to deploy Sync Gateway on Kubernetes and connect it to a Couchbase Server cluster that is not on Kubernetes.
+However, this guide and all of its instructions assume that Couchbase Server is deployed on Kubernetes using the Autonomous Operator.
+
+[#configuring-sync-gateway]
+== Configuring Sync Gateway
 
 Sync Gateway is configured with a configuration file within its container.
-The configuration contains sensitive data such as usernames, passwords and TLS private keys.
-We therefore should define the configuration as a secret. Create a `sgw-config.yaml` file with the relevant configuration as shown below:
-Relevant configuration variables are documented below:
+The configuration contains sensitive data such as usernames, passwords, and TLS private keys.
+We therefore should define the configuration as a secret.
+Create a `sync-gateway-config.yaml` file with the relevant configuration variables.
+An example is shown below:
 
 [source,yaml]
 ----
@@ -48,7 +48,7 @@ stringData:
       },
       "databases": {
         "cb-example": { # <.>
-          "server": "couchbase://cb-example", # <.>
+          "server": "couchbase://cb-example-srv.my-namespace?network=default", # <.>
           "bucket": "default", # <.>
           "username": "Administrator", # <.>
           "password": "password", # <.>
@@ -69,18 +69,33 @@ stringData:
 ----
 
 <.> `logging.console.enabled` enables logging to the console.
-    This is especially relevant on Kubernetes where applications are expected to log to standard out.
+This is especially relevant on Kubernetes where applications are expected to log to standard out.
 
 <.> `logging.console.log_level` defines what messages are printed.
-    For most use cases `info` is sufficient, however `debug` may provide additional information that can aid in problem determination.
+For most use cases `info` is sufficient, however `debug` may provide additional information that can aid in problem determination.
 
-<.> `databases.cb-example` is the names of a database connection.
-    The database name is arbitrary.
-    In this instance we have named it after the `CouchbaseCluster` resource it references.
+<.> `databases.cb-example` is the name of a database connection.
+The database name is arbitrary.
+In this instance we have named it after the `CouchbaseCluster` resource it references.
 
-<.> `databases.cb-example.server` defines the Couchbase server instance to connect to.
-    The connection string may be determined the same way as for xref:howto-client-sdks.adoc[client SDKs].
-    The connection options are dependent on the chosen xref:concept-couchbase-networking.adoc[network architecture].
+<.> `databases.cb-example.server` defines the connection string of the Couchbase Server instance that Sync Gateway will connect to.
+The connection string may be determined in the same way as for xref:howto-client-sdks.adoc[client SDKs].
++
+The connection string in the example -- `couchbase://cb-example-srv.my-namespace` -- assumes that Sync Gateway and Couchbase Server are running on the same Kubernetes cluster.
+If we examine each part of the string:
++
+--
+* `couchbase` (as opposed to `couchbases`) specifies that the connection is over plain text and not secured by TLS
+* `cb-example` is the name of the Couchbase cluster
+* `-srv` specifies that the connection utilizes DNS SRV lookup to xref:howto-client-sdks.adoc#dns-based-addressing[discover] Couchbase cluster pods running the Data Service
+* `?network=default` instructs Sync Gateway to xref:howto-client-sdks.adoc#client-explicit-network-selection[explicitly select] the internal network addresses of Couchbase cluster pods.
+_Requires Sync Gateway 2.8.2 or higher; otherwise omit this parameter._
+* `my-namespace` is the namespace in which the Couchbase cluster is deployed.
+--
++
+NOTE: The `server` property can technically accept connection endpoints as defined in the Sync Gateway xref:sync-gateway::configuration-properties.adoc#databases-this_db-server[documentation].
+However, many of these connection endpoints are not recommended (some not even supported) when connecting to Couchbase Server deployments that are managed by the Autonomous Operator.
+In particular, there are xref:concept-couchbase-networking.adoc#sync-gateway-exposed-features-limitations[limitations when using exposed features] that affect which connection methods can be used with certain versions of Sync Gateway. 
 
 <.> `databases.cb-example.bucket` defines the `metadata.name` to connect to and use to store mobile data.
 
@@ -88,11 +103,11 @@ stringData:
 
 <.> `databases.cb-example.password` defines the user password that will be used to connect to the cluster.
 
-Deploy the secret using the following command. If the configuration file is `sgw-config.yaml`, the command would be as follows
+If the configuration file is named `sync-gateway-config.yaml`, the command to deploy it would be:
 
 [source,console]
 ----
-$ kubectl create -f sgw-config.yaml
+$ kubectl create -f sync-gateway.yaml
 ----
 
 === Enabling TLS Connectivity to Couchbase Server
@@ -136,48 +151,49 @@ stringData:
 Certificates have been truncated for brevity.
 
 <.> `databases.cb-example.cacertpath` defines where the CA certificate will be read from.
-    This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
+This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
 
 <.> **Mutual TLS Only:** `databases.cb-example.certpath` defines where the client certificate chain will be read from.
-    This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
+This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
 
 <.> **Mutual TLS Only:** `databases.cb-example.keypath` defines where the client key will be read from.
-    This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
+This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
 
 <.> The `ca.pem` secret is the CA certificate.
-    The name of this secret data item defines the file name as used by `databases.cb-example.cacertpath` in the Sync Gateway configuration.
+The name of this secret data item defines the file name as used by `databases.cb-example.cacertpath` in the Sync Gateway configuration.
 
 <.> **Mutual TLS Only:** The `cert.pem` secret is the client certificate chain.
-    The name of this secret data item defines the file name as used by `databases.cb-example.certpath` in the Sync Gateway configuration.
+The name of this secret data item defines the file name as used by `databases.cb-example.certpath` in the Sync Gateway configuration.
 
 <.> **Mutual TLS Only:** The `key.pem` secret is the client key.
-    The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync Gateway configuration.
+The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync Gateway configuration.
 
-Deploy the secret using the following command. If the configuration file is `sgw-config.yaml`, the command would be as follows
+If the configuration file is named `sync-gateway-tls.yaml`, the command to deploy it would be:
 
 [source,console]
 ----
-$ kubectl create -f sgw-config.yaml
+$ kubectl create -f sync-gateway-tls.yaml
 ----
 
-=== Configuring RBAC User for Sync Gateway
+[#configure-an-rbac-user-for-sync-gateway]
+=== Configuring an RBAC User for Sync Gateway
 
 If not using client certificate authentication, secure the system further by using a limited role to access Couchbase Server.
-In doing so, the scope of operations that can be performed in the event the Sync Gateway configuration is compromised is limited.
-The RBAC user corresponding to Sync Gateway can be manually configured as specified in link:https://docs.couchbase.com/sync-gateway/2.7/getting-started.html#creating-an-rbac-user[Getting Started Guide].
+In doing so, the scope of operations that can be performed in the event that the Sync Gateway configuration is compromised is limited.
+The RBAC user corresponding to Sync Gateway can be manually configured as specified in the Sync Gateway xref:sync-gateway::get-started-prepare.adoc#configure-server[Getting Started Guide].
 
-Alternatively, you can take advantage of the xref:concept-user-rbac.adoc[Couchbase user RBAC management] capability introduced with Autonomous Operator 2.0.
-With this method, the Autonomous Operator takes care of creating the relevant Sync Gateway user and binding it to a specified role.
+Alternatively, you can take advantage of the xref:concept-user-rbac.adoc[Couchbase user RBAC management] capability introduced in Autonomous Operator 2.0.
+With this method, the Autonomous Operator takes care of creating the relevant Sync Gateway user and binds it to a specified role.
+The following subsections assume that you will be using this feature.
  
 ==== Enabling RBAC Management
 
-RBAC security management on the Couchbase Server cluster defaults to `false`.
-This is the relevant snippet that would need to be added or modified in your `CouchbaseCluster` configuration:
+RBAC security management on the Couchbase cluster defaults to `false`.
+Therefore, you'll need to enable it by setting xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-security-rbac-managed[`couchbaseclusters.spec.security.rbac.managed`] to true:
 
 [source,yaml]
 ----
 security:
-  adminSecret: cb-example-auth
   rbac:
     managed: true
 ----
@@ -187,7 +203,7 @@ Therefore, you will need to specify the relevant users and role bindings for tho
 
 ==== Creating a Sync Gateway RBAC User
 
-First define a secret for the `sync-gateway` user that contains a password:
+First, define a secret for the `sync-gateway` user that contains a password:
 
 [source,yaml]
 ----
@@ -198,22 +214,23 @@ metadata:
 data:
   password: cGFzc3dvcmQ= # <.>
 ----
-<.> This password is the literal `password`.
-    The correctly encoded form can be generated on a "UNIX-like" command line terminal with `echo -n 'password' | base64`.
 
-Deploy the secret using the following command.
-This creates a sync gateway user with specified password.
-If the configuration file is `sync-gateway-rbac-user.yaml`, the command would be as follows
+<.> This example password is literally the encoded form of the word `password`.
+The correctly encoded form can be generated on a "UNIX-like" command line terminal with `echo -n 'password' | base64`.
+
+If the configuration file is named `sync-gateway-rbac-user.yaml`, the command to deploy it would be:
 
 [source,console]
 ----
 $ kubectl create -f sync-gateway-rbac-user.yaml
 ----
 
+This creates a sync gateway user with the specified password.
+
 ==== Role Binding of Sync Gateway User
 
-Next define the `sync-gateway` user and bind it to a group that allows it the "application access" role as defined by Couchbase Server.
-The Operator will create the required user and group on any Couchbase cluster that selects that user:
+Next, define the `sync-gateway` user and bind it to a group that allows it the "application access" role as defined by Couchbase Server.
+The Autonomous Operator will create the required user and group on any Couchbase cluster that selects that user.
 
 [source,yaml]
 ----
@@ -250,16 +267,19 @@ spec:
 ----
 
 <.> The `CouchbaseUser` is labeled so it can be explicitly selected by a specific cluster.
-    This is the recommended method of deployment as defined in the xref:concept-label-selection.adoc[label selection concepts].
-<.> The `CouchbaseUser` uses the `local` authentication domain, meaning that a password will be locally installed on the Couchbase cluster for authentication.
-<.> The `CouchbaseUser` references the secret we previously created so that the Operator can associate the `sync-gateway` user with its password.
-<.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of needs the `bucket_full_access` role.
-<.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of only requires access to a single bucket.
-    We therefore further limit scope to only enable modification of the `default` bucket.
-    By default this would be set to `*` granting access to all buckets.
+This is the recommended method of deployment as defined in the xref:concept-label-selection.adoc[label selection concepts].
 
-Deploy the Sync Gateway RBAC user using the following command.
-If the configuration file is `sync-gateway-user-rolebinding.yaml`, the command would be as follows
+<.> The `CouchbaseUser` uses the `local` authentication domain, meaning that a password will be locally installed on the Couchbase cluster for authentication.
+
+<.> The `CouchbaseUser` references the secret we previously created so that the Autonomous Operator can associate the `sync-gateway` user with its password.
+
+<.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of needs the `bucket_full_access` role.
+
+<.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of only requires access to a single bucket.
+We therefore further limit scope to only enable modification of the `default` bucket.
+By default this would be set to `*` granting access to all buckets.
+
+If the configuration file is named `sync-gateway-user-rolebinding.yaml`, the command to deploy it would be:
 
 [source,console]
 ----
@@ -267,7 +287,8 @@ $ kubectl create -f sync-gateway-user-rolebinding.yaml
 ----
 
 ==== Configure Sync Gateway with the RBAC User
-Finally, to enable Sync Gateway to use the `sync-gateway` user, modify the configuration defined in <<configuring-a-sync-gateway>>:
+
+Finally, to enable Sync Gateway to use the `sync-gateway` user, we'll need to modify the configuration that we previously defined in <<configuring-sync-gateway>>:
 
 [source,yaml]
 ----
@@ -289,23 +310,25 @@ stringData:
 ----
 
 <.> The `databases.cb-example.bucket` attribute must match the bucket granted access to in the `CouchbaseGroup`.
+
 <.> The `databases.cb-example.username` attribute must match the `CouchbaseUser` resource's name.
+
 <.> The `databases.cb-example.password` attribute must match the plain-text password associated with the `CouchbaseUser`.
 
-Deploy the secret using the following command.
-If the configuration file is `sgw-config.yaml`, the command would be as follows
+If the configuration file is named `sync-gateway.yaml`, the command to deploy the configuration changes would be:
 
 [source,console]
 ----
-$ kubectl create -f sgw-config.yaml
+$ kubectl create -f sync-gateway.yaml
 ----
 
+[#deploying-sync-gateway]
 == Deploying Sync Gateway
 
-Sync Gateway is a simple state-less application so does not require any application specific controller like the Operator.
-An typical configuration is as described below:
+Sync Gateway is a simple stateless application, and therefore does not require any application-specific controller like the Autonomous Operator.
+The following is a typical `Deployment` resource configuration for Sync Gateway:
 
-[source,yaml]
+[source,yaml,subs="attributes,verbatim"]
 ----
 apiVersion: apps/v1
 kind: Deployment
@@ -323,7 +346,7 @@ spec:
     spec:
       containers:
       - name: sync-gateway
-        image: couchbase/sync-gateway:2.7.0-enterprise # <.>
+        image: couchbase/sync-gateway:{sgw-version} # <.>
         volumeMounts:
         - name: config
           mountPath: /etc/sync_gateway # <.>
@@ -338,40 +361,40 @@ spec:
 ----
 
 <.> `spec.replicas` defines how many Sync Gateway pods to create.
-    As Sync Gateway is stateless. This attribute can be modified to horizontally scale the deployment as needs require.
+As Sync Gateway is stateless, this attribute can be modified to horizontally scale the deployment as needs require.
 
-<.> `spec.template.spec.containers[0].image` defines the container image to deploy.
-    Version 2.7.0 or higher is recommended in order to support connecting to a cluster using xref:concept-couchbase-networking.adoc#public-networking-with-external-dns[public networking with external-DNS] or xref:concept-couchbase-networking.adoc#generic-networking[generic networking].
+<.> `spec.template.spec.containers[].image` defines the container image to deploy.
+Version 2.8.2 or higher is recommended as it has the fewest number of xref:concept-couchbase-networking.adoc#sync-gateway-exposed-features-limitations[network limitations].
 
-<.> `spec.template.spec.containers[0].volumeMounts[0].mountPath` mounts the configuration secret in the correct location.
-    By default the Sync Gateway container will try to load configuration from `/etc/sync_gateway/config.json`, and this is how the `Secret` and `Deployment` are configured.
+<.> `spec.template.spec.containers[].volumeMounts[].mountPath` mounts the configuration secret in the correct location.
+By default the Sync Gateway container will try to load configuration from `/etc/sync_gateway/config.json`, and this is how the `Secret` and `Deployment` are configured.
 
-<.> `spec.template.spec.volumes[0].secret.secretName` references the <<configuring-sync-gateway,Sync Gateway configuration>> `Secret` that is mounted in the Sync Gateway container.
-
+<.> `spec.template.spec.volumes[].secret.secretName` references the <<configuring-sync-gateway,Sync Gateway configuration>> `Secret` that is mounted in the Sync Gateway container.
 
 Deploy the Sync Gateway cluster from the specified deployment controller file.
-If the above configuration is in a file named `sync-gateway.yaml`, the command would be as follows
+If the above configuration is in a file named `sync-gateway.yaml`, the command to deploy it would be:
 
 [source,console]
 ----
 $ kubectl create -f sync-gateway.yaml
 ----
 
-If successful, the equivalent of the following will be returned.
-In sample output below, the deployment with name `sync-gateway` was created
+If successful, the equivalent of the following output will be returned:
+
 [source,console]
 ----
 deployment.extensions "sync-gateway" created
 ----
 
-You can check the status of the deployment with the following command
+You can check the status of the deployment with the following command:
+
 [source,console]
 ----
 $ kubectl get deployments sync-gateway
 ----
 
 If successful, a listing of the Sync Gateway pods that were deployed is returned.
-In the sample output below, 2 out of 2 requested Sync Gateway pods up and running
+In the sample output below, 2 out of 2 requested Sync Gateway pods up and running:
 
 [source,console]
 ----
@@ -379,29 +402,29 @@ NAME           READY   UP-TO-DATE   AVAILABLE   AGE
 sync-gateway   2/2     2            2           24d
 ----
 
-At this stage, the Sync Gateway node is configured to communicate with Couchbase Server.
+== Next Steps
 
-Now, let's look at the xref:tutorial-sync-gateway-clients.adoc[connectivity to Couchbase Lite clients].
+At this stage, the Sync Gateway custer is configured to communicate with Couchbase Server.
+You can now move on to xref:tutorial-sync-gateway-clients.adoc[connecting Couchbase Lite clients].
 
 == Templates
 
-Template files are provided in the Operator binary distribution :
+Template files are provided in the Autonomous Operator binary distribution available at https://www.couchbase.com/downloads[couchbase.com/downloads^].
+These template files are provided as *evaluation examples* -- they should be modified to suit production deployments.
 
-** `sync-gateway.yaml` : Sample Deployment Controller for Sync Gateway using RBAC for server connectivity
-This template creates a sync gateway RBAC user per procedures outlined in <<Configuring RBAC User for Sync Gateway>> section. 
-However, the `couchbase-custer.yaml` template that is packaged has RBAC management set to false by default.
-So before you deploy the sync gateway cluster using the `sync-gateway.yaml` template, you must enable RBAC management on the server cluster as specified in the <<Enabling RBAC Management>> section. 
+* `sync-gateway.yaml`: Sample Deployment Controller for Sync Gateway using RBAC for server connectivity.
+This template creates a sync gateway RBAC user per procedures outlined in the previous section <<configure-an-rbac-user-for-sync-gateway>>.
 
-These files are provided as *evaluation examples* -- they should be modified to suit production deployments.
-
-
-[IMPORTANT]
-====
-Red Hat OCP users will need to modify the provided template to reference an image pull secret.
+* `couchbase-custer.yaml`: Sample CouchbaseCluster custom resource deployment to be used with the Autonomous Operator.
++
+NOTE: The `couchbase-custer.yaml` template has RBAC management set to `false` by default.
+So before you deploy the Sync Gateway cluster using the `sync-gateway.yaml` template, you must enable RBAC management as specified in the previous section <<configure-an-rbac-user-for-sync-gateway>>. 
++
+IMPORTANT: Red Hat OpenShift users will need to modify the provided template to reference an image pull secret.
 This must grant permission to pull container images from the Red Hat Container Registry.
-====
+Refer to xref:install-openshift.adoc[] for details.
 
 == Further Reading
 
-* xref:sync-gateway::introduction.adoc[Sync Gateway Documentation]
-* xref:tutorial-sync-gateway-clients.adoc[Connecting Couchbase Lite Clients]
+* xref:sync-gateway::index.adoc[Sync Gateway Documentation]
+* xref:tutorial-sync-gateway-clients.adoc[]

@@ -8,3 +8,4 @@
 :prometheus-version: 1.0.3
 :tutorial-gke-version: 1.14.10-gke.27
 :backup-version: 6.6.0-100
+:sgw-version: 2.8.2-enterprise

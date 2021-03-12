@@ -16,6 +16,7 @@ This how-to documents how to calculate the required connection string based on y
 While we discuss client SDKs, these configurations also apply to Couchbase Connectors and Couchbase Mobile.
 ====
 
+[#client-explicit-network-selection]
 .Client Explicit Network Selection
 ****
 Various Couchbase clients behave differently from one another in the way they perform automatic network selection when using alternate addressing, with some clients selecting the wrong network in certain circumstances.
@@ -37,7 +38,7 @@ If you happen to be using a client that doesn't support explicit network selecti
 | < 6.6.0
 
 | Couchbase Sync Gateway
-| < 2.8.1
+| < 2.8.2
 
 | Couchbase SDKs
 | < 3.x (Java, .NET, C, Node.js, PHP, Python, Ruby)

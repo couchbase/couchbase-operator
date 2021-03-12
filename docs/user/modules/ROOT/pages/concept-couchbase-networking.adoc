@@ -13,6 +13,7 @@ For this reason Couchbase Server cannot be accessed using normal Kubernetes `Ser
 The following options depict the possible networking topologies for connecting clients to a Couchbase cluster.
 Clients includes all Couchbase Client SDKs, Couchbase Mobile and Couchbase XDCR connections unless otherwise stated.
 
+[[intra-kubernetes-networking]]
 == Intra-Kubernetes Networking
 
 Intra-Kubernetes networking is the simplest and allow clients running in the same Kubernetes cluster as the Couchbase server instance.
@@ -115,7 +116,7 @@ Additionally xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networki
 As <<public-networking-with-external-dns>> and <<generic-networking>> require exposed features, clients need to be able to support this feature.
 The minimum versions are specified below.
 
-.Supported Clients for Exposed Features
+.Couchbase Clients That Support Exposed Features
 [#table-public-connectivity,cols="1,2",options="header"]
 |===
 | Client | Version
@@ -149,7 +150,10 @@ NOTE: When not using the embedded `libcouchbase` and choosing to build with an e
 | 1.6.1+
 
 | Couchbase Sync Gateway
-| 2.7.0+footnote:[A known issue exists (https://issues.couchbase.com/browse/K8S-1585[K8S-1585^]) where lookup may fail when using DNS SRV over TLS to connect to a Couchbase Cluster in the same Kubernetes cluster. In such cases, the workaround is to add wildcard matches to the Subject Alternate Names (SANs) as discussed in the xref:tutorial-tls.adoc#creating-a-couchbase-cluster-server-certificate[Creating TLS Certificates\] tutorial.]
+a| 2.7.0+ *
+
+*Earlier versions of Sync Gateway have limited support for exposed features.
+For more information, refer to <<sync-gateway-exposed-features-limitations>>.
 
 | Couchbase Elasticsearch Connector
 | 4.1.0+
@@ -157,3 +161,78 @@ NOTE: When not using the embedded `libcouchbase` and choosing to build with an e
 | Couchbase Kafka Connector
 | 3.4.5+
 |===
+
+NOTE: A known issue exists (https://issues.couchbase.com/browse/K8S-1585[K8S-1585^]) where lookup may fail when using DNS SRV over TLS to connect to a Couchbase Cluster in the same Kubernetes cluster. In such cases, the workaround is to add wildcard matches to the Subject Alternate Names (SANs) as discussed in the xref:tutorial-tls.adoc#creating-a-couchbase-cluster-server-certificate[Creating TLS Certificates] tutorial.
+
+[[sync-gateway-exposed-features-limitations]]
+==== Sync Gateway Limitations When Using Exposed Features
+
+Earlier versions of Sync Gateway can experience certain network limitations when connecting to a Couchbase cluster that is configured with xref:concept-couchbase-networking.adoc#exposed-features[exposed features].
+<<table-sgw-exposed-features-limitations>> describes the different network limitations that can occur based on the version of Sync Gateway that is being used.
+
+IMPORTANT: Sync Gateway, like other Couchbase clients, does not require exposed features to be configured in order to establish a network connection with an instance of Couchbase Server that is running on the same local Kubernetes cluster.
+The rows labeled *Local* in <<table-sgw-exposed-features-limitations>> assume that you already have exposed features configured for a different purpose, e.g. exposing the admin port for remote administrarion, connecting to a remote cluster for XDCR, etc.
+However, if you are running Sync Gateway on the same Kubernetes cluster as Couchbase Server, and there is nothing else requiring you to configure xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposedfeatures[`couchbaseclusters.spec.networking.exposedFeatures`] for a different purpose, then you can ignore the rest of this section as this issue will not affect you.
+
+.Supported Connection Methods for Sync Gateway When Using Exposed Features
+[#table-sgw-exposed-features-limitations,cols="1,1,1,3,1",options="header"]
+|===
+| Sync Gateway Version | Relationship to Cluster | Method | Connection String | High Availability
+
+.2+.^| 2.8.2+
+| *Local*
+| DNS SRV
+| `couchbase://my-cluster-srv.my-namespace?network=default`
+| ✅ Yes
+
+| *Remote*
+| DNS SRV
+| `couchbase://my-cluster-srv.my-namespace?network=external`
+| ✅ Yes
+
+.2+.^| 2.8.0, +
+2.7.3
+| *Local*
+| DNS address
+| `couchbase://pod-0.my-cluster.my-namespace.svc,pod-1.my-cluster.my-namespace.svc`
+| 🚫 No
+
+| *Remote*
+| DNS SRV
+| `couchbase://my-cluster-srv.my-namespace`
+| ✅ Yes
+
+.2+.^| <= 2.7.2
+| *Local*
+| DNS address
+| `couchbase://pod-0.my-cluster.my-namespace.svc,pod-1.my-cluster.my-namespace.svc`
+| 🚫 No
+
+| *Remote*
+| Round-robin DNS
+| `couchbase://my-cluster.my-namespace`
+| ⚠️ Yes
+|===
+
+In <<table-sgw-exposed-features-limitations>> above, the *Relationship to Cluster* column indicates the location of the Sync Gateway cluster in relation to the Couchbase cluster that is being managed by the Autonomous Operator. *_Local_* refers to instances where Sync Gateway is deployed in the same Kubernetes cluster where Couchbase Server is running (see <<intra-kubernetes-networking>> and <<inter-kubernetes-networking-with-forwarded-dns>>).
+*_Remote_* refers to instances where Sync Gateway is deployed outside of the Kubernetes cluster where Couchbase Server is running (see <<public-networking-with-external-dns>>).
+
+* Sync Gateway 2.8.2 and higher do not experience any connection issues related to exposed features as these versions have full support for DNS SRV lookup _and_ support explicit network selection.
+Both *Local* and *Remote* connections can be configured in accordance with the standard client connection xref:howto-client-sdks.adoc[documentation].
+
+* Sync Gateway 2.7.3 and 2.8.0 introduced DNS SRV lookup for service discovery, however the automatic network selection behavior of Sync Gateway incorrectly directs traffic to "external" interfaces when running within the same Kubernetes cluster as the target Couchbase cluster.
+
+** *Remote* connections still work as expected and can be configured in accordance with the standard client connection xref:howto-client-sdks.adoc[documentation].
+
+** *Local* connections _do not_ work as expected, and Sync Gateway ends up selecting the "external" network interface.
+This causes network traffic to be sent through a load balancer, which can lead to significant financial costs with a cloud provider.
++
+If you intend to use a *Local* connection, you can choose to mitigate the issue by connecting using only DNS addresses.
+This method requires that the connection string contain a list of the hostnames of all the Couchbase Server pods in the Couchbase cluster.
+This method of connectivity is highly discouraged, as it is not tolerant to Couchbase cluster pod topology changes.
+(Sync Gateway will be informed of any topology changes so long as it stays running. However, once it restarts, it will fail to reconnect because the connection string has the old topology.)
+
+* Sync Gateway 2.7.2 and lower don't feature DNS SRV support at all, instead falling back to a DNS address record lookup.
+*Local* connections have the same limitations as they do in versions 2.7.3 and 2.8.0 above.
+*Remote* connections support high availability through round-robin DNS.
+(Note, however, that since this connection method runs over HTTP on port 8091, there is a potential risk of a denial of service should port 8091 ever experience too many connections at once.)
