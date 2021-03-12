@@ -54,6 +54,8 @@ func TestScheduleEvacuateAllPersistent(t *testing.T) {
 	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).StaticCluster()
+
 	// Static configuration.
 	mdsSize := 2
 	clusterSize := mdsSize * 2

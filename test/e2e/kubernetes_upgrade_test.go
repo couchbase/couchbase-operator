@@ -19,7 +19,7 @@ func TestPodReadiness(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	kubernetes, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -50,6 +50,8 @@ func TestKubernetesRollingUpgrade(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	clusterSize := 3

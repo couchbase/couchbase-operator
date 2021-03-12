@@ -5,7 +5,6 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -22,10 +21,6 @@ import (
 // mustCreateXDCRBuckets creates default buckets in the source and target clusters, ensuring
 // we don't redefine if the same cluster is used for source and target couchbase instances.
 func mustCreateXDCRBuckets(t *testing.T, k8s1, k8s2 *types.Cluster) metav1.Object {
-	if framework.Global.BucketType == "memcached" {
-		t.Skip("Unsupported Bucket type")
-	}
-
 	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, k8s1, bucket)
 
@@ -127,8 +122,6 @@ func XDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Serv
 // xdcrClusterRemoveNode removes nodes from the selected cluster in numerous
 // nefarious ways.
 func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcrCluster, operation xdcrOperation) {
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
-
 	// Static configuration.
 	clusterSize := constants.Size3
 	scaleDownSize := constants.Size1
@@ -244,6 +237,8 @@ func TestXDCRCreateClusterLocal(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).CouchbaseBucket()
+
 	testXDCRCreateCluster(t, k8s1, k8s1, nil, nil, nil)
 }
 
@@ -251,6 +246,8 @@ func TestXDCRCreateClusterLocal(t *testing.T) {
 func TestXDCRCreateClusterLocalTLS(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
@@ -261,6 +258,8 @@ func TestXDCRCreateClusterLocalTLS(t *testing.T) {
 func TestXDCRCreateClusterLocalMutualTLS(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
@@ -273,6 +272,8 @@ func TestXDCRCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).CouchbaseBucket()
+
 	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
@@ -284,6 +285,8 @@ func TestXDCRCreateClusterRemote(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).CouchbaseBucket()
+
 	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	testXDCRCreateCluster(t, k8s1, k8s2, dns, nil, nil)
@@ -293,6 +296,8 @@ func TestXDCRCreateClusterRemote(t *testing.T) {
 func TestXDCRCreateClusterRemoteTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
@@ -306,6 +311,8 @@ func TestXDCRCreateClusterRemoteMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).CouchbaseBucket()
+
 	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
@@ -318,6 +325,8 @@ func TestXDCRCreateClusterRemoteMutualTLS(t *testing.T) {
 func TestXDCRCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
@@ -333,7 +342,7 @@ func TestXDCRCreateCluster(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -381,7 +390,7 @@ func TestXDCRPauseReplication(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
@@ -442,7 +451,7 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 3
@@ -500,7 +509,7 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -556,7 +565,7 @@ func TestXDCRTargetNodeServiceDelete(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -611,6 +620,8 @@ func TestXDCRRebalanceOutSourceClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationEject)
 }
 
@@ -620,6 +631,8 @@ func TestXDCRRebalanceOutSourceClusterNodes(t *testing.T) {
 func TestXDCRRebalanceOutTargetClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationEject)
 }
@@ -631,6 +644,8 @@ func TestXDCRRemoveSourceClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).CouchbaseBucket()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationDelete)
 }
 
@@ -641,6 +656,8 @@ func TestXDCRRemoveTargetClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).CouchbaseBucket()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationDelete)
 }
 
@@ -649,6 +666,8 @@ func TestXDCRRemoveTargetClusterNodes(t *testing.T) {
 func TestXDCRResizedOutSourceClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationScaleDown)
 }
@@ -659,6 +678,8 @@ func TestXDCRResizedOutTargetClusterNodes(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).CouchbaseBucket()
+
 	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationScaleDown)
 }
 
@@ -668,7 +689,7 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
@@ -732,7 +753,7 @@ func TestXDCRFilterExp(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
@@ -746,26 +767,8 @@ func TestXDCRFilterExp(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection with the specified filter expression
-	// for 6.0.3, template for filter expression: "regex_pattern"
-	// for 6.5.0, template for filter expression: `REGEXP_CONTAINS(expression, "regex_pattern")`
-	// filter expression is defined to allow docs with Key Id starting from `doc` to get replicated.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
-	threshold, _ := couchbaseutil.NewVersion("6.5.0")
-
-	tag, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	version, err := couchbaseutil.NewVersion(tag)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
 	replication.Spec.FilterExpression = `REGEXP_CONTAINS(META().id, "^doc.*$")`
-	if version.Less(threshold) {
-		replication.Spec.FilterExpression = `^doc.*$`
-	}
 
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
 
@@ -810,7 +813,7 @@ func TestXDCRRotatePassword(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
@@ -898,7 +901,7 @@ func TestXDCRRotateClientMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyEnable
@@ -913,7 +916,7 @@ func TestXDCRRotateClientMandatoryMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyMandatory
@@ -969,7 +972,7 @@ func TestXDCRRotateCAMandatoryMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyMandatory
@@ -984,7 +987,7 @@ func TestXDCRRotateCAMutualTLS(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	e2eutil.SkipVersion(t, framework.Global.CouchbaseServerImage, "6.5.1")
+	framework.Requires(t, k8s1).CouchbaseBucket()
 
 	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyEnable

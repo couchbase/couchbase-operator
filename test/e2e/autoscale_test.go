@@ -241,6 +241,8 @@ func TestAutoscaleUp(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+
 	testAutoscale(t, targetKube, testMetricIncrement, 80, nil, nil)
 }
 
@@ -250,6 +252,8 @@ func TestAutoscaleUpTLS(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
 
 	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
@@ -263,6 +267,7 @@ func TestAutoscaleUpMutualTLS(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
 	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
@@ -276,6 +281,8 @@ func TestAutoscaleUpMandatoryMutualTLS(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
 
 	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
@@ -294,6 +301,8 @@ func TestAutoscaleDown(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+
 	testAutoscale(t, targetKube, testMetricDecrement, 100, nil, nil)
 }
 
@@ -303,6 +312,8 @@ func TestAutoscaleDownTLS(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
 
 	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
@@ -315,6 +326,8 @@ func TestAutoscaleDownMutualTLS(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
 
 	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
@@ -329,6 +342,8 @@ func TestAutoscaleDownMandatoryMutualTLS(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
 
 	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
 
@@ -346,6 +361,8 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
 
 	// Static configuration.
 	clusterSize := 4

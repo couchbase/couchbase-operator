@@ -178,39 +178,6 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 	}
 }
 
-// skipUpgrade checks configuration and skips a test if illegal.
-func skipUpgrade(t *testing.T) {
-	f := framework.Global
-
-	if f.CouchbaseServerImageUpgrade == "" {
-		t.Skip("Upgrade version not specified")
-	}
-
-	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	upgradeStr, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImageUpgrade)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	version, err := couchbaseutil.NewVersion(versionStr)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	upgrade, err := couchbaseutil.NewVersion(upgradeStr)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	if upgrade.GreaterEqual(version) {
-		t.Skip("Upgrade base version greater than or equal to upgrade version")
-	}
-}
-
 // TestUpgrade upgrades a three node cluster.
 func TestUpgrade(t *testing.T) {
 	// Platform configuration.
@@ -219,8 +186,7 @@ func TestUpgrade(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -261,8 +227,7 @@ func TestUpgradeRollback(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -308,8 +273,7 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -357,8 +321,7 @@ func TestUpgradeInvalidUpgrade(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -379,8 +342,7 @@ func TestUpgradeInvalidDowngrade(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -401,8 +363,7 @@ func TestUpgradeInvalidRollback(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -427,8 +388,7 @@ func TestUpgradeSupportable(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -472,8 +432,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -527,8 +486,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -583,8 +541,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -638,8 +595,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
@@ -929,8 +885,7 @@ func TestUpgradeImmediate(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -973,8 +928,7 @@ func TestUpgradeConstrained(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
+	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
 	clusterSize := 3
@@ -1020,9 +974,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Skip if not correctly configured
-	skipUpgrade(t)
-	e2eutil.SkipVersionsBefore(t, framework.Global.CouchbaseServerImage, "6.6.0")
+	framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").Upgradable()
 
 	// Static Config
 	clusterSize := 3

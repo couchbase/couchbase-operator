@@ -81,10 +81,6 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
-
 	// Static configuration.
 	clusterSize := 3
 	victim := 1
@@ -131,10 +127,6 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
 
 	// Static configuration.
 	clusterSize := 6
@@ -237,10 +229,6 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
-
 	// Static configuration.
 	clusterSize := 3
 	pvcName := "couchbase"
@@ -288,10 +276,6 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
 
 	// Static configuration.
 	clusterSize := 3
@@ -349,10 +333,6 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
-
 	// Static configuration.
 	clusterSize := 4
 	victim := 1
@@ -401,10 +381,6 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
 
 	// Static configuration.
 	clusterSize := 3
@@ -455,11 +431,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, targetKube)
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
+	framework.Requires(t, targetKube).StaticCluster().ServerGroups(2)
 
 	// Create cluster spec for RZA feature
 	availableServerGroups := getAvailabilityZones(t, targetKube)
@@ -532,11 +504,7 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, targetKube)
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
+	framework.Requires(t, targetKube).ServerGroups(2)
 
 	// Create cluster spec for RZA feature
 	availableServerGroups := getAvailabilityZones(t, targetKube)
@@ -605,11 +573,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, targetKube)
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
+	framework.Requires(t, targetKube).StaticCluster().ServerGroups(2)
 
 	pvcName := "couchbase"
 
@@ -679,10 +643,6 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
 
 	// Static configuration.
 	clusterSize := 3

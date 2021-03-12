@@ -446,13 +446,16 @@ func NewBasicCluster(options *ClusterOptions) *couchbasev2.CouchbaseCluster {
 			},
 			Servers:              []couchbasev2.ServerConfig{},
 			VolumeClaimTemplates: []couchbasev2.PersistentVolumeClaimTemplate{},
-			Platform:             options.Platform,
 			Backup: couchbasev2.Backup{
 				Managed:        true,
 				Image:          options.BackupImage,
 				ServiceAccount: config.BackupResourceName,
 			},
 		},
+	}
+
+	if options.Platform != "gke-autopilot" {
+		cluster.Spec.Platform = options.Platform
 	}
 
 	for _, class := range options.Topology {

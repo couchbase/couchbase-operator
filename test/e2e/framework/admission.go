@@ -38,6 +38,12 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		"--kubeconfig=" + k8s.KubeConfPath,
 	}
 
+	// On Autopilot mutation isn't supported, and stuff moves around, so use
+	// multiple replicas in the deployment to keep it working.
+	if Global.Platform == "gke-autopilot" {
+		args = append(args, "--with-mutation=false", "--replicas=3")
+	}
+
 	if k8s.Context != "" {
 		args = append(args, "--context="+k8s.Context)
 	}

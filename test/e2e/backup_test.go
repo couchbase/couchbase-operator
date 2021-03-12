@@ -130,6 +130,8 @@ func testFullIncremental(t *testing.T, s3 bool) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	skipBackup(t, s3)
 
 	// Static configuration.
@@ -186,6 +188,8 @@ func testFullOnly(t *testing.T, s3 bool) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	skipBackup(t, s3)
 
 	// Static configuration.
@@ -241,6 +245,8 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
 
 	skipBackup(t, s3)
 
@@ -328,6 +334,8 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	skipBackup(t, s3)
 
 	// Static configuration.
@@ -405,6 +413,8 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
 
 	skipBackup(t, s3)
 
@@ -490,6 +500,8 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	skipBackup(t, s3)
 
 	// Static configuration.
@@ -567,6 +579,8 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
 
 	skipBackup(t, s3)
 
@@ -672,6 +686,8 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	skipBackup(t, s3)
 
 	// Create a normal cluster.
@@ -737,6 +753,8 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
 
 	skipBackup(t, s3)
 
@@ -806,6 +824,8 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	skipBackup(t, s3)
 
 	clusterSize := constants.Size3
@@ -867,6 +887,8 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	skipBackup(t, s3)
 
 	// Create the cluster.
@@ -927,6 +949,8 @@ func testBackupRetention(t *testing.T, s3 bool) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).StaticCluster()
+
 	skipBackup(t, s3)
 
 	// Static configuration.
@@ -972,6 +996,8 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
 
 	skipBackup(t, s3)
 

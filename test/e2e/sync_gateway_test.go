@@ -6,8 +6,6 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -16,24 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// skipRBAC inhibits tests for versions below 6.5.0.
-func skipRBAC(t *testing.T) {
-	tag, err := k8sutil.CouchbaseVersion(framework.Global.CouchbaseServerImage)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	version, err := couchbaseutil.NewVersion(tag)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	threshold, _ := couchbaseutil.NewVersion("6.5.0")
-	if version.Less(threshold) {
-		t.Skip("Unsupported couchbase version: RBAC requires >6.5.0")
-	}
-}
 
 // testSyncGatewayCreate is a generic creation and connectivity test.
 func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
@@ -146,8 +126,6 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	// Platform configuration.
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
-
-	skipRBAC(t)
 
 	// Static configuration.
 	// NOTE: the secret handling is a hack, by default the sync-gateway configuration will

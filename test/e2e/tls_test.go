@@ -812,43 +812,6 @@ func TestTLSRotateInvalid(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-// skipMutualTLSCheck doesn't run these tests unless using 5.5.4+ or
-// 6.0.2+ due to a bug in NS server when using administrator certificates.
-func skipMutualTLSCheck(t *testing.T) {
-	f := framework.Global
-
-	rawVersion, err := k8sutil.CouchbaseVersion(f.CouchbaseServerImage)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	version, err := couchbaseutil.NewVersion(rawVersion)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	switch version.Major() {
-	case 5:
-		minVersion, err := couchbaseutil.NewVersion("5.5.4")
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		if version.Less(minVersion) {
-			t.Skip("Test requires Couchbase 5.5.4 or greater")
-		}
-	case 6:
-		minVersion, err := couchbaseutil.NewVersion("6.0.2")
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		if version.Less(minVersion) {
-			t.Skip("Test requires Couchbase 6.0.2 or greater")
-		}
-	}
-}
-
 // testMutualTLSCreateCluster ensures a cluster can be created with mTLS enabled.
 func testMutualTLSCreateCluster(t *testing.T, policy couchbasev2.ClientCertificatePolicy, opts *e2eutil.TLSOpts) {
 	// Platform configuration.
@@ -856,8 +819,6 @@ func testMutualTLSCreateCluster(t *testing.T, policy couchbasev2.ClientCertifica
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -901,8 +862,6 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -957,8 +916,6 @@ func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePoli
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipMutualTLSCheck(t)
-
 	// Static configuration.
 	clusterSize := constants.Size3
 
@@ -1003,8 +960,6 @@ func testMutualTLSRotateClient(t *testing.T, policy couchbasev2.ClientCertificat
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1055,8 +1010,6 @@ func testMutualTLSRotateClientChain(t *testing.T, policy couchbasev2.ClientCerti
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipMutualTLSCheck(t)
-
 	// Static configuration.
 	clusterSize := constants.Size3
 
@@ -1098,8 +1051,6 @@ func testMutualTLSRotateCA(t *testing.T, policy couchbasev2.ClientCertificatePol
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -1159,8 +1110,6 @@ func testMutualTLSRotateInvalid(t *testing.T, policy couchbasev2.ClientCertifica
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipMutualTLSCheck(t)
 
 	// Static configuration.
 	clusterSize := constants.Size3

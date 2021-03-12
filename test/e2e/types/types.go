@@ -58,6 +58,8 @@ type Cluster struct {
 	KubeConfPath string
 	// Context is the context used in the Kubernetes config
 	Context string
+	// Platform is the platform we are running on.
+	Platform string
 
 	// Dynamic configuration.
 
@@ -70,11 +72,6 @@ type Cluster struct {
 	OperatorDeployment *appsv1.Deployment
 	// DefaultSecret is the secret to use defining admin credentials.
 	DefaultSecret *v1.Secret
-
-	// Hacks - remove me
-
-	// SupportsMultipleVolumeClaims overrides dynamic checks of storage classes.
-	SupportsMultipleVolumeClaims bool
 }
 
 // Copy performs a shallow copy of a cluster, static content only should be

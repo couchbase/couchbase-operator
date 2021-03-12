@@ -21,6 +21,8 @@ func TestPodResourcesBasic(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	// Static configuration.
 	clusterSize := 1
 	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
@@ -53,6 +55,8 @@ func TestNegPodResourcesBasic(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
 
 	// Static configuration.
 	clusterSize := 1
@@ -90,6 +94,8 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	minMem := e2eutil.MustGetMinNodeMem(t, targetKube)
 	memoryRequest := 0.9 * minMem
 	memReq := strconv.Itoa(int(memoryRequest)) + "Mi"
@@ -125,6 +131,8 @@ func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	// Static configuration.
 	clusterSize := 1
 	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
@@ -150,6 +158,8 @@ func TestAntiAffinityOn(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 
@@ -172,6 +182,8 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodesAbsolute(t, targetKube) + 1
@@ -200,6 +212,8 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube)
 
@@ -227,6 +241,8 @@ func TestAntiAffinityOff(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
 
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1

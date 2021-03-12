@@ -297,6 +297,8 @@ func TestNodeUnschedulable(t *testing.T) {
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).StaticCluster()
+
 	// Static configuration.
 	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
 	allocatableMemory := e2eutil.MustGetMinNodeMem(t, targetKube)

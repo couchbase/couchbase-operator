@@ -1407,50 +1407,6 @@ func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPa
 	}
 }
 
-// SkipVersion prevents a test running with a specific version of an image.
-func SkipVersion(t *testing.T, image, version string) {
-	parts := strings.Split(image, ":")
-	if len(parts) != 2 {
-		Die(t, fmt.Errorf("malformed image: %v", image))
-	}
-
-	v1, err := couchbaseutil.NewVersion(parts[1])
-	if err != nil {
-		Die(t, err)
-	}
-
-	v2, err := couchbaseutil.NewVersion(version)
-	if err != nil {
-		Die(t, err)
-	}
-
-	if v1.Equal(v2) {
-		t.Skip("test cannot run with image version")
-	}
-}
-
-// SkipVersionsBefore prevents a test running with old versions of an image.
-func SkipVersionsBefore(t *testing.T, image, version string) {
-	parts := strings.Split(image, ":")
-	if len(parts) != 2 {
-		Die(t, fmt.Errorf("malformed image: %v", image))
-	}
-
-	v1, err := couchbaseutil.NewVersion(parts[1])
-	if err != nil {
-		Die(t, err)
-	}
-
-	v2, err := couchbaseutil.NewVersion(version)
-	if err != nil {
-		Die(t, err)
-	}
-
-	if v1.Less(v2) {
-		t.Skip("test cannot run with image version")
-	}
-}
-
 func MustSetBucketTTL(t *testing.T, bucket metav1.Object, duration time.Duration) {
 	d := metav1.Duration{
 		Duration: duration,

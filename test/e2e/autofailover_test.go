@@ -24,9 +24,9 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	availableServerGroupList := getAvailabilityZones(t, targetKube)
+	framework.Requires(t, targetKube).StaticCluster().ServerGroups(3)
 
-	skipServerGroupTestWithFewerThan(t, targetKube, 3)
+	availableServerGroupList := getAvailabilityZones(t, targetKube)
 
 	// Create cluster spec for RZA feature.  Ensure that data is correctly
 	// balanced by rounding down the largest multiple of number of AZs that
@@ -89,7 +89,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.

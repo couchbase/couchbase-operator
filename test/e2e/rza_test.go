@@ -67,18 +67,10 @@ func (expected rzaMap) mustValidateRzaMap(t *testing.T, cluster *types.Cluster, 
 // These zones will be pre-provisioned by Kops etc. or added via a cluster decorator.
 func getAvailabilityZones(t *testing.T, cluster *types.Cluster) clustercapabilities.ZoneList {
 	capabilities := clustercapabilities.MustNewCapabilities(t, cluster.KubeClient)
-	if !capabilities.ZonesSet {
-		t.Skip("cluster availability zones unset")
-	}
 
 	sort.Strings(capabilities.AvailabilityZones)
 
 	return capabilities.AvailabilityZones
-}
-
-// mustNumAvailabilityZones returns the number of availability zones defined in the target cluster.
-func mustNumAvailabilityZones(t *testing.T, cluster *types.Cluster) int {
-	return len(getAvailabilityZones(t, cluster))
 }
 
 // chooseServerGroups deterministically chooses a set of server groups to use based
@@ -111,20 +103,6 @@ func chooseServerGroups(groups []string, seed string, max int) []string {
 	return output
 }
 
-// skipServerGroupTestWithFewerThan skips the test should there be less than n
-// availability zones.
-func skipServerGroupTestWithFewerThan(t *testing.T, k8s *types.Cluster, n int) {
-	if len(getAvailabilityZones(t, k8s)) < n {
-		t.Skipf("test requires at least %d availability zones", n)
-	}
-}
-
-// skipServerGroupTest skips the test should there be less than 2 availability
-// zones.
-func skipServerGroupTest(t *testing.T, k8s *types.Cluster) {
-	skipServerGroupTestWithFewerThan(t, k8s, 2)
-}
-
 // Define Static ServersGroups in the CRD.
 // Deploy the cluster through operator and verify the server groups are balanced.
 func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
@@ -133,7 +111,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, targetKube)
+	framework.Requires(t, targetKube).ServerGroups(2)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -163,10 +141,10 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, targetKube)
+	framework.Requires(t, targetKube).ServerGroups(2)
 
 	serverGroups := getAvailabilityZones(t, targetKube)
 
@@ -240,7 +218,7 @@ func TestRzaResizeCluster(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, targetKube)
+	framework.Requires(t, targetKube).ServerGroups(2)
 
 	// Create cluster spec for RZA feature
 	clusterSize := 3
@@ -292,7 +270,7 @@ func TestRzaAntiAffinityOn(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, targetKube)
+	framework.Requires(t, targetKube).StaticCluster().ServerGroups(2)
 
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 	// WARNING: this assumes all AZs have the same number of nodes
@@ -334,7 +312,7 @@ func TestRzaAntiAffinityOff(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, targetKube)
+	framework.Requires(t, targetKube).StaticCluster().ServerGroups(2)
 
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 	// WARNING: this assumes all AZs have the same number of nodes
@@ -373,7 +351,7 @@ func TestServerGroupEnable(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, kubernetes)
+	framework.Requires(t, kubernetes).ServerGroups(2)
 
 	// Dynamic configuration.
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
@@ -411,7 +389,7 @@ func TestServerGroupDisable(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, kubernetes)
+	framework.Requires(t, kubernetes).ServerGroups(2)
 
 	// Dynamic configuration.
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
@@ -448,7 +426,7 @@ func TestServerGroupAddGroup(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, kubernetes)
+	framework.Requires(t, kubernetes).ServerGroups(2)
 
 	// Dynamic configuration.
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
@@ -491,7 +469,7 @@ func TestServerGroupRemoveGroup(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, kubernetes)
+	framework.Requires(t, kubernetes).ServerGroups(2)
 
 	// Dynamic configuration.
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
@@ -534,7 +512,7 @@ func TestServerGroupReplaceGroup(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipServerGroupTest(t, kubernetes)
+	framework.Requires(t, kubernetes).ServerGroups(2)
 
 	// Dynamic configuration.
 	availableServerGroups := getAvailabilityZones(t, kubernetes)

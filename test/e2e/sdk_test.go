@@ -42,7 +42,7 @@ func testSDK(t *testing.T, local, remote *types.Cluster, config sdkConfig) {
 		defer cleanup()
 
 		job := e2eutil.MustCreateSDKJob(t, local, remote, cluster, bucket, config.cccpImage, nil, true)
-		e2eutil.MustWaitForSDKJobCompletion(t, local, job, time.Minute)
+		e2eutil.MustWaitForSDKJobCompletion(t, local, job, 10*time.Minute)
 	})
 
 	t.Run("V2/TLS", func(t *testing.T) {
@@ -50,7 +50,7 @@ func testSDK(t *testing.T, local, remote *types.Cluster, config sdkConfig) {
 		defer cleanup()
 
 		job := e2eutil.MustCreateSDKJob(t, local, remote, cluster, bucket, config.cccpImage, tls, true)
-		e2eutil.MustWaitForSDKJobCompletion(t, local, job, time.Minute)
+		e2eutil.MustWaitForSDKJobCompletion(t, local, job, 10*time.Minute)
 	})
 
 	t.Run("V3", func(t *testing.T) {
@@ -58,7 +58,7 @@ func testSDK(t *testing.T, local, remote *types.Cluster, config sdkConfig) {
 		defer cleanup()
 
 		job := e2eutil.MustCreateSDKJob(t, local, remote, cluster, bucket, config.gcccpImage, nil, false)
-		e2eutil.MustWaitForSDKJobCompletion(t, local, job, time.Minute)
+		e2eutil.MustWaitForSDKJobCompletion(t, local, job, 10*time.Minute)
 	})
 
 	t.Run("V3/TLS", func(t *testing.T) {
@@ -66,12 +66,14 @@ func testSDK(t *testing.T, local, remote *types.Cluster, config sdkConfig) {
 		defer cleanup()
 
 		job := e2eutil.MustCreateSDKJob(t, local, remote, cluster, bucket, config.gcccpImage, tls, false)
-		e2eutil.MustWaitForSDKJobCompletion(t, local, job, time.Minute)
+		e2eutil.MustWaitForSDKJobCompletion(t, local, job, 10*time.Minute)
 	})
 }
 
 // TestSDK tests basic connectivity of any SDKs that are defined.
 func TestSDK(t *testing.T) {
+	t.Parallel()
+
 	configs := []sdkConfig{
 		{
 			language:   "Go",
@@ -84,6 +86,8 @@ func TestSDK(t *testing.T) {
 		config := configs[i]
 
 		test := func(t *testing.T) {
+			t.Parallel()
+
 			test1 := func(t *testing.T) {
 				k8s1, cleanup := framework.Global.SetupTest(t)
 				defer cleanup()

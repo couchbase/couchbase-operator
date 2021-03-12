@@ -18,8 +18,10 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/analyzer"
+	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -155,6 +157,29 @@ func (v *SuiteConfigValue) String() string {
 	return ""
 }
 
+type durationVar struct {
+	value time.Duration
+}
+
+func (v *durationVar) Set(s string) error {
+	value, err := time.ParseDuration(s)
+	if err != nil {
+		return fmt.Errorf("duration invalid: %w", err)
+	}
+
+	v.value = value
+
+	return nil
+}
+
+func (v *durationVar) Type() string {
+	return "string"
+}
+
+func (v *durationVar) String() string {
+	return v.value.String()
+}
+
 func readYamlData() (err error) {
 	// Provide some sane defaults.
 	params := TestRunParam{
@@ -172,6 +197,10 @@ func readYamlData() (err error) {
 	var suites SuiteConfigValue
 
 	var suiteSuffix string
+
+	podCreateTimeout := durationVar{
+		value: 5 * time.Minute,
+	}
 
 	// CLI based configuration (CI/computer friendly)
 	flag.StringVar(&params.KubeType, "platform-type", "kubernetes", "Either kubernetes or openshift")
@@ -201,6 +230,7 @@ func readYamlData() (err error) {
 	flag.BoolVar(&util.UseANSIColor, "color", false, "Prettify output")
 	flag.IntVar(&params.DocsCount, "docs", 10, "The amount of Documents created during tests")
 	flag.StringVar(&params.LogLevel, "log-level", "debug", "Log Level to use")
+	flag.Var(&podCreateTimeout, "pod-creation-timeout", "Time before giving up on pod creation")
 
 	// File based configuration (meat-space friendly)
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
@@ -213,6 +243,7 @@ func readYamlData() (err error) {
 
 	params.ClusterConfigs = clusters.values
 	params.RegistryConfigs = registries.values
+	params.PodCreateTimeout = podCreateTimeout.value
 
 	// We are using the CLI to configure if the suite or tests are explcitly stated.
 	useCLI := len(suites.values) > 0 || len(tests.values) > 0
@@ -387,7 +418,7 @@ func Setup() (err error) {
 		SuiteYmlData:                  suiteData,
 		CouchbaseServerImage:          runtimeParams.CouchbaseServerImage,
 		CouchbaseServerImageUpgrade:   runtimeParams.CouchbaseServerImageUpgrade,
-		PodCreateTimeout:              5 * time.Minute,
+		PodCreateTimeout:              runtimeParams.PodCreateTimeout,
 		SyncGatewayImage:              runtimeParams.SyncGatewayImage,
 		CouchbaseExporterImage:        runtimeParams.CouchbaseExporterImage,
 		CouchbaseExporterImageUpgrade: runtimeParams.CouchbaseExporterImageUpgrade,
@@ -522,6 +553,7 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 		RESTMapper:      restMapper,
 		KubeConfPath:    c.Config,
 		Context:         c.Context,
+		Platform:        string(Global.Platform),
 	}, nil
 }
 
@@ -614,10 +646,12 @@ const (
 
 // tells us if the underlying physical cluster on a host exists.
 func (f *Framework) SetupFramework(k8s *types.Cluster) error {
-	logrus.Info("Removing node taints")
+	if Global.Platform != "gke-autopilot" {
+		logrus.Info("Removing node taints")
 
-	if err := e2eutil.UntaintAll(k8s); err != nil {
-		return err
+		if err := e2eutil.UntaintAll(k8s); err != nil {
+			return err
+		}
 	}
 
 	logrus.Info("Cleaning-Up Namespaces")
@@ -982,4 +1016,133 @@ func generateLogDir() (string, error) {
 	ts := t.Format(time.RFC3339)
 
 	return filepath.Join(cwd, "logs", ts), nil
+}
+
+// TestRequirement is a type used to check if a cluster has the ability to run a test.
+type TestRequirement struct {
+	t          *testing.T
+	kubernetes *types.Cluster
+}
+
+// Requires is the constructor for TestRequirement.
+func Requires(t *testing.T, kubernetes *types.Cluster) *TestRequirement {
+	return &TestRequirement{
+		t:          t,
+		kubernetes: kubernetes,
+	}
+}
+
+// StaticCluster is a cluster that has a constant size, and you can actually
+// test filling it up.  This is as opposed to a dynamic cluster that will keep
+// on growing to fufil your capacity needs.
+func (r *TestRequirement) StaticCluster() *TestRequirement {
+	if Global.Platform == "gke-autopilot" {
+		r.t.Skip("GKE Autopilot implements cluster autoscaling")
+	}
+
+	return r
+}
+
+// CouchbaseBucket is a non-memcached bucket in essence.
+func (r *TestRequirement) CouchbaseBucket() *TestRequirement {
+	if Global.BucketType == "memcached" {
+		r.t.Skip("Memcached buckets unsupported")
+	}
+
+	return r
+}
+
+// NotVersion skips the test if the Couchbase version is buggy.
+func (r *TestRequirement) NotVersion(v ...string) *TestRequirement {
+	parts := strings.Split(Global.CouchbaseServerImage, ":")
+	if len(parts) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+	}
+
+	for _, version := range v {
+		v2, err := couchbaseutil.NewVersion(version)
+		if err != nil {
+			r.t.Skip(fmt.Sprintf("malformed version: %s: %v", version, err))
+		}
+
+		if v1.Equal(v2) {
+			r.t.Skip("Couchbase server image version not supported (defective)")
+		}
+	}
+
+	return r
+}
+
+// AtLeastVersion skips the test for Couchbase versions before this threshold.
+func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
+	parts := strings.Split(Global.CouchbaseServerImage, ":")
+	if len(parts) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+	}
+
+	v2, err := couchbaseutil.NewVersion(v)
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+	}
+
+	if v1.Less(v2) {
+		r.t.Skip("Couchbase server image version not supported (geriatric)")
+	}
+
+	return r
+}
+
+// Upgradable skips the test if the upgrade version is greater than or equal to the
+// test version.
+func (r *TestRequirement) Upgradable() *TestRequirement {
+	if Global.CouchbaseServerImageUpgrade == "" {
+		r.t.Skip("Upgrade version not specified")
+	}
+
+	parts1 := strings.Split(Global.CouchbaseServerImage, ":")
+	if len(parts1) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+	}
+
+	parts2 := strings.Split(Global.CouchbaseServerImageUpgrade, ":")
+	if len(parts2) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+	}
+
+	version, err := couchbaseutil.NewVersion(parts1[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts1[1], err))
+	}
+
+	upgrade, err := couchbaseutil.NewVersion(parts2[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts2[1], err))
+	}
+
+	if upgrade.GreaterEqual(version) {
+		r.t.Skip("Upgrade from version greater than or equal to upgrade to version")
+	}
+
+	return r
+}
+
+// ServerGroups skips the test is there aren't enough server groups to play with.
+func (r *TestRequirement) ServerGroups(i int) *TestRequirement {
+	capabilities := clustercapabilities.MustNewCapabilities(r.t, r.kubernetes.KubeClient)
+
+	if len(capabilities.AvailabilityZones) < i {
+		r.t.Skip("Required number of availability zones not found")
+	}
+
+	return r
 }

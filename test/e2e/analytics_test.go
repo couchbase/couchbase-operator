@@ -269,10 +269,6 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 
 	skipAnalytics(t)
 
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
-
 	// Static configuration.
 	clusterSize := 3
 	analyticsDataset1 := "testDataset1"

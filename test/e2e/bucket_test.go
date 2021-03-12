@@ -17,14 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func skipEditBucket(t *testing.T) {
-	f := framework.Global
-
-	if f.BucketType == "memcached" {
-		t.Skip("Memcached buckets cannot be edited")
-	}
-}
-
 func TestBucketAddRemoveBasic(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -179,7 +171,7 @@ func TestEditBucket(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipEditBucket(t)
+	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	// Constants
 	enabled := true
@@ -248,7 +240,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipEditBucket(t)
+	framework.Requires(t, targetKube).CouchbaseBucket()
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)

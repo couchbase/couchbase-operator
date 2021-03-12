@@ -27,26 +27,6 @@ func mustCreateLDAPBoundUser(t *testing.T, k8s *types.Cluster) (*couchbasev2.Cou
 	return user, group, binding
 }
 
-func skipLDAP(t *testing.T) {
-	tag, err := k8sutil.CouchbaseVersion(framework.Global.CouchbaseServerImage)
-
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	version, err := couchbaseutil.NewVersion(tag)
-
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	threshold, _ := couchbaseutil.NewVersion("6.5.0")
-
-	if version.Less(threshold) {
-		t.Skip("Unsupported couchbase version: LDAP requires >6.5.0")
-	}
-}
-
 func setupLDAP(t *testing.T, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 	// Static configuration.
 	clusterSize := 1
@@ -64,7 +44,7 @@ func setupLDAP(t *testing.T, k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 	pod := e2espec.NewLDAPServerTLS(k8s.Namespace, ctx.ClusterSecretName)
 	_ = e2eutil.MustNewLDAPServer(t, k8s, pod)
 
-	e2eutil.MustCheckLDAPServer(t, k8s, pod.Name, ctx, 5*time.Minute)
+	e2eutil.MustCheckLDAPServer(t, k8s, pod.Name, ctx, 10*time.Minute)
 
 	// Create a cluster with LDAP Auth
 	testCouchbase := e2espec.NewLDAPClusterBasic(clusterOptions().WithEphemeralTopology(clusterSize).Options, k8s.Namespace, ctx.ClusterSecretName, k8s.DefaultSecret.Name)
@@ -82,8 +62,6 @@ func TestLDAPCreateAdminUser(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipLDAP(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -109,8 +87,6 @@ func TestLDAPDeleteUser(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipLDAP(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -150,8 +126,6 @@ func TestLDAPDeleteRole(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipLDAP(t)
 
 	// Static configuration.
 	clusterSize := 1
@@ -194,8 +168,6 @@ func TestLDAPUpdateRole(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipLDAP(t)
-
 	timeout := 2 * time.Minute
 
 	// Cluster
@@ -233,8 +205,6 @@ func TestLDAPRemoveUserFromBinding(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipLDAP(t)
 
 	timeout := 2 * time.Minute
 
@@ -294,8 +264,6 @@ func TestLDAPDeleteBinding(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	skipLDAP(t)
 
 	timeout := 2 * time.Minute
 

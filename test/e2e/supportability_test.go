@@ -31,7 +31,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,54 +39,6 @@ import (
 
 	"github.com/ghodss/yaml"
 )
-
-// lazyBoundStorageClass examines the requested storage class and returns true if
-// the persistent volumes are bound when attached to a pod.
-func lazyBoundStorageClass(t *testing.T, cluster *types.Cluster) bool {
-	f := framework.Global
-
-	// When explcitly stated, lookup the storage class.
-	if f.StorageClassName != "" {
-		sc, err := cluster.KubeClient.StorageV1().StorageClasses().Get(context.Background(), f.StorageClassName, metav1.GetOptions{})
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
-	}
-
-	// When implicit (default), then lookup the default storage class that will
-	// be used by Kubernetes.
-	scs, err := cluster.KubeClient.StorageV1().StorageClasses().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	for _, sc := range scs.Items {
-		value, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]
-		if !ok {
-			continue
-		}
-
-		if value == "true" {
-			return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
-		}
-	}
-
-	return false
-}
-
-// supportsMultipleVolumeClaims returns true if multiple PVCs can be supported by a test.
-// We can run the test if there is just a single node (minikube/minishift), all nodes are
-// in the same zone (and thus all PVs will be scheduled in that zone), or lazy binding is
-// enabled (the PVCs will be scheduled in the same zone as a pod).  Additionally for abnormal
-// clusters we allow them to be used if explicitly stated in the cluster definition.
-func supportsMultipleVolumeClaims(t *testing.T, cluster *types.Cluster) bool {
-	return cluster.SupportsMultipleVolumeClaims ||
-		e2eutil.MustNumNodes(t, cluster) == 1 ||
-		mustNumAvailabilityZones(t, cluster) == 1 ||
-		lazyBoundStorageClass(t, cluster)
-}
 
 // compoundError is a group of errors.
 type compoundError struct {
@@ -116,7 +67,8 @@ func (e *compoundError) Error() string {
 // any differences with these types.
 func isIgnroableResource(path string) bool {
 	ignored := []string{
-		"persistentvolume",
+		"persistentvolume", // global resources provisioned by other tests
+		"node",             // may be dynamic (e.g. cluster auto scaling)
 	}
 
 	for _, i := range ignored {
@@ -1023,6 +975,9 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 func TestLogCollect(t *testing.T) {
 	f := framework.Global
 
+	// TODO: this is hard to parallelize on a dynamic cluster due to the control
+	// plane moving all over the place, and the barrier that exclusive puts in
+	// place severely hampers performance.
 	targetKube, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
@@ -1868,10 +1823,6 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
 
 	version := strings.Split(f.CouchbaseServerImage, ":")
 

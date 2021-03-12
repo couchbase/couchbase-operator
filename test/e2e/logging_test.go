@@ -225,10 +225,6 @@ func TestLoggingAndAuditingDefaults(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
-
 	testCouchbase := clusterOptions().WithPersisitentTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.Servers[0].VolumeMounts = &v2.VolumeMounts{
 		DefaultClaim: pvcName,
@@ -272,10 +268,6 @@ func TestAuditingNoLogging(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.Servers[0].VolumeMounts = &v2.VolumeMounts{
@@ -327,10 +319,6 @@ func TestCustomLogging(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
-
 	testCouchbase := clusterOptions().WithPersisitentTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.Servers[0].VolumeMounts = &v2.VolumeMounts{
 		DefaultClaim: pvcName,
@@ -381,10 +369,6 @@ func TestChangeLogShipperImage(t *testing.T) {
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	if !supportsMultipleVolumeClaims(t, targetKube) {
-		t.Skip("storage class unsupported")
-	}
 
 	testCouchbase := clusterOptions().WithPersisitentTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.Servers[0].VolumeMounts = &v2.VolumeMounts{

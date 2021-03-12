@@ -102,6 +102,8 @@ type TestRunParam struct {
 	DocsCount                     int    `yaml:"docs-count"`
 	LogLevel                      string `yaml:"log-level"`
 
+	PodCreateTimeout time.Duration `yaml:"pod-creation-timeout"`
+
 	ServiceAccountName string `yaml:"serviceAccountName"`
 	StorageClassName   string `yaml:"StorageClassName"`
 

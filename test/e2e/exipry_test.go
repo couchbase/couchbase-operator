@@ -21,7 +21,7 @@ func TestBucketTTL(t *testing.T) {
 	defer cleanup()
 
 	// This actually means don't run for memcached buckets...
-	skipEditBucket(t)
+	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	// Static configuration.
 	clusterSize := 1
@@ -57,7 +57,7 @@ func TestBucketTTLUpdate(t *testing.T) {
 	defer cleanup()
 
 	// This actually means don't run for memcached buckets...
-	skipEditBucket(t)
+	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	// Static configuration.
 	clusterSize := 1

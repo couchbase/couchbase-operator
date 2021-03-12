@@ -20,14 +20,16 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 	e2espec.ApplyImagePullSecret(cl, k8s.PullSecrets)
 
 	// Enable resource management for everything, it's far easier to see and understand
-	// scheduler errors, rather than see random OOM killing.  Also of note, if we left
-	// the CPU requests as default, that would have some nasty side effects e.g. things
-	// failing more frequently, so set it low enough not to interfere :D
-	cpuRequest := resource.MustParse("500m")
-
+	// scheduler errors, rather than see random OOM killing.
 	cl.Spec.AutoResourceAllocation = &couchbasev2.AutoResourceAllocation{
-		Enabled:     true,
-		CPURequests: &cpuRequest,
+		Enabled: true,
+	}
+
+	// If we left the CPU requests as default, that would have some nasty side effects
+	// e.g. things failing more frequently, so set it low enough not to interfere :D
+	if k8s.Platform != "gke-autopilot" {
+		cpuRequest := resource.MustParse("500m")
+		cl.Spec.AutoResourceAllocation.CPURequests = &cpuRequest
 	}
 
 	cl.Namespace = k8s.Namespace

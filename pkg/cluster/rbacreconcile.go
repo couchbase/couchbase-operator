@@ -68,9 +68,14 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 
 			// copy roles to group
 			for _, role := range cbGroup.Spec.Roles {
+				bucket := role.Bucket
+				if bucket == "" && couchbasev2.IsBucketRole(role.Name) {
+					bucket = "*"
+				}
+
 				group.Roles = append(group.Roles, couchbaseutil.UserRole{
 					Role:       string(role.Name),
-					BucketName: role.Bucket,
+					BucketName: bucket,
 				})
 			}
 

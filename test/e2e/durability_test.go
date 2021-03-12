@@ -22,8 +22,7 @@ func TestCreateDurableBucket(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	e2eutil.SkipVersionsBefore(t, framework.Global.CouchbaseServerImage, "6.6.0")
-	skipEditBucket(t)
+	framework.Requires(t, kubernetes).CouchbaseBucket().AtLeastVersion("6.6.0")
 
 	// Static configuration.
 	clusterSize := 1
@@ -52,8 +51,7 @@ func TestEditDurableBucket(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	e2eutil.SkipVersionsBefore(t, framework.Global.CouchbaseServerImage, "6.6.0")
-	skipEditBucket(t)
+	framework.Requires(t, kubernetes).CouchbaseBucket().AtLeastVersion("6.6.0")
 
 	// Static configuration.
 	clusterSize := 1
@@ -90,8 +88,7 @@ func TestLoadDurableBucket(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	e2eutil.SkipVersionsBefore(t, framework.Global.CouchbaseServerImage, "6.6.0")
-	skipEditBucket(t)
+	framework.Requires(t, kubernetes).CouchbaseBucket().AtLeastVersion("6.6.0")
 
 	// Static configuration.
 	clusterSize := 3
