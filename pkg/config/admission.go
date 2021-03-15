@@ -496,8 +496,8 @@ func (o *generateAdmissionOptions) getAdmissionSecret(key, cert []byte) *corev1.
 			Name: AdmissionResourceName,
 		},
 		Data: map[string][]byte{
-			"tls-cert-file":        cert,
-			"tls-private-key-file": key,
+			"tls.crt": cert,
+			"tls.key": key,
 		},
 	}
 }
@@ -534,8 +534,8 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 							},
 							Args: []string{
 								"-zap-level=" + o.logLevel.value,
-								"-tls-cert-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-cert-file",
-								"-tls-private-key-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls-private-key-file",
+								"-tls-cert-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls.crt",
+								"-tls-private-key-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls.key",
 								"-validate-secrets=" + strconv.FormatBool(o.validateSecrets),
 								"-validate-storage-classes=" + strconv.FormatBool(o.validateStorageClasses),
 								"-default-file-system-group=" + strconv.FormatBool(o.defaultFileSystemGroup),
