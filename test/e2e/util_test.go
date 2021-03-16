@@ -430,7 +430,8 @@ var (
 		"TestKubernetesRollingUpgrade": TestKubernetesRollingUpgrade,
 
 		// Kubernetes Scheduling Tests
-		"TestScheduleEvacuateAllPersistent": TestScheduleEvacuateAllPersistent,
+		"TestScheduleEvacuateAllPersistent":   TestScheduleEvacuateAllPersistent,
+		"TestScheduleCleanupUninitializedPod": TestScheduleCleanupUninitializedPod,
 
 		// SDK testing
 		"TestSDK": TestSDK,

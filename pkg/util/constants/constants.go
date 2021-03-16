@@ -34,10 +34,16 @@ var (
 	PVCSpecAnnotation             = "pvc.couchbase.com/spec"
 	SVCSpecAnnotation             = "svc.couchbase.com/spec"
 	PodTLSAnnotation              = "pod.couchbase.com/tls"
+	PodInitializedAnnotation      = "pod.couchbase.com/initialized"
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"
 
 	CronjobSpecAnnotation = "cronjob.couchbase.com/spec"
+
+	// PodInitializedAnnotationMinVersion is the version pod.couchbase.com/initialized
+	// first appeared in, so we shouldn't do anything with resources created on earlier
+	// versions.
+	PodInitializedAnnotationMinVersion = "2.2.0"
 )
 
 // Label types added to pods.

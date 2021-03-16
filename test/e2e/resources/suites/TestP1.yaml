@@ -173,3 +173,4 @@ testcases:
 
 # Scheduling Tests
 - TestScheduleEvacuateAllPersistent
+- TestScheduleCleanupUninitializedPod

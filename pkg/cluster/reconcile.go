@@ -443,6 +443,10 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.
 	log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", newMember.Name())
 	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name(), c.cluster))
 
+	if err := k8sutil.SetPodInitialized(c.k8s, newMember.Name()); err != nil {
+		return newMember, err
+	}
+
 	return newMember, nil
 }
 

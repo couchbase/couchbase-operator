@@ -1324,3 +1324,37 @@ func AntiAffinityForCluster(clusterName string) *v1.Affinity {
 		},
 	}
 }
+
+// SetPodInitialized sets the pod initialized annotation.  This means that the
+// pod has either been fully set up (first node), or has successfully joined in
+// to the cluster (all subsequent nodes).  Before this annotation is set, we haven't
+// the faintest clue what state the pod is in, and more pertinently, it may not
+// even respond to poking.
+func SetPodInitialized(client *client.Client, name string) error {
+	// Get the most recent cached version, just in case the generation has been
+	// bumped asynchronously and we're out of sync.  Also give it a couple retries
+	// to make this less error prone.
+	callback := func() error {
+		pod, ok := client.Pods.Get(name)
+		if !ok {
+			return fmt.Errorf("%w: unable to set initialized annotation", errors.NewStackTracedError(errors.ErrResourceRequired))
+		}
+
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+
+		pod.Annotations[constants.PodInitializedAnnotation] = "true"
+
+		if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	return retryutil.Retry(ctx, time.Second, callback)
+}

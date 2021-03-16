@@ -1032,3 +1032,16 @@ func MustWaitForLoggingSidecarReady(t *testing.T, k8s *types.Cluster, couchbase 
 		Die(t, err)
 	}
 }
+
+func MustWaitForPendingPod(t *testing.T, k8s *types.Cluster, name string, timeout time.Duration) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: k8s.Namespace,
+		},
+	}
+
+	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, pod, string(v1.PodScheduled), string(v1.ConditionFalse))); err != nil {
+		Die(t, err)
+	}
+}

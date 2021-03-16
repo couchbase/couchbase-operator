@@ -20,6 +20,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
+	"github.com/Masterminds/semver"
 	"github.com/golang/groupcache/lru"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -339,6 +340,10 @@ func (c *Cluster) create() error {
 
 	c.raiseEvent(k8sutil.MemberAddEvent(m.Name(), c.cluster))
 
+	if err := k8sutil.SetPodInitialized(c.k8s, m.Name()); err != nil {
+		return err
+	}
+
 	// This takes a while to get set, yawn...
 	var uuid string
 
@@ -424,6 +429,37 @@ func (c *Cluster) runReconcile() {
 		log.Error(err, "Failed to update members", "cluster", c.namespacedName())
 		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
 		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
+
+		// When we call updateMembers, it's going to look at all running pods can try
+		// to dial Couchbase and get health status.  It's entirely possible that the
+		// operator got killed or rescheduled before pods were correctly initialized,
+		// and thus will not respond to our pleas for help.  Execute any uninitialized
+		// nodes, so that we may recreate the cluster next time around.
+		for _, pod := range running {
+			// The initialized annotation came to be in 2.2...
+			versionAnnotation, ok := pod.Annotations[constants.ResourceVersionAnnotation]
+			if !ok {
+				continue
+			}
+
+			version, err := semver.NewVersion(versionAnnotation)
+			if err != nil {
+				log.Error(err, "Failed to parse pod version", "cluster", c.namespacedName(), "pod", pod.Name, "version", versionAnnotation)
+				continue
+			}
+
+			threshold := semver.MustParse(constants.PodInitializedAnnotationMinVersion)
+			if version.LessThan(threshold) {
+				continue
+			}
+
+			log.Info("Killing uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
+
+			if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, pod.Name, metav1.DeleteOptions{}); err != nil {
+				log.Error(err, "Failed to delete uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
+				continue
+			}
+		}
 
 		return
 	}
