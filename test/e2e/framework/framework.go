@@ -231,6 +231,7 @@ func readYamlData() (err error) {
 	flag.IntVar(&params.DocsCount, "docs", 10, "The amount of Documents created during tests")
 	flag.StringVar(&params.LogLevel, "log-level", "debug", "Log Level to use")
 	flag.Var(&podCreateTimeout, "pod-creation-timeout", "Time before giving up on pod creation")
+	flag.BoolVar(&params.EnableIstio, "istio", false, "Enable istio injection")
 
 	// File based configuration (meat-space friendly)
 	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
