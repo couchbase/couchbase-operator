@@ -2605,12 +2605,74 @@ func (c *Cluster) reconcileBackup() error {
 			// PVC update for later k8s versions
 			existing[pvc.Name] = true
 
-			if reflect.DeepEqual(pvc.Spec.Resources, existingPVC.Spec.Resources) {
+			// First up, if things look whiffy get the hell out, we don't want to
+			// stack shit on top of shit and have the tower of shit collapse.
+			requested, ok := existingPVC.Spec.Resources.Requests[v1.ResourceStorage]
+			if !ok {
+				log.V(1).Info("Skipping backup volume reconcile, no storage requested", "cluster", c.namespacedName(), "backup", pvc.Name)
+				continue
+			}
+
+			actual, ok := existingPVC.Status.Capacity[v1.ResourceStorage]
+			if !ok {
+				log.V(1).Info("Skipping backup volume reconcile, no capacity defined", "cluster", c.namespacedName(), "backup", pvc.Name)
+				continue
+			}
+
+			if !requested.Equal(actual) {
+				log.V(1).Info("Skipping backup volume reconcile, resize pending", "cluster", c.namespacedName(), "backup", pvc.Name)
+				continue
+			}
+
+			// Thankfully the PVC maps directly to the backup name...
+			backup, ok := c.k8s.CouchbaseBackups.Get(pvc.Name)
+			if !ok {
+				return fmt.Errorf("%w: missing backup resource for pvc %s", errors.NewStackTracedError(errors.ErrResourceRequired), pvc.Name)
+			}
+
+			// Determine the effective size of the volume.
+			// This is the largest of either the spec (requested minimum size),
+			// or the actual PVC.
+			size := backup.Spec.Size
+
+			// 0 eq, -1 lt, 1 gt
+			if requested.Cmp(*size) > 0 {
+				size = &requested
+			}
+
+			// Determine whether the volume needs to be embiggened.
+			if backup.Spec.AutoScaling != nil {
+				// If the free capacity is less than the threshold, we need to alter the
+				// size by the configured amount.  We also need to cap this at the
+				// limit if one is provided.
+				if backup.Status.CapacityUsed != nil {
+					free := size.DeepCopy()
+					free.Sub(*backup.Status.CapacityUsed)
+
+					threshold := resource.NewQuantity((size.Value()*int64(backup.Spec.AutoScaling.ThresholdPercent))/100, resource.BinarySI)
+
+					log.V(1).Info("Backup autoscaler status", "cluster", c.namespacedName(), "backup", backup.Name, "size", size, "free", free, "used", backup.Status.CapacityUsed, "threshold", threshold)
+
+					if free.Cmp(*threshold) < 0 {
+						increment := resource.NewQuantity((size.Value()*(100+int64(backup.Spec.AutoScaling.IncrementPercent)))/100, resource.BinarySI)
+						size.Add(*increment)
+
+						if backup.Spec.AutoScaling.Limit != nil && size.Cmp(*backup.Spec.AutoScaling.Limit) > 0 {
+							size = backup.Spec.AutoScaling.Limit
+						}
+
+						log.Info("Backup autoscaler scaling", "cluster", c.namespacedName(), "backup", backup.Name, "size", size)
+					}
+				}
+			}
+
+			currentRequest := existingPVC.Spec.Resources.Requests[v1.ResourceStorage]
+			if currentRequest.Equal(*size) {
 				continue
 			}
 
 			updatedPVC := existingPVC.DeepCopy()
-			updatedPVC.Spec.Resources = pvc.Spec.Resources
+			updatedPVC.Spec.Resources.Requests[v1.ResourceStorage] = *size
 
 			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(context.Background(), updatedPVC, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("failed to update PVC: %w", errors.NewStackTracedError(err))

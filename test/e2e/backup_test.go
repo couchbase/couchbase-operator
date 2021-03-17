@@ -1061,3 +1061,83 @@ func TestBackupPVCResize(t *testing.T) {
 func TestBackupPVCResizeS3(t *testing.T) {
 	testBackupPVCResize(t, true)
 }
+
+// TestBackupAutoscaling populates the database with a load of data, then backs it up.
+// We check the capacity and then ensure that by setting the right thresholds, it
+// resizes the volume as we need it.
+func TestBackupAutoscaling(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 3
+	initialVolumeSize := e2espec.NewResourceQuantityMi(1024)
+	volumeSizeLimit := e2espec.NewResourceQuantityMi(1024 + 512)
+
+	// Create a 2 node cluster, with 1Gi of memory per node...
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Create a bucket with 1Gi per node, and no replicas...
+	bucket := e2espec.DefaultBucket()
+	bucket.Spec.MemoryQuota = initialVolumeSize
+	bucket.Spec.Replicas = 0
+
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	// The stage is set, we have 3Gi of document storage to play around with.
+	// First up, populate the cluster with a sizable amount of documentation.
+	// When backed up, it will shrink by something like 5x.  So 1Gi of data
+	// will be 200Mi of backup, on 1Gi of volume, which is a good 20% of the
+	// space...
+	e2eutil.MustPopulateWithDataSize(t, kubernetes, cluster, bucket.Name, f.CouchbaseServerImage, 1<<30, time.Minute)
+
+	// Schedule the backup to happen in 2 minutes time, and expect it to complete...
+	// at some point, this may take a while given VMs may need to be created to schedule
+	// the thing.  Importantly, we set the threshold at 99% (e.g. we need 99% of the
+	// volume to be free), we increment by 200% (triple the existing 1Gi), and put a limit
+	// in of 1.5Gi. We wait for the backup to be updated
+	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", false)
+	backup.Spec.Size = e2espec.NewResourceQuantityMi(1024)
+	backup.Spec.AutoScaling = &v2.CouchbaseBackupAutoScaling{
+		Limit:            volumeSizeLimit,
+		ThresholdPercent: 99,
+		IncrementPercent: 200,
+	}
+
+	backup = e2eutil.MustNewBackup(t, kubernetes, backup)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupUpdateEvent(backup.Name, cluster), 20*time.Minute)
+
+	// Trigger another backup, this will cause volume expansion when it's remounted.
+	// Also reduce the threshold down so we don't trigger another update unnecessarily,
+	// and also test that another update doesn't happen erroneously.  Beware of rounding,
+	// My request for 1.5Gi turned into 2Gi in reality!!
+	patchset := jsonpatch.NewPatchSet().
+		Replace("/spec/full/schedule", cronScheduleOnceIn(2*time.Minute)).
+		Replace("/spec/autoScaling/thresholdPercent", 1)
+
+	e2eutil.MustPatchBackup(t, kubernetes, backup, patchset, time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 20*time.Minute)
+	e2eutil.MustWaitForPVCNotSize(t, kubernetes, backup.Name, initialVolumeSize, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created.
+	// * Bucket created.
+	// * Backup created.
+	// * PVC resized after the backup reported low space (auto update).
+	// * Backup rescheduled and occurred (update).
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
+		eventschema.Repeat{
+			Times:     2,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonBackupUpdated},
+		},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

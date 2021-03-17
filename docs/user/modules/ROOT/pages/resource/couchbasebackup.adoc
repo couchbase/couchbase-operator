@@ -47,6 +47,58 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasebackup]
 
 CouchbaseBackupSpec is allows the specification of how a Couchbase backup is configured, including when backups are performed, how long they are retained for, and where they are backed up to.
 
+=== couchbasebackups.spec.autoScaling
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+AutoScaling allows the volume size to be dynamically increased.
+When specified, the backup volume will start with an initial size as defined by `spec.size`, and increase as required.
+
+=== couchbasebackups.spec.autoScaling.incrementPercent
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `20`
+
+==== Description
+
+IncrementPercent controls how much the volume is increased each time the threshold is exceeded, upto a maximum as defined by the limit.
+This field defaults to 20 if not specified.
+
+=== couchbasebackups.spec.autoScaling.limit
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+Limit imposes a hard limit on the size we can autoscale to.
+When not specified no bounds are imposed.
+
+=== couchbasebackups.spec.autoScaling.thresholdPercent
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `20`
+
+==== Description
+
+ThresholdPercent determines the point at which a volume is autoscaled.
+This represents the percentage of free space remaining on the volume, when less than this threshold, it will trigger a volume expansion.
+For example, if the volume is 100Gi, and the threshold 20%, then a resize will be triggered when the used capcity exceeds 80Gi, and free space is less than 20Gi.
+This field defaults to 20 if not specified.
+
 === couchbasebackups.spec.backoffLimit
 
 ==== Constraints

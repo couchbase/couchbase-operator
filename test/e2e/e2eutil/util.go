@@ -30,6 +30,7 @@ import (
 
 	other_jsonpatch "github.com/evanphx/json-patch"
 
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1263,6 +1264,70 @@ func MustGenerateWorkload(t *testing.T, k8s *types.Cluster, couchbase *couchbase
 	}
 
 	return cleanup
+}
+
+// MustPopulateWithDataSize fills Couchbase with an approximate number of docs that
+// fulfill the requested size.  I cannot for the life of me fathom how this pillowfight
+// junk is meant to work, and cannot seem to make it generate what I want!  But it's
+// a good enough approximation.
+func MustPopulateWithDataSize(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucket, image string, size int, timeout time.Duration) {
+	documentSize := 1 << 20 // 1 megabyte
+	documents := size / documentSize
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "populator",
+			Namespace: k8s.Namespace,
+		},
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:  "pillowfight",
+							Image: image,
+							Command: []string{
+								"/opt/couchbase/bin/cbc-pillowfight",
+							},
+							Args: []string{
+								"-U",
+								fmt.Sprintf("couchbase://%s/%s", couchbase.Name, bucket),
+								"-u",
+								string(k8s.DefaultSecret.Data["username"]),
+								"-P",
+								string(k8s.DefaultSecret.Data["password"]),
+								"--sequential",
+								"-r",
+								"100",
+								"-c",
+								"1",
+								"-B",
+								strconv.Itoa(documents),
+								"-m",
+								strconv.Itoa(documentSize),
+								"-M",
+								strconv.Itoa(documentSize),
+								"-J",
+								"-n",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if _, err := k8s.KubeClient.BatchV1().Jobs(k8s.Namespace).Create(ctx, job, metav1.CreateOptions{}); err != nil {
+		Die(t, err)
+	}
+
+	if err := retryutil.Retry(ctx, time.Second, ResourceConstraints(k8s, job, resourceExists, resourceConditionExists("Complete", "True"), jobSucceeded(1))); err != nil {
+		Die(t, err)
+	}
 }
 
 // GetUUID returns the UUID of the cluster.

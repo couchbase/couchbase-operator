@@ -149,6 +149,22 @@ func couchbaseClusterScaled(resource *unstructured.Unstructured, lookupError err
 	return nil
 }
 
+// jobSucceeded checks whether a job has completed successfully.
+func jobSucceeded(replicas int) func(*unstructured.Unstructured, error) error {
+	return func(resource *unstructured.Unstructured, lookupError error) error {
+		succeeded, ok, _ := unstructured.NestedInt64(resource.Object, "status", "succeeded")
+		if !ok {
+			return fmt.Errorf("no jobs have succeeded")
+		}
+
+		if int(succeeded) != replicas {
+			return fmt.Errorf("jobs succeeded %d, expected %d", succeeded, replicas)
+		}
+
+		return nil
+	}
+}
+
 // ResourceConstraints gets a resource and then applies constraints to it, if any fail, so
 // does this.
 func ResourceConstraints(k8s *types.Cluster, resource runtime.Object, constraints ...resourceCheckFunc) func() error {
@@ -611,8 +627,28 @@ func fieldEqualQuantity(size *resource.Quantity, fields ...string) resourceCheck
 			return err
 		}
 
-		if quantity.Value() != size.Value() {
-			return fmt.Errorf("quantity does not match size")
+		if !quantity.Equal(*size) {
+			return fmt.Errorf("quantity %v not equal to size %v", quantity.String(), size.String())
+		}
+
+		return nil
+	}
+}
+
+func fieldNotEqualQuantity(size *resource.Quantity, fields ...string) resourceCheckFunc {
+	return func(u *unstructured.Unstructured, lookupError error) error {
+		raw, ok, _ := unstructured.NestedString(u.Object, fields...)
+		if !ok {
+			return fmt.Errorf("no value found within resource")
+		}
+
+		quantity, err := resource.ParseQuantity(raw)
+		if err != nil {
+			return err
+		}
+
+		if quantity.Equal(*size) {
+			return fmt.Errorf("quantity %v equal to size %v", quantity.String(), size.String())
 		}
 
 		return nil
@@ -620,12 +656,27 @@ func fieldEqualQuantity(size *resource.Quantity, fields ...string) resourceCheck
 }
 
 func MustWaitForPVCSize(t *testing.T, k8s *types.Cluster, name string, size *resource.Quantity, timeout time.Duration) {
-	pvc, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		Die(t, err)
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: k8s.Namespace,
+		},
 	}
 
 	if err := retryutil.RetryFor(timeout, ResourceConstraints(k8s, pvc, fieldEqualQuantity(size, "status", "capacity", "storage"))); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustWaitForPVCNotSize(t *testing.T, k8s *types.Cluster, name string, size *resource.Quantity, timeout time.Duration) {
+	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: k8s.Namespace,
+		},
+	}
+
+	if err := retryutil.RetryFor(timeout, ResourceConstraints(k8s, pvc, fieldNotEqualQuantity(size, "status", "capacity", "storage"))); err != nil {
 		Die(t, err)
 	}
 }

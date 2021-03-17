@@ -177,11 +177,41 @@ type CouchbaseBackupSpec struct {
 	// +kubebuilder:validation:Type=string
 	Size *resource.Quantity `json:"size,omitempty"`
 
+	// AutoScaling allows the volume size to be dynamically increased.
+	// When specified, the backup volume will start with an initial size
+	// as defined by `spec.size`, and increase as required.
+	AutoScaling *CouchbaseBackupAutoScaling `json:"autoScaling,omitempty"`
+
 	// Name of StorageClass to use.
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
 	// Name of S3 bucket to backup to. If non-empty this overrides local backup.
 	S3Bucket string `json:"s3bucket,omitempty"`
+}
+
+type CouchbaseBackupAutoScaling struct {
+	// Limit imposes a hard limit on the size we can autoscale to.  When not
+	// specified no bounds are imposed.
+	// +kubebuilder:validation:Type=string
+	Limit *resource.Quantity `json:"limit,omitempty"`
+
+	// ThresholdPercent determines the point at which a volume is autoscaled.
+	// This represents the percentage of free space remaining on the volume,
+	// when less than this threshold, it will trigger a volume expansion.
+	// For example, if the volume is 100Gi, and the threshold 20%, then a resize
+	// will be triggered when the used capcity exceeds 80Gi, and free space is
+	// less than 20Gi.  This field defaults to 20 if not specified.
+	// +kubebuilder:default=20
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=99
+	ThresholdPercent int `json:"thresholdPercent,omitempty"`
+
+	// IncrementPercent controls how much the volume is increased each time the
+	// threshold is exceeded, upto a maximum as defined by the limit.
+	// This field defaults to 20 if not specified.
+	// +kubebuilder:default=20
+	// +kubebuilder:validation:Minimum=0
+	IncrementPercent int `json:"incrementPercent,omitempty"`
 }
 
 // CouchbaseBackupStatus provides status notifications about the Couchbase backup

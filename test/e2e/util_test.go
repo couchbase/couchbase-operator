@@ -383,6 +383,7 @@ var (
 		"TestFullOnlyOverTLSS3":              TestFullOnlyOverTLSS3,
 		"TestBackupRetention":                TestBackupRetention,
 		"TestBackupRetentionS3":              TestBackupRetentionS3,
+		"TestBackupAutoscaling":              TestBackupAutoscaling,
 
 		// Node-to-node Encryption
 		"TestCreateClusterWithTLSAndControlPlaneNodeToNode":                            TestCreateClusterWithTLSAndControlPlaneNodeToNode,

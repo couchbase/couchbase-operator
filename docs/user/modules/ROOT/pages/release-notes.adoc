@@ -86,6 +86,22 @@ A whole cluster "immediate" upgrade is now synonymous with a rolling upgrade set
 Immediate upgrades may be removed at some point in the future as it duplicates functionality.
 ====
 
+==== Improved Backup Handling
+
+While not a replacement for a properly implemented monitoring solution, it may be beneficial to have your backup storage grow with your requirements.
+To this end, two new features are introduced.
+
+The first allows manual update of the volume size, by manually editing the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-size[`couchbasebackups.spec.size`] field.
+
+The second allows automatic updates to be performed by the Autonomous Operator, thus keeping backups to the minimum size necessary to operate, and reducing cost, while also supporting future expansion.
+In this mode of operation, the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling[`couchbasebackups.spec.autoScaling`] field controls the behavior.
+When the free storage becomes lower than xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-thresholdpercent[`couchbasebackups.spec.autoScaling.thresholdPercent`] percent, volume expansion will be triggered.
+Volumes will be automatically grown by xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-incrementpercent[`couchbasebackups.spec.autoScaling.incrementPercent`] percent of the current volume size.
+If specified, the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-limit[`couchbasebackups.spec.autoScaling.limit`] field will limit the maximum volume size.
+When not specified, volumes can grow indefinitely.
+
+In order to use any resize capability, your backups must be using a storage class where volume expansion is enabled.
+
 ==== Other Notable Changes
 
 * The dynamic admission controller (DAC) now allows xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-volumeMounts-index[couchbaseclusters.spec.servers.volumeMounts.index] to be configured for server classes that include the Search Service and that don't include the Index Service.
