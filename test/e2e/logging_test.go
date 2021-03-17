@@ -196,16 +196,16 @@ func TestNoLogOrAuditConfig(t *testing.T) {
 	// Check no extra sidecars
 	e2eutil.MustCheckLoggingSidecarsCount(t, targetKube, testCouchbase, 0)
 
-	// Check we can manually enable
+	// Check we can manually enable, i.e. existing behaviour
 	e2eutil.MustEnableAuditLogging(t, targetKube, testCouchbase)
 
-	// Prior to applying the new config, we start watching for the event that indicates it - it may happen too quickly otherwise to observe
-	op := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("audit", testCouchbase), 2*time.Minute)
-	// Apply the new configuration
+	// Apply the new configuration and set explicitly false
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", &v2.CouchbaseClusterAuditLoggingSpec{Enabled: false}), time.Minute)
-	// Check we have seen the event
-	e2eutil.MustReceiveErrorValue(t, op)
-	// Check the audit configuration has been applied correctly now
+
+	// We only have one of these events so no need to mess with race conditions & async waits
+	e2eutil.MustObserveClusterEvent(t, targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("audit", testCouchbase), 5*time.Minute)
+
+	// Check we have seen the event before continuing to check the audit configuration has been applied correctly now
 	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
 
 	// Check that the user can see the cluster being edited.
@@ -293,20 +293,16 @@ func TestAuditingNoLogging(t *testing.T) {
 	newConfig.DisabledEvents = []int{8243}
 	newConfig.DisabledUsers = []v2.AuditDisabledUser{"@eventing/local", "@cbq-engine/local"}
 
-	// Prior to applying the new config, we start watching for the event that indicates it - it may happen too quickly otherwise to observe
-	op := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("audit", testCouchbase), 2*time.Minute)
 	// Apply the new configuration
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", newConfig), time.Minute)
-	// Check we have seen the event
-	e2eutil.MustReceiveErrorValue(t, op)
-	// Check the audit configuration has been applied correctly now
-	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
 
 	// Check that the user can see the cluster settings being edited twice.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(1),
-		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
-		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		eventschema.Repeat{
+			Times:     2,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
