@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -230,15 +231,27 @@ func (c *Cluster) generateBackupContainer(containerName string, spec couchbasev2
 		resources = *c.cluster.Spec.Backup.Resources
 	}
 
+	command := []string{
+		"backup_script",
+		"--strategy", string(strategy),
+		"--config", strconv.FormatBool(config),
+		"--mode", "backup",
+		"--backup-ret", fmt.Sprintf("%.2f", spec.BackupRetention.Hours()),
+		"--log-ret", fmt.Sprintf("%.2f", spec.LogRetention.Hours()),
+		"-v", "INFO",
+		c.cluster.Name,
+	}
+
 	container := corev1.Container{
-		Name:    containerName,
-		Image:   c.cluster.Spec.BackupImage(),
-		Command: []string{"backup_script"},
-		Args: []string{c.cluster.Name, "--strategy", string(strategy), "--config", strconv.FormatBool(config),
-			"--mode", "backup",
-			"--backup-ret", fmt.Sprintf("%.2f", spec.BackupRetention.Hours()),
-			"--log-ret", fmt.Sprintf("%.2f", spec.LogRetention.Hours()),
-			"-v", "INFO"},
+		Name:  containerName,
+		Image: c.cluster.Spec.BackupImage(),
+		Command: []string{
+			"/bin/bash",
+		},
+		Args: []string{
+			"-c",
+			strings.Join(command, " ") + "; CODE=$?; curl -X POST http://localhost:15020/quitquitquit; exit ${CODE}",
+		},
 		WorkingDir: "/",
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -355,13 +368,25 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 		resources = *c.cluster.Spec.Backup.Resources
 	}
 
+	command := []string{
+		"backup_script",
+		"--mode", "restore",
+		"--repo", spec.Repo,
+		"--start", start, "--end", end,
+		"--log-ret", fmt.Sprintf("%.2f", spec.LogRetention.Hours()),
+		c.cluster.Name,
+	}
+
 	container := corev1.Container{
-		Name:    "cbbackupmgr-restore",
-		Image:   c.cluster.Spec.BackupImage(),
-		Command: []string{"backup_script"},
-		Args: []string{c.cluster.Name, "--mode", "restore",
-			"--repo", spec.Repo, "--start", start, "--end", end,
-			"--log-ret", fmt.Sprintf("%.2f", spec.LogRetention.Hours())},
+		Name:  "cbbackupmgr-restore",
+		Image: c.cluster.Spec.BackupImage(),
+		Command: []string{
+			"/bin/bash",
+		},
+		Args: []string{
+			"-c",
+			strings.Join(command, " ") + "; CODE=$?; curl -X POST http://localhost:15020/quitquitquit; exit ${CODE}",
+		},
 		WorkingDir: "/",
 		VolumeMounts: []corev1.VolumeMount{
 			{
