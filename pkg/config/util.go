@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -303,9 +304,9 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	// Note: these should be updated every release.
-	technicalLowerBound := &version.Info{Major: "1", Minor: "17"}
-	supportedLowerBound := &version.Info{Major: "1", Minor: "17"}
-	supportedUpperBound := &version.Info{Major: "1", Minor: "20"}
+	technicalLowerBound := &version.Info{Major: "1", Minor: "17", GitVersion: "v1.17.0"}
+	supportedLowerBound := &version.Info{Major: "1", Minor: "17", GitVersion: "v1.17.0"}
+	supportedUpperBound := &version.Info{Major: "1", Minor: "20", GitVersion: "v1.20.0"}
 
 	// You shall not pass!!  AKA don't waste our time.
 	ok, err := versionLessThan(technicalLowerBound, v)
@@ -315,7 +316,12 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	if ok {
-		return fmt.Errorf("platform version %s too old to run Operator version", v)
+		// https://en.wikipedia.org/wiki/ANSI_escape_code
+		fmt.Println("\033[1;31mError\033[0m: platform version", v, "is too old to run Operator, minimum supported version is", technicalLowerBound)
+
+		// Bail out here, if we return an error to the handler then it will
+		// dump out the help page, which is less user friendly.
+		os.Exit(1)
 	}
 
 	// You're doing something risky!! Do it by all means, but if support see it...
