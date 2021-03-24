@@ -1795,18 +1795,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			expectedErrors: []string{"spec.servers[0].services"},
 		},
 		{
-			name:           "TestValidateApplyAntiAffinityImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/antiAffinity", true)},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.antiAffinity"},
-		},
-		{
-			name:           "TestValidateApplyAuthSecretImmutable",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/security/adminSecret", "auth-secret-update")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.authSecret"},
-		},
-		{
 			name:           "TestValidateApplyIndexStorageSettingsImmutable",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard)},
 			shouldFail:     true,

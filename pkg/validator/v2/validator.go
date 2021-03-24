@@ -1386,15 +1386,6 @@ func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name s
 func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error {
 	errs := []error{}
 
-	if current.Spec.AntiAffinity != updated.Spec.AntiAffinity {
-		errs = append(errs, util.NewUpdateError("spec.antiAffinity", "body"))
-	}
-
-	if current.Spec.Security.AdminSecret != updated.Spec.Security.AdminSecret {
-		err := util.NewUpdateError("spec.authSecret", "body")
-		errs = append(errs, err)
-	}
-
 	if !reflect.DeepEqual(current.Spec.Networking.AddressFamily, updated.Spec.Networking.AddressFamily) {
 		errs = append(errs, util.NewUpdateError(`spec.networking.addressFamily`, `body`))
 	}
