@@ -23,6 +23,10 @@ The HPA allows high-level functionality such as allowing scaling to be driven by
 While this feature is generic, and will work for any server class, it has been inhibited to only work with server classes comprised of the stateless query service, and only when all buckets are ephemeral, by default.
 This restriction can be removed with the xref:reference-couchbasecluster.adoc#spec-enablepreviewscaling[`spec.enablePreviewScaling`] configuration switch, allowing -- for example -- the data service to be scaled when using standard Couchbase buckets.
 
+Refer to xref:concept-couchbase-autoscaling.adoc[] for more information.
+
+See also: xref:tutorial-autoscale.adoc[] (tutorial)
+
 == Administrator Password Rotation
 
 The Operator's persistence and caching layer has been upgraded in version {operator-version-minor}.
