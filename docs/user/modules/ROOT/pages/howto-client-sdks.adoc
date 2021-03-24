@@ -91,8 +91,7 @@ Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS 
 
 [NOTE]
 ====
-Use of client SDKs with this network configuration relies on support for DNAT.
-Consult the xref:concept-couchbase-networking.adoc#supported-client-versions-for-use-with-exposed-features[networking concepts page] for compatibility information.
+Use of client SDKs with this network configuration relies on support for DNAT, which in turn requires that the SDK support xref:concept-couchbase-networking.adoc#exposed-features[exposed features].
 ====
 
 [IMPORTANT]
@@ -138,8 +137,7 @@ The address to connect to is `\http://10.0.2.15:31410?network=external`.
 
 [NOTE]
 ====
-Use of client SDKs with this network configuration relies on support for DNAT.
-Consult the xref:concept-couchbase-networking.adoc#supported-client-versions-for-use-with-exposed-features[networking concepts page] for compatibility information.
+Use of client SDKs with this network configuration relies on support for DNAT, which in turn requires that the SDK support xref:concept-couchbase-networking.adoc#exposed-features[exposed features].
 ====
 
 [#cbs-651]
