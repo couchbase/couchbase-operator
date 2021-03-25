@@ -121,8 +121,8 @@ type Config struct {
 	// DefaultFileSystemGroup allows opt-in to fs group defaulting.
 	DefaultFileSystemGroup bool
 
-	// level is the log level.
-	Level logging.LogLevel
+	// LogOptions allow everything about logging to be set.
+	LogOptions logging.Options
 }
 
 // addFlags parses command line parameters and adds them to a Config object.
@@ -140,8 +140,8 @@ func (c *Config) AddFlags() {
 		"Validate referenced storage classes")
 	flag.BoolVar(&c.DefaultFileSystemGroup, "default-file-system-group", true, ""+
 		"Default file system group information")
-	flag.Var(&c.Level, "zap-level", ""+
-		"The log level ('info', 'error', 'debug' or an integer >= 0)")
+
+	c.LogOptions.AddFlagSet(flag.CommandLine)
 }
 
 // errorResponse takes an error and creates an admission response.
@@ -420,7 +420,7 @@ func (s *Server) Restart(tlsConfig *tls.Config) {
 
 // main initializes the system then starts a HTTPS server to process requests.
 func Serve(config *Config) {
-	logf.SetLogger(logging.New(config.Level.Level))
+	logf.SetLogger(logging.New(&config.LogOptions))
 
 	log.Info(version.Application+"-admission-controller", "version", version.WithBuildNumber(), "revision", revision.Revision())
 

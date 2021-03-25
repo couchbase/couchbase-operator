@@ -533,7 +533,7 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 								"couchbase-operator-admission",
 							},
 							Args: []string{
-								"-zap-level=" + o.logLevel.value,
+								"-zap-log-level=" + o.logLevel.value,
 								"-tls-cert-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls.crt",
 								"-tls-private-key-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls.key",
 								"-validate-secrets=" + strconv.FormatBool(o.validateSecrets),

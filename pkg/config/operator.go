@@ -537,7 +537,7 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 							},
 							Args: []string{
 								"--pod-create-timeout=" + o.podCreationTimeout.value.String(),
-								"--zap-level=" + o.logLevel.value,
+								"--zap-log-level=" + o.logLevel.value,
 							},
 							Env: []corev1.EnvVar{
 								namespaceEnv,

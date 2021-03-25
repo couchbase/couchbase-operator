@@ -68,13 +68,13 @@ spec:
     spec:
       containers:
         args:
-        - --zap-level=info
+        - --zap-log-level=info
         - --concurrency=4
         - --pod-create-timeout=10m
         - --listen-addr=8080
 ----
 
---zap-level <string>::
+--zap-log-level <string>::
 This argument controls the log level a message has to reach before being printed.
 +
 Valid values are:

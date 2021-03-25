@@ -39,11 +39,11 @@ var log = logf.Log.WithName("main")
 
 // create controller from initialised config.
 func main() {
-	var level logging.LogLevel
+	logOptions := &logging.Options{}
+	logOptions.AddFlagSet(flag.CommandLine)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
-	pflag.Var(&level, "zap-level", "The log level ('info', 'error', 'debug' or an integer >= 0)")
 	pflag.StringVar(&listenAddr, "listen-addr", "0.0.0.0:8080", "The address on which the HTTP server will listen to")
 	pflag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the couchbase clusters created by the operator.")
 	pflag.BoolVar(&printVersion, "version", false, "Show version and quit")
@@ -52,7 +52,7 @@ func main() {
 	pflag.Parse()
 
 	// Route all library logging to the ZAP JSON logger.
-	logger := logging.New(level.Level)
+	logger := logging.New(logOptions)
 	logf.SetLogger(logger)
 	klog.SetLogger(logger)
 
