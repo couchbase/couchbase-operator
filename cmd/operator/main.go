@@ -17,7 +17,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/klog"
+	klog "k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -51,13 +51,10 @@ func main() {
 	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
 	pflag.Parse()
 
-	logf.SetLogger(logging.New(level.Level))
-
-	// Some 3rd party libraries try to write to a file on error, which it cannot do
-	// when using scratch containers, so route those errors to standard error.  Not
-	// doing so results in operator restarts after said 3rd party loggers panic on
-	// error...
-	klog.SetOutput(os.Stderr)
+	// Route all library logging to the ZAP JSON logger.
+	logger := logging.New(level.Level)
+	logf.SetLogger(logger)
+	klog.SetLogger(logger)
 
 	// Log the version, branch and revision so we know
 	// * Version feature set
