@@ -89,6 +89,8 @@ Omitting this field will only restore the backup referenced by start.
 
 *Type*: `integer`
 
+*Minimum*: `1`
+
 ==== Description
 
 Int references a relative backup by index.
@@ -153,6 +155,8 @@ Start denotes the first backup to restore from.
 ==== Constraints
 
 *Type*: `integer`
+
+*Minimum*: `1`
 
 ==== Description
 

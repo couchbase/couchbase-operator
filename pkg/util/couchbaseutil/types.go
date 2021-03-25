@@ -1120,3 +1120,10 @@ type AuditUser struct {
 	Name   string `json:"name"`
 	Domain string `json:"domain"`
 }
+
+// Classic API design... these return nothing when unset, and remain set once set
+// so we have no idea what the defaults are!
+type MemcachedGlobals struct {
+	NumReaderThreads int `json:"num_reader_threads" url:"num_reader_threads,omitempty"`
+	NumWriterThreads int `json:"num_writer_threads" url:"num_writer_threads,omitempty"`
+}

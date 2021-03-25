@@ -929,3 +929,39 @@ func TestManageMultipleClusters(t *testing.T) {
 		ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 	}
 }
+
+// TestModifyDataServiceSettings checks that couchbase behaves as we expect (badly)
+// and that it's updated when we tell it to.
+func TestModifyDataServiceSettings(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Check that the starting state is correct (aka totally unknown).
+	// The check that adding configuration shows up.
+	e2eutil.MustVerifyReaderWriterThreads(t, kubernetes, cluster, 0, 0, time.Minute)
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: 6}), time.Minute)
+	e2eutil.MustVerifyReaderWriterThreads(t, kubernetes, cluster, 6, 0, time.Minute)
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/writerThreads", 9), time.Minute)
+	e2eutil.MustVerifyReaderWriterThreads(t, kubernetes, cluster, 6, 9, time.Minute) // ... dude!
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Settings updated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{
+			Times:     2,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

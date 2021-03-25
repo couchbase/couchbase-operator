@@ -116,7 +116,7 @@ def generate_scalar_constraints(content, typ, schema):
     If the data type is a scalar, create any optional constraints
     that are defined for it.
     """
-    if typ == 'number':
+    if typ == 'integer':
         if 'minimum' in schema:
             generate_constraint(content, MINIMUM_LABEL, schema['minimum'])
         if 'maximum' in schema:

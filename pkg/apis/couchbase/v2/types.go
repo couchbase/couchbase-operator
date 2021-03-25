@@ -1715,6 +1715,9 @@ type ClusterConfig struct {
 	// +kubebuilder:default="memory_optimized"
 	IndexStorageSetting CouchbaseClusterIndexStorageSetting `json:"indexStorageSetting,omitempty"`
 
+	// Data allows the data service to be configured.
+	Data *CouchbaseClusterDataSettings `json:"data,omitempty"`
+
 	// Indexer allows the indexer to be configured.
 	Indexer *CouchbaseClusterIndexerSettings `json:"indexer,omitempty"`
 
@@ -1827,6 +1830,29 @@ type CouchbaseClusterQuerySettings struct {
 	// requires `backfillEnabled` to be set to true in order to have any effect.
 	// This field overrides `temporarySpace`.
 	TemporarySpaceUnlimited bool `json:"temporarySpaceUnlimited,omitempty"`
+}
+
+// CouchbaseClusterDataSettings allows data service tweaks.
+type CouchbaseClusterDataSettings struct {
+	// ReaderThreads allows the number of threads used by the data service,
+	// per pod, to be altered.  This value must be between 4 and 64 threads,
+	// and should only be increased where there are sufficient CPU resources
+	// allocated for their use.  If not specified, this defaults to the
+	// default value set by Couchbase Server.
+	// +kubebuilder:validation:Minimum=4
+	// +kubebuilder:validation:Maximum=64
+	ReaderThreads int `json:"readerThreads,omitempty"`
+
+	// ReaderThreads allows the number of threads used by the data service,
+	// per pod, to be altered.  This setting is especially relevant when
+	// using "durable writes", increaing this field will have a large
+	// impact on performance.  This value must be between 4 and 64 threads,
+	// and should only be increased where there are sufficient CPU resources
+	// allocated for their use. If not specified, this defaults to the
+	// default value set by Couchbase Server.
+	// +kubebuilder:validation:Minimum=4
+	// +kubebuilder:validation:Maximum=64
+	WriterThreads int `json:"writerThreads,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

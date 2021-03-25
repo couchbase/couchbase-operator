@@ -1283,6 +1283,10 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
+	if err := c.reconcileDataSettings(); err != nil {
+		return err
+	}
+
 	if err := c.reconcileIndexSettings(); err != nil {
 		return err
 	}
@@ -1427,6 +1431,44 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 
 	log.Info("Software notification settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("update notifications", c.cluster))
+
+	return nil
+}
+
+// reconcileDataSettings updates stuff to do with the data service.
+func (c *Cluster) reconcileDataSettings() error {
+	// This is yet another quality API.  The values don't exist until you set them,
+	// then remain for the rest of existence.  So if nothing is set, then leave it
+	// alone.
+	if c.cluster.Spec.ClusterSettings.Data == nil {
+		return nil
+	}
+
+	current := couchbaseutil.MemcachedGlobals{}
+	if err := couchbaseutil.GetMemcachedGlobalSettings(&current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := current
+
+	if c.cluster.Spec.ClusterSettings.Data.ReaderThreads != 0 {
+		requested.NumReaderThreads = c.cluster.Spec.ClusterSettings.Data.ReaderThreads
+	}
+
+	if c.cluster.Spec.ClusterSettings.Data.WriterThreads != 0 {
+		requested.NumWriterThreads = c.cluster.Spec.ClusterSettings.Data.WriterThreads
+	}
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetMemcachedGlobalSettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	log.Info("Memcached settings updated", "cluster", c.namespacedName())
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("data service", c.cluster))
 
 	return nil
 }

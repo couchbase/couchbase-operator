@@ -66,6 +66,8 @@ When specified, the backup volume will start with an initial size as defined by 
 
 *Default*: `20`
 
+*Minimum*: `0`
+
 ==== Description
 
 IncrementPercent controls how much the volume is increased each time the threshold is exceeded, upto a maximum as defined by the limit.
@@ -91,6 +93,10 @@ When not specified no bounds are imposed.
 *Type*: `integer`
 
 *Default*: `20`
+
+*Minimum*: `0`
+
+*Maximum*: `99`
 
 ==== Description
 
@@ -131,6 +137,8 @@ Number of hours to hold backups for, everything older will be deleted.
 *Type*: `integer`
 
 *Default*: `3`
+
+*Minimum*: `0`
 
 ==== Description
 
@@ -253,6 +261,8 @@ Default: Full/Incremental.
 *Type*: `integer`
 
 *Default*: `3`
+
+*Minimum*: `0`
 
 ==== Description
 

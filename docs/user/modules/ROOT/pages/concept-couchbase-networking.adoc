@@ -171,7 +171,7 @@ Earlier versions of Sync Gateway can experience certain network limitations when
 <<table-sgw-exposed-features-limitations>> describes the different network limitations that can occur based on the version of Sync Gateway that is being used.
 
 IMPORTANT: Sync Gateway, like other Couchbase clients, does not require exposed features to be configured in order to establish a network connection with an instance of Couchbase Server that is running on the same local Kubernetes cluster.
-The rows labeled *Local* in <<table-sgw-exposed-features-limitations>> assume that you already have exposed features configured for a different purpose, e.g. exposing the admin port for remote administrarion, connecting to a remote cluster for XDCR, etc.
+The rows labeled *Local* in <<table-sgw-exposed-features-limitations>> assume that you already have exposed features configured for a different purpose, e.g. exposing the admin port for remote administration, connecting to a remote cluster for XDCR, etc.
 However, if you are running Sync Gateway on the same Kubernetes cluster as Couchbase Server, and there is nothing else requiring you to configure xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposedfeatures[`couchbaseclusters.spec.networking.exposedFeatures`] for a different purpose, then you can ignore the rest of this section as this issue will not affect you.
 
 .Supported Connection Methods for Sync Gateway When Using Exposed Features

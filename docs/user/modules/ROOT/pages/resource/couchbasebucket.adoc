@@ -218,6 +218,10 @@ Legal bucket names have a maximum length of 100 characters and may be composed o
 
 *Default*: `1`
 
+*Minimum*: `0`
+
+*Maximum*: `3`
+
 ==== Description
 
 Replicas defines how many copies of documents Couchbase server maintains.

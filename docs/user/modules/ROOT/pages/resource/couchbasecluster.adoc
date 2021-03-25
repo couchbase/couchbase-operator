@@ -125,6 +125,8 @@ Enabled defines whether auto-resource allocation is enabled.
 
 *Default*: `25`
 
+*Minimum*: `0`
+
 ==== Description
 
 OverheadPercent defines the amount of memory above that required for individual services on a pod.
@@ -457,6 +459,10 @@ DatabaseFragmentationThreshold defines triggers for when database compaction sho
 
 *Default*: `30`
 
+*Minimum*: `2`
+
+*Maximum*: `100`
+
 ==== Description
 
 Percent is the percentage of disk fragmentation after which to decompaction will be triggered.
@@ -563,6 +569,10 @@ ViewFragmentationThreshold defines triggers for when view compaction should star
 
 *Default*: `30`
 
+*Minimum*: `2`
+
+*Maximum*: `100`
+
 ==== Description
 
 Percent is the percentage of disk fragmentation after which to decompaction will be triggered.
@@ -588,6 +598,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 *Type*: `integer`
 
 *Default*: `3`
+
+*Minimum*: `1`
+
+*Maximum*: `3`
 
 ==== Description
 
@@ -653,6 +667,49 @@ More info:  https://golang.org/pkg/time/#ParseDuration.
 
 ClusterName defines the name of the cluster, as displayed in the Couchbase UI.
 By default, the cluster name is that specified in the CouchbaseCluster resource's metadata.
+
+=== couchbaseclusters.spec.cluster.data
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Data allows the data service to be configured.
+
+=== couchbaseclusters.spec.cluster.data.readerThreads
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `4`
+
+*Maximum*: `64`
+
+==== Description
+
+ReaderThreads allows the number of threads used by the data service, per pod, to be altered.
+This value must be between 4 and 64 threads, and should only be increased where there are sufficient CPU resources allocated for their use.
+If not specified, this defaults to the default value set by Couchbase Server.
+
+=== couchbaseclusters.spec.cluster.data.writerThreads
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `4`
+
+*Maximum*: `64`
+
+==== Description
+
+ReaderThreads allows the number of threads used by the data service, per pod, to be altered.
+This setting is especially relevant when using "durable writes", increaing this field will have a large impact on performance.
+This value must be between 4 and 64 threads, and should only be increased where there are sufficient CPU resources allocated for their use.
+If not specified, this defaults to the default value set by Couchbase Server.
 
 === couchbaseclusters.spec.cluster.dataServiceMemoryQuota
 
@@ -759,6 +816,8 @@ This field must be one of "silent", "fatal", "error", "warn", "info", "verbose",
 
 *Default*: `2`
 
+*Minimum*: `1`
+
 ==== Description
 
 MaxRollbackPoints controls the number of checkpoints that can be rolled back to.
@@ -811,6 +870,8 @@ The field must be one of "memory_optimized" or "plasma", defaulting to "memory_o
 ==== Constraints
 
 *Type*: `integer`
+
+*Minimum*: `0`
 
 ==== Description
 
@@ -1126,6 +1187,8 @@ Size allows the specification of a rotation size for the log, defaults to 20Mi.
 ==== Constraints
 
 *Type*: `integer`
+
+*Minimum*: `0`
 
 ==== Description
 
@@ -1784,6 +1847,8 @@ If this field is specified then that number can be increased.
 
 *Type*: `integer`
 
+*Minimum*: `1`
+
 ==== Description
 
 MaxUpgradable allows the number of pods affected by an upgrade at any one time to be increased.
@@ -2204,6 +2269,8 @@ Each service may only be specified once.
 *Required*
 
 *Type*: `integer`
+
+*Minimum*: `1`
 
 ==== Description
 

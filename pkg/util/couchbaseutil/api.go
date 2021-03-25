@@ -796,3 +796,18 @@ func SetQuerySettings(settings *QuerySettings) *Request {
 
 	return NewRequest((*Client).Post, "/settings/querySettings", data, nil)
 }
+
+// GetMemcachedGlobalSettings returns stuff like reader/writer threads.
+func GetMemcachedGlobalSettings(settings *MemcachedGlobals) *Request {
+	return NewRequest((*Client).Get, "/pools/default/settings/memcached/global", nil, settings)
+}
+
+// SetMemcachedGlobalSettings sets stuff like reader/writer threads.
+func SetMemcachedGlobalSettings(settings *MemcachedGlobals) *Request {
+	data, err := urlencoding.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/pools/default/settings/memcached/global", data, nil)
+}

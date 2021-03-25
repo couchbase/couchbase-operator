@@ -70,6 +70,8 @@ Servers specifies the server group that this autoscaler belongs to.
 
 *Type*: `integer`
 
+*Minimum*: `0`
+
 ==== Description
 
 Size allows the server group to be dynamically scaled.
@@ -103,6 +105,8 @@ LabelSelector allows the HPA to select resources to monitor for resource utiliza
 *Required*
 
 *Type*: `integer`
+
+*Minimum*: `0`
 
 ==== Description
 

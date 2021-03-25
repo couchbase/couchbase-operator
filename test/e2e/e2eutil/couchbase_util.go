@@ -1287,3 +1287,35 @@ func MustGetCouchbaseVersion(t *testing.T, image string) string {
 
 	return version
 }
+
+// MustVerifyReaderWriterThreads checks memcached's reader and writer thread counts.
+// Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
+func MustVerifyReaderWriterThreads(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads int, timeout time.Duration) {
+	callback := func() error {
+		client, cleanup, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		defer cleanup()
+
+		current := couchbaseutil.MemcachedGlobals{}
+		if err := couchbaseutil.GetMemcachedGlobalSettings(&current).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if current.NumReaderThreads != readerThreads {
+			return fmt.Errorf("expected %d readers, got %d", readerThreads, current.NumReaderThreads)
+		}
+
+		if current.NumWriterThreads != writerThreads {
+			return fmt.Errorf("expected %d writers, got %d", writerThreads, current.NumWriterThreads)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}

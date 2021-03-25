@@ -404,7 +404,7 @@ sync-gateway   2/2     2            2           24d
 
 == Next Steps
 
-At this stage, the Sync Gateway custer is configured to communicate with Couchbase Server.
+At this stage, the Sync Gateway cluster is configured to communicate with Couchbase Server.
 You can now move on to xref:tutorial-sync-gateway-clients.adoc[connecting Couchbase Lite clients].
 
 == Templates
@@ -415,7 +415,7 @@ These template files are provided as *evaluation examples* -- they should be mod
 * `sync-gateway.yaml`: Sample Deployment Controller for Sync Gateway using RBAC for server connectivity.
 This template creates a sync gateway RBAC user per procedures outlined in the previous section <<configure-an-rbac-user-for-sync-gateway>>.
 
-* `couchbase-custer.yaml`: Sample CouchbaseCluster custom resource deployment to be used with the Autonomous Operator.
+* `couchbase-custer.yaml`: Sample `CouchbaseCluster` custom resource deployment to be used with the Autonomous Operator.
 +
 NOTE: The `couchbase-custer.yaml` template has RBAC management set to `false` by default.
 So before you deploy the Sync Gateway cluster using the `sync-gateway.yaml` template, you must enable RBAC management as specified in the previous section <<configure-an-rbac-user-for-sync-gateway>>. 

@@ -102,6 +102,7 @@ var (
 		"TestDenyCommunityEdition":             TestDenyCommunityEdition,
 		"TestRemoveServerClassWithNodeService": TestRemoveServerClassWithNodeService,
 		"TestAutoCompactionUpdate":             TestAutoCompactionUpdate,
+		"TestModifyDataServiceSettings":        TestModifyDataServiceSettings,
 
 		// System testing cases
 		"TestFeaturesAll": TestFeaturesAll,

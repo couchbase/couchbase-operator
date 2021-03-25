@@ -6,6 +6,7 @@ testcases:
 - TestBasicMDSScaling
 - TestDenyCommunityEdition
 - TestAutoCompactionUpdate
+- TestModifyDataServiceSettings
 
 # Bucket Tests
 - TestBucketUnmanaged
