@@ -21,7 +21,7 @@ metadata:
   name: sync-gateway
 spec:
   roles:
-  - name: bucket_full_access
+  - name: mobile_sync_gateway
     bucket: default
 ---
 apiVersion: couchbase.com/v2
@@ -89,7 +89,7 @@ spec:
     spec:
       containers:
       - name: sync-gateway
-        image: couchbase/sync-gateway:2.8.0-enterprise
+        image: couchbase/sync-gateway:2.8.2-enterprise
         volumeMounts:
         - name: config
           mountPath: /etc/sync_gateway

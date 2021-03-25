@@ -861,11 +861,12 @@ const (
 	RoleQueryInsert        RoleName = "query_insert"
 	RoleQueryDelete        RoleName = "query_delete"
 	RoleQueryManageIndex   RoleName = "query_manage_index"
+	RoleSyncGateway        RoleName = "mobile_sync_gateway"
 )
 
 type Role struct {
 	// Name of role.
-	// +kubebuilder:validation:Enum=admin;cluster_admin;security_admin;ro_admin;replication_admin;query_external_access;query_system_catalog;analytics_reader;bucket_admin;views_admin;fts_admin;bucket_full_access;data_reader;data_writer;data_dcp_reader;data_backup;data_monitoring;replication_target;analytics_manager;views_reader;fts_searcher;query_select;query_update;query_insert;query_delete;query_manage_index
+	// +kubebuilder:validation:Enum=admin;cluster_admin;security_admin;ro_admin;replication_admin;query_external_access;query_system_catalog;analytics_reader;bucket_admin;views_admin;fts_admin;bucket_full_access;data_reader;data_writer;data_dcp_reader;data_backup;data_monitoring;replication_target;analytics_manager;views_reader;fts_searcher;query_select;query_update;query_insert;query_delete;query_manage_index;mobile_sync_gateway
 	Name RoleName `json:"name"`
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped

@@ -631,6 +631,7 @@ var bucketRoles = []RoleName{
 	RoleQueryInsert,
 	RoleQueryDelete,
 	RoleQueryManageIndex,
+	RoleSyncGateway,
 }
 
 func ValidRolePattern() string {

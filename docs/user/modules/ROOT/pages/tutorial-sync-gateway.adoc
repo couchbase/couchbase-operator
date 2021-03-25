@@ -250,7 +250,7 @@ metadata:
   name: sync-gateway
 spec:
   roles:
-  - name: bucket_full_access # <.>
+  - name: mobile_sync_gateway # <.>
     bucket: default # <.>
 ---
 apiVersion: couchbase.com/v2
@@ -273,7 +273,7 @@ This is the recommended method of deployment as defined in the xref:concept-labe
 
 <.> The `CouchbaseUser` references the secret we previously created so that the Autonomous Operator can associate the `sync-gateway` user with its password.
 
-<.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of needs the `bucket_full_access` role.
+<.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of needs the `mobile_sync_gateway` role.
 
 <.> The `CouchbaseGroup` that the `sync-gateway` user will be a member of only requires access to a single bucket.
 We therefore further limit scope to only enable modification of the `default` bucket.

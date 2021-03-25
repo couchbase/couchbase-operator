@@ -127,6 +127,8 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, k8s1).AtLeastVersion("6.6.0")
+
 	// Static configuration.
 	// NOTE: the secret handling is a hack, by default the sync-gateway configuration will
 	// use the cluster's admin account secret, so while RBAC requires "password" we also put
@@ -162,7 +164,7 @@ func TestSyncGatewayRBAC(t *testing.T) {
 		Spec: couchbasev2.CouchbaseGroupSpec{
 			Roles: []couchbasev2.Role{
 				{
-					Name:   couchbasev2.RoleApplicationAccess,
+					Name:   couchbasev2.RoleSyncGateway,
 					Bucket: e2espec.DefaultBucket().Name,
 				},
 			},

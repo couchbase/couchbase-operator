@@ -90,7 +90,7 @@ When not specified for a role that can be scoped to a specific bucket, the role 
 
 *Type*: `string`
 
-*Enumerations*: `admin, cluster\_admin, security\_admin, ro\_admin, replication\_admin, query\_external\_access, query\_system\_catalog, analytics\_reader, bucket\_admin, views\_admin, fts\_admin, bucket\_full\_access, data\_reader, data\_writer, data\_dcp\_reader, data\_backup, data\_monitoring, replication\_target, analytics\_manager, views\_reader, fts\_searcher, query\_select, query\_update, query\_insert, query\_delete, query\_manage\_index`
+*Enumerations*: `admin, cluster\_admin, security\_admin, ro\_admin, replication\_admin, query\_external\_access, query\_system\_catalog, analytics\_reader, bucket\_admin, views\_admin, fts\_admin, bucket\_full\_access, data\_reader, data\_writer, data\_dcp\_reader, data\_backup, data\_monitoring, replication\_target, analytics\_manager, views\_reader, fts\_searcher, query\_select, query\_update, query\_insert, query\_delete, query\_manage\_index, mobile\_sync\_gateway`
 
 ==== Description
 
