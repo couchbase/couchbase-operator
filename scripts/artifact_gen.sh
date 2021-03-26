@@ -29,6 +29,11 @@ case $arg in
     shift
     shift
     ;;
+    -a|--arch)
+    ARCH="$2"
+    shift
+    shift
+    ;;
     *)    # unknown option
     shift
     ;;
@@ -37,16 +42,16 @@ done
 
 case $OS in
     linux)
-    DIRNAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-linux-x86_64
-    NAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-${BLD_NUM}-linux-x86_64
+    DIRNAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-linux-${ARCH}
+    NAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-${BLD_NUM}-linux-${ARCH}
     ;;
     darwin)
-    DIRNAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-macos-x86_64
-    NAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-${BLD_NUM}-macos-x86_64
+    DIRNAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-macos-${ARCH}
+    NAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-${BLD_NUM}-macos-${ARCH}
     ;;
     windows)
-    DIRNAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-windows-amd64
-    NAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-${BLD_NUM}-windows-amd64
+    DIRNAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-windows-${ARCH}
+    NAME=couchbase-autonomous-operator-${PLATFORM}_${VERSION}-${BLD_NUM}-windows-${ARCH}
     ;;
     *)
     ;;
@@ -68,8 +73,8 @@ cp ${WORKSPACE_DIR}/example/crd.yaml ${ARTIFACTS_DIR}
 # Static stuff
 cp ${WORKSPACE_DIR}/docs/License.txt ${ARTIFACTS_DIR}
 cp ${WORKSPACE_DIR}/docs/README.txt ${ARTIFACTS_DIR}
-cp -r ${BUILD_DIR}/${OS}/* ${ARTIFACTS_DIR}
-cp -r ${BUILD_DIR}/${PLATFORM}/${OS}/* ${ARTIFACTS_DIR}
+cp -r ${BUILD_DIR}/${OS}/${ARCH}/* ${ARTIFACTS_DIR}
+cp -r ${BUILD_DIR}/${PLATFORM}/${OS}/${ARCH}/* ${ARTIFACTS_DIR}
 
 # Package contents
 case $OS in

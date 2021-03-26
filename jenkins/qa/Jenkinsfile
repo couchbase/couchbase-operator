@@ -40,6 +40,7 @@ pipeline {
   }
 
   environment {
+    GOVERSION = "1.16.3"
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
@@ -57,7 +58,7 @@ pipeline {
 
     stage('Install Go') {
       steps {
-        sh 'wget -q -O- https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz | tar xz'
+        sh 'wget -q -O- https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz | tar xz'
       }
     }
 

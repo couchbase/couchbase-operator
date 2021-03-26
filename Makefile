@@ -199,22 +199,26 @@ tools-openshift: tools-platform-specific
 tools: generated
 	$(MAKE) tools-kubernetes
 	$(MAKE) tools-openshift
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/bin/cbopinfo.exe -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/x86_64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o build/darwin/arm64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/x86_64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/amd64/bin/cbopinfo.exe -ldflags $(LDFLAGS) ./cmd/cbopinfo/
 
 tools-platform-specific:
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/linux/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/windows/bin/cbopcfg.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/arm64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/linux/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/windows/amd64/bin/cbopcfg.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 
 artifacts: tools crd
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --version $(revisionedVersion) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os linux --version $(revisionedVersion) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os windows --version $(revisionedVersion) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os darwin --version $(revisionedVersion) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --version $(revisionedVersion) --bld_num $(bldNum)
-	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --arch x86_64 --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --arch arm64 --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os linux --arch x86_64 --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os windows --arch amd64 --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os darwin --arch x86_64 --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os darwin --arch arm64 --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --arch x86_64 --version $(revisionedVersion) --bld_num $(bldNum)
+	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --arch amd64 --version $(revisionedVersion) --bld_num $(bldNum)
 
 image-artifacts: binaries
 	# Create a subdirectory for the operator docker build
