@@ -1173,3 +1173,17 @@ func (r *TestRequirement) DefaultAndExplicitStorageClass() *TestRequirement {
 
 	return r
 }
+
+// ExpandableStorage skips the test if the storage class does not have allowVolumeExpansion set to True.
+func (r *TestRequirement) ExpandableStorage() *TestRequirement {
+	sc, err := r.kubernetes.KubeClient.StorageV1().StorageClasses().Get(context.Background(), Global.StorageClassName, metav1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(r.t, err)
+	}
+
+	if !*sc.AllowVolumeExpansion {
+		r.t.Skip("Storage Class does not have allowVolumeExpansion=true")
+	}
+
+	return r
+}

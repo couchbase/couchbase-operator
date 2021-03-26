@@ -90,6 +90,8 @@ testcases:
 - TestOnlinePersistentVolumeResizeMDS
 - TestOnlinePersistentVolumeResizeMixedClaims
 - TestOnlinePersistentVolumeResizeNop
+- TestOnlinePersistentVolumeResizeWithDocs
+- TestOnlinePersistentVolumeResizeWhenPodKilled
 
 # May be fixed in 6.0.4+
 # Analytics Tests

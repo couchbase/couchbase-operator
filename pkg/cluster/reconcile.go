@@ -394,7 +394,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 
 	// Initialize storage paths.
 	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
-	if err := couchbaseutil.SetStoragePaths(dataPath, indexPath, analyticsPaths).On(c.api, newMember); err != nil {
+	if err := couchbaseutil.SetStoragePaths(dataPath, indexPath, analyticsPaths).RetryFor(time.Minute).On(c.api, newMember); err != nil {
 		return nil, err
 	}
 

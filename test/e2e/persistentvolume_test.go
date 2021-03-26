@@ -716,13 +716,15 @@ func TestOnlinePersistentVolumeResize(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).ExpandableStorage()
+
 	// Static configuration.
 	clusterSize := 1
 	pvcName := "couchbase"
 
 	// Create cluster with Online Resizing Enabled
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
+	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).Generate(targetKube)
 	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
 	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
@@ -761,6 +763,8 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).ExpandableStorage()
+
 	// Static configuration.
 	groupSize := 1
 	pvcDataName := "couchbase_data"
@@ -769,7 +773,7 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 
 	// Define cluster with separate data service config
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(groupSize).Generate(targetKube)
+	testCouchbase := clusterOptions().WithPersistentTopology(groupSize).Generate(targetKube)
 	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
 	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcDataName,
@@ -829,13 +833,15 @@ func TestOnlinePersistentVolumeResizeMixedClaims(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).ExpandableStorage()
+
 	// Static configuration.
 	groupSize := 1
 	pvcDataName := "couchbase_data"
 	pvcIndexName := "couchbase_index"
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(groupSize).Generate(targetKube)
+	testCouchbase := clusterOptions().WithPersistentTopology(groupSize).Generate(targetKube)
 	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
 	// Define different claims for data and index service
 	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
@@ -880,13 +886,15 @@ func TestOnlinePersistentVolumeResizeNop(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).ExpandableStorage()
+
 	// Static configuration.
 	groupSize := 1
 	pvcDataName := "couchbase_data"
 	pvcIndexName := "couchbase_index"
 
 	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(groupSize).Generate(targetKube)
+	testCouchbase := clusterOptions().WithPersistentTopology(groupSize).Generate(targetKube)
 	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
 	// Define different claims for data and index service
 	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
@@ -913,6 +921,116 @@ func TestOnlinePersistentVolumeResizeNop(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(groupSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, targetKube).ExpandableStorage()
+
+	// Static configuration.
+	clusterSize := 1
+	pvcName := "couchbase"
+	numOfDocs := f.DocsCount
+
+	// Create cluster with Online Resizing Enabled
+	bucket := e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
+	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).Generate(targetKube)
+	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+	}
+	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+
+	// Resize up to 3Gi
+	requestedQuantity := e2espec.NewResourceQuantityGi(3)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+
+	// Start Adding Docs
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs)
+
+	// Verify resize state
+	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcName, requestedQuantity, 5*time.Minute)
+
+	// Check all docs were added during resize
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+
+	// Events indirectly verify that upgrade did not occur
+	// since no scale up events should be present
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Repeat{Times: 2 * clusterSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+// TestOnlinePersistentVolumeResizeWhenPodKilled brings down a pod during a PV resize, and checks that the resize
+// is still correctly applied.
+func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, targetKube).ExpandableStorage()
+
+	// Static configuration.
+	clusterSize := 1
+	pvcName := "couchbase"
+
+	// Create cluster with Online Resizing Enabled
+	bucket := e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
+	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).Generate(targetKube)
+	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
+	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+	}
+	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+
+	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
+
+	// Resize up to 3Gi
+	requestedQuantity := e2espec.NewResourceQuantityGi(3)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+
+	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewVolumeExpandStartedEvent(k8sutil.NameForPersistentVolumeClaim(memberName, 1, "data"), "2Gi", "3Gi", testCouchbase), 2*time.Minute)
+
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+
+	// Verify resize state
+	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcName, requestedQuantity, 10*time.Minute)
+
+	// Verify pod recovery during expansion events
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

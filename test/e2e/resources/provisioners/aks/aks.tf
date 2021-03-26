@@ -5,6 +5,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "=2.40.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0"
+    }
   }
 }
 
@@ -40,7 +44,7 @@ resource "azurerm_subnet" "qe-auto-vnet1-subnet" {
 }
 
 # Create Cluster 1
-resource "azurerm_kubernetes_cluster" "qe-auto-cluster1" {
+resource "azurerm_kubernetes_cluster" "cluster1" {
   name                = "qe-auto-cluster1"
   location            = "East US 2"
   resource_group_name = azurerm_resource_group.qe-auto.name
@@ -96,7 +100,7 @@ resource "azurerm_subnet" "qe-auto-vnet2-subnet" {
 
 
 # Create Cluster 2
-resource "azurerm_kubernetes_cluster" "qe-auto-cluster2" {
+resource "azurerm_kubernetes_cluster" "cluster2" {
   name                = "qe-auto-cluster2"
   location            = "West US 2"
   resource_group_name = azurerm_resource_group.qe-auto.name
@@ -150,14 +154,58 @@ resource "azurerm_virtual_network_peering" "qe-auto-peer-2to1" {
   allow_forwarded_traffic   = true
 }
 
+# Create Kubernetes providers for both clusters
+provider "kubernetes" {
+  alias = "kube1"
+  host                   = azurerm_kubernetes_cluster.cluster1.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.cluster_ca_certificate)
+}
+
+provider "kubernetes" {
+  alias = "kube2"
+  host                   = azurerm_kubernetes_cluster.cluster2.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.cluster2.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.cluster2.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.cluster2.kube_config.0.cluster_ca_certificate)
+}
+
+# Set up Storage classes for both clusters
+
+resource "kubernetes_storage_class" "custom-azurefile1" {
+  metadata {
+    name = "cao-azurefile"
+    labels = {
+      "kubernetes.io/cluster-service" = "true"
+    }
+  }
+  storage_provisioner = "kubernetes.io/azure-file"
+  reclaim_policy      = "Delete"
+  volume_binding_mode = "WaitForFirstConsumer"
+  provider = kubernetes.kube1
+}
+
+resource "kubernetes_storage_class" "custom-azurefile2" {
+  metadata {
+    name = "cao-azurefile"
+    labels = {
+      "kubernetes.io/cluster-service" = "true"
+    }
+  }
+  storage_provisioner = "kubernetes.io/azure-file"
+  reclaim_policy      = "Delete"
+  volume_binding_mode = "WaitForFirstConsumer"
+  provider = kubernetes.kube2
+}
 # Output the kubeconfigs for the two clusters
 
 output "kubeconfig1" {
-  value = azurerm_kubernetes_cluster.qe-auto-cluster1.kube_config_raw
+  value = azurerm_kubernetes_cluster.cluster1.kube_config_raw
   sensitive = true
 }
 
 output "kubeconfig2" {
-  value = azurerm_kubernetes_cluster.qe-auto-cluster2.kube_config_raw
+  value = azurerm_kubernetes_cluster.cluster2.kube_config_raw
   sensitive = true
 }

@@ -1,10 +1,9 @@
 ---
 timeout: 4h
 testcases:
-- TestRBACWithLDAPAuth
-- TestLDAPCreateAdminUser
-- TestLDAPDeleteUser
-- TestLDAPDeleteRole
-- TestLDAPUpdateRole
-- TestLDAPRemoveUserFromBinding
-- TestLDAPDeleteBinding
+- TestOnlinePersistentVolumeResizeWithDocs
+- TestOnlinePersistentVolumeResizeWhenPodKilled
+- TestOnlinePersistentVolumeResizeNop
+- TestOnlinePersistentVolumeResizeMixedClaims
+- TestOnlinePersistentVolumeResizeMDS
+- TestOnlinePersistentVolumeResize
