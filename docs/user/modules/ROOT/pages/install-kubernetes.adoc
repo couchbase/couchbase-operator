@@ -61,7 +61,7 @@ And then install just the Operator into the `asgard` namespace:
 $ bin/cbopcfg create operator --namespace asgard
 ----
 
-For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
+For further installation options please see the xref:tools/cbopcfg.adoc[cbopcfg] reference manual.
 
 == Check the Status of the Operator
 You can use the following command to check on the status of the deployments:

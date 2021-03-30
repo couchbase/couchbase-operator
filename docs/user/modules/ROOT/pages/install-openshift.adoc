@@ -79,7 +79,7 @@ $ oc project asgard
 $ bin/cbopcfg create operator --image-pull-secret rh-catalog
 ----
 
-For further installation options please see the xref:reference-cbopcfg.adoc[cbopcfg] reference manual.
+For further installation options please see the xref:tools/cbopcfg.adoc[cbopcfg] reference manual.
 
 == Check the Status of the Operator
 

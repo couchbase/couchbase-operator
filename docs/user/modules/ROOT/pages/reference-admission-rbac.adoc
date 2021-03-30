@@ -50,5 +50,5 @@ These resources will never be leaked through logs and are never persisted by the
 If, however, your security policies declare that such permissions cannot be granted to an application, then they can be safely removed from the admission controller's role.
 You will then no longer be informed about missing secrets and storage classes, incorrectly formatted secrets, and invalid TLS configurations.
 
-For further information on opting out of these checks, see the documentation for the xref:reference-cbopcfg.adoc[`cbopcfg generate admission`] command.
+For further information on opting out of these checks, see the documentation for the xref:tools/cbopcfg.adoc[`cbopcfg generate admission`] command.
 ====

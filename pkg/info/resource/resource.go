@@ -59,8 +59,8 @@ func getResourceSelector(c *config.Configuration, all bool) (labels.Selector, er
 	requirements = append(requirements, *req)
 
 	// If we specify specific clusters add this requirement
-	if len(c.Clusters) != 0 {
-		req, err := labels.NewRequirement(constants.LabelCluster, selection.In, c.Clusters)
+	if len(c.Clusters.Values) != 0 {
+		req, err := labels.NewRequirement(constants.LabelCluster, selection.In, c.Clusters.Values)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +189,7 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 			switch r.Scope {
 			case ScopeClusterName:
 				// No constraints, let everything through.
-				if len(context.Config.Clusters) == 0 {
+				if len(context.Config.Clusters.Values) == 0 {
 					break
 				}
 
@@ -197,7 +197,7 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 				// any that aren't in the list.
 				found := false
 
-				for _, name := range context.Config.Clusters {
+				for _, name := range context.Config.Clusters.Values {
 					if name == o.GetName() {
 						found = true
 						break

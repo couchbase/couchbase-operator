@@ -42,6 +42,7 @@ GIT_STATUS="$(git status --short)"
 if [[ ${GIT_STATUS} != "" ]]; then
   echo "Documentation has not been generated and committed:"
   echo ${GIT_STATUS}
+  git diff
   echo
   echo "Run 'make docs' and commit the result."
   exit 1
@@ -52,7 +53,7 @@ fi
 # only look in the top-level directory, anything outside of it is
 # considered auto-generated and exempt.
 FAIL=""
-for DOCUMENT in $(find docs/user -path */resource -prune -false -o -path *autogen* -quit -o -type f -name *.adoc); do
+for DOCUMENT in $(find docs/user -name resource -prune -false -o -name tools -prune -false -o -path *autogen* -quit -o -type f -name *.adoc); do
   MISTAKES=$(cat ${DOCUMENT} | ${FILTER} | aspell list ${CHECK_ARGS} | sort | uniq)
   if [[ ${MISTAKES} != "" ]]; then
     echo "Spell check for file ${DOCUMENT} failed:"

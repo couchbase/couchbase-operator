@@ -4,7 +4,7 @@
 How to extract and use Operator logs for problem determination.
 
 The Operator provides flexible logging support to enable failure detection and alerting.
-It is also a key resource when submitting a support request with the xref:reference-cbopinfo.adoc[`cbopinfo`] tool.
+It is also a key resource when submitting a support request with the xref:tools/cbopinfo.adoc[`cbopinfo`] tool.
 
 Logs are structured as JSON with one entry per line.
 This provides a simple and stable foundation for parsing and ingesting logs into 3rd party logging databases.
@@ -20,7 +20,7 @@ Detailed instructions on how to configure logging can be found in the xref:refer
 ====
 Couchbase server logs cannot be collected by default from the pod's standard output as is typical in Kubernetes environments.
 
-The xref:reference-cbopinfo.adoc[`cbopinfo`] support tool can be used to collect a log archive at any time, as can the Couchbase web console.
+The xref:tools/cbopinfo.adoc[`cbopinfo`] support tool can be used to collect a log archive at any time, as can the Couchbase web console.
 
 A logging sidecar is now optionally available to stream logs from the volume used by Couchbase server. 
 This is not enabled by default but see xref:reference-server-logging.adoc[Server logging reference] for full details on specifying this.

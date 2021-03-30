@@ -1,0 +1,7 @@
+// tag::cbopinfo[]
+:page-alias: reference-cbopinfo.adoc
+// end::cbopinfo[]
+
+// tag::cbopcfg[]
+:page-alias: reference-cbopcfg.adoc
+// end::cbopcfg[]

@@ -13,7 +13,7 @@ This page details any tasks that need to be performed before deploying the Opera
 === Authentication
 
 Amazon EKS uses proprietary authentication based on IAM.
-The use of Couchbase provided tools (xref:reference-cbopinfo.adoc[`cbopinfo`]) will require your Kubernetes configuration file to be setup to use IAM authentication.
+The use of Couchbase provided tools (xref:tools/cbopinfo.adoc[`cbopinfo`]) will require your Kubernetes configuration file to be setup to use IAM authentication.
 Instructions for installing the authenticator can be found in the https://docs.aws.amazon.com/eks/latest/userguide/install-aws-iam-authenticator.html[official documentation^].
 
 [#eks-best-practices]

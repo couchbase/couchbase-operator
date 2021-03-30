@@ -768,7 +768,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	t.Logf("Context: %v", context)
 
 	// Validate args which won't produce output file
-	for _, arg := range []string{"--help", "--version"} {
+	for _, arg := range []string{"--help", "version"} {
 		if _, err := e2eutil.Cbopinfo(f.CbopinfoPath, []string{arg}); err != nil {
 			e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %w", arg, err))
 		}
@@ -1000,7 +1000,7 @@ func TestLogCollect(t *testing.T) {
 		defer cleanup()
 
 		args := commonArgs.Clone()
-		args.Add(cluster1.Name, "")
+		args.Add("--couchbase-cluster", cluster1.Name)
 
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
@@ -1014,8 +1014,8 @@ func TestLogCollect(t *testing.T) {
 		defer cleanup()
 
 		args := commonArgs.Clone()
-		args.Add(cluster1.Name, "")
-		args.Add(cluster3.Name, "")
+		args.Add("--couchbase-cluster", cluster1.Name)
+		args.Add("--couchbase-cluster", cluster3.Name)
 
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
@@ -1041,7 +1041,7 @@ func TestLogCollect(t *testing.T) {
 
 		args := commonArgs.Clone()
 		args.Add("--system", "")
-		args.Add(cluster2.Name, "")
+		args.Add("--couchbase-cluster", cluster2.Name)
 
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
@@ -1057,8 +1057,8 @@ func TestLogCollect(t *testing.T) {
 
 		args := commonArgs.Clone()
 		args.Add("--system", "")
-		args.Add(cluster1.Name, "")
-		args.Add(cluster3.Name, "")
+		args.Add("--couchbase-cluster", cluster1.Name)
+		args.Add("--couchbase-cluster", cluster3.Name)
 
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
@@ -1090,7 +1090,7 @@ func TestLogCollect(t *testing.T) {
 		args := commonArgs.Clone()
 		args.Add("--collectinfo", "")
 		args.Add("--collectinfo-collect", "all")
-		args.Add(cluster1.Name, "")
+		args.Add("--couchbase-cluster", cluster1.Name)
 
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
@@ -1270,7 +1270,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	cbCluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
 
 	// Collect logs
-	args.Add(cbCluster.Name, "")
+	args.Add("--couchbase-cluster", cbCluster.Name)
 
 	archive, cleanCbopinfo := cbopinfo(t, args)
 	defer cleanCbopinfo()

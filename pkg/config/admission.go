@@ -145,7 +145,7 @@ func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Co
 			Use of the DAC is encouraged as it will report any configuration
 			errors that are specific to deployment of Couchbase resources that
 			aren't available by default in the Kubernetes API.  For example,
-			this includes validating memory quotas are satisfyable, TLS
+			this includes validating memory quotas are satisfiable, TLS
 			certificates are correctly configured, and any resources referenced
 			actually exist.
 		`),
@@ -205,7 +205,7 @@ func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
                         Use of the DAC is encouraged as it will report any configuration
                         errors that are specific to deployment of Couchbase resources that
                         aren't available by default in the Kubernetes API.  For example,
-                        this includes validating memory quotas are satisfyable, TLS
+                        this includes validating memory quotas are satisfiable, TLS
                         certificates are correctly configured, and any resources referenced
                         actually exist.
 		`),

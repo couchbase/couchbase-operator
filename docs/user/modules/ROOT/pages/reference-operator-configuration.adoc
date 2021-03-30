@@ -53,7 +53,7 @@ spec:
 <.> The container arguments can be modified to suit your requirements.
     Valid flags are documented <<command-line-arguments,below>>.
 <.> The `WATCH_NAMESPACE` and `POD_NAME` environment variables are required by the underlying library and can not be modified.
-<.> The HTTP container port can be modified, however this will affect log collection with the xref:reference-cbopinfo.adoc[`cbopinfo`] tool.
+<.> The HTTP container port can be modified, however this will affect log collection with the xref:tools/cbopinfo.adoc[`cbopinfo`] tool.
 <.> The Prometheus container port is fixed and cannot be modified at present.
 <.> The Operator must be run as a service account with the xref:reference-operator-rbac.adoc[correct roles] to function.
 

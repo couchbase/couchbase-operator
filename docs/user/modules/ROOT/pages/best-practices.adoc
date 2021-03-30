@@ -83,7 +83,7 @@ This is because without a volume mount, all of the Full Text Indexes will need t
 
 Production Stateless::
 These deployments require the `logs` volume mount to be defined.
-This covers the Couchbase Server logs only so pods that fail cannot be recovered, however the logs can still be accessed and downloaded with the xref:reference-cbopinfo.adoc[support tool].
+This covers the Couchbase Server logs only so pods that fail cannot be recovered, however the logs can still be accessed and downloaded with the xref:tools/cbopinfo.adoc[support tool].
 The `query` and `eventing` services may be deployed with this method, if they are not running with a stateful service.
 Logs are only retained in the event of a pod failure.
 They will be automatically deleted due to a user initiated action e.g. scaling the cluster down.
@@ -128,7 +128,7 @@ Keeping your data safe is of paramount importance. This section contains some be
 
 === Cluster Scope
 
-When you deploy a cluster, you do so in a https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespace^]. The Operator needs to be given a fairly broad set of permissions in order to dynamically create pods, services, etc. It is recommended that the Operator, and the clusters that it manages, be segregated in their own name space. This limits the set of resources that the Operator can affect, and that xref:reference-cbopinfo.adoc[support tools] can collect data about, which aids in security compliance situations where confidential information may be leaked via the Kubernetes API operations.
+When you deploy a cluster, you do so in a https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespace^]. The Operator needs to be given a fairly broad set of permissions in order to dynamically create pods, services, etc. It is recommended that the Operator, and the clusters that it manages, be segregated in their own name space. This limits the set of resources that the Operator can affect, and that xref:tools/cbopinfo.adoc[support tools] can collect data about, which aids in security compliance situations where confidential information may be leaked via the Kubernetes API operations.
 
 == Node Configuration
 

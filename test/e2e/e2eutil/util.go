@@ -1387,17 +1387,19 @@ func MustTerminateAllPods(t *testing.T, kubernetes *types.Cluster, cluster *couc
 // ArgumentList represents parameters to cbopinfo.  They are modelled as a
 // map to support keys and values (an empty value is ignored) and to allow
 // simple overriding (uniqueness).
-type ArgumentList map[string]string
+type ArgumentList map[string][]string
 
 // Slice returns the flattened ArgumentList with empty values removed.
 func (a ArgumentList) Slice() []string {
 	args := []string{}
 
 	for k, v := range a {
-		args = append(args, k)
+		for _, value := range v {
+			args = append(args, k)
 
-		if v != "" {
-			args = append(args, v)
+			if value != "" {
+				args = append(args, value)
+			}
 		}
 	}
 
@@ -1406,7 +1408,7 @@ func (a ArgumentList) Slice() []string {
 
 // Add adds a new key and value to the argument list.
 func (a ArgumentList) Add(k, v string) {
-	a[k] = v
+	a[k] = append(a[k], v)
 }
 
 // AddClusterDefaults adds in configuration specific default arguments that must
@@ -1431,7 +1433,8 @@ func (a ArgumentList) Clone() ArgumentList {
 	n := ArgumentList{}
 
 	for k, v := range a {
-		n[k] = v
+		n[k] = make([]string, len(v))
+		copy(n[k], v)
 	}
 
 	return n

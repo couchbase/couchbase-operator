@@ -263,6 +263,7 @@ test-helm:
 docs: $(CRD_FILE)
 	scripts/asciidoc-gen --version v2
 	scripts/asciidoc-link
+	go run scripts/mangen.go
 
 docs-lint:
 	scripts/asciidoc-lint

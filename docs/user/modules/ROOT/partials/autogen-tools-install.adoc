@@ -1,0 +1,150 @@
+////
+Because Eric is going to insist on this :D
+////
+
+// tag::cbopcfg[]
+== Installation
+
+Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package^] and unpacked it.
+
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
+
+[{tabs}]
+====
+macOS::
++
+--
+. Open a Terminal window and go to the directory where the `cbopcfg` binary is located:
++
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-macos_x86_64/bin/
+----
+
+. Make the `cbopcfg` binary executable:
++
+[source,console]
+----
+$ chmod +x ./cbopcfg
+----
+
+. Move the binary into your PATH:
++
+[source,console]
+----
+$ sudo mv ./cbopcfg /usr/local/bin/cbopcfg
+----
+--
+
+Linux::
++
+--
+. Open a command prompt and go to the directory where the `cbopcfg` binary is located:
++
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
+----
+
+. Make the `cbopcfg` binary executable:
++
+[source,console]
+----
+$ chmod +x ./cbopcfg
+----
+
+. Move the binary into your PATH:
++
+[source,console]
+----
+$ sudo mv ./cbopcfg /usr/local/bin/cbopcfg
+----
+--
+
+Windows::
++
+--
+. Open a command prompt and go to the directory where the `cbopcfg` binary is located:
++
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
+----
+
+. Add the `cbopcfg` binary into your PATH.
+--
+====
+// end::cbopcfg[]
+
+// tag::cbopinfo[]
+== Installation
+
+Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package^] and unpacked it on the same computer where you normally run `kubectl` or `oc`.
+
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
+
+[{tabs}]
+====
+macOS::
++
+--
+. Open a Terminal window and go to the directory where the `cbopinfo` binary is located:
++ 
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-macos_x86_64/bin/
+----
+
+. Make the `cbopinfo` binary executable:
++ 
+[source,console]
+----
+$ chmod +x ./cbopinfo
+----
+
+. Move the binary into your PATH:
++ 
+[source,console]
+----
+$ sudo mv ./cbopinfo /usr/local/bin/cbopinfo
+----
+--
+
+Linux::
++
+--
+. Open a command prompt and go to the directory where the `cbopinfo` binary is located:
++ 
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
+----
+
+. Make the `cbopinfo` binary executable:
++
+[source,console]
+----
+$ chmod +x ./cbopinfo
+----
+. Move the binary into your PATH:
++
+[source,console]
+----
+$ sudo mv ./cbopinfo /usr/local/bin/cbopinfo
+----
+--
+
+Windows::
++
+--
+. Open a command prompt and go to the directory where the `cbopinfo` binary is located:
++
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
+----
+
+. Add the `cbopinfo` binary into your PATH.
+--
+====
+// end::cbopinfo[]

@@ -85,8 +85,8 @@ include::partial$autogen-reference.adoc[]
 * Helm
  ** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]
 * Tools
- ** xref:reference-cbopcfg.adoc[cbopcfg]
- ** xref:reference-cbopinfo.adoc[cbopinfo]
+ ** xref:tools/cbopcfg.adoc[cbopcfg]
+ ** xref:tools/cbopinfo.adoc[cbopinfo]
 
 .Tutorials
 * Sync Gateway

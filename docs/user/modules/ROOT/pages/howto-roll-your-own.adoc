@@ -67,7 +67,7 @@ You may use any combination of tag you wish.
 
 == Using the Custom Images
 
-When installing the Operator with xref:reference-cbopcfg.adoc[`cbopcfg`] you can specify the images to use.
+When installing the Operator with xref:tools/cbopcfg.adoc[`cbopcfg`] you can specify the images to use.
 Consider the following command that uses the images we created in the prior steps:
 
 [source,console,subs="attributes"]

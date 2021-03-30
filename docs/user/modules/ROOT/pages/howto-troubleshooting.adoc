@@ -13,7 +13,7 @@ The following topics are also helpful to understand when troubleshooting the Ope
 
 == Full Deployment Logs
 
-The Operator is distributed with a support tool which can automatically collect resources, logs and events from the Kubernetes cluster for use in support cases.  It is also capable of collecting logs from Couchbase server instances via `cbcollect_info`. Please see the xref:reference-cbopinfo.adoc[documentation].
+The Operator is distributed with a support tool which can automatically collect resources, logs and events from the Kubernetes cluster for use in support cases.  It is also capable of collecting logs from Couchbase server instances via `cbcollect_info`. Please see the xref:tools/cbopinfo.adoc[documentation].
 
 == Operator Logs
 
@@ -140,7 +140,7 @@ For additional details on the Go language pprof feature please read the https://
 
 == Couchbase Server Logs
 
-In must situations the xref:reference-cbopinfo.adoc[cbopinfo] command will successfully allow logs to be collected and downloaded.  There are some cases where collection will fail, for example if a stateful service crashes when the Operator recovers the pod continuously.  In this situation as the pod is not alive for long enough to collect logs so we provide a method to manually collect logs.
+In must situations the xref:tools/cbopinfo.adoc[cbopinfo] command will successfully allow logs to be collected and downloaded.  There are some cases where collection will fail, for example if a stateful service crashes when the Operator recovers the pod continuously.  In this situation as the pod is not alive for long enough to collect logs so we provide a method to manually collect logs.
 
 The general log collection process is as follows:
 

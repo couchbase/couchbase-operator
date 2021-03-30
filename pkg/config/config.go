@@ -18,8 +18,7 @@ const (
 	versionAnnotation = "config.couchbase.com/version"
 )
 
-// ParseArgs parses command line arguments into a Config struct and executes the command.
-func Execute() {
+func GenerateCommand() *cobra.Command {
 	flags := genericclioptions.NewConfigFlags(true)
 
 	// 'cbopcfg version' prints out the Operator version this binary belongs to.
@@ -73,7 +72,23 @@ func Execute() {
 
 	// 'cbopcfg' is the top level command.
 	root := &cobra.Command{
-		Use: "cbopcfg",
+		Use:   "cbopcfg",
+		Short: "Couchbase Autonomous Operator configuration utility",
+		Long: normalize(`
+			Couchbase Autonomous Operator configuration utility.
+
+			The cbopcfg tool is used to automate the life-cycle of the Autonomous
+			Operator.  It is responsible for creation and deletion of Autonomous
+			Operator components.  A typical installation involves installing the
+			Couchbase custom resource definitions, then the Dynamic Admission
+			Controller, and finally the Operator itself.
+
+			Additional details for each component are documented under each
+			sub-command.
+
+			Alternative methods of life-cycle management are available in the form
+			of Helm charts and the Couchbase Open Service Broker. 
+		`),
 	}
 
 	flags.AddFlags(root.PersistentFlags())
@@ -82,6 +97,12 @@ func Execute() {
 	root.AddCommand(generate)
 	root.AddCommand(create)
 	root.AddCommand(deleteCmd)
+
+	return root
+}
+
+func Execute() {
+	root := GenerateCommand()
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
