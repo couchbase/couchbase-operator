@@ -36,6 +36,7 @@ pipeline {
     string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-vanilla/operator-backup:6.6.0-100')
     string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-vanilla/exporter:1.0.3-103')
     string(name: 'exporter_image_upgrade', defaultValue: 'registry.gitlab.com/cb-vanilla/exporter:1.0.3-103')
+    string(name: 'logging_image', defaultValue: 'couchbase/fluent-bit:1.0.0')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.2-enterprise')
     string(name: 'platform', defaultValue: 'kubernetes')
     string(name: 'kubernetes_version', defaultValue: '1.18.14')
