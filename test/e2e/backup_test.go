@@ -257,7 +257,6 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	s3secret := createS3Secret(t, targetKube, s3)
 
 	// Create cluster.
-	numOfDocs := f.DocsCount
 	testCouchbase := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(targetKube)
 
 	if s3secret != nil {
@@ -272,9 +271,9 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
 
-	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	// insert docs to backup, make a lot, we need this backup to be slow to the point
+	// we can vaguely reliably kill pods while it's happening.
+	e2eutil.MustPopulateWithDataSize(t, targetKube, testCouchbase, bucket.GetName(), f.CouchbaseServerImage, 1<<30, time.Minute)
 
 	// create this backup to run every 2 minutes so we can test the backup still runs successfully after a failure.
 	fullBackup := createTestBackup(v2.FullOnly, "*/2 * * * *", "", s3)
@@ -282,6 +281,10 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+
+	// Wait for the failure now, the backup has a tendency to fail and raise the event
+	// while we are still deleting the pods.
+	backupFailWait := e2eutil.WaitForPendingClusterEvent(targetKube, fullBackup, e2eutil.BackupFailedEvent(testCouchbase, fullBackup.Name), 15*time.Minute)
 
 	// wait for the backup to start
 	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
@@ -292,7 +295,7 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	}
 
 	// backup should fail
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupFailedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustReceiveErrorValue(t, backupFailWait)
 
 	// check backup and cronjob are still up
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)

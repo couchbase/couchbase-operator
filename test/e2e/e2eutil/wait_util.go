@@ -922,9 +922,9 @@ func (a *AsyncOperation) Cancel() {
 
 // WaitForPendingClusterEvent returns a channel to be
 // populated with result of a pending cluster event.
-func WaitForPendingClusterEvent(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) *AsyncOperation {
+func WaitForPendingClusterEvent(k8s *types.Cluster, resource runtime.Object, event *v1.Event, timeout time.Duration) *AsyncOperation {
 	f := func(ctx context.Context, ready chan struct{}) error {
-		return waitForResourceEventFromNow(ctx, ready, k8s, cl, event)
+		return waitForResourceEventFromNow(ctx, ready, k8s, resource, event)
 	}
 
 	op := NewAsyncOperationWithTimeout(timeout)
