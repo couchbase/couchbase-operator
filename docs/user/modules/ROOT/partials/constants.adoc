@@ -6,7 +6,7 @@
 :couchbase-version-redhat: 6.6.2-1
 :couchbase-version-redhat-upgrade-from: 6.6.1-1
 :prometheus-version: 1.0.3
-:logging-version: 1.0.0
+:logging-version: fluent-bit:1.0.1
 :logging-helper: busybox:1.32.1
 :tutorial-gke-version: 1.14.10-gke.27
 :backup-version: 6.6.0-100

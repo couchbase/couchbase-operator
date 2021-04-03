@@ -204,3 +204,11 @@ LUA
 PromTail
 goroutine
 callout
+natively
+PersistentVolumeClaim
+PersistentVolumeClaims
+customizations
+parsers
+localhost
+unredacted
+StatefulSet

@@ -117,7 +117,7 @@ Ephemeral clusters favor caching use-cases where the data can be repopulated by 
 Since fully-ephemeral Couchbase clusters only use ephemeral storage, Couchbase Server logs are highly likely to be unavailable in the event of a crash.
 This can make supporting an ephemeral cluster particularly difficult, and it is recommended that you exercise caution when using this type of deployment.
 
-Starting with version 2.2, the Autonomous Operator supports xref:howto-couchbase-log-streaming.adoc[streaming] Couchbase Server logs.
+Starting with version 2.2, the Autonomous Operator supports xref:howto-couchbase-log-forwarding.adoc[forwarding] Couchbase Server logs.
 However, the current implementation requires the use of a (persistent) volume.
 ====
 

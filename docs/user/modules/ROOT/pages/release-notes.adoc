@@ -14,14 +14,14 @@ Couchbase Autonomous Operator 2.2.0 was released in 2021.
 [#changes-in-behavior-v220]
 === Major Behavior Changes and Enhancements
 
-==== Log Streaming and Audit Log Management
+==== Log Forwarding and Audit Log Management
 
-Couchbase Server logs can now be xref:howto-couchbase-log-streaming.adoc[streamed] to standard output (`stdout`).
-This functionality is provided by a Couchbase-supplied container image -- `operator-logging` -- which is based on https://fluentbit.io/[Fluent Bit^].
-The container runs as a sidecar and can be configured to send Couchbase Server logging information to centralized logging systems.
 
-In addition, audit logging can now be configured via the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification, thus allowing for xref:howto-manage-couchbase-logging.adoc#configuring-audit-logging[automated audit logging].
-Audit logs are supported by the new log streaming functionality, and can now be optionally managed/expired by the Autonomous Operator.
+The Autonomous Operator now supports xref:concept-couchbase-logging.adoc#log-forwarding[_log forwarding_] through the optional deployment of a third party log processor.
+The log processor runs in a sidecar container on each Couchbase pod, which then reads the log files and forwards them to standard console output.
+For this purpose, Couchbase supplies a default https://hub.docker.com/r/couchbase/fluent-bit[log processor image^] based on https://fluentbit.io/[Fluent Bit^].
+
+In addition, audit logging can now be configured via the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification, thus allowing for xref:howto-manage-couchbase-logging.adoc#configuring-audit-logging[automated audit logging] via the Autonomous Operator.
 
 ==== Improved Security Defaults
 

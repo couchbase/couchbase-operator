@@ -21,7 +21,7 @@ Familiarity with the xref:reference-operator-configuration.adoc[Operator's confi
 
 == Collecting Autonomous Operator Logs
 
-Using `kubectl` or `oc`, you can choose to print the Autonomous Operator logs to to standard output (`stdout`).
+Using `kubectl` or `oc`, you can choose to print the Autonomous Operator logs to to standard console output.
 
 [{tabs}]
 ====

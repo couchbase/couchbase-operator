@@ -52,7 +52,7 @@ The Operator does not need `pods/exec` permissions to run.
 However, the xref:tools/cbopinfo.adoc[`cbopinfo`] tool -- specifically the xref:tools/cbopinfo.adoc#options[`--collectinfo`] option -- _does_ require `pods/exec` permissions.
 It needs these permissions in order to execute log collection scripts and run the `cbcollect_info` command locally on each pod belonging to a Couchbase cluster.
 
-If this is not acceptable, then please refer to xref:concept-couchbase-logging.adoc[] for additional options that ensure log availability (such as xref:concept-couchbase-logging.adoc#log-streaming[log streaming]).
+If this is not acceptable, then please refer to xref:concept-couchbase-logging.adoc[] for additional options that ensure log availability (such as xref:concept-couchbase-logging.adoc#log-forwarding[log forwarding]).
 ====
 
 services::
