@@ -1150,3 +1150,26 @@ func (r *TestRequirement) ServerGroups(i int) *TestRequirement {
 
 	return r
 }
+
+// DefaultAndExplicitStorageClass does what it says, looks for an implicit storage class
+// and that an explcit named one is configured.
+func (r *TestRequirement) DefaultAndExplicitStorageClass() *TestRequirement {
+	if Global.StorageClassName == "" {
+		r.t.Skip("No storage class name configured")
+	}
+
+	scs, err := r.kubernetes.KubeClient.StorageV1().StorageClasses().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("Unable to list storage classes: %v", err))
+	}
+
+	for _, sc := range scs.Items {
+		if _, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]; ok {
+			return r
+		}
+	}
+
+	r.t.Skip("No default storage class configured for platform")
+
+	return r
+}

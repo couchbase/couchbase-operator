@@ -353,6 +353,13 @@ func (o *ClusterOptions) WithGenericNetworking() *ClusterOptions {
 	return o
 }
 
+// WithDefaultStorageClass overrides the explicit storage class and uses the default.
+func (o *ClusterOptions) WithDefaultStorageClass() *ClusterOptions {
+	o.Options.StorageClass = ""
+
+	return o
+}
+
 // Generate generates the basic cluster based on options and applies
 // and features.
 func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseCluster {

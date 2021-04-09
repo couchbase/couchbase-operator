@@ -855,10 +855,47 @@ func TestUpgradePVC(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create the cluster.
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Update the PVC template size from 1Gi to 2GI
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests", v1.ResourceList{v1.ResourceStorage: *e2espec.NewResourceQuantityMi(2048)}), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node in the server group is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: mdsGroupSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpgradePVCStorageClass tests that we can change the storage class of PVCs.
+func TestUpgradePVCStorageClass(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).DefaultAndExplicitStorageClass()
+
+	// Static configuration.
+	mdsGroupSize := 2
+	clusterSize := mdsGroupSize * 2
+
+	// Create the cluster.
+	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).WithDefaultStorageClass().MustCreate(t, kubernetes)
+
+	// Update the PVC storage class from none to the configure one.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/storageClassName", f.StorageClassName), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 

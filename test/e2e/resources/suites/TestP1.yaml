@@ -122,6 +122,7 @@ testcases:
 - TestUpgradeToTLS
 - TestUpgradeToMandatoryMutualTLS
 - TestUpgradePVC
+- TestUpgradePVCStorageClass
 
 # Status Tests
 - TestStatusRecovery

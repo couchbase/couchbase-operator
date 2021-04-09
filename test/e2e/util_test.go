@@ -329,6 +329,7 @@ var (
 		"TestUpgradeToTLS":                                  TestUpgradeToTLS,
 		"TestUpgradeToMandatoryMutualTLS":                   TestUpgradeToMandatoryMutualTLS,
 		"TestUpgradePVC":                                    TestUpgradePVC,
+		"TestUpgradePVCStorageClass":                        TestUpgradePVCStorageClass,
 		"TestUpgradeImmediate":                              TestUpgradeImmediate,
 		"TestUpgradeConstrained":                            TestUpgradeConstrained,
 		"TestUpgradeBucketDurability":                       TestUpgradeBucketDurability,
