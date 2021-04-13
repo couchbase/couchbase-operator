@@ -683,6 +683,10 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 							Name:  "COUCHBASE_LOGS",
 							Value: CouchbaseVolumeMountLogsDir,
 						},
+						{
+							Name:  "COUCHBASE_LOGS_DYNAMIC_CONFIG",
+							Value: sidecarConfig.ConfigurationMountPath,
+						},
 					},
 					Resources: loggingResources,
 				}
