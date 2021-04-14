@@ -238,7 +238,6 @@ cluster:
   buckets:
     # Managed defines whether buckets are managed by us or the clients.
     managed: true
-  enablePreviewScaling: false
   servers:
     # Name for the server configuration. It must be unique.
     default:
@@ -267,17 +266,14 @@ cluster:
   # that can be requested and claimed by a pod.
   volumeClaimTemplates: []
 
-# couchbase buckets to create
-# disable default bucket creation by setting
-# buckets.default: null
-#
-# setting default to null throws warning https://github.com/helm/helm/issues/5184
+# Couchbase buckets to automatically create and manage
+# A default bucket is created unless you configure one, or otherwise set `buckets: null` in the values file or `buckets=null` on the command line.
 buckets:
-  # A bucket to create by default
+  # The name of the default bucket object in Kubernetes
   default:
     # Kind of bucket
     kind: CouchbaseBucket
-    # Name of the bucket
+    # Name of the bucket within Couchbase server, defaults to the object name
     name: default
     # The amount of memory that should be allocated to the bucket
     memoryQuota: 128Mi
@@ -667,28 +663,44 @@ helm install  my-release -f tls_values.yaml couchbase/couchbase-cluster
 == Buckets
 
 The `buckets` configuration represent `CouchbaseBucket` resources to be installed by the cluster.
-Buckets are installed whenever `install.CouchbaseCluster` is set to `true`.
 
 [source,yaml]
 ----
 buckets:
   default:
     name: default
-    type: couchbase
+    kind: CouchbaseBucket
 ----
 
 NOTE: Buckets are automatically provisioned with xref:concept-label-selection.adoc[label selectors] matching the corresponding Couchbase cluster.
 
+At least one bucket will be created whenever `install.CouchbaseCluster` is set to `true` (if you don't actively configure at least one bucket, then a default bucket is created automatically).
+If zero buckets are desired, then you must disable bucket creation completely by setting the contents to `null`.
+
+[source,yaml]
+----
+buckets: null
+----
+
+NOTE: The `buckets` field must be explicitly set to `null` in order to avoid bucket creation.
+Even if the section is completely empty, unless `buckets: null` is specified, the default bucket will be created.
+
 === `name`
-This value determines name of the bucket to create.
+This value determines the name of the bucket to create within Couchbase Server.
 
 _Value rules:_ The `bucket.name` value is a string.
-This value is optional and when not set, the name of the object key is used instead.
+This value is optional and when not set, the object key name is used instead.
+The object key name is used for the Kubernetes CRD, whereas this value is used for the bucket name that is recognized within the Couchbase Server application.
+
+=== `kind`
+This is the type of the bucket to create and can be one of the supported types provided by Couchbase Server.
+
+_Value rules:_ The `bucket.kind` value takes one of the supported values: `CouchbaseBucket`, `CouchbaseEphemeralBucket`, or `CouchbaseMemcachedBucket`.
+This value is optional and defaults to `CouchbaseBucket` when not set.
 
 === additional values
 
 All of the remaining values which can be overridden in this spec are described in the `CouchbaseCluster` documentation.
-
 
 
 == Users
