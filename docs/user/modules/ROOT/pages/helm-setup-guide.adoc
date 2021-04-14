@@ -10,6 +10,11 @@ The official Couchbase Helm Chart can help you easily set up the Couchbase Auton
 
 This page describes how to use the Couchbase Helm Chart to create various deployments of the Autonomous Operator, Admission Controller, Couchbase clusters, and Sync Gateway.
 
+[IMPORTANT]
+====
+The official Couchbase Helm Chart may only be used with Enterprise Edition products, such as Couchbase Server Enterprise Edition and Sync Gateway Enterprise Edition.
+====
+
 == Install Helm
 
 https://github.com/helm/helm/releases)[Helm 3.1+^] is required when installing the official Couchbase Helm Chart.
