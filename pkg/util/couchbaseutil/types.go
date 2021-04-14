@@ -810,17 +810,12 @@ func (r *AutoCompactionViewFragmentationThreshold) UnmarshalJSON(b []byte) error
 	return nil
 }
 
-type AutoCompactionInterval struct {
-	FromHour     int  `json:"fromHour" url:"indexCircularCompaction[interval][fromHour]"`
-	FromMinute   int  `json:"fromMinute" url:"indexCircularCompaction[interval][fromMinute]"`
-	ToHour       int  `json:"toHour" url:"indexCircularCompaction[interval][toHour]"`
-	ToMinute     int  `json:"toMinute" url:"indexCircularCompaction[interval][toMinute]"`
-	AbortOutside bool `json:"abortOutside" url:"indexCircularCompaction[interval][abortOutside]"`
-}
-
-type AutoCompactionIndexCircularCompaction struct {
-	DaysOfWeek string                 `json:"daysOfWeek" url:"indexCircularCompaction[daysOfWeek]"`
-	Interval   AutoCompactionInterval `json:"interval" url:""`
+type AutoCompactionAllowedTimePeriod struct {
+	FromHour     int  `json:"fromHour" url:"allowedTimePeriod[fromHour]"`
+	FromMinute   int  `json:"fromMinute" url:"allowedTimePeriod[fromMinute]"`
+	ToHour       int  `json:"toHour" url:"allowedTimePeriod[toHour]"`
+	ToMinute     int  `json:"toMinute" url:"allowedTimePeriod[toMinute]"`
+	AbortOutside bool `json:"abortOutside" url:"allowedTimePeriod[abortOutside]"`
 }
 
 type AutoCompactionAutoCompactionSettings struct {
@@ -828,7 +823,7 @@ type AutoCompactionAutoCompactionSettings struct {
 	ViewFragmentationThreshold     AutoCompactionViewFragmentationThreshold     `json:"viewFragmentationThreshold" url:""`
 	ParallelDBAndViewCompaction    bool                                         `json:"parallelDBAndViewCompaction" url:"parallelDBAndViewCompaction"`
 	IndexCompactionMode            string                                       `json:"indexCompactionMode" url:"indexCompactionMode"`
-	IndexCircularCompaction        AutoCompactionIndexCircularCompaction        `json:"indexCircularCompaction" url:""`
+	AllowedTimePeriod              AutoCompactionAllowedTimePeriod              `json:"allowedTimePeriod" url:""`
 }
 
 // AutoCompactionSettings is the cluster wide auto-compaction settings for a

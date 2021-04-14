@@ -1718,15 +1718,12 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 			},
 			ParallelDBAndViewCompaction: c.cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction,
 			IndexCompactionMode:         "circular",
-			IndexCircularCompaction: couchbaseutil.AutoCompactionIndexCircularCompaction{
-				DaysOfWeek: "Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday",
-				Interval: couchbaseutil.AutoCompactionInterval{
-					FromHour:     fromHour,
-					FromMinute:   fromMinute,
-					ToHour:       toHour,
-					ToMinute:     toMinute,
-					AbortOutside: c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.AbortCompactionOutsideWindow,
-				},
+			AllowedTimePeriod: couchbaseutil.AutoCompactionAllowedTimePeriod{
+				FromHour:     fromHour,
+				FromMinute:   fromMinute,
+				ToHour:       toHour,
+				ToMinute:     toMinute,
+				AbortOutside: c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.AbortCompactionOutsideWindow,
 			},
 		},
 		PurgeInterval: c.cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Hours() / 24.0,

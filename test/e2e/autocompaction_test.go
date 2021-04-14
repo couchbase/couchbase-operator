@@ -57,15 +57,15 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/ParallelDBAndViewCompaction", true), time.Minute)
 
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/start", "01:01"), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/IndexCircularCompaction/Interval/FromHour", 1), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/IndexCircularCompaction/Interval/FromMinute", 1), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/FromHour", 1), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/FromMinute", 1), time.Minute)
 
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/end", "07:37"), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/IndexCircularCompaction/Interval/ToHour", 7), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/IndexCircularCompaction/Interval/ToMinute", 37), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/ToHour", 7), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/ToMinute", 37), time.Minute)
 
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/abortCompactionOutsideWindow", true), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/IndexCircularCompaction/Interval/AbortOutside", true), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/AbortOutside", true), time.Minute)
 
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/tombstonePurgeInterval", &purgeInterval), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/PurgeInterval", purgeIntervalInternal), time.Minute)
