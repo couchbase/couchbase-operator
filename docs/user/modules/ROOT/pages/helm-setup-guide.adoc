@@ -211,23 +211,54 @@ For more information about using Sync Gateway with the Autonomous Operator, you 
 == Production Considerations
 
 === TLS Encryption
+
 Production deployments should enable TLS to encrypt traffic between the Autonomous Operator and the Couchbase cluster.
 TLS certificates can be auto-generated, or provided by the user.
 
-.Auto-generated certificates
-====
+==== Auto-Generated Certificates
+
 Install the chart with `tls` enabled:
 
 [source,console]
 ----
 helm install my-release --set tls.generate=true couchbase/couchbase-operator
 ----
+
+The Autonomous Operator will create the certificates and then configure them as Kubernetes Secrets for the cluster.
+
+[NOTE]
+====
+There is an issue (https://issues.couchbase.com/browse/K8S-1900[K8S-1900^]) that may cause a certificate error when using the Helm chart to upgrade the Autonomous Operator:
+
+----
+certificate cannot be verified for zone
+----
+
+This issue is caused by the certificate not having the necessary subject alternative names (SANs) required by the new version of the Autonomous Operator. 
+
+To resolve this issue, start by regenerating the Secrets from the new chart version:
+
+[source,console]
+----
+helm template my-release --values values.yaml couchbase/couchbase-operator > secrets.yaml
+----
+
+The `secrets.yaml` file that is created by the command above will now contain the Kubernetes Secret definitions for the cluster.
+Remove anything else from the file other than the Secrets with the `-operator-tls` and `-server-tls` suffixes for your release.
+Now update the Secrets in Kubernetes with the new ones:
+
+[source,console]
+----
+kubectl replace -f secrets.yaml
+----
+
+The Autonomous Operator should now pick up the new certificates and proceed through the upgrade process.
 ====
 
-.Bring your own certificates
-====
-. Create a file named `tls_values.yaml` with the following <<custom-installation,custom override values>> for the Couchbase Helm Chart:
-+
+==== Bring Your Own Certificates
+
+Create a file named `tls_values.yaml` with the following <<custom-installation,custom override values>> for the Couchbase Helm Chart:
+
 [source,yaml]
 ----
 cluster:
@@ -238,13 +269,12 @@ cluster:
 
 ----
 
-. Install the chart using the custom override values.
-+
+Install the chart using the custom override values.
+
 [source,console]
 ----
 helm install my-release -f tls_values.yaml couchbase/couchbase-operator
 ----
-====
 
 === Deploying Multiple Chart Instances (Releases)
 
