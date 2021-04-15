@@ -55,7 +55,7 @@ func (c *Cluster) generateCronJobs(backups []couchbasev2.CouchbaseBackup) ([]*ba
 	// if TLS enabled apply TLS config to cronjobs
 	if c.cluster.Spec.Networking.TLS != nil {
 		for _, cronjob := range cronjobs {
-			if err := applyTLSConfiguration(c.cluster.Spec, &cronjob.Spec.JobTemplate.Spec); err != nil {
+			if err := applyTLSConfiguration(c.cluster, &cronjob.Spec.JobTemplate.Spec); err != nil {
 				return nil, err
 			}
 		}
@@ -76,57 +76,57 @@ func getBackupContainerForTLS(podSpec corev1.PodSpec, containerName string) (*co
 }
 
 // Adds any necessary pod prerequisites before enabling TLS.
-func applyTLSConfiguration(cs couchbasev2.ClusterSpec, job *batchv1.JobSpec) error {
-	if cs.Networking.TLS != nil {
-		// Static configuration:
-		// * Defines a volume which contains the secrets necessary
-		//   to explicitly define TLS certificates and keys
-		if cs.Networking.TLS.Static != nil {
-			// Ensure the schema is correct
-			// TODO: does this make sense not to be a pointer?
-			if len(cs.Networking.TLS.Static.OperatorSecret) == 0 {
-				return fmt.Errorf("static tls operator secret required: %w", errors.NewStackTracedError(errors.ErrResourceRequired))
-			}
-
-			// Add the TLS secret volume to the podSpec
-			volume := corev1.Volume{
-				Name: "couchbase-operator-tls",
-			}
-			volume.VolumeSource.Secret = &corev1.SecretVolumeSource{
-				SecretName: cs.Networking.TLS.Static.OperatorSecret,
-			}
-			job.Template.Spec.Volumes = append(job.Template.Spec.Volumes, volume)
-
-			// add --cacert argument to backup_script
-			containerArgs := job.Template.Spec.Containers[0].Args
-			containerArgs = append(containerArgs, "--cacert")
-			containerArgs = append(containerArgs, "/var/run/secrets/couchbase.com/tls-mount/ca.crt")
-			job.Template.Spec.Containers[0].Args = containerArgs
-
-			// Mount the secret volume in Couchbase's inbox
-			volumeMount := corev1.VolumeMount{
-				Name:      "couchbase-operator-tls",
-				ReadOnly:  true,
-				MountPath: "/var/run/secrets/couchbase.com/tls-mount",
-			}
-
-			containerName := job.Template.Spec.Containers[0].Name
-
-			container, err := getBackupContainerForTLS(job.Template.Spec, containerName)
-			if err != nil {
-				return err
-			}
-
-			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-
-			// Annotate the podSpec as having TLS enabled
-			if job.Template.Annotations == nil {
-				job.Template.Annotations = map[string]string{}
-			}
-
-			job.Template.Annotations[constants.PodTLSAnnotation] = "enabled"
-		}
+// BUG: this completely ignores mTLS...
+func applyTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, job *batchv1.JobSpec) error {
+	if !cluster.IsTLSEnabled() {
+		return nil
 	}
+
+	var secret string
+
+	if cluster.IsTLSShadowed() {
+		secret = cluster.Spec.Networking.TLS.SecretSource.ServerSecretName
+	} else {
+		secret = cluster.Spec.Networking.TLS.Static.OperatorSecret
+	}
+
+	// Add the TLS secret volume to the podSpec
+	volume := corev1.Volume{
+		Name: "couchbase-operator-tls",
+	}
+	volume.VolumeSource.Secret = &corev1.SecretVolumeSource{
+		SecretName: secret,
+	}
+	job.Template.Spec.Volumes = append(job.Template.Spec.Volumes, volume)
+
+	// add --cacert argument to backup_script
+	containerArgs := job.Template.Spec.Containers[0].Args
+	containerArgs = append(containerArgs, "--cacert")
+	containerArgs = append(containerArgs, "/var/run/secrets/couchbase.com/tls-mount/ca.crt")
+	job.Template.Spec.Containers[0].Args = containerArgs
+
+	// Mount the secret volume in Couchbase's inbox
+	volumeMount := corev1.VolumeMount{
+		Name:      "couchbase-operator-tls",
+		ReadOnly:  true,
+		MountPath: "/var/run/secrets/couchbase.com/tls-mount",
+	}
+
+	containerName := job.Template.Spec.Containers[0].Name
+
+	container, err := getBackupContainerForTLS(job.Template.Spec, containerName)
+	if err != nil {
+		return err
+	}
+
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+
+	// Annotate the podSpec as having TLS enabled
+	if job.Template.Annotations == nil {
+		job.Template.Annotations = map[string]string{}
+	}
+
+	job.Template.Annotations[constants.PodTLSAnnotation] = "enabled"
 
 	return nil
 }
@@ -359,7 +359,7 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 		},
 	}
 
-	if err := applyTLSConfiguration(c.cluster.Spec, &restorejob.Spec); err != nil {
+	if err := applyTLSConfiguration(c.cluster, &restorejob.Spec); err != nil {
 		return nil, err
 	}
 

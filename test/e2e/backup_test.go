@@ -898,7 +898,7 @@ func TestFullIncrementalOverTLSS3(t *testing.T) {
 	testFullIncrementalOverTLS(t, true)
 }
 
-func testFullOnlyOverTLS(t *testing.T, s3 bool) {
+func testFullOnlyOverTLS(t *testing.T, s3, useStandardTLS bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
@@ -913,7 +913,14 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool) {
 	numOfDocs := f.DocsCount
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	opts := &e2eutil.TLSOpts{}
+
+	if useStandardTLS {
+		keyEncoding := e2eutil.KeyEncodingPKCS8
+		opts = &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding}
+	}
+
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, opts)
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
@@ -952,11 +959,19 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool) {
 }
 
 func TestFullOnlyOverTLS(t *testing.T) {
-	testFullOnlyOverTLS(t, false)
+	testFullOnlyOverTLS(t, false, false)
+}
+
+func TestFullOnlyOverTLSStandard(t *testing.T) {
+	testFullOnlyOverTLS(t, false, true)
 }
 
 func TestFullOnlyOverTLSS3(t *testing.T) {
-	testFullOnlyOverTLS(t, true)
+	testFullOnlyOverTLS(t, true, false)
+}
+
+func TestFullOnlyOverTLSS3Standard(t *testing.T) {
+	testFullOnlyOverTLS(t, true, true)
 }
 
 func testBackupRetention(t *testing.T, s3 bool) {

@@ -167,7 +167,9 @@ testcases:
 - TestFullIncrementalOverTLS
 - TestFullIncrementalOverTLSS3
 - TestFullOnlyOverTLS
+- TestFullOnlyOverTLSStandard
 - TestFullOnlyOverTLSS3
+- TestFullOnlyOverTLSS3Standard
 - TestMultipleBackups
 - TestMultipleBackupsS3
 - TestBackupRetention
