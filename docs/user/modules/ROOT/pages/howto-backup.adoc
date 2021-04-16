@@ -3,59 +3,16 @@
 include::partial$constants.adoc[]
 
 [abstract]
-You can configure the Autonomous Operator to take periodic, automated backups of your Couchbase Cluster with the existing functionality provided by `cbbackupmgr`.
+You can configure the Autonomous Operator to take periodic, automated backups of your Couchbase cluster with the existing functionality provided by `cbbackupmgr`.
 
 == Overview
 
-The Autonomous Operator provides automated backup and restore capabilities through a native integration with the Couchbase Server tool xref:server:backup-restore:enterprise-backup-restore.adoc[`cbbackupmgr`].
-
-Automated backup is enabled in the `CouchbaseCluster` resource.
-The configuration allows you to specify a Couchbase-provided container image that contains the `cbbackupmgr` tool.
-
-Once automated backup is enabled, individual backup policies can be configured using `CouchbaseBackup` resources, which define things like schedule and backup strategy.
-Each `CouchbaseBackup` resource creates one or two Kubernetes https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/[`CronJob` resources^] that will spawn backup jobs according to the given Cron schedule(s).
-These backup jobs execute a helper script which performs logging and cleanup, and utilizes `cbbackupmgr` to perform backup and restore.
-
-TIP: Because backup policies are configured with a separate resource, you can use xref:concept-rbac.adoc[custom resource RBAC] to allow individuals who may not have access to `CouchbaseCluster` resources to still perform backup administration.
+This page details how to backup a Couchbase cluster and restore data in the face of disaster.
+A conceptual overview of using the Autonomous Operator to backup and restore Couchbase clusters can be found in xref:concept-backup.adoc[].
 
 The Autonomous Operator supports two of the backup strategies available in `cbbackupmgr`: _Full Only_ and _Full/Incremental_.
 Complete descriptions and explanations of these strategies can be found in the xref:server:backup-restore:cbbackupmgr-strategies.adoc[`cbbackupmgr` documentation].
-The examples on this page assume a backup schedule based on the Full/Incremental strategy for both creating backups and performing restores.
-
-== Important Considerations
-
-* The Autonomous Operator runs the backup utility in a separate Pod.
-Where this Pod is scheduled can have implications on backup performance, and can affect whether backup jobs are able to complete within the desired time window.
-+
-You should schedule backup Pods onto Kubernetes nodes that have enough resources to successfully fulfill your backup schedule.
-It is also recommended that you do not schedule backup Pods onto Kubernetes nodes that host Couchbase cluster Pods, since your Couchbase cluster would be competing for resources with the backup utility.
-Refer to the <<pod-scheduling>> section below for further details.
-
-* Backup Pods require access permissions that necessitate the creation of `ServiceAccount`, `Role`, and `RoleBinding` resources.
-This is covered in the <<grant-backup-permissions,Grant Access Permissions>> section on this page.
-
-* You can enable and disable automated backup at any time in the `CouchbaseCluster` configuration.
-Disabling automated backup does not delete `CouchbaseBackup` resources. When you re-enabled automated backup, any applicable `CouchbaseBackup` resources will continue to be used.
-
-* Only official Autonomous Operator Backup images provided by Couchbase are supported.
-Note that these images are designed to only ever be pulled and run by the Autonomous Operator -- they should not be used in any other context.
-+
-In addition, you should ensure that your image source is trusted.
-The backup image requires access to the Couchbase cluster administrative credentials in order to login and perform collection.
-Granting these credentials to arbitrary code is potentially harmful.
-
-=== Version Compatibility
-* Supported Autonomous Operator Backup images correspond to the version of `cbbackupmgr` it runs.
-Due to version compatibility between `cbbackupmgr` versions and versions of Couchbase Server, only certain Backup images will be compatible with certain versions of Couchbase Server.
-+
-For example, backup and restore operations on a cluster running Couchbase Server 6.6.x must use backup image of the same tag, so in this case, `couchbase/operator-backup:6.6.0`.
-Data from a 6.6.x cluster cannot be restored on a cluster running Couchbase Server 6.5.x.
-+
-Further information on compatibility can be found over in the `cbbackupmgr` https://docs.couchbase.com/server/current/backup-restore/enterprise-backup-restore.html#version-compatibility[documentation].
-
-* Only 6.6.x Autonomous Operator Backup images will be able to utilize AWS S3 backup and restore operations, as it runs `cbbackupmgr` version 6.6.
-Only `cbbackupmgr` version 6.6 supports this feature, as mentioned https://docs.couchbase.com/server/current/backup-restore/enterprise-backup-restore.html#66-and-aws-s3[here].
-
+The examples on this page assume a backup schedule based on the _Full/Incremental_ strategy for both creating backups and performing restores.
 
 == Enable Automated Backup
 

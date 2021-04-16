@@ -33,6 +33,7 @@
  ** xref:concept-upgrade.adoc[Couchbase Upgrades]
  ** xref:concept-hibernation.adoc[Couchbase Cluster Hibernation]
  ** xref:concept-couchbase-logging.adoc[Couchbase Logging]
+ ** xref:concept-backup.adoc[Couchbase Backup and Restore]
 
 .Manage
 * Operator
