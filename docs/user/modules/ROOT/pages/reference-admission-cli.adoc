@@ -1,0 +1,161 @@
+= Dynamic Admission Controller Deployment Settings
+
+[abstract]
+Command line options for the Autonomous Operator Dynamic Admission Controller.
+
+== Dynamic Admission Controller Deployment
+
+The Dynamic Admission Controller (DAC) configuration is defined below:
+This is intended as a reference only, and you should prefer the use of the xref:tools/cbopcfg.adoc[`cbopcfg` utility] or xref:helm-setup-guide.adoc[Helm], as these will handle configuration for you and provide an abstraction layer, less prone to modification.
+
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    config.couchbase.com/version: 2.2.0
+  name: couchbase-operator-admission
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: couchbase-operator-admission
+  template:
+    metadata:
+      labels:
+        app: couchbase-operator-admission
+    spec:
+      containers:
+      - args: # <.>
+        - -zap-log-level=info
+        - -tls-cert-file=/var/run/secrets/couchbase.com/couchbase-operator-admission/tls.crt 
+        - -tls-private-key-file=/var/run/secrets/couchbase.com/couchbase-operator-admission/tls.key
+        - -validate-secrets=true
+        - -validate-storage-classes=true
+        - -default-file-system-group=true
+        command:
+        - couchbase-operator-admission
+        image: couchbase/admission-controller:2.2.0 <.>
+        name: couchbase-operator-admission
+        ports:
+        - containerPort: 8443 # <.>
+          name: https
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: https
+            scheme: HTTPS
+        volumeMounts: # <.>
+        - mountPath: /var/run/secrets/couchbase.com/couchbase-operator-admission
+          name: couchbase-operator-admission
+          readOnly: true
+      serviceAccountName: couchbase-operator-admission # <.>
+      volumes: # <.>
+      - name: couchbase-operator-admission
+        secret:
+          secretName: couchbase-operator-admission
+----
+
+<.> The command-line arguments for the DAC are defined <<command-line-arguments,below>>.
+<.> The container image to use.
+    The version is defined by the tools package you are using, so typically handed for you.
+    Likewise, this is a standard Kubernetes image, for Red Hat OCP you will need to use the Red Hat Container Catalog version.
+    An OCP specific tool set usually handles this for you.
+<.> The DAC is a regular HTTPS web service, so needs this port defining.
+    Port `8443` is the default as it's a user space port and doesn't need any elevated privileges.
+<.> The DAC must use TLS transport between the Kubernetes API and itself.
+    This volume mount gives access to an X.509 certificate/key pair.
+<.> The DAC runs under a service account granting it privileges as defined in xref:reference-admission-rbac.adoc[the DAC RBAC reference].
+    Certain privileges are optional based on the provided flags defined <<command-line-arguments,below>>.
+<.> The TLS certificates are provided via a Kubernetes secret.
+    This allows you to provide the certificates explicitly, or use `kubernetes.io/tls` type secrets provided by xref:tutorial-cert-manager.adoc[3rd party certificate managers].
+
+== Command-line Arguments
+
+-address::
+*Type*: `integer`
++
+*Default*: `:8443`
+*
+Address for the server to listen for requests on.
+By default it will listen to port 8443 on all interfaces.
+
+-default-file-system-group | -default-file-system-group=false::
+*Type*: `boolean`
++
+*Default*: `true`
++
+Enables mutation of `CouchbaseCluster` resources, setting a default file system group for when persistent volumes are in use.
+
+-tls-cert-file::
+*Type*: `string`
++
+*Required*
++
+Specifies the path to a file containing a valid PEM formatted X.509 server certificate, and optionally containing any intermediate CA certificates.
+
+-tls-private-key-file::
+*Type*: `string`
++
+*Required*
++
+Specifies the path to a file containing a valid PEM formatted private key.
+
+-validate-secrets | -validate-secrets=false::
+*Type*: `boolean`
++
+*Default*: `true`
++
+Enables validation of `Secret` resources.
+When enabled any secrets referenced by Couchbase custom resources will be validated for existence.
+Where possible the contents will also be validated e.g. for password or TLS certificate validity.
+
+-validate-storage-classes | -validate-storage-classes=false::
+*Type*: `boolean`
++
+*Default*: `true`
++
+Enables validation of `StorageClass` resources.
+When enabled any storage classes referenced by Couchbase custom resources will be validated for existence.
+
+-zap-devel | -zap-devel=false::
+*Type*: `boolean`
++
+*Default*: `false`
++
+Enables development mode logging, which while more human readable, is less easily integrated into centralized log shipping and collection infrastructure.
+Development mode sets `-zap-encoder` default to `console`, `-zap-log-level` to `debug`, and `-zap-stacktrace-level` to `warn`.
+Production mode sets `-zap-encoder` default to `json`, `-zap-log-level` to `info`, and `-zap-stacktrace-level` to `error`.
+
+-zap-encoder::
+*Type*: `string`
++
+*Enumeration*: `json`, `console`
++
+*Default*: see `-zap-devel`
++
+Allows log format to be specified.
+By default, `json` logging provides a machine readable format easily integrated into centralized logging platforms.
+The alternative `console` logging, is more easily readable to the human, but less easily integrated into centralized log shipping and collection infrastructure.
+
+-zap-log-level::
+*Type*: `string`
++
+*Enumeration*: `debug`, `info`, `error`
++
+*Default*: see `-zap-devel`
++
+Controls the verbosity of log output.
+Informational logging displays HTTP requests and response codes.
+Debug logging displays the HTTP payloads and extended debug information.
+Passwords or other sensitive information are never displayed in log output.
+
+-zap-stacktrace-level::
+*Type*: `string`
++
+*Enumeration*: `info`, `error`
++
+*Default*: see `-zap-devel`
++
+Controls at what level a log message generates a stack trace for debugging purposes.

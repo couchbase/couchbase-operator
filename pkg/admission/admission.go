@@ -127,10 +127,10 @@ type Config struct {
 
 // addFlags parses command line parameters and adds them to a Config object.
 func (c *Config) AddFlags() {
-	flag.StringVar(&c.Addr, "address", ":443", ""+
-		"Address the server listens on (defaults to :443).")
+	flag.StringVar(&c.Addr, "address", ":8443", ""+
+		"Address the server listens on.")
 	flag.StringVar(&c.CertFile, "tls-cert-file", c.CertFile, ""+
-		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
+		"File containing the default x509 Certificate for HTTPS, including any intermediate certificates."+
 		"after server cert).")
 	flag.StringVar(&c.KeyFile, "tls-private-key-file", c.KeyFile, ""+
 		"File containing the default x509 private key matching --tls-cert-file.")
@@ -387,12 +387,15 @@ type Server struct {
 	// err is used to communicate the error condition asynchronously back from
 	// the server instance.
 	err chan error
+
+	// config is the static configuration for the application.
+	config *Config
 }
 
 // Start launches the server in its own routine as it's a blocking call.
 func (s *Server) Start(tlsConfig *tls.Config) {
 	s.server = &http.Server{
-		Addr:      ":8443",
+		Addr:      s.config.Addr,
 		TLSConfig: tlsConfig,
 	}
 
@@ -436,7 +439,9 @@ func Serve(config *Config) {
 
 	tlsConfig := configTLS(config)
 
-	server := &Server{}
+	server := &Server{
+		config: config,
+	}
 	server.Start(tlsConfig)
 
 	for {

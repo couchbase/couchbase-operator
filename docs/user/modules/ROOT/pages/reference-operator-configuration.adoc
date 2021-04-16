@@ -1,7 +1,10 @@
 = Operator Deployment Settings
 :page-aliases: operator-config
 
+== Operator Deployment
+
 The Couchbase Autonomous Operator configuration is defined below.
+This is intended as a reference only, and you should prefer the use of the xref:tools/cbopcfg.adoc[`cbopcfg` utility] or xref:helm-setup-guide.adoc[Helm], as these will handle configuration for you and provide an abstraction layer, less prone to modification.
 
 IMPORTANT: Most of the fields in the Operator configuration should never be changed and it is recommended that you use the configuration as is. However, there are some exceptions noted below.
 
@@ -59,58 +62,77 @@ spec:
 
 == Command-line Arguments
 
-You can specify a list of command-line flags to pass on to the Operator to modify its behavior.
-
-[source,yaml]
-----
-spec:
-  template:
-    spec:
-      containers:
-        args:
-        - --zap-log-level=info
-        - --concurrency=4
-        - --pod-create-timeout=10m
-        - --listen-addr=8080
-----
-
---zap-log-level <string>::
-This argument controls the log level a message has to reach before being printed.
+--concurrency::
+*Type*: `integer`
 +
-Valid values are:
+*Default*: `4`
 +
---
-* `error` - only error messages are printed
-* `info` - errors and informational messages are printed
-* `debug` and `1` - basic debug, error and informational messages are printed
-* `2` - full debug, error and informational messages are printed.
---
+This argument controls how many Couchbase clusters can be reconciled at the same time.
 +
-This flag defaults to `info`.
+The Operator can manage multiple Couchbase clusters regardless of this setting, however if set too low clusters may have to wait for a worker to become available before being inspected and reconciled.
+This is especially relevant where a Couchbase cluster can block others from being repaired due to a long running process such as a rebalance.
 
+--listen-addr <integer>::
+*Type*: `integer`
++
+*Default*: `8080`
++
+This argument controls the Operator HTTP server.
+It is primarily used to expose debugging information for support requests.
+
+--pod-create-timeout::
+*Type*: `string`
++
+*Default*: `10m`
++
+The Operator allows the timeout of pod creation to be manually configured.
+It is primarily intended for use on cloud platforms where the deployment of multiple volumes and pulling of a Couchbase Server container image may take a longer time than the default timeout period.
++
+Valid values are any string that is a https://golang.org/pkg/time/#ParseDuration[golang duration^].
+
+--zap-devel | --zap-devel=false::
+*Type*: `boolean`
++
+*Default*: `false`
++
+Enables development mode logging, which while more human readable, is less easily integrated into centralized log shipping and collection infrastructure.
+Development mode sets `-zap-encoder` default to `console`, `-zap-log-level` to `debug`, and `-zap-stacktrace-level` to `warn`.
+Production mode sets `-zap-encoder` default to `json`, `-zap-log-level` to `info`, and `-zap-stacktrace-level` to `error`.
+
+--zap-encoder::
+*Type*: `string`
++
+*Enumeration*: `json`, `console`
++
+*Default*: see `-zap-devel`
++
+Allows log format to be specified.
+By default, `json` logging provides a machine readable format easily integrated into centralized logging platforms.
+The alternative `console` logging, is more easily readable to the human, but less easily integrated into centralized log shipping and collection infrastructure.
+
+--zap-log-level::
+*Type*: `string`
++
+*Enumeration*: `debug`, `info`, `error`, `2`
++
+*Default*: see `-zap-devel`
++
+Controls the verbosity of log output.
+Informational logging displays errors and informational messages.
+Debug logging displays basic debug, error and informational messages.
+Level 2 debug logging displays full debug, error and informational messages, including Couchbase server API calls.
++
 [IMPORTANT]
 ====
 When using logging level `2` be aware this will print all data payloads to and from Couchbase server.
 This data may contain user names and passwords in plain text along with any other sensitive information concerning naming of resources.
 ====
 
---concurrency <integer>::
-This argument controls how many Couchbase clusters can be reconciled at the same time.
+--zap-stacktrace-level::
+*Type*: `string`
 +
-The Operator can manage multiple Couchbase clusters regardless of this setting, however if set too low clusters may have to wait for a worker to become available before being inspected and reconciled.
-This is especially relevant where a Couchbase cluster can block others from being repaired due to a long running process such as a rebalance.
+*Enumeration*: `info`, `error`
 +
-If not specified this flag defaults to `1`.
-
---pod-create-timeout <string>::
-The Operator allows the timeout of pod creation to be manually configured.
-It is primarily intended for use on cloud platforms where the deployment of multiple volumes and pulling of a Couchbase Server container image may take a longer time than the default timeout period.
+*Default*: see `-zap-devel`
 +
-Valid values are any string that is a https://golang.org/pkg/time/#ParseDuration[golang duration^].
-This flag defaults to `5m`.
-
---listen-addr <integer>::
-This argument controls the Operator HTTP server.
-It is primarily used to expose debugging information for support requests.
-+
-This flag defaults to `8080`.
+Controls at what level a log message generates a stack trace for debugging purposes.
