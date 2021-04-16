@@ -168,6 +168,8 @@ testcases:
 - TestFullIncrementalOverTLSS3
 - TestFullOnlyOverTLS
 - TestFullOnlyOverTLSStandard
+- TestFullOnlyOverMutualTLS
+- TestFullOnlyOverMandatoryMutualTLS
 - TestFullOnlyOverTLSS3
 - TestFullOnlyOverTLSS3Standard
 - TestMultipleBackups

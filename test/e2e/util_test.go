@@ -387,6 +387,8 @@ var (
 		"TestFullIncrementalOverTLSS3":       TestFullIncrementalOverTLSS3,
 		"TestFullOnlyOverTLS":                TestFullOnlyOverTLS,
 		"TestFullOnlyOverTLSStandard":        TestFullOnlyOverTLSStandard,
+		"TestFullOnlyOverMutualTLS":          TestFullOnlyOverMutualTLS,
+		"TestFullOnlyOverMandatoryMutualTLS": TestFullOnlyOverMandatoryMutualTLS,
 		"TestFullOnlyOverTLSS3":              TestFullOnlyOverTLSS3,
 		"TestFullOnlyOverTLSS3Standard":      TestFullOnlyOverTLSS3Standard,
 		"TestBackupRetention":                TestBackupRetention,

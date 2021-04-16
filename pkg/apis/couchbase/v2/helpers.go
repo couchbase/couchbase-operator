@@ -423,6 +423,10 @@ func (c *CouchbaseCluster) IsMutualTLSEnabled() bool {
 	return c.IsTLSEnabled() && c.Spec.Networking.TLS.ClientCertificatePolicy != nil
 }
 
+func (c *CouchbaseCluster) IsMandatoryMutualTLSEnabled() bool {
+	return c.IsMutualTLSEnabled() && *c.Spec.Networking.TLS.ClientCertificatePolicy == ClientCertificatePolicyMandatory
+}
+
 func (c *CouchbaseCluster) IsTLSShadowed() bool {
 	return c.IsTLSEnabled() && c.Spec.Networking.TLS.SecretSource != nil
 }

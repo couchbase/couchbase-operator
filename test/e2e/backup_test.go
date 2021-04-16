@@ -898,7 +898,7 @@ func TestFullIncrementalOverTLSS3(t *testing.T) {
 	testFullIncrementalOverTLS(t, true)
 }
 
-func testFullOnlyOverTLS(t *testing.T, s3, useStandardTLS bool) {
+func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2.ClientCertificatePolicy) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
@@ -913,18 +913,11 @@ func testFullOnlyOverTLS(t *testing.T, s3, useStandardTLS bool) {
 	numOfDocs := f.DocsCount
 
 	// Create the cluster.
-	opts := &e2eutil.TLSOpts{}
-
-	if useStandardTLS {
-		keyEncoding := e2eutil.KeyEncodingPKCS8
-		opts = &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding}
-	}
-
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, opts)
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tls)
 
 	s3secret := createS3Secret(t, targetKube, s3)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).WithS3(s3secret).MustCreate(t, targetKube)
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, policy).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, targetKube, bucket)
@@ -951,6 +944,9 @@ func testFullOnlyOverTLS(t *testing.T, s3, useStandardTLS bool) {
 	// * Backup created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
 	}
@@ -959,19 +955,37 @@ func testFullOnlyOverTLS(t *testing.T, s3, useStandardTLS bool) {
 }
 
 func TestFullOnlyOverTLS(t *testing.T) {
-	testFullOnlyOverTLS(t, false, false)
+	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, nil)
 }
 
 func TestFullOnlyOverTLSStandard(t *testing.T) {
-	testFullOnlyOverTLS(t, false, true)
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding}
+
+	testFullOnlyOverTLS(t, false, opts, nil)
+}
+
+func TestFullOnlyOverMutualTLS(t *testing.T) {
+	policy := v2.ClientCertificatePolicyEnable
+
+	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, &policy)
+}
+
+func TestFullOnlyOverMandatoryMutualTLS(t *testing.T) {
+	policy := v2.ClientCertificatePolicyMandatory
+
+	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, &policy)
 }
 
 func TestFullOnlyOverTLSS3(t *testing.T) {
-	testFullOnlyOverTLS(t, true, false)
+	testFullOnlyOverTLS(t, true, &e2eutil.TLSOpts{}, nil)
 }
 
 func TestFullOnlyOverTLSS3Standard(t *testing.T) {
-	testFullOnlyOverTLS(t, true, true)
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding}
+
+	testFullOnlyOverTLS(t, true, opts, nil)
 }
 
 func testBackupRetention(t *testing.T, s3 bool) {
