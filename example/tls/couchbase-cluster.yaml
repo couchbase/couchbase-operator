@@ -8,7 +8,7 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  image: couchbase/server:6.5.0
+  image: couchbase/server:6.6.2
   security:
     adminSecret: cb-example-auth
   networking:
