@@ -107,8 +107,9 @@ func (v KubernetesVersion) String() string {
 }
 
 const (
-	CouchbaseVersionMin = "enterprise-6.0.4"
-	CouchbaseVersion650 = "enterprise-6.5.0"
+	// The DAC will not allow any version lower than this to run, it may be possible
+	// but some features won't work most likely and lead to support requests.
+	CouchbaseVersionMin = "6.5.0"
 )
 
 const (

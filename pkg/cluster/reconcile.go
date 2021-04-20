@@ -2853,31 +2853,12 @@ Outerloop:
 
 // reconcileRBAC reconciles users, groups, along with ldap settings.
 func (c *Cluster) reconcileRBAC() error {
-	// rbac features require 6.5
-	version, err := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
-	if err != nil {
+	if err := c.reconcileLDAPSettings(); err != nil {
 		return err
 	}
 
-	required, _ := couchbaseutil.NewVersion(constants.CouchbaseVersion650)
-
-	if version.GreaterEqual(required) {
-		if err := c.reconcileLDAPSettings(); err != nil {
-			return err
-		}
-
-		if err := c.reconcileRBACResources(); err != nil {
-			return err
-		}
-	} else {
-		// Warn if user is attempting to use rbac feature with an unsupported version
-		if c.cluster.Spec.Security.LDAP != nil {
-			log.V(1).Info("LDAP security settings are not allowed", "cluster", c.namespacedName(), "cluster_version", version, "required_version", constants.CouchbaseVersion650)
-		}
-
-		if len(c.k8s.CouchbaseGroups.List()) > 0 {
-			log.V(1).Info("RBAC is not allowed", "cluster", c.namespacedName(), "cluster_version", version, "required_version", constants.CouchbaseVersion650)
-		}
+	if err := c.reconcileRBACResources(); err != nil {
+		return err
 	}
 
 	return nil
