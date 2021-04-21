@@ -1132,6 +1132,12 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.indexer.storageMode`},
 		},
+		{
+			name:           "TestValidateQueryTemporarySpaceUnderflow",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpace", "-2Gi")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.query.temporarySpace`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

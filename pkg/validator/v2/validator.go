@@ -263,6 +263,12 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		}
 	}
 
+	if customResource.Spec.ClusterSettings.Query != nil {
+		if customResource.Spec.ClusterSettings.Query.TemporarySpace.Cmp(*k8sutil.NewResourceQuantityMi(0)) <= 0 {
+			errs = append(errs, fmt.Errorf("spec.cluster.query.temporarySpace in body should be greater than 0Mi"))
+		}
+	}
+
 	// Referenced object validation
 	if v.Options.ValidateSecrets {
 		secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret)
