@@ -20,11 +20,12 @@ func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	trueVar := true
 
 	return metav1.OwnerReference{
-		APIVersion: SchemeGroupVersion.String(),
-		Kind:       ClusterCRDResourceKind,
-		Name:       c.Name,
-		UID:        c.UID,
-		Controller: &trueVar,
+		APIVersion:         SchemeGroupVersion.String(),
+		Kind:               ClusterCRDResourceKind,
+		Name:               c.Name,
+		UID:                c.UID,
+		Controller:         &trueVar,
+		BlockOwnerDeletion: &trueVar,
 	}
 }
 

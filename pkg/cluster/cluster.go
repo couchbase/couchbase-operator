@@ -207,9 +207,41 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 	return c, nil
 }
 
+// addForegroundDeleteFinalizer adds a finalizer to the cluster that tells it
+// to wait for all dependent resources to be deleted before deleting itself.
+// Means that a quick delete/recreate doesn't run aground on resource conflicts.
+// Does however mean things can get stuck more easily...
+func (c *Cluster) addForegroundDeleteFinalizer() error {
+	var hasForegroundDeleteFinalizer bool
+
+	for _, finalizer := range c.cluster.Finalizers {
+		if finalizer == metav1.FinalizerDeleteDependents {
+			hasForegroundDeleteFinalizer = true
+			break
+		}
+	}
+
+	if !hasForegroundDeleteFinalizer {
+		c.cluster.Finalizers = append(c.cluster.Finalizers, metav1.FinalizerDeleteDependents)
+
+		newCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), c.cluster, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		c.cluster = newCluster
+	}
+
+	return nil
+}
+
 // newCluster does the bulk of cluster initialization once the cluster object is initialized.
 func (c *Cluster) newCluster() error {
 	var err error
+
+	if err := c.addForegroundDeleteFinalizer(); err != nil {
+		return err
+	}
 
 	// Create a new persistence layer to store and retrieve state.  Add in
 	// defaults if they don't exist.
