@@ -214,6 +214,17 @@ In this example above, the Autonomous Operator would restore a range of backups 
 The omission of the `spec.repo` field means that the Autonomous Operator will look for the most recent backup repository either from the `CouchbaseBackup` object defined by `spec.backup` or from the PVC of the same name.
 If the `spec.repo` field is unable to be populated by the Autonomous Operator, then the resource will be rejected and no restore job will be created.
 
+[CAUTION]
+====
+When a `CouchbaseBackupRestore` resource is deleted, its associated `Job` and `Pod` resources are deleted immediately.
+====
+
+[NOTE]
+====
+Any `CouchbaseBackupRestore` edits performed with `kubectl edit` will not be reflected in the respective `Job` once the `Job` has been created.
+The `CouchbaseBackupRestore` resource will have to be deleted and created from scratch.
+====
+
 == Monitor and Manage Backups
 
 It's important to regularly monitor backup performance to ensure you’re backing up all the required data within your desired time window.
@@ -401,6 +412,13 @@ couchbase-operator-b6496564f-qpqsb                1/1     Running     0         
 === Editing a Backup Configuration
 
 `CouchbaseBackup` resources cannot be edited, and once created, will need to be deleted and recreated if any edits wish to be made.
+
+=== Deleting a Backup Configuration
+
+When a `CouchbaseBackup` resource is deleted, any associated `Cronjob`(s) are deleted.
+`Jobs` and their respective `Pods` from those `Cronjobs` are orphaned; the number of these resources that are left over is determined by the limits `spec.successfulJobsHistoryLimit` and `spec.failedJobsHistoryLimit`.
+
+If a backup job is running whilst the parent `CouchbaseBackup` is deleted then the job will continue until completion or eventual failure.
 
 === Viewing Detailed Logs
 
