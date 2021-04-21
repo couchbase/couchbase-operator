@@ -87,7 +87,7 @@ spec:
 <1> On detection of the `CouchbaseBackup` resource, the Autonomous Operator creates the correct cron jobs for the `spec.full.schedule` and the `spec.incremental.schedule`.
 In this example a full backup would be performed at 3:00AM on a Sunday and then an incremental backup on every other day of the week at 3:00AM.
 
-<2> The Autonomous Operator will also create a Persistent Volume Claim to store the backups and logs with the same name that is specified in `metadata.name`.
+<2> The Autonomous Operator will also create a PersistentVolumeClaim (PVC) to store the backups and logs with the same name that is specified in `metadata.name`.
 So if a PVC called "my-backup" does not yet exist in this case, one will be created.
 This would also happen if for some reason the PVC was deleted.
 
@@ -594,3 +594,12 @@ spec:
 ----
 
 Please note that operations involving S3 take more time to complete in comparison to regular backup to PVCs so please bear this in mind when configuring your automated backup schedules.
+
+[IMPORTANT]
+====
+Backing up to S3 still requires a local PVC with enough space for xref:server:backup-restore:cbbackupmgr-cloud.adoc#the-staging-directory[a `staging` folder],
+where files will be stored locally first before being uploaded to S3.
+Please note that cleanup schedules will also apply to the local PVC as well as the S3 bucket.
+
+The `staging` folder does not need to be created manually by the user.
+====
