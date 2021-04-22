@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -26,42 +27,397 @@ const (
 	Full        CBBackupmgrAction = "full"
 )
 
-// generateCronJobs generates the appropriate backup Cronjobs for a CouchbaseBackup.
-func (c *Cluster) generateCronJobs(backups []couchbasev2.CouchbaseBackup) ([]*batchv1beta1.CronJob, error) {
-	var cronjobs []*batchv1beta1.CronJob
+// backupResources contains all the resources required to create and manage a backup.
+type backupResources struct {
+	// name is the backup this set of resources relates to.
+	name string
+
+	// backup is the backup resource this relates to.
+	// If this is nil, then it needs deleting.
+	backup *couchbasev2.CouchbaseBackup
+
+	// fullCronJob deals with running and scheduling a full backup.
+	fullCronJob *batchv1beta1.CronJob
+
+	// incrementalCronJob (optional) deals with running and schedling an incremental backup.
+	incrementalCronJob *batchv1beta1.CronJob
+
+	// pvc deals with persisting the backup data.
+	pvc *corev1.PersistentVolumeClaim
+}
+
+type backupResourcesList []backupResources
+
+func (l backupResourcesList) find(name string) *backupResources {
+	for i, r := range l {
+		if r.name == name {
+			return &l[i]
+		}
+	}
+
+	return nil
+}
+
+func (l backupResourcesList) contains(resource backupResources) bool {
+	return l.find(resource.name) != nil
+}
+
+// generateBackupResources evaluates the specification and determines the resources
+// required to implement the intended function.
+func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
+	var resources backupResourcesList
+
+	backups, err := c.gatherBackups()
+	if err != nil {
+		return nil, err
+	}
 
 	for i := range backups {
-		backup := backups[i]
+		backup := &backups[i]
+
+		fullCronJob, err := c.generateBackupCronjob(backup, Full)
+		if err != nil {
+			return nil, err
+		}
+
+		resource := backupResources{
+			name:        backup.Name,
+			backup:      backup,
+			fullCronJob: fullCronJob,
+			pvc:         c.generateBackupPVC(backup),
+		}
 
 		if backup.Spec.Strategy == couchbasev2.FullIncremental {
-			cronjobs = append(cronjobs, c.generateBackupCronjob(&backup, Incremental, couchbasev2.FullIncremental))
-		}
-
-		cronjobs = append(cronjobs, c.generateBackupCronjob(&backup, Full, backup.Spec.Strategy))
-	}
-
-	// apply annotations
-	for _, cronjob := range cronjobs {
-		k8sutil.ApplyBaseAnnotations(cronjob)
-
-		specJSON, err := json.Marshal(cronjob.Spec)
-		if err != nil {
-			return nil, errors.NewStackTracedError(err)
-		}
-
-		cronjob.Annotations[constants.CronjobSpecAnnotation] = string(specJSON)
-	}
-
-	// if TLS enabled apply TLS config to cronjobs
-	if c.cluster.Spec.Networking.TLS != nil {
-		for _, cronjob := range cronjobs {
-			if err := applyTLSConfiguration(c.cluster, &cronjob.Spec.JobTemplate.Spec); err != nil {
+			incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
+			if err != nil {
 				return nil, err
+			}
+
+			resource.incrementalCronJob = incrementalCronJob
+		}
+
+		resources = append(resources, resource)
+	}
+
+	return resources, nil
+}
+
+// listBackupResources searches Kubernetes for any backup resources and returns them.
+func (c Cluster) listBackupResources() (backupResourcesList, error) {
+	var resources backupResourcesList
+
+	for _, cronjob := range c.k8s.CronJobs.List() {
+		// Extract the backup name, which is defined as a label.
+		// If these fire then either the job hasn't been labelled correctly or,
+		// even more sinful, we are caching things that we shouldn't.
+		if cronjob.Labels == nil {
+			log.Info("cronjob missing labels", "cluster", c.namespacedName(), "cronjob", cronjob.Name)
+			continue
+		}
+
+		name, ok := cronjob.Labels[constants.LabelBackup]
+		if !ok {
+			log.Info("cronjob missing backup label", "cluster", c.namespacedName(), "cronjob", cronjob.Name)
+			continue
+		}
+
+		// As we may have multiple cronjobs per backup we're either going to
+		// modify an existing set of resources, or create a new one.  Look for
+		// an existing one...
+		var resource *backupResources
+
+		for i := range resources {
+			if resources[i].backup == nil {
+				continue
+			}
+
+			if resources[i].backup.Name == name {
+				resource = &resources[i]
+				break
+			}
+		}
+
+		// .. if it doesn't exist, create temporary storage and record that
+		// it needs appending.
+		var create bool
+
+		if resource == nil {
+			resource = &backupResources{
+				name: name,
+			}
+			create = true
+		}
+
+		backup, ok := c.k8s.CouchbaseBackups.Get(name)
+		if ok {
+			resource.backup = backup
+		}
+
+		// There is nothing to discriminate between usage other than the name
+		// so go off this.
+		switch {
+		case strings.HasSuffix(cronjob.Name, string(Full)):
+			resource.fullCronJob = cronjob
+		case strings.HasSuffix(cronjob.Name, string(Incremental)):
+			resource.incrementalCronJob = cronjob
+		default:
+			return nil, fmt.Errorf("unable to determine cronjob type: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
+
+		// There is nothing to tell us that a PVC belongs to a backup, so this is a little
+		// dodgy, well a lot dodgy, in that we only get an entry in the result if a cronjob
+		// is defeind.  The knock on effect is that we may end up "recreating" a backup
+		// job, not rectifying it, and during that creation we need to be on the lookout for
+		// the PVC already existing.
+		pvc, ok := c.k8s.PersistentVolumeClaims.Get(name)
+		if ok {
+			resource.pvc = pvc
+		}
+
+		if create {
+			resources = append(resources, *resource)
+		}
+	}
+
+	return resources, nil
+}
+
+// createBackupResource creates all Kubernetes resources associated with a backup.
+func (c *Cluster) createBackupResource(resource backupResources) error {
+	// There is nothing to flag a PVC as belonging to a backup (bug!)
+	// so we won't create a current backup resource for it, and thus
+	// it's possible to delete all cronjobs and end up here, so ensure
+	// the PVC doesn't already exist first.
+	if _, ok := c.k8s.PersistentVolumeClaims.Get(resource.pvc.Name); !ok {
+		if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(context.Background(), resource.pvc, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+	}
+
+	if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.fullCronJob, metav1.CreateOptions{}); err != nil {
+		return err
+	}
+
+	if resource.incrementalCronJob != nil {
+		if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.incrementalCronJob, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Backup created", "cbbackup", resource.name)
+
+	c.raiseEvent(k8sutil.BackupCreateEvent(resource.name, c.cluster))
+
+	return nil
+}
+
+// backupUpdateNotifier acts like a singleton pattern, raising the even only once.
+type backupUpdateNotifier struct {
+	// c is is the cluster this relates to.
+	c *Cluster
+
+	// name is the backup name.
+	name string
+
+	// raised is whether the even has been raised.
+	raised bool
+}
+
+func (n *backupUpdateNotifier) notify() {
+	if n.raised {
+		return
+	}
+
+	log.Info("Backup updated", "cbbackup", n.name)
+
+	n.c.raiseEvent(k8sutil.BackupUpdateEvent(n.name, n.c.cluster))
+
+	n.raised = true
+}
+
+// updateBackupResource conditionally updates Kubernetes resources associated with a backup.
+func (c *Cluster) updateBackupResource(requested backupResources, current *backupResources) error {
+	notifier := &backupUpdateNotifier{
+		c:    c,
+		name: requested.name,
+	}
+
+	if err := c.updateBackupCronJob(notifier, requested.fullCronJob, current.fullCronJob); err != nil {
+		return err
+	}
+
+	if err := c.updateBackupCronJob(notifier, requested.incrementalCronJob, current.incrementalCronJob); err != nil {
+		return err
+	}
+
+	if err := c.updateBackupPVC(notifier, requested.backup, requested.pvc, current.pvc); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// updateBackupCronJob recreates jobs if they have been deleted, deletes them if they need
+// to be e.g. switching from incremental to full, or modifies the configuration.
+func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested, current *batchv1beta1.CronJob) error {
+	if requested == nil && current == nil {
+		return nil
+	}
+
+	if requested != nil && current == nil {
+		if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+
+		notifier.notify()
+
+		return nil
+	}
+
+	if requested == nil && current != nil {
+		if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), current.Name, metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+
+		notifier.notify()
+
+		return nil
+	}
+
+	requestedSpec := &batchv1beta1.CronJobSpec{}
+
+	if err := json.Unmarshal([]byte(requested.Annotations[constants.CronjobSpecAnnotation]), requestedSpec); err != nil {
+		return err
+	}
+
+	currentSpec := &batchv1beta1.CronJobSpec{}
+
+	if err := json.Unmarshal([]byte(current.Annotations[constants.CronjobSpecAnnotation]), currentSpec); err != nil {
+		return err
+	}
+
+	if reflect.DeepEqual(requestedSpec, currentSpec) {
+		return nil
+	}
+
+	resource := current.DeepCopy()
+	resource.Annotations = requested.Annotations
+	resource.Spec = requested.Spec
+
+	if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(context.Background(), resource, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+
+	notifier.notify()
+
+	return nil
+}
+
+// updateBackupPVC recreates the PVC if it has been deleted or does dyanmic expansion if
+// the backup is reporting that space is running low.
+func (c *Cluster) updateBackupPVC(notifier *backupUpdateNotifier, backup *couchbasev2.CouchbaseBackup, requested, current *corev1.PersistentVolumeClaim) error {
+	if current == nil {
+		if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+
+		notifier.notify()
+
+		return nil
+	}
+
+	currentRequestedSize, ok := current.Spec.Resources.Requests[corev1.ResourceStorage]
+	if !ok {
+		log.V(1).Info("Skipping backup volume reconcile, no storage requested", "cluster", c.namespacedName(), "backup", requested.Name)
+		return nil
+	}
+
+	currentActualSize, ok := current.Status.Capacity[corev1.ResourceStorage]
+	if !ok {
+		log.V(1).Info("Skipping backup volume reconcile, no capacity defined", "cluster", c.namespacedName(), "backup", requested.Name)
+		return nil
+	}
+
+	if !currentRequestedSize.Equal(currentActualSize) {
+		log.V(1).Info("Skipping backup volume reconcile, resize pending", "cluster", c.namespacedName(), "backup", requested.Name)
+		return nil
+	}
+
+	// By this point we know that the volume is not resizing.  We will determine the size
+	// the volume should be.  This starts as either the requested volume size, or the actual
+	// volume size if it's larger (volume contraction is not supported).
+	size := backup.Spec.Size
+
+	if currentRequestedSize.Cmp(*size) > 0 {
+		size = &currentRequestedSize
+	}
+
+	// Next we need to dynamically expand the volume size if requested.
+	if backup.Spec.AutoScaling != nil {
+		// If the free capacity is less than the threshold, we need to alter the
+		// size by the configured amount.  We also need to cap this at the
+		// limit if one is provided.
+		if backup.Status.CapacityUsed != nil {
+			free := size.DeepCopy()
+			free.Sub(*backup.Status.CapacityUsed)
+
+			threshold := resource.NewQuantity((size.Value()*int64(backup.Spec.AutoScaling.ThresholdPercent))/100, resource.BinarySI)
+
+			log.V(1).Info("Backup autoscaler status", "cluster", c.namespacedName(), "backup", backup.Name, "size", size, "free", free, "used", backup.Status.CapacityUsed, "threshold", threshold)
+
+			if free.Cmp(*threshold) < 0 {
+				increment := resource.NewQuantity((size.Value()*(100+int64(backup.Spec.AutoScaling.IncrementPercent)))/100, resource.BinarySI)
+				size.Add(*increment)
+
+				if backup.Spec.AutoScaling.Limit != nil && size.Cmp(*backup.Spec.AutoScaling.Limit) > 0 {
+					size = backup.Spec.AutoScaling.Limit
+				}
+
+				log.Info("Backup autoscaler scaling", "cluster", c.namespacedName(), "backup", backup.Name, "size", size)
 			}
 		}
 	}
 
-	return cronjobs, nil
+	if currentRequestedSize.Equal(*size) {
+		return nil
+	}
+
+	pvc := current.DeepCopy()
+	pvc.Spec.Resources.Requests[corev1.ResourceStorage] = *size
+
+	if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+
+	log.Info("Backup PVC resize pending", "cbbackup", pvc.Name, "new size", *size)
+
+	notifier.notify()
+
+	return nil
+}
+
+// deleteBackupResource deletes Kubernetes resources associated with a backup.
+// The exception being the PVC, because it's not a very good backup if it gets deleted
+// when you accidentally delete the backup :D
+// So it strikes me that if the cronjobs were owned by the backup, then Kubernetes GC
+// would do this for us, we'd lose the ability to generate an event... but then we could
+// use the shared informer to raise it for us (if we are online at the time).
+func (c *Cluster) deleteBackupResource(resource backupResources) error {
+	if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.fullCronJob.Name, metav1.DeleteOptions{}); err != nil {
+		return err
+	}
+
+	if resource.incrementalCronJob != nil {
+		if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.incrementalCronJob.Name, metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
+
+	log.Info("Backup deleted", "cbbackup", resource.name)
+
+	c.raiseEvent(k8sutil.BackupDeleteEvent(resource.name, c.cluster))
+
+	return nil
 }
 
 // Given a podSpec, return a pointer to the backup container.
@@ -139,7 +495,7 @@ func applyTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, job *batchv1.J
 }
 
 // generateBackupCronjob generates a backup cronjob taking into account the backup strategy and the cbbackupmgr action.
-func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction, strategy couchbasev2.Strategy) *batchv1beta1.CronJob {
+func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction) (*batchv1beta1.CronJob, error) {
 	var schedule string
 
 	var container corev1.Container
@@ -149,10 +505,10 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 	switch action {
 	case Incremental:
 		schedule = backup.Spec.Incremental.Schedule
-		container = c.generateBackupContainer("cbbackupmgr-incremental", backup.Spec, strategy, false)
+		container = c.generateBackupContainer("cbbackupmgr-incremental", backup.Spec, backup.Spec.Strategy, false)
 	case Full:
 		schedule = backup.Spec.Full.Schedule
-		container = c.generateBackupContainer("cbbackupmgr-full", backup.Spec, strategy, true)
+		container = c.generateBackupContainer("cbbackupmgr-full", backup.Spec, backup.Spec.Strategy, true)
 	}
 
 	if c.cluster.Spec.AntiAffinity {
@@ -224,7 +580,21 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 		},
 	}
 
-	return cronjob
+	k8sutil.ApplyBaseAnnotations(cronjob)
+
+	// if TLS enabled apply TLS config to cronjobs
+	if err := applyTLSConfiguration(c.cluster, &cronjob.Spec.JobTemplate.Spec); err != nil {
+		return nil, err
+	}
+
+	specJSON, err := json.Marshal(cronjob.Spec)
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	cronjob.Annotations[constants.CronjobSpecAnnotation] = string(specJSON)
+
+	return cronjob, nil
 }
 
 // generateBackupContainer returns the actual backup container
@@ -538,27 +908,17 @@ func (c *Cluster) getBackupRepo(restore *couchbasev2.CouchbaseBackupRestore) err
 	return nil
 }
 
-func generateBackupPVCs(backups []couchbasev2.CouchbaseBackup, cluster *couchbasev2.CouchbaseCluster) []*corev1.PersistentVolumeClaim {
-	var pvcs []*corev1.PersistentVolumeClaim
-
-	for _, backup := range backups {
-		pvcs = append(pvcs, generateBackupPVC(backup, cluster, backup.Spec.Size))
-	}
-
-	return pvcs
-}
-
 // generateBackupPVC returns the PVC that backups will be stored on.
-func generateBackupPVC(backup couchbasev2.CouchbaseBackup, cluster *couchbasev2.CouchbaseCluster, storage *resource.Quantity) *corev1.PersistentVolumeClaim {
+func (c *Cluster) generateBackupPVC(backup *couchbasev2.CouchbaseBackup) *corev1.PersistentVolumeClaim {
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   backup.Name,
-			Labels: k8sutil.LabelsForCluster(cluster),
+			Labels: k8sutil.LabelsForCluster(c.cluster),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: *storage,
+					corev1.ResourceStorage: *backup.Spec.Size,
 				},
 			},
 			AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -567,33 +927,4 @@ func generateBackupPVC(backup couchbasev2.CouchbaseBackup, cluster *couchbasev2.
 			StorageClassName: backup.Spec.StorageClassName,
 		},
 	}
-}
-
-func (c *Cluster) deleteBackups() error {
-	deletedBackups := make(map[string]bool)
-
-	// loop over the current existing actualCronjobs
-	actualCronjobs := c.k8s.CronJobs.List()
-	for _, cronjob := range actualCronjobs {
-		// check if the job has an "owner" backup
-		backupToDelete := cronjob.Labels[constants.LabelBackup]
-
-		// no "owner" backup exists, must have been deleted. cleanup cronjobs which in turn deletes jobs + pods
-		if _, ok := c.k8s.CouchbaseBackups.Get(backupToDelete); !ok {
-			if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), cronjob.Name, metav1.DeleteOptions{}); err != nil {
-				return errors.NewStackTracedError(err)
-			}
-
-			log.Info("Backup Cronjob deleted", "cbbackup", backupToDelete, "cronjob", cronjob.Name)
-			// add and raise events later
-			deletedBackups[backupToDelete] = true
-		}
-	}
-
-	for backup := range deletedBackups {
-		log.Info("Backup deleted", "cbbackup", backup)
-		c.raiseEvent(k8sutil.BackupDeleteEvent(backup, c.cluster))
-	}
-
-	return nil
 }

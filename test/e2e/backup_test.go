@@ -272,8 +272,10 @@ func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool, cleanup fu
 
 	MustCreateS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region)
 
+	// Note: deferred functions must not call Die.
 	cleanup1 := func() {
-		MustDeleteS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region)
+		_ = deleteS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region)
+
 		cleanup()
 	}
 

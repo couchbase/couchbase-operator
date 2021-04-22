@@ -25,7 +25,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 
-	"k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2579,177 +2578,41 @@ func (c *Cluster) reconcileBackup() error {
 		return nil
 	}
 
-	// get existing CouchbaseBackup resources
-	currentBackups, err := c.gatherBackups()
+	requested, err := c.generateBackupResources()
 	if err != nil {
 		return err
 	}
 
-	// get cronjobs from all Backups
-	cronjobs, err := c.generateCronJobs(currentBackups)
+	current, err := c.listBackupResources()
 	if err != nil {
 		return err
 	}
 
-	pvcs := generateBackupPVCs(currentBackups, c.cluster)
-
-	// existing backups tells us about the state of the backup CRDs
-	existing := map[string]bool{}
-	// mutated tracks if a backup has been created/updated (aka mutated)
-	// and so what events need to be raised
-	mutated := map[string]bool{}
-
-	for _, cronjob := range cronjobs {
-		if current, ok := c.k8s.CronJobs.Get(cronjob.Name); ok {
-			// if a backup cronjob needs editing (a backup can have max 2 cronjobs),
-			existing[cronjob.Labels[constants.LabelBackup]] = true
-
-			actualSpec := &v1beta1.CronJobSpec{}
-
-			if annotation, ok := current.Annotations[constants.CronjobSpecAnnotation]; ok {
-				if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
-					return errors.NewStackTracedError(err)
-				}
-			}
-
-			requestedSpec := &v1beta1.CronJobSpec{}
-			if err := json.Unmarshal([]byte(cronjob.Annotations[constants.CronjobSpecAnnotation]), requestedSpec); err != nil {
-				return errors.NewStackTracedError(err)
-			}
-
-			if !reflect.DeepEqual(actualSpec, requestedSpec) {
-				// update
-				if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(context.Background(), cronjob, metav1.UpdateOptions{}); err != nil {
-					return err
-				}
-
-				log.Info("Backup Cronjob updated", "cbbackup", cronjob.Labels[constants.LabelBackup], "cronjob", cronjob.Name)
-
-				mutated[cronjob.Labels[constants.LabelBackup]] = true
-			}
-		} else {
-			// create new cronjob
-			if _, err = c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(context.Background(), cronjob, metav1.CreateOptions{}); err != nil {
+	for _, req := range requested {
+		// Requested resource doesn't exist (as best we know...), so create it.
+		if !current.contains(req) {
+			if err := c.createBackupResource(req); err != nil {
 				return err
 			}
 
-			log.Info("Backup Cronjob created", "cbbackup", cronjob.Labels[constants.LabelBackup], "cronjob", cronjob.Name)
+			continue
+		}
 
-			mutated[cronjob.Labels[constants.LabelBackup]] = true
+		// Check for any of the resources needing an update.
+		if err := c.updateBackupResource(req, current.find(req.backup.Name)); err != nil {
+			return err
 		}
 	}
 
-	for _, pvc := range pvcs {
-		if existingPVC, ok := c.k8s.PersistentVolumeClaims.Get(pvc.Name); ok {
-			// PVC update for later k8s versions
-			existing[pvc.Name] = true
-
-			// First up, if things look whiffy get the hell out, we don't want to
-			// stack shit on top of shit and have the tower of shit collapse.
-			requested, ok := existingPVC.Spec.Resources.Requests[v1.ResourceStorage]
-			if !ok {
-				log.V(1).Info("Skipping backup volume reconcile, no storage requested", "cluster", c.namespacedName(), "backup", pvc.Name)
-				continue
-			}
-
-			actual, ok := existingPVC.Status.Capacity[v1.ResourceStorage]
-			if !ok {
-				log.V(1).Info("Skipping backup volume reconcile, no capacity defined", "cluster", c.namespacedName(), "backup", pvc.Name)
-				continue
-			}
-
-			if !requested.Equal(actual) {
-				log.V(1).Info("Skipping backup volume reconcile, resize pending", "cluster", c.namespacedName(), "backup", pvc.Name)
-				continue
-			}
-
-			// Thankfully the PVC maps directly to the backup name...
-			backup, ok := c.k8s.CouchbaseBackups.Get(pvc.Name)
-			if !ok {
-				return fmt.Errorf("%w: missing backup resource for pvc %s", errors.NewStackTracedError(errors.ErrResourceRequired), pvc.Name)
-			}
-
-			// Determine the effective size of the volume.
-			// This is the largest of either the spec (requested minimum size),
-			// or the actual PVC.
-			size := backup.Spec.Size
-
-			// 0 eq, -1 lt, 1 gt
-			if requested.Cmp(*size) > 0 {
-				size = &requested
-			}
-
-			// Determine whether the volume needs to be embiggened.
-			if backup.Spec.AutoScaling != nil {
-				// If the free capacity is less than the threshold, we need to alter the
-				// size by the configured amount.  We also need to cap this at the
-				// limit if one is provided.
-				if backup.Status.CapacityUsed != nil {
-					free := size.DeepCopy()
-					free.Sub(*backup.Status.CapacityUsed)
-
-					threshold := resource.NewQuantity((size.Value()*int64(backup.Spec.AutoScaling.ThresholdPercent))/100, resource.BinarySI)
-
-					log.V(1).Info("Backup autoscaler status", "cluster", c.namespacedName(), "backup", backup.Name, "size", size, "free", free, "used", backup.Status.CapacityUsed, "threshold", threshold)
-
-					if free.Cmp(*threshold) < 0 {
-						increment := resource.NewQuantity((size.Value()*(100+int64(backup.Spec.AutoScaling.IncrementPercent)))/100, resource.BinarySI)
-						size.Add(*increment)
-
-						if backup.Spec.AutoScaling.Limit != nil && size.Cmp(*backup.Spec.AutoScaling.Limit) > 0 {
-							size = backup.Spec.AutoScaling.Limit
-						}
-
-						log.Info("Backup autoscaler scaling", "cluster", c.namespacedName(), "backup", backup.Name, "size", size)
-					}
-				}
-			}
-
-			currentRequest := existingPVC.Spec.Resources.Requests[v1.ResourceStorage]
-			if currentRequest.Equal(*size) {
-				continue
-			}
-
-			updatedPVC := existingPVC.DeepCopy()
-			updatedPVC.Spec.Resources.Requests[v1.ResourceStorage] = *size
-
-			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(context.Background(), updatedPVC, metav1.UpdateOptions{}); err != nil {
-				return fmt.Errorf("failed to update PVC: %w", errors.NewStackTracedError(err))
-			}
-
-			log.Info("Backup PVC resize pending", "cbbackup", pvc.Name, "new size", updatedPVC.Spec.Resources.Requests[v1.ResourceStorage])
-
-			mutated[pvc.Name] = true
-		} else {
-			// create new PVC
-			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(context.Background(), pvc, metav1.CreateOptions{}); err != nil {
-				return fmt.Errorf("failed to create PVC: %w", errors.NewStackTracedError(err))
-			}
-
-			log.Info("Backup PVC created", "cbbackup", pvc.Name)
-			mutated[pvc.Name] = true
+	for _, cur := range current {
+		if cur.backup != nil {
+			continue
 		}
-	}
 
-	for backup := range mutated {
-		if existing[backup] {
-			// if a resource is updated or if a resource is left over (existing),
-			// then we create all other resources and we raise a backup updated event
-			log.Info("Backup updated", "cbbackup", backup)
-
-			c.raiseEvent(k8sutil.BackupUpdateEvent(backup, c.cluster))
-		} else {
-			// if the backup PVC and the cronjob(s) are created then we have
-			// created a backup from scratch and we class this as a backup created event
-			log.Info("Backup created", "cbbackup", backup)
-
-			c.raiseEvent(k8sutil.BackupCreateEvent(backup, c.cluster))
+		// Current resource is no longer valid, so delete them.
+		if err := c.deleteBackupResource(cur); err != nil {
+			return err
 		}
-	}
-
-	// delete
-	if err := c.deleteBackups(); err != nil {
-		return err
 	}
 
 	return nil
