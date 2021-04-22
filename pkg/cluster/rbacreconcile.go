@@ -45,42 +45,63 @@ func (c *Cluster) reconcileRBACResources() error {
 	return nil
 }
 
-// reconcileGroups creates, edits, removes server groups according to requested configuration.
-func (c *Cluster) reconcileGroups() ([]string, error) {
+// generateGroups generates the list of groups that should exist, under the control
+// of the RBAC label selector.
+func (c *Cluster) generateGroups() (map[string]couchbaseutil.Group, error) {
 	// gather selected groups
 	selector := labels.Everything()
 
 	if c.cluster.Spec.Security.RBAC.Selector != nil {
-		var err error
-		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector); err != nil {
+		s, err := metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector)
+		if err != nil {
 			return nil, err
 		}
+
+		selector = s
 	}
 
-	requestedGroups := make(map[string]couchbaseutil.Group)
+	groups := map[string]couchbaseutil.Group{}
 
-	for _, cbGroup := range c.k8s.CouchbaseGroups.List() {
-		if selector.Matches(labels.Set(cbGroup.Labels)) {
-			group := couchbaseutil.Group{
-				ID:           cbGroup.Name,
-				LDAPGroupRef: cbGroup.Spec.LDAPGroupRef,
-			}
-
-			// copy roles to group
-			for _, role := range cbGroup.Spec.Roles {
-				bucket := role.Bucket
-				if bucket == "" && couchbasev2.IsBucketRole(role.Name) {
-					bucket = "*"
-				}
-
-				group.Roles = append(group.Roles, couchbaseutil.UserRole{
-					Role:       string(role.Name),
-					BucketName: bucket,
-				})
-			}
-
-			requestedGroups[group.ID] = group
+	for _, g := range c.k8s.CouchbaseGroups.List() {
+		if !selector.Matches(labels.Set(g.Labels)) {
+			continue
 		}
+
+		group := couchbaseutil.Group{
+			ID:           g.Name,
+			LDAPGroupRef: g.Spec.LDAPGroupRef,
+		}
+
+		for _, role := range g.Spec.Roles {
+			// Roles that relate to buckets are scoped to either one, or
+			// all of them.  We used to have a special mutator that would fill
+			// in the default "all the things" if not specified for bucket
+			// specific roles, but we don't mutate any more, as this is becoming
+			// problematic in the ecosystem.  Instead we apply a default here.
+			// The other option is just to default to "*" but filter it out from
+			// non-bucket roles.
+			bucket := role.Bucket
+			if bucket == "" && couchbasev2.IsBucketRole(role.Name) {
+				bucket = "*"
+			}
+
+			group.Roles = append(group.Roles, couchbaseutil.UserRole{
+				Role:       string(role.Name),
+				BucketName: bucket,
+			})
+		}
+
+		groups[g.Name] = group
+	}
+
+	return groups, nil
+}
+
+// reconcileGroups creates, edits, removes server groups according to requested configuration.
+func (c *Cluster) reconcileGroups() ([]string, error) {
+	requestedGroups, err := c.generateGroups()
+	if err != nil {
+		return nil, err
 	}
 
 	// reconcile with existing groups
@@ -134,77 +155,100 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 	return existingGroupNames, nil
 }
 
-// reconcileUsers creates, edits, removes server users according to requested configuration.
-func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
-	// Map of requested users by name
-	requestedUsers := make(map[string]couchbaseutil.User)
+// getUsersForRoleBinding returns the subjects that are bound to the rolebinding
+// but under the control of the RBAC label selector.
+func (c *Cluster) gatherSubjectsForRoleBinding(roleBinding *couchbasev2.CouchbaseRoleBinding) ([]couchbasev2.CouchbaseUser, error) {
+	selector := labels.Everything()
 
-	// get rolebindings
-	couchbaseRoleBindings := c.k8s.CouchbaseRoleBindings.List()
-	for _, roleBinding := range couchbaseRoleBindings {
-		roleRef := roleBinding.Spec.RoleRef
-		groupName := roleRef.Name
+	if c.cluster.Spec.Security.RBAC.Selector != nil {
+		s, err := metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector)
+		if err != nil {
+			return nil, err
+		}
 
-		// warn if referred group is missing because
-		// bound users may not be created or deleted
-		if _, found := couchbasev2.HasItem(groupName, groups); !found {
-			msg := fmt.Sprintf("Rolebinding `%s` refers to a missing group `%s`", roleBinding.Name, groupName)
-			log.V(1).Info(msg, "cluster", c.namespacedName())
+		selector = s
+	}
 
+	var subjects []couchbasev2.CouchbaseUser
+
+	for _, subject := range roleBinding.Spec.Subjects {
+		user, ok := c.k8s.CouchbaseUsers.Get(subject.Name)
+		if !ok {
+			log.V(1).Info("Rolebinding missing subject", "cluster", c.namespacedName(), "rolebinding", roleBinding.Name, "subject", subject.Name)
 			continue
 		}
 
-		// Gather users bound to group
-		for _, roleSubject := range roleBinding.Spec.Subjects {
-			selector := labels.Everything()
+		if !selector.Matches(labels.Set(user.Labels)) {
+			continue
+		}
 
-			if c.cluster.Spec.Security.RBAC.Selector != nil {
-				var err error
+		subjects = append(subjects, *user)
+	}
 
-				if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.RBAC.Selector); err != nil {
-					return nil, err
+	return subjects, nil
+}
+
+// generateUsers generates all the user configurations that can be created, under the
+// control of the groups parameter (e.g. the group must exist before creating the dependent
+// user).
+func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User, error) {
+	users := map[string]couchbaseutil.User{}
+
+	// For every rolebinding (SM: this is not filtered, why??) check if the
+	// group exists, if it does, then accumulate the subjects, that are selected
+	// by the cluster.
+	for _, binding := range c.k8s.CouchbaseRoleBindings.List() {
+		group := binding.Spec.RoleRef.Name
+
+		// Group doesn't exist, so warn that we cannot add any users for it.
+		if _, ok := couchbasev2.HasItem(group, groups); !ok {
+			log.V(1).Info("Rolebinding missing group", "cluster", c.namespacedName(), "rolebinding", binding.Name, "group", group)
+			continue
+		}
+
+		subjects, err := c.gatherSubjectsForRoleBinding(binding)
+		if err != nil {
+			return nil, err
+		}
+
+		// For each user we've found for the binding, either use the existing
+		// internal user we have cached, or create a new one, then append the
+		// group (thus accumulating multiple groups for a specific user).
+		for _, subject := range subjects {
+			user, ok := users[subject.Name]
+			if !ok {
+				user = couchbaseutil.User{
+					ID:     subject.Name,
+					Name:   subject.Spec.FullName,
+					Domain: couchbaseutil.AuthDomain(subject.Spec.AuthDomain),
 				}
-			}
 
-			cbUser, found := c.k8s.CouchbaseUsers.Get(roleSubject.Name)
-			if found {
-				if !selector.Matches(labels.Set(cbUser.Labels)) {
-					// ignoring non-matching users
-					continue
-				}
-			} else {
-				msg := fmt.Sprintf("Rolebinding `%s` refers to a missing user `%s`", roleBinding.Name, roleSubject.Name)
-				log.V(1).Info(msg, "cluster", c.namespacedName())
-
-				continue
-			}
-
-			// Add group to user
-			if user, ok := requestedUsers[cbUser.Name]; !ok {
-				user := couchbaseutil.User{
-					ID:     cbUser.Name,
-					Name:   cbUser.Spec.FullName,
-					Domain: couchbaseutil.AuthDomain(cbUser.Spec.AuthDomain),
-					Groups: []string{groupName},
-				}
-
-				// Require password when using internal auth domain
-				if cbUser.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
-					password, err := c.getRBACAuthPassword(cbUser.Spec.AuthSecret)
+				if subject.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
+					password, err := c.getRBACAuthPassword(subject.Spec.AuthSecret)
 					if err != nil {
 						return nil, err
 					}
 
 					user.Password = password
 				}
-
-				requestedUsers[user.ID] = user
-			} else if _, found := couchbasev2.HasItem(groupName, user.Groups); !found {
-				// Add additional group to user
-				user.Groups = append(user.Groups, groupName)
-				requestedUsers[user.ID] = user
 			}
+
+			user.Groups = append(user.Groups, group)
+
+			users[subject.Name] = user
 		}
+	}
+
+	return users, nil
+}
+
+// reconcileUsers creates, edits, removes server users according to requested configuration.
+// The groups parameters is a list of groups that are known to exist at this moment in
+// time in Couchbase server, this is used to only add users to an existing group.
+func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
+	requestedUsers, err := c.generateUsers(groups)
+	if err != nil {
+		return nil, err
 	}
 
 	// reconcile with existing users
