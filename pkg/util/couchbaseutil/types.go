@@ -285,10 +285,10 @@ type Task struct {
 	Timeout  bool    `json:"masterRequestTimedOut"`
 
 	// Replication attributes.
-	Source           string `json:"source"`
-	Target           string `json:"target"`
-	ReplicationType  string `url:"replicationType"`
-	FilterExpression string `url:"filterExpression"`
+	Source           string          `json:"source"`
+	Target           string          `json:"target"`
+	ReplicationType  ReplicationType `url:"replicationType"`
+	FilterExpression string          `url:"filterExpression"`
 }
 
 type TaskList []Task
@@ -866,16 +866,28 @@ type RemoteCluster struct {
 	Key         string `json:"-" url:"clientKey,omitempty"`
 }
 
+type ReplicationType string
+
+const (
+	ReplicationTypeXMEM ReplicationType = "xmem"
+)
+
+type ReplicationReplicationType string // _sigh_
+
+const (
+	ReplicationReplicationTypeContinuous ReplicationReplicationType = "continuous"
+)
+
 // Replication describes an XDCR replication as set with /controller/createReplication.
 type Replication struct {
-	FromBucket       string `url:"fromBucket"`
-	ToCluster        string `url:"toCluster"`
-	ToBucket         string `url:"toBucket"`
-	Type             string `url:"type"`
-	ReplicationType  string `url:"replicationType"`
-	CompressionType  string `url:"compressionType,omitempty"`
-	FilterExpression string `url:"filterExpression,omitempty"`
-	PauseRequested   bool   `url:"pauseRequested"`
+	FromBucket       string                     `url:"fromBucket"`
+	ToCluster        string                     `url:"toCluster"`
+	ToBucket         string                     `url:"toBucket"`
+	Type             ReplicationType            `url:"type"`
+	ReplicationType  ReplicationReplicationType `url:"replicationType"`
+	CompressionType  string                     `url:"compressionType,omitempty"`
+	FilterExpression string                     `url:"filterExpression,omitempty"`
+	PauseRequested   bool                       `url:"pauseRequested"`
 }
 
 type ReplicationList []Replication

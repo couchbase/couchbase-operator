@@ -40,8 +40,8 @@ const (
 	// Admin service constants.
 	adminServicePortName    = string(couchbasev2.AdminService)
 	adminServicePortNameTLS = string(couchbasev2.AdminService) + tlsPortNameSuffix
-	adminServicePort        = 8091
-	adminServicePortTLS     = tlsBasePort + adminServicePort
+	AdminServicePort        = 8091
+	AdminServicePortTLS     = tlsBasePort + AdminServicePort
 
 	// Index service constants.
 	indexServicePortName    = string(couchbasev2.IndexService)
@@ -105,12 +105,12 @@ var (
 	uiServicePorts = []v1.ServicePort{
 		{
 			Name:     couchbaseUIPortName,
-			Port:     adminServicePort,
+			Port:     AdminServicePort,
 			Protocol: v1.ProtocolTCP,
 		},
 		{
 			Name:     couchbaseUIPortNameTLS,
-			Port:     adminServicePortTLS,
+			Port:     AdminServicePortTLS,
 			Protocol: v1.ProtocolTCP,
 		},
 	}
@@ -138,12 +138,12 @@ var (
 		couchbasev2.AdminService: {
 			{
 				Name:     adminServicePortName,
-				Port:     adminServicePort,
+				Port:     AdminServicePort,
 				Protocol: v1.ProtocolTCP,
 			},
 			{
 				Name:     adminServicePortNameTLS,
-				Port:     adminServicePortTLS,
+				Port:     AdminServicePortTLS,
 				Protocol: v1.ProtocolTCP,
 			},
 		},

@@ -2114,7 +2114,7 @@ func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
 			ToCluster:        cluster.Name,
 			ToBucket:         to,
 			Type:             task.ReplicationType,
-			ReplicationType:  "continuous",
+			ReplicationType:  couchbaseutil.ReplicationReplicationTypeContinuous,
 			CompressionType:  settings.CompressionType,
 			FilterExpression: task.FilterExpression,
 			PauseRequested:   settings.PauseRequested,
@@ -2158,338 +2158,503 @@ func (c *Cluster) getRemoteClusterByUUID(uuid string) (*couchbaseutil.RemoteClus
 	return nil, fmt.Errorf("lookupClusterForUUID: no cluster found for uuid %v: %w", uuid, errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 }
 
-// reconcileXDCR creates and deletes XDCR connections dynamically.
-func (c *Cluster) reconcileXDCR() error {
-	if !c.cluster.Spec.XDCR.Managed {
-		return nil
+// getXDCRHostnameAndNetwork translates the common connection string format we advertise
+// and translate it into something XDCR understands.
+func getXDCRHostnameAndNetwork(cluster couchbasev2.RemoteCluster) (string, string, error) {
+	// We act as a translation layer here, treating XDCR as just another client
+	connectionString, err := url.Parse(cluster.Hostname)
+	if err != nil {
+		return "", "", err
 	}
 
-	requestedClusters := []couchbaseutil.RemoteCluster{}
-	requestedReplications := []couchbaseutil.Replication{}
+	// Default to host:port
+	hostname := connectionString.Host
 
-	for _, cluster := range c.cluster.Spec.XDCR.RemoteClusters {
-		// We act as a translation layer here, treating XDCR as just another client
-		connectionString, err := url.Parse(cluster.Hostname)
-		if err != nil {
-			return err
+	// When using http chances are you are using node port networking
+	// so will have to specify a port, couchbase means round-robin DNS
+	// or SRV, and XDCR will default to 8091.
+	// With https and couchbases we need to provide a default of 18091
+	// because XDCR has no way of autoconfiguring.  These two modes
+	// translate to public addressing, DNS based round-robin and SRV
+	// (the port is stripped for the latter).
+	switch connectionString.Scheme {
+	case "https", "couchbases":
+		if connectionString.Port() == "" {
+			hostname += ":" + strconv.Itoa(k8sutil.AdminServicePortTLS)
+		}
+	}
+
+	network := connectionString.Query().Get("network")
+
+	return hostname, network, nil
+}
+
+// generateXDCRReplications uses the remote's label selector to pick all the replications
+// to create for this remote cluster connection.
+func (c *Cluster) generateXDCRReplications(cluster couchbasev2.RemoteCluster) ([]couchbaseutil.Replication, error) {
+	var replications []couchbaseutil.Replication
+
+	selector := labels.Everything()
+
+	if cluster.Replications.Selector != nil {
+		var err error
+
+		if selector, err = metav1.LabelSelectorAsSelector(cluster.Replications.Selector); err != nil {
+			return nil, err
+		}
+	}
+
+	apiReplications := c.k8s.CouchbaseReplications.List()
+
+	for _, replication := range apiReplications {
+		if !selector.Matches(labels.Set(replication.Labels)) {
+			continue
 		}
 
-		// Default to host:port
-		hostname := connectionString.Host
+		replications = append(replications, couchbaseutil.Replication{
+			FromBucket:       replication.Spec.Bucket,
+			ToCluster:        cluster.Name,
+			ToBucket:         replication.Spec.RemoteBucket,
+			Type:             couchbaseutil.ReplicationTypeXMEM,
+			ReplicationType:  couchbaseutil.ReplicationReplicationTypeContinuous,
+			CompressionType:  string(replication.Spec.CompressionType),
+			FilterExpression: replication.Spec.FilterExpression,
+			PauseRequested:   replication.Spec.Paused,
+		})
+	}
 
-		// When using http chances are you are using node port networking
-		// so will have to specify a port, couchbase means round-robin DNS
-		// or SRV, and XDCR will default to 8091.
-		// With https and couchbases we need to provide a default of 18091
-		// because XDCR has no way of autoconfiguring.  These two modes
-		// translate to public addressing, DNS based round-robin and SRV
-		// (the port is stripped for the latter).
-		switch connectionString.Scheme {
-		case "https", "couchbases":
-			if connectionString.Port() == "" {
-				hostname += ":18091"
-			}
+	return replications, nil
+}
+
+// generateXDCR combines API and secret data to construct an idealized form
+// of XDCR primitives that need to exist.
+func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, []couchbaseutil.Replication, error) {
+	var clusters []couchbaseutil.RemoteCluster
+
+	var replications []couchbaseutil.Replication
+
+	for _, cluster := range c.cluster.Spec.XDCR.RemoteClusters {
+		hostname, network, err := getXDCRHostnameAndNetwork(cluster)
+		if err != nil {
+			return nil, nil, err
 		}
 
 		requested := couchbaseutil.RemoteCluster{
 			Name:       cluster.Name,
 			UUID:       cluster.UUID,
 			Hostname:   hostname,
-			Network:    connectionString.Query().Get("network"),
+			Network:    network,
 			SecureType: couchbaseutil.RemoteClusterSecurityNone,
 		}
 
 		if cluster.AuthenticationSecret != nil {
 			secret, found := c.k8s.Secrets.Get(*cluster.AuthenticationSecret)
 			if !found {
-				return fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *cluster.AuthenticationSecret)
+				return nil, nil, fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *cluster.AuthenticationSecret)
 			}
 
 			requested.Username = string(secret.Data["username"])
 			requested.Password = string(secret.Data["password"])
 		}
 
-		if cluster.TLS != nil {
-			if cluster.TLS.Secret != nil {
-				secret, found := c.k8s.Secrets.Get(*cluster.TLS.Secret)
-				if !found {
-					return fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *cluster.TLS.Secret)
-				}
+		if cluster.TLS != nil && cluster.TLS.Secret != nil {
+			secret, found := c.k8s.Secrets.Get(*cluster.TLS.Secret)
+			if !found {
+				return nil, nil, fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *cluster.TLS.Secret)
+			}
 
-				if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
-					return fmt.Errorf("%w: CA certificate is required for TLS encryption", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
-				}
+			if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
+				return nil, nil, fmt.Errorf("%w: CA certificate is required for TLS encryption", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+			}
 
-				// No, we will never support any other type!
-				requested.SecureType = couchbaseutil.RemoteClusterSecurityTLS
+			// No, we will never support any other type!
+			requested.SecureType = couchbaseutil.RemoteClusterSecurityTLS
 
-				// While we should pass through the raw []byte, it makes life simpler for the client
-				// library if we pass it as a string.
-				requested.CA = string(secret.Data[couchbasev2.RemoteClusterTLSCA])
+			// While we should pass through the raw []byte, it makes life simpler for the client
+			// library if we pass it as a string.
+			requested.CA = string(secret.Data[couchbasev2.RemoteClusterTLSCA])
 
-				// Add in client certificates if requested.
-				if cert, ok := secret.Data[couchbasev2.RemoteClusterTLSCertificate]; ok {
-					requested.Certificate = string(cert)
-				}
+			// Add in client certificates if requested.
+			if cert, ok := secret.Data[couchbasev2.RemoteClusterTLSCertificate]; ok {
+				requested.Certificate = string(cert)
+			}
 
-				if key, ok := secret.Data[couchbasev2.RemoteClusterTLSKey]; ok {
-					requested.Key = string(key)
-				}
+			if key, ok := secret.Data[couchbasev2.RemoteClusterTLSKey]; ok {
+				requested.Key = string(key)
 			}
 		}
 
-		requestedClusters = append(requestedClusters, requested)
+		clusters = append(clusters, requested)
 
-		selector := labels.Everything()
-
-		if cluster.Replications.Selector != nil {
-			var err error
-
-			if selector, err = metav1.LabelSelectorAsSelector(cluster.Replications.Selector); err != nil {
-				return err
-			}
+		clusterReplications, err := c.generateXDCRReplications(cluster)
+		if err != nil {
+			return nil, nil, err
 		}
 
-		replications := c.k8s.CouchbaseReplications.List()
-
-		for _, replication := range replications {
-			if !selector.Matches(labels.Set(replication.Labels)) {
-				continue
-			}
-
-			requestedReplications = append(requestedReplications, couchbaseutil.Replication{
-				FromBucket:       replication.Spec.Bucket,
-				ToCluster:        cluster.Name,
-				ToBucket:         replication.Spec.RemoteBucket,
-				Type:             "xmem",
-				ReplicationType:  "continuous",
-				CompressionType:  string(replication.Spec.CompressionType),
-				FilterExpression: replication.Spec.FilterExpression,
-				PauseRequested:   replication.Spec.Paused,
-			})
-		}
+		replications = append(replications, clusterReplications...)
 	}
 
-	currentClusters := &couchbaseutil.RemoteClusters{}
-	if err := couchbaseutil.ListRemoteClusters(currentClusters).On(c.api, c.readyMembers()); err != nil {
+	return clusters, replications, nil
+}
+
+// getPersistentXDCRData grabs a persistent data string.
+func (c *Cluster) getPersistentXDCRData(cluster *couchbaseutil.RemoteCluster, key persistence.PersistentKindXDCR, value *string) error {
+	v, err := c.state.Get(persistence.GetPersistentKindXDCR(cluster.Name, key))
+	if err != nil {
 		return err
 	}
 
+	*value = v
+
+	return nil
+}
+
+// getOptionalPersistentXDCRData grabs a persistent data string, but doesn't error if it doesn't exist.
+func (c *Cluster) getOptionalPersistentXDCRData(cluster *couchbaseutil.RemoteCluster, key persistence.PersistentKindXDCR, value *string) error {
+	if err := c.getPersistentXDCRData(cluster, key, value); err != nil {
+		if !goerrors.Is(err, persistence.ErrKeyError) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// setPersistentXDCRData sets a persistent data string.
+func (c *Cluster) setPersistentXDCRData(cluster *couchbaseutil.RemoteCluster, key persistence.PersistentKindXDCR, value string) error {
+	return c.state.Insert(persistence.GetPersistentKindXDCR(cluster.Name, key), value)
+}
+
+// setOptionalPersistentXDCRData sets a persistent data string, but only if there's something to store.
+func (c *Cluster) setOptionalPersistentXDCRData(cluster *couchbaseutil.RemoteCluster, key persistence.PersistentKindXDCR, value string) error {
+	if value == "" {
+		return nil
+	}
+
+	return c.setPersistentXDCRData(cluster, key, value)
+}
+
+// listRemoteClusters does what it says fom Couchbase.  The XDCR API doesn't even attempt to
+// support read/modify/write, and in some cases it's acceptable, such as not giving out
+// credentials.  We, however, do need RMW, so we need to get what the API provides and then
+// fill in the blanks with persitent data.
+func (c *Cluster) listRemoteClusters() (couchbaseutil.RemoteClusters, error) {
+	var clusters couchbaseutil.RemoteClusters
+
+	if err := couchbaseutil.ListRemoteClusters(&clusters).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	for i := range clusters {
+		cluster := &clusters[i]
+
+		// Load up the configuration that changes... OMG!!
+		if err := c.getPersistentXDCRData(cluster, persistence.XDCRHostname, &cluster.Hostname); err != nil {
+			return nil, err
+		}
+
+		// Load up configuration that is written to the API but not returned.
+		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRPassword, &cluster.Password); err != nil {
+			return nil, err
+		}
+
+		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRClientKey, &cluster.Key); err != nil {
+			return nil, err
+		}
+
+		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRClientCertificate, &cluster.Certificate); err != nil {
+			return nil, err
+		}
+	}
+
+	return clusters, nil
+}
+
+// updateXDCRPersistentState flushes any existing XDCR persistent data out, so if the
+// user wanted to swtich from basic auth to mTLS we won't load up the wrong stuff.
+// Then we conditionally add any stuff that is set and isn't returned by an API read.
+func (c *Cluster) updateXDCRPersistentState(cluster *couchbaseutil.RemoteCluster) error {
+	if err := c.state.DeleteXDCR(cluster.Name); err != nil {
+		return err
+	}
+
+	if err := c.setPersistentXDCRData(cluster, persistence.XDCRHostname, cluster.Hostname); err != nil {
+		return err
+	}
+
+	if err := c.setOptionalPersistentXDCRData(cluster, persistence.XDCRPassword, cluster.Password); err != nil {
+		return err
+	}
+
+	if err := c.setOptionalPersistentXDCRData(cluster, persistence.XDCRClientKey, cluster.Key); err != nil {
+		return err
+	}
+
+	if err := c.setOptionalPersistentXDCRData(cluster, persistence.XDCRClientCertificate, cluster.Certificate); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// remoteClusterCreations is a generator that returns clusters that need to be created.
+func remoteClusterCreations(current, requested couchbaseutil.RemoteClusters) couchbaseutil.RemoteClusters {
+	var clusters couchbaseutil.RemoteClusters
+
+Next:
+	for _, req := range requested {
+		for _, cur := range current {
+			if cur.Name == req.Name {
+				continue Next
+			}
+		}
+
+		clusters = append(clusters, req)
+	}
+
+	return clusters
+}
+
+// remoteClusterUpdates is a generator that returns clusters that need to be updated.
+func (c *Cluster) remoteClusterUpdates(current, requested couchbaseutil.RemoteClusters) couchbaseutil.RemoteClusters {
+	var clusters couchbaseutil.RemoteClusters
+
+Next:
+	for _, req := range requested {
+		for _, cur := range current {
+			if req.Name != cur.Name {
+				continue
+			}
+
+			// XDCR doesn't return the network mode, and that's a bug on their side
+			// so I'm not persisting it and worrying about it.  Just perform a hack
+			// here.
+			req.Network = cur.Network
+
+			if !reflect.DeepEqual(req, cur) {
+				log.V(2).Info("XDCR connection state", "cluster", c.namespacedName(), "requested", req, "current", cur)
+
+				clusters = append(clusters, req)
+			}
+
+			continue Next
+		}
+	}
+
+	return clusters
+}
+
+// remoteClusterDeletions is a generator that returns clusters that need deleting.
+func remoteClusterDeletions(current, requested couchbaseutil.RemoteClusters) couchbaseutil.RemoteClusters {
+	var clusters couchbaseutil.RemoteClusters
+
+Next:
+	for _, cur := range current {
+		for _, req := range requested {
+			if req.Name == cur.Name {
+				continue Next
+			}
+		}
+
+		clusters = append(clusters, cur)
+	}
+
+	return clusters
+}
+
+// replicationCreations is a generator that returns replications that need creating.
+func replicationCreations(current, requested couchbaseutil.ReplicationList) couchbaseutil.ReplicationList {
+	var replications couchbaseutil.ReplicationList
+
+Next:
+	for _, req := range requested {
+		for _, cur := range current {
+			if replicationKey(req) == replicationKey(cur) {
+				continue Next
+			}
+		}
+
+		replications = append(replications, req)
+	}
+
+	return replications
+}
+
+// replicationUpdates is a generator that returns replications that need updating.
+func replicationUpdates(current, requested couchbaseutil.ReplicationList) couchbaseutil.ReplicationList {
+	var replications couchbaseutil.ReplicationList
+
+Next:
+	for _, req := range requested {
+		for _, cur := range current {
+			if replicationKey(req) != replicationKey(cur) {
+				continue
+			}
+
+			if !reflect.DeepEqual(req, cur) {
+				replications = append(replications, req)
+			}
+
+			continue Next
+		}
+	}
+
+	return replications
+}
+
+// replicationDeletions is a generator that returns replications that need deleting.
+func replicationDeletions(current, requested couchbaseutil.ReplicationList) couchbaseutil.ReplicationList {
+	var replications couchbaseutil.ReplicationList
+
+Next:
+	for _, cur := range current {
+		for _, req := range requested {
+			if replicationKey(cur) == replicationKey(req) {
+				continue Next
+			}
+		}
+
+		replications = append(replications, cur)
+	}
+
+	return replications
+}
+
+// reconcileXDCRReplications handles the creation, update and removal of replications.
+// This must be called after new remotes are added, and before old remotes are removed.
+func (c *Cluster) reconcileXDCRReplications(requestedReplications couchbaseutil.ReplicationList) error {
 	currentReplications, err := c.listReplications()
 	if err != nil {
 		return err
 	}
 
-	// Create any new clusters...
-CreateNextCluster:
-	for requestedIndex := range requestedClusters {
-		requested := requestedClusters[requestedIndex]
-
-		for _, current := range *currentClusters {
-			if current.Name == requested.Name {
-				// Load up the configuration that changes... OMG!!
-				hostname, err := c.state.Get(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRHostname))
-				if err != nil {
-					return err
-				}
-
-				current.Hostname = hostname
-
-				// Load up configuration that is written to the API but not returned.
-				password, err := c.state.Get(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRPassword))
-				if err != nil {
-					if !goerrors.Is(err, persistence.ErrKeyError) {
-						return err
-					}
-				} else {
-					current.Password = password
-				}
-
-				key, err := c.state.Get(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientKey))
-				if err != nil {
-					if !goerrors.Is(err, persistence.ErrKeyError) {
-						return err
-					}
-				} else {
-					current.Key = key
-				}
-
-				certificate, err := c.state.Get(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientCertificate))
-				if err != nil {
-					if !goerrors.Is(err, persistence.ErrKeyError) {
-						return err
-					}
-				} else {
-					current.Certificate = certificate
-				}
-
-				// AGGGGGGHHHHH... I set to "external", it comes back blank.  This is a joke!
-				// For now just ignore this, I'm not persisting it.
-				current.Network = requested.Network
-
-				// Diff, this is safe it doesn't have any slices in it...
-				if reflect.DeepEqual(current, requested) {
-					continue CreateNextCluster
-				}
-
-				log.Info("Updating XDCR remote cluster", "cluster", c.namespacedName(), "remote", requested.Name)
-				log.V(2).Info("XDCR connection state", "cluster", c.namespacedName(), "requested", requested, "current", current)
-
-				if err := couchbaseutil.UpdateRemoteCluster(&requested).On(c.api, c.readyMembers()); err != nil {
-					return err
-				}
-
-				c.raiseEvent(k8sutil.RemoteClusterUpdatedEvent(c.cluster, requested.Name))
-
-				// Remove any existing persistent items associated with the connection.
-				// I can imagine someone will try changing from username/password to
-				// mTLS at some point and we can't leave the old stuff behind as it will
-				// come back from the dead next time around.
-				if err := c.state.DeleteXDCR(requested.Name); err != nil {
-					return err
-				}
-
-				// Save any updatable parameters that will not be returned by a GET from the
-				// API.  We will use these to detect and trigger updates.
-				if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRHostname), requested.Hostname); err != nil {
-					return err
-				}
-
-				if requested.Password != "" {
-					if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRPassword), requested.Password); err != nil {
-						return err
-					}
-				}
-
-				if requested.Key != "" {
-					if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientKey), requested.Key); err != nil {
-						return err
-					}
-				}
-
-				if requested.Certificate != "" {
-					if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientCertificate), requested.Certificate); err != nil {
-						return err
-					}
-				}
-
-				// On to the next!
-				continue CreateNextCluster
-			}
-		}
-
-		log.Info("Creating XDCR remote cluster", "cluster", c.namespacedName(), "remote", requested.Name)
-		if err := couchbaseutil.CreateRemoteCluster(&requested).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		c.raiseEvent(k8sutil.RemoteClusterAddedEvent(c.cluster, requested.Name))
-
-		// Save any updatable parameters that will not be returned by a GET from the
-		// API.  We will use these to detect and trigger updates.
-		if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRHostname), requested.Hostname); err != nil {
-			return err
-		}
-
-		if requested.Password != "" {
-			if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRPassword), requested.Password); err != nil {
-				return err
-			}
-		}
-
-		if requested.Key != "" {
-			if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientKey), requested.Key); err != nil {
-				return err
-			}
-		}
-
-		if requested.Certificate != "" {
-			if err := c.state.Insert(persistence.GetPersistentKindXDCR(requested.Name, persistence.XDCRClientCertificate), requested.Certificate); err != nil {
-				return err
-			}
-		}
-	}
-
 	// Create/update any replications...
-CreateNextReplication:
-	for requestedIndex := range requestedReplications {
-		requested := requestedReplications[requestedIndex]
+	replicationUpdates := replicationUpdates(currentReplications, requestedReplications)
+	for i := range replicationUpdates {
+		replication := replicationUpdates[i]
 
-		for _, current := range currentReplications {
-			if replicationKey(current) == replicationKey(requested) {
-				if !reflect.DeepEqual(current, requested) {
-					log.Info("Updating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(requested))
+		log.Info("Updating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(replication))
 
-					cluster, err := c.getRemoteClusterByName(requested.ToCluster)
-					if err != nil {
-						return err
-					}
-
-					if err := couchbaseutil.UpdateReplication(&requested, cluster.UUID, requested.FromBucket, requested.ToBucket).On(c.api, c.readyMembers()); err != nil {
-						return err
-					}
-
-					c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("xdcr replication", c.cluster))
-				}
-
-				continue CreateNextReplication
-			}
-		}
-
-		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(requested))
-
-		if err := couchbaseutil.CreateReplication(&requested).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, replicationKey(requested)))
-	}
-
-	// Delete any orphaned replications...
-DeleteNextReplication:
-	for _, currentReplication := range currentReplications {
-		current := currentReplication
-
-		for _, requested := range requestedReplications {
-			if replicationKey(current) == replicationKey(requested) {
-				continue DeleteNextReplication
-			}
-		}
-
-		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(current))
-
-		cluster, err := c.getRemoteClusterByName(current.ToCluster)
+		cluster, err := c.getRemoteClusterByName(replication.ToCluster)
 		if err != nil {
 			return err
 		}
 
-		if err := couchbaseutil.DeleteReplication(&current, cluster.UUID, current.FromBucket, current.ToBucket).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.UpdateReplication(&replication, cluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
-		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, replicationKey(current)))
+		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("xdcr replication", c.cluster))
+	}
+
+	replicationCreates := replicationCreations(currentReplications, requestedReplications)
+	for i := range replicationCreates {
+		replication := replicationCreates[i]
+
+		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(replication))
+
+		if err := couchbaseutil.CreateReplication(&replication).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, replicationKey(replication)))
+	}
+
+	// Delete any orphaned replications...
+	replicationDeletes := replicationDeletions(currentReplications, requestedReplications)
+	for i := range replicationDeletes {
+		replication := replicationDeletes[i]
+
+		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(replication))
+
+		cluster, err := c.getRemoteClusterByName(replication.ToCluster)
+		if err != nil {
+			return err
+		}
+
+		if err := couchbaseutil.DeleteReplication(&replication, cluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, replicationKey(replication)))
+	}
+
+	return nil
+}
+
+// reconcileXDCR creates and deletes XDCR connections dynamically.
+func (c *Cluster) reconcileXDCR() error {
+	if !c.cluster.Spec.XDCR.Managed {
+		return nil
+	}
+
+	requestedClusters, requestedReplications, err := c.generateXDCR()
+	if err != nil {
+		return err
+	}
+
+	currentClusters, err := c.listRemoteClusters()
+	if err != nil {
+		return err
+	}
+
+	// Create/update any new clusters...
+	updates := c.remoteClusterUpdates(currentClusters, requestedClusters)
+	for i := range updates {
+		cluster := &updates[i]
+
+		log.Info("Updating XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
+
+		if err := couchbaseutil.UpdateRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.RemoteClusterUpdatedEvent(c.cluster, cluster.Name))
+
+		if err := c.updateXDCRPersistentState(cluster); err != nil {
+			return err
+		}
+	}
+
+	creates := remoteClusterCreations(currentClusters, requestedClusters)
+	for i := range creates {
+		cluster := &creates[i]
+
+		log.Info("Creating XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
+
+		if err := couchbaseutil.CreateRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.RemoteClusterAddedEvent(c.cluster, cluster.Name))
+
+		// Save any updatable parameters that will not be returned by a GET from the
+		// API.  We will use these to detect and trigger updates.
+		if err := c.updateXDCRPersistentState(cluster); err != nil {
+			return err
+		}
+	}
+
+	// Replications depend on remotes existing, and also need to be removed before
+	// the remote they depend on, so perform it here.
+	if err := c.reconcileXDCRReplications(requestedReplications); err != nil {
+		return err
 	}
 
 	// Delete any orphaned clusters...
-DeleteNextCluster:
-	for _, currentCluster := range *currentClusters {
-		current := currentCluster
+	deletes := remoteClusterDeletions(currentClusters, requestedClusters)
+	for i := range deletes {
+		cluster := &deletes[i]
 
-		for _, requested := range requestedClusters {
-			if current.Name == requested.Name {
-				continue DeleteNextCluster
-			}
-		}
+		log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
 
-		log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", current.Name)
-
-		if err := couchbaseutil.DeleteRemoteCluster(&current).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.DeleteRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
-		c.raiseEvent(k8sutil.RemoteClusterRemovedEvent(c.cluster, current.Name))
+		c.raiseEvent(k8sutil.RemoteClusterRemovedEvent(c.cluster, cluster.Name))
 
-		if err := c.state.DeleteXDCR(current.Name); err != nil {
+		if err := c.state.DeleteXDCR(cluster.Name); err != nil {
 			return err
 		}
 	}
