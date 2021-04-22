@@ -45,22 +45,15 @@ func getServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couch
 	return serverGroups, nil
 }
 
-// NewStripeScheduler creates an initializes a new sripe scheduler, caching
-// state from the current set of pods for the cluster.
-func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
-	// Initialize data structures, creating maps for each server class
-	// and empty lists for each server group defined for that class
-	sched := &stripeSchedulerImpl{
-		serverClasses:              serverClassGroupMap{},
-		unschedulableServerClasses: serverClassGroupMap{},
-	}
-
+// initServerClasses populates the scheduler with all server classes that
+// are defined in the specification.
+func (sched *stripeSchedulerImpl) initServerClasses(cluster *couchbasev2.CouchbaseCluster) error {
 	for i := range cluster.Spec.Servers {
 		class := cluster.Spec.Servers[i]
 
 		groups, err := getServerGroupsForClass(cluster, &class)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		sched.serverClasses[class.Name] = serverGroups{}
@@ -70,7 +63,11 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 		}
 	}
 
-	// Populate the server group lists with pods
+	return nil
+}
+
+// populateServerClasses populates the server group lists with pods.
+func (sched *stripeSchedulerImpl) populateServerClasses(pods []*v1.Pod) error {
 	for _, pod := range pods {
 		// Pod is faulty ignore it
 		if pod.Status.Phase != v1.PodPending && pod.Status.Phase != v1.PodRunning {
@@ -79,7 +76,7 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
-			return nil, fmt.Errorf("%s: pod %s does not have server class label: %w", stripeErrorHeader, pod.Name, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+			return fmt.Errorf("%s: pod %s does not have server class label: %w", stripeErrorHeader, pod.Name, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
 		// Class deleted, ignore the pod
@@ -120,6 +117,27 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 		}
 
 		sched.serverClasses[class][group].push(pod.Name)
+	}
+
+	return nil
+}
+
+// NewStripeScheduler creates an initializes a new stripe scheduler, caching
+// state from the current set of pods for the cluster.
+func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
+	// Initialize data structures, creating maps for each server class
+	// and empty lists for each server group defined for that class
+	sched := &stripeSchedulerImpl{
+		serverClasses:              serverClassGroupMap{},
+		unschedulableServerClasses: serverClassGroupMap{},
+	}
+
+	if err := sched.initServerClasses(cluster); err != nil {
+		return nil, err
+	}
+
+	if err := sched.populateServerClasses(pods); err != nil {
+		return nil, err
 	}
 
 	return sched, nil
@@ -224,6 +242,50 @@ type state struct {
 
 	// Moves recores the moves required to get to this state.
 	Moves []Move
+}
+
+// newState returns a new initial game state for the given scheduler and server class.
+func newState(sched *stripeSchedulerImpl, class string) *state {
+	s := &state{
+		Members:      map[string]*Member{},
+		ServerGroups: map[string]*ServerGroup{},
+	}
+
+	if groups, ok := sched.serverClasses[class]; ok {
+		for group, members := range groups {
+			if _, ok := s.ServerGroups[group]; !ok {
+				s.ServerGroups[group] = &ServerGroup{}
+			}
+
+			for _, member := range members.servers {
+				s.Members[member] = &Member{
+					ServerGroup: group,
+				}
+
+				s.ServerGroups[group].Size++
+			}
+		}
+	}
+
+	if groups, ok := sched.unschedulableServerClasses[class]; ok {
+		for group, members := range groups {
+			if _, ok := s.ServerGroups[group]; !ok {
+				s.ServerGroups[group] = &ServerGroup{
+					Unschedulable: true,
+				}
+			}
+
+			for _, member := range members.servers {
+				s.Members[member] = &Member{
+					ServerGroup: group,
+				}
+
+				s.ServerGroups[group].Size++
+			}
+		}
+	}
+
+	return s
 }
 
 // clone deep copies the state.
@@ -405,44 +467,7 @@ func (sched *stripeSchedulerImpl) Reschedule() ([]Move, error) {
 	}
 
 	for class := range knownClasses {
-		s := &state{
-			Members:      map[string]*Member{},
-			ServerGroups: map[string]*ServerGroup{},
-		}
-
-		if groups, ok := sched.serverClasses[class]; ok {
-			for group, members := range groups {
-				if _, ok := s.ServerGroups[group]; !ok {
-					s.ServerGroups[group] = &ServerGroup{}
-				}
-
-				for _, member := range members.servers {
-					s.Members[member] = &Member{
-						ServerGroup: group,
-					}
-
-					s.ServerGroups[group].Size++
-				}
-			}
-		}
-
-		if groups, ok := sched.unschedulableServerClasses[class]; ok {
-			for group, members := range groups {
-				if _, ok := s.ServerGroups[group]; !ok {
-					s.ServerGroups[group] = &ServerGroup{
-						Unschedulable: true,
-					}
-				}
-
-				for _, member := range members.servers {
-					s.Members[member] = &Member{
-						ServerGroup: group,
-					}
-
-					s.ServerGroups[group].Size++
-				}
-			}
-		}
+		s := newState(sched, class)
 
 		if s.Done() {
 			return nil, nil
