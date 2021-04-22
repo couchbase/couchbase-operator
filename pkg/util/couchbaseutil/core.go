@@ -1,7 +1,6 @@
 package couchbaseutil
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -11,7 +10,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"reflect"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -39,81 +37,8 @@ var ErrUUIDError = fmt.Errorf("cluster UUID error")
 //
 // Here be dragons!  You have been warned...
 func (c *Client) makeClient() {
-	// uuidCheck is a closure which binds basic HTTP authorization and cluster
-	// UUID to the configuration.  It is responsible for doing a HTTP GET from
-	// a new network connection and verifying that the UUID matches what we
-	// expect before allowing the http.Client to be used.
-	uuidCheck := func(addr string, conn net.Conn) error {
-		// Checks not enabled yet i.e. cluster initialization
-		if c.uuid == "" {
-			return nil
-		}
-
-		// Construct a HTTP request
-		req, err := http.NewRequest("GET", "/pools", nil)
-		if err != nil {
-			return fmt.Errorf("uuid check: %w", errors.NewStackTracedError(err))
-		}
-
-		req.URL.Host = addr
-		req.Header.Set("Accept-Encoding", "application/json")
-		req.SetBasicAuth(c.username, c.password)
-
-		// Perform the transaction
-		if err = req.Write(conn); err != nil {
-			return fmt.Errorf("uuid check: %w", errors.NewStackTracedError(err))
-		}
-
-		resp, err := http.ReadResponse(bufio.NewReader(conn), req)
-		if err != nil {
-			return fmt.Errorf("uuid check: %w", errors.NewStackTracedError(err))
-		}
-
-		// Check the status code was 2XX
-		if resp.StatusCode/100 != 2 {
-			return fmt.Errorf("%w: uuid check: unexpected status code '%s' from %s", errors.NewStackTracedError(ErrStatusError), resp.Status, addr)
-		}
-
-		defer resp.Body.Close()
-
-		// Read the body
-		buffer, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("uuid check: %w", errors.NewStackTracedError(err))
-		}
-
-		// Parse the JSON body into our anonymous struct, we only care about the UUID
-		var body struct {
-			UUID interface{}
-		}
-
-		if err = json.Unmarshal(buffer, &body); err != nil {
-			return fmt.Errorf("uuid check: json error '%w' from %s", errors.NewStackTracedError(err), addr)
-		}
-
-		// UUID is a string if set or an empty array otherwise :/
-		var uuid string
-
-		switch t := body.UUID.(type) {
-		case string:
-			uuid = t
-		case []interface{}:
-			return fmt.Errorf("%w: uuid is unset", errors.NewStackTracedError(ErrUUIDError))
-		default:
-			return fmt.Errorf("%w: uuid is unexpected type: %s", errors.NewStackTracedError(ErrUUIDError), reflect.TypeOf(t))
-		}
-
-		// Finally check the UUID is as we expect.  Will be empty if no body was found
-		if uuid != c.uuid {
-			return fmt.Errorf("%w: uuid check: wanted %s got %s from %s", errors.NewStackTracedError(ErrUUIDError), c.uuid, uuid, addr)
-		}
-
-		return nil
-	}
-
-	// dialContext is a closure which binds to the uuidCheck closure which
-	// is specific to the username/password/uuid of the cluster.  It is called
-	// when a HTTP client first dials a host and verifies the UUID is as expected.
+	// dialContext is a closure which gives us full control over TCP connections.
+	// It is called when a HTTP client first dials a host.
 	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		// Establish a TCP connection
 		dialer := &net.Dialer{
@@ -127,18 +52,11 @@ func (c *Client) makeClient() {
 			return nil, errors.NewStackTracedError(err)
 		}
 
-		// Check the UUID of the host matches our configuration before
-		// allowing use of this connection
-		if err = uuidCheck(addr, conn); err != nil {
-			return nil, err
-		}
-
 		return conn, nil
 	}
 
-	// dialTLS is a closure which binds to the uuidCheck closure which
-	// is specific to the username/password/uuid of the cluster.  It is called
-	// when a HTTPS client first dials a host and verifies the UUID is as expected.
+	// dialTLS is a closure which gives us full control over TCP connections.
+	// It is called when a HTTPS client first dials a host.
 	dialTLS := func(network, addr string) (net.Conn, error) {
 		// If the TLS configuration is explicitly set use that, otherwise
 		// use a basic configuration (which won't ever work unless your cluster
@@ -176,12 +94,6 @@ func (c *Client) makeClient() {
 		conn, err := tls.DialWithDialer(dialer, network, addr, tlsClientConfig)
 		if err != nil {
 			return nil, errors.NewStackTracedError(err)
-		}
-
-		// Check the UUID of the host matches our configuration before
-		// allowing use of this connection
-		if err = uuidCheck(addr, conn); err != nil {
-			return nil, err
 		}
 
 		return conn, nil
