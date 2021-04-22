@@ -120,124 +120,167 @@ type Collector struct {
 	Scope Scope
 }
 
+// getRESTMapping translates from a concrete opbect type into a group/version/kind with
+// the scheme mapper.  Then use the GVK to map into an API call.
+func getRESTMapping(context *context.Context, r runtime.Object) (*meta.RESTMapping, error) {
+	kinds, _, err := scheme.Scheme.ObjectKinds(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map resource to GVK: %w", err)
+	}
+
+	gvk := kinds[0]
+
+	mapping, err := context.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map gvk to API: %w", err)
+	}
+
+	return mapping, nil
+}
+
+// getListOptions returns API list options with any server side filtering
+// applied.
+func getListOptions(context *context.Context, scope Scope) (*metav1.ListOptions, error) {
+	opts := &metav1.ListOptions{}
+
+	if scope == ScopeCluster {
+		selector, err := GetResourceSelector(&context.Config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get label selector for resource: %w", err)
+		}
+
+		opts.LabelSelector = selector.String()
+	}
+
+	return opts, nil
+}
+
+// listResources returns all resources of the specified kind that match the filter options.
+func listResources(context *context.Context, mapping *meta.RESTMapping, opts *metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+		return context.DynamicClient.Resource(mapping.Resource).List(ctx.Background(), *opts)
+	}
+
+	return context.DynamicClient.Resource(mapping.Resource).Namespace(context.Namespace()).List(ctx.Background(), *opts)
+}
+
+// filterObject returns true if the object needs to be filtered out and not collected.
+func filterObject(context *context.Context, scope Scope, o *unstructured.Unstructured) bool {
+	switch scope {
+	case ScopeClusterName:
+		// No constraints, let everything through.
+		if len(context.Config.Clusters.Values) == 0 {
+			return false
+		}
+
+		// Check to see it the named cluster is specified, rejecting
+		// any that aren't in the list.
+		found := false
+
+		for _, name := range context.Config.Clusters.Values {
+			if name == o.GetName() {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return true
+		}
+	case ScopeNamespace:
+		if context.Namespace() != o.GetName() {
+			return true
+		}
+	case ScopeCouchbaseGroup:
+		if !strings.Contains(o.GetName(), couchbasev2.GroupName) {
+			return true
+		}
+	case ScopeOperatorDeployment:
+		// We need to interrogate all deployments, and work out if this
+		// deployment refers to the Operator.  Doing this in typed land
+		// is a lot easier...
+		deployment := &appsv1.Deployment{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(o.Object, deployment); err != nil {
+			return true
+		}
+
+		// Filter out non-operator deployments to limit the scope of our
+		// collection efforts, we don't need to see, nor do customers want
+		// us to see all the things (this is meaningless, we collect all the
+		// secrets as is...)
+		if !context.Config.All && !k8s.IsOperatorDeployment(context, deployment) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getArchivePath returns the path to archive the resource to.
+func getArchivePath(context *context.Context, mapping *meta.RESTMapping, o *unstructured.Unstructured) string {
+	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+		return util.ArchivePathUnscoped(o.GetKind(), o.GetName(), o.GetName()+".yaml")
+	}
+
+	return util.ArchivePath(context.Namespace(), o.GetKind(), o.GetName(), o.GetName()+".yaml")
+}
+
+// processResourceMetadata spot special resources and adds them to the archive metadata
+// to make locating key logs easier.
+func processResourceMetadata(context *context.Context, o *unstructured.Unstructured, path string, reference Reference) {
+	// Metadata collation, used by support for automation.
+	switch o.GetKind() {
+	case "CouchbaseCluster":
+		// The image will be part of the cluster, it's guaranteed by CRD
+		// validation.  Events however, we cannot guess at whether there are
+		// any at this point in the process, so just fill in the path that we
+		// expect, and support can deal with the missing file.
+		image, _, _ := unstructured.NestedString(o.Object, "spec", "image")
+
+		log_meta.SetCluster(o.GetName(), image, path)
+	case "Deployment":
+		deployment := &appsv1.Deployment{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(o.Object, deployment); err != nil {
+			return
+		}
+
+		if k8s.IsOperatorDeployment(context, deployment) {
+			reference.SetIsOperator()
+
+			log_meta.SetOperator(context.Config.OperatorImage)
+		}
+	}
+}
+
 // Collect goes through each defined type and lists all resources, filtered by the
 // scoping rules.
 func Collect(context *context.Context, backend backend.Backend, resources []Collector) []Reference {
 	references := []Reference{}
 
 	for _, r := range resources {
-		// Translate from a concrete opbect type into a group/version/kind with
-		// the scheme mapper.  Then use the GVK to map into an API call.
-		kinds, _, err := scheme.Scheme.ObjectKinds(r.Resource)
+		mapping, err := getRESTMapping(context, r.Resource)
 		if err != nil {
-			fmt.Println("failed to map resource to GVK:", err)
+			fmt.Println(err)
 			continue
 		}
 
-		gvk := kinds[0]
-
-		mapping, err := context.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		opts, err := getListOptions(context, r.Scope)
 		if err != nil {
-			fmt.Println("failed to map gvk to API:", err)
+			fmt.Println(err)
 			continue
 		}
 
-		// Collect everything by default, if we are filtering based on cluster
-		// then do this server side in order to save bandwidth.
-		opts := metav1.ListOptions{}
-
-		if r.Scope == ScopeCluster {
-			selector, err := GetResourceSelector(&context.Config)
-			if err != nil {
-				fmt.Println("failed to get label selector for resource:", err)
-				continue
-			}
-
-			opts.LabelSelector = selector.String()
+		objects, err := listResources(context, mapping, opts)
+		if err != nil {
+			fmt.Println("failed to list dynamic resources:", err)
+			continue
 		}
 
-		var objects *unstructured.UnstructuredList
+		for i := range objects.Items {
+			o := &objects.Items[i]
 
-		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-			objects, err = context.DynamicClient.Resource(mapping.Resource).List(ctx.Background(), opts)
-			if err != nil {
-				fmt.Println("failed to list dynamic resources:", err)
+			if filterObject(context, r.Scope, o) {
 				continue
-			}
-		} else {
-			objects, err = context.DynamicClient.Resource(mapping.Resource).Namespace(context.Namespace()).List(ctx.Background(), opts)
-			if err != nil {
-				fmt.Println("failed to list dynamic resources:", err)
-				continue
-			}
-		}
-
-	NextObject:
-		for _, o := range objects.Items {
-			// Watch out for the operator, we need to flag this for special
-			// handling down the line.
-			var isOperatorDeployment bool
-
-			// At this level we get access to the full resource, and the Operator
-			// image name.
-			operatorImage := context.Config.OperatorImage
-
-			// Perform any post list filtering.  If we are filtering based on cluster
-			// name then reject any resources that don't match a named cluster.  If we
-			// are filtering based on namespace name, then reject any resources that
-			// don't match the namespace name.
-			switch r.Scope {
-			case ScopeClusterName:
-				// No constraints, let everything through.
-				if len(context.Config.Clusters.Values) == 0 {
-					break
-				}
-
-				// Check to see it the named cluster is specified, rejecting
-				// any that aren't in the list.
-				found := false
-
-				for _, name := range context.Config.Clusters.Values {
-					if name == o.GetName() {
-						found = true
-						break
-					}
-				}
-
-				if !found {
-					continue NextObject
-				}
-			case ScopeNamespace:
-				if context.Namespace() != o.GetName() {
-					continue NextObject
-				}
-			case ScopeCouchbaseGroup:
-				if !strings.Contains(o.GetName(), couchbasev2.GroupName) {
-					continue NextObject
-				}
-			case ScopeOperatorDeployment:
-				// We need to interrogate all deployments, and work out if this
-				// deployment refers to the Operator.  Doing this in typed land
-				// is a lot easier...
-				deployment := &appsv1.Deployment{}
-				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(o.Object, deployment); err != nil {
-					continue NextObject
-				}
-
-				// Determine whether the deployment is the operator and needs
-				// further scrutiny.
-				if k8s.IsOperatorDeployment(context, deployment) {
-					isOperatorDeployment = true
-					operatorImage = deployment.Spec.Template.Spec.Containers[0].Image
-				}
-
-				// Filter out non-operator deployments to limit the scope of our
-				// collection efforts, we don't need to see, nor do customers want
-				// us to see all the things (this is meaningless, we collect all the
-				// secrets as is...)
-				if !context.Config.All && !isOperatorDeployment {
-					continue NextObject
-				}
 			}
 
 			// Finally marshal to YAML and add to the backend archive.
@@ -247,36 +290,11 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 				continue
 			}
 
-			var path string
-
-			if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-				path = util.ArchivePathUnscoped(gvk.Kind, o.GetName(), o.GetName()+".yaml")
-			} else {
-				path = util.ArchivePath(context.Namespace(), gvk.Kind, o.GetName(), o.GetName()+".yaml")
-			}
-
+			path := getArchivePath(context, mapping, o)
 			_ = backend.WriteFile(path, string(data))
 
-			reference := NewReference(gvk.Kind, o.GetName())
-
-			// Metadata collation, used by support for automation.
-			switch gvk.Kind {
-			case "CouchbaseCluster":
-				// The image will be part of the cluster, it's guaranteed by CRD
-				// validation.  Events however, we cannot guess at whether there are
-				// any at this point in the process, so just fill in the path that we
-				// expect, and support can deal with the missing file.
-				image, _, _ := unstructured.NestedString(o.Object, "spec", "image")
-
-				log_meta.SetCluster(o.GetName(), image, path)
-			case "Deployment":
-				if isOperatorDeployment {
-					reference.SetIsOperator()
-
-					log_meta.SetOperator(operatorImage)
-				}
-			}
-
+			reference := NewReference(o.GetKind(), o.GetName())
+			processResourceMetadata(context, o, path, reference)
 			references = append(references, reference)
 		}
 	}
