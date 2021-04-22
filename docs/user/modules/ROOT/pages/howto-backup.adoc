@@ -45,15 +45,24 @@ This will be covered in the next xref:howto-backup.adoc#grant-backup-permissions
 
 Backup Pods need read-only access to Kubernetes resources such as `Pods`, `CronJobs`, and `Jobs`.
 They also need write access to Events and the `CouchbaseBackup`/`CouchbaseBackupRestore` custom resources.
+Without these resources, backup jobs will still run as scheduled, but they will ultimately fail as the pods won't have the required permissions.
 
-To grant these permissions, you can use `cbopcfg` to generate the required resources by running the following command:
+You can use the xref:tools/cbopcfg.adoc[`cbopcfg`] tool to create the resources that grant the required permissions.
+The following command creates the necessary resources in the default namespace:
 
 [source,console]
 ----
-$ bin/cbopcfg generate backup | kubectl create -f -
+$ bin/cbopcfg create backup
 ----
 
-Without these resources, backup jobs will still run as scheduled, but they will ultimately fail as the pods won't have the required permissions.
+To create the resources in a custom namespace, use the `-n` flag:
+
+[source,console]
+----
+$ bin/cbopcfg create backup -n my-namespace
+----
+
+To make your own edits to these resources, you can use `cbopcfg generate backup` to generate the YAML output instead of creating the resources in Kubernetes immediately.
 
 == Configure Backups
 
