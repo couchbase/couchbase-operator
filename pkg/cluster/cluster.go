@@ -251,9 +251,7 @@ func (c *Cluster) Delete() {
 	c.k8s.Shutdown()
 }
 
-func (c *Cluster) create() error {
-	log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.namespacedName())
-
+func (c *Cluster) initializeClusterState() error {
 	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return err
@@ -265,6 +263,8 @@ func (c *Cluster) create() error {
 		return err
 	}
 
+	// Once cleared, initialize the clients, using the underlying secrets as the source
+	// of truth (as opposed to the persistent state data).
 	if err := c.initClients(); err != nil {
 		return err
 	}
@@ -299,44 +299,49 @@ func (c *Cluster) create() error {
 		}
 	}
 
-	c.cluster.Status.SetCreatingCondition()
-	c.cluster.Status.CurrentVersion = version
+	return nil
+}
 
-	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
-
+// createInitialMember picks a server class containing the data service and
+// creates a member/pod for it.
+func (c *Cluster) createInitialMember() (couchbaseutil.Member, *couchbasev2.ServerConfig, error) {
 	if len(c.cluster.Spec.Servers) == 0 {
-		return fmt.Errorf("cluster create: no server specification defined: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, fmt.Errorf("cluster create: no server specification defined: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
-	idx := c.indexOfServerConfigWithService(couchbasev2.DataService)
-	if idx == -1 {
-		return fmt.Errorf("%w: cluster create: at least one server specification must contain the data service", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
+	index := c.indexOfServerConfigWithService(couchbasev2.DataService)
+	if index == -1 {
+		return nil, nil, fmt.Errorf("%w: cluster create: at least one server specification must contain the data service", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 	}
 
 	c.members = couchbaseutil.NewMemberSet()
 
-	m, err := c.createMember(c.cluster.Spec.Servers[idx])
+	class := c.cluster.Spec.Servers[index]
+
+	member, err := c.createMember(class)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	// Notify that we have added a new member, this makes it callable.
-	c.clusterAddMember(m)
+	c.clusterAddMember(member)
 
-	// Setup passwords, defaults, that kind of stuff.  It's unlikely that this
-	// can go wrong, you've probably bypassed the admission controller (naughty)...
-	if err := c.initMember(m, c.cluster.Spec.Servers[idx]); err != nil {
+	return member, &class, nil
+}
+
+// configureInitialMember sets up passwords, defaults, that kind of stuff.  It's unlikely
+// that this can go wrong, you've probably bypassed the admission controller (naughty)...
+func (c *Cluster) configureInitialMember(member couchbaseutil.Member, class *couchbasev2.ServerConfig) error {
+	if err := c.initMember(member, class); err != nil {
 		// ... if we fail to initialize the cluster, then chances are we won't be
 		// able to contact it and get stuck.  Like all pod creation/recreation code
 		// we should clean up and let retries potentially work, either as transient
 		// errors clear up, or the user unbreaks their bad configuration.
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(m.Name(), c.cluster))
+		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(member.Name(), c.cluster))
 
 		// Remove the volumes too, we want to recreate them in case they are the
 		// problem.  They contain no data at this point.
-		if err := c.removePod(m.Name(), true); err != nil {
+		if err := c.removePod(member.Name(), true); err != nil {
 			// Unlikely, print the error in scope, propagate the outer error.
 			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", err)
 		}
@@ -344,20 +349,53 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	log.Info("Operator added member", "cluster", c.namespacedName(), "name", m.Name())
-
-	c.raiseEvent(k8sutil.MemberAddEvent(m.Name(), c.cluster))
-
-	if err := k8sutil.SetPodInitialized(c.k8s, m.Name()); err != nil {
+	if err := k8sutil.SetPodInitialized(c.k8s, member.Name()); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// create is the main cluster creation routine.  It is called on initial cluster creation
+// and any time it is recreated (e.g. all ephemeral pods have been killed).
+func (c *Cluster) create() error {
+	log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.namespacedName())
+
+	if err := c.initializeClusterState(); err != nil {
+		return err
+	}
+
+	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return err
+	}
+
+	c.cluster.Status.SetCreatingCondition()
+	c.cluster.Status.CurrentVersion = version
+
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+
+	member, class, err := c.createInitialMember()
+	if err != nil {
+		return err
+	}
+
+	if err := c.configureInitialMember(member, class); err != nil {
+		return err
+	}
+
+	log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
+
+	c.raiseEvent(k8sutil.MemberAddEvent(member.Name(), c.cluster))
 
 	// This takes a while to get set, yawn...
 	var uuid string
 
 	callback := func() error {
 		info := &couchbaseutil.PoolsInfo{}
-		if err := couchbaseutil.GetPools(info).On(c.api, m); err != nil {
+		if err := couchbaseutil.GetPools(info).On(c.api, member); err != nil {
 			return err
 		}
 

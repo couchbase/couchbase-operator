@@ -126,32 +126,6 @@ func (l ExposedFeatureList) Contains(feature string) bool {
 	return false
 }
 
-// Get all of the volume mounts to be used for analytics service
-// as an indexed list mapped to their claims.
-func (v *VolumeMounts) GetAnalyticsMountClaims() map[string]string {
-	mountClaims := make(map[string]string)
-
-	if v.AnalyticsClaims != nil {
-		for i, claim := range v.AnalyticsClaims {
-			mount := fmt.Sprintf("%s-%02d", AnalyticsVolumeMount, i)
-			mountClaims[mount] = claim
-		}
-	}
-
-	return mountClaims
-}
-
-// Get all of the paths which correspond to the mounts to be used
-// for analytics service.
-func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
-	paths := []string{}
-	for mount := range v.GetAnalyticsMountClaims() {
-		paths = append(paths, fmt.Sprintf("/mnt/%s", mount))
-	}
-
-	return paths
-}
-
 // HasVolumeMounts returns true if volume mounts are defined.
 // This does not check the existence of individual fields.
 func (v *VolumeMounts) HasVolumeMounts() bool {

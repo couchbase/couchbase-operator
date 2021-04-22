@@ -812,7 +812,7 @@ func (c *Cluster) reconcilePodServices() error {
 }
 
 // initializes the first member in the cluster.
-func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec *couchbasev2.ServerConfig) error {
 	log.Info("Initial pod creating", "cluster", c.namespacedName())
 	settings := c.cluster.Spec.ClusterSettings
 
@@ -1783,7 +1783,7 @@ func getServiceDataPaths(mounts *couchbasev2.VolumeMounts) (string, string, []st
 		}
 
 		if len(mounts.AnalyticsClaims) > 0 {
-			analyticsPaths = mounts.GetAnalyticsVolumePaths()
+			analyticsPaths = k8sutil.GetAnalyticsVolumePaths(mounts)
 		}
 	}
 
