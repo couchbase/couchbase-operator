@@ -27,9 +27,8 @@ import (
 )
 
 var (
-	unavailableStorageClass       = "unavailableStorageClass"
-	defaultFSGroup          int64 = 1000
-	emptyObject                   = struct{}{}
+	unavailableStorageClass = "unavailableStorageClass"
+	emptyObject             = struct{}{}
 )
 
 // Resources are stored in a list in order to maintain ordering.  Do not try to use a map
@@ -600,14 +599,14 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", "0")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.volumeClaimTemplates[*].resources.requests"},
+			expectedErrors: []string{"spec.volumeClaimTemplates.resources.requests"},
 		},
 		{
 			name: "TestValidateVolumeClaimTemplatesNegRejected",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", "-1")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.volumeClaimTemplates[*].resources.requests"},
+			expectedErrors: []string{"spec.volumeClaimTemplates.resources.requests"},
 		},
 	}
 
@@ -800,7 +799,7 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			name:           "TestNoDataService",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers", []couchbasev2.ServerConfig{{Name: "test", Size: 1, Services: couchbasev2.ServiceList{couchbasev2.IndexService}}})},
 			shouldFail:     true,
-			expectedErrors: []string{`at least one "data" service in spec.servers[*].services is required`},
+			expectedErrors: []string{`at least one "data" service in spec.servers.services is required`},
 		},
 		{
 			name:           "TestValidateServerServerGroupsUnique",
@@ -849,10 +848,9 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 			expectedErrors: []string{"spec.servers[3].volumeMounts.default"},
 		},
 		{
-			name:           "TestValidateDefaultVolumeMountRequiredForStatefulServices",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.QueryService, couchbasev2.SearchService, couchbasev2.EventingService, couchbasev2.AnalyticsService})},
-			shouldFail:     true,
-			expectedErrors: []string{"default in spec.servers[3].volumeMounts"},
+			name:       "TestValidateDefaultVolumeMountRequiredForStatefulServices",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.QueryService, couchbasev2.SearchService, couchbasev2.EventingService, couchbasev2.AnalyticsService})},
+			shouldFail: true,
 		},
 		{
 			name:           "TestValidateServerServiceRequiredForVolumeMountData",
@@ -898,10 +896,9 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 	// Cases to validate with Log PV only defined,but one of stateful service is included
 	for _, statefulService := range constants.StatefulCbServiceList {
 		testCase := testDef{
-			name:           "TestValidateDefaultVolumeMountRequiredForStatefulService_" + string(statefulService),
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", couchbasev2.ServiceList{couchbasev2.QueryService, couchbasev2.SearchService, couchbasev2.EventingService, statefulService})},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[3].volumeMounts"},
+			name:       "TestValidateDefaultVolumeMountRequiredForStatefulService_" + string(statefulService),
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", couchbasev2.ServiceList{couchbasev2.QueryService, couchbasev2.SearchService, couchbasev2.EventingService, statefulService})},
+			shouldFail: true,
 		}
 		testDefs = append(testDefs, testCase)
 	}
@@ -951,9 +948,9 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/logging/server", &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
 					Enabled: true,
-				}).Remove("/spec/servers/0/volumeMounts")}, // only need to remove first as we validate only on that
-			shouldFail:     true,
-			expectedErrors: []string{"spec.logging.server"},
+				}).Remove("/spec/servers/0/volumeMounts"), // only need to remove first as we validate only on that
+			},
+			shouldFail: true,
 		},
 		{
 			name: "TestValidateLoggingIgnoresGCWithNoAudit",
@@ -965,11 +962,12 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 							Enabled: true,
 						},
 					},
-				})},
+				}),
+			},
 			shouldFail: false,
 		},
 		{
-			name: "TestValidateLoggingFailsAuditGCWithNoServerLogging",
+			name: "TestValidateLoggingFailsAuditGCWithNoPersistentVolume",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
 					Enabled: true,
@@ -978,9 +976,10 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 							Enabled: true,
 						},
 					},
-				})},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.logging.audit.garbageCollection.sidecar.enabled"},
+				}).
+				Remove("/spec/servers/0/volumeMounts"),
+			},
+			shouldFail: true,
 		},
 		{
 			name: "TestValidateLoggingFailsForInvalidAuditUser",
@@ -989,7 +988,8 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 					DisabledUsers: []couchbasev2.AuditDisabledUser{
 						"Cthulu",
 					},
-				})},
+				}),
+			},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.logging.audit.disabledUsers"},
 		},
@@ -1002,7 +1002,8 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 						"externalusername/external",
 						"@internalusername/local",
 					},
-				})},
+				}),
+			},
 			shouldFail: false,
 		},
 	}
@@ -1542,11 +1543,6 @@ func TestValidationDefaultCreate(t *testing.T) {
 			},
 		},
 		{
-			name:        "TestValidateSecurityContextDefault",
-			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/securityContext")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/securityContext/fsGroup", &defaultFSGroup)},
-		},
-		{
 			name:       "TestValidateSecurityContextfsgroup",
 			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/securityContext/fsGroup")},
 			shouldFail: false,
@@ -1781,7 +1777,7 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 				Replace("/spec/enableOnlineVolumeExpansion", true).
 				Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", "1Gi")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.volumeClaimTemplates[*].resources.requests"},
+			expectedErrors: []string{"spec.volumeClaimTemplates.resources.requests"},
 		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})
@@ -1896,11 +1892,6 @@ func TestRBACValidationCreate(t *testing.T) {
 			expectedErrors: []string{"spec.authSecret"},
 		},
 		{
-			name:        "TestValidateDefaultBucketRole",
-			validations: patchMap{"data-group": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "*")},
-			shouldFail:  false,
-		},
-		{
 			name:       "TestValidateBucketName",
 			mutations:  patchMap{"data-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "99.buckets-0nthe_w%ll")},
 			shouldFail: false,
@@ -1954,17 +1945,6 @@ func TestRBACValidationLDAP(t *testing.T) {
 			name:        "TestValidateAuthenticationDefault",
 			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/authenticationEnabled")},
 			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/authenticationEnabled", true)},
-			shouldFail:  false,
-		}, {
-			name:        "TestValidateAuthorizationDefault",
-			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/authorizationEnabled")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/authorizationEnabled", true)},
-			shouldFail:  false,
-		},
-		{
-			name:        "TestValidateCertValidationDefault",
-			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/serverCertValidation")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/serverCertValidation", true)},
 			shouldFail:  false,
 		},
 		{

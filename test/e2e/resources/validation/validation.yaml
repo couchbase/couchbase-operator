@@ -327,7 +327,6 @@ spec:
       services:
         - query
         - search
-        - eventing
       volumeMounts:
         logs: couchbase-log-pv
     - size: 1

@@ -32,6 +32,8 @@ type KubeAbstraction interface {
 	GetCouchbaseEphemeralBuckets(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error)
 	// GetCouchbaseMemcachedBuckets returns all memcached buckets for a specified selector.
 	GetCouchbaseMemcachedBuckets(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error)
+	// GetBuckets returns all abstract buckets for a specified selector.
+	GetBuckets(string, *metav1.LabelSelector) ([]couchbasev2.AbstractBucket, error)
 	// GetCouchbaseReplications returns all replications for a specified selector.
 	GetCouchbaseReplications(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseReplicationList, error)
 	// GetCouchbaseUsers returns all users for a specified selector
@@ -123,6 +125,39 @@ func (ab *kubeAbstractionImpl) GetCouchbaseMemcachedBuckets(namespace string, se
 	}
 
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(context.Background(), listOpts)
+}
+
+func (ab *kubeAbstractionImpl) GetBuckets(namespace string, selector *metav1.LabelSelector) ([]couchbasev2.AbstractBucket, error) {
+	buckets, err := ab.GetCouchbaseBuckets(namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	ephemeral, err := ab.GetCouchbaseEphemeralBuckets(namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	memcached, err := ab.GetCouchbaseMemcachedBuckets(namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
+	abstract := []couchbasev2.AbstractBucket{}
+
+	for i := range buckets.Items {
+		abstract = append(abstract, &buckets.Items[i])
+	}
+
+	for i := range ephemeral.Items {
+		abstract = append(abstract, &ephemeral.Items[i])
+	}
+
+	for i := range memcached.Items {
+		abstract = append(abstract, &memcached.Items[i])
+	}
+
+	return abstract, nil
 }
 
 // GetCouchbaseReplications returns all replications for a specified selector.

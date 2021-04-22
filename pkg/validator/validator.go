@@ -3,30 +3,15 @@ package validator
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
-	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	validationv2 "github.com/couchbase/couchbase-operator/pkg/validator/v2"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 )
 
 func New(client kubernetes.Interface, couchbaseClient versioned.Interface, options *types.ValidatorOptions) *types.Validator {
 	return types.New(client, couchbaseClient, options)
-}
-
-func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	if object.GetAPIVersion() == couchbasev2.GroupName+"/v2" {
-		switch object.GetKind() {
-		case couchbasev2.ClusterCRDResourceKind:
-			return validationv2.ApplyDefaults(v, object)
-		case couchbasev2.GroupCRDResourceKind:
-			return validationv2.ApplyGroupDefaults(v, object)
-		}
-	}
-
-	return nil
 }
 
 func CheckConstraints(v *types.Validator, resource runtime.Object) error {

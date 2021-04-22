@@ -152,9 +152,28 @@ func (v *VolumeMounts) GetAnalyticsVolumePaths() []string {
 	return paths
 }
 
+// HasVolumeMounts returns true if volume mounts are defined.
+// This does not check the existence of individual fields.
+func (v *VolumeMounts) HasVolumeMounts() bool {
+	return v != nil
+}
+
+// HasDefaultMount return true if the default mount is specified.
+func (v *VolumeMounts) HasDefaultMount() bool {
+	if !v.HasVolumeMounts() {
+		return false
+	}
+
+	return v.DefaultClaim != ""
+}
+
 // LogsOnly returns true if logs will be the only mounts applied to cluster.
 func (v *VolumeMounts) LogsOnly() bool {
 	return v.LogsClaim != ""
+}
+
+func (v *VolumeMounts) HasSubMounts() bool {
+	return v.DataClaim != "" || v.IndexClaim != "" || v.AnalyticsClaims != nil
 }
 
 func (sc *ServerConfig) GetVolumeMounts() *VolumeMounts {
@@ -411,6 +430,88 @@ func (c *CouchbaseCluster) IsMandatoryMutualTLSEnabled() bool {
 
 func (c *CouchbaseCluster) IsTLSShadowed() bool {
 	return c.IsTLSEnabled() && c.Spec.Networking.TLS.SecretSource != nil
+}
+
+func (c *CouchbaseCluster) IsServerLoggingEnabled() bool {
+	return c.Spec.Logging.Server != nil && c.Spec.Logging.Server.Enabled
+}
+
+func (c *CouchbaseCluster) IsAuditLoggingEnabled() bool {
+	return c.Spec.Logging.Audit != nil && c.Spec.Logging.Audit.Enabled
+}
+
+func (c *CouchbaseCluster) IsAuditGarbageCollectionEnabled() bool {
+	return c.IsAuditLoggingEnabled() && c.Spec.Logging.Audit.GarbageCollection != nil
+}
+
+func (c *CouchbaseCluster) IsAuditGarbageCollectionSidecarEnabled() bool {
+	return c.IsAuditGarbageCollectionEnabled() && c.Spec.Logging.Audit.GarbageCollection.Sidecar != nil && c.Spec.Logging.Audit.GarbageCollection.Sidecar.Enabled
+}
+
+// IsIndexerEnabled tells us whether any server class is running the index service.
+// This is useful as the storage mode cannot be changed on the fly.
+func (c *CouchbaseCluster) IsIndexerEnabled() bool {
+	for _, class := range c.Spec.Servers {
+		if ServiceList(class.Services).Contains(IndexService) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsSupportable tells us whether we can realistically support this cluster.
+// This means that all server classes use the required volume mounts to preserve
+// both data and logs.
+func (c *CouchbaseCluster) IsSupportable() bool {
+	for _, class := range c.Spec.Servers {
+		if !class.IsSupportable() {
+			return false
+		}
+	}
+
+	return true
+}
+
+// AnySupportable tells us whether any classes are supportable, and potentially whether
+// we should enforce them all being so.
+func (c *CouchbaseCluster) AnySupportable() bool {
+	for _, class := range c.Spec.Servers {
+		if class.IsSupportable() {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsSupportable tells us whether a specific server class is supportable, it must
+// have volume mounts, the default claim, or the logs claim if all enabled services
+// are stateless.
+func (sc *ServerConfig) IsSupportable() bool {
+	if !sc.VolumeMounts.HasVolumeMounts() {
+		return false
+	}
+
+	if sc.VolumeMounts.HasDefaultMount() {
+		return true
+	}
+
+	// Note that due to history, we consider full-text search stateless, it
+	// in fact shares the indexer's storage for indexes.  So while we allow
+	// it to use log volumes (and no one uses them anyway...) we recommend
+	// that they use the index mount.
+	statefulServices := []Service{
+		DataService,
+		IndexService,
+		AnalyticsService,
+	}
+
+	if sc.VolumeMounts.LogsOnly() && !ServiceList(sc.Services).ContainsAny(statefulServices...) {
+		return true
+	}
+
+	return false
 }
 
 // Set ready members from list.
@@ -719,6 +820,14 @@ func (b *CouchbaseEphemeralBucket) GetMinimumDurability() CouchbaseEphemeralBuck
 	return CouchbaseEphemeralBucketMinimumDurabilityNone
 }
 
+type BucketType string
+
+const (
+	BucketTypeCouchbase = "couchbase"
+	BucketTypeEphemeral = "ephemeral"
+	BucketTypeMemcached = "memcached"
+)
+
 // AbstractBucket give a bit of commonality to buckets!!
 type AbstractBucket interface {
 	// GetName returns the Couchbase bucket name, either from the metadata
@@ -728,6 +837,9 @@ type AbstractBucket interface {
 
 	// GetMemoryQuota simply returns the buckets resource allocation.
 	GetMemoryQuota() *resource.Quantity
+
+	// GetType returns the bucket type.
+	GetType() BucketType
 }
 
 func (b *CouchbaseBucket) GetName() string {
@@ -744,6 +856,10 @@ func (b *CouchbaseBucket) GetMemoryQuota() *resource.Quantity {
 	return b.Spec.MemoryQuota
 }
 
+func (b *CouchbaseBucket) GetType() BucketType {
+	return BucketTypeCouchbase
+}
+
 func (b *CouchbaseEphemeralBucket) GetName() string {
 	name := b.Name
 
@@ -758,6 +874,10 @@ func (b *CouchbaseEphemeralBucket) GetMemoryQuota() *resource.Quantity {
 	return b.Spec.MemoryQuota
 }
 
+func (b *CouchbaseEphemeralBucket) GetType() BucketType {
+	return BucketTypeEphemeral
+}
+
 func (b *CouchbaseMemcachedBucket) GetName() string {
 	name := b.Name
 
@@ -770,4 +890,8 @@ func (b *CouchbaseMemcachedBucket) GetName() string {
 
 func (b *CouchbaseMemcachedBucket) GetMemoryQuota() *resource.Quantity {
 	return b.Spec.MemoryQuota
+}
+
+func (b *CouchbaseMemcachedBucket) GetType() BucketType {
+	return BucketTypeMemcached
 }

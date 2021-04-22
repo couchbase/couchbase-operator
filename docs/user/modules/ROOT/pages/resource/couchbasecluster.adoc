@@ -2048,6 +2048,8 @@ More info: https://docs.couchbase.com/server/current/manage/manage-security/conf
 
 *Type*: `[]string`
 
+*Minimum Items*: `1`
+
 ==== Description
 
 List of LDAP hosts.

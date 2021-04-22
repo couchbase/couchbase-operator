@@ -339,7 +339,7 @@ type CouchbaseBackupRestoreSpec struct {
 	Backup string `json:"backup"`
 
 	// Repo is the backup folder to restore from.
-	Repo string `json:"repo,omitempty"`
+	Repo string `json:"repo"`
 
 	// Start denotes the first backup to restore from.
 	Start *StrOrInt `json:"start"`
@@ -1484,6 +1484,7 @@ type CouchbaseClusterLDAPSpec struct {
 	AuthorizationEnabled bool `json:"authorizationEnabled,omitempty"`
 
 	// List of LDAP hosts.
+	// +kubebuilder:validation:MinItems=1
 	Hosts []string `json:"hosts"`
 
 	// LDAP port.

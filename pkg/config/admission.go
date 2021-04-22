@@ -91,10 +91,6 @@ type generateAdmissionOptions struct {
 
 	// memoryLimit is the burst amount of memory to kill the pod if exceeded.
 	memoryLimit quantityVar
-
-	// withMutation allows us to deactivate mutating webhooks on platforms
-	// that don't support them.
-	withMutation bool
 }
 
 // newGenerateAdmissionOptions returns a set of options with the defaults applied.
@@ -125,7 +121,6 @@ func (o *generateAdmissionOptions) registerAdmissionGenerateFlags(cmd *cobra.Com
 	cmd.Flags().Var(&o.cpuLimit, "cpu-limit", "CPU limit for constraining, only valid when used with --with-resources")
 	cmd.Flags().Var(&o.memoryRequest, "memory-request", "Memory requested for scheduling, only valid when used with --with-resources")
 	cmd.Flags().Var(&o.memoryLimit, "memory-limit", "Memory limit for constraining, only valid when used with --with-resources")
-	cmd.Flags().BoolVar(&o.withMutation, "with-mutation", true, "Enables resource mutation, may not be supported on some platforms")
 }
 
 // getGenerateAdmissionCommand creates YAML capable of creating the dynamic admission controller.
@@ -282,7 +277,6 @@ func getDeleteAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
 	}
 
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
-	cmd.Flags().BoolVar(&o.withMutation, "with-mutation", true, "Enables resource mutation, may not be supported on some platforms")
 
 	return cmd
 }
@@ -349,10 +343,6 @@ func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags
 		o.getAdmissionDeployment(),
 		o.getAdmissionService(),
 		o.getAdmissionValidatingWebhook(namespace, ca.Certificate),
-	}
-
-	if o.withMutation {
-		resources = append(resources, o.getAdmissionMutatingWebhook(namespace, ca.Certificate))
 	}
 
 	return resources, nil
@@ -627,86 +617,6 @@ func (o *generateAdmissionOptions) getAdmissionService() *corev1.Service {
 			},
 		},
 	}
-}
-
-// getAdmissionMutatingWebhook creates a mutating webhook for the admission controller.
-func (o *generateAdmissionOptions) getAdmissionMutatingWebhook(namespace string, ca []byte) *admissionregistrationv1.MutatingWebhookConfiguration {
-	// You need a webhook per controller when running in namespaced mode.
-	// IF we resued the same one each time, we'd need to aggregate the webhooks
-	// and act as a client doing read/modify/write.  This is complex so instead
-	// just name them deterministically (for deletion) and make many resources.
-	name := AdmissionResourceName
-
-	if !o.scope.value.isClusterScope() {
-		name = AdmissionResourceName + "-" + namespace
-	}
-
-	admissionControllerMutatePath := "/couchbaseclusters/mutate"
-
-	failurePolicy := admissionregistrationv1.Fail
-	sideEffectClass := admissionregistrationv1.SideEffectClassNone
-
-	webhook := &admissionregistrationv1.MutatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Webhooks: []admissionregistrationv1.MutatingWebhook{
-			{
-				Name: AdmissionResourceName + "." + namespace + ".svc",
-				Rules: []admissionregistrationv1.RuleWithOperations{
-					{
-						Rule: admissionregistrationv1.Rule{
-							APIGroups: []string{
-								couchbasev2.GroupName,
-							},
-							Resources: []string{
-								couchbasev2.ClusterCRDResourcePlural,
-								couchbasev2.BucketCRDResourcePlural,
-								couchbasev2.EphemeralBucketCRDResourcePlural,
-								couchbasev2.MemcachedBucketCRDResourcePlural,
-								couchbasev2.ReplicationCRDResourcePlural,
-								couchbasev2.UserCRDResourcePlural,
-								couchbasev2.GroupCRDResourcePlural,
-								couchbasev2.RoleBindingCRDResourcePlural,
-								couchbasev2.BackupCRDResourcePlural,
-								couchbasev2.BackupRestoreCRDResourcePlural,
-								couchbasev2.AutoscalerCRDResourcePlural,
-							},
-							APIVersions: []string{
-								"v1",
-								"v2",
-							},
-						},
-						Operations: []admissionregistrationv1.OperationType{
-							admissionregistrationv1.Create,
-							admissionregistrationv1.Update,
-						},
-					},
-				},
-				ClientConfig: admissionregistrationv1.WebhookClientConfig{
-					Service: &admissionregistrationv1.ServiceReference{
-						Namespace: namespace,
-						Name:      AdmissionResourceName,
-						Path:      &admissionControllerMutatePath,
-					},
-					CABundle: ca,
-				},
-				FailurePolicy: &failurePolicy,
-				SideEffects:   &sideEffectClass,
-				AdmissionReviewVersions: []string{
-					"v1",
-				},
-			},
-		},
-	}
-
-	// When in namespace scoped mode, the selector will be populated and must be
-	// added to the webhook.
-	if !o.scope.value.isClusterScope() {
-		webhook.Webhooks[0].NamespaceSelector = o.namespaceSelector.LabelSelector
-	}
-
-	return webhook
 }
 
 // getAdmissionValidatingWebhook creates a validating webhook for the admission controller.

@@ -22,7 +22,6 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -237,59 +236,6 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 	return &reviewResponse
 }
 
-// couchbaseClustersMutate mutates a CouchbaseCluster object before validation.  This allows
-// us to set sensible default values for various properties.
-func couchbaseClustersMutate(config *Config, ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
-	fields := []interface{}{
-		"operation", ar.Request.Operation,
-		"kind", ar.Request.Kind,
-		"namespace", ar.Request.Namespace,
-		"name", ar.Request.Name,
-	}
-
-	if log.V(1).Enabled() {
-		fields = append(fields, "resource", ar.Request.Object)
-	}
-
-	log.Info("Mutating resource", fields...)
-
-	// Decode the object as an unstructured data type.  Defaulting happens before
-	// schema validation, so we mustn't try decode until this occurs.
-	object := &unstructured.Unstructured{}
-	if err := json.Unmarshal(ar.Request.Object.Raw, object); err != nil {
-		log.Error(err, "Resource decode failed")
-		return errorResponse(err)
-	}
-
-	// Build the response object
-	pt := admissionv1.PatchTypeJSONPatch
-	reviewResponse := admissionv1.AdmissionResponse{
-		Allowed: true,
-	}
-
-	options := &types.ValidatorOptions{
-		ValidateSecrets:        config.ValidateSecrets,
-		ValidateStorageClasses: config.ValidateStorageClasses,
-		DefaultFileSystemGroup: config.DefaultFileSystemGroup,
-	}
-
-	patch := validator.ApplyDefaults(validator.New(getClient(), getCouchbaseClient(), options), object)
-	if patch != nil {
-		log.V(1).Info("Applying patch", "patch", patch)
-
-		data, err := json.Marshal(patch)
-		if err != nil {
-			log.Error(err, "Patch encode failed")
-			return errorResponse(err)
-		}
-
-		reviewResponse.PatchType = &pt
-		reviewResponse.Patch = data
-	}
-
-	return &reviewResponse
-}
-
 // admitFunc defines a callback function which accepts an admission review and returns a response.
 type admitFunc func(*Config, admissionv1.AdmissionReview) *admissionv1.AdmissionResponse
 
@@ -371,13 +317,6 @@ func serveCouchbaseClustersValidate(config *Config) func(http.ResponseWriter, *h
 	}
 }
 
-// serveCouchbaseClustersValidate handles CouchbaseCluster mutation requests.
-func serveCouchbaseClustersMutate(config *Config) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		serve(config, w, r, couchbaseClustersMutate)
-	}
-}
-
 // Server wraps up a HTTP server and gives it restart capabilities.
 type Server struct {
 	// server is the server instance, it is replaced each time the server
@@ -435,7 +374,6 @@ func Serve(config *Config) {
 	http.HandleFunc("/", serveDefault)
 	http.HandleFunc("/readyz", serveReadiness)
 	http.HandleFunc("/couchbaseclusters/validate", serveCouchbaseClustersValidate(config))
-	http.HandleFunc("/couchbaseclusters/mutate", serveCouchbaseClustersMutate(config))
 
 	tlsConfig := configTLS(config)
 

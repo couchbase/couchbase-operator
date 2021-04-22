@@ -148,13 +148,6 @@ Validates secrets referenced by Couchbase resources, and their contents e.g. TLS
 +
 Validates storage classes referenced by Couchbase resources
 
---with-mutation::
-*Type*: bool
-+
-*Default*: true
-+
-Enables resource mutation, may not be supported on some platforms
-
 --with-resources::
 *Type*: bool
 +
@@ -562,13 +555,6 @@ cbopcfg delete admission --scope namespace
 *Default*: cluster
 +
 Whether to scope the Operator to a 'namespace' or to the 'cluster'.
-
---with-mutation::
-*Type*: bool
-+
-*Default*: true
-+
-Enables resource mutation, may not be supported on some platforms
 
 === Inherited Flags
 
@@ -995,13 +981,6 @@ Validates secrets referenced by Couchbase resources, and their contents e.g. TLS
 *Default*: true
 +
 Validates storage classes referenced by Couchbase resources
-
---with-mutation::
-*Type*: bool
-+
-*Default*: true
-+
-Enables resource mutation, may not be supported on some platforms
 
 --with-resources::
 *Type*: bool

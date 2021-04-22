@@ -2,15 +2,14 @@ package v2
 
 import (
 	"crypto/x509"
+	goerrors "errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
@@ -19,683 +18,842 @@ import (
 	"github.com/go-openapi/errors"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/robfig/cron/v3"
 )
 
 const (
-	defaultFSGroup              = 1000
-	defaultMetricsImage         = "couchbase/exporter:1.0.4"
-	redhatMetricsImage          = "registry.connect.redhat.com/couchbase/exporter:1.0.4-1"
-	defaultBackupImage          = "couchbase/operator-backup:1.1.0"
-	redhatBackupImage           = "registry.connect.redhat.com/couchbase/operator-backup:1.1.0-1"
-	defaultBackupServiceAccount = "couchbase-backup"
-	bucketTTLMax                = (1 << 31) - 1 // Puny 32 bit signed integers
+	bucketTTLMax = (1 << 31) - 1 // Puny 32 bit signed integers
 )
 
-var (
-	emptyObject = struct{}{}
-)
+// CheckConstraints does domain specific validation for a Couchbase cluster.
+// NOTE: philosophically, we shouldn't need this many, and my gut feeling is that
+// through clever API design we can cull some of them.  Obviously this is a
+// CRDv3 thing.
+func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
+		checkConstraintDataServiceMemoryQuota,
+		checkConstraintIndexServiceMemoryQuota,
+		checkConstraintSearchServiceMemoryQuota,
+		checkConstraintEventingServiceMemoryQuota,
+		checkConstraintAnalyticsServiceMemoryQuota,
+		checkConstraintQueryTemporarySpace,
+		checkConstraintAutoFailoverTimeout,
+		checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod,
+		checkConstraintIndexerMemorySnapshotInterval,
+		checkConstraintIndexerStableSnapshotInterval,
+		checkConstraintAdminSecret,
+		checkConstraintPrometheusAuthorizationSecret,
+		checkConstraintLoggingPermissible,
+		checkConstraintAuditLoggingPermissible,
+		checkConstraintXDCRRemoteAuthentication,
+		checkConstraintXDCRReplicationBuckets,
+		checkConstraintServerClassContainsDataService,
+		checkConstraintClusterSupportable,
+		checkConstraintServiceEnabledForVolumeMount,
+		checkConstraintDefaultAndLogVolumesMututallyExclusive,
+		checkConstraintServiceMountsUsedWithDefaultMount,
+		checkConstraintTemplateExistsForMount,
+		checkConstraintVolumeTemplateNameUnique,
+		checkConstraintVolumeTemplateSize,
+		checkConstraintVolumeTemplateStorageClass,
+		checkConstraintServerMinimumVersion,
+		checkConstraintTLS,
+		checkConstraintXDCRConnectionTLS,
+		checkConstraintPublicNetworking,
+		checkConstraintBucketNames,
+		checkConstraintMemoryAllocations,
+		checkConstraintMTLSPaths,
+		checkConstraintAutoCompactionTombstonePurgeInterval,
+		checkConstraintLDAPAuthentication,
+		checkConstraintLDAPConnectionTLS,
+		checkConstraintLDAPAuthorization,
+		checkConstraintAutoscalingStabilizationPeriod,
+	}
 
-func ApplyDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	var patch jsonpatch.PatchList
+	var errs []error
 
-	// SM: This may not actually be needed any more on OCP.  I say may, as I don't trust
-	// customers, however, I think it prudent to make this behaviour optional so support
-	// can turn it off if it becomes a problem.  It has certainly prevented a lot of
-	// support cases in the past few years!
-	if v.Options.DefaultFileSystemGroup {
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext", Value: emptyObject})
-		}
+	for _, check := range checks {
+		if err := check(v, cluster); err != nil {
+			var composite *errors.CompositeError
 
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "securityContext", "fsGroup"); !found {
-			fsgroup := defaultFSGroup
-
-			// OCP specific hack, set the fsGroup to that defined in the namespace.
-			// Otherwise default to the default for the dockerhub container.
-			namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
-			if !apierrors.IsForbidden(err) {
-				if namespace.Annotations != nil {
-					if groups, ok := namespace.Annotations["openshift.io/sa.scc.supplemental-groups"]; ok {
-						// This may either look like 1000140000/10000
-						// or 1000140000-1000150000, just pick the first
-						// group.
-						i := strings.Index(groups, "-")
-						if i == -1 {
-							i = strings.Index(groups, "/")
-						}
-
-						if i != -1 {
-							if val, err := strconv.Atoi(groups[:i]); err == nil {
-								fsgroup = val
-							}
-						}
-					}
-				}
+			if ok := goerrors.As(err, &composite); ok {
+				errs = append(errs, composite.Errors...)
+				continue
 			}
 
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/securityContext/fsGroup", Value: fsgroup})
-		}
-	}
-
-	if managedBackup, found, _ := unstructured.NestedBool(object.Object, "spec", "backup", "managed"); found && managedBackup {
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "image"); !found {
-			backupImage := defaultBackupImage
-
-			namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
-			if !apierrors.IsForbidden(err) {
-				if namespace.Annotations != nil {
-					for annotation := range namespace.Annotations {
-						if strings.HasPrefix(annotation, "openshift.io") {
-							backupImage = redhatBackupImage
-							break
-						}
-					}
-				}
-			}
-
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/image", Value: backupImage})
-		}
-
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "backup", "serviceAccountName"); !found {
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/backup/serviceAccountName", Value: defaultBackupServiceAccount})
-		}
-	}
-
-	if enableMonitoring, found, _ := unstructured.NestedBool(object.Object, "spec", "monitoring", "prometheus", "enabled"); found && enableMonitoring {
-		if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "monitoring", "prometheus", "image"); !found {
-			metricsImage := defaultMetricsImage
-
-			namespace, err := v.Abstraction.GetNamespace(object.GetNamespace())
-			if !apierrors.IsForbidden(err) {
-				if namespace.Annotations != nil {
-					for annotation := range namespace.Annotations {
-						if strings.HasPrefix(annotation, "openshift.io") {
-							metricsImage = redhatMetricsImage
-							break
-						}
-					}
-				}
-			}
-
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/monitoring/prometheus/image", Value: metricsImage})
-		}
-	}
-
-	if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "security", "ldap"); found {
-		// enable authorization if not specified but groupsQuery also exists.
-		// otherwise this can remain false since authorization can still be
-		// done for external users with names that already exist in the cluster
-		if _, found, _ := unstructured.NestedBool(object.Object, "spec", "security", "ldap", "authorizationEnabled"); !found {
-			if _, found, _ := unstructured.NestedFieldNoCopy(object.Object, "spec", "security", "ldap", "groupsQuery"); found {
-				patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/authorizationEnabled", Value: true})
-			}
-		}
-
-		// enable cert validation if encryption type is not None
-		if encryption, found, _ := unstructured.NestedFieldCopy(object.Object, "spec", "security", "ldap", "encryption"); found {
-			if encryption != string(couchbasev2.LDAPEncryptionNone) {
-				if _, found, _ := unstructured.NestedBool(object.Object, "spec", "security", "ldap", "serverCertValidation"); !found {
-					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/serverCertValidation", Value: true})
-				}
-			}
-		} else {
-			// encryption is disabled by default
-			patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: "/spec/security/ldap/encryption", Value: couchbasev2.LDAPEncryptionNone})
-		}
-	}
-
-	return patch
-}
-
-func ApplyGroupDefaults(v *types.Validator, object *unstructured.Unstructured) jsonpatch.PatchList {
-	var patch jsonpatch.PatchList
-
-	roles, _, _ := unstructured.NestedSlice(object.Object, "spec", "roles")
-	for i, role := range roles {
-		if r, ok := role.(map[string]interface{}); ok {
-			// Apply bucket role to all buckets by default
-			bucket, ok := r["bucket"]
-			if !ok || (bucket == "") {
-				if couchbasev2.IsBucketRole(couchbasev2.RoleName(r["name"].(string))) {
-					path := fmt.Sprintf("/spec/roles/%d/bucket", i)
-
-					patch = append(patch, jsonpatch.Patch{Op: jsonpatch.Add, Path: path, Value: "*"})
-				}
-			}
-		}
-	}
-
-	return patch
-}
-
-func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseCluster) error {
-	errs := []error{}
-
-	// Basic schema openapi v3 validation (not provided by structural schema)
-	// DELETE ME AFTER 1.17
-	if !util.UniqueString(couchbasev2.ServiceList(customResource.Spec.Networking.AdminConsoleServices).StringSlice()) {
-		errs = append(errs, errors.DuplicateItems("spec.networking.adminConsoleServices", "body"))
-	}
-
-	if !util.UniqueString(couchbasev2.ExposedFeatureList(customResource.Spec.Networking.ExposedFeatures).StringSlice()) {
-		errs = append(errs, errors.DuplicateItems("spec.networking.exposedFeatures", "body"))
-	}
-
-	if !util.UniqueString(customResource.Spec.ServerGroups) {
-		errs = append(errs, errors.DuplicateItems("spec.serverGroups", "body"))
-	}
-
-	for i, class := range customResource.Spec.Servers {
-		if !util.UniqueString(couchbasev2.ServiceList(class.Services).StringSlice()) {
-			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].services", i), "body"))
-		}
-
-		if !util.UniqueString(class.ServerGroups) {
-			errs = append(errs, errors.DuplicateItems(fmt.Sprintf("spec.servers[%d].serverGroups", i), "body"))
-		}
-	}
-
-	// Cluster validation
-	if customResource.Spec.ClusterSettings.DataServiceMemQuota != nil {
-		if customResource.Spec.ClusterSettings.DataServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256Mi"))
-		}
-	}
-
-	if customResource.Spec.ClusterSettings.IndexServiceMemQuota != nil {
-		if customResource.Spec.ClusterSettings.IndexServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256Mi"))
-		}
-	}
-
-	if customResource.Spec.ClusterSettings.SearchServiceMemQuota != nil {
-		if customResource.Spec.ClusterSettings.SearchServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256Mi"))
-		}
-	}
-
-	if customResource.Spec.ClusterSettings.EventingServiceMemQuota != nil {
-		if customResource.Spec.ClusterSettings.EventingServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.eventingServiceMemoryQuota in body should be greater than or equal to 256Mi"))
-		}
-	}
-
-	if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota != nil {
-		if customResource.Spec.ClusterSettings.AnalyticsServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.analyticsServiceMemoryQuota in body should be greater than or equal to 1Gi"))
-		}
-	}
-
-	if customResource.Spec.ClusterSettings.AutoFailoverTimeout != nil {
-		if customResource.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() < 5.0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5s"))
-		}
-
-		if customResource.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() > 3600.0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be less than or equal to 1h"))
-		}
-	}
-
-	if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod != nil {
-		if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() < 5.0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be greater than or equal to 5s"))
-		}
-
-		if customResource.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() > 3600.0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h"))
-		}
-	}
-
-	if customResource.Spec.ClusterSettings.Indexer != nil {
-		if int(customResource.Spec.ClusterSettings.Indexer.MemorySnapshotInterval.Milliseconds()) < 1 {
-			errs = append(errs, fmt.Errorf("spec.cluster.indexer.memorySnapshotInterval in body must be greater than or equal to 1ms"))
-		}
-
-		if int(customResource.Spec.ClusterSettings.Indexer.StableSnapshotInterval.Milliseconds()) < 1 {
-			errs = append(errs, fmt.Errorf("spec.cluster.indexer.stableSnapshotInterval in body must be greater than or equal to 1ms"))
-		}
-	}
-
-	if customResource.Spec.ClusterSettings.Query != nil {
-		if customResource.Spec.ClusterSettings.Query.TemporarySpace.Cmp(*k8sutil.NewResourceQuantityMi(0)) <= 0 {
-			errs = append(errs, fmt.Errorf("spec.cluster.query.temporarySpace in body should be greater than 0Mi"))
-		}
-	}
-
-	// Referenced object validation
-	if v.Options.ValidateSecrets {
-		secret, err := v.Abstraction.GetSecret(customResource.Namespace, customResource.Spec.Security.AdminSecret)
-
-		switch {
-		case err != nil:
-			errs = append(errs, err)
-		case secret == nil:
-			errs = append(errs, fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", customResource.Spec.Security.AdminSecret))
-		default:
-			if _, ok := secret.Data["username"]; !ok {
-				errs = append(errs, fmt.Errorf("spec.security.adminSecret must contain \"username\" key"))
-			}
-
-			if value, ok := secret.Data["password"]; !ok {
-				errs = append(errs, fmt.Errorf("spec.security.adminSecret must contain \"password\" key"))
-			} else {
-				if len(value) < 6 {
-					errs = append(errs, errors.TooShort("password", "spec.security.adminSecret", 6))
-				}
-				if strings.ContainsAny(string(value), `()<>,;:\"/[]?={}`) {
-					errs = append(errs, fmt.Errorf(`password in spec.security.adminSecret must not contain any of the following characters ()<>,;:\"/[]?={}`))
-				}
-			}
-		}
-	}
-
-	// Referenced object validation
-	if customResource.Spec.Monitoring != nil && customResource.Spec.Monitoring.Prometheus != nil {
-		if v.Options.ValidateSecrets {
-			authSecret := customResource.Spec.Monitoring.Prometheus.AuthorizationSecret
-			if authSecret != nil {
-				if secret, err := v.Abstraction.GetSecret(customResource.Namespace, *authSecret); err != nil {
-					errs = append(errs, err)
-				} else if secret == nil {
-					errs = append(errs, fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", *customResource.Spec.Monitoring.Prometheus.AuthorizationSecret))
-				} else if _, ok := secret.Data["token"]; !ok {
-					errs = append(errs, fmt.Errorf("monitoring authorization secret %s must contain key 'token'", *authSecret))
-				}
-			}
-		}
-	}
-
-	if customResource.Spec.Logging.Server != nil && customResource.Spec.Logging.Server.Enabled {
-		// If we want to use the sidecars then a PV must be present to use.
-		// See separate PV validation but if any server class has a log volume or a default volume they all should.
-		// Just checking the first server with some extra nil pointer checks
-		// No checks are required for empty strings for configurationName, configurationMountPath or image as this will be omitted and defaulted then.
-		if len(customResource.Spec.Servers) == 0 {
-			errs = append(errs, fmt.Errorf("spec.logging.server requires spec.servers to be populated to enable logging sidecar"))
-		} else {
-			mounts := customResource.Spec.Servers[0].VolumeMounts
-			if mounts == nil || (mounts.DefaultClaim == "" && mounts.LogsClaim == "") {
-				errs = append(errs, fmt.Errorf("spec.logging.server requires a default or logs volume to enable logging sidecar"))
-			}
-		}
-	} else {
-		// Checks for server logging being disabled (not enabled) and any that require it (audit).
-		// Ignore any settings if audit not enabled.
-		auditSettings := customResource.Spec.Logging.Audit
-		if auditSettings != nil && auditSettings.Enabled {
-			// We are not allowing audit garbage collection without some form of server log shipping.
-			gc := auditSettings.GarbageCollection
-			if gc != nil && gc.Sidecar != nil && gc.Sidecar.Enabled {
-				errs = append(errs, fmt.Errorf("spec.logging.audit.garbageCollection.sidecar.enabled requires spec.logging.server configured for log shipping"))
-			}
-		}
-	}
-
-	if customResource.Spec.XDCR.Managed {
-		for i, remoteCluster := range customResource.Spec.XDCR.RemoteClusters {
-			if remoteCluster.AuthenticationSecret != nil {
-				if v.Options.ValidateSecrets {
-					if secret, err := v.Abstraction.GetSecret(customResource.Namespace, *remoteCluster.AuthenticationSecret); err != nil {
-						errs = append(errs, err)
-					} else if secret == nil {
-						errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", *remoteCluster.AuthenticationSecret, i))
-					}
-				}
-			}
-
-			replications, err := v.Abstraction.GetCouchbaseReplications(customResource.Namespace, remoteCluster.Replications.Selector)
-			if err != nil {
-				errs = append(errs, err)
-			}
-
-			for _, replication := range replications.Items {
-				if err := validateBucketExists(v, customResource, replication.Spec.Bucket); err != nil {
-					errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist: %w", replication.Spec.Bucket, replication.Name, err))
-				}
-			}
-		}
-	}
-
-	// Check to make sure:
-	// 1. Server names are unique
-	// 2. The data service is specified on at least one node
-	// 3. The derived autoscaler name will be unique
-	unique := make(map[string]bool)
-	hasDataService := false
-
-	for i, config := range customResource.Spec.Servers {
-		// DELETE ME AFTER 1.17
-		if _, ok := unique[customResource.Spec.Servers[i].Name]; ok {
-			errs = append(errs, errors.DuplicateItems("spec.servers.name", "body"))
-		}
-
-		for _, svc := range customResource.Spec.Servers[i].Services {
-			if svc == "data" {
-				hasDataService = true
-			}
-		}
-
-		if _, ok := unique[config.AutoscalerName(customResource.Name)]; ok {
-			errs = append(errs, errors.DuplicateItems("spec.servers.autoscaler.name", "body"))
-		}
-
-		unique[customResource.Spec.Servers[i].Name] = true
-		unique[config.AutoscalerName(customResource.Name)] = true
-	}
-
-	if !hasDataService {
-		err := errors.Required("at least one \"data\" service", "spec.servers[*].services")
-		errs = append(errs, err)
-	}
-
-	stabilizationPeriod := customResource.Spec.AutoscaleStabilizationPeriod
-	if stabilizationPeriod != nil && stabilizationPeriod.Duration < 0 {
-		errs = append(errs, fmt.Errorf("spec.autoscaleStabilizationPeriod cannot be a negative value"))
-	}
-
-	// Validate the cluster is supportable.
-	// 1. If any server class has a log volume or a default volume they all should.
-	// 2. Log volumes can only be used on server classes containing query, search and eventing services.
-	//    Data, index and analytics volumes must use the default mount for data persistence.
-	anySupportable := false
-
-	for _, class := range customResource.Spec.Servers {
-		if class.VolumeMounts != nil {
-			if class.VolumeMounts.DefaultClaim != "" || class.VolumeMounts.LogsClaim != "" {
-				anySupportable = true
-			}
-		}
-	}
-
-	if anySupportable {
-		for index, class := range customResource.Spec.Servers {
-			// Volume mounts must be specified if any others are supportable
-			if class.VolumeMounts == nil {
-				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d]", index)))
-			} else if couchbasev2.ServiceList(class.Services).ContainsAny(couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.AnalyticsService) && class.VolumeMounts.DefaultClaim == "" {
-				// These stateful services must have a "default" mount
-				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
-				// Note that we don't test for search here but we do allow the Index mount to be used for it later though for performance reasons.
-			}
-		}
-	}
-
-	// validate persistent volume spec such that when volumeMounts are specified, claim for
-	// `default` must be provided, and all mounts much pair to associated persistentVolumeClaims.
-	// `logs` claim cannot be used in conjunction with `default` claim.
-	for index, config := range customResource.Spec.Servers {
-		if config.VolumeMounts != nil {
-			mounts := config.VolumeMounts
-
-			secondaryMounts := []string{}
-
-			if mounts.DataClaim != "" {
-				secondaryMounts = append(secondaryMounts, "data")
-			}
-
-			if mounts.IndexClaim != "" {
-				secondaryMounts = append(secondaryMounts, "index")
-			}
-
-			if mounts.AnalyticsClaims != nil {
-				secondaryMounts = append(secondaryMounts, "analytics")
-			}
-
-			hasSecondaryMounts := len(secondaryMounts) > 0
-
-			// Check the associated service is enabled
-			if mounts.DataClaim != "" && !couchbasev2.ServiceList(config.Services).Contains(couchbasev2.DataService) {
-				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.data requires the data service to be enabled", index))
-			}
-
-			if mounts.IndexClaim != "" && !couchbasev2.ServiceList(config.Services).ContainsAny(couchbasev2.IndexService, couchbasev2.SearchService) {
-				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.index requires the index or search service to be enabled", index))
-			}
-
-			if mounts.AnalyticsClaims != nil && !couchbasev2.ServiceList(config.Services).Contains(couchbasev2.AnalyticsService) {
-				errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.analytics requires the analytics service to be enabled", index))
-			}
-
-			templateNamesEnum := []interface{}{}
-
-			templateNames := customResource.Spec.GetVolumeClaimTemplateNames()
-			for _, name := range templateNames {
-				templateNamesEnum = append(templateNamesEnum, name)
-			}
-
-			switch {
-			case mounts.LogsOnly():
-				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.LogsClaim); template == nil {
-					errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].logs", index), "", mounts.LogsClaim, templateNamesEnum))
-				}
-
-				if mounts.DefaultClaim != "" || hasSecondaryMounts {
-					if mounts.DefaultClaim != "" {
-						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].volumeMounts", index), "", "default"))
-					}
-
-					for _, secondaryMount := range secondaryMounts {
-						errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].volumeMounts", index), "", secondaryMount))
-					}
-				}
-			case mounts.DefaultClaim != "":
-				if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DefaultClaim); template == nil {
-					errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].default", index), "", mounts.DefaultClaim, templateNamesEnum))
-				}
-
-				if mounts.DataClaim != "" {
-					if template := customResource.Spec.GetVolumeClaimTemplate(mounts.DataClaim); template == nil {
-						errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].data", index), "", mounts.DataClaim, templateNamesEnum))
-					}
-				}
-
-				if mounts.IndexClaim != "" {
-					if template := customResource.Spec.GetVolumeClaimTemplate(mounts.IndexClaim); template == nil {
-						errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].index", index), "", mounts.IndexClaim, templateNamesEnum))
-					}
-				}
-
-				if len(mounts.AnalyticsClaims) > 0 {
-					for analyticsIndex, claim := range mounts.AnalyticsClaims {
-						if template := customResource.Spec.GetVolumeClaimTemplate(claim); template == nil {
-							errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].analytics[%d]", index, analyticsIndex), "", claim, templateNamesEnum))
-						}
-					}
-				}
-			case hasSecondaryMounts:
-				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
-			}
-		}
-	}
-
-	// validate claim templates such that storage class is provided along with valid request
-	pvcMap := map[string]bool{}
-
-	for i, pvc := range customResource.Spec.VolumeClaimTemplates {
-		hasStorageQuantity := false
-
-		// Request quantity cannot be negative or zero
-		if quantity, ok := pvc.Spec.Resources.Requests[v1.ResourceStorage]; ok {
-			hasStorageQuantity = hasStorageQuantity || (quantity.Sign() == 1)
-		}
-
-		// There is no such thing as a limit in regard to storage request
-		// but the k8s api allows a value here since it is a Resource kind.
-		// It's not an error to provide this, but it cannot be standalone
-		// since the volume capacity only requires a request value.
-		if quantity, ok := pvc.Spec.Resources.Limits[v1.ResourceStorage]; ok {
-			hasStorageQuantity = hasStorageQuantity && (quantity.Sign() == 1)
-		}
-
-		if !hasStorageQuantity {
-			err := errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates[*].resources.requests|limits")
 			errs = append(errs, err)
 		}
-
-		pvcName := pvc.ObjectMeta.Name
-		if pvcMap[pvcName] {
-			err := errors.DuplicateItems(fmt.Sprintf("spec.volumeClaimTemplates[%d].metadata.name", i), "body")
-			errs = append(errs, err)
-		} else {
-			pvcMap[pvcName] = true
-		}
-
-		// Ensure storageClass exists
-		if pvc.Spec.StorageClassName != nil && v.Options.ValidateStorageClasses {
-			storageClass, err := v.Abstraction.GetStorageClass(*pvc.Spec.StorageClassName)
-
-			switch {
-			case err != nil:
-				errs = append(errs, err)
-			case storageClass == nil:
-				errs = append(errs, fmt.Errorf("storage class %q must exist", *pvc.Spec.StorageClassName))
-			case customResource.Spec.EnableOnlineVolumeExpansion:
-				// StorageClass must allow volume expansion when feature is enabled
-				volumeExpansionAllowed := false
-				if val := storageClass.AllowVolumeExpansion; val != nil {
-					volumeExpansionAllowed = *val
-				}
-
-				if !volumeExpansionAllowed {
-					errs = append(errs, fmt.Errorf("spec.cluster.enableOnlineVolumeExpansion cannot be enabled since storage class %q does not specify `allowVolumeExpansion=true`", *pvc.Spec.StorageClassName))
-				}
-			}
-		}
 	}
 
-	// version check
-	currentVersionString, err := k8sutil.CouchbaseVersion(customResource.Spec.Image)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("unsupported Couchbase version: %w", err))
-	}
-
-	currentVersion, err := couchbaseutil.NewVersion(currentVersionString)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("unsupported Couchbase version: %w", err))
-	} else {
-		// current version must be equal or greater than min version
-		minVersion, _ := couchbaseutil.NewVersion(constants.CouchbaseVersionMin)
-		if currentVersion.Less(minVersion) {
-			errs = append(errs, fmt.Errorf("unsupported Couchbase version: %s, minimum version required: %s", currentVersion, constants.CouchbaseVersionMin))
-		}
-	}
-
-	// Record the zones that the server certificate needs to support as we look at the network configuration.
-	subjectAltNames := util_x509.MandatorySANs(customResource.Name, customResource.Namespace)
-
-	if customResource.Spec.Networking.DNS != nil {
-		subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", customResource.Spec.Networking.DNS.Domain))
-	}
-
-	// Check TLS
-	errs = append(errs, validateTLS(v, customResource, subjectAltNames)...)
-	errs = append(errs, validateTLSXDCR(v, customResource)...)
-
-	// Require that publically visible service ports have DNS information available.
-	if customResource.Spec.IsExposedFeatureServiceTypePublic() || customResource.Spec.IsAdminConsoleServiceTypePublic() {
-		if customResource.Spec.Networking.TLS == nil {
-			errs = append(errs, errors.Required("spec.networking.tls", "body"))
-		}
-
-		if customResource.Spec.Networking.DNS == nil {
-			errs = append(errs, errors.Required("spec.networking.dns", "body"))
-		}
-	}
-
-	if err := validateBucketNameConstraints(v, customResource); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := validateMemoryConstraints(v, customResource); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Check mutual verification
-	if customResource.Spec.Networking.TLS != nil && customResource.Spec.Networking.TLS.ClientCertificatePolicy != nil {
-		if len(customResource.Spec.Networking.TLS.ClientCertificatePaths) == 0 {
-			errs = append(errs, errors.TooFewItems("spec.networking.tls.clientCertificatePaths", "", 1))
-		}
-	}
-
-	// Check auto compaction
-	purgeInterval := customResource.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
-	if purgeInterval < 1.0 {
-		errs = append(errs, fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h"))
-	}
-
-	if purgeInterval > 60.0*24.0 {
-		errs = append(errs, fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d"))
-	}
-
-	// Check LDAP Settings
-	if ldap := customResource.Spec.Security.LDAP; ldap != nil {
-		if len(ldap.Hosts) == 0 {
-			errs = append(errs, errors.TooFewItems("spec.security.ldap.hosts", "", 1))
-		}
-
-		// If authentication enabled then require username mapping
-		if ldap.AuthenticationEnabled {
-			// Both mapping options cannot be empty
-			if (ldap.UserDNMapping.Template == "") && (ldap.UserDNMapping.Query == "") {
-				errs = append(errs, errors.Required("spec.security.ldap.userDNMapping", "body"))
-			}
-			// Only 1 mapping option allowed
-			if (ldap.UserDNMapping.Template != "") && (ldap.UserDNMapping.Query != "") {
-				errs = append(errs, fmt.Errorf("ldap.userDNMapping must contain either query or template"))
-			}
-		}
-
-		// ca is required when tls is enabled
-		if ldap.EnableCertValidation {
-			// encryption type must be set
-			if ldap.Encryption == couchbasev2.LDAPEncryptionNone {
-				errs = append(errs, fmt.Errorf("encryption must be one of %s | %s, when serverCertValidation is enabled",
-					couchbasev2.LDAPEncryptionTLS, couchbasev2.LDAPEncryptionStartTLS))
-			}
-
-			// If encryption enabled then require cert secret
-			tlsSecretName := customResource.Spec.Security.LDAP.TLSSecret
-			if tlsSecretName == "" {
-				errs = append(errs, errors.Required("spec.security.ldap.tlsSecret", "body"))
-			}
-
-			// secret containing ldap ca must exist
-			if v.Options.ValidateSecrets {
-				tlsSecret, err := v.Abstraction.GetSecret(customResource.Namespace, tlsSecretName)
-				if err != nil {
-					errs = append(errs, err)
-				} else if tlsSecret == nil {
-					errs = append(errs, fmt.Errorf("secret %s referenced by security.ldap.tlsSecret must exist", tlsSecretName))
-				} else if _, ok := tlsSecret.Data["ca.crt"]; !ok {
-					errs = append(errs, fmt.Errorf("ldap tls secret %s must contain key 'ca.crt'", tlsSecretName))
-				}
-			}
-		}
-
-		// require groups query when group auth enabled
-		if ldap.AuthorizationEnabled {
-			if ldap.GroupsQuery == "" {
-				errs = append(errs, errors.Required("security.ldap.groupsQuery", "body"))
-			}
-		}
-	}
-
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
 }
 
+// checkConstraintDataServiceMemoryQuota checks the service memory resource lower limit.
+func checkConstraintDataServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	if cluster.Spec.ClusterSettings.DataServiceMemQuota == nil {
+		return errors.Required("spec.cluster.dataServiceMemoryQuota", "body")
+	}
+
+	if cluster.Spec.ClusterSettings.DataServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
+		return fmt.Errorf("spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256Mi")
+	}
+
+	return nil
+}
+
+// checkConstraintIndexServiceMemoryQuota checks the service memory resource lower limit.
+func checkConstraintIndexServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	if cluster.Spec.ClusterSettings.IndexServiceMemQuota == nil {
+		return errors.Required("spec.cluster.indexServiceMemoryQuota", "body")
+	}
+
+	if cluster.Spec.ClusterSettings.IndexServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
+		return fmt.Errorf("spec.cluster.indexServiceMemoryQuota in body should be greater than or equal to 256Mi")
+	}
+
+	return nil
+}
+
+// checkConstraintSearchServiceMemoryQuota checks the service memory resource lower limit.
+func checkConstraintSearchServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	if cluster.Spec.ClusterSettings.SearchServiceMemQuota == nil {
+		return errors.Required("spec.cluster.searchServiceMemoryQuota", "body")
+	}
+
+	if cluster.Spec.ClusterSettings.SearchServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
+		return fmt.Errorf("spec.cluster.searchServiceMemoryQuota in body should be greater than or equal to 256Mi")
+	}
+
+	return nil
+}
+
+// checkConstraintEventingServiceMemoryQuota checks the service memory resource lower limit.
+func checkConstraintEventingServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	if cluster.Spec.ClusterSettings.EventingServiceMemQuota == nil {
+		return errors.Required("spec.cluster.eventingServiceMemoryQuota", "body")
+	}
+
+	if cluster.Spec.ClusterSettings.EventingServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
+		return fmt.Errorf("spec.cluster.eventingServiceMemoryQuota in body should be greater than or equal to 256Mi")
+	}
+
+	return nil
+}
+
+// checkConstraintAnalyticsServiceMemoryQuota checks the service memory resource lower limit.
+func checkConstraintAnalyticsServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	if cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota == nil {
+		return errors.Required("spec.cluster.anayticsServiceMemoryQuota", "body")
+	}
+
+	if cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+		return fmt.Errorf("spec.cluster.analyticsServiceMemoryQuota in body should be greater than or equal to 1Gi")
+	}
+
+	return nil
+}
+
+// checkConstraintQueryTemporarySpace checks the query temporary space is higher than the lower limit.
+func checkConstraintQueryTemporarySpace(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Query == nil {
+		return nil
+	}
+
+	if cluster.Spec.ClusterSettings.Query.TemporarySpace.Cmp(*k8sutil.NewResourceQuantityMi(0)) <= 0 {
+		return fmt.Errorf("spec.cluster.query.temporarySpace in body should be greater than 0Mi")
+	}
+
+	return nil
+}
+
+// checkConstraintAutoFailoverTimeout checks the autofailover timeout is within range.
+func checkConstraintAutoFailoverTimeout(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	if cluster.Spec.ClusterSettings.AutoFailoverTimeout == nil {
+		return errors.Required("spec.cluster.autoFailoverTimeout", "body")
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() < 5.0 {
+		return fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5s")
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() > 3600.0 {
+		return fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be less than or equal to 1h")
+	}
+
+	return nil
+}
+
+// checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod checks the auto failover timeout is within range.
+func checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == nil {
+		return errors.Required("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body")
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() < 5.0 {
+		return fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be greater than or equal to 5s")
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() > 3600.0 {
+		return fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h")
+	}
+
+	return nil
+}
+
+// checkConstraintIndexerMemorySnapshotInterval checks the indexer snapshot interval is within range.
+func checkConstraintIndexerMemorySnapshotInterval(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Indexer == nil {
+		return nil
+	}
+
+	if int(cluster.Spec.ClusterSettings.Indexer.MemorySnapshotInterval.Milliseconds()) < 1 {
+		return fmt.Errorf("spec.cluster.indexer.memorySnapshotInterval in body must be greater than or equal to 1ms")
+	}
+
+	return nil
+}
+
+// checkConstraintIndexerStableSnapshotInterval checks the indexer snapshot interval is within range.
+func checkConstraintIndexerStableSnapshotInterval(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Indexer == nil {
+		return nil
+	}
+
+	if int(cluster.Spec.ClusterSettings.Indexer.StableSnapshotInterval.Milliseconds()) < 1 {
+		return fmt.Errorf("spec.cluster.indexer.stableSnapshotInterval in body must be greater than or equal to 1ms")
+	}
+
+	return nil
+}
+
+// checkConstraintAdminSecret checks that the admin secret exists.  If it does then it checks
+// that the "username" and "password" keys are present.  If the "password" key is present
+// it also checks that the password is of the correct length and using the correct dictionary.
+func checkConstraintAdminSecret(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	secret, err := v.Abstraction.GetSecret(cluster.Namespace, cluster.Spec.Security.AdminSecret)
+	if err != nil {
+		return err
+	}
+
+	if secret == nil {
+		return fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", cluster.Spec.Security.AdminSecret)
+	}
+
+	var errs []error
+
+	if _, ok := secret.Data["username"]; !ok {
+		errs = append(errs, fmt.Errorf("spec.security.adminSecret must contain \"username\" key"))
+	}
+
+	if value, ok := secret.Data["password"]; !ok {
+		errs = append(errs, fmt.Errorf("spec.security.adminSecret must contain \"password\" key"))
+	} else {
+		if len(value) < 6 {
+			errs = append(errs, errors.TooShort("password", "spec.security.adminSecret", 6))
+		}
+		if strings.ContainsAny(string(value), `()<>,;:\"/[]?={}`) {
+			errs = append(errs, fmt.Errorf(`password in spec.security.adminSecret must not contain any of the following characters ()<>,;:\"/[]?={}`))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintPrometheusAuthorizationSecret checks that if enabled, the Prometheus token
+// based authentication secret exists.  If it does then check that it includes a "token" key.
+func checkConstraintPrometheusAuthorizationSecret(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	if cluster.Spec.Monitoring == nil || cluster.Spec.Monitoring.Prometheus == nil {
+		return nil
+	}
+
+	if cluster.Spec.Monitoring.Prometheus.AuthorizationSecret == nil {
+		return nil
+	}
+
+	secretName := *cluster.Spec.Monitoring.Prometheus.AuthorizationSecret
+
+	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	if err != nil {
+		return err
+	}
+
+	if secret == nil {
+		return fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", secretName)
+	}
+
+	if _, ok := secret.Data["token"]; !ok {
+		return fmt.Errorf("monitoring authorization secret %s must contain key 'token'", secretName)
+	}
+
+	return nil
+}
+
+// checkConstraintLoggingPermissible checks persistent volumes are being used.
+func checkConstraintLoggingPermissible(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.IsServerLoggingEnabled() {
+		return nil
+	}
+
+	if !cluster.IsSupportable() {
+		return fmt.Errorf("server logging requires 'spec.servers.volumeMounts' to be configured")
+	}
+
+	return nil
+}
+
+// checkConstraintAuditLoggingPermissible checks that when using the audit log
+// garbage collector, shared volumes are enabled and audit logging is also enabled.
+func checkConstraintAuditLoggingPermissible(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.IsAuditGarbageCollectionSidecarEnabled() {
+		return nil
+	}
+
+	if !cluster.IsSupportable() {
+		return fmt.Errorf("server audit logging requires 'spec.servers.volumeMounts' to be configured")
+	}
+
+	if !cluster.IsAuditLoggingEnabled() {
+		return fmt.Errorf("server audit logging requires 'spec.logging.audit.garbageCollection.sidecar.enabled' to be set")
+	}
+
+	return nil
+}
+
+func checkConstraintXDCRRemoteAuthentication(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.XDCR.Managed {
+		return nil
+	}
+
+	var errs []error
+
+	for i, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+		if v.Options.ValidateSecrets && remoteCluster.AuthenticationSecret != nil {
+			secretName := *remoteCluster.AuthenticationSecret
+
+			secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+			if err != nil {
+				errs = append(errs, err)
+			}
+
+			if secret == nil {
+				errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", secretName, i))
+			}
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.XDCR.Managed {
+		return nil
+	}
+
+	var errs []error
+
+	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+		replications, err := v.Abstraction.GetCouchbaseReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, replication := range replications.Items {
+			if err := validateBucketExists(v, cluster, replication.Spec.Bucket); err != nil {
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist: %w", replication.Spec.Bucket, replication.Name, err))
+			}
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintServerClassContainsDataService checks are least one class has the data service enabled.
+func checkConstraintServerClassContainsDataService(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	for _, config := range cluster.Spec.Servers {
+		if couchbasev2.ServiceList(config.Services).Contains(couchbasev2.DataService) {
+			return nil
+		}
+	}
+
+	return errors.Required("at least one \"data\" service", "spec.servers.services")
+}
+
+// checkConstraintClusterSupportable checks that if you have one supportable class, they all are.
+func checkConstraintClusterSupportable(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.AnySupportable() && !cluster.IsSupportable() {
+		return fmt.Errorf("all server classes must have volumes defined, all classes with stateful services must have the 'default' mount defined")
+	}
+
+	return nil
+}
+
+// checkConstraintServiceEnabledForVolumeMount checks that volume mounts are only used with the correct services.
+func checkConstraintServiceEnabledForVolumeMount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	for index, config := range cluster.Spec.Servers {
+		if !config.VolumeMounts.HasVolumeMounts() {
+			continue
+		}
+
+		services := couchbasev2.ServiceList(config.Services)
+
+		if config.VolumeMounts.DataClaim != "" && !services.Contains(couchbasev2.DataService) {
+			errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.data requires the data service to be enabled", index))
+		}
+
+		if config.VolumeMounts.IndexClaim != "" && !services.ContainsAny(couchbasev2.IndexService, couchbasev2.SearchService) {
+			errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.index requires the index or search service to be enabled", index))
+		}
+
+		if config.VolumeMounts.AnalyticsClaims != nil && !services.Contains(couchbasev2.AnalyticsService) {
+			errs = append(errs, fmt.Errorf("spec.servers[%d].volumeMounts.analytics requires the analytics service to be enabled", index))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintDefaultAndLogVolumesMututallyExclusive checks either logs or default mounts
+// are specified, but never both at the same time.
+func checkConstraintDefaultAndLogVolumesMututallyExclusive(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	for index, config := range cluster.Spec.Servers {
+		if !config.VolumeMounts.HasVolumeMounts() {
+			continue
+		}
+
+		if config.VolumeMounts.LogsClaim != "" && config.VolumeMounts.DefaultClaim != "" {
+			errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.servers[%d].volumeMounts", index), "", "default"))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintServiceMountsUsedWithDefaultMount checks that service specific mounts are
+// only used when the default mount is i.e. persisting data and not /etc just doesn't work!
+func checkConstraintServiceMountsUsedWithDefaultMount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	for index, config := range cluster.Spec.Servers {
+		if !config.VolumeMounts.HasVolumeMounts() {
+			continue
+		}
+
+		if config.VolumeMounts.HasSubMounts() && !config.VolumeMounts.HasDefaultMount() {
+			errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintTemplateExistsForMount checks that volume mounts are only specified when the
+// corresponding service is enabled.
+func checkConstraintTemplateExistsForMount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	templateNamesEnum := []interface{}{}
+
+	for _, template := range cluster.Spec.VolumeClaimTemplates {
+		templateNamesEnum = append(templateNamesEnum, template.ObjectMeta.Name)
+	}
+
+	for index, config := range cluster.Spec.Servers {
+		if !config.VolumeMounts.HasVolumeMounts() {
+			continue
+		}
+
+		if config.VolumeMounts.DefaultClaim != "" && cluster.Spec.GetVolumeClaimTemplate(config.VolumeMounts.DefaultClaim) == nil {
+			errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].default", index), "", config.VolumeMounts.DefaultClaim, templateNamesEnum))
+		}
+
+		if config.VolumeMounts.DataClaim != "" && cluster.Spec.GetVolumeClaimTemplate(config.VolumeMounts.DataClaim) == nil {
+			errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].data", index), "", config.VolumeMounts.DataClaim, templateNamesEnum))
+		}
+
+		if config.VolumeMounts.IndexClaim != "" && cluster.Spec.GetVolumeClaimTemplate(config.VolumeMounts.IndexClaim) == nil {
+			errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].index", index), "", config.VolumeMounts.IndexClaim, templateNamesEnum))
+		}
+
+		for analyticsIndex, claim := range config.VolumeMounts.AnalyticsClaims {
+			if cluster.Spec.GetVolumeClaimTemplate(claim) == nil {
+				errs = append(errs, errors.EnumFail(fmt.Sprintf("spec.servers[%d].analytics[%d]", index, analyticsIndex), "", claim, templateNamesEnum))
+			}
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintVolumeTemplateNameUnique checks that volume claim templates have unique
+// names and therefore selection is unambiguous.
+func checkConstraintVolumeTemplateNameUnique(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	names := map[string]interface{}{}
+
+	for _, template := range cluster.Spec.VolumeClaimTemplates {
+		if _, ok := names[template.ObjectMeta.Name]; ok {
+			return errors.DuplicateItems("spec.volumeClaimTemplates.metadata.name", "body")
+		}
+
+		names[template.ObjectMeta.Name] = nil
+	}
+
+	return nil
+}
+
+// checkConstraintVolumeTemplateSize checks that volume claim templates have a resource
+// request (aka size) specified, and it's greater than zero.
+func checkConstraintVolumeTemplateSize(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	for _, template := range cluster.Spec.VolumeClaimTemplates {
+		if template.Spec.Resources.Requests == nil {
+			errs = append(errs, errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates.resources.requests"))
+			continue
+		}
+
+		value, ok := template.Spec.Resources.Requests[v1.ResourceStorage]
+		if !ok {
+			errs = append(errs, errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates.resources.requests"))
+			continue
+		}
+
+		if value.Sign() <= 0 {
+			errs = append(errs, fmt.Errorf("spec.volumeClaimTemplates.resources.requests in body should be greater than 0"))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintVolumeTemplateStorageClass checks that volume claim templates reference
+// a storage class that actually exists.  When using volume expansion it also checks that
+// said feature is enabled for that storage class.
+func checkConstraintVolumeTemplateStorageClass(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !v.Options.ValidateStorageClasses {
+		return nil
+	}
+
+	var errs []error
+
+	for _, template := range cluster.Spec.VolumeClaimTemplates {
+		if template.Spec.StorageClassName == nil {
+			// Not so fast skippy, you can lookup the default storage class
+			// and continue with the checks...
+			continue
+		}
+
+		storageClassName := *template.Spec.StorageClassName
+
+		storageClass, err := v.Abstraction.GetStorageClass(storageClassName)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		if storageClass == nil {
+			errs = append(errs, fmt.Errorf("storage class %s must exist", storageClassName))
+			continue
+		}
+
+		if !cluster.Spec.EnableOnlineVolumeExpansion {
+			continue
+		}
+
+		if storageClass.AllowVolumeExpansion == nil || !*storageClass.AllowVolumeExpansion {
+			errs = append(errs, fmt.Errorf("spec.cluster.enableOnlineVolumeExpansion cannot be enabled since storage class %q does not specify `allowVolumeExpansion=true`", storageClassName))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintServerMinimumVersion checks that the Couchbase version is supported.
+func checkConstraintServerMinimumVersion(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// version check
+	currentVersionString, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return fmt.Errorf("unsupported Couchbase version: %w", err)
+	}
+
+	currentVersion, err := couchbaseutil.NewVersion(currentVersionString)
+	if err != nil {
+		return fmt.Errorf("unsupported Couchbase version: %w", err)
+	}
+
+	// current version must be equal or greater than min version
+	minVersion, _ := couchbaseutil.NewVersion(constants.CouchbaseVersionMin)
+	if currentVersion.Less(minVersion) {
+		return fmt.Errorf("unsupported Couchbase version: %s, minimum version required: %s", currentVersion, constants.CouchbaseVersionMin)
+	}
+
+	return nil
+}
+
+// checkConstraintTLS checks that the X.509v3 SANs are correctly configured for use with
+// Couchbase on Kubernetes, that the referenced secret exists and is correctly formatted.
+func checkConstraintTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.IsTLSEnabled() {
+		return nil
+	}
+
+	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace)
+
+	if cluster.Spec.Networking.DNS != nil {
+		subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", cluster.Spec.Networking.DNS.Domain))
+	}
+
+	errs := validateTLS(v, cluster, subjectAltNames)
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintXDCRConnectionTLS checks that the referenced XDCR connection secrets
+// exist and are correctly formatted.
+func checkConstraintXDCRConnectionTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	errs := validateTLSXDCR(v, cluster)
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintPublicNetworking checks that when the intention (this is implicit, thus
+// probably bad) is to use public networking, then both TLS and DNS are configured.
+func checkConstraintPublicNetworking(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.IsExposedFeatureServiceTypePublic() && !cluster.Spec.IsAdminConsoleServiceTypePublic() {
+		return nil
+	}
+
+	var errs []error
+
+	if cluster.Spec.Networking.TLS == nil {
+		errs = append(errs, errors.Required("spec.networking.tls", "body"))
+	}
+
+	if cluster.Spec.Networking.DNS == nil {
+		errs = append(errs, errors.Required("spec.networking.dns", "body"))
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintBucketNames checks that all buckets referenced by this cluster have
+// unique names.
+func checkConstraintBucketNames(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	return validateBucketNameConstraints(v, cluster)
+}
+
+// checkConstraintMemoryAllocations checks that all buckets referenced by this cluster
+// have total memory requirements less than or equal to the data service memory quota.
+func checkConstraintMemoryAllocations(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	return validateMemoryConstraints(v, cluster)
+}
+
+// checkConstraintMTLSPaths checks that when mTLS is enabled, then paths are specified
+// in order to extract user identinty from the X.509 client certificate.
+func checkConstraintMTLSPaths(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.IsMutualTLSEnabled() {
+		return nil
+	}
+
+	if len(cluster.Spec.Networking.TLS.ClientCertificatePaths) == 0 {
+		return errors.TooFewItems("spec.networking.tls.clientCertificatePaths", "", 1)
+	}
+
+	return nil
+}
+
+// checkConstraintAutoCompactionTombstonePurgeInterval checks that the tombstone purge
+// interval is in range.
+func checkConstraintAutoCompactionTombstonePurgeInterval(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	purgeInterval := cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
+	if purgeInterval < 1.0 {
+		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h")
+	}
+
+	if purgeInterval > 60.0*24.0 {
+		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d")
+	}
+
+	return nil
+}
+
+// checkConstraintLDAPAuthentication checks that when enabled, either a template or
+// query are provided for LDAP authentication.
+func checkConstraintLDAPAuthentication(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	ldap := cluster.Spec.Security.LDAP
+
+	if ldap == nil {
+		return nil
+	}
+
+	if !ldap.AuthenticationEnabled {
+		return nil
+	}
+
+	if ldap.UserDNMapping.Template == "" && ldap.UserDNMapping.Query == "" {
+		return errors.Required("spec.security.ldap.userDNMapping", "body")
+	}
+
+	if ldap.UserDNMapping.Template != "" && ldap.UserDNMapping.Query != "" {
+		return fmt.Errorf("ldap.userDNMapping must contain either query or template")
+	}
+
+	return nil
+}
+
+// checkConstraintLDAPConnectionTLS checks that when enabled, the encryption type and
+// TLS secrets exists and is correctly formatted for LDAPS.
+func checkConstraintLDAPConnectionTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	ldap := cluster.Spec.Security.LDAP
+
+	if ldap == nil {
+		return nil
+	}
+
+	if !ldap.EnableCertValidation {
+		return nil
+	}
+
+	if ldap.Encryption == couchbasev2.LDAPEncryptionNone {
+		return fmt.Errorf("encryption must be one of %s | %s, when serverCertValidation is enabled", couchbasev2.LDAPEncryptionTLS, couchbasev2.LDAPEncryptionStartTLS)
+	}
+
+	tlsSecretName := cluster.Spec.Security.LDAP.TLSSecret
+	if tlsSecretName == "" {
+		return errors.Required("spec.security.ldap.tlsSecret", "body")
+	}
+
+	if v.Options.ValidateSecrets {
+		tlsSecret, err := v.Abstraction.GetSecret(cluster.Namespace, tlsSecretName)
+		if err != nil {
+			return err
+		}
+
+		if tlsSecret == nil {
+			return fmt.Errorf("secret %s referenced by security.ldap.tlsSecret must exist", tlsSecretName)
+		}
+
+		if _, ok := tlsSecret.Data["ca.crt"]; !ok {
+			return fmt.Errorf("ldap tls secret %s must contain key 'ca.crt'", tlsSecretName)
+		}
+	}
+
+	return nil
+}
+
+// checkConstraintLDAPAuthorization checks that when enabled, a query is provided
+// for LDAP authorization.
+func checkConstraintLDAPAuthorization(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	ldap := cluster.Spec.Security.LDAP
+
+	if ldap == nil {
+		return nil
+	}
+
+	// require groups query when group auth enabled
+	if !ldap.AuthorizationEnabled {
+		return nil
+	}
+
+	if ldap.GroupsQuery == "" {
+		return errors.Required("security.ldap.groupsQuery", "body")
+	}
+
+	return nil
+}
+
+// checkConstraintAutoscalingStabilizationPeriod checks the autoscaling stablization period is greater than the lower limit.
+func checkConstraintAutoscalingStabilizationPeriod(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	stabilizationPeriod := cluster.Spec.AutoscaleStabilizationPeriod
+
+	if stabilizationPeriod == nil {
+		return nil
+	}
+
+	if stabilizationPeriod.Duration < 0 {
+		return fmt.Errorf("spec.autoscaleStabilizationPeriod must be greater than or equal to 0s")
+	}
+
+	return nil
+}
+
 func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
-	errs := []error{}
+	var errs []error
 
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
@@ -723,7 +881,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -731,7 +889,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 }
 
 func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket) error {
-	errs := []error{}
+	var errs []error
 
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
@@ -759,7 +917,7 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 		errs = append(errs, err)
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -767,7 +925,7 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 }
 
 func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.CouchbaseMemcachedBucket) error {
-	errs := []error{}
+	var errs []error
 
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
@@ -783,7 +941,7 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 		errs = append(errs, err)
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -795,7 +953,7 @@ func CheckConstraintsReplication(v *types.Validator, replication *couchbasev2.Co
 }
 
 func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.CouchbaseUser) error {
-	errs := []error{}
+	var errs []error
 
 	// only 'local' and 'ldap' auth domains accepted
 	domain := user.Spec.AuthDomain
@@ -826,7 +984,7 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 		return fmt.Errorf("unknown auth domain: %s", user.Spec.AuthDomain)
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -834,7 +992,7 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 }
 
 func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
-	errs := []error{}
+	var errs []error
 
 	if err := validateBackupCronSchedules(backup); err != nil {
 		errs = err
@@ -848,7 +1006,7 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = append(errs, fmt.Errorf("spec.s3bucket %s is not a valid S3 bucket URI format", backup.Spec.S3Bucket))
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -856,70 +1014,117 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 }
 
 func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
-	errs := []error{}
-
-	if len(restore.Spec.Backup) == 0 && len(restore.Spec.Repo) == 0 {
-		errs = append(errs, fmt.Errorf("both spec.backup and spec.repo fields are empty. Please supply a value for at least one"))
+	checks := []func(*types.Validator, *couchbasev2.CouchbaseBackupRestore) error{
+		checkContraintRestoreStart,
+		checkContraintRestoreEnd,
+		checkContraintRestoreRange,
+		checkContraintRestoreBucketsMutuallyExclusive,
+		checkConstraintRestoreMappedBucketNotExcluded,
 	}
 
-	// start is required
+	var errs []error
+
+	for _, check := range checks {
+		if err := check(v, restore); err != nil {
+			var composite *errors.CompositeError
+
+			if ok := goerrors.As(err, &composite); ok {
+				errs = append(errs, composite.Errors...)
+				continue
+			}
+
+			errs = append(errs, err)
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkContraintRestoreStart(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	start := restore.Spec.Start
-	if start == nil {
-		errs = append(errs, fmt.Errorf("specify a start point or backup"))
-	} else if start.Str != nil && start.Int != nil {
-		// both str and int are specified
-		errs = append(errs, fmt.Errorf("specify just one value, either Str or Int"))
+
+	if start.Str != nil && start.Int != nil {
+		return fmt.Errorf("specify just one value, either Str or Int")
 	}
 
-	// if end has been specified
+	return nil
+}
+
+func checkContraintRestoreEnd(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	end := restore.Spec.End
-	if start != nil && end != nil {
-		// both str and int are specified
-		if end.Str != nil && end.Int != nil {
-			errs = append(errs, fmt.Errorf("specify just one value, either Str or Int"))
+
+	if end == nil {
+		return nil
+	}
+
+	// both str and int are specified
+	if end.Str != nil && end.Int != nil {
+		return fmt.Errorf("specify just one value, either Str or Int")
+	}
+
+	return nil
+}
+
+func checkContraintRestoreRange(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	start := restore.Spec.Start
+	end := restore.Spec.End
+
+	if end == nil {
+		return nil
+	}
+
+	if end.Str != nil && start.Str != nil {
+		if *end.Str == "oldest" && *start.Str == "newest" {
+			return fmt.Errorf("start point %s is after end point %s", *start.Str, *end.Str)
 		}
+	}
 
-		// end and start differ
-		if end != start {
-			// start and end are using string arguments
-			if end.Str != nil && start.Str != nil {
-				if *end.Str == "oldest" && *start.Str == "newest" {
-					errs = append(errs, fmt.Errorf("start point %s is after end point %s", *start.Str, *end.Str))
-				}
-			}
+	// start and end are using integer arguments
+	if start.Int != nil && end.Int != nil {
+		if *start.Int > *end.Int {
+			return fmt.Errorf("start integer cannot be larger than end integer")
+		}
+	}
 
-			// start and end are using integer arguments
-			if start.Int != nil && end.Int != nil {
-				if *start.Int > *end.Int {
-					errs = append(errs, fmt.Errorf("start integer cannot be larger than end integer"))
-				}
+	return nil
+}
+
+func checkContraintRestoreBucketsMutuallyExclusive(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	var errs []error
+
+	for _, b := range restore.Spec.Buckets.Exclude {
+		for _, b1 := range restore.Spec.Buckets.Include {
+			if b1 == b {
+				errs = append(errs, fmt.Errorf("bucket to be excluded cannot also be in bucket include list"))
+				break
 			}
 		}
 	}
 
-	if len(restore.Spec.Buckets.Exclude) != 0 {
-	outer:
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintRestoreMappedBucketNotExcluded(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	var errs []error
+
+	for _, m := range restore.Spec.Buckets.BucketMap {
 		for _, b := range restore.Spec.Buckets.Exclude {
-			if len(restore.Spec.Buckets.Include) != 0 {
-				for _, b1 := range restore.Spec.Buckets.Include {
-					if strings.TrimSpace(b1) == strings.TrimSpace(b) {
-						errs = append(errs, fmt.Errorf("bucket to be excluded cannot also be in bucket include list"))
-						break outer
-					}
-				}
-			}
-			if len(restore.Spec.Buckets.BucketMap) != 0 {
-				for _, m := range restore.Spec.Buckets.BucketMap {
-					if strings.TrimSpace(m.Source) == strings.TrimSpace(b) {
-						errs = append(errs, fmt.Errorf("bucket to be excluded cannot also be in a source field of the bucketMap"))
-						break outer
-					}
-				}
+			if m.Source == b {
+				errs = append(errs, fmt.Errorf("bucket to be excluded cannot also be in a source field of the bucketMap"))
+				break
 			}
 		}
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -927,7 +1132,7 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 }
 
 func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.CouchbaseGroup) error {
-	errs := []error{}
+	var errs []error
 
 	for index, role := range group.Spec.Roles {
 		// role itself must be valid
@@ -938,7 +1143,7 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 		}
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -1330,55 +1535,21 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 
 // validateBucketExists ensures the specified Couchbase bucket exists.
 func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, name string) error {
-	buckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	buckets, err := v.Abstraction.GetBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
 		return err
 	}
 
-	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
-	if err != nil {
-		return err
-	}
-
-	for _, bucket := range buckets.Items {
-		if bucket.Spec.Name != "" {
-			if bucket.Spec.Name == name {
-				return nil
-			}
-		} else {
-			if bucket.Name == name {
-				return nil
-			}
+	for _, bucket := range buckets {
+		if bucket.GetName() != name {
+			continue
 		}
-	}
 
-	for _, bucket := range ephemeralBuckets.Items {
-		if bucket.Spec.Name != "" {
-			if bucket.Spec.Name == name {
-				return nil
-			}
-		} else {
-			if bucket.Name == name {
-				return nil
-			}
+		if bucket.GetType() == couchbasev2.BucketTypeMemcached {
+			return fmt.Errorf("memcached bucket %s cannot be replicated", name)
 		}
-	}
 
-	memcachedBuckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
-	if err != nil {
-		return err
-	}
-
-	for _, bucket := range memcachedBuckets.Items {
-		if bucket.Spec.Name != "" {
-			if bucket.Spec.Name == name {
-				return fmt.Errorf("memcached bucket %s cannot be replicated", name)
-			}
-		} else {
-			if bucket.Name == name {
-				return fmt.Errorf("memcached bucket %s cannot be replicated", name)
-			}
-		}
+		return nil
 	}
 
 	return fmt.Errorf("bucket %s not found", name)
@@ -1386,7 +1557,7 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 
 // validateBackupCronSchedules ensures that the correct cronjob schedules are valid for the desired backup strategy.
 func validateBackupCronSchedules(backup *couchbasev2.CouchbaseBackup) []error {
-	errs := []error{}
+	var errs []error
 
 	switch backup.Spec.Strategy {
 	case couchbasev2.FullIncremental:
@@ -1422,125 +1593,194 @@ func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name s
 	return nil
 }
 
+// CheckImmutableFields checks whether the user is trying to change something
+// that cannot be changed.  Think long and hard about adding stuff here... is it
+// technically impossible to be updated?  Are you just being lazy?  History
+// dictates that anything in here will soon not be because users will change it
+// it won't work and they will complain at you.
 func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error {
-	errs := []error{}
-
-	if !reflect.DeepEqual(current.Spec.Networking.AddressFamily, updated.Spec.Networking.AddressFamily) {
-		errs = append(errs, util.NewUpdateError(`spec.networking.addressFamily`, `body`))
+	checks := []func(*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster) error{
+		checkImmutableAddressFamily,
+		checkImmutableServerClass,
+		checkImmutableIndexStorage,
+		checkImmutableImage,
+		checkImmutableVolumeTemplateSize,
 	}
+
+	var errs []error
+
+	for _, check := range checks {
+		if err := check(current, updated); err != nil {
+			var composite *errors.CompositeError
+
+			if ok := goerrors.As(err, &composite); ok {
+				errs = append(errs, composite.Errors...)
+				continue
+			}
+
+			errs = append(errs, err)
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkImmutableAddressFamily checks that you aren't doing something silly like trying
+// to migrate from IPv4 to IPv6.  Couchbase doesn't do dual stack, it's one or the other
+// and set at pod creation time.
+func checkImmutableAddressFamily(current, updated *couchbasev2.CouchbaseCluster) error {
+	if !reflect.DeepEqual(current.Spec.Networking.AddressFamily, updated.Spec.Networking.AddressFamily) {
+		return util.NewUpdateError(`spec.networking.addressFamily`, `body`)
+	}
+
+	return nil
+}
+
+// checkImmuatableServerClass checks that you aren't modifying that Couchbase cannot
+// change about a pod, e.g. the set of services is it running.  This is set at pod
+// creation time and cannot be updated.
+func checkImmutableServerClass(current, updated *couchbasev2.CouchbaseCluster) error {
+	var errs []error
 
 	for _, cur := range current.Spec.Servers {
 		for i, up := range updated.Spec.Servers {
 			if cur.Name == up.Name {
 				if !util.StringArrayCompare(couchbasev2.ServiceList(cur.Services).StringSlice(), couchbasev2.ServiceList(up.Services).StringSlice()) {
-					err := util.NewUpdateError(fmt.Sprintf("spec.servers[%d].services", i), "body")
-					errs = append(errs, err)
+					errs = append(errs, util.NewUpdateError(fmt.Sprintf("spec.servers[%d].services", i), "body"))
+					continue
 				}
 			}
 		}
 	}
 
-	// Check to see if either the old or new specification have the the index
-	// service defined. If they do then we cannot change the indexStorageSetting.
-	hasIndexSvc := false
-
-	for _, cur := range current.Spec.Servers {
-		for _, svc := range cur.Services {
-			if svc == couchbasev2.IndexService {
-				hasIndexSvc = true
-			}
-		}
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
 	}
 
-	for _, up := range updated.Spec.Servers {
-		for _, svc := range up.Services {
-			if svc == couchbasev2.IndexService {
-				hasIndexSvc = true
-			}
-		}
+	return nil
+}
+
+// checkImmutableIndexStorage checks you aren't trying to update the index storage
+// setting when the index service is running.  This is again a limitation of Couchbase
+// and is set on pod creation.  You can just balance out all your index pods, then
+// change the setting and add them back again, which requires a maintenance window.
+func checkImmutableIndexStorage(current, updated *couchbasev2.CouchbaseCluster) error {
+	// Index storage modes are updated after the topology changes, therefore
+	// we only care if the updated cluster has any index services running.
+	if !updated.IsIndexerEnabled() {
+		return nil
 	}
 
-	if hasIndexSvc {
-		prev := current.Spec.ClusterSettings.IndexStorageSetting
+	prev := current.Spec.ClusterSettings.IndexStorageSetting
 
-		if current.Spec.ClusterSettings.Indexer != nil {
-			prev = current.Spec.ClusterSettings.Indexer.StorageMode
-		}
-
-		curr := updated.Spec.ClusterSettings.IndexStorageSetting
-
-		if updated.Spec.ClusterSettings.Indexer != nil {
-			curr = updated.Spec.ClusterSettings.Indexer.StorageMode
-		}
-
-		if prev != curr {
-			errs = append(errs, fmt.Errorf("spec.cluster.indexStorageSetting/spec.cluster.indexer.storageMode in body cannot be modified if there are any nodes in the cluster running the index service"))
-		}
+	if current.Spec.ClusterSettings.Indexer != nil {
+		prev = current.Spec.ClusterSettings.Indexer.StorageMode
 	}
 
-	// Upgrade validation
-	// * Deny downgrades if no upgrade in progress
-	// * Deny upgrade if across major versions
-	// * Deny rollback if it doesn't match the current version
+	curr := updated.Spec.ClusterSettings.IndexStorageSetting
+
+	if updated.Spec.ClusterSettings.Indexer != nil {
+		curr = updated.Spec.ClusterSettings.Indexer.StorageMode
+	}
+
+	if prev != curr {
+		return fmt.Errorf("spec.cluster.indexStorageSetting/spec.cluster.indexer.storageMode in body cannot be modified if there are any nodes in the cluster running the index service")
+	}
+
+	return nil
+}
+
+// checkImmutableImage checks whether the image is immutable.  This is conditional,
+// because we want to allow upgrades, while stopping ones that may cause problems.
+// Couchbase cannot be downgraded (because network protocols may have changed).
+// Upgrade is only allowed (aka tested) between N.x.x and N+1.x.x.  Finally we allow
+// a special type of downgrade -- rollback -- but only to the original version.
+func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
+	if current.Spec.Image == updated.Spec.Image {
+		return nil
+	}
+
 	currentVersion, err := k8sutil.CouchbaseVersion(current.Spec.Image)
 	if err != nil {
-		errs = append(errs, err)
+		return err
 	}
 
 	updatedVersion, err := k8sutil.CouchbaseVersion(updated.Spec.Image)
 	if err != nil {
-		errs = append(errs, err)
+		return err
 	}
 
 	upgradeCondition := current.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
-	if upgradeCondition == nil && currentVersion != updatedVersion {
+
+	// Condition is not set, therefore we are starting an upgrade.
+	if upgradeCondition == nil {
 		src, err := couchbaseutil.NewVersion(currentVersion)
 		if err != nil {
-			errs = append(errs, err)
+			return err
 		}
 
 		dst, err := couchbaseutil.NewVersion(updatedVersion)
 		if err != nil {
-			errs = append(errs, err)
+			return err
 		}
 
 		if dst.Less(src) {
-			errs = append(errs, fmt.Errorf("spec.Version in body should be greater than %s", src.Semver()))
+			return fmt.Errorf("spec.Version in body should be greater than %s", src.Semver())
 		}
 
 		if dst.Major() > src.Major()+1 {
 			max, _ := couchbaseutil.NewVersion(fmt.Sprintf("%d.0.0", src.Major()+2))
-			errs = append(errs, fmt.Errorf("spec.Version in body should be less than %s", max.Semver()))
+			return fmt.Errorf("spec.Version in body should be less than %s", max.Semver())
+		}
+
+		return nil
+	}
+
+	// Modification during upgrade, only allow rollback.
+	if updatedVersion != current.Status.CurrentVersion {
+		return util.NewUpdateError("spec.version", "body")
+	}
+
+	return nil
+}
+
+// checkImmutableVolumeTemplateSize checks that you aren't downscaling volumes
+// as this is not allowed by the underlying platform.
+func checkImmutableVolumeTemplateSize(current, updated *couchbasev2.CouchbaseCluster) error {
+	if !updated.Spec.EnableOnlineVolumeExpansion {
+		return nil
+	}
+
+	var errs []error
+
+	for _, updatedClaimTemplate := range updated.Spec.VolumeClaimTemplates {
+		currentClaimTemplate := current.Spec.GetVolumeClaimTemplate(updatedClaimTemplate.ObjectMeta.Name)
+		if currentClaimTemplate == nil {
+			// Claim is being added
+			continue
+		}
+
+		// Compare storage requests
+		currentQuantity, ok := currentClaimTemplate.Spec.Resources.Requests[v1.ResourceStorage]
+		if !ok {
+			continue
+		}
+
+		updatedQuantity, ok := updatedClaimTemplate.Spec.Resources.Requests[v1.ResourceStorage]
+		if !ok {
+			continue
+		}
+
+		if updatedQuantity.Cmp(currentQuantity) == -1 {
+			errs = append(errs, fmt.Errorf("spec.volumeClaimTemplates.resources.requests.storage in body can not be less than previous value %s", currentQuantity.String()))
 		}
 	}
 
-	if upgradeCondition != nil && currentVersion != updatedVersion {
-		if updatedVersion != current.Status.CurrentVersion {
-			errs = append(errs, util.NewUpdateError("spec.version", "body"))
-		}
-	}
-
-	if updated.Spec.EnableOnlineVolumeExpansion {
-		// Online Persistent Volumes cannot be down-scaled since the current
-		// action is provided by a Filesystem 'expansion' storage driver
-		for _, updatedClaimTemplate := range updated.Spec.VolumeClaimTemplates {
-			currentClaimTemplate := current.Spec.GetVolumeClaimTemplate(updatedClaimTemplate.ObjectMeta.Name)
-			if currentClaimTemplate == nil {
-				// Claim is being added
-				continue
-			}
-
-			// Compare storage requests
-			currentQuantity, cOk := currentClaimTemplate.Spec.Resources.Requests[v1.ResourceStorage]
-			updatedQuantity, uOk := updatedClaimTemplate.Spec.Resources.Requests[v1.ResourceStorage]
-
-			if cOk && uOk && updatedQuantity.Cmp(currentQuantity) == -1 {
-				errs = append(errs, fmt.Errorf("spec.volumeClaimTemplates[*].resources.requests[storage] in body can not be less than previous value %s", currentQuantity.String()))
-			}
-		}
-	}
-
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -1548,13 +1788,13 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 }
 
 func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
-	errs := []error{}
+	var errs []error
 
 	if prev.Spec.ConflictResolution != curr.Spec.ConflictResolution {
 		errs = append(errs, util.NewUpdateError("spec.conflictResolution", "body"))
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -1562,13 +1802,13 @@ func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 }
 
 func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEphemeralBucket) error {
-	errs := []error{}
+	var errs []error
 
 	if prev.Spec.ConflictResolution != curr.Spec.ConflictResolution {
 		errs = append(errs, util.NewUpdateError("spec.conflictResolution", "body"))
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -1580,7 +1820,7 @@ func CheckImmutableFieldsMemcachedBucket(prev, curr *couchbasev2.CouchbaseMemcac
 }
 
 func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplication) error {
-	errs := []error{}
+	var errs []error
 
 	if prev.Spec.Bucket != curr.Spec.Bucket {
 		errs = append(errs, util.NewUpdateError("spec.bucket", "body"))
@@ -1594,7 +1834,7 @@ func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplicatio
 		errs = append(errs, util.NewUpdateError("spec.filterExpression", "body"))
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -1602,13 +1842,13 @@ func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplicatio
 }
 
 func CheckImmutableFieldsBackup(prev, curr *couchbasev2.CouchbaseBackup) error {
-	errs := []error{}
+	var errs []error
 
 	if prev.Spec.Strategy != curr.Spec.Strategy {
 		errs = append(errs, util.NewUpdateError("spec.strategy", "body"))
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -1616,14 +1856,14 @@ func CheckImmutableFieldsBackup(prev, curr *couchbasev2.CouchbaseBackup) error {
 }
 
 func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler) error {
-	errs := []error{}
+	var errs []error
 
 	// Referenced server group cannot be changed
 	if prev.Spec.Servers != curr.Spec.Servers {
 		errs = append(errs, util.NewUpdateError("spec.servers", "body"))
 	}
 
-	if len(errs) > 0 {
+	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 

@@ -568,5 +568,8 @@ func ApplySecurityContext(cluster *couchbasev2.CouchbaseCluster, platformType st
 	if platformType != "openshift" {
 		user := int64(1000)
 		cluster.Spec.SecurityContext.RunAsUser = &user
+
+		fsGroup := int64(1000)
+		cluster.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 }

@@ -366,7 +366,9 @@ func TestPrometheusMetricsUpgrade(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestOperatorMetrics(t *testing.T) {
+// TestPrometheusMetricsOperator checks that the operator, when operating is
+// generating API level statistics.
+func TestPrometheusMetricsOperator(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 

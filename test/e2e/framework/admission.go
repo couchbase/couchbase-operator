@@ -95,6 +95,10 @@ func deleteAdmissionController(k8s *types.Cluster) error {
 		logrus.Fatal(err.Error())
 	}
 
+	// Hack going from <2.3, there will be an old mutating webhook lingering like a
+	// bad smell.
+	_ = k8s.KubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.Background(), "couchbase-operator-admission", metav1.DeleteOptions{})
+
 	return nil
 }
 
