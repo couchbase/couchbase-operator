@@ -688,7 +688,7 @@ func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
 		return false
 	}
 
-	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name()); err != nil {
+	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m); err != nil {
 		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
 		return false
 	}

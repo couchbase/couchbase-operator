@@ -1753,7 +1753,7 @@ func (c *Cluster) verifyMemberVolumes(m couchbaseutil.Member) error {
 		return nil
 	}
 
-	err := k8sutil.IsPodRecoverable(c.k8s, *config, m.Name())
+	err := k8sutil.IsPodRecoverable(c.k8s, *config, m)
 	if err != nil {
 		if goerrors.Is(err, errors.ErrNoVolumeMounts) {
 			// Pod is not configured for volumes
@@ -1827,7 +1827,7 @@ func (c *Cluster) reconcilePods() error {
 			continue
 		}
 
-		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member.Name(), c.cluster, *serverClass)
+		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
 		if err != nil {
 			return err
 		}
@@ -1906,7 +1906,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			continue
 		}
 
-		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member.Name(), c.cluster, *serverClass)
+		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
 		if err != nil {
 			return nil, err
 		}

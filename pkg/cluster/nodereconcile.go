@@ -844,7 +844,7 @@ func handleVolumeExpansion(r *ReconcileMachine, c *Cluster) error {
 		}
 
 		// Get state of persistent volumes
-		pvcState, err := k8sutil.GetPodVolumes(c.k8s, name, c.cluster, *serverClass)
+		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
 		if err != nil {
 			return err
 		}

@@ -52,7 +52,7 @@ const (
 // necessary for the Pod prior to creating the Pod.
 func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig) (*v1.Pod, error) {
 	// First work out what persistent volumes we need.
-	pvcState, err := GetPodVolumes(client, m.Name(), cluster, config)
+	pvcState, err := GetPodVolumes(client, m, cluster, config)
 	if err != nil {
 		return nil, err
 	}
@@ -193,10 +193,176 @@ func (p *PersistentVolumeClaimState) List() []*v1.PersistentVolumeClaim {
 	return p.pvcs
 }
 
+// addVolume takes a requested volume for a pod and interrogates Kubernetes
+// in order to work out how to process it e.g. does it need to be created,
+// updated, resized etc.
+func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *v1.PersistentVolumeClaim, member couchbaseutil.Member, mountMapping volumeMount) error {
+	// BUG: this returns an error we ignore, the PVC may actually exist but
+	// be in a bad state.
+	pvc, _ := findMemberPVC(client, member.Name(), mountMapping.mountPath)
+
+	// If a PVC doesn't exist mark it for creation.
+	if pvc == nil {
+		p.pvcs = append(p.pvcs, required)
+		p.create = append(p.create, required)
+
+		d, err := diff.Diff(nil, required.Spec)
+		if err == nil {
+			p.diff += d
+		}
+
+		return nil
+	}
+
+	p.pvcs = append(p.pvcs, pvc)
+
+	// Set any scheduling hints.
+	if group, ok := pvc.Annotations[constants.ServerGroupLabel]; ok {
+		p.availabilityZone = group
+	}
+
+	existingSpec := v1.PersistentVolumeClaimSpec{}
+
+	if annotation, ok := pvc.Annotations[constants.PVCSpecAnnotation]; ok {
+		if err := json.Unmarshal([]byte(annotation), &existingSpec); err != nil {
+			return errors.NewStackTracedError(err)
+		}
+	}
+
+	// Determine if volume is in one of the following states.
+	// update: due to mis-match between requested and existing specs.
+	// expanding: due to mis-match between requested and existing status.
+	// resizeFailed: volume is reporting resize failure events.
+	if !reflect.DeepEqual(existingSpec, required.Spec) {
+		// Applying required attributes to list of update PVC's to allow in place updates.
+		// BUG: what if I change my storage class???
+		updatedClaim := pvc.DeepCopy()
+		updatedClaim.Spec.Resources = required.Spec.Resources
+		updatedClaim.Annotations = required.Annotations
+		p.update = append(p.update, updatedClaim)
+
+		d, err := diff.Diff(existingSpec, required.Spec)
+		if err == nil {
+			p.diff += d
+		}
+
+		return nil
+	}
+
+	// Even when the annotations of existingSpec and required spec are the same,
+	// it is possible that the requested storage capacity is not yet applied either
+	// due to expansion being in progress, or user manually changing pvc request.
+	actualSize := pvc.Status.Capacity[v1.ResourceStorage]
+	requestedSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+
+	if actualSize.Equal(requestedSize) {
+		return nil
+	}
+
+	if err := checkVolumeResizeFailure(client, pvc); err != nil {
+		if !goerrors.Is(err, errors.ErrVolumeResizeError) {
+			return err
+		}
+
+		p.resizeFailed = append(p.resizeFailed, pvc)
+
+		return nil
+	}
+
+	// failure event isn't reported so volume is still expanding
+	p.expanding = append(p.expanding, required)
+
+	return nil
+}
+
+// addVolumeMounts accepts a set of volume mappings for a pod and uses this
+// to generate the required set of volume mounts to apply to the containers.
+func (p *PersistentVolumeClaimState) addVolumeMounts(mountMappings volumeMountList) {
+	for _, mountMapping := range mountMappings {
+		p.volumes = append(p.volumes, podVolumeSpecForClaim(mountMapping.persistentVolumeClaimName))
+
+		// Mount point for Pod Container spec to reference volume by name.
+		if mountMapping.name == defaultVolumeMount {
+			// Default mount consists of 2 mounts for default(config) and etc data
+			configMount := v1.VolumeMount{
+				Name:      mountMapping.persistentVolumeClaimName,
+				MountPath: mountMapping.mountPath,
+				SubPath:   defaultSubPathName,
+			}
+			etcMount := v1.VolumeMount{
+				Name:      mountMapping.persistentVolumeClaimName,
+				MountPath: couchbaseVolumeDefaultEtcDir,
+				SubPath:   etcSubPathName,
+			}
+
+			p.volumeMounts = append(p.volumeMounts, configMount)
+			p.volumeMounts = append(p.volumeMounts, etcMount)
+
+			continue
+		}
+
+		p.volumeMounts = append(p.volumeMounts, v1.VolumeMount{
+			Name:      mountMapping.persistentVolumeClaimName,
+			MountPath: mountMapping.mountPath,
+		})
+	}
+}
+
+// generatePVC consumes the member, its server class configuration and generates the required
+// PVC for a specific mount mapping for that member.
+func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member, mount volumeMount, config couchbasev2.ServerConfig) (*v1.PersistentVolumeClaim, error) {
+	version, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return nil, err
+	}
+
+	// every volume mount must have associated claim template
+	// within the spec before we can add it to the pod
+	pvc := cluster.Spec.GetVolumeClaimTemplate(mount.persistentVolumeClaimTemplateName)
+	if pvc == nil {
+		return nil, fmt.Errorf("%w: claim (%s) does not map to any claimTemplates", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), mount.persistentVolumeClaimTemplateName)
+	}
+
+	labels := map[string]string{
+		constants.LabelApp:        constants.App,
+		constants.LabelNode:       member.Name(),
+		constants.LabelCluster:    cluster.Name,
+		constants.LabelVolumeName: mount.persistentVolumeClaimTemplateName,
+	}
+
+	annotations := map[string]string{
+		constants.AnnotationVolumeMountPath:     mount.mountPath,
+		constants.AnnotationVolumeNodeConf:      config.Name,
+		constants.CouchbaseVersionAnnotationKey: version,
+	}
+
+	// Merge our labels/annotations on top of any user defined ones.  We take
+	// precedence.
+	pvc.Labels = mergeLabels(pvc.Labels, labels)
+	pvc.Annotations = mergeLabels(pvc.Annotations, annotations)
+
+	ApplyBaseAnnotations(pvc)
+
+	if gid := cluster.Spec.GetFSGroup(); gid != nil {
+		pvc.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
+	}
+
+	pvc.Name = mount.persistentVolumeClaimName
+
+	specJSON, err := json.Marshal(pvc.Spec)
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	pvc.Annotations[constants.PVCSpecAnnotation] = string(specJSON)
+
+	return pvc, nil
+}
+
 // Add a persistent volume to the pod spec for each volumeMount.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused.
-func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*PersistentVolumeClaimState, error) {
+func GetPodVolumes(client *client.Client, member couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*PersistentVolumeClaimState, error) {
 	// No mounts are required, do nothing
 	if config.GetVolumeMounts() == nil {
 		return nil, nil
@@ -204,249 +370,169 @@ func GetPodVolumes(client *client.Client, memberName string, cluster *couchbasev
 
 	state := &PersistentVolumeClaimState{}
 
-	mountPaths, err := getPathsToPersist(config.VolumeMounts)
+	mountMappings, err := getPathsToPersist(member, config.VolumeMounts)
 	if err != nil {
 		return nil, err
 	}
 
-	version, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
-	if err != nil {
-		return nil, err
-	}
-
-	// Keep track of volumes generated from the same claim
-	claimUsageCnt := map[string]int{}
-
-	// Order the mounts so that the pod spec is deterministic
-	mountNames := []string{}
-	for name := range mountPaths {
-		mountNames = append(mountNames, string(name))
-	}
-
-	sort.Strings(mountNames)
-
-	for _, name := range mountNames {
-		mountName := couchbasev2.VolumeMountName(name)
-		claimName := mountPaths[mountName]
-
-		// Update PVC name
-		claimUsageCnt[claimName]++
-
-		// Find volumes that already exist for this mount path
-		// to allow pod recovery. Otherwise, create a new PVC
-		mountPath := pathForVolumeMountName(mountName)
-		pvc, _ := findMemberPVC(client, memberName, mountPath)
-
-		// every volume mount must have associated claim template
-		// within the spec before we can add it to the pod
-		required := cluster.Spec.GetVolumeClaimTemplate(claimName)
-		if required == nil {
-			return nil, fmt.Errorf("%w: claim (%s) does not map to any claimTemplates", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), claimName)
-		}
-
-		labels := map[string]string{
-			constants.LabelApp:        constants.App,
-			constants.LabelNode:       memberName,
-			constants.LabelCluster:    cluster.Name,
-			constants.LabelVolumeName: claimName,
-		}
-
-		annotations := map[string]string{
-			constants.AnnotationVolumeMountPath:     mountPath,
-			constants.AnnotationVolumeNodeConf:      config.Name,
-			constants.CouchbaseVersionAnnotationKey: version,
-		}
-
-		// Merge our labels/annotations on top of any user defined ones.  We take
-		// precedence.
-		required.Labels = mergeLabels(required.Labels, labels)
-		required.Annotations = mergeLabels(required.Annotations, annotations)
-
-		ApplyBaseAnnotations(required)
-
-		if gid := cluster.Spec.GetFSGroup(); gid != nil {
-			required.Annotations["pv.beta.kubernetes.io/gid"] = fmt.Sprintf("%d", *gid)
-		}
-
-		required.Name = NameForPersistentVolumeClaim(memberName, claimUsageCnt[claimName], mountName)
-
-		specJSON, err := json.Marshal(required.Spec)
+	for _, mountMapping := range mountMappings {
+		required, err := generatePVC(cluster, member, mountMapping, config)
 		if err != nil {
-			return nil, errors.NewStackTracedError(err)
+			return nil, err
 		}
 
-		required.Annotations[constants.PVCSpecAnnotation] = string(specJSON)
-
-		// If a PVC does exist and differs, mark it for update.
-		if pvc != nil {
-			existingSpec := v1.PersistentVolumeClaimSpec{}
-
-			if annotation, ok := pvc.Annotations[constants.PVCSpecAnnotation]; ok {
-				if err := json.Unmarshal([]byte(annotation), &existingSpec); err != nil {
-					return nil, errors.NewStackTracedError(err)
-				}
-			}
-
-			// Determine if volume is in one of the following states.
-			// update: due to mis-match between requested and existing specs.
-			// expanding: due to mis-match between requested and existing status.
-			// resizeFailed: volume is reporting resize failure events.
-			if !reflect.DeepEqual(existingSpec, required.Spec) {
-				// Applying required attributes to list of update PVC's to allow in place updates.
-				updatedClaim := pvc.DeepCopy()
-				updatedClaim.Spec.Resources = required.Spec.Resources
-				updatedClaim.Annotations = required.Annotations
-				state.update = append(state.update, updatedClaim)
-
-				d, err := diff.Diff(existingSpec, required.Spec)
-				if err == nil {
-					state.diff += d
-				}
-			} else {
-				// Even when the annotations of existingSpec and required spec are the same,
-				// it is possible that the requested storage capacity is not yet applied either
-				// due to expansion being in progress, or user manually changing pvc request.
-				actualSize := pvc.Status.Capacity[v1.ResourceStorage]
-				requestedSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
-				sizesMatch := actualSize.Equal(requestedSize)
-				if !sizesMatch {
-					resizeFailed := false
-					if err := checkVolumeResizeFailure(client, pvc); err != nil {
-						if goerrors.Is(err, errors.ErrVolumeResizeError) {
-							resizeFailed = true
-						} else {
-							return state, err
-						}
-					}
-
-					if resizeFailed {
-						state.resizeFailed = append(state.resizeFailed, pvc)
-					} else {
-						// failure event isn't reported so volume is still expanding
-						state.expanding = append(state.expanding, required)
-					}
-
-					// apply actual size to deployed spec and requestedSized to required spec
-					// so it's clear that volumes are still in an upgrade state because
-					// required size isn't reached
-					actualPVC := pvc.DeepCopy()
-					actualPVC.Spec.Resources.Requests[v1.ResourceStorage] = actualSize
-					required.Spec.Resources.Requests[v1.ResourceStorage] = requestedSize
-					d, err := diff.Diff(actualPVC.Spec, required.Spec)
-					if err == nil {
-						state.diff += d
-					}
-				}
-			}
-		}
-
-		// If a PVC doesn't exist mark it for creation.
-		if pvc == nil {
-			pvc = required
-			state.create = append(state.create, pvc)
-
-			d, err := diff.Diff(nil, required.Spec)
-			if err == nil {
-				state.diff += d
-			}
-		}
-
-		state.pvcs = append(state.pvcs, pvc)
-
-		// Set any scheduling hints
-		if group, ok := pvc.Annotations[constants.ServerGroupLabel]; ok {
-			state.availabilityZone = group
-		}
-
-		// Volumes will be added to Pod spec
-		volume := podVolumeSpecForClaim(pvc.Name)
-		state.volumes = append(state.volumes, volume)
-
-		// Mount point for Pod Container spec to reference volume by name.
-		if mountName == couchbasev2.DefaultVolumeMount {
-			// Default mount consists of 2 mounts for default(config) and etc data
-			configMount := v1.VolumeMount{
-				Name:      volume.Name,
-				MountPath: mountPath,
-				SubPath:   defaultSubPathName,
-			}
-			etcMount := v1.VolumeMount{
-				Name:      volume.Name,
-				MountPath: couchbaseVolumeDefaultEtcDir,
-				SubPath:   etcSubPathName,
-			}
-
-			state.volumeMounts = append(state.volumeMounts, configMount)
-			state.volumeMounts = append(state.volumeMounts, etcMount)
-		} else {
-			state.volumeMounts = append(state.volumeMounts, v1.VolumeMount{Name: volume.Name, MountPath: mountPath})
+		if err := state.addVolume(client, required, member, mountMapping); err != nil {
+			return nil, err
 		}
 	}
+
+	state.addVolumeMounts(mountMappings)
 
 	return state, nil
 }
 
+// volumeMountName is our internal, short name for a volume mount.
+type volumeMountName string
+
+const (
+	defaultVolumeMount volumeMountName = "default"
+	dataVolumeMount    volumeMountName = "data"
+	indexVolumeMount   volumeMountName = "index"
+	logsVolumeMount    volumeMountName = "logs"
+
+	// Note: analytics names are dynamically generated as there can be more than one :/
+	// This is just a prefix.
+	analyticsVolumeMount volumeMountName = "analytics"
+)
+
+// volumeMount describes a volume mount for a specific service, for a specific pod.
+type volumeMount struct {
+	// nane is the human readable name of the service this mount belongs to.
+	name volumeMountName
+
+	// persistentVolumeClaimTemplateName is the template to use for generating
+	// the persistent volume, this contains the size, and optionally the storage
+	// class etc.
+	persistentVolumeClaimTemplateName string
+
+	// mountPath is where in the pod this could be mounted.
+	mountPath string
+
+	// persistentVolumeClaimName is the name of the PVC for this mount.
+	persistentVolumeClaimName string
+}
+
+func newVolumeMount(member couchbaseutil.Member, name volumeMountName, persistentVolumeClaimTemplateName string) volumeMount {
+	return volumeMount{
+		name:                              name,
+		persistentVolumeClaimTemplateName: persistentVolumeClaimTemplateName,
+		mountPath:                         pathForVolumeMountName(name),
+		persistentVolumeClaimName:         NameForPersistentVolumeClaim(member.Name(), 0, name),
+	}
+}
+
+// volumeMountList holds all the volume mounts for a pod, dependent on what volumes
+// for what services are configured.  This is ORDERED to facilitate deterministic
+// generation (i.e. don't use a map).
+type volumeMountList []volumeMount
+
+func (l volumeMountList) Len() int {
+	return len(l)
+}
+
+func (l volumeMountList) Less(i, j int) bool {
+	return strings.Compare(string(l[i].name), string(l[j].name)) < 0
+}
+
+func (l volumeMountList) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
+}
+
 // Get all paths to that should be persisted within pod.
-func getPathsToPersist(mounts *couchbasev2.VolumeMounts) (map[couchbasev2.VolumeMountName]string, error) {
-	mountPaths := make(map[couchbasev2.VolumeMountName]string)
+func getPathsToPersist(member couchbaseutil.Member, mounts *couchbasev2.VolumeMounts) (volumeMountList, error) {
+	mountPaths := volumeMountList{}
+
 	defaultClaim := mounts.DefaultClaim
 	dataClaim := mounts.DataClaim
 	indexClaim := mounts.IndexClaim
 	analyticsClaims := mounts.AnalyticsClaims
+	logsClaim := mounts.LogsClaim
 
 	// var to test existence of non default/logs mounts
 	hasSecondaryMounts := dataClaim != "" || indexClaim != "" || analyticsClaims != nil
 
-	if logsClaim := mounts.LogsClaim; logsClaim != "" {
-		// When logsClaim is specified no other mounts are allowed.
-		// Return error if validation didn't prevent this from occurring.
+	// If no default claim is given (this persists /etc) and other data are persisted,
+	// that's going to lead to broken.  This *should* be handled by the DAC, however
+	// there is no way of checking this at present without the DAC, which may not be
+	// deployed by some users.
+	if defaultClaim == "" && hasSecondaryMounts {
+		return nil, fmt.Errorf("%w: other mounts cannot be used in without `default` mount", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
+	}
+
+	// When logs volumes are specified, these need to be mututally exclusive with
+	// all other volume claims.
+	if logsClaim != "" {
 		if defaultClaim != "" || hasSecondaryMounts {
-			return mountPaths, fmt.Errorf("%w: other mounts cannot be used in with `logs` mount", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
+			return nil, fmt.Errorf("%w: other mounts cannot be used in with `logs` mount", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 		}
 
-		mountPaths[couchbasev2.LogsVolumeMount] = logsClaim
+		mountPaths = append(mountPaths, newVolumeMount(member, logsVolumeMount, logsClaim))
 
 		return mountPaths, nil
 	}
 
-	if defaultClaim != "" {
-		mountPaths[couchbasev2.DefaultVolumeMount] = defaultClaim
+	mountPaths = append(mountPaths, newVolumeMount(member, defaultVolumeMount, defaultClaim))
 
-		if dataClaim != "" {
-			mountPaths[couchbasev2.DataVolumeMount] = dataClaim
-		}
-
-		if indexClaim != "" {
-			mountPaths[couchbasev2.IndexVolumeMount] = indexClaim
-		}
-
-		if analyticsClaims != nil {
-			for mount, claim := range mounts.GetAnalyticsMountClaims() {
-				mountPaths[couchbasev2.VolumeMountName(mount)] = claim
-			}
-		}
-	} else if hasSecondaryMounts {
-		// Reutrn error if other mount paths are specified without default volume
-		return mountPaths, fmt.Errorf("%w: other mounts cannot be used in without `default` mount", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
+	if dataClaim != "" {
+		mountPaths = append(mountPaths, newVolumeMount(member, dataVolumeMount, dataClaim))
 	}
+
+	if indexClaim != "" {
+		mountPaths = append(mountPaths, newVolumeMount(member, indexVolumeMount, indexClaim))
+	}
+
+	for index, template := range analyticsClaims {
+		mountPaths = append(mountPaths, newVolumeMount(member, volumeMountName(fmt.Sprintf("%s-%02d", analyticsVolumeMount, index)), template))
+	}
+
+	// Important note... this used to be a map map, not a list map.  As a result the
+	// ordering of iteration was non-detemrinistic, and thus the pods were upgraded
+	// all the time by accident.  A legacy hangover (read as hack) was we ordered the
+	// mount names and iterated using that, so we need to maintain this behaviour in
+	// order to prevent upgrading everyone's clusters for them.
+	sort.Stable(mountPaths)
 
 	return mountPaths, nil
 }
 
-func pathForVolumeMountName(id couchbasev2.VolumeMountName) string {
+func GetAnalyticsVolumePaths(mounts *couchbasev2.VolumeMounts) []string {
+	paths := []string{}
+
+	if mounts.AnalyticsClaims == nil {
+		return paths
+	}
+
+	for index := range mounts.AnalyticsClaims {
+		paths = append(paths, fmt.Sprintf("/mnt/%s-%02d", analyticsVolumeMount, index))
+	}
+
+	return paths
+}
+
+func pathForVolumeMountName(id volumeMountName) string {
 	var path string
 
 	switch id {
-	case couchbasev2.DefaultVolumeMount:
+	case defaultVolumeMount:
 		return couchbaseVolumeDefaultConfigDir
-	case couchbasev2.DataVolumeMount:
+	case dataVolumeMount:
 		path = CouchbaseVolumeMountDataDir
-	case couchbasev2.IndexVolumeMount:
+	case indexVolumeMount:
 		path = CouchbaseVolumeMountIndexDir
-	case couchbasev2.LogsVolumeMount:
+	case logsVolumeMount:
 		path = CouchbaseVolumeMountLogsDir
 	default:
-		if strings.Contains(string(id), string(couchbasev2.AnalyticsVolumeMount)) {
+		if strings.Contains(string(id), string(analyticsVolumeMount)) {
 			// path resolves to /mnt/analytics-00 when matching on analytics volume
 			path = fmt.Sprintf("/mnt/%s", id)
 		}
@@ -576,7 +662,7 @@ func MemberHasLogVolumes(client *client.Client, name string) bool {
 // Names of persistent volume claims are combinations of
 // Member name, mount type, and mount index.
 // ie...: cb-example-0000-default-00, pvc-data-cb-example-0000-01-index.
-func NameForPersistentVolumeClaim(memberName string, index int, mountName couchbasev2.VolumeMountName) string {
+func NameForPersistentVolumeClaim(memberName string, index int, mountName volumeMountName) string {
 	return fmt.Sprintf("%s-%s-%02d", memberName, mountName, index)
 }
 
@@ -601,9 +687,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		FailureThreshold:    1,
 	}
 
-	if pvcState != nil {
-		container.VolumeMounts = pvcState.volumeMounts
-	}
+	applyContainerStorage(&container, pvcState)
 
 	// Use the user provided Pod template if provided.
 	pod := &v1.Pod{}
@@ -638,244 +722,15 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		},
 	}
 
-	// Add the logging side car container if enabled and we have pvcState available
-	fbs := cluster.Spec.Logging.Server
-	if fbs != nil && fbs.Enabled {
-		// Iterate over mounts to find the one we need for logs
-		// Use the container.VolumeMounts to handle pvcState == nil as this is already checked above
-		for _, mount := range container.VolumeMounts {
-			// Only need to cope with a mutually exclusive set of mount paths
-			if mount.MountPath == CouchbaseVolumeMountLogsDir || mount.MountPath == couchbaseVolumeDefaultConfigDir {
-				// This should be always present as defaulted if not provided
-				sidecarConfig := fbs.Sidecar
+	applyPodScheduling(cluster, pod, serverGroup)
+	applyPodNetworking(cluster, pod, m)
+	applyPodStorage(pod, pvcState)
+	applyPodLogging(cluster, pod)
 
-				// Set up the volume containing the Secret contents to configure the sidecar
-				configVolumeMount := v1.VolumeMount{
-					Name:      fbs.ConfigurationName,
-					MountPath: sidecarConfig.ConfigurationMountPath,
-					ReadOnly:  true,
-				}
-
-				// Set up a duplicate volume mount but make sure to set it read-only
-				readonlyLogsMount := mount.DeepCopy()
-				readonlyLogsMount.ReadOnly = true
-
-				// If we have the default mount then extend further to only provide the logs sub-path
-				if mount.MountPath == couchbaseVolumeDefaultConfigDir {
-					readonlyLogsMount.SubPath = defaultSubPathName + "/logs"
-					readonlyLogsMount.MountPath = CouchbaseVolumeMountLogsDir
-				}
-
-				// Optional resource requirements - either left nil or set to what is provided.
-				var loggingResources v1.ResourceRequirements
-				if sidecarConfig.Resources != nil {
-					loggingResources = *sidecarConfig.Resources
-				}
-
-				// The volume holding pod meta-data for use by the sidecar
-				metaDataVolueMount := v1.VolumeMount{
-					Name:      loggingSidecarMetadataMountName,
-					MountPath: loggingSidecarMetadataMountDir,
-					ReadOnly:  true,
-				}
-
-				// Create a side car container to retrieve the logs.
-				logging := v1.Container{
-					Name:  CouchbaseLogSidecarContainerName,
-					Image: sidecarConfig.Image,
-					VolumeMounts: []v1.VolumeMount{
-						*readonlyLogsMount,
-						configVolumeMount,
-						metaDataVolueMount,
-					},
-					Env: []v1.EnvVar{
-						{
-							Name:  "COUCHBASE_LOGS",
-							Value: CouchbaseVolumeMountLogsDir,
-						},
-						{
-							Name:  "COUCHBASE_LOGS_DYNAMIC_CONFIG",
-							Value: sidecarConfig.ConfigurationMountPath,
-						},
-						{
-							Name:  "COUCHBASE_K8S_CONFIG_DIR",
-							Value: loggingSidecarMetadataMountDir,
-						},
-						{
-							Name: "POD_NAME",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "metadata.name",
-								},
-							},
-						},
-						{
-							Name: "POD_NAMESPACE",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "metadata.namespace",
-								},
-							},
-						},
-						{
-							Name: "POD_UID",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "metadata.uid",
-								},
-							},
-						},
-					},
-					Resources: loggingResources,
-				}
-
-				pod.Spec.Volumes = append(pod.Spec.Volumes,
-					// Make sure we include the volume for the Secret as well
-					v1.Volume{
-						Name: fbs.ConfigurationName,
-						VolumeSource: v1.VolumeSource{
-							Secret: &v1.SecretVolumeSource{
-								SecretName: fbs.ConfigurationName,
-							},
-						},
-					},
-					// Add the pod meta-data as well from annotations and labels as files
-					v1.Volume{
-						Name: loggingSidecarMetadataMountName,
-						VolumeSource: v1.VolumeSource{
-							DownwardAPI: &v1.DownwardAPIVolumeSource{
-								Items: []v1.DownwardAPIVolumeFile{
-									{
-										Path: "labels",
-										FieldRef: &v1.ObjectFieldSelector{
-											FieldPath: "metadata.labels",
-										},
-									},
-									{
-										Path: "annotations",
-										FieldRef: &v1.ObjectFieldSelector{
-											FieldPath: "metadata.annotations",
-										},
-									},
-								},
-							},
-						},
-					},
-				)
-
-				pod.Spec.Containers = append(pod.Spec.Containers, logging)
-
-				// Add a suggested parser to help with Fluent Bit usage as a daemonset
-				// https://docs.fluentbit.io/manual/pipeline/filters/kubernetes#kubernetes-annotations
-				parserAnnotation := map[string]string{
-					"fluentbit.io/parser_stdout-" + CouchbaseLogSidecarContainerName: "couchbase_sidecar",
-				}
-				pod.SetAnnotations(mergeLabels(pod.GetAnnotations(), parserAnnotation))
-
-				// Deal with audit log cleanup if both auditing is enabled and then GC is also enabled.
-				// Disgusting solution to remove all rotated audit logs after configurable amount of timeand output those deleted to stdout for reference.
-				acs := cluster.Spec.Logging.Audit
-				if acs != nil && acs.Enabled {
-					// We may disable this GC later once the server handles cleanup of rotated logs properly.
-					if acs.GarbageCollection != nil {
-						// Determine if GC is enabled
-						gc := acs.GarbageCollection.Sidecar
-						if gc != nil && gc.Enabled {
-							// Convert & truncate age to mmin units to handle more granularity than days with mtime
-							age := int64(gc.Age.Duration.Minutes())
-							if age < 0 {
-								age = 0
-							}
-
-							// Now we want the interval to sleep for between runs
-							interval := int64(gc.Interval.Duration.Seconds())
-							if interval < 0 {
-								interval = 0
-							}
-
-							var auditResources v1.ResourceRequirements
-							if gc.Resources != nil {
-								auditResources = *gc.Resources
-							}
-
-							auditMount := mount.DeepCopy()
-
-							// This is a significant security concern but is required to delete
-							auditMount.ReadOnly = false
-
-							// If we have the default mount then extend further to only provide the logs sub-path.
-							// An attempt at mitigating some security concerns with full access to a volume from an arbitrary shell.
-							if mount.MountPath == couchbaseVolumeDefaultConfigDir {
-								auditMount.SubPath = defaultSubPathName + "/logs"
-							}
-
-							auditcleaner := v1.Container{
-								Name:  CouchbaseAuditCleanupSidecarContainerName,
-								Image: gc.Image,
-								VolumeMounts: []v1.VolumeMount{
-									*auditMount,
-								},
-								Command: []string{
-									"/bin/sh",
-								},
-								// Note that no support for relocation of audit logs - this should not ever be done with the operator.
-								// We also provide the env vars for the various intervals in case someone wants to override things in the future.
-								Env: []v1.EnvVar{
-									{
-										Name:  "AUDIT_LOG_DIR",
-										Value: mount.MountPath,
-									},
-									{
-										Name:  "AUDIT_CLEANUP_INTERVAL",
-										Value: strconv.FormatInt(interval, 10),
-									},
-									{
-										Name:  "AUDIT_CLEANUP_AGE",
-										Value: strconv.FormatInt(age, 10),
-									},
-								},
-								Args: []string{
-									"-c",
-									"while true; do sleep ${AUDIT_CLEANUP_INTERVAL} ; echo \"Cleaning audit logs every ${AUDIT_CLEANUP_INTERVAL}s, files older than ${AUDIT_CLEANUP_AGE}\"; find ${AUDIT_LOG_DIR} -mmin ${AUDIT_CLEANUP_AGE} -type f -name \"*-audit.log\" -delete -print; done",
-								},
-								Resources: auditResources,
-							}
-
-							pod.Spec.Containers = append(pod.Spec.Containers, auditcleaner)
-						}
-					}
-				}
-
-				// Once we have found one of the mounts there are no other options - they're mutually exclusive
-				break
-			}
-		}
-	}
-
-	// If we are in istio mode, add in DNS configuration to avoid hairpinning
-	// which causes death with mTLS enabled.  Also note that Analytics is broke
-	// with this until 6.5.1.
-	if cluster.Spec.Networking.NetworkPlatform != nil && *cluster.Spec.Networking.NetworkPlatform == couchbasev2.NetworkPlatformIstio {
-		pod.Spec.HostAliases = []v1.HostAlias{
-			{
-				IP: "127.0.0.1",
-				Hostnames: []string{
-					"localhost",
-					m.GetDNSName(),
-				},
-			},
-		}
-	}
-
-	// If anti-affinity is set then ensure no two pods from the same cluster
-	// run on the same hosts.
-	if cluster.Spec.AntiAffinity {
-		pod.Spec.Affinity = AntiAffinityForCluster(cluster.Name)
-	}
-
-	// If persistent volumes are specified then add them.
-	if pvcState != nil {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, pvcState.volumes...)
+	// Note: anything using clients to look up state at this point, is probably doing
+	// it wrong, gut feeling.
+	if err := applyPodMonitoring(client, cluster, pod); err != nil {
+		return nil, err
 	}
 
 	// If TLS is specified then add the certificate volume.
@@ -883,32 +738,9 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		return nil, err
 	}
 
-	// If monitoring is enabled add the necessary side cars.
-	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil {
-		if cluster.Spec.Monitoring.Prometheus.Enabled {
-			metricsContainer := createMetricsContainer(cluster.Spec)
-
-			if err := applyMetricsPodSecurity(client, cluster.Spec, &metricsContainer, pod); err != nil {
-				return nil, err
-			}
-
-			applyMetricsPodTLS(cluster.Spec, &metricsContainer, pod)
-			pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
-		}
-	}
-
 	// Set the Couchbase version metadata.
 	if err := SetCouchbaseVersion(pod, cluster.Spec.CouchbaseImage()); err != nil {
 		return nil, err
-	}
-
-	// Add or override any scheduling operation.
-	if serverGroup != "" {
-		if pod.Spec.NodeSelector == nil {
-			pod.Spec.NodeSelector = map[string]string{}
-		}
-
-		pod.Spec.NodeSelector[constants.ServerGroupLabel] = serverGroup
 	}
 
 	// Add the original specification to the annotations, we will use this to upgrade
@@ -923,6 +755,322 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	pod.Annotations[constants.PodSpecAnnotation] = string(specJSON)
 
 	return pod, nil
+}
+
+func applyContainerStorage(container *v1.Container, pvcState *PersistentVolumeClaimState) {
+	if pvcState == nil {
+		return
+	}
+
+	container.VolumeMounts = pvcState.volumeMounts
+}
+
+// applyPodScheduling adds any scheduling to place the pods in the right place.
+func applyPodScheduling(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, serverGroup string) {
+	// If anti-affinity is set then ensure no two pods from the same cluster
+	// run on the same hosts.
+	if cluster.Spec.AntiAffinity {
+		pod.Spec.Affinity = AntiAffinityForCluster(cluster.Name)
+	}
+
+	// Add or override any scheduling operation.  Server group will be set when
+	// we are recovering from a pod deletion, and we have to place the pod in the
+	// same AZ as the volume from which it is recovering.  Pods are scheduled where
+	// they want, irrespective of existing volumes (is this still the case??)
+	if serverGroup != "" {
+		if pod.Spec.NodeSelector == nil {
+			pod.Spec.NodeSelector = map[string]string{}
+		}
+
+		pod.Spec.NodeSelector[constants.ServerGroupLabel] = serverGroup
+	}
+}
+
+// applyPodNetworking adds any network specific hacks required to work.
+func applyPodNetworking(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, m couchbaseutil.Member) {
+	// If we are in istio mode, add in DNS configuration to avoid hairpinning
+	// which causes death with mTLS enabled.  Also note that Analytics is broke
+	// with this until 6.5.1.
+	if cluster.Spec.Networking.NetworkPlatform == nil {
+		return
+	}
+
+	if *cluster.Spec.Networking.NetworkPlatform != couchbasev2.NetworkPlatformIstio {
+		return
+	}
+
+	pod.Spec.HostAliases = []v1.HostAlias{
+		{
+			IP: "127.0.0.1",
+			Hostnames: []string{
+				"localhost",
+				m.GetDNSName(),
+			},
+		},
+	}
+}
+
+// applyPodStorage adds any storage options to the pod.
+func applyPodStorage(pod *v1.Pod, pvcState *PersistentVolumeClaimState) {
+	if pvcState == nil {
+		return
+	}
+
+	pod.Spec.Volumes = append(pod.Spec.Volumes, pvcState.volumes...)
+}
+
+// applyPodMonitoring adds any monitoring related hacks required to work.
+func applyPodMonitoring(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
+	// If monitoring is enabled add the necessary side cars.
+	if cluster.Spec.Monitoring == nil {
+		return nil
+	}
+
+	if cluster.Spec.Monitoring.Prometheus == nil {
+		return nil
+	}
+
+	if !cluster.Spec.Monitoring.Prometheus.Enabled {
+		return nil
+	}
+
+	metricsContainer := createMetricsContainer(cluster.Spec)
+
+	if err := applyMetricsPodSecurity(client, cluster.Spec, &metricsContainer, pod); err != nil {
+		return err
+	}
+
+	applyMetricsPodTLS(cluster.Spec, &metricsContainer, pod)
+	pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
+
+	return nil
+}
+
+func getLoggingMount(container *v1.Container) *v1.VolumeMount {
+	for i, mount := range container.VolumeMounts {
+		if mount.MountPath != CouchbaseVolumeMountLogsDir && mount.MountPath != couchbaseVolumeDefaultConfigDir {
+			continue
+		}
+
+		return &container.VolumeMounts[i]
+	}
+
+	return nil
+}
+
+func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+	fbs := cluster.Spec.Logging.Server
+
+	if fbs == nil || !fbs.Enabled {
+		return
+	}
+
+	// Iterate over mounts to find the one we need for logs
+	container, _ := getCouchbaseContainer(pod)
+	mount := getLoggingMount(container)
+
+	sidecarConfig := fbs.Sidecar
+
+	// Set up the volume containing the Secret contents to configure the sidecar
+	configVolumeMount := v1.VolumeMount{
+		Name:      fbs.ConfigurationName,
+		MountPath: sidecarConfig.ConfigurationMountPath,
+		ReadOnly:  true,
+	}
+
+	// Set up a duplicate volume mount but make sure to set it read-only
+	readonlyLogsMount := mount.DeepCopy()
+	readonlyLogsMount.ReadOnly = true
+
+	// If we have the default mount then extend further to only provide the logs sub-path
+	if mount.MountPath == couchbaseVolumeDefaultConfigDir {
+		readonlyLogsMount.SubPath = defaultSubPathName + "/logs"
+		readonlyLogsMount.MountPath = CouchbaseVolumeMountLogsDir
+	}
+
+	// Optional resource requirements - either left nil or set to what is provided.
+	var loggingResources v1.ResourceRequirements
+
+	if sidecarConfig.Resources != nil {
+		loggingResources = *sidecarConfig.Resources
+	}
+
+	// The volume holding pod meta-data for use by the sidecar
+	metaDataVolueMount := v1.VolumeMount{
+		Name:      loggingSidecarMetadataMountName,
+		MountPath: loggingSidecarMetadataMountDir,
+		ReadOnly:  true,
+	}
+
+	// Create a side car container to retrieve the logs.
+	logging := v1.Container{
+		Name:  CouchbaseLogSidecarContainerName,
+		Image: sidecarConfig.Image,
+		VolumeMounts: []v1.VolumeMount{
+			*readonlyLogsMount,
+			configVolumeMount,
+			metaDataVolueMount,
+		},
+		Env: []v1.EnvVar{
+			{
+				Name:  "COUCHBASE_LOGS",
+				Value: CouchbaseVolumeMountLogsDir,
+			},
+			{
+				Name:  "COUCHBASE_LOGS_DYNAMIC_CONFIG",
+				Value: sidecarConfig.ConfigurationMountPath,
+			},
+			{
+				Name:  "COUCHBASE_K8S_CONFIG_DIR",
+				Value: loggingSidecarMetadataMountDir,
+			},
+			{
+				Name: "POD_NAME",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "metadata.name",
+					},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace",
+					},
+				},
+			},
+			{
+				Name: "POD_UID",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						FieldPath: "metadata.uid",
+					},
+				},
+			},
+		},
+		Resources: loggingResources,
+	}
+
+	pod.Spec.Volumes = append(pod.Spec.Volumes,
+		// Make sure we include the volume for the Secret as well
+		v1.Volume{
+			Name: fbs.ConfigurationName,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: fbs.ConfigurationName,
+				},
+			},
+		},
+		// Add the pod meta-data as well from annotations and labels as files
+		v1.Volume{
+			Name: loggingSidecarMetadataMountName,
+			VolumeSource: v1.VolumeSource{
+				DownwardAPI: &v1.DownwardAPIVolumeSource{
+					Items: []v1.DownwardAPIVolumeFile{
+						{
+							Path: "labels",
+							FieldRef: &v1.ObjectFieldSelector{
+								FieldPath: "metadata.labels",
+							},
+						},
+						{
+							Path: "annotations",
+							FieldRef: &v1.ObjectFieldSelector{
+								FieldPath: "metadata.annotations",
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+
+	pod.Spec.Containers = append(pod.Spec.Containers, logging)
+
+	// Add a suggested parser to help with Fluent Bit usage as a daemonset
+	// https://docs.fluentbit.io/manual/pipeline/filters/kubernetes#kubernetes-annotations
+	parserAnnotation := map[string]string{
+		"fluentbit.io/parser_stdout-" + CouchbaseLogSidecarContainerName: "couchbase_sidecar",
+	}
+	pod.SetAnnotations(mergeLabels(pod.GetAnnotations(), parserAnnotation))
+
+	// Deal with audit log cleanup if both auditing is enabled and then GC is also enabled.
+	// Disgusting solution to remove all rotated audit logs after configurable amount of timeand output those deleted to stdout for reference.
+	acs := cluster.Spec.Logging.Audit
+
+	if acs == nil || !acs.Enabled || acs.GarbageCollection == nil {
+		return
+	}
+
+	// Determine if GC is enabled
+	gc := acs.GarbageCollection.Sidecar
+
+	if gc == nil || !gc.Enabled {
+		return
+	}
+
+	// Convert & truncate age to mmin units to handle more granularity than days with mtime
+	age := int64(gc.Age.Duration.Minutes())
+	if age < 0 {
+		age = 0
+	}
+
+	// Now we want the interval to sleep for between runs
+	interval := int64(gc.Interval.Duration.Seconds())
+	if interval < 0 {
+		interval = 0
+	}
+
+	var auditResources v1.ResourceRequirements
+	if gc.Resources != nil {
+		auditResources = *gc.Resources
+	}
+
+	auditMount := mount.DeepCopy()
+
+	// This is a significant security concern but is required to delete
+	auditMount.ReadOnly = false
+
+	// If we have the default mount then extend further to only provide the logs sub-path.
+	// An attempt at mitigating some security concerns with full access to a volume from an arbitrary shell.
+	if mount.MountPath == couchbaseVolumeDefaultConfigDir {
+		auditMount.SubPath = defaultSubPathName + "/logs"
+	}
+
+	auditcleaner := v1.Container{
+		Name:  CouchbaseAuditCleanupSidecarContainerName,
+		Image: gc.Image,
+		VolumeMounts: []v1.VolumeMount{
+			*auditMount,
+		},
+		Command: []string{
+			"/bin/sh",
+		},
+		// Note that no support for relocation of audit logs - this should not ever be done with the operator.
+		// We also provide the env vars for the various intervals in case someone wants to override things in the future.
+		Env: []v1.EnvVar{
+			{
+				Name:  "AUDIT_LOG_DIR",
+				Value: mount.MountPath,
+			},
+			{
+				Name:  "AUDIT_CLEANUP_INTERVAL",
+				Value: strconv.FormatInt(interval, 10),
+			},
+			{
+				Name:  "AUDIT_CLEANUP_AGE",
+				Value: strconv.FormatInt(age, 10),
+			},
+		},
+		Args: []string{
+			"-c",
+			"while true; do sleep ${AUDIT_CLEANUP_INTERVAL} ; echo \"Cleaning audit logs every ${AUDIT_CLEANUP_INTERVAL}s, files older than ${AUDIT_CLEANUP_AGE}\"; find ${AUDIT_LOG_DIR} -mmin ${AUDIT_CLEANUP_AGE} -type f -name \"*-audit.log\" -delete -print; done",
+		},
+		Resources: auditResources,
+	}
+
+	pod.Spec.Containers = append(pod.Spec.Containers, auditcleaner)
 }
 
 func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) {
@@ -1406,7 +1554,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume.
-func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, podName string) error {
+func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return errors.NewStackTracedError(errors.ErrNoVolumeMounts)
@@ -1419,15 +1567,13 @@ func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, po
 	}
 
 	// all volume mounts must be healthy
-	mountPaths, err := getPathsToPersist(mounts)
+	mountMappings, err := getPathsToPersist(member, mounts)
 	if err != nil {
 		return err
 	}
 
-	for mountName := range mountPaths {
-		mountPath := pathForVolumeMountName(mountName)
-
-		if _, err := findMemberPVC(client, podName, mountPath); err != nil {
+	for _, mountMapping := range mountMappings {
+		if _, err := findMemberPVC(client, member.Name(), mountMapping.mountPath); err != nil {
 			return err
 		}
 	}
