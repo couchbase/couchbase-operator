@@ -388,6 +388,57 @@ func GetPodUptime(client *client.Client, name string) int {
 	return int(time.Since(pod.CreationTimestamp.Time).Seconds())
 }
 
+// getStringifiedEvents looks up events for a named resource and returns them
+// as a string blob for logging.
+func getStringifiedEvents(client *client.Client, namespace, kind, name string) string {
+	events, err := GetEventsForResource(client.KubeClient, namespace, kind, name)
+	if err != nil {
+		return ""
+	}
+
+	output := ""
+
+	for _, event := range events {
+		data, err := yaml.Marshal(event)
+		if err != nil {
+			continue
+		}
+
+		output += string(data) + "\n"
+	}
+
+	return output
+}
+
+// logPodEvents returns an unordered text dump of pod events from the last
+// hour or so.
+func logPodEvents(client *client.Client, namespace, name string) string {
+	return getStringifiedEvents(client, namespace, "Pod", name)
+}
+
+// logPodPVCs returns a text dump of all PVCs associated with the pod and
+// also any events from the last hour or so that are associated with them.
+func logPodPVCs(client *client.Client, name string) string {
+	output := ""
+
+	for _, pvc := range client.PersistentVolumeClaims.List() {
+		node, ok := pvc.Labels[constants.LabelNode]
+		if !ok || node != name {
+			continue
+		}
+
+		// Dump the pod's PVC.
+		data, err := yaml.Marshal(pvc)
+		if err == nil {
+			output += string(data) + "\n"
+		}
+
+		output += getStringifiedEvents(client, pvc.Namespace, "PersistentVolumeClaim", pvc.Name)
+	}
+
+	return output
+}
+
 // LogPod returns ephemeral debug information about a failed pod, e.g. it's about to be
 // deleted and we want to know why.
 func LogPod(client *client.Client, namespace, name string) (output string) {
@@ -400,6 +451,9 @@ func LogPod(client *client.Client, namespace, name string) (output string) {
 		}
 
 		// Dump the pod's logs
+		// Note: with the advent of server logging, this may, infact, be a terrible
+		// idea.  From completeness yes, to see istio/prometheus yes, all of server's
+		// crap... nope!  Although this *may* satisfy the requirement from support...
 		for _, container := range pod.Spec.Containers {
 			logs := client.KubeClient.CoreV1().Pods(namespace).GetLogs(pod.Name, &v1.PodLogOptions{Container: container.Name})
 
@@ -420,44 +474,8 @@ func LogPod(client *client.Client, namespace, name string) (output string) {
 		}
 	}
 
-	// Dump the pods's events
-	events, err := GetEventsForResource(client.KubeClient, namespace, "Pod", name)
-	if err == nil {
-		for _, event := range events {
-			data, err := yaml.Marshal(event)
-			if err != nil {
-				continue
-			}
-
-			output += string(data) + "\n"
-		}
-	}
-
-	for _, pvc := range client.PersistentVolumeClaims.List() {
-		node, ok := pvc.Labels[constants.LabelNode]
-		if !ok || node != name {
-			continue
-		}
-
-		// Dump the pod's PVC.
-		data, err := yaml.Marshal(pvc)
-		if err == nil {
-			output += string(data) + "\n"
-		}
-
-		// Dump the pod's PVC events.
-		events, err := GetEventsForResource(client.KubeClient, namespace, "PersistentVolumeClaim", pvc.Name)
-		if err == nil {
-			for _, event := range events {
-				data, err := yaml.Marshal(event)
-				if err != nil {
-					continue
-				}
-
-				output += string(data) + "\n"
-			}
-		}
-	}
+	output += logPodEvents(client, namespace, name)
+	output += logPodPVCs(client, name)
 
 	return
 }
