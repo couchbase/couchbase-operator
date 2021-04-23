@@ -1084,54 +1084,6 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	return true, couchbaseutil.UpdateServerGroups(existingGroups.GetRevision(), &newGroups).On(c.api, c.readyMembers())
 }
 
-// TEMPORARY HACK
-// Does exactly the same as above but tells us if we need to do anything.
-func (c *Cluster) wouldReconcileServerGroups() (bool, error) {
-	// Cluster not server group aware
-	if !c.cluster.Spec.ServerGroupsEnabled() {
-		return false, nil
-	}
-
-	// Poll the server for existing information
-	existingGroups := &couchbaseutil.ServerGroups{}
-	if err := couchbaseutil.ListServerGroups(existingGroups).On(c.api, c.readyMembers()); err != nil {
-		return false, err
-	}
-
-	// Create any server groups which need defining
-	if err := c.createServerGroups(existingGroups); err != nil {
-		return false, err
-	}
-
-	// Look at each node in each existing group building up the update
-	// structure and also checking to see whether we need to dispatch this
-	// change to Couchbase server
-	for _, existingGroup := range existingGroups.Groups {
-		for _, existingMember := range existingGroup.Nodes {
-			// Extract the scheduled server group for the node
-			podName := existingMember.HostName.GetMemberName()
-
-			// Just reuse the old server group location on error, the pod is likely down
-			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
-			if err != nil {
-				scheduledServerGroup = existingGroup.Name
-			}
-
-			// TODO: should we flag this as a warning and leave it where it is?
-			if scheduledServerGroup == "" {
-				return false, fmt.Errorf("%w: server group unset for pod %s", errors.NewStackTracedError(errors.ErrCouchbaseServerError), podName)
-			}
-
-			// If the node is in the wrong server group schedule an update
-			if scheduledServerGroup != existingGroup.Name {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
 // createAlternateAddressesExternal calculates what the current state of the node's alternate
 // addresses should be. For public addresses we maintain the default ports, however set the
 // alternate address to the DDNS name.  For private addresses these will be an IP based on the

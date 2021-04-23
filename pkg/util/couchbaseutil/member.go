@@ -248,6 +248,18 @@ func (ms MemberSet) Diff(other MemberSet) MemberSet {
 	return diff
 }
 
+func (ms MemberSet) Intersect(other MemberSet) MemberSet {
+	intersection := MemberSet{}
+
+	for n, m := range ms {
+		if _, ok := other[n]; ok {
+			intersection[n] = m
+		}
+	}
+
+	return intersection
+}
+
 // Equal returns whether each member set contains the same members.  It is only a
 // shallow compare, so member fields are not compared.
 func (ms MemberSet) Equal(other MemberSet) bool {

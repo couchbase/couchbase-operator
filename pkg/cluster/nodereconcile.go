@@ -15,80 +15,6 @@ import (
 
 var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
 
-// ReconcileState is an enumeration used to define the current
-// node in the state machine.
-type ReconcileState int
-
-const (
-	ReconcileInit ReconcileState = iota
-	ReconcileUnknownMembers
-	ReconcileRebalanceCheck
-	ReconcileWarmupNodes
-	ReconcileDownNodes
-	ReconcileUnclusteredNodes
-	ReconcileFailedAddNodes
-	ReconcileAddBackNodes
-	ReconcileFailedAddBackNodes
-	ReconcileFailedNodes
-	ReconcileServerConfigs
-	ReconcileVolumeExpansion
-	ReconcileUpgradeNode
-	ReconcileRemoveNodes
-	ReconcileAddNodes
-	ReconcileServerGroups
-	ReconcileNodeServices
-	ReconcileAutoscaleServerConfigs
-	ReconcileRebalance
-	ReconcileDeadMembers
-	ReconcileNotifyFinished
-	ReconcileFinished
-)
-
-const downNodeThreshold int = 60
-
-// reconcileFunc represents a function used to reconcile the cluster state,
-// it must transition the state if necessary, or return an error.
-type reconcileFunc func(*ReconcileMachine, *Cluster) error
-
-// reconcileFuncMap maps from a reconciliation state to a reconcile function.
-type reconcileFuncMap map[ReconcileState]reconcileFunc
-
-// lookup finds the matching reconcile function for a specific state and returns
-// a reference to it, or an error.
-func (r reconcileFuncMap) lookup(state ReconcileState) (reconcileFunc, error) {
-	f, ok := r[state]
-	if !ok {
-		return nil, fmt.Errorf("%w: invalid reconcile state", errors.NewStackTracedError(errors.ErrInternalError))
-	}
-
-	return f, nil
-}
-
-var (
-	reconcileFunctions = reconcileFuncMap{
-		ReconcileInit:                   handleInit,
-		ReconcileUnknownMembers:         handleUnknownMembers,
-		ReconcileRebalanceCheck:         handleRebalanceCheck,
-		ReconcileWarmupNodes:            handleWarmupNodes,
-		ReconcileDownNodes:              handleDownNodes,
-		ReconcileUnclusteredNodes:       handleUnclusteredNodes,
-		ReconcileFailedAddNodes:         handleFailedAddNodes,
-		ReconcileAddBackNodes:           handleAddBackNodes,
-		ReconcileFailedNodes:            handleFailedNodes,
-		ReconcileServerConfigs:          handleUnknownServerConfigs,
-		ReconcileVolumeExpansion:        handleVolumeExpansion,
-		ReconcileUpgradeNode:            handleUpgradeNode,
-		ReconcileRemoveNodes:            handleRemoveNode,
-		ReconcileAddNodes:               handleAddNode,
-		ReconcileServerGroups:           handleServerGroups,
-		ReconcileNodeServices:           handleNodeServices,
-		ReconcileAutoscaleServerConfigs: handleAutoscaleServerConfigs,
-		ReconcileRebalance:              handleRebalance,
-		ReconcileDeadMembers:            handleDeadMembers,
-		ReconcileNotifyFinished:         handleNotifyFinished,
-	}
-)
-
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
 type MemberState struct {
@@ -104,25 +30,6 @@ type MemberState struct {
 	UnclusteredNodes couchbaseutil.MemberSet
 	IsRebalancing    bool
 	NeedsRebalance   bool
-}
-
-func (m *MemberState) ClusterHealthy() bool {
-	// All nodes must be active.
-	badMembers := couchbaseutil.NewMemberSet()
-	badMembers.Merge(m.PendingAddNodes)
-	badMembers.Merge(m.AddBackNodes)
-	badMembers.Merge(m.FailedAddNodes)
-	badMembers.Merge(m.WarmupNodes)
-	badMembers.Merge(m.DownNodes)
-	badMembers.Merge(m.FailedNodes)
-	badMembers.Merge(m.UnclusteredNodes)
-
-	if !badMembers.Empty() {
-		return false
-	}
-
-	// Must be balanced and not rebalancing.
-	return !m.IsRebalancing && !m.NeedsRebalance
 }
 
 // nodeStatus is an intermediate data structured used to log node status information.
@@ -181,14 +88,68 @@ func (m *MemberState) LogStatus(cluster string) {
 }
 
 type ReconcileMachine struct {
-	runningPods   couchbaseutil.MemberSet
-	knownNodes    couchbaseutil.MemberSet
-	newNodes      couchbaseutil.MemberSet
-	ejectNodes    couchbaseutil.MemberSet
-	unknownNodes  couchbaseutil.MemberSet
+	// clusteredMembers is the set of members we have some resources for and Couchbase knows
+	// about.  We add to/remove from this as the machine operates.  At any point in time this
+	// reflects the members we want to be clustered when a rebalance is called.
+	clusteredMembers couchbaseutil.MemberSet
+
+	// runningMembers is the subset of clustered members with a running pod.
+	runningMembers couchbaseutil.MemberSet
+
+	// ejectMembers are the nodes that we wish to kick out of the cluster when we call
+	// if and when we rebalance.
+	ejectMembers couchbaseutil.MemberSet
+
+	// unclusteredMembers members Couchbase knows about but we have no resource for
+	// so they need ejecting and deleting.  They are treated separately from ejectMembers
+	// because there is no book keeping to clean up.
+	// TODO: is this true?  We reinitialize the cluster member state straight after this
+	// FSM is called.
+	unclusteredMembers couchbaseutil.MemberSet
+
+	needsRebalance bool
+
 	couchbase     *MemberState
-	state         ReconcileState
 	removeVolumes map[string]bool // map of nodes with volumes to remove if deleted
+
+	// abortReason when set stops the reconciler in its tracks and echos out the message.
+	abortReason string
+}
+
+func (r *ReconcileMachine) logState() {
+	log.V(0).Info("reconciler", "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance)
+}
+
+// addMember simulates creating and clustering a new member.
+func (r *ReconcileMachine) addMember(m couchbaseutil.Member) {
+	r.clusteredMembers.Add(m)
+	r.runningMembers.Add(m)
+	r.needsRebalance = true
+
+	r.logState()
+}
+
+// removeMember simulates removing a current member.
+func (r *ReconcileMachine) removeMember(m couchbaseutil.Member) {
+	r.clusteredMembers.Remove(m.Name())
+	r.runningMembers.Remove(m.Name())
+	r.ejectMembers.Add(m)
+	r.needsRebalance = true
+
+	r.logState()
+}
+
+// removeMemberNoEject simulates removing a current member where no ejection is necessary.
+func (r *ReconcileMachine) removeMemberNoEject(m couchbaseutil.Member) {
+	r.clusteredMembers.Remove(m.Name())
+	r.runningMembers.Remove(m.Name())
+
+	r.logState()
+}
+
+// abort causes non-fatal termination from the runloop.
+func (r *ReconcileMachine) abort(reason string) {
+	r.abortReason = reason
 }
 
 func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
@@ -238,47 +199,73 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 	}
 
 	fsm := &ReconcileMachine{
-		runningPods:   podsToMemberSet(c.getClusterPods()),
-		knownNodes:    couchbaseutil.NewMemberSet(),
-		newNodes:      couchbaseutil.NewMemberSet(),
-		ejectNodes:    couchbaseutil.NewMemberSet(),
+		// c.members contains all members we know about from Kubernetes or from
+		// Couchbase server.  By removing all the ones that Couchbase doesn't know
+		// about we get the current set of things in the Couchbase cluster.
+		clusteredMembers: c.members.Diff(state.UnclusteredNodes),
+
+		// By intersecting all known members with the set of members pods we
+		// get a set of members that we know are running (in some capacity) and
+		// can be further interrogated for state.
+		runningMembers: c.members.Intersect(podsToMemberSet(c.getClusterPods())),
+
+		// This starts empty, we will populate it as we move through the manchine.
+		ejectMembers: couchbaseutil.NewMemberSet(),
+
+		unclusteredMembers: state.UnclusteredNodes.Copy(),
+
+		needsRebalance: state.NeedsRebalance,
+
 		couchbase:     state,
-		state:         ReconcileInit,
 		removeVolumes: make(map[string]bool),
+	}
+
+	// Reset any timeout counters if nodes have recovered.
+	for name := range state.ActiveNodes {
+		delete(c.recoveryTime, name)
+	}
+
+	// When nodes are being removed, the default behavior is to remove volumes
+	// unless user is initiating the removal and only logs are mounted
+	for name := range c.members {
+		fsm.removeVolumes[name] = !c.memberHasLogVolumes(name)
 	}
 
 	return fsm, nil
 }
 
-func (r *ReconcileMachine) transitionState(to ReconcileState) {
-	r.state = to
-}
-
-// step runs a single step of the state machine.
-func (r *ReconcileMachine) step(c *Cluster) error {
-	f, err := reconcileFunctions.lookup(r.state)
-	if err != nil {
-		return err
-	}
-
-	if err := f(r, c); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// done reports whether the reconciliation has completed.
-func (r *ReconcileMachine) done() bool {
-	return r.state == ReconcileFinished
-}
-
 // exec runs the state machine until a finished condition or error
 // is encountered.
 func (r *ReconcileMachine) exec(c *Cluster) error {
-	for !r.done() {
-		if err := r.step(c); err != nil {
+	reconcileFunctions := []func(*ReconcileMachine, *Cluster) error{
+		(*ReconcileMachine).handleRebalanceCheck,
+		(*ReconcileMachine).handleWarmupNodes,
+		(*ReconcileMachine).handleDownNodes,
+		(*ReconcileMachine).handleUnclusteredNodes,
+		(*ReconcileMachine).handleFailedAddNodes,
+		(*ReconcileMachine).handleAddBackNodes,
+		(*ReconcileMachine).handleFailedNodes,
+		(*ReconcileMachine).handleUnknownServerConfigs,
+		(*ReconcileMachine).handleVolumeExpansion,
+		(*ReconcileMachine).handleUpgradeNode,
+		(*ReconcileMachine).handleRemoveNode,
+		(*ReconcileMachine).handleAddNode,
+		(*ReconcileMachine).handleServerGroups,
+		(*ReconcileMachine).handleNodeServices,
+		(*ReconcileMachine).handleAutoscaleServerConfigs,
+		(*ReconcileMachine).handleRebalance,
+		(*ReconcileMachine).handleDeadMembers,
+		(*ReconcileMachine).handleNotifyFinished,
+	}
+
+	for i := 0; i < len(reconcileFunctions); i++ {
+		if err := reconcileFunctions[i](r, c); err != nil {
 			return err
+		}
+
+		if r.abortReason != "" {
+			log.Info("Aborting topology reconcile", "cluster", c.namespacedName(), "reason", r.abortReason)
+			return nil
 		}
 
 		if err := c.updateCRStatus(); err != nil {
@@ -289,168 +276,90 @@ func (r *ReconcileMachine) exec(c *Cluster) error {
 	return nil
 }
 
-func handleInit(r *ReconcileMachine, c *Cluster) error {
-	needsReconcile := false
-
-	// If we have any cluster related issues like failed nodes or if the cluster
-	// is not balanced or is currently rebalancing then we need to run reconcile.
-	if !r.couchbase.ClusterHealthy() || !r.runningPods.Equal(c.members) {
-		needsReconcile = true
-	}
-
-	// If we have any server specs that are not properly sized then we need to
-	// reconcile the nodes.
-	serverSpecs := c.cluster.Spec.Servers
-	for _, serverSpec := range serverSpecs {
-		nodes := r.couchbase.ActiveNodes.GroupByServerConfig(serverSpec.Name)
-		if nodes.Size() != serverSpec.Size {
-			needsReconcile = true
-		}
-	}
-
-	// If we have any running pods that are not part of one of the current
-	// server configs then we need to reconcile so they can be removed.
-	for _, m := range r.runningPods {
-		found := false
-
-		for _, serverSpec := range serverSpecs {
-			if m.Config() == serverSpec.Name {
-				found = true
-			}
-		}
-
-		if !found {
-			needsReconcile = true
-		}
-	}
-
-	// Reset any timeout counters if nodes have recovered.
-	for name := range r.couchbase.ActiveNodes {
-		delete(c.recoveryTime, name)
-	}
-
-	// When nodes are being removed, the default behavior is to remove volumes
-	// unless user is initiating the removal and only logs are mounted
-	for name := range c.members {
-		r.removeVolumes[name] = !c.memberHasLogVolumes(name)
-	}
-
-	if updated, err := c.wouldReconcileServerGroups(); err != nil {
-		return err
-	} else if updated {
-		needsReconcile = true
-	}
-
-	candidates, err := c.needsUpgrade()
-	if err != nil {
-		return err
-	}
-
-	if !candidates.Empty() {
-		needsReconcile = true
-	}
-	// TEMPORARY HACK END
-
-	if c.checkVolumeExpansionState() {
-		needsReconcile = true
-	}
-
-	if !needsReconcile {
-		c.cluster.Status.SetBalancedCondition()
-		r.transitionState(ReconcileFinished)
-
-		return nil
-	}
-
-	// Catch all "needs rebalance" check handles things like auto-failover
-	// which is outside of our control, or existing rebalance conditions
-	// after a restart
-	if r.couchbase.NeedsRebalance || r.couchbase.IsRebalancing {
-		c.cluster.Status.SetUnbalancedCondition()
-
-		if err := c.updateCRStatus(); err != nil {
-			// TODO: we should handle errors properly
-			r.transitionState(ReconcileFinished)
-			return nil
-		}
-	}
-
-	// We are performing an action log the cluster status
-	c.logStatus(r.couchbase)
-
-	r.knownNodes.Merge(r.couchbase.ActiveNodes)
-	r.knownNodes.Merge(r.couchbase.PendingAddNodes)
-	r.transitionState(ReconcileUnknownMembers)
-
-	return nil
-}
-
-// Unknown members are members who are currently running, but not part
-// of the set of nodes the operator is tracking.
-func handleUnknownMembers(r *ReconcileMachine, c *Cluster) error {
-	// Safely balance out these illegal members
-	r.unknownNodes = r.runningPods.Diff(c.members)
-	r.runningPods = r.runningPods.Diff(r.unknownNodes)
-	r.transitionState(ReconcileWarmupNodes)
-
-	return nil
-}
-
 // If we have nodes that are warming up then we need to wait for them to finish
-// before doing any cluster operations.
-func handleWarmupNodes(r *ReconcileMachine, c *Cluster) error {
+// before doing any cluster operations.  The one exception is for down nodes
+// where we let this through in the hope that pod recovery will save the day.
+// Q: do we need a way to stop further reconcile, as this is likely to fail given
+// the unstable nature of the cluster and litter the logs with stuff.
+func (r *ReconcileMachine) handleWarmupNodes(c *Cluster) error {
 	if r.couchbase.WarmupNodes.Size() > 0 && r.couchbase.DownNodes.Empty() {
 		// SM: So, this and a lot of others causes silent skipping of topology changes and
 		// then we do other things... I'm of a mind that only allowing said things
 		// after we have completed the topology changes is a good thing, and we are in
 		// a known good state is a good assumption to make, meaning less code and fewer
 		// hidden race condition bugs.
-		log.Info("Pods warming up, skipping", "cluster", c.namespacedName())
-		r.transitionState(ReconcileNotifyFinished)
-
+		r.abort("pods are warming up")
 		return nil
 	}
 
-	r.transitionState(ReconcileRebalanceCheck)
-
 	return nil
 }
 
-func handleRebalanceCheck(r *ReconcileMachine, c *Cluster) error {
-	if r.couchbase.IsRebalancing {
-		// If rebalance isn't actually active then we should stop it
-		running, err := c.IsRebalanceActive(c.readyMembers())
-		if err != nil {
-			log.Error(err, "Rebalance status collection failed", "cluster", c.namespacedName())
-		} else if !running {
-			// stop rebalance
-			if err := couchbaseutil.StopRebalance().On(c.api, c.readyMembers()); err != nil {
-				log.Error(err, "Rebalance cancellation failed", "cluster", c.namespacedName())
-				return err
-			}
-
-			log.Info("Rebalance cancelled", "cluster", c.namespacedName())
-			r.transitionState(ReconcileDownNodes)
-
-			return nil
-		}
-
-		return fmt.Errorf("%w: cluster is currently rebalancing", errors.NewStackTracedError(ErrReconcileInhibited))
+// If the cluster is rebalancing, we need to let it continue before letting any more
+// topology changes happen.  If Couchbase reports as rebalancing, but there is no
+// active task, then stop the rebalance.
+func (r *ReconcileMachine) handleRebalanceCheck(c *Cluster) error {
+	if !r.couchbase.IsRebalancing {
+		return nil
 	}
 
-	r.transitionState(ReconcileDownNodes)
+	running, err := c.IsRebalanceActive(c.readyMembers())
+	if err != nil {
+		return fmt.Errorf("%w: Rebalance status collection failed", errors.NewStackTracedError(ErrReconcileInhibited))
+	}
+
+	if running {
+		r.abort("cluster is currently rebalancing")
+		return nil
+	}
+
+	if err := couchbaseutil.StopRebalance().On(c.api, c.readyMembers()); err != nil {
+		log.Error(err, "Rebalance cancellation failed", "cluster", c.namespacedName())
+		return err
+	}
+
+	log.Info("Rebalance cancelled", "cluster", c.namespacedName())
 
 	return nil
 }
 
-func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
-	if r.couchbase.DownNodes.Size() > 0 {
-		// Ensure the cluster is visibly unhealthy before triggering any events
-		c.cluster.Status.SetUnavailableCondition(r.couchbase.DownNodes.Names())
+// allDownNodesRecoveryTimedout looks at every down node, if we haven't seen it timeout yet,
+// cache the time it should fail.  If all the nodes have been seen and their
+// timeouts have expired, indicate "aggressive" recovery is allowed.
+func (c *Cluster) allDownNodesRecoveryTimedout(members couchbaseutil.MemberSet) bool {
+	recoverable := true
 
-		if err := c.updateCRStatus(); err != nil {
-			return err
+	for name := range members {
+		recoveryTime, ok := c.recoveryTime[name]
+		if !ok {
+			timeout := c.cluster.Spec.ClusterSettings.AutoFailoverTimeout
+			recoveryTime = time.Now().Add(timeout.Duration).Add(30 * time.Second)
+			c.recoveryTime[name] = recoveryTime
+			recoverable = false
 		}
+
+		if recoveryTime.After(time.Now()) {
+			log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", name, "recovery_in", time.Until(recoveryTime))
+
+			recoverable = false
+		}
+	}
+
+	return recoverable
+}
+
+// If any nodes are marked as down, we first and foremost, wait for Server to safely
+// autofailover.
+func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
+	if r.couchbase.DownNodes.Empty() {
+		return nil
+	}
+
+	// Ensure the cluster is visibly unhealthy before triggering any events
+	c.cluster.Status.SetUnavailableCondition(r.couchbase.DownNodes.Names())
+
+	if err := c.updateCRStatus(); err != nil {
+		return err
 	}
 
 	// Alaways flag nodes down, the observed behaviour can change based on whether
@@ -459,43 +368,21 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 		c.raiseEventCached(k8sutil.MemberDownEvent(name, c.cluster))
 	}
 
-	pendingFailovers := 0
+	// If the recovery timeouts haven't all expired, wait...
+	// Note that we do a hard abort here.  This allows the cluster to get back into a
+	// stable state before we do "dangerous" things like reconcile TLS, which needs to
+	// be done one-shot.
+	if !c.allDownNodesRecoveryTimedout(r.couchbase.DownNodes) {
+		return fmt.Errorf("%w: waiting for pod failover", errors.NewStackTracedError(ErrReconcileInhibited))
+	}
 
 	// Get the duration that the node has been down from the status
 	// and check if it has persistent volumes to be recovered
 	for name, m := range r.couchbase.DownNodes {
-		if _, ok := r.runningPods[name]; ok {
-			// If the pod was created in the last minute then it may be a down node
-			// that was restarted and is still coming back online. If this is the
-			// case then we may be able to delta recover it in the near future.
-			if k8sutil.GetPodUptime(c.k8s, name) < downNodeThreshold {
-				log.Info("Recently created pod down, waiting", "cluster", c.namespacedName())
-				continue
-			}
-		}
-
 		// Ephemeral clusters are handled either automatically by server or
 		// manually by the user.
 		if !c.isPodRecoverable(m) && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeDataIntegrity {
-			return fmt.Errorf("%w: pod down, waiting for auto-failover on cluster: %s, pod: %s", errors.NewStackTracedError(ErrReconcileInhibited), c.namespacedName(), m.Name())
-		}
-
-		// If we've not seen this node down yet, then take note of when we should
-		// begin manual recovery.
-		recoveryTime, ok := c.recoveryTime[name]
-		if !ok {
-			timeout := c.cluster.Spec.ClusterSettings.AutoFailoverTimeout
-			recoveryTime = time.Now().Add(timeout.Duration).Add(30 * time.Second)
-			c.recoveryTime[name] = recoveryTime
-		}
-
-		// If the timeout has yet to expire then continue.
-		if recoveryTime.After(time.Now()) {
-			log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", name, "recovery_in", time.Until(recoveryTime))
-
-			pendingFailovers++
-
-			continue
+			return nil
 		}
 
 		// If this is an ephemeral pod, then let volume backed ones take priority.
@@ -514,15 +401,10 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 
 		c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 		delete(c.recoveryTime, name)
-		r.transitionState(ReconcileNotifyFinished)
+
+		r.abort("pod is recovering")
 
 		return nil
-	}
-
-	// We are still waiting for failovers to occur, don't allow the rest of the reconcile to
-	// happen.
-	if pendingFailovers != 0 {
-		return fmt.Errorf("%w: waiting for pod failover", errors.NewStackTracedError(ErrReconcileInhibited))
 	}
 
 	// By this point we know:
@@ -535,7 +417,7 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 	// * Nothing to do
 	// * Stuff that server thinks cannot be failed over e.g. a bunch of query nodes.
 	// Give the system a helping hand...
-	if len(r.couchbase.DownNodes) > 0 && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeUptime {
+	if c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeUptime {
 		log.Info("Forcing failover of unrecoverable nodes", "cluster", c.namespacedName())
 
 		otpNodes := couchbaseutil.OTPNodeList{}
@@ -550,26 +432,26 @@ func handleDownNodes(r *ReconcileMachine, c *Cluster) error {
 			return err
 		}
 
-		r.transitionState(ReconcileNotifyFinished)
+		r.abort("pods are failing over")
 
 		return nil
 	}
 
-	r.transitionState(ReconcileUnclusteredNodes)
-
 	return nil
 }
 
-func handleUnclusteredNodes(r *ReconcileMachine, c *Cluster) error {
-	for name := range r.couchbase.UnclusteredNodes {
-		removeVolumes := shouldRemoveVolumes(r, c, name)
+func (r *ReconcileMachine) handleUnclusteredNodes(c *Cluster) error {
+	if r.unclusteredMembers.Empty() {
+		return nil
+	}
+
+	for name := range r.unclusteredMembers {
+		removeVolumes := r.shouldRemoveVolumes(c, name)
 		if err := c.destroyMember(name, removeVolumes); err != nil {
 			return fmt.Errorf("unable to remove unclustered node: %w", err)
 		}
 
 		log.Info("Pod unclustered, deleting", "cluster", c.namespacedName(), "name", name)
-
-		r.runningPods.Remove(name)
 
 		// Nodes may be rebalanced out in a previous iteration (caused by
 		// node failover) and thus miss out the ejection events from rebalance().
@@ -581,12 +463,14 @@ func handleUnclusteredNodes(r *ReconcileMachine, c *Cluster) error {
 		c.raiseEvent(k8sutil.MemberRemoveEvent(name, c.cluster))
 	}
 
-	r.transitionState(ReconcileFailedAddNodes)
-
 	return nil
 }
 
-func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
+	if r.couchbase.FailedAddNodes.Empty() {
+		return nil
+	}
+
 	// These nodes have been added, but the node failed before a rebalance could
 	// start. If the node is configured to use volumes then we will recreate it,
 	// otherwise, we will remove these nodes and re-add them in other pods later.
@@ -596,7 +480,7 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				log.Error(err, "Pending add pod cannot be recovered", "cluster", c.namespacedName(), "name", name)
-				r.transitionState(ReconcileNotifyFinished)
+				r.abort("unaable to recover pod pending addition")
 
 				return nil
 			}
@@ -615,10 +499,9 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 			return err
 		}
 
-		r.runningPods.Remove(name)
+		// This is a special snowflake case, and the member is ejected by the cancel.
+		r.removeMemberNoEject(m)
 	}
-
-	r.transitionState(ReconcileAddBackNodes)
 
 	return nil
 }
@@ -626,14 +509,17 @@ func handleFailedAddNodes(r *ReconcileMachine, c *Cluster) error {
 // Add back failed nodes to cluster.
 // Delta recover is performed for data nodes,
 // otherwise a full recovery is performed.
-func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) error {
+	if r.couchbase.AddBackNodes.Empty() {
+		return nil
+	}
+
 	for name, m := range r.couchbase.AddBackNodes {
 		err := c.verifyMemberVolumes(m)
 		if err != nil {
 			log.Error(err, "Failed pod cannot be recovered, volumes unhealthy", "cluster", c.namespacedName(), "name", name)
 
-			r.ejectNodes.Add(m)
-			r.runningPods.Remove(name)
+			r.removeMember(m)
 			c.raiseEvent(k8sutil.FailedAddBackNodeEvent(name, c.cluster))
 
 			break
@@ -663,25 +549,25 @@ func handleAddBackNodes(r *ReconcileMachine, c *Cluster) error {
 			}
 
 			r.couchbase.NeedsRebalance = true
-
-			r.knownNodes.Add(m)
 		} else {
 			log.Info("Add back pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
 
-			r.ejectNodes.Add(m)
+			r.ejectMembers.Add(m)
 
 			break
 		}
 	}
-
-	r.transitionState(ReconcileFailedNodes)
 
 	return nil
 }
 
 // Failed nodes can be recovered if the pod's volumes are healthy,
 // otherwise the node is ejected from the cluster and it's node deleted.
-func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
+	if r.couchbase.FailedNodes.Empty() {
+		return nil
+	}
+
 	for _, name := range r.couchbase.FailedNodes.Names() {
 		c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
 	}
@@ -693,7 +579,7 @@ func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 			if err := c.recreatePod(m); err != nil {
 				log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", name, "reason", err)
 
-				r.transitionState(ReconcileNotifyFinished)
+				r.abort("unable to recover pod")
 
 				return nil
 			}
@@ -705,60 +591,36 @@ func handleFailedNodes(r *ReconcileMachine, c *Cluster) error {
 
 		log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", name)
 
-		r.ejectNodes.Add(m)
-		r.runningPods.Remove(name)
+		r.removeMember(m)
 	}
-
-	r.transitionState(ReconcileServerConfigs)
 
 	return nil
 }
 
-func handleUnknownServerConfigs(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 	// If a server configuration was deleted in a spec update then we will clean
 	// up all of the nodes from that server config here.
-	for name, m := range r.runningPods {
-		found := false
-
-		for _, serverSpec := range c.cluster.Spec.Servers {
-			if m.Config() == serverSpec.Name {
-				found = true
-				break
-			}
-		}
-
-		if !found {
+	for name, m := range r.runningMembers {
+		if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
 			log.Info("Pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
 
-			r.couchbase.NeedsRebalance = true
-			r.knownNodes.Remove(name)
-			r.ejectNodes.Add(m)
+			r.removeMember(m)
 		}
 	}
-
-	r.transitionState(ReconcileRemoveNodes)
 
 	return nil
 }
 
-func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
-	// Bookkeep the scaling information for only the affected server classes
-	currentSize := 0
-	desiredSize := 0
-
+func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 	serverSpecs := c.cluster.Spec.Servers
 	for _, serverSpec := range serverSpecs {
 		// Check to see if we need to remove anything
-		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)
+		nodes := r.clusteredMembers.GroupByServerConfig(serverSpec.Name)
 		nodesToRemove := nodes.Size() - serverSpec.Size
 
 		if nodesToRemove <= 0 {
 			continue
 		}
-
-		// Update global scaling information
-		currentSize += nodes.Size()
-		desiredSize += serverSpec.Size
 
 		// Schedule deletion based on server class
 		for i := 0; i < nodesToRemove; i++ {
@@ -767,8 +629,9 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 				return fmt.Errorf("failed to schedule removal of member '%s': %w", serverSpec.Name, err)
 			}
 
-			r.knownNodes.Remove(server)
-			r.ejectNodes.Add(c.members[server])
+			member := c.members[server]
+
+			r.removeMember(member)
 
 			if c.memberHasLogVolumes(server) {
 				// Remove log volumes when user initiated scale down
@@ -777,59 +640,45 @@ func handleRemoveNode(r *ReconcileMachine, c *Cluster) error {
 		}
 	}
 
-	// If we are performing any scaling update the status and request a rebalance
-	// to eject the scheduled servers
-	if currentSize != desiredSize {
-		c.cluster.Status.SetScalingDownCondition(currentSize, desiredSize)
-
-		r.couchbase.NeedsRebalance = true
-	}
-
-	r.transitionState(ReconcileAddNodes)
-
 	return nil
 }
 
-func handleAddNode(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 	serverSpecs := c.cluster.Spec.Servers
 	for _, serverSpec := range serverSpecs {
-		addCount := 0
+		nodes := r.clusteredMembers.GroupByServerConfig(serverSpec.Name)
+		nodesToCreate := serverSpec.Size - nodes.Size()
 
-		nodes := r.runningPods.GroupByServerConfig(serverSpec.Name)
-		for nodes.Size()+addCount < serverSpec.Size {
-			originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
+		if nodesToCreate <= 0 {
+			continue
+		}
 
-			c.cluster.Status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
+		// TODO: Move me
+		originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
+		c.cluster.Status.SetScalingUpCondition(originalSize, c.cluster.Spec.TotalSize())
 
-			if err := c.updateCRStatus(); err != nil {
-				log.Error(err, "Cluster status update failed", "cluster", c.namespacedName())
-			}
+		if err := c.updateCRStatus(); err != nil {
+			log.Error(err, "Cluster status update failed", "cluster", c.namespacedName())
+		}
 
-			r.couchbase.NeedsRebalance = true
-
+		for i := 0; i < nodesToCreate; i++ {
 			m, err := c.addMember(serverSpec)
 			if err != nil {
 				log.Error(err, "Pod addition to cluster failed", "cluster", c.namespacedName())
 				return err
 			}
 
-			r.knownNodes.Add(m)
-			r.runningPods.Add(m)
-			r.newNodes.Add(m)
-			addCount++
+			r.addMember(m)
 		}
 	}
-
-	r.transitionState(ReconcileVolumeExpansion)
 
 	return nil
 }
 
 // handleVolumeExpansion attempts to perform online expansion of Persistent Volumes.
-func handleVolumeExpansion(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	if !c.cluster.Spec.EnableOnlineVolumeExpansion {
 		// currently only volumes are allowed for online upgrade
-		r.transitionState(ReconcileUpgradeNode)
 		return nil
 	}
 
@@ -863,8 +712,6 @@ func handleVolumeExpansion(r *ReconcileMachine, c *Cluster) error {
 					}
 				}
 
-				r.transitionState(ReconcileUpgradeNode)
-
 				return nil
 			}
 
@@ -874,7 +721,7 @@ func handleVolumeExpansion(r *ReconcileMachine, c *Cluster) error {
 				// to the storageclass there isn't really a good action to take while volumes
 				// are in an unstable state.
 				log.Info("Pod volume expansion is in progress", "cluster", c.namespacedName(), "volume", pvc.Name)
-				r.transitionState(ReconcileFinished)
+				r.abort("persisitent volumes expanding")
 
 				return nil
 			}
@@ -898,7 +745,7 @@ func handleVolumeExpansion(r *ReconcileMachine, c *Cluster) error {
 				log.Info("Volume expanding", "cluster", c.namespacedName(), "name", pvc.Name, "current", currentSize, "requested", requestedSize)
 
 				// Done for now. Not going to upgrade all volumes at once.
-				r.transitionState(ReconcileFinished)
+				r.abort("persistent volumes expanding")
 
 				return nil
 			}
@@ -917,15 +764,12 @@ func handleVolumeExpansion(r *ReconcileMachine, c *Cluster) error {
 		}
 	}
 
-	r.transitionState(ReconcileUpgradeNode)
-
 	return nil
 }
 
-func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
-	if r.couchbase.NeedsRebalance {
-		r.transitionState(ReconcileServerGroups)
+	if r.needsRebalance {
 		return nil
 	}
 
@@ -936,7 +780,6 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 	}
 
 	if candidates.Empty() {
-		r.transitionState(ReconcileServerGroups)
 		return nil
 	}
 
@@ -1044,20 +887,13 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 		}
 
 		// Update book keeping
-		r.knownNodes.Add(member)
-		r.runningPods.Add(member)
-		r.newNodes.Add(member)
-		r.knownNodes.Remove(candidate.Name())
-		r.ejectNodes.Add(candidate)
+		r.addMember(member)
+		r.removeMember(candidate)
 
 		if c.memberHasLogVolumes(candidate.Name()) {
 			r.removeVolumes[candidate.Name()] = true
 		}
 	}
-
-	r.couchbase.NeedsRebalance = true
-
-	r.transitionState(ReconcileServerGroups)
 
 	return nil
 }
@@ -1065,14 +901,12 @@ func handleUpgradeNode(r *ReconcileMachine, c *Cluster) error {
 // handleServerGroups moves nodes from their current server group into the one
 // the pod is labelled as by the scheduler.  It occurs after node addition and
 // balance in as alterations would trigger an additional rebalance otherwise.
-func handleServerGroups(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleServerGroups(c *Cluster) error {
 	if updated, err := c.reconcileServerGroups(); err != nil {
 		return err
 	} else if updated {
-		r.couchbase.NeedsRebalance = true
+		r.needsRebalance = true
 	}
-
-	r.transitionState(ReconcileNodeServices)
 
 	return nil
 }
@@ -1081,7 +915,7 @@ func handleServerGroups(r *ReconcileMachine, c *Cluster) error {
 // before the node is balanaced in and starts serving bucket shards.  This is for the
 // benefit of external clients such as xdcr which would not function until the
 // balance in has completed otherwise.
-func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleNodeServices(c *Cluster) error {
 	if err := c.reconcilePodServices(); err != nil {
 		return err
 	}
@@ -1090,19 +924,17 @@ func handleNodeServices(r *ReconcileMachine, c *Cluster) error {
 		return err
 	}
 
-	r.transitionState(ReconcileAutoscaleServerConfigs)
-
 	return nil
 }
 
 // When cluster is under topology changes that are outside of
 // HorizontalPodAutoscaler or due to pending changes via restart/crash,
 // incoming requests from the HorizontalPodAutoscaler are suspended.
-func handleAutoscaleServerConfigs(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleAutoscaleServerConfigs(c *Cluster) error {
 	// Check if cluster is rebalancing (or needs to be rebalanced), and pause HPA activity
 	// by entering 'maintenance-mode' to prevent any intermediate scaling requests.
 	if c.cluster.Spec.AutoscaleStabilizationPeriod != nil {
-		if r.couchbase.IsRebalancing || r.couchbase.NeedsRebalance {
+		if r.couchbase.IsRebalancing || r.needsRebalance {
 			if err := c.startAutoscalingMaintenanceMode(); err != nil {
 				return err
 			}
@@ -1113,17 +945,15 @@ func handleAutoscaleServerConfigs(r *ReconcileMachine, c *Cluster) error {
 		}
 	}
 
-	r.transitionState(ReconcileRebalance)
-
 	return nil
 }
 
-func handleRebalance(r *ReconcileMachine, c *Cluster) error {
-	if r.couchbase.NeedsRebalance {
+func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
+	if r.needsRebalance {
 		// Eject nodes that we want to discard.
-		eject := r.ejectNodes.OTPNodes()
+		eject := r.ejectMembers.OTPNodes()
 
-		if err := c.rebalance(r.knownNodes, eject); err != nil {
+		if err := c.rebalance(r.clusteredMembers, eject); err != nil {
 			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be set to a full recovery type.  The state
 			// will have changed from add-back to pending-add, so we won't loop
@@ -1169,56 +999,36 @@ func handleRebalance(r *ReconcileMachine, c *Cluster) error {
 
 			return fmt.Errorf("failed to rebalance: %w", err)
 		}
-
-		for name := range r.ejectNodes {
-			r.ejectNodes.Remove(name)
-			r.runningPods.Remove(name)
-		}
 	}
-
-	r.transitionState(ReconcileDeadMembers)
 
 	return nil
 }
 
 // Dead members are members that the operator is tracking, but do not have a
 // corresponding running pod.
-func handleDeadMembers(r *ReconcileMachine, c *Cluster) error {
-	dead := c.members.Diff(r.runningPods)
-
+func (r *ReconcileMachine) handleDeadMembers(c *Cluster) error {
 	for name := range r.couchbase.FailedNodes {
 		c.logFailedMember("Node failed", name)
 	}
 
-	for name := range dead {
-		removeVolumes := shouldRemoveVolumes(r, c, name)
+	for name := range r.ejectMembers {
+		removeVolumes := r.shouldRemoveVolumes(c, name)
 		if err := c.destroyMember(name, removeVolumes); err != nil {
 			return fmt.Errorf("failed to remove dead members: %w", err)
 		}
 	}
 
-	for name := range r.unknownNodes {
-		removeVolumes := shouldRemoveVolumes(r, c, name)
-		if err := c.removePod(name, removeVolumes); err != nil {
-			return fmt.Errorf("failed to remove unknown member: %w", err)
-		}
-	}
-
-	r.transitionState(ReconcileNotifyFinished)
-
 	return nil
 }
 
-func handleNotifyFinished(r *ReconcileMachine, c *Cluster) error {
+func (r *ReconcileMachine) handleNotifyFinished(c *Cluster) error {
 	log.Info("Reconcile completed", "cluster", c.namespacedName())
-
-	r.transitionState(ReconcileFinished)
 
 	return nil
 }
 
 // Check if volumes should be removed with Pod based on reconcile status.
-func shouldRemoveVolumes(r *ReconcileMachine, c *Cluster, server string) bool {
+func (r *ReconcileMachine) shouldRemoveVolumes(c *Cluster, server string) bool {
 	removeVolumes, ok := r.removeVolumes[server]
 	if !ok {
 		// If decision to remove volume is unset then only

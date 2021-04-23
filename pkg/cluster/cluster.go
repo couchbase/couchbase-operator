@@ -1204,7 +1204,7 @@ func (c *Cluster) checkVolumeExpansionState() bool {
 	return true
 }
 
-func (c *Cluster) logStatus(status *MemberState) {
-	status.LogStatus(c.namespacedName())
-	c.scheduler.LogStatus(c.namespacedName())
-}
+// func (c *Cluster) logStatus(status *MemberState) {
+// 	status.LogStatus(c.namespacedName())
+// 	c.scheduler.LogStatus(c.namespacedName())
+// }
