@@ -212,3 +212,4 @@ parsers
 localhost
 unredacted
 StatefulSet
+StorageClass

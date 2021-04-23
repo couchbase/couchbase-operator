@@ -225,6 +225,77 @@ Any `CouchbaseBackupRestore` edits performed with `kubectl edit` will not be ref
 The `CouchbaseBackupRestore` resource will have to be deleted and created from scratch.
 ====
 
+[[additional-restore-options]]
+=== Additional Restore Options
+
+Additional options from xref:server:backup-restore:cbbackupmgr-restore.adoc[`cbbackupmgr restore`] may also be specified.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+metadata:
+  name: my-restore
+spec:
+  backup: my-backup
+  repo: cb-example-2020-02-12T19_00_03
+  start:
+    int: 1
+  buckets:
+    include: # <1>
+      - default
+      - peanutbutter
+    exclude: # <1>
+      - horseman
+    bucketMap: # <2>
+    - source: default
+      destination: new-default
+    - source: peanutbutter
+      destination: pickles
+  services: # <3>
+    analytics: true
+    bucketConfig: false
+    data: true
+    eventing: true
+    ftAlias: true
+    ftIndex: true
+    gsiIndex: true
+    views: true
+  threads: 1 # <4>
+----
+
+<1> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-buckets-include[`couchbasebackuprestores.spec.buckets.include`]: Explicitly restore only the specified list of buckets. 
++
+xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-buckets-exclude[`couchbasebackuprestores.spec.buckets.exclude`]: Restore all buckets _except_ the list of specified buckets.
++
+[NOTE]
+====
+The Dynamic Admission Controller will throw errors if discrepancies are found, such as:
+* a bucket being included in both lists, or
+* a bucket in the exclude list is also found in xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-buckets-bucketmap[`couchbasebackuprestores.spec.buckets.bucketMap`]` as a source bucket.
+====
+
+<2> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-buckets-bucketmap[`couchbasebackuprestores.spec.buckets.bucketMap`]: Specified when you want to restore a backup to a destination bucket that has a different name than the bucket that was originally backed up.
++
+This field requires a pair of fields named `source` and `destination`.
++
+--
+* `source` refers to the name of the bucket to restore from in the backup archive
+* `destination` refers to the name of the existing (renamed) bucket to restore to in the Couchbase cluster
+--
++
+Multiple `source`/`destination` pairs may be specified.
+Note that this option will only restore data to the Data Service and will not restore the metadata for any other service.
+Refer to the xref:server:backup-restore:cbbackupmgr-restore.adoc#options[`cbbackupmgr restore --map-buckets`] documentation for more information.
+
+<3> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-services[`couchbasebackuprestores.spec.services`]: By default, all data and configuration settings, for all services, are restored to the Couchbase cluster, _apart from bucket configuration settings_.
++
+In order to skip restoring a particular service, simply set the service to `false` (these options correspond to the xref:server:backup-restore:cbbackupmgr-restore.adoc#options[`cbbackupmgr restore --disable-<service>`] flags).
+In order to restore bucket configuration settings, set xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-services-bucketconfig[`couchbasebackuprestores.spec.services.bucketConfig`] to `true` (this option corresponds to the xref:server:backup-restore:cbbackupmgr-restore.adoc#options[`cbbackupmgr restore --enable-bucket-config`] flag).
+
+<4> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-threads[`couchbasebackuprestores.spec.threads`]: An integer that specifies the number of concurrent `cbbackupmgr` clients to use when restoring data.
+Refer to the xref:server:backup-restore:cbbackupmgr-restore.adoc#options[`cbbackupmgr restore --threads`] documentation for more information.
+
 == Monitor and Manage Backups
 
 It's important to regularly monitor backup performance to ensure you’re backing up all the required data within your desired time window.
@@ -411,7 +482,71 @@ couchbase-operator-b6496564f-qpqsb                1/1     Running     0         
 
 === Editing a Backup Configuration
 
-`CouchbaseBackup` resources cannot be edited, and once created, will need to be deleted and recreated if any edits wish to be made.
+Only the preexisting schedules and volume size of a xref:resource/couchbasebackup.adoc[`CouchbaseBackup`] resource can be edited.
+Attempts to edit things like the name or strategy will fail.
+
+[[online-backup-volume-resizing]]
+=== Online Backup Volume Resizing
+
+A Backup PVC that is referenced by an existing xref:resource/couchbasebackup.adoc[`CouchbaseBackup`] resource can be resized _manually_ by the user, or _automatically_ by the Autonomous Operator.
+
+[IMPORTANT]
+====
+A Backup PVC can only be resized if its associated StorageClass is configured to allow volume expansion. 
+This means the default StorageClass in your Kubernetes environment should have `allowVolumeExpansion` set to `true`.
+
+Ensure that the StorageClass is configured to allow volume expansion _before_ creating the xref:resource/couchbasebackup.adoc[`CouchbaseBackup`] resource.
+====
+
+[[manual-backup-volume-resizing]]
+==== Manual Backup Volume Resizing
+
+To perform a manual resize, simply edit xref:resource/couchbasebackup.adoc#couchbasebackups-spec-size[`couchbasebackups.spec.size`] and change it to a value that is _larger_ than the current size.
+The resize will then be performed with the next scheduled backup job.
+
+NOTE: The underlying StorageClass must be configured to allow volume expansion in order to modify the size of the Backup PVC (as stated <<online-backup-volume-resizing,previously>>).
+Changes to the volume size may go through,but the Autonomous Operator will error until the change is reverted.
+
+[[automated-backup-volume-resizing]]
+==== Automated Backup Volume Resizing
+
+A xref:resource/couchbasebackup.adoc[`CouchbaseBackup`] resource can be modified to allow the Autonomous Operator to automatically resize the Backup PVC once a specific percentage of space is left.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: my-backup
+spec:
+  strategy: full_incremental
+  full:
+    schedule: "0 3 * * 0"
+  incremental:
+    schedule: "0 3 * * 1-6"
+  size: 20Gi # <.>
+  autoscaling:
+    thresholdPercent: 20 # <.>
+    incrementPercent: 20 # <.>
+    limit: 100Gi # <.>
+----
+
+<.> xref:resource/couchbasebackup.adoc#couchbasebackups-spec-size[`couchbasebackups.spec.size`] is set to the initial size when the xref:resource/couchbasebackup.adoc[`CouchbaseBackup`] resource is created.
+Here, the size is set to `20Gi` (the default).
+
+<.> xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-thresholdpercent[`couchbasebackups.spec.autoScaling.thresholdPercent`] represents the percentage of free space _remaining_ on the volume at which point a volume expansion will be triggered.
+Here, the threshold is set to `20` (the default).
+In this case, if the volume is currently 80 GiB, a volume expansion will be triggered once the used capacity reaches 64 GiB and free space is less than 16 GiB.
+
+<.> xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-incrementpercent[`couchbasebackups.spec.autoScaling.incrementPercent`] controls how much the volume is increased each time the threshold is exceeded.
+Here, the increment is set to `20` (the default).
+In this case, if the volume is currently 80 GiB when the threshold is reached, the volume will be expanded to 100 GiB.
+
+<.> xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-limit[`couchbasebackups.spec.autoScaling.limit`] imposes a hard limit on the size of the Backup PVC, at which point the volume size will no longer be incremented.
+When this field is not defined, no bounds are imposed.
+
+NOTE: The underlying StorageClass must be configured to allow volume expansion in order to modify the size of the Backup PVC (as stated <<online-backup-volume-resizing,previously>>).
+Changes to the volume size may go through, but the Autonomous Operator will error until the change is reverted.
 
 === Deleting a Backup Configuration
 

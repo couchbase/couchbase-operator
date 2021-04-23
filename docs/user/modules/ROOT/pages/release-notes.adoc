@@ -95,34 +95,31 @@ A whole cluster "immediate" upgrade is now synonymous with a rolling upgrade set
 Immediate upgrades may be removed at some point in the future as it duplicates functionality.
 ====
 
-==== Improved Backup Handling
+==== Online Backup Volume Resizing
 
 While not a replacement for a properly implemented monitoring solution, it may be beneficial to have your backup storage grow with your requirements.
-To this end, two new features are introduced.
+To this end, the Autonomous Operator now supports xref:howto-backup.adoc#online-backup-volume-resizing[online resizing of backup volumes].
 
-The first allows manual update of the volume size, by manually editing the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-size[`couchbasebackups.spec.size`] field.
+Backup volumes can be resized in one of two ways:
 
-The second allows automatic updates to be performed by the Autonomous Operator, thus keeping backups to the minimum size necessary to operate, and reducing cost, while also supporting future expansion.
+. Backup volumes can be xref:howto-backup.adoc#manual-backup-volume-resizing[manually resized] by directly editing the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-size[`couchbasebackups.spec.size`] field.
+
+. Backup volumes can be xref:howto-backup.adoc#manual-backup-volume-resizing[automatically resized] by the Autonomous Operator, thus keeping backups to the minimum size necessary to operate, helping to reduce cost while also supporting future expansion.
 In this mode of operation, the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling[`couchbasebackups.spec.autoScaling`] field controls the behavior.
-When the free storage becomes lower than xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-thresholdpercent[`couchbasebackups.spec.autoScaling.thresholdPercent`] percent, volume expansion will be triggered.
-Volumes will be automatically grown by xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-incrementpercent[`couchbasebackups.spec.autoScaling.incrementPercent`] percent of the current volume size.
-If specified, the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling-limit[`couchbasebackups.spec.autoScaling.limit`] field will limit the maximum volume size.
-When not specified, volumes can grow indefinitely.
 
-In order to use any resize capability, your backups must be using a storage class where volume expansion is enabled.
+In order to use any of these resize capabilities, the underlying StorageClass associated with the backup volume must be configured to allow volume expansion.
 
 ==== Improved Backup and Restore
 
-By default, both of these operations would execute with only a single thread of execution.
-This led to poor performance.
-You can now specify the number of threads to use.
-This will typically be dictated by the CPU resource allocated to the backup job.
+By default, backup and restore operations execute with only a single thread of execution, which can sometimes lead to poor performance.
+To mitigate thread-related performance issues, xref:resource/couchbasebackup.adoc#couchbasebackups-spec-threads[`couchbasebackups.spec.threads`] and xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-threads[`couchbasebackuprestores.spec.threads`] can now be specified to configure the number of concurrent `cbbackupmgr` clients to use when backing up or restoring data.
 
-Restores were also inflexible, all data that was backed up, was also restored.
-This release introduces filters, so that you can control exactly what is restored from a backup.
-You can choose to include or exclude specific buckets, restore data for a particular service, and even restore to a different bucket name when restoring documents.
+This release also introduces filters that allow you to control exactly what is restored from a backup.
+In previous releases, restore operations were fairly inflexible in that the only option was to restore all data from a backup.
+Now you can choose to include or exclude specific buckets, restore data for a particular service, and even restore to a different bucket name when restoring documents.
+Refer to xref:howto-backup.adoc#additional-restore-options[Additional Restore Options] for more information.
 
-This release requires you to upgrade your backup image to at least `couchbase/operator-backup:6.6.0-XXX`.
+IMPORTANT: This release requires you to upgrade your backup image to at least `couchbase/operator-backup:6.6.0-XXX`.
 
 ==== Other Notable Changes
 
