@@ -204,6 +204,10 @@ func applyAuditing(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.Co
 	cluster.Spec.Logging.Audit = config
 }
 
+func applyMonitoring(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.CouchbaseClusterMonitoringSpec) {
+	cluster.Spec.Monitoring = config
+}
+
 // ClusterOptions is used to generate or create all Couchbase clusters by the framework.
 // The key observation is all clusters are ostensibly the same, with features layered on
 // top.  We use the builder pattern to declare those features, so they are only defined
@@ -226,6 +230,8 @@ type ClusterOptions struct {
 	LogStreaming *couchbasev2.CouchbaseClusterLoggingConfigurationSpec
 
 	AuditConfiguration *couchbasev2.CouchbaseClusterAuditLoggingSpec
+
+	MonitoringConfiguration *couchbasev2.CouchbaseClusterMonitoringSpec
 }
 
 // WithEphemeralTopology defines a cluster as being ephemeral (no volumes).
@@ -329,6 +335,20 @@ func (o *ClusterOptions) WithAuditing(enableCleanup bool) *ClusterOptions {
 	return o
 }
 
+func (o *ClusterOptions) WithMonitoring() *ClusterOptions {
+	o.MonitoringConfiguration = &couchbasev2.CouchbaseClusterMonitoringSpec{
+		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
+			Enabled: true,
+		},
+	}
+
+	if imageName := strings.TrimSpace(o.Options.MonitoringImage); imageName != "" {
+		o.MonitoringConfiguration.Prometheus.Image = imageName
+	}
+
+	return o
+}
+
 // WithTLS sets the cluster as having TLS configured.
 func (o *ClusterOptions) WithTLS(tls *TLSContext) *ClusterOptions {
 	o.TLS = tls
@@ -391,6 +411,7 @@ func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseClus
 	applyGenericNetworking(cluster, o.GenericNetworking)
 	applyLogStreaming(cluster, o.LogStreaming)
 	applyAuditing(cluster, o.AuditConfiguration)
+	applyMonitoring(cluster, o.MonitoringConfiguration)
 
 	return cluster
 }

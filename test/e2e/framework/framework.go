@@ -1177,6 +1177,50 @@ func (r *TestRequirement) Upgradable() *TestRequirement {
 	return r
 }
 
+func (r *TestRequirement) ExporterUpgradable() *TestRequirement {
+	if Global.CouchbaseExporterImageUpgrade == "" {
+		r.t.Skip("Exporter upgrade version not specified")
+	}
+
+	if Global.CouchbaseExporterImageUpgrade == "latest" {
+		r.t.Skip("Cannot upgrade Exporter from latest version")
+	}
+
+	parts1 := strings.Split(Global.CouchbaseExporterImage, ":")
+	if len(parts1) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseExporterImage))
+	}
+
+	parts2 := strings.Split(Global.CouchbaseExporterImageUpgrade, ":")
+	if len(parts2) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseExporterImageUpgrade))
+	}
+
+	if parts1[1] == parts2[1] {
+		r.t.Skip("Exporter upgrade and base version are the same")
+	}
+
+	if parts1[1] == "latest" {
+		return r
+	}
+
+	version, err := couchbaseutil.NewVersion(parts1[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts1[1], err))
+	}
+
+	upgrade, err := couchbaseutil.NewVersion(parts2[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts2[1], err))
+	}
+
+	if upgrade.GreaterEqual(version) {
+		r.t.Skip(fmt.Sprintf("Exporter upgrade version %s greater than or equal to base version %s", parts2[1], parts1[1]))
+	}
+
+	return r
+}
+
 // ServerGroups skips the test is there aren't enough server groups to play with.
 func (r *TestRequirement) ServerGroups(i int) *TestRequirement {
 	capabilities := clustercapabilities.MustNewCapabilities(r.t, r.kubernetes.KubeClient)

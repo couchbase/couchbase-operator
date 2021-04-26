@@ -7,7 +7,6 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -328,65 +327,23 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func skipPrometheusUpgrade(t *testing.T) {
-	f := framework.Global
-
-	if f.CouchbaseExporterImageUpgrade == "" {
-		t.Skip("Upgrade exporter image not specified")
-	}
-
-	versionStr, err := k8sutil.CouchbaseVersion(f.CouchbaseExporterImage)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	upgradeStr, err := k8sutil.CouchbaseVersion(f.CouchbaseExporterImageUpgrade)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	version, err := couchbaseutil.NewVersion(versionStr)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	upgrade, err := couchbaseutil.NewVersion(upgradeStr)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	if version.GreaterEqual(upgrade) {
-		t.Skip("Exporter base version greater than or equal to upgrade version")
-	}
-}
-
-func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
+func TestPrometheusMetricsUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	skipPrometheusUpgrade(t)
+	framework.Requires(t, targetKube).ExporterUpgradable()
 
 	// Static configuration.
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := clusterOptionsUpgradeMonitoring().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	testCouchbase := clusterOptionsUpgradeMonitoring().WithEphemeralTopology(clusterSize).WithMonitoring().MustCreate(t, targetKube)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
-
-	// Enable monitoring.
-	monitoring := enableMonitoring(f)
-
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/monitoring", monitoring), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
+	// Wait for the cluster to be ready.
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
-
-	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
 	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 5*time.Minute)
 	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
 
@@ -402,17 +359,9 @@ func TestPrometheusMetricsEnableAndUpgrade(t *testing.T) {
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{
-			Times: 2,
-			Validator: eventschema.Sequence{
-				Validators: []eventschema.Validatable{
-					eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-					eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
-					eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-				},
-			},
-		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }

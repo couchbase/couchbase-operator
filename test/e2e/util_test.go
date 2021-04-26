@@ -351,7 +351,7 @@ var (
 		"TestPrometheusMetricsEnableMandatoryMutualTLS": TestPrometheusMetricsEnableMandatoryMutualTLS,
 		"TestPrometheusMetricsEnableAndPerformOps":      TestPrometheusMetricsEnableAndPerformOps,
 		"TestPrometheusMetricsBearerTokenAuth":          TestPrometheusMetricsBearerTokenAuth,
-		"TestPrometheusMetricsEnableAndUpgrade":         TestPrometheusMetricsEnableAndUpgrade,
+		"TestPrometheusMetricsUpgrade":                  TestPrometheusMetricsUpgrade,
 
 		// Backup tests
 		"TestFullIncremental":                TestFullIncremental,

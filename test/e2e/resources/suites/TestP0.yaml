@@ -188,7 +188,7 @@ testcases:
 - TestPrometheusMetricsEnableMandatoryMutualTLS
 - TestPrometheusMetricsEnableAndPerformOps
 - TestPrometheusMetricsBearerTokenAuth
-- TestPrometheusMetricsEnableAndUpgrade
+- TestPrometheusMetricsUpgrade
 
 # Node-To-Node Encryption Tests
 - TestCreateClusterWithTLSAndControlPlaneNodeToNode
