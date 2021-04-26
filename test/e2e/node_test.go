@@ -345,7 +345,6 @@ func TestRemoveForeignNode(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: foreignNodeName},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 

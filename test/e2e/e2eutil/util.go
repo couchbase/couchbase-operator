@@ -921,16 +921,9 @@ func CreateMemberPod(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, m cou
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: m.Name(),
-			Labels: map[string]string{
-				operator_constants.LabelApp:      "couchbase",
-				operator_constants.LabelServer:   "true",
-				operator_constants.LabelCluster:  cl.Name,
-				operator_constants.LabelNode:     m.Name(),
-				operator_constants.LabelNodeConf: m.Config(),
-			},
-			OwnerReferences: []metav1.OwnerReference{
-				cl.AsOwner(),
-			},
+			// At a minimum, any naughty user needs to have the following labels
+			// to establish DNS and allow node-to-node connectivity.
+			Labels: k8sutil.SelectorForClusterResource(cl),
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
