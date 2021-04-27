@@ -2745,6 +2745,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 		currentRestore := currentRestores[i]
 
 		// check if Repo field is populated, if not, try and find the repo
+		// TODO: why in the (#&@! is the script not doing this itself??
 		if len(currentRestore.Spec.Repo) == 0 {
 			if err := c.getBackupRepo(&currentRestore); err != nil {
 				return err
@@ -2758,70 +2759,32 @@ func (c *Cluster) reconcileBackupRestore() error {
 
 		k8sutil.ApplyBaseAnnotations(requested)
 
-		// check if restore job already exists
+		// Check if restore job already exists.  If it doesn't, then it's never been created, or
+		// less likely, been deleted and needs recreating.
 		currentjob, ok := c.k8s.Jobs.Get(requested.Name)
-		if ok {
-			// update any existing requested specs
-			if currentjob.Annotations[constants.CronjobSpecAnnotation] != requested.Annotations[constants.CronjobSpecAnnotation] {
-				updatedRestore, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Update(context.Background(), &currentRestore, metav1.UpdateOptions{})
-				if err != nil {
-					return err
-				}
-
-				// compare the specs
-				if updatedRestore.Annotations[constants.CronjobSpecAnnotation] != requested.Annotations[constants.CronjobSpecAnnotation] {
-					return fmt.Errorf("%w: inconsistency between requested job and actual job", errors.NewStackTracedError(errors.ErrInternalError))
-				}
-
-				log.Info("restore job updated", "cbrestore", currentRestore.Name, "updated job", requested.Name)
-			}
-
-			// cleanup completed restores
-			if currentjob.Status.Succeeded == 1 {
-				log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", currentRestore.Name)
-
-				if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), currentRestore.Name, *metav1.NewDeleteOptions(0)); err != nil {
-					return err
-				}
-			}
-		} else {
+		if !ok {
 			log.Info("Restore created", "cbrestore", currentRestore.Name)
 
 			c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
 
-			// else try to create the job as it does not exist
 			createdJob, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{})
 			if err != nil {
 				return err
 			}
 
 			log.Info("restore job created", "cbrestore", currentRestore.Name, "created job", createdJob.Name)
-		}
-	}
 
-	jobs := c.k8s.Jobs.List()
-	// loop over the current existing jobs
-Outerloop:
-	for _, job := range jobs {
-		if _, ok := job.Labels[constants.LabelBackupRestore]; !ok {
 			continue
 		}
 
-		// check if the job has an "owner" restore
-		for _, currentRestore := range currentRestores {
-			if job.Name == currentRestore.Name {
-				continue Outerloop
+		// Cleanup completed restores so that aren't rerun.
+		if currentjob.Status.Succeeded == 1 {
+			log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", currentRestore.Name)
+
+			if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), currentRestore.Name, *metav1.NewDeleteOptions(0)); err != nil {
+				return err
 			}
 		}
-
-		// no "owner" restore, must have been deleted. cleanup
-		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{}); err != nil {
-			return err
-		}
-
-		log.Info("Restore deleted", "cbrestore", job.Name)
-
-		c.raiseEvent(k8sutil.BackupRestoreDeleteEvent(job.Name, c.cluster))
 	}
 
 	return nil
