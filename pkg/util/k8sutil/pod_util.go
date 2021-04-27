@@ -44,6 +44,8 @@ const (
 	podReadinessCondition                     = v1.PodConditionType("pod.couchbase.com/readiness")
 	CouchbaseLogSidecarContainerName          = "logging"
 	CouchbaseAuditCleanupSidecarContainerName = "audit-cleanup"
+	loggingSidecarMetadataMountDir            = "/etc/podinfo"
+	loggingSidecarMetadataMountName           = "podinfo"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -670,6 +672,13 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 					loggingResources = *sidecarConfig.Resources
 				}
 
+				// The volume holding pod meta-data for use by the sidecar
+				metaDataVolueMount := v1.VolumeMount{
+					Name:      loggingSidecarMetadataMountName,
+					MountPath: loggingSidecarMetadataMountDir,
+					ReadOnly:  true,
+				}
+
 				// Create a side car container to retrieve the logs.
 				logging := v1.Container{
 					Name:  CouchbaseLogSidecarContainerName,
@@ -677,6 +686,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 					VolumeMounts: []v1.VolumeMount{
 						*readonlyLogsMount,
 						configVolumeMount,
+						metaDataVolueMount,
 					},
 					Env: []v1.EnvVar{
 						{
@@ -687,21 +697,80 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 							Name:  "COUCHBASE_LOGS_DYNAMIC_CONFIG",
 							Value: sidecarConfig.ConfigurationMountPath,
 						},
+						{
+							Name:  "COUCHBASE_K8S_CONFIG_DIR",
+							Value: loggingSidecarMetadataMountDir,
+						},
+						{
+							Name: "POD_NAME",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "metadata.name",
+								},
+							},
+						},
+						{
+							Name: "POD_NAMESPACE",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "metadata.namespace",
+								},
+							},
+						},
+						{
+							Name: "POD_UID",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "metadata.uid",
+								},
+							},
+						},
 					},
 					Resources: loggingResources,
 				}
 
-				// Make sure we include the volume for the Secret as well
-				pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
-					Name: fbs.ConfigurationName,
-					VolumeSource: v1.VolumeSource{
-						Secret: &v1.SecretVolumeSource{
-							SecretName: fbs.ConfigurationName,
+				pod.Spec.Volumes = append(pod.Spec.Volumes,
+					// Make sure we include the volume for the Secret as well
+					v1.Volume{
+						Name: fbs.ConfigurationName,
+						VolumeSource: v1.VolumeSource{
+							Secret: &v1.SecretVolumeSource{
+								SecretName: fbs.ConfigurationName,
+							},
 						},
 					},
-				})
+					// Add the pod meta-data as well from annotations and labels as files
+					v1.Volume{
+						Name: loggingSidecarMetadataMountName,
+						VolumeSource: v1.VolumeSource{
+							DownwardAPI: &v1.DownwardAPIVolumeSource{
+								Items: []v1.DownwardAPIVolumeFile{
+									{
+										Path: "labels",
+										FieldRef: &v1.ObjectFieldSelector{
+											FieldPath: "metadata.labels",
+										},
+									},
+									{
+										Path: "annotations",
+										FieldRef: &v1.ObjectFieldSelector{
+											FieldPath: "metadata.annotations",
+										},
+									},
+								},
+							},
+						},
+					},
+				)
 
 				pod.Spec.Containers = append(pod.Spec.Containers, logging)
+
+				// Add a suggested parser to help with Fluent Bit usage as a daemonset
+				// https://docs.fluentbit.io/manual/pipeline/filters/kubernetes#kubernetes-annotations
+				parserAnnotation := map[string]string{
+					"fluentbit.io/parser_stdout-" + CouchbaseLogSidecarContainerName: "couchbase_sidecar",
+				}
+				pod.SetAnnotations(mergeLabels(pod.GetAnnotations(), parserAnnotation))
 
 				// Deal with audit log cleanup if both auditing is enabled and then GC is also enabled.
 				// Disgusting solution to remove all rotated audit logs after configurable amount of timeand output those deleted to stdout for reference.
