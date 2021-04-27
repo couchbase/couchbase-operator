@@ -5,13 +5,6 @@ import (
 	util_const "github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
-const (
-	// CommunityEditionImage is a version of CE that exists.  Sadly we have to
-	// hard code this (not do a regex replace) as this only gets major releases,
-	// mo minors or patches.
-	CommunityEditionImage = "couchbase/server:community-6.0.4"
-)
-
 // Couchbase cluster.
 var (
 	ClusterNamePrefix          = "test-couchbase-"

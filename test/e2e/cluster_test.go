@@ -6,6 +6,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	pkgconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -243,7 +244,7 @@ func TestInvalidBaseImage(t *testing.T) {
 
 	// Create the cluster.
 	testCouchbase := clusterOptions().WithEphemeralTopology(1).Generate(targetKube)
-	testCouchbase.Spec.Image = "basecouch/123:enterprise-6.0.4"
+	testCouchbase.Spec.Image = pkgconstants.InvalidBaseImage
 	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
@@ -259,7 +260,7 @@ func TestInvalidBaseImage(t *testing.T) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-// TestInvalidBaseImage tests cluster with invalid version repos fail.
+// TestInvalidVersion tests cluster with invalid version repos fail.
 func TestInvalidVersion(t *testing.T) {
 	f := framework.Global
 

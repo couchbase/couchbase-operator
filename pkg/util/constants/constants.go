@@ -110,6 +110,15 @@ const (
 	// The DAC will not allow any version lower than this to run, it may be possible
 	// but some features won't work most likely and lead to support requests.
 	CouchbaseVersionMin = "6.5.0"
+	// CommunityEditionImage and InvalidBaseImage must both be of versions equal to
+	// or greater than CouchbaseVersionMin.
+
+	// CommunityEditionImage is a version of CE that exists.  Sadly we have to
+	// hard code this (not do a regex replace) as this only gets major releases,
+	// mo minors or patches.
+	CommunityEditionImage = "couchbase/server:community-6.6.0"
+	// InvalidBaseImage is an invalid/nonexistant base image used for testing.
+	InvalidBaseImage = "basecouch/123:enterprise-6.6.2"
 )
 
 const (
