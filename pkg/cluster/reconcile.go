@@ -1817,6 +1817,37 @@ func (c *Cluster) reconcilePods() error {
 	return nil
 }
 
+func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, serverClass *couchbasev2.ServerConfig, pvcState *k8sutil.PersistentVolumeClaimState, moves []scheduler.Move) (*v1.Pod, error) {
+	// For server groups, if off, then leave it blank.  If it's enabled, default to
+	// what was there originally, unless overridden by a resceduling move.
+	serverGroup := ""
+
+	if c.cluster.Spec.ServerGroupsEnabled() {
+		// Keep the existing selector if one exists.
+		if actual.Spec.NodeSelector != nil {
+			if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+				serverGroup = group
+			}
+		}
+
+		// Check the rescheuling information for any overrides.
+		for _, move := range moves {
+			if move.Name == member.Name() {
+				serverGroup = move.To
+
+				break
+			}
+		}
+	}
+
+	requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState)
+	if err != nil {
+		return nil, err
+	}
+
+	return requested, nil
+}
+
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
@@ -1856,31 +1887,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			return nil, err
 		}
 
-		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
-
-		// For server groups, if off, then leave it blank.  If it's enabled, default to
-		// what was there originally, unless overridden by a resceduling move.
-		serverGroup := ""
-
-		if c.cluster.Spec.ServerGroupsEnabled() {
-			// Keep the existing selector if one exists.
-			if actual.Spec.NodeSelector != nil {
-				if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
-					serverGroup = group
-				}
-			}
-
-			// Check the rescheuling information for any overrides.
-			for _, move := range moves {
-				if move.Name == member.Name() {
-					serverGroup = move.To
-
-					break
-				}
-			}
-		}
-
-		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState)
+		requested, err := c.regeneratePod(member, actual, serverClass, pvcState, moves)
 		if err != nil {
 			return nil, err
 		}
@@ -1904,6 +1911,8 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 		}
 
 		podsEqual, d := c.resourcesEqual(actualSpec, requestedSpec)
+
+		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
 
 		// Nothing to do, carry on...
 		if podsEqual && pvcsEqual {
