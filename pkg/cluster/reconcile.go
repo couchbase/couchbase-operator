@@ -2842,7 +2842,12 @@ func (c *Cluster) reconcileRBAC() error {
 
 // supportsNodeToNode tells us whether the current version supports N2N encryption.
 func (c *Cluster) supportsNodeToNode() bool {
-	version, err := couchbaseutil.NewVersion(c.cluster.Status.CurrentVersion)
+	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return false
+	}
+
+	version, err := couchbaseutil.NewVersion(tag)
 	if err != nil {
 		return false
 	}
