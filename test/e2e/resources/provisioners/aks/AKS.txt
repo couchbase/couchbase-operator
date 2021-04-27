@@ -1,0 +1,20 @@
+Azure Kubernetes Service Auto Provisioning with Terraform
+
+`terraform init` to initialise Terraform in the directory.
+
+`terraform apply ...` to apply the Terraform plan, including the relevant `-var` flags:
+- `-var name`: The prefix for provisioned resources.
+- `-var kubernetes-version`: The desired Kubernetes version to be used.
+  - Azure requires you to specify a Kubernetes version including the patch number. Check available versions with `az aks get-versions`
+- `-var remote`: If `true`, creates two clusters and peers them, for use with XDCR remote testing. (Defaults to `false`)
+- `-var service-principal-id`: The ID of your Azure Service Principal.
+- `-var service-principal-secret`: The secret of your Azure Service Principal.
+  - Service principals must be created seperately, beforehand.
+- `-var subscription-id`: The subscription ID of your Azure subscription.
+- `-var tenant-id`: The tenant ID of your Azure account.
+  - Use `az account list` to view relevant Azure info.
+
+`terraform output ...` can be used to access the two generated kubeconfigs:
+- `terraform output -raw kubeconfig1 > config` outputs the first cluster's kubeconfig to the `config` file.
+
+When finished with the provisioned cluster, `terraform destroy ...` will deprovision any resources it created. `destroy` requires the same `-var` flags used with `apply`.

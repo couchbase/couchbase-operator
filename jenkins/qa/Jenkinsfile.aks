@@ -39,7 +39,7 @@ pipeline {
     string(name: 'logging_image', defaultValue: 'couchbase/fluent-bit:1.0.0')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.2-enterprise')
     string(name: 'platform', defaultValue: 'kubernetes')
-    string(name: 'kubernetes_version', defaultValue: '1.18.14')
+    string(name: 'kubernetes_version', defaultValue: '1.18.17')
     string(name: 'storage_class', defaultValue: 'cao-azurefile')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
@@ -48,6 +48,7 @@ pipeline {
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '100')
     string(name: 'istio_version', defaultValue: '1.9.0')
+    string(name: 'terraform_version', defaultValue: '0.15.1')
     booleanParam(name: 'enable_istio', defaultValue: false)
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
@@ -69,6 +70,7 @@ pipeline {
     AZURE_SUBSCRIPTION_ID = credentials('azure-subscription-id')
     AZURE_TENANT_ID = credentials('azure-tenant-id')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
+    NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     TF_IN_AUTOMATION = "TRUE"
   }
 
@@ -87,8 +89,8 @@ pipeline {
         sh 'chmod +x jq-linux64'
         sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
 
-        sh 'wget -q https://releases.hashicorp.com/terraform/0.14.4/terraform_0.14.4_linux_amd64.zip'
-        sh 'unzip terraform_0.14.4_linux_amd64.zip'
+        sh "wget -q https://releases.hashicorp.com/terraform/${params.terraform_version}/terraform_${params.terraform_version}_linux_amd64.zip"
+        sh "unzip terraform_${params.terraform_version}_linux_amd64.zip"
         sh "mv terraform ${env.WORKSPACE}/bin"
 
         sh "wget -q https://github.com/istio/istio/releases/download/${params.istio_version}/istioctl-${params.istio_version}-linux-amd64.tar.gz"
@@ -102,9 +104,11 @@ pipeline {
       steps {
         dir("./test/e2e/resources/provisioners/aks") {
           sh 'terraform init -no-color -input=false'
-          sh "terraform apply -var service-principal-id=\"${env.AZURE_CREDENTIALS_USR}\" -var service-principal-secret=\"${env.AZURE_CREDENTIALS_PSW}\" -var subscription-id=\"${env.AZURE_SUBSCRIPTION_ID}\" -var tenant-id=\"${env.AZURE_TENANT_ID}\" -var kubernetes-version=\"${params.kubernetes_version}\" -auto-approve -no-color"
-          sh "terraform output -json kubeconfig1 | jq -r > ${env.WORKSPACE}/config1"
-          sh "terraform output -json kubeconfig2 | jq -r > ${env.WORKSPACE}/config2"
+          sh "terraform apply -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -var remote=true -auto-approve -no-color"
+          sh "terraform output -raw kubeconfig1 > ${env.WORKSPACE}/config1"
+          sh "terraform output -raw kubeconfig2 > ${env.WORKSPACE}/config2"
+          sh "kubectl create -f cao-azurefile.yaml --kubeconfig ${env.WORKSPACE}/config1"
+          sh "kubectl create -f cao-azurefile.yaml --kubeconfig ${env.WORKSPACE}/config2"
         }
       }
     }
@@ -304,7 +308,7 @@ pipeline {
   post {
     always {
       dir("./test/e2e/resources/provisioners/aks") {
-        sh "terraform destroy -var service-principal-id=\"${env.AZURE_CREDENTIALS_USR}\" -var service-principal-secret=\"${env.AZURE_CREDENTIALS_PSW}\" -var subscription-id=\"${env.AZURE_SUBSCRIPTION_ID}\" -var tenant-id=\"${env.AZURE_TENANT_ID}\" -var kubernetes-version=\"${params.kubernetes_version}\" -auto-approve -no-color"
+        sh "terraform destroy -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -var remote=true -auto-approve -no-color"
       }
       cleanWs()
     }

@@ -71,7 +71,7 @@ pipeline {
     GCLOUD_AUTH_ACCOUNT = "couchbase-operator@couchbase-qe.iam.gserviceaccount.com"
     GCLOUD_AUTH_PROJECT = "couchbase-qe"
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
-    NAME = "qe-gke-test-${env.BUILD_NUMBER}"
+    NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     TF_IN_AUTOMATION = "TRUE"
   }
 

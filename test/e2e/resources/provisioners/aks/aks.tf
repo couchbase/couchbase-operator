@@ -21,34 +21,34 @@ provider "azurerm" {
 }
 
 # Create resource group
-resource "azurerm_resource_group" "qe-auto" {
-  name     = "qe-auto"
+resource "azurerm_resource_group" "resourcegroup" {
+  name     = var.name
   location = "East US 2"
 }
 
 
 # Create VNet 1
-resource "azurerm_virtual_network" "qe-auto-vnet1" {
-  name                = "qe-auto-vnet1"
+resource "azurerm_virtual_network" "vnet1" {
+  name                = "${var.name}-vnet1"
   location            = "East US 2"
-  resource_group_name = azurerm_resource_group.qe-auto.name
+  resource_group_name = azurerm_resource_group.resourcegroup.name
   address_space       = ["10.0.0.0/12"]
 }
 
 # Create Subnet for VNet 1
-resource "azurerm_subnet" "qe-auto-vnet1-subnet" {
-  name                  = "qe-auto-vnet1-subnet"
-  resource_group_name   = azurerm_resource_group.qe-auto.name
-  virtual_network_name  = azurerm_virtual_network.qe-auto-vnet1.name
+resource "azurerm_subnet" "vnet1-subnet" {
+  name                  = "${var.name}-vnet1-subnet"
+  resource_group_name   = azurerm_resource_group.resourcegroup.name
+  virtual_network_name  = azurerm_virtual_network.vnet1.name
   address_prefixes      = ["10.8.0.0/16"]
 }
 
 # Create Cluster 1
 resource "azurerm_kubernetes_cluster" "cluster1" {
-  name                = "qe-auto-cluster1"
+  name                = "${var.name}-cluster1"
   location            = "East US 2"
-  resource_group_name = azurerm_resource_group.qe-auto.name
-  dns_prefix          = "qe-auto-cluster1"
+  resource_group_name = azurerm_resource_group.resourcegroup.name
+  dns_prefix          = "${var.name}-cluster1"
   kubernetes_version  = var.kubernetes-version
 
   default_node_pool {
@@ -57,7 +57,7 @@ resource "azurerm_kubernetes_cluster" "cluster1" {
     vm_size             = "Standard_D4s_v4"
     availability_zones  = ["1", "2", "3"]
     os_disk_size_gb     = 30
-    vnet_subnet_id      = azurerm_subnet.qe-auto-vnet1-subnet.id
+    vnet_subnet_id      = azurerm_subnet.vnet1-subnet.id
   }
 
   network_profile {
@@ -83,28 +83,34 @@ resource "azurerm_kubernetes_cluster" "cluster1" {
 # Do it all again for a 2nd cluster!
 
 # Create VNet 2
-resource "azurerm_virtual_network" "qe-auto-vnet2" {
-  name                = "qe-auto-vnet2"
+resource "azurerm_virtual_network" "vnet2" {
+  count = var.remote ? 1 : 0
+
+  name                = "${var.name}-vnet2"
   location            = "West US 2"
-  resource_group_name = azurerm_resource_group.qe-auto.name
+  resource_group_name = azurerm_resource_group.resourcegroup.name
   address_space       = ["10.16.0.0/12"]
 }
 
 # Create Subnet for VNet 2
-resource "azurerm_subnet" "qe-auto-vnet2-subnet" {
-  name                  = "qe-auto-vnet2-subnet"
-  resource_group_name   = azurerm_resource_group.qe-auto.name
-  virtual_network_name  = azurerm_virtual_network.qe-auto-vnet2.name
+resource "azurerm_subnet" "vnet2-subnet" {
+  count = var.remote ? 1 : 0
+
+  name                  = "${var.name}vnet2-subnet"
+  resource_group_name   = azurerm_resource_group.resourcegroup.name
+  virtual_network_name  = azurerm_virtual_network.vnet2[0].name
   address_prefixes      = ["10.24.0.0/16"]
 }
 
 
 # Create Cluster 2
 resource "azurerm_kubernetes_cluster" "cluster2" {
-  name                = "qe-auto-cluster2"
+  count = var.remote ? 1 : 0
+
+  name                = "${var.name}-cluster2"
   location            = "West US 2"
-  resource_group_name = azurerm_resource_group.qe-auto.name
-  dns_prefix          = "qe-auto-cluster2"
+  resource_group_name = azurerm_resource_group.resourcegroup.name
+  dns_prefix          = "${var.name}-cluster2"
   kubernetes_version  = var.kubernetes-version
 
   default_node_pool {
@@ -113,7 +119,7 @@ resource "azurerm_kubernetes_cluster" "cluster2" {
     vm_size             = "Standard_D4s_v4"
     availability_zones  = ["1", "2", "3"]
     os_disk_size_gb     = 30
-    vnet_subnet_id      = azurerm_subnet.qe-auto-vnet2-subnet.id
+    vnet_subnet_id      = azurerm_subnet.vnet2-subnet[0].id
   }
 
   network_profile {
@@ -138,66 +144,26 @@ resource "azurerm_kubernetes_cluster" "cluster2" {
 
 # Peer the VNets so they can chat
 
-resource "azurerm_virtual_network_peering" "qe-auto-peer-1to2" {
-  name = "qe-auto-peer-1to2"
-  resource_group_name       = azurerm_resource_group.qe-auto.name
-  virtual_network_name      = azurerm_virtual_network.qe-auto-vnet1.name
-  remote_virtual_network_id = azurerm_virtual_network.qe-auto-vnet2.id
+resource "azurerm_virtual_network_peering" "peer-1to2" {
+  count = var.remote ? 1 : 0
+
+  name = "${var.name}-peer-1to2"
+  resource_group_name       = azurerm_resource_group.resourcegroup.name
+  virtual_network_name      = azurerm_virtual_network.vnet1.name
+  remote_virtual_network_id = azurerm_virtual_network.vnet2[0].id
   allow_forwarded_traffic   = true
 }
 
-resource "azurerm_virtual_network_peering" "qe-auto-peer-2to1" {
-  name = "qe-auto-peer-2to1"
-  resource_group_name       = azurerm_resource_group.qe-auto.name
-  virtual_network_name      = azurerm_virtual_network.qe-auto-vnet2.name
-  remote_virtual_network_id = azurerm_virtual_network.qe-auto-vnet1.id
+resource "azurerm_virtual_network_peering" "peer-2to1" {
+  count = var.remote ? 1 : 0
+
+  name = "${var.name}-peer-2to1"
+  resource_group_name       = azurerm_resource_group.resourcegroup.name
+  virtual_network_name      = azurerm_virtual_network.vnet2[0].name
+  remote_virtual_network_id = azurerm_virtual_network.vnet1.id
   allow_forwarded_traffic   = true
 }
 
-# Create Kubernetes providers for both clusters
-provider "kubernetes" {
-  alias = "kube1"
-  host                   = azurerm_kubernetes_cluster.cluster1.kube_config.0.host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.cluster1.kube_config.0.cluster_ca_certificate)
-}
-
-provider "kubernetes" {
-  alias = "kube2"
-  host                   = azurerm_kubernetes_cluster.cluster2.kube_config.0.host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.cluster2.kube_config.0.client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.cluster2.kube_config.0.client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.cluster2.kube_config.0.cluster_ca_certificate)
-}
-
-# Set up Storage classes for both clusters
-
-resource "kubernetes_storage_class" "custom-azurefile1" {
-  metadata {
-    name = "cao-azurefile"
-    labels = {
-      "kubernetes.io/cluster-service" = "true"
-    }
-  }
-  storage_provisioner = "kubernetes.io/azure-file"
-  reclaim_policy      = "Delete"
-  volume_binding_mode = "WaitForFirstConsumer"
-  provider = kubernetes.kube1
-}
-
-resource "kubernetes_storage_class" "custom-azurefile2" {
-  metadata {
-    name = "cao-azurefile"
-    labels = {
-      "kubernetes.io/cluster-service" = "true"
-    }
-  }
-  storage_provisioner = "kubernetes.io/azure-file"
-  reclaim_policy      = "Delete"
-  volume_binding_mode = "WaitForFirstConsumer"
-  provider = kubernetes.kube2
-}
 # Output the kubeconfigs for the two clusters
 
 output "kubeconfig1" {
@@ -206,6 +172,6 @@ output "kubeconfig1" {
 }
 
 output "kubeconfig2" {
-  value = azurerm_kubernetes_cluster.cluster2.kube_config_raw
+  value = var.remote ? azurerm_kubernetes_cluster.cluster2[0].kube_config_raw : null
   sensitive = true
 }
