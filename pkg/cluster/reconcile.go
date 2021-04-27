@@ -37,6 +37,26 @@ const (
 	extendedRetryPeriod = 3 * time.Minute
 )
 
+// reconcileFunc is a stable and consistent interface to a reconcile function.
+// Where there is consistency, then there is peace, happiness and unicorns.
+type reconcileFunc func(*Cluster) error
+
+// reconcileFuncList wraps up reconcile functions into an ordered list of
+// execution.
+type reconcileFuncList []reconcileFunc
+
+// run executes each reconcile function, in-order, and bombs out if anything
+// goes wrong.
+func (l reconcileFuncList) run(c *Cluster) error {
+	for _, f := range l {
+		if err := f(c); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // reconcile is the main function for the whole cluster lifecycle.  It works like this:
 //
 // * Deletes any completed pods, these are not considered as members, but do pollute the
@@ -76,32 +96,19 @@ func (c *Cluster) reconcile() error {
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)
 
-	if err := c.reconcileStatus(); err != nil {
-		return err
+	// Run pre-creation reconcilers.  These are all the things we need to correctly
+	// provision a Couchbase pod such as requisite services or any secrets/configmaps
+	// that may be mounted in the container.
+	preCreationReconcilers := reconcileFuncList{
+		(*Cluster).reconcileStatus,
+		(*Cluster).reconcileCompletedPods,
+		(*Cluster).reconcilePeerServices,
+		(*Cluster).reconcileAdminService,
+		(*Cluster).refreshTLSShadowSecret,
+		(*Cluster).reconcileLogConfig,
 	}
 
-	if err := c.reconcileCompletedPods(); err != nil {
-		return err
-	}
-
-	// Establish DNS for cluster communication.
-	if err := k8sutil.ReconcilePeerServices(c.k8s, c.cluster); err != nil {
-		return err
-	}
-
-	// Setup the UI so we can monitor cluster creation.  This is legacy behaviour, but
-	// makes for a good demo...
-	if err := c.reconcileAdminService(); err != nil {
-		return err
-	}
-
-	// Ensure any resources required by pods are in place.
-	if err := c.refreshTLSShadowSecret(); err != nil {
-		return err
-	}
-
-	// Set up any log cofiguration required
-	if err := c.reconcileLogConfig(c.k8s); err != nil {
+	if err := preCreationReconcilers.run(c); err != nil {
 		return err
 	}
 
@@ -139,25 +146,20 @@ func (c *Cluster) reconcile() error {
 		}
 	}
 
-	// Persistent data may need to be reflected in the status.
-	if err := c.reconcilePersistentStatus(); err != nil {
-		return err
+	// Run pre-topology change reconcilers.  These are the things that need
+	// a running cluster, but must be performed before any pods are modified.
+	preTopologyReconcilers := reconcileFuncList{
+		(*Cluster).reconcilePersistentStatus,
+		(*Cluster).reconcileAdminPassword,
+		(*Cluster).reconcileTLSPreTopologyChange,
 	}
 
-	// Update the password after we have done TLS to ensure we can actually talk to
-	// the API.
-	if err := c.reconcileAdminPassword(); err != nil {
+	if err := preTopologyReconcilers.run(c); err != nil {
 		return err
 	}
 
 	fsm, err := c.newReconcileMachine()
 	if err != nil {
-		return err
-	}
-
-	// Some features need to treat topology changes as atomic, the key one
-	// being TLS.
-	if err := c.reconcileTLSPreTopologyChange(); err != nil {
 		return err
 	}
 
@@ -181,62 +183,27 @@ func (c *Cluster) reconcile() error {
 		return nil
 	}
 
-	// Update the status in case an upgrade has bumped the version and allowed
-	// new features.  Now we gate feature updated on upgrade completion we can
-	// remove the use of Status.CurrentVersion and just use Spec.Image.
-	if err := c.reconcilePersistentStatus(); err != nil {
-		return err
+	// Run post-topology reconcilers.  These typically manage Couchbase
+	// features, and we are guaranteed that the cluster is in a stable
+	// and happy state (most of the time, races can still occur).
+	postTopologyReconcilers := reconcileFuncList{
+		(*Cluster).reconcilePersistentStatus,
+		(*Cluster).reconcileTLSPostTopologyChange,
+		(*Cluster).reconcilePods,
+		(*Cluster).reconcileClusterSettings,
+		(*Cluster).reconcileBuckets,
+		(*Cluster).reconcileXDCR,
+		(*Cluster).reconcileReadiness,
+		(*Cluster).reconcileAdminService,
+		(*Cluster).reconcilePodServices,
+		(*Cluster).reconcileMemberAlternateAddresses,
+		(*Cluster).reconcileRBAC,
+		(*Cluster).reconcileBackup,
+		(*Cluster).reconcileBackupRestore,
+		(*Cluster).reconcileAutoscalers,
 	}
 
-	if err := c.reconcileTLSPostTopologyChange(); err != nil {
-		return err
-	}
-
-	if err := c.reconcilePods(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileClusterSettings(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileBuckets(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileXDCR(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileReadiness(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileAdminService(); err != nil {
-		return err
-	}
-
-	if err := c.reconcilePodServices(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileMemberAlternateAddresses(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileRBAC(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileBackup(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileBackupRestore(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileAutoscalers(); err != nil {
+	if err := postTopologyReconcilers.run(c); err != nil {
 		return err
 	}
 
@@ -246,6 +213,10 @@ func (c *Cluster) reconcile() error {
 	c.cluster.Status.SetReadyCondition()
 
 	return nil
+}
+
+func (c *Cluster) reconcilePeerServices() error {
+	return k8sutil.ReconcilePeerServices(c.k8s, c.cluster)
 }
 
 // reconcileMembers reconciles
@@ -489,7 +460,12 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		}
 	}
 
-	durable, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "6.6.0")
+	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return nil, err
+	}
+
+	durable, err := couchbaseutil.VersionAfter(tag, "6.6.0")
 	if err != nil {
 		return nil, err
 	}

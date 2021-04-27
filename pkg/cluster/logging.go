@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	v1 "k8s.io/api/core/v1"
@@ -18,7 +17,7 @@ const (
 )
 
 // reconcileLogConfig will create a default ConfigMap for log configuration if one does not exist.
-func (c *Cluster) reconcileLogConfig(client *client.Client) error {
+func (c *Cluster) reconcileLogConfig() error {
 	fbs := c.cluster.Spec.Logging.Server
 	if fbs == nil || !fbs.Enabled {
 		return nil
@@ -38,7 +37,7 @@ func (c *Cluster) reconcileLogConfig(client *client.Client) error {
 	}
 
 	// Retrieve the current configuration and whether it exists at all
-	current, exists := client.Secrets.Get(fbs.ConfigurationName)
+	current, exists := c.k8s.Secrets.Get(fbs.ConfigurationName)
 
 	// Use a ConfigMap as this can then be dynamically changed and picked up by existing sidecars (or new ones).
 	// The config map means we are fully configurable as well to handle output to ES, Azure, S3, etc, per customer.
@@ -86,7 +85,7 @@ func (c *Cluster) reconcileLogConfig(client *client.Client) error {
 		log.Info("Updating default log config secret", "cluster", c.namespacedName(), "name", fbs.ConfigurationName)
 
 		// This will make any meta-data updates as well.
-		if _, err := client.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), requestedConfig, metav1.UpdateOptions{}); err != nil {
+		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), requestedConfig, metav1.UpdateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 
@@ -96,7 +95,7 @@ func (c *Cluster) reconcileLogConfig(client *client.Client) error {
 	// If we get here then must not exist
 	log.Info("Creating default log config secret", "cluster", c.namespacedName(), "name", fbs.ConfigurationName)
 
-	if _, err := client.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedConfig, metav1.CreateOptions{}); err != nil {
+	if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedConfig, metav1.CreateOptions{}); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
