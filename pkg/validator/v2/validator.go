@@ -100,7 +100,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 func checkConstraintDataServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.DataServiceMemQuota == nil {
-		return errors.Required("spec.cluster.dataServiceMemoryQuota", "body")
+		return errors.Required("spec.cluster.dataServiceMemoryQuota", "body", nil)
 	}
 
 	if cluster.Spec.ClusterSettings.DataServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
@@ -114,7 +114,7 @@ func checkConstraintDataServiceMemoryQuota(v *types.Validator, cluster *couchbas
 func checkConstraintIndexServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.IndexServiceMemQuota == nil {
-		return errors.Required("spec.cluster.indexServiceMemoryQuota", "body")
+		return errors.Required("spec.cluster.indexServiceMemoryQuota", "body", nil)
 	}
 
 	if cluster.Spec.ClusterSettings.IndexServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
@@ -128,7 +128,7 @@ func checkConstraintIndexServiceMemoryQuota(v *types.Validator, cluster *couchba
 func checkConstraintSearchServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.SearchServiceMemQuota == nil {
-		return errors.Required("spec.cluster.searchServiceMemoryQuota", "body")
+		return errors.Required("spec.cluster.searchServiceMemoryQuota", "body", nil)
 	}
 
 	if cluster.Spec.ClusterSettings.SearchServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
@@ -142,7 +142,7 @@ func checkConstraintSearchServiceMemoryQuota(v *types.Validator, cluster *couchb
 func checkConstraintEventingServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.EventingServiceMemQuota == nil {
-		return errors.Required("spec.cluster.eventingServiceMemoryQuota", "body")
+		return errors.Required("spec.cluster.eventingServiceMemoryQuota", "body", nil)
 	}
 
 	if cluster.Spec.ClusterSettings.EventingServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
@@ -156,7 +156,7 @@ func checkConstraintEventingServiceMemoryQuota(v *types.Validator, cluster *couc
 func checkConstraintAnalyticsServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota == nil {
-		return errors.Required("spec.cluster.anayticsServiceMemoryQuota", "body")
+		return errors.Required("spec.cluster.anayticsServiceMemoryQuota", "body", nil)
 	}
 
 	if cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
@@ -183,7 +183,7 @@ func checkConstraintQueryTemporarySpace(v *types.Validator, cluster *couchbasev2
 func checkConstraintAutoFailoverTimeout(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.AutoFailoverTimeout == nil {
-		return errors.Required("spec.cluster.autoFailoverTimeout", "body")
+		return errors.Required("spec.cluster.autoFailoverTimeout", "body", nil)
 	}
 
 	if cluster.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() < 5.0 {
@@ -201,7 +201,7 @@ func checkConstraintAutoFailoverTimeout(v *types.Validator, cluster *couchbasev2
 func checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == nil {
-		return errors.Required("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body")
+		return errors.Required("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body", nil)
 	}
 
 	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() < 5.0 {
@@ -268,7 +268,7 @@ func checkConstraintAdminSecret(v *types.Validator, cluster *couchbasev2.Couchba
 		errs = append(errs, fmt.Errorf("spec.security.adminSecret must contain \"password\" key"))
 	} else {
 		if len(value) < 6 {
-			errs = append(errs, errors.TooShort("password", "spec.security.adminSecret", 6))
+			errs = append(errs, errors.TooShort("password", "spec.security.adminSecret", 6, nil))
 		}
 		if strings.ContainsAny(string(value), `()<>,;:\"/[]?={}`) {
 			errs = append(errs, fmt.Errorf(`password in spec.security.adminSecret must not contain any of the following characters ()<>,;:\"/[]?={}`))
@@ -411,7 +411,7 @@ func checkConstraintServerClassContainsDataService(v *types.Validator, cluster *
 		}
 	}
 
-	return errors.Required("at least one \"data\" service", "spec.servers.services")
+	return errors.Required("at least one \"data\" service", "spec.servers.services", nil)
 }
 
 // checkConstraintClusterSupportable checks that if you have one supportable class, they all are.
@@ -487,7 +487,7 @@ func checkConstraintServiceMountsUsedWithDefaultMount(v *types.Validator, cluste
 		}
 
 		if config.VolumeMounts.HasSubMounts() && !config.VolumeMounts.HasDefaultMount() {
-			errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
+			errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index), nil))
 		}
 	}
 
@@ -563,13 +563,13 @@ func checkConstraintVolumeTemplateSize(v *types.Validator, cluster *couchbasev2.
 
 	for _, template := range cluster.Spec.VolumeClaimTemplates {
 		if template.Spec.Resources.Requests == nil {
-			errs = append(errs, errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates.resources.requests"))
+			errs = append(errs, errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates.resources.requests", nil))
 			continue
 		}
 
 		value, ok := template.Spec.Resources.Requests[v1.ResourceStorage]
 		if !ok {
-			errs = append(errs, errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates.resources.requests"))
+			errs = append(errs, errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates.resources.requests", nil))
 			continue
 		}
 
@@ -697,11 +697,11 @@ func checkConstraintPublicNetworking(v *types.Validator, cluster *couchbasev2.Co
 	var errs []error
 
 	if cluster.Spec.Networking.TLS == nil {
-		errs = append(errs, errors.Required("spec.networking.tls", "body"))
+		errs = append(errs, errors.Required("spec.networking.tls", "body", nil))
 	}
 
 	if cluster.Spec.Networking.DNS == nil {
-		errs = append(errs, errors.Required("spec.networking.dns", "body"))
+		errs = append(errs, errors.Required("spec.networking.dns", "body", nil))
 	}
 
 	if errs != nil {
@@ -731,7 +731,7 @@ func checkConstraintMTLSPaths(v *types.Validator, cluster *couchbasev2.Couchbase
 	}
 
 	if len(cluster.Spec.Networking.TLS.ClientCertificatePaths) == 0 {
-		return errors.TooFewItems("spec.networking.tls.clientCertificatePaths", "", 1)
+		return errors.TooFewItems("spec.networking.tls.clientCertificatePaths", "", 1, nil)
 	}
 
 	return nil
@@ -766,7 +766,7 @@ func checkConstraintLDAPAuthentication(v *types.Validator, cluster *couchbasev2.
 	}
 
 	if ldap.UserDNMapping.Template == "" && ldap.UserDNMapping.Query == "" {
-		return errors.Required("spec.security.ldap.userDNMapping", "body")
+		return errors.Required("spec.security.ldap.userDNMapping", "body", nil)
 	}
 
 	if ldap.UserDNMapping.Template != "" && ldap.UserDNMapping.Query != "" {
@@ -795,7 +795,7 @@ func checkConstraintLDAPConnectionTLS(v *types.Validator, cluster *couchbasev2.C
 
 	tlsSecretName := cluster.Spec.Security.LDAP.TLSSecret
 	if tlsSecretName == "" {
-		return errors.Required("spec.security.ldap.tlsSecret", "body")
+		return errors.Required("spec.security.ldap.tlsSecret", "body", nil)
 	}
 
 	if v.Options.ValidateSecrets {
@@ -831,7 +831,7 @@ func checkConstraintLDAPAuthorization(v *types.Validator, cluster *couchbasev2.C
 	}
 
 	if ldap.GroupsQuery == "" {
-		return errors.Required("security.ldap.groupsQuery", "body")
+		return errors.Required("security.ldap.groupsQuery", "body", nil)
 	}
 
 	return nil
@@ -865,11 +865,11 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		timeout := int(bucket.Spec.MaxTTL.Duration.Seconds())
 
 		if timeout < 0 {
-			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false))
+			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false, nil))
 		}
 
 		if timeout > bucketTTLMax {
-			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false))
+			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false, nil))
 		}
 	}
 
@@ -901,11 +901,11 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 		timeout := int(bucket.Spec.MaxTTL.Duration.Seconds())
 
 		if timeout < 0 {
-			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false))
+			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false, nil))
 		}
 
 		if timeout > bucketTTLMax {
-			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false))
+			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false, nil))
 		}
 	}
 
@@ -963,7 +963,7 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 		authSecretName := user.Spec.AuthSecret
 		if authSecretName == "" {
 			emsg := fmt.Sprintf("spec.authSecret for `%s` domain", domain)
-			errs = append(errs, errors.Required(emsg, user.Name))
+			errs = append(errs, errors.Required(emsg, user.Name, nil))
 		} else if v.Options.ValidateSecrets {
 			// Check the ldap auth secret exists and has the correct keys
 			authSecret, err := v.Abstraction.GetSecret(user.Namespace, authSecretName)

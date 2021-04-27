@@ -434,6 +434,20 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"watch",  // used by the operator for caching
 			},
 		},
+		// Leader election...
+		{
+			APIGroups: []string{
+				"coordination.k8s.io",
+			},
+			Resources: []string{
+				"leases",
+			},
+			Verbs: []string{
+				"get",
+				"create",
+				"update",
+			},
+		},
 	}
 
 	if o.scope.value.isClusterScope() {
