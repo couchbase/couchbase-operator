@@ -91,6 +91,21 @@ Review the xref:best-practices.adoc#persistent-volumes-best-practices[Operator b
 | Certified
 |===
 
+== CPU and Memory Requirements
+
+It is highly recommended that your Couchbase clusters are deployed with some form of memory resource request in order to ensure fair scheduling of workloads and to ensure resources are available to meet basic service levels.
+
+You can set all resource allocations yourself explicitly, however for new users to the platform we recommend using xref:resource/couchbasecluster.adoc#spec-autoresourceallocation[auto resource allocation].
+Using this feature will require:
+
+* 2 CPUs per Couchbase pod by default.
+* 512MiB of memory per pod for each of the Data, Index, Search, and Eventing Services that are enabled.
+  1GiB of memory per pod if the the Analytics Service is enabled.
+  An additional 25% memory overhead on top of the memory requirements for each service.
+  For a typical development cluster where all services are enabled, this would equal 3.75GiB.
+
+You can read more about pod scheduling in the xref:best-practices.adoc#pod-scheduling[best practices] documentation.
+
 == RBAC and Networking Requirements
 
 Preparing the Kubernetes cluster to run the Operator may require setting up proper RBAC and network settings in your Kubernetes cluster.
