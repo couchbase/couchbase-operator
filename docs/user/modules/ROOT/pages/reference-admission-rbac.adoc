@@ -4,16 +4,17 @@ The admission controller requires read-only access to several resource types in 
 
 == Required Permissions
 
+couchbase.com/couchbaseclusters::
 couchbase.com/couchbasebuckets::
 couchbase.com/couchbaseephemeralbuckets::
 couchbase.com/couchbasememcachedbuckets::
 couchbase.com/couchbasereplications::
 couchbase.com/couchbaseusers::
 couchbase.com/couchbasegroups::
-couchbase.com/couchbaseroles::
 couchbase.com/couchbaserolebindings::
 couchbase.com/couchbasebackups::
 couchbase.com/couchbasebackuprestores::
+couchbase.com/couchbaseautoscalers::
 Used by the DAC to collect resources associated with a `CouchbaseCluster`.
 The DAC ensures -- when considered as a whole -- the configuration is valid for the Couchbase cluster.
 +
@@ -26,6 +27,8 @@ Used the the DAC to lookup the namespace a cluster is running in.
 This is used on determine whether the cluster is running on Red Hat OpenShift.
 This information is used to determine correct defaults for the platform.
 +
+You can opt out of this requirement with the xref:tools/cbopcfg.adoc[`--default-file-system-group` cbopcfg flag].
++
 _Required Permissions_: `get`
 
 secrets::
@@ -33,11 +36,15 @@ Used by the DAC to look for secrets references in the `CouchbaseCluster` specifi
 It will ensure that the username and password secrets exist.
 It will ensure that, if specified, the TLS secrets are present and correct, and are valid for the cluster.
 +
+You can opt out of this requirement with the xref:tools/cbopcfg.adoc[`--validate-secrets` cbopcfg flag].
++
 _Required Permissions_: `get`
 
 storage.k8s.io/storageclasses::
 Used by the DAC to look for storage class references in the `CouchbaseCluster` specification.
 It will ensure that, if present, any storage class templates reference existing storage classes.
++
+You can opt out of this requirement with the xref:tools/cbopcfg.adoc[`--validate-storage-classes` cbopcfg flag].
 +
 _Required Permissions_: `get`
 

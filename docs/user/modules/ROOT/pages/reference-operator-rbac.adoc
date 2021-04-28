@@ -25,10 +25,8 @@ couchbase.com/couchbasememcachedbuckets::
 couchbase.com/couchbasereplications::
 couchbase.com/couchbaseusers::
 couchbase.com/couchbasegroups::
-couchbase.com/couchbaseroles::
 couchbase.com/couchbaserolebindings::
 couchbase.com/couchbasebackups::
-couchbase.com/couchbaseautoscalers::
 The Operator logically combines `CouchbaseCluster` resources with these resources in order to manage a Couchbase cluster.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
@@ -41,12 +39,24 @@ It also garbage collects restores on success, so needs permission to delete them
 +
 _Required Permissions_: `list`, `watch`, `delete`
 
+couchbase.com/couchbaseautoscalers::
+The Operator needs to be able to create and delete autoscaler endpoints to provide an interface with the Kubernetes horizontal pod autoscaler (HPA).
++
+_Required Permissions_: `list`, `watch`, `create`, `update`, `delete`
+
+couchbase.com/couchbaseautoscalers/status::
+The Operator needs to be able to update autoscaler status to communicate cluster state with the HPA.
++
+_Required Permissions_: `update`
+
 pods::
+pods/status::
 The Operator needs to be able to create and delete pods to deploy and scale the Couchbase Server cluster, as well as perform auto-healing activities.
+Pod readiness is communicated to Kubernetes with pod readiness gates, requiring access to the pod status conditions.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
-_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
-
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`, `patch`
++
 [IMPORTANT]
 ====
 The Operator does not need `pods/exec` permissions to run.
@@ -60,7 +70,7 @@ services::
 The Operator needs to create services in order to generate DNS names that are used to address pods, as well as create SRV records for service discovery.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
-_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`, `patch`
 
 events::
 The Operator will raise events that are associated with a `CouchbaseCluster` resource, which can be used to synchronize external operations or raise alerts.
@@ -69,15 +79,16 @@ _Required Permissions_: `list`, `create`, `update`
 
 secrets::
 The Operator consumes cluster passwords and private keys from secrets.  Secrets can be securely managed by a separate user from that which is controlling the cluster, giving isolation for security compliance purposes.
+The Operator also uses secrets to cache persistent state about a Couchbase cluster, such as passwords and keys that are not exposed by the Couchbase API, but are required to detect modification and trigger rectification.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
-_Required Permissions_: `get`, `list`, `watch`
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`
 
 persistentvolumeclaims::
 The Operator needs to be able to claim persistent volumes when server pods are using the persistent storage option.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
-_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`, `patch`
 
 policy/poddisruptionbudgets::
 The Operator need to be able to create and update pod disruption budgets to allow orchestration of xref:concept-kubernetes-upgrade.adoc[automatic Kubernetes upgrades].
@@ -88,19 +99,14 @@ _Required Permissions_: `get`, `list`, `watch`, `create`, `delete`
 configmaps::
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
-_Required Permissions_: `get`, `create`, `update`
-
-batch/cronjobs::
-The Operator needs to be able to create and update cron jobs in order to schedule regular backups.
-The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
-+
-_Required Permissions_: `list`, `watch`, `create`, `update`
+_Required Permissions_: `get`, `create`, `update`, `delete`
 
 batch/jobs::
-The operator needs to be able to create jobs in order to create a restore of a backup.
+batch/cronjobs::
+The Operator needs to be able to create and update jobs and cron jobs in order to schedule regular backups and restore data.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
-_Required Permissions_: `list`, `watch`, `create`, `update`
+_Required Permissions_: `list`, `watch`, `create`, `update`, `delete`
 
 couchbase.com/couchbaseautoscalers::
 The operator needs to be able to create, update, and delete these resources to propagate changes received from the `HorizontalPodAutoscaler`.
