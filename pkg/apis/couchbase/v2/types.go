@@ -163,16 +163,19 @@ type CouchbaseBackupSpec struct {
 	// +kubebuilder:default=2
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 
-	// Number of hours to hold backups for, everything older will be deleted.
+	// Number of hours to hold backups for, everything older will be deleted.  More info:
+	// https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="720h"
 	BackupRetention *metav1.Duration `json:"backupRetention,omitempty"`
 
-	// Number of hours to hold script logs for, everything older will be deleted.
+	// Number of hours to hold script logs for, everything older will be deleted.  More info:
+	// https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="168h"
 	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
 
 	// Size allows the specification of a backup persistent volume, when using
-	// volume based backup.
+	// volume based backup. More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="20Gi"
 	// +kubebuilder:validation:Type=string
 	Size *resource.Quantity `json:"size,omitempty"`
@@ -196,7 +199,8 @@ type CouchbaseBackupSpec struct {
 
 type CouchbaseBackupAutoScaling struct {
 	// Limit imposes a hard limit on the size we can autoscale to.  When not
-	// specified no bounds are imposed.
+	// specified no bounds are imposed. More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	Limit *resource.Quantity `json:"limit,omitempty"`
 
@@ -223,7 +227,8 @@ type CouchbaseBackupAutoScaling struct {
 // including when the last backup occurred, whether is succeeded or not, the run
 // time of the backup and the size of the backup.
 type CouchbaseBackupStatus struct {
-	// CapacityUsed tells us how much of the PVC we are using.
+	// CapacityUsed tells us how much of the PVC we are using. More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	CapacityUsed *resource.Quantity `json:"capacityUsed,omitempty"`
 
@@ -255,7 +260,8 @@ type CouchbaseBackupStatus struct {
 	// Cronjob tells us which Cronjob the job belongs to.
 	CronJob string `json:"cronjob"`
 
-	// Duration tells us how long the last backup took.
+	// Duration tells us how long the last backup took.  More info:
+	// https://golang.org/pkg/time/#ParseDuration
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
 	// LastFailure tells us the time the last failed backup failed.
@@ -341,6 +347,8 @@ type CouchbaseBackupRestoreSpec struct {
 	End *StrOrInt `json:"end,omitempty"`
 
 	// Number of hours to hold restore script logs for, everything older will be deleted.
+	// More info:
+	// https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="168h"
 	LogRetention *metav1.Duration `json:"logRetention,omitempty"`
 
@@ -468,7 +476,8 @@ type CouchbaseBackupRestoreStatus struct {
 	// Job tells us which job is running/ran last.
 	Job string `json:"job"`
 
-	// Duration tells us how long the last restore took.
+	// Duration tells us how long the last restore took.  More info:
+	// https://golang.org/pkg/time/#ParseDuration
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
 	// LastFailure tells us the time the last failed restore failed.
@@ -1788,7 +1797,8 @@ type ClusterConfig struct {
 	// memory resource constrints for the query service, so this has no effect on Couchbase
 	// server.  It is, however, used when the spec.autoResourceAllocation feature is enabled,
 	// and is used to define the amount of memory reserved by the query service for use with
-	// Kubernetes resource scheduling.
+	// Kubernetes resource scheduling. More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	QueryServiceMemQuota *resource.Quantity `json:"queryServiceMemoryQuota,omitempty"`
 
@@ -1933,6 +1943,8 @@ type CouchbaseClusterQuerySettings struct {
 	// TemporarySpace allows the temporary storage used by the query
 	// service backfill, per-pod, to be modified.  This field requires
 	// `backfillEnabled` to be set to true in order to have any effect.
+	// More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="5Gi"
 	// +kubebuilder:validation:Type=string
 	TemporarySpace *resource.Quantity `json:"temporarySpace,omitempty"`
@@ -2462,10 +2474,14 @@ type ServerClassStatus struct {
 	Name string `json:"name"`
 
 	// RequestedMemory, if set, defines the Kubernetes resource request for the server class.
+	// More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	RequestedMemory *resource.Quantity `json:"requestedMemory,omitempty"`
 
 	// AllocatedMemory defines the total memory allocated for constrained Couchbase services.
+	// More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	AllocatedMemory *resource.Quantity `json:"allocatedMemory,omitempty"`
 
@@ -2474,7 +2490,8 @@ type ServerClassStatus struct {
 	AllocatedMemoryPercent int `json:"allocatedMemoryPercent,omitempty"`
 
 	// UnusedMemory is set when memory resources are requested and is the difference between
-	// the requestedMemory and allocatedMemory.
+	// the requestedMemory and allocatedMemory.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	UnusedMemory *resource.Quantity `json:"unusedMemory,omitempty"`
 
@@ -2483,27 +2500,32 @@ type ServerClassStatus struct {
 	UnusedMemoryPercent int `json:"unusedMemoryPercent,omitempty"`
 
 	// DataServiceAllocation is set when the data service is enabled for this class and
-	// defines how much memory this service consumes per pod.
+	// defines how much memory this service consumes per pod.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	DataServiceAllocation *resource.Quantity `json:"dataServiceAllocation,omitempty"`
 
 	// IndexServiceAllocation is set when the index service is enabled for this class and
-	// defines how much memory this service consumes per pod.
+	// defines how much memory this service consumes per pod.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	IndexServiceAllocation *resource.Quantity `json:"indexServiceAllocation,omitempty"`
 
 	// SearchServiceAllocation is set when the search service is enabled for this class and
-	// defines how much memory this service consumes per pod.
+	// defines how much memory this service consumes per pod.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	SearchServiceAllocation *resource.Quantity `json:"searchServiceAllocation,omitempty"`
 
 	// EventingServiceAllocation is set when the eventing service is enabled for this class and
-	// defines how much memory this service consumes per pod.
+	// defines how much memory this service consumes per pod.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	EventingServiceAllocation *resource.Quantity `json:"eventingServiceAllocation,omitempty"`
 
 	// AnalyticsServiceAllocation is set when the analytics service is enabled for this class and
-	// defines how much memory this service consumes per pod.
+	// defines how much memory this service consumes per pod.  More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:validation:Type=string
 	AnalyticsServiceAllocation *resource.Quantity `json:"analyticsServiceAllocation,omitempty"`
 }
@@ -2677,6 +2699,8 @@ type CouchbaseClusterLogRotationSpec struct {
 	Interval *metav1.Duration `json:"interval,omitempty"`
 
 	// Size allows the specification of a rotation size for the log, defaults to 20Mi.
+	// More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
 	// +kubebuilder:default="20Mi"
 	// +kubebuilder:validation:Type=string
 	Size *resource.Quantity `json:"size,omitempty"`

@@ -185,6 +185,7 @@ Str references an absolute backup by name.
 ==== Description
 
 Number of hours to hold restore script logs for, everything older will be deleted.
+More info: https://golang.org/pkg/time/#ParseDuration.
 
 === couchbasebackuprestores.spec.repo
 
@@ -433,6 +434,7 @@ Name of the repository.
 ==== Description
 
 Duration tells us how long the last restore took.
+More info: https://golang.org/pkg/time/#ParseDuration.
 
 === couchbasebackuprestores.status.failed
 

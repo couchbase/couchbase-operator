@@ -929,6 +929,7 @@ BackfillEnabled allows the query service to backfill.
 
 TemporarySpace allows the temporary storage used by the query service backfill, per-pod, to be modified.
 This field requires `backfillEnabled` to be set to true in order to have any effect.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.query.temporarySpaceUnlimited
 
@@ -955,6 +956,7 @@ This field overrides `temporarySpace`.
 QueryServiceMemQuota is a dummy field.
 By default, Couchbase server provides no memory resource constrints for the query service, so this has no effect on Couchbase server.
 It is, however, used when the spec.autoResourceAllocation feature is enabled, and is used to define the amount of memory reserved by the query service for use with Kubernetes resource scheduling.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.searchServiceMemoryQuota
 
@@ -1214,6 +1216,7 @@ The interval at which to rotate log files, defaults to 15 minutes.
 ==== Description
 
 Size allows the specification of a rotation size for the log, defaults to 20Mi.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.logging.logRetentionCount
 
@@ -2588,6 +2591,7 @@ Allocations shows memory allocations within server classes.
 ==== Description
 
 AllocatedMemory defines the total memory allocated for constrained Couchbase services.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.allocatedMemoryPercent
 
@@ -2610,6 +2614,7 @@ AllocatedMemoryPercent is set when memory resources are requested and define how
 ==== Description
 
 AnalyticsServiceAllocation is set when the analytics service is enabled for this class and defines how much memory this service consumes per pod.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.dataServiceAllocation
 
@@ -2622,6 +2627,7 @@ AnalyticsServiceAllocation is set when the analytics service is enabled for this
 ==== Description
 
 DataServiceAllocation is set when the data service is enabled for this class and defines how much memory this service consumes per pod.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.eventingServiceAllocation
 
@@ -2634,6 +2640,7 @@ DataServiceAllocation is set when the data service is enabled for this class and
 ==== Description
 
 EventingServiceAllocation is set when the eventing service is enabled for this class and defines how much memory this service consumes per pod.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.indexServiceAllocation
 
@@ -2646,6 +2653,7 @@ EventingServiceAllocation is set when the eventing service is enabled for this c
 ==== Description
 
 IndexServiceAllocation is set when the index service is enabled for this class and defines how much memory this service consumes per pod.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.name
 
@@ -2670,6 +2678,7 @@ Name is the name of the server class defined in spec.servers.
 ==== Description
 
 RequestedMemory, if set, defines the Kubernetes resource request for the server class.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.searchServiceAllocation
 
@@ -2682,6 +2691,7 @@ RequestedMemory, if set, defines the Kubernetes resource request for the server 
 ==== Description
 
 SearchServiceAllocation is set when the search service is enabled for this class and defines how much memory this service consumes per pod.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.unusedMemory
 
@@ -2694,6 +2704,7 @@ SearchServiceAllocation is set when the search service is enabled for this class
 ==== Description
 
 UnusedMemory is set when memory resources are requested and is the difference between the requestedMemory and allocatedMemory.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.unusedMemoryPercent
 
