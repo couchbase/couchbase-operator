@@ -351,8 +351,20 @@ spec:
         - name: config
           mountPath: /etc/sync_gateway # <.>
           readOnly: true
+        ports: # <.>
+        - name: http-api
+          containerPort: 4984
+        - name: http-metrics
+          containerPort: 4986
+        resources: # <.>
+          requests:
+            cpu: 1
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 2Gi
         env:
-        - name: GOMAXPROCS
+        - name: GOMAXPROCS # <.>
           value: "1"
       volumes:
       - name: config
@@ -368,6 +380,20 @@ Version 2.8.2 or higher is recommended as it has the fewest number of xref:conce
 
 <.> `spec.template.spec.containers[].volumeMounts[].mountPath` mounts the configuration secret in the correct location.
 By default the Sync Gateway container will try to load configuration from `/etc/sync_gateway/config.json`, and this is how the `Secret` and `Deployment` are configured.
+
+<.> `spec.template.spec.containers[].ports[]` defines the Sync Gateway ports.
+The `sync-gateway` port is required for Couchbase Mobile to connect to, this can be load balanced and exposed via a service, load-balancer or ingress.
+The `metrics` port is optional, and provides integration with Prometheus.
+
+<.> `spec.template.spec.containers[].resources` allows the a pod's resource requirements to be configured.
+We highly recommend that this is configured to ensure fair scheduling and access to the required resources.
+The actual values are dependent on your actual workload, and the ones depicted are an example only.
+
+<.> `spec.template.spec.containers[].env` allows environment variables to the passed to Sync Gateway.
+Particular attention should be paid to `GOMAXPROCS` and this defines the number of CPUs that Sync Gateway can use.
+This is directly related to the resources defined previously.
+If you have allocated 4 CPUs, you should set the maximum number of CPUs to 4 also.
+The limits should be above this number to allow for any overheads, as Kubernetes will terminate pods who exceed their resource limits.
 
 <.> `spec.template.spec.volumes[].secret.secretName` references the <<configuring-sync-gateway,Sync Gateway configuration>> `Secret` that is mounted in the Sync Gateway container.
 

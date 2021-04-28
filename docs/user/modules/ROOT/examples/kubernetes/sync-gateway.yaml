@@ -94,6 +94,18 @@ spec:
         - name: config
           mountPath: /etc/sync_gateway
           readOnly: true
+        ports:
+        - name: sync-gateway
+          containerPort: 4984
+        - name: metrics
+          containerPort: 4986
+        resources:
+          requests:
+            cpu: 1
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 2Gi
         env:
         - name: GOMAXPROCS
           value: "1"

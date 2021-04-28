@@ -15,12 +15,19 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	// syncGatewayResourceName is the name used for all sync gateway resources.
 	syncGatewayResourceName = "test-sync-gateway"
+
+	// syncGatewayAPIPort is what clients connect to.
+	syncGatewayAPIPort = 4984
+
+	// syncGatewayMetricsPort is what prometheus connects to.
+	syncGatewayMetricsPort = 4986
 )
 
 // createSyncGateway creates a sync gateway instance in the given cluster.
@@ -129,6 +136,8 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 	// Define and create the deployment.
 	// If a custom DNS service is specified override the default DNS configuration
 	// in the sync-gateway containers.
+	// Remember folks, we document what we test, and test what we document, so keep
+	// this N Sync with the tutorials.
 	podTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -145,6 +154,26 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 							Name:      "config",
 							MountPath: "/etc/sync_gateway",
 							ReadOnly:  true,
+						},
+					},
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "http-api",
+							ContainerPort: int32(syncGatewayAPIPort),
+						},
+						{
+							Name:          "http-metrics",
+							ContainerPort: int32(syncGatewayMetricsPort),
+						},
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2"),
+							corev1.ResourceMemory: resource.MustParse("2Gi"),
 						},
 					},
 					Env: []corev1.EnvVar{
