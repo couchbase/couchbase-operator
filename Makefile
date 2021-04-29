@@ -219,7 +219,9 @@ artifacts: tools crd
 image-artifacts: binaries
 	# Create a subdirectory for the operator docker build
 	mkdir -p $(OPERATOR_ARTIFACTS)/docs
+	mkdir -p $(OPERATOR_ARTIFACTS)/scripts
 	mkdir -p $(OPERATOR_ARTIFACTS)/build/bin
+	cp scripts/passwd $(OPERATOR_ARTIFACTS)/scripts/passwd
 	cp docs/License.txt $(OPERATOR_ARTIFACTS)/docs/License.txt
 	cp docs/README.txt $(OPERATOR_ARTIFACTS)/docs/README.txt
 	cp $(OPERATOR_BINARY) $(OPERATOR_ARTIFACTS)/$(OPERATOR_BINARY)
@@ -227,7 +229,9 @@ image-artifacts: binaries
 	cp Dockerfile.rhel $(OPERATOR_ARTIFACTS)/Dockerfile.rhel
 	# Create a subdirectory for the admission controller docker build
 	mkdir -p $(ADMISSION_ARTIFACTS)/docs
+	mkdir -p $(ADMISSION_ARTIFACTS)/scripts
 	mkdir -p $(ADMISSION_ARTIFACTS)/build/bin
+	cp scripts/passwd $(ADMISSION_ARTIFACTS)/scripts/passwd
 	cp docs/License.txt $(ADMISSION_ARTIFACTS)/docs/License.txt
 	cp docs/README.txt $(ADMISSION_ARTIFACTS)/docs/README.txt
 	cp $(ADMISSION_BINARY) $(ADMISSION_ARTIFACTS)/$(ADMISSION_BINARY)

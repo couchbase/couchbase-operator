@@ -4,3 +4,4 @@
 !build/bin/couchbase-operator-admission
 !docs/License.txt
 !docs/README.txt
+!scripts/passwd

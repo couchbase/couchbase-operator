@@ -495,6 +495,8 @@ func (o *generateOperatorOptions) getOperatorRoleBinding(namespace string) runti
 func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 	replicas := int32(1)
 
+	nonRoot := true
+
 	// IF we are running namespace scoped, then use the namespace metadata
 	// to set the environment variable and imit the Operator.  If not then
 	// set it to "" and let it have free reign over the whole cluster.
@@ -529,6 +531,9 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: OperatorResourceName,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: &nonRoot,
+					},
 					Containers: []corev1.Container{
 						{
 							Name:  OperatorResourceName,

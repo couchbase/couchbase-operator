@@ -506,6 +506,8 @@ func (o *generateAdmissionOptions) getAdmissionSecret(key, cert []byte) *corev1.
 func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 	replicas := int32(o.replicas)
 
+	nonRoot := true
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: AdmissionResourceName,
@@ -525,6 +527,9 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: AdmissionResourceName,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: &nonRoot,
+					},
 					Containers: []corev1.Container{
 						{
 							Name:  AdmissionResourceName,
