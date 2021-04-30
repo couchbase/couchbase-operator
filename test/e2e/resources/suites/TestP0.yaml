@@ -248,7 +248,6 @@ testcases:
 - TestAutoscaleManualMaintenanceMode
 
 # Logging tests
-- TestLoggingAndAuditingDefaults
 - TestAuditingNoLogging
 - TestCustomLogging
 - TestChangeLogShipperImage
