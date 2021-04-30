@@ -138,11 +138,11 @@ func testFullIncremental(t *testing.T, s3 bool) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestFullIncremental(t *testing.T) {
+func TestBackupFullIncremental(t *testing.T) {
 	testFullIncremental(t, false)
 }
 
-func TestFullIncrementalS3(t *testing.T) {
+func TestBackupFullIncrementalS3(t *testing.T) {
 	testFullIncremental(t, true)
 }
 
@@ -196,11 +196,11 @@ func testFullOnly(t *testing.T, s3 bool) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestFullOnly(t *testing.T) {
+func TestBackupFullOnly(t *testing.T) {
 	testFullOnly(t, false)
 }
 
-func TestFullOnlyS3(t *testing.T) {
+func TestBackupFullOnlyS3(t *testing.T) {
 	testFullOnly(t, true)
 }
 
@@ -872,11 +872,11 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestFullIncrementalOverTLS(t *testing.T) {
+func TestBackupFullIncrementalOverTLS(t *testing.T) {
 	testFullIncrementalOverTLS(t, false)
 }
 
-func TestFullIncrementalOverTLSS3(t *testing.T) {
+func TestBackupFullIncrementalOverTLSS3(t *testing.T) {
 	testFullIncrementalOverTLS(t, true)
 }
 
@@ -938,34 +938,34 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
-func TestFullOnlyOverTLS(t *testing.T) {
+func TestBackupFullOnlyOverTLS(t *testing.T) {
 	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, nil)
 }
 
-func TestFullOnlyOverTLSStandard(t *testing.T) {
+func TestBackupFullOnlyOverTLSStandard(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding}
 
 	testFullOnlyOverTLS(t, false, opts, nil)
 }
 
-func TestFullOnlyOverMutualTLS(t *testing.T) {
+func TestBackupFullOnlyOverMutualTLS(t *testing.T) {
 	policy := v2.ClientCertificatePolicyEnable
 
 	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, &policy)
 }
 
-func TestFullOnlyOverMandatoryMutualTLS(t *testing.T) {
+func TestBackupFullOnlyOverMandatoryMutualTLS(t *testing.T) {
 	policy := v2.ClientCertificatePolicyMandatory
 
 	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, &policy)
 }
 
-func TestFullOnlyOverTLSS3(t *testing.T) {
+func TestBackupFullOnlyOverTLSS3(t *testing.T) {
 	testFullOnlyOverTLS(t, true, &e2eutil.TLSOpts{}, nil)
 }
 
-func TestFullOnlyOverTLSS3Standard(t *testing.T) {
+func TestBackupFullOnlyOverTLSS3Standard(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding}
 

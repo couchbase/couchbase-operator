@@ -33,7 +33,7 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 	args := []string{
 		"create",
 		"admission",
-		"--image=" + runtimeParams.AdmissionControllerImage,
+		"--image=" + Global.AdmissionControllerImage,
 		"--namespace=" + admissionNamespace,
 		"--kubeconfig=" + k8s.KubeConfPath,
 	}

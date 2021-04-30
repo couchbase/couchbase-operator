@@ -1,9 +1,0 @@
----
-timeout: 4h
-testcases:
-- TestOnlinePersistentVolumeResizeWithDocs
-- TestOnlinePersistentVolumeResizeWhenPodKilled
-- TestOnlinePersistentVolumeResizeNop
-- TestOnlinePersistentVolumeResizeMixedClaims
-- TestOnlinePersistentVolumeResizeMDS
-- TestOnlinePersistentVolumeResize

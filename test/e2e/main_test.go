@@ -20,13 +20,10 @@ func TestMain(m *testing.M) {
 		_ = http.ListenAndServe("localhost:6060", nil)
 	}()
 
+	registerTests()
+
 	// Perform any static initialization
 	if err := framework.Init(); err != nil {
-		logrus.Error(err)
-		os.Exit(1)
-	}
-
-	if err := framework.Setup(); err != nil {
 		logrus.Error(err)
 		os.Exit(1)
 	}
@@ -34,7 +31,7 @@ func TestMain(m *testing.M) {
 	// Run Test module
 	code := m.Run()
 
-	analyzer.Report(framework.SuiteName)
+	analyzer.Report()
 
 	os.Exit(code)
 }

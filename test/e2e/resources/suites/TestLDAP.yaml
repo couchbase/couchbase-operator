@@ -1,9 +1,0 @@
----
-timeout: 4h
-testcases:
-- TestLDAPCreateAdminUser
-- TestLDAPDeleteUser
-- TestLDAPDeleteRole
-- TestLDAPUpdateRole
-- TestLDAPRemoveUserFromBinding
-- TestLDAPDeleteBinding

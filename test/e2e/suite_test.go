@@ -7,14 +7,7 @@ import (
 )
 
 func TestOperator(t *testing.T) {
-	f := framework.Global
-
-	for _, testName := range f.SuiteYmlData.TestCase {
-		if _, ok := TestFuncMap[testName]; !ok {
-			t.Logf("Skipping %s.. Undefined test", testName)
-			continue
-		}
-
-		t.Run(testName, TestFuncMap[testName])
+	for _, test := range framework.SelectedTests {
+		test.Run(t)
 	}
 }

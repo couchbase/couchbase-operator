@@ -36,6 +36,7 @@ pipeline {
     choice(name: 'bucket_type', choices: ['couchbase', 'ephemeral', 'memcached'], description: 'Bucket type to test with, for tests where bucket type is dynamic')
     choice(name: 'compression_mode', choices: ['passive', 'active', 'off'], description: 'Bucket compression to test with, for tests where compression is dynamic')
     choice(name: 'suites', choices: ['', 'p0', 'p0 p1'], description: 'Any additional suites to run (validation and sanity are mandarory)')
+    string(name: 'features', defaultValue: '', description: 'Much like a suite, these feature sets allow functional area testing e.g. "backup"')
     string(name: 'tests', defaultValue: '', description: 'Any custom tests to run, this is a space delimited list of tests names e.g. "TestCreateCluster TestCreateBucketCluster"')
   }
 
@@ -131,7 +132,7 @@ pipeline {
       steps {
         // Warn if something went wrong, but don't fail, it's probably just an unstable test/platform.
         warnError('Suite failed') {
-          sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -suite sanity ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} -platform-type kubernetes -operator-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator:\${GIT_COMMIT} -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:\${GIT_COMMIT} -mobile-image \${mobile_image} -server-image \${server_image} -server-image-upgrade \${server_image_upgrade} -exporter-image \${exporter_image} -exporter-image-upgrade \${exporter_image_upgrade} -backup-image \${backup_image} -logging-image \${logging_image} -storage-class dynamic-bound -bucket-type \${bucket_type} -compression-mode \${compression_mode} -cluster \${WORKSPACE}/config1 -cluster \${WORKSPACE}/config2 -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} -collect-logs"
+          sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -suite sanity ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} ${params.features.split().collect{s -> '-suite ' + s}.join(' ')} ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} -platform-type kubernetes -operator-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator:\${GIT_COMMIT} -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:\${GIT_COMMIT} -mobile-image \${mobile_image} -server-image \${server_image} -server-image-upgrade \${server_image_upgrade} -exporter-image \${exporter_image} -exporter-image-upgrade \${exporter_image_upgrade} -backup-image \${backup_image} -logging-image \${logging_image} -storage-class dynamic-bound -bucket-type \${bucket_type} -compression-mode \${compression_mode} -cluster \${WORKSPACE}/config1 -cluster \${WORKSPACE}/config2 -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} -collect-logs"
         }
       }
     }

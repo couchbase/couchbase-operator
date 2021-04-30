@@ -1,9 +1,14 @@
 package framework
 
-// Variables local to this package.
-var runtimeParams TestRunParam
-var suiteData SuiteData
-var SuiteName string
+var (
+	// TestDefinitions is a static list of all known tests.
+	// This is defined by test/e2e/util_test.go.
+	TestDefinitions TestDefList
 
-// Global holds contextual information for all tests.
-var Global *Framework
+	// SelectedTests is initialized during framework startup
+	// and is a user defined subset of those defined above.
+	SelectedTests TestDefList
+
+	// Global holds contextual information for all tests.
+	Global *Framework
+)

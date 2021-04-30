@@ -541,7 +541,7 @@ func TestFeaturesAll(t *testing.T) {
 	f := framework.Global
 	testDef := sysTestDef{
 		name:     "simple",
-		duration: framework.GetDuration(f.SuiteYmlData.Timeout),
+		duration: 7 * 24 * time.Hour,
 		ops: []operation{
 			// load data to default cluster 1
 			{

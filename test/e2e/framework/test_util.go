@@ -4,49 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// Read Test run params from test_config yaml file.
-func readRuntimeConfig(ymlFilePath string) (runTimeConfig TestRunParam, err error) {
-	ymlFileContent, err := ioutil.ReadFile(ymlFilePath)
-	if err != nil {
-		err = fmt.Errorf("unable to read cluster config file `%s`: %w", ymlFilePath, err)
-		return
-	}
-
-	if err = yaml.Unmarshal(ymlFileContent, &runTimeConfig); err != nil {
-		err = fmt.Errorf("unable to decode test config: %w", err)
-		return
-	}
-
-	return
-}
-
-// Function to read Suite and required cluster info from suite.yaml file.
-func getSuiteDataFromYml(ymlFilePath string) (suiteData SuiteData, err error) {
-	yamlFileContent, err := ioutil.ReadFile(ymlFilePath)
-	if err != nil {
-		err = fmt.Errorf("unable to read suite config file: %w", err)
-		return
-	}
-
-	err = yaml.Unmarshal(yamlFileContent, &suiteData)
-	if err != nil {
-		err = fmt.Errorf("unable to decode suite config: %w", err)
-		return
-	}
-
-	return
-}
 
 func RemoveServiceAccount(k8s *types.Cluster, serviceAccountName string) error {
 	svcAccList, err := k8s.KubeClient.CoreV1().ServiceAccounts(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
@@ -81,10 +46,10 @@ func recreateDockerAuthSecret(k8s *types.Cluster, namespace string) ([]string, e
 		return nil, err
 	}
 
-	pullSecrets := make([]string, len(runtimeParams.RegistryConfigs))
+	pullSecrets := make([]string, len(Global.RegistryConfigs))
 
 	// If specified create the authentication secrets
-	for i, registry := range runtimeParams.RegistryConfigs {
+	for i, registry := range Global.RegistryConfigs {
 		// auth string is simply "username:password" base64 encoded
 		auth := registry.Username + ":" + registry.Password
 		auth = base64.StdEncoding.EncodeToString([]byte(auth))

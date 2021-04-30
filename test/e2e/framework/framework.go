@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -62,7 +61,11 @@ func Init() error {
 		return err
 	}
 
-	if err := readYamlData(); err != nil {
+	if err := configure(); err != nil {
+		return err
+	}
+
+	if err := setup(); err != nil {
 		return err
 	}
 
@@ -180,9 +183,9 @@ func (v *durationVar) String() string {
 	return v.value.String()
 }
 
-func readYamlData() (err error) {
+func configure() (err error) {
 	// Provide some sane defaults.
-	params := TestRunParam{
+	params := &Framework{
 		ServiceAccountName: "couchbase-operator",
 	}
 
@@ -205,7 +208,7 @@ func readYamlData() (err error) {
 	// CLI based configuration (CI/computer friendly)
 	flag.StringVar(&params.KubeType, "platform-type", "kubernetes", "Either kubernetes or openshift")
 	flag.StringVar(&platform, "platform-vendor", "", "Either aws, gce or azure")
-	flag.StringVar(&params.OperatorImage, "operator-image", "couchbase/couchbase-operator:v1", "Docker image to use for the operator")
+	flag.StringVar(&params.OpImage, "operator-image", "couchbase/couchbase-operator:v1", "Docker image to use for the operator")
 	flag.StringVar(&params.AdmissionControllerImage, "admission-image", "couchbase/couchbase-operator-admission:v1", "Docker image to use for the admission controller")
 	flag.StringVar(&params.SyncGatewayImage, "mobile-image", "couchbase/sync-gateway:2.8.2-enterprise", "Docker image to use for couchbase mobile")
 	flag.StringVar(&params.CouchbaseServerImage, "server-image", "couchbase/server:6.6.2", "Docker image to use for couchbase server")
@@ -222,7 +225,7 @@ func readYamlData() (err error) {
 	flag.StringVar(&params.S3AccessKey, "s3-access-key", "", "S3 Access Key")
 	flag.StringVar(&params.S3SecretID, "s3-secret-id", "", "S3 Secret ID")
 	flag.StringVar(&suiteSuffix, "suite-suffix", "", "Suffix to apply to suite name in JUnit results, useful when running multiple versions of the same suite in parallel")
-	flag.BoolVar(&params.CollectLogsOnFailure, "collect-logs", false, "Whether to collect logs on failure")
+	flag.BoolVar(&params.CollectLogs, "collect-logs", false, "Whether to collect logs on failure")
 	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs", false, "Whether to collect logs on failure")
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
@@ -234,9 +237,6 @@ func readYamlData() (err error) {
 	flag.Var(&podCreateTimeout, "pod-creation-timeout", "Time before giving up on pod creation")
 	flag.BoolVar(&params.EnableIstio, "istio", false, "Enable istio injection")
 
-	// File based configuration (meat-space friendly)
-	testConfigFilePath := flag.String("testconfig", "resources/test_config.yaml", "test_config.yaml path. eg: $HOME/test_config.yaml")
-
 	flag.Parse()
 
 	if util.UseANSIColor {
@@ -246,160 +246,42 @@ func readYamlData() (err error) {
 	params.ClusterConfigs = clusters.values
 	params.RegistryConfigs = registries.values
 	params.PodCreateTimeout = podCreateTimeout.value
+	params.Platform = couchbasev2.PlatformType(platform)
 
-	// We are using the CLI to configure if the suite or tests are explcitly stated.
-	useCLI := len(suites.values) > 0 || len(tests.values) > 0
-
-	// Use either the CLI parameters, or the YAML file.  I suspect the YAML
-	// method will suffer a quick death...
-	if useCLI {
-		params.Platform = couchbasev2.PlatformType(platform)
-
-		// If no cluster configurations were specified, then provide some
-		// sane defaults.  At most we need two clusters in different namespaces
-		// to run XDCR/client tests.
-		if len(params.ClusterConfigs) == 0 {
-			params.ClusterConfigs = []ClusterConfig{
-				{
-					Config: "~/.kube/config",
-				},
-			}
-		}
-
-		// Heretical use of global variables alert.
-		runtimeParams = params
-	} else {
-		logrus.Info("Using test_config file ", *testConfigFilePath)
-
-		runtimeParams, err = readRuntimeConfig(*testConfigFilePath)
-		if err != nil {
-			return err
+	// If no cluster configurations were specified, then provide some
+	// sane defaults.  At most we need two clusters in different namespaces
+	// to run XDCR/client tests.
+	if len(params.ClusterConfigs) == 0 {
+		params.ClusterConfigs = []ClusterConfig{
+			{
+				Config: "~/.kube/config",
+			},
 		}
 	}
 
-	for index, config := range runtimeParams.ClusterConfigs {
+	// Heretical use of global variables alert.
+	Global = params
+
+	for index, config := range Global.ClusterConfigs {
 		if strings.HasPrefix(config.Config, "~/") {
-			runtimeParams.ClusterConfigs[index].Config = strings.Replace(config.Config, "~", os.Getenv("HOME"), 1)
+			Global.ClusterConfigs[index].Config = strings.Replace(config.Config, "~", os.Getenv("HOME"), 1)
 		}
 	}
 
-	// When using an explcit list of tests, fake a suite... otherwise load one
-	// up from disk.
-	if useCLI {
-		// These values are way more friendly for CI, so it doesn't need to know
-		// about internal file names.
-		mapping := map[string]string{
-			"validation": "TestCRDValidation",
-			"sanity":     "TestSanity",
-			"p0":         "TestP0",
-			"p1":         "TestP1",
-		}
-
-		SuiteName = "custom"
-
-		// For every suite that has been defined, buffer it up and add it
-		// to our list.
-		for _, suite := range suites.values {
-			// For backwards compatibility, QE have hard coded file names
-			// so default to this.  If this isn't one of those names, then
-			// implicitly do the filename conversion.
-			// TODO: There is literally no reason for this to be a file,
-			// you may as well just make it a slice in code...
-			suiteName := suite
-
-			if !strings.HasPrefix(suite, "Test") {
-				if _, ok := mapping[suite]; !ok {
-					return fmt.Errorf("unable to find suite %s", suite)
-				}
-
-				suiteName = mapping[suite]
-			}
-
-			suiteFilePath := fmt.Sprintf("./resources/suites/%s.yaml", suiteName)
-
-			data, err := getSuiteDataFromYml(suiteFilePath)
-			if err != nil {
-				return err
-			}
-
-			suiteData.TestCase = append(suiteData.TestCase, data.TestCase...)
-
-			analyzerSuiteName := suite
-
-			if suiteSuffix != "" {
-				analyzerSuiteName += "-" + suiteSuffix
-			}
-
-			// Register tests with a suite in the analyzer.
-			for _, test := range data.TestCase {
-				analyzer.RegisterTest(analyzerSuiteName, test)
-			}
-		}
-
-		// For every test that has been defined, buffer it up and add it
-		// to our list.
-		suiteData.TestCase = append(suiteData.TestCase, tests.values...)
-
-		analyzerSuiteName := "custom"
+	SelectedTests = TestDefinitions.Select(suites.values, tests.values)
+	for _, test := range SelectedTests {
+		analyzerSuiteName := test.selectedTag
 
 		if suiteSuffix != "" {
 			analyzerSuiteName += "-" + suiteSuffix
 		}
 
-		// Register tests with a suite in the analyzer.
-		for _, test := range tests.values {
-			analyzer.RegisterTest(analyzerSuiteName, test)
-		}
-	} else {
-		suiteFilePath := "./resources/suites/" + runtimeParams.SuiteToRun + ".yaml"
-
-		logrus.Info("Using suite file ", suiteFilePath)
-
-		SuiteName = runtimeParams.SuiteToRun
-		suiteData, err = getSuiteDataFromYml(suiteFilePath)
-		if err != nil {
-			return err
-		}
-
-		// Register tests with a suite in the analyzer.
-		for _, test := range suiteData.TestCase {
-			analyzer.RegisterTest(runtimeParams.SuiteToRun, test)
-		}
+		analyzer.RegisterTest(analyzerSuiteName, test.Name())
 	}
+
+	Global = params
 
 	return nil
-}
-
-// Returs time.Duration from given string
-// Default return value: "2h0m0s".
-func GetDuration(timeoutStr string) time.Duration {
-	// Default timeout to 2 hours
-	durationToReturn := (2 * time.Hour)
-
-	pattern := regexp.MustCompile("^([0-9]+)([mhd])$")
-
-	// Calculates only if valid pattern exists
-	if pattern.MatchString(timeoutStr) {
-		match := pattern.FindStringSubmatch(timeoutStr)
-
-		timeoutVal, err := strconv.Atoi(match[1])
-		if err != nil {
-			return durationToReturn
-		}
-
-		timeoutDuration := time.Duration(timeoutVal)
-
-		switch match[2] {
-		case "m":
-			durationToReturn = timeoutDuration * time.Minute
-		case "h":
-			durationToReturn = timeoutDuration * time.Hour
-		case "d":
-			durationToReturn = timeoutDuration * (time.Hour * 24)
-		}
-	}
-
-	return durationToReturn
 }
 
 func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout time.Duration, logLevel string) *appsv1.Deployment {
@@ -408,48 +290,21 @@ func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreat
 	return deployment
 }
 
-// Setup setups a test framework and points "Global" to it.
-func Setup() (err error) {
-	// Initialize Global from runtime info
-	Global = &Framework{
-		KubeType:                      runtimeParams.KubeType,
-		OpImage:                       runtimeParams.OperatorImage,
-		SkipTeardown:                  runtimeParams.SkipTearDown,
-		CollectLogs:                   runtimeParams.CollectLogsOnFailure,
-		CollectServerLogsOnFailure:    runtimeParams.CollectServerLogsOnFailure,
-		SuiteYmlData:                  suiteData,
-		CouchbaseServerImage:          runtimeParams.CouchbaseServerImage,
-		CouchbaseServerImageUpgrade:   runtimeParams.CouchbaseServerImageUpgrade,
-		PodCreateTimeout:              runtimeParams.PodCreateTimeout,
-		SyncGatewayImage:              runtimeParams.SyncGatewayImage,
-		CouchbaseExporterImage:        runtimeParams.CouchbaseExporterImage,
-		CouchbaseExporterImageUpgrade: runtimeParams.CouchbaseExporterImageUpgrade,
-		CouchbaseBackupImage:          runtimeParams.CouchbaseBackupImage,
-		CouchbaseLoggingImage:         runtimeParams.CouchbaseLoggingImage,
-		BucketType:                    runtimeParams.BucketType,
-		CompressionMode:               runtimeParams.CompressionMode,
-		EnableIstio:                   runtimeParams.EnableIstio,
-		S3Bucket:                      runtimeParams.S3Bucket,
-		S3Region:                      runtimeParams.S3Region,
-		S3AccessKey:                   runtimeParams.S3AccessKey,
-		S3SecretID:                    runtimeParams.S3SecretID,
-		DocsCount:                     runtimeParams.DocsCount,
-		LogLevel:                      runtimeParams.LogLevel,
-		Platform:                      runtimeParams.Platform,
-		StorageClassName:              runtimeParams.StorageClassName,
-	}
-
-	Global.LogDir, err = makeLogDir()
+// setup setups a test framework and points "Global" to it.
+func setup() error {
+	logDir, err := makeLogDir()
 	if err != nil {
 		return err
 	}
 
-	Global.ClusterSpec = make([]*types.Cluster, len(runtimeParams.ClusterConfigs))
+	Global.LogDir = logDir
 
-	for i, kubeConf := range runtimeParams.ClusterConfigs {
-		clusterSpec, cerr := createKubeClusterObject(kubeConf)
-		if cerr != nil {
-			return cerr
+	Global.ClusterSpec = make([]*types.Cluster, len(Global.ClusterConfigs))
+
+	for i, kubeConf := range Global.ClusterConfigs {
+		clusterSpec, err := createKubeClusterObject(kubeConf)
+		if err != nil {
+			return err
 		}
 
 		Global.ClusterSpec[i] = clusterSpec
@@ -462,29 +317,29 @@ func Setup() (err error) {
 
 	logrus.Info(util.PrettyHeading("Docker Registries"))
 
-	for _, registry := range runtimeParams.RegistryConfigs {
+	for _, registry := range Global.RegistryConfigs {
 		logrus.Info(" →  server: " + registry.Server)
 		logrus.Info("    username: " + registry.Username)
 		logrus.Info("    password: " + strings.Repeat("*", len(registry.Password)))
 	}
 
 	logrus.Info(util.PrettyHeading("Container Images"))
-	logrus.Info(" →  couchbase operator: " + runtimeParams.OperatorImage)
-	logrus.Info(" →  couchbase admission controller: " + runtimeParams.AdmissionControllerImage)
-	logrus.Info(" →  couchbase server: " + runtimeParams.CouchbaseServerImage)
-	logrus.Info(" →  couchbase server upgrade: " + runtimeParams.CouchbaseServerImageUpgrade)
+	logrus.Info(" →  couchbase operator: " + Global.OpImage)
+	logrus.Info(" →  couchbase admission controller: " + Global.AdmissionControllerImage)
+	logrus.Info(" →  couchbase server: " + Global.CouchbaseServerImage)
+	logrus.Info(" →  couchbase server upgrade: " + Global.CouchbaseServerImageUpgrade)
 	logrus.Info(" →  couchbase sync gateway: " + Global.SyncGatewayImage)
-	logrus.Info(" →  couchbase exporter: " + runtimeParams.CouchbaseExporterImage)
-	logrus.Info(" →  couchbase exporter upgrade: " + runtimeParams.CouchbaseExporterImageUpgrade)
-	logrus.Info(" →  couchbase backup: " + runtimeParams.CouchbaseBackupImage)
-	logrus.Info(" →  couchbase logging: " + runtimeParams.CouchbaseLoggingImage)
+	logrus.Info(" →  couchbase exporter: " + Global.CouchbaseExporterImage)
+	logrus.Info(" →  couchbase exporter upgrade: " + Global.CouchbaseExporterImageUpgrade)
+	logrus.Info(" →  couchbase backup: " + Global.CouchbaseBackupImage)
+	logrus.Info(" →  couchbase logging: " + Global.CouchbaseLoggingImage)
 
 	logrus.Info(util.PrettyHeading("Framework Configuration"))
-	logrus.Info(" →  Bucket Type: " + runtimeParams.BucketType)
-	logrus.Info(" →  Compression Mode: " + runtimeParams.CompressionMode)
-	logrus.Info(" →  S3 Bucket: " + runtimeParams.S3Bucket)
-	logrus.Info(" →  Documents: " + strconv.Itoa(runtimeParams.DocsCount))
-	logrus.Info(" →  Logging Level: " + runtimeParams.LogLevel)
+	logrus.Info(" →  Bucket Type: " + Global.BucketType)
+	logrus.Info(" →  Compression Mode: " + Global.CompressionMode)
+	logrus.Info(" →  S3 Bucket: " + Global.S3Bucket)
+	logrus.Info(" →  Documents: " + strconv.Itoa(Global.DocsCount))
+	logrus.Info(" →  Logging Level: " + Global.LogLevel)
 
 	logrus.Info(util.PrettyHeading("Clusters"))
 
@@ -494,14 +349,14 @@ func Setup() (err error) {
 	}
 
 	logrus.Info(util.PrettyHeading("Kubernetes"))
-	logrus.Info(" →  storage class: " + runtimeParams.StorageClassName)
+	logrus.Info(" →  storage class: " + Global.StorageClassName)
 	logrus.Info(util.PrettyHeading("Logs"))
 	logrus.Info(" →  directory: " + Global.LogDir)
 
 	// Setup the cbopinfo absolute path so it will not change if we move directories
-	wd, oserr := os.Getwd()
-	if oserr != nil {
-		return oserr
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
 	}
 
 	Global.CbopinfoPath = wd + "/../../build/bin/cbopinfo"

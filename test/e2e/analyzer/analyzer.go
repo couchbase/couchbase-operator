@@ -328,7 +328,7 @@ func (a accounting) report() {
 }
 
 // Report is called on termination of the full test run to perform global anaysis.
-func Report(suiteName string) {
+func Report() {
 	if len(results) == 0 {
 		logrus.Warn("no test results collected")
 		return
