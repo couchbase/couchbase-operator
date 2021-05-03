@@ -6,69 +6,19 @@ The changes in this release enable several advancements in how you can manage, m
 
 Take a look at the xref:release-notes.adoc[release notes] for a more complete list of changes in this release, including known and fixed issues.
 
-== Cluster Autoscaling
+== Customizable Prometheus Metrics
 
-The main new feature of this release is cluster autoscaling.
+The latest version of the Couchbase Prometheus Exporter allows for certain customizations to exported metrics.
+The following customizations are currently supported:
 
-It was decided at an early stage that having the Operator control scaling of the cluster would be both restrictive and inflexible.
-Instead, the Operator creates custom resources -- on demand -- that implement the scale API.
+* Change the namespace, subsystem, name, and help text for each metric.
+* Enable and disable whether a metric is exported to Prometheus.
 
-The scale API is relatively simple.
-It defines where an external controller can look within a resource to determine the current size of a resource (in our case the cluster as a whole or a multi-dimensional scaling group), and where to modify the requested size.
-By using the scale API, Couchbase clusters are directly compatible with the Kubernetes horizontal pod autoscaler (HPA).
+For more information, refer to xref:howto-prometheus.adoc#customizing-metrics[Customizing Metrics].
 
-The Operator can now delegate scaling responsibilities to the HPA.
-The HPA allows high-level functionality such as allowing scaling to be driven by Prometheus metrics, and scaling decisions to be constrained, for example introducing delays to even out load spikes.
-
-While this feature is generic, and will work for any server class, it has been inhibited to only work with server classes comprised of the stateless query service, and only when all buckets are ephemeral, by default.
-This restriction can be removed with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enablepreviewscaling[`couchbaseclusters.spec.enablePreviewScaling`] configuration switch, allowing -- for example -- the data service to be scaled when using standard Couchbase buckets.
-
-== Administrator Password Rotation
-
-The Operator's persistence and caching layer has been upgraded in version {operator-version-minor}.
-This now enables fault-tolerant things like password and TLS rotation.
-
-Cluster Administrator passwords can now be rotated by xref:howto-admin-password-rotation[modifying the administrative authentication secret].
-
-== Cluster Hibernation
-
-There may be situations where a Couchbase cluster need not be running, for example when not needed in a development environment.
-By allowing a Couchbase cluster to be xref:concept-hibernation.adoc[hibernated], the Operator frees up unneeded compute resources required by cluster pods, and can lead to cost savings when used in conjunction with the Kubernetes cluster autoscaler.
-
-== Bulk Upgrades
-
-When performing upgrades, the Operator takes the safe approach -- upgrading one pod at a time.
-The major drawback to this approach is that it takes a long time, scaling linearly with the cluster size.
-
-Operator version {operator-version-minor} introduces upgrade policies that can control upgrades.
-While the default policy is the same as before, you may set it to upgrade xref:concept-upgrade.adoc#upgrading-couchbase-server[all pods at once].
-This will reduce the time required for an upgrade substantially, at the expense of a more resource intensive operation.
-
-== Amazon S3 Backup
-
-The Couchbase cluster and Couchbase backup resources have been extended to allow use of new cloud backup features released in Couchbase Server 6.6.
-
-The global backup configuration for a cluster now accepts a secret containing Amazon AWS credentials that permit access to S3 object storage.
-Each backup resource may also be configured with an S3 bucket.
-By using an S3 bucket, backups are stored to the cloud instead of a Kubernetes persistent volume.
-This provides true off-site backups, decoupled from the underlying Kubernetes cluster.
-
-== Configuration Enhancements
-
-Operator version {operator-version-minor} includes added ability to modify Couchbase cluster configuration.
-This includes full control over the indexer, and bucket-level document expiration.
-
-== Networking Enhancements
-
-With the coming of Couchbase Server 6.5, comes the ability to xref:howto-ui.adoc#configuring-an-ingress[use Kubernetes ingresses] to expose the administrative UI outside of the Kubernetes cluster.
-
-Full support for Istio service mesh is now provided, and may be enabled in the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-networkplatform[`couchbaseclusters.spec.networking.networkPlatform`] configuration.
-This supports both basic and mTLS modes of operation.
-
-Please note that service meshes (including Istio), must already be enabled in the namespace before you install the Autonomous Operator and provision any Couchbase clusters.
-Therefore, in order to use Istio with an existing Autonomous Operator deployment, you'll need to recreate the deployment in a namespace that already has Istio enabled, and then migrate any cluster data to the new deployment using methods such as XDCR.
-
-== Upgrading to Operator 2.1
+// Commenting out this section for future review.
+////
+== Upgrading to Operator 2.2
 
 Upgrading a previous release to Operator {operator-version-minor} follows the xref:howto-operator-upgrade.adoc[usual process], however there are some things you should be aware of.
 
@@ -92,3 +42,4 @@ As of Operator version {operator-version-minor} this will now be performed using
 
 You may use the <<bulk-upgrades>> feature to speed up this upgrade.
 To enable during the Operator upgrade, stop the old Operator, replace the CRDs, edit the Couchbase cluster resource to enable bulk upgrades before restarting the new Operator.
+////

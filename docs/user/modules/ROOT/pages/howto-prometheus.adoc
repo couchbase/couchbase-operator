@@ -7,11 +7,13 @@ You can set up the Autonomous Operator to use the Couchbase Prometheus Exporter 
 == Overview
 
 Prometheus is the de facto metrics collection platform for use in Kubernetes environments.
-The Autonomous Operator provides native integration with the https://github.com/couchbase/couchbase-exporter[Couchbase Prometheus Exporter^] for collecting and exposing Couchbase Server metrics.
+The Autonomous Operator provides Prometheus integration for collecting and exposing Couchbase Server metrics via the https://github.com/couchbase/couchbase-exporter[Couchbase Prometheus Exporter^].
 
 Prometheus metrics collection is enabled in the `CouchbaseCluster` resource.
 The configuration allows you to specify a Couchbase-provided container image that contains the Prometheus Exporter.
 The Autonomous Operator injects the image as a https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#how-pods-manage-multiple-containers["sidecar" container^] in each Couchbase Server pod.
+
+NOTE: The Couchbase-supplied Prometheus Exporter container image is only supported on Kubernetes platforms in conjunction with the Couchbase Autonomous Operator.
 
 == Configuration
 
@@ -62,11 +64,25 @@ The `stringData` field allows you to put a non-base64 encoded string directly in
 .Important Considerations
 * You can enable/disable Prometheus metric collection at any time during the cluster's lifecycle.
 However, since `Pod` resources are immutable, enabling or disabling metric collection will require a rolling upgrade of the cluster.
-* Only official Prometheus images provided by Couchbase are supported.
+* Only official Prometheus images provided by Couchbase are supported (with the exception of user-supplied images that specifically enable <<customizing-metrics,customized metrics>>).
 +
 In addition, you should ensure that your image source is trusted.
 The sidecar container requires access to the Couchbase cluster administrative credentials in order to login and perform collection.
 Granting these credentials to arbitrary code is potentially harmful.
+
+[[customizing-metrics]]
+== Customizing Metrics
+
+By default, the exporter collects all metrics from Couchbase Server, with each metric having a default name and default metadata associated with it.
+The exporter supports certain user-configurable customizations to these defaults.
+
+The Couchbase Prometheus Exporter currently supports the following customizations:
+
+* Change the namespace, subsystem, name, and help text for each metric.
+* Enable and disable whether a metric is exported to Prometheus.
+
+These customizations are enabled by building your own custom version of the Couchbase Prometheus Exporter container image.
+For instructions on how to create a custom metrics configuration and build it into a container image, refer to the https://github.com/couchbase/couchbase-exporter#customizing-metrics[`couchbase-exporter` README^].
 
 == Using Exported Metrics
 

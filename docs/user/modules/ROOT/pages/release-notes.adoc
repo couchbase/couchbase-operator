@@ -121,6 +121,16 @@ Refer to xref:howto-backup.adoc#additional-restore-options[Additional Restore Op
 
 IMPORTANT: This release requires you to upgrade your backup image to at least `couchbase/operator-backup:6.6.0-XXX`.
 
+==== Customizable Prometheus Metrics
+
+The latest version of the Couchbase Prometheus Exporter allows for certain customizations to exported metrics.
+The following customizations are currently supported:
+
+* Change the namespace, subsystem, name, and help text for each metric.
+* Enable and disable whether a metric is exported to Prometheus.
+
+For more information, refer to xref:howto-prometheus.adoc#customizing-metrics[Customizing Metrics].
+
 ==== Other Notable Changes
 
 * The dynamic admission controller (DAC) now allows xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-volumeMounts-index[couchbaseclusters.spec.servers.volumeMounts.index] to be configured for server classes that include the Search Service and that don't include the Index Service.
