@@ -15,6 +15,8 @@ For this purpose, Couchbase supplies a default https://hub.docker.com/r/couchbas
 
 The sections on this page describe how to enable and configure log forwarding using the Couchbase-supplied log processor image.
 
+NOTE: The Couchbase-supplied log processor container image is only supported on Kubernetes platforms in conjunction with the Couchbase Autonomous Operator.
+
 NOTE: Log forwarding requires that logs be written to a persistent volume (i.e. the Couchbase deployment's `default` or `logs` volumes are backed by xref:best-practices.adoc#storage[persistent storage]).
 Fully-ephemeral clusters are not supported by this feature.
 
@@ -178,6 +180,8 @@ Instead, the administrator is expected to create a custom Secret themselves, and
 The rest of this section covers some relatively simple ways in which you can customize the default log forwarding configuration, such as limiting the number of forwarded logs, and enabling log redaction.
 However, since the Couchbase-supplied log processor image is based on Fluent Bit, you can technically customize the log forwarding configuration with any kind of configuration that is https://docs.fluentbit.io/manual/administration/configuring-fluent-bit[supported by Fluent Bit^].
 Some examples of these types of customizations are covered in the tutorial xref:howto-couchbase-log-forwarding.adoc[].
+
+NOTE: Only custom configurations that leverage the built-in parsing, redaction, and other standard features of the Couchbase-supplied log processor image are supported.
 
 [[create-custom-log-forwarding-config-secret]]
 === Creating a Secret That Contains a Custom Log Forwarding Configuration
