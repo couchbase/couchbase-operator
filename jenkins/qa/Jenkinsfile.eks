@@ -65,7 +65,7 @@ pipeline {
     S3_SECRET_ID = credentials('cbqe-s3-secret-id')
     AWS_CREDENTIALS = credentials('couchbaseqe-aws')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
-    NAME = "qe-eks-test-2.1.x-${env.BUILD_NUMBER}-"
+    NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     TF_IN_AUTOMATION = "TRUE"
   }
 
@@ -84,8 +84,8 @@ stages {
         sh 'chmod +x jq-linux64'
         sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
 
-        sh 'wget -q https://releases.hashicorp.com/terraform/0.14.4/terraform_0.14.4_linux_amd64.zip'
-        sh 'unzip terraform_0.14.4_linux_amd64.zip'
+        sh 'wget -q https://releases.hashicorp.com/terraform/0.15.1/terraform_0.15.1_linux_amd64.zip'
+        sh 'unzip terraform_0.15.1_linux_amd64.zip'
         sh "mv terraform ${env.WORKSPACE}/bin"
       }
     }
@@ -98,8 +98,7 @@ stages {
         sh "aws configure set default.output json"
         dir("./test/e2e/resources/provisioners/eks") {
           sh 'terraform init -no-color -input=false'
-          sh "terraform apply -var kubernetes-version=\"${params.kubernetes_version}\" -auto-approve -no-color"
-          sh "terraform apply -var kubernetes-version=\"${params.kubernetes_version}\" -var peering=true -auto-approve -no-color"
+          sh "terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -var remote=true -auto-approve -no-color"    
           sh "terraform output -raw kubeconfig1 > ${env.WORKSPACE}/config1"
           sh "terraform output -raw kubeconfig2 > ${env.WORKSPACE}/config2"
         }
@@ -287,8 +286,7 @@ stages {
   post {
     always {
       dir("./test/e2e/resources/provisioners/eks") {
-        sh "terraform refresh -no-color"
-        sh "terraform destroy -var peering=true -var kubernetes-version=\"${params.kubernetes_version}\" -auto-approve -no-color"
+        sh "terraform destroy -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -var remote=true -auto-approve -no-color"
       }
       cleanWs()
     }

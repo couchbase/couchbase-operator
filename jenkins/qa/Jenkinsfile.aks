@@ -38,7 +38,7 @@ pipeline {
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.3')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.0-enterprise')
     string(name: 'platform', defaultValue: 'kubernetes')
-    string(name: 'kubernetes_version', defaultValue: '1.17.16')
+    string(name: 'kubernetes_version', defaultValue: '1.18.17')
     string(name: 'storage_class', defaultValue: 'default')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')

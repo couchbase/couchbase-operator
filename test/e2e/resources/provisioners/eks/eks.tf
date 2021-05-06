@@ -16,9 +16,9 @@ provider "kubernetes" {
 
 provider "kubernetes" {
   alias = "kube2"
-  host                   = data.aws_eks_cluster.cluster2.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.cluster2.certificate_authority.0.data)
-  token                  = data.aws_eks_cluster_auth.cluster2.token
+  host                   = var.remote ? data.aws_eks_cluster.cluster2[0].endpoint : null
+  cluster_ca_certificate = var.remote ? base64decode(data.aws_eks_cluster.cluster2[0].certificate_authority.0.data) : null
+  token                  = var.remote ? data.aws_eks_cluster_auth.cluster2[0].token : null
   load_config_file       = false
 }
 
@@ -33,7 +33,7 @@ provider "aws" {
 
 module "vpc1" {
   source          = "terraform-aws-modules/vpc/aws"
-  name            = "qe-auto-vpc1-2_1_x"
+  name            = "${var.name}-vpc1"
   cidr            = "10.0.0.0/16"
   azs             = ["us-west-2a", "us-west-2b", "us-west-2c"]
   public_subnets  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
@@ -63,7 +63,7 @@ module "vpc1" {
 }
 
 resource "aws_security_group" "securitygroup1" {
-  name    = "qe-auto-securitygroup1-2_1_x"
+  name    = "${var.name}-securitygroup1"
   vpc_id  = module.vpc1.vpc_id
 
   ingress {
@@ -84,8 +84,10 @@ resource "aws_security_group" "securitygroup1" {
 }
 
 module "vpc2" {
+  count = var.remote ? 1 : 0
+
   source          = "terraform-aws-modules/vpc/aws"
-  name            = "qe-auto-vpc2-2_1_x"
+  name            = "${var.name}-vpc2"
   cidr            = "192.168.0.0/16"
   azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
   public_subnets  = ["192.168.1.0/24", "192.168.2.0/24", "192.168.3.0/24"]
@@ -119,9 +121,11 @@ module "vpc2" {
 }
 
 resource "aws_security_group" "securitygroup2" {
-  name      = "qe-auto-securitygroup2-2_1_x"
+  count = var.remote ? 1 : 0
+
+  name      = "${var.name}-securitygroup2"
   provider  = aws.east
-  vpc_id    = module.vpc2.vpc_id
+  vpc_id    = module.vpc2[0].vpc_id
 
   ingress {
     description = "Ingress allowing ALL"
@@ -140,17 +144,9 @@ resource "aws_security_group" "securitygroup2" {
 
 }
 
-data "aws_eks_cluster" "cluster1" {
-  name = module.cluster1.cluster_id
-}
-
-data "aws_eks_cluster_auth" "cluster1" {
-  name = module.cluster1.cluster_id
-}
-
 module "cluster1" {
   source          = "terraform-aws-modules/eks/aws"
-  cluster_name    = "qe-auto-cluster1-2_1_x"
+  cluster_name    = "${var.name}-1"
   cluster_version = var.kubernetes-version
   subnets         = module.vpc1.public_subnets
   vpc_id          = module.vpc1.vpc_id
@@ -172,25 +168,25 @@ module "cluster1" {
   }
 }
 
-data "aws_eks_cluster" "cluster2" {
-  name      = module.cluster2.cluster_id
-  provider  = aws.east
+data "aws_eks_cluster" "cluster1" {
+  name = module.cluster1.cluster_id
 }
 
-data "aws_eks_cluster_auth" "cluster2" {
-  name      = module.cluster2.cluster_id
-  provider  = aws.east
+data "aws_eks_cluster_auth" "cluster1" {
+  name = module.cluster1.cluster_id
 }
 
 module "cluster2" {
-  source          = "terraform-aws-modules/eks/aws"
-  cluster_name    = "qe-auto-cluster2-2_1_x"
-  cluster_version = var.kubernetes-version
-  subnets         = module.vpc2.public_subnets
-  vpc_id          = module.vpc2.vpc_id
+  count = var.remote ? 1 : 0
 
-  cluster_security_group_id             = aws_security_group.securitygroup2.id
-  worker_additional_security_group_ids  = [aws_security_group.securitygroup2.id]
+  source          = "terraform-aws-modules/eks/aws"
+  cluster_name    = "${var.name}-2"
+  cluster_version = var.kubernetes-version
+  subnets         = module.vpc2[0].public_subnets
+  vpc_id          = module.vpc2[0].vpc_id
+
+  cluster_security_group_id             = aws_security_group.securitygroup2[0].id
+  worker_additional_security_group_ids  = [aws_security_group.securitygroup2[0].id]
 
   worker_groups = [
     {
@@ -207,21 +203,51 @@ module "cluster2" {
   }
 }
 
-module "vpc_cross_region_peering" {
-  source = "github.com/grem11n/terraform-aws-vpc-peering"
+data "aws_eks_cluster" "cluster2" {
+  count = var.remote ? 1 : 0
+  name      = module.cluster2[0].cluster_id
+  provider  = aws.east
+}
 
-  count = var.peering ? 1 : 0
+data "aws_eks_cluster_auth" "cluster2" {
+  count = var.remote ? 1 : 0
+  name      = module.cluster2[0].cluster_id
+  provider  = aws.east
+}
 
-  providers = {
-    aws.this = aws
-    aws.peer = aws.east
-  }
+resource "aws_vpc_peering_connection" "peering" {
+  count = var.remote ? 1 : 0
 
-  this_vpc_id             = module.vpc1.vpc_id
-  peer_vpc_id             = module.vpc2.vpc_id
+  vpc_id = module.vpc1.vpc_id
+  peer_vpc_id = module.vpc2[0].vpc_id
+  peer_region = "us-east-1"
+  auto_accept = false
+}
 
-  auto_accept_peering     = true
+resource "aws_vpc_peering_connection_accepter" "peering-accept" {
+  count = var.remote ? 1 : 0
 
+  provider = aws.east
+  vpc_peering_connection_id = aws_vpc_peering_connection.peering[0].id
+  auto_accept = true
+}
+
+
+resource "aws_route" "peering-route-1" {
+  count = var.remote ? 1 : 0
+
+  route_table_id = module.vpc1.public_route_table_ids[0]
+  destination_cidr_block = "192.168.0.0/16"
+  vpc_peering_connection_id = aws_vpc_peering_connection.peering[0].id
+}
+
+resource "aws_route" "peering-route-2" {
+  count = var.remote ? 1 : 0
+
+  route_table_id = module.vpc2[0].public_route_table_ids[0]
+  destination_cidr_block = "10.0.0.0/16"
+  vpc_peering_connection_id = aws_vpc_peering_connection.peering[0].id
+  provider  = aws.east
 }
 
 output "kubeconfig1" {
@@ -230,6 +256,6 @@ output "kubeconfig1" {
 }
 
 output "kubeconfig2" {
-  value     = module.cluster2.kubeconfig
+  value     = var.remote ? module.cluster2[0].kubeconfig : null
   sensitive = true
 }
