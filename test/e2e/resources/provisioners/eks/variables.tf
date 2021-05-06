@@ -3,6 +3,10 @@ variable "kubernetes-version" {
   default = "1.17"
 }
 
-variable "peering" {
+variable "name" {
+  type = string
+}
+
+variable "remote" {
   default = false
 }
