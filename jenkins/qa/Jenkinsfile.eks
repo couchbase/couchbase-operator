@@ -65,7 +65,7 @@ pipeline {
     S3_SECRET_ID = credentials('cbqe-s3-secret-id')
     AWS_CREDENTIALS = credentials('couchbaseqe-aws')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
-    NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+    NAME = "cao-eks-pipeline-21x-${env.BUILD_NUMBER}"
     TF_IN_AUTOMATION = "TRUE"
   }
 
