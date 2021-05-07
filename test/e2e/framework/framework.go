@@ -213,7 +213,7 @@ func configure() (err error) {
 	flag.StringVar(&params.SyncGatewayImage, "mobile-image", "couchbase/sync-gateway:2.8.2-enterprise", "Docker image to use for couchbase mobile")
 	flag.StringVar(&params.CouchbaseServerImage, "server-image", "couchbase/server:6.6.2", "Docker image to use for couchbase server")
 	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade", "couchbase/server:6.6.1", "Docker image to use for couchbase server upgrades to upgrade from")
-	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.3", "Docker image to use for the couchbase exporter")
+	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.5", "Docker image to use for the couchbase exporter")
 	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.3", "Docker image to use for couchbase exporter upgrades to upgrade from")
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:6.6.0-100", "Docker image to use for couchbase backup")
 	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image", "couchbase/fluent-bit:1.0.0", "Docker image to use for couchbase log shipping")

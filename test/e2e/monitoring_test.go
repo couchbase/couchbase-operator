@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -199,62 +201,54 @@ func TestPrometheusMetricsEnableMandatoryMutualTLS(t *testing.T) {
 	testPrometheusMetrics(t, targetKube, tls, &policy, false)
 }
 
-func TestPrometheusMetricsEnableAndPerformOps(t *testing.T) {
-	/*
-		// Platform configuration.
-		f := framework.Global
+func TestPrometheusMetricsPerformOps(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
 
-		targetKube, cleanup := f.SetupTest(t)
-		defer cleanup()
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
 
-			// Static configuration.
-			clusterSize := 3
-			numOfDocs := f.DocsCount
+	// Static configuration.
+	clusterSize := 3
+	numOfDocs := f.DocsCount
 
-			// Create the cluster.
-			testCouchbase := e2eutil.MustNewClusterBasic(t, targetKube, clusterSize)
-			bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	// Create the cluster.
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithMonitoring().MustCreate(t, targetKube)
 
-			e2eutil.MustNewBucket(t, targetKube, bucket)
-			e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	// Wait for the cluster to be ready.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
 
-			// Enable monitoring.
-			monitoring := enableMonitoring(f)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
-			testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/monitoring", monitoring), time.Minute)
-			e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
-			e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
+	// Perform Bucket Ops: Inserting 200 documents in the default Bucket
+	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket().Name, numOfDocs)
 
-			// Perform Bucket Ops: Inserting 200 documents in the default Bucket
-			e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket.Name, numOfDocs)
+	// Perform ClusterOps: Failover a given node.
+	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, true)
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
-			// Perform ClusterOps: Failover a given node.
-			e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 3, true)
-			e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
-			e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
 
-			// Wait for Prometheus to be ready on each pod, then check that each pod is exporting the expected Couchbase metrics.
-			e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 2*time.Minute)
-			e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
+	bucketStat := `cbbucketstat_curr_items{bucket="default",cluster="` + testCouchbase.Name + `"}`
+	nodeStat := `cbnode_failover_complete{cluster="` + testCouchbase.Name + `"}`
 
-			bucketStat := `cbbucketstat_curr_items{bucket="default",cluster="` + testCouchbase.Name + `"}`
-			nodeStat := `cbnode_failover_complete{cluster="` + testCouchbase.Name + `"}`
+	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, nil, bucketStat, strconv.Itoa(numOfDocs), time.Minute)
+	e2eutil.MustExposeMetric(t, targetKube, testCouchbase, nil, nodeStat, `1`, time.Minute)
 
-			e2eutil.MustExposeMetric(t, targetKube, testCouchbase, nil, bucketStat, `200`, time.Minute)
-			e2eutil.MustExposeMetric(t, targetKube, testCouchbase, nil, nodeStat, `1`, time.Minute)
-
-			// Check the events match what we expect:
-			expectedEvents := []eventschema.Validatable{
-				e2eutil.ClusterCreateSequence(clusterSize),
-				eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-				eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-				eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
-				eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-				e2eutil.PodDownFailoverRecoverySequence(),
-			}
-			ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-	*/
-	t.Skip("I am broken on both 1.0.0 and 1.0.2")
+	// Check the events match what we expect:
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownFailoverRecoverySequence(),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 
 func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
@@ -391,5 +385,89 @@ func TestPrometheusMetricsOperator(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func TestPrometheusRotateAdminPassword(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithMonitoring().MustCreate(t, targetKube)
+
+	// Wait for the cluster to be ready.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
+
+	// Rotate the password.
+	e2eutil.MustRotateClusterPassword(t, targetKube)
+
+	// Check Prometheus is still functioning.
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, nil)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Password rotated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonAdminPasswordChanged},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func TestPrometheusRotateCA(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithMonitoring().WithTLS(ctx).MustCreate(t, targetKube)
+
+	// Wait for the cluster to be ready.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForPrometheusReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, ctx)
+
+	// Rotate the CA, and give Prometheus a moment to catch up.
+	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
+	e2eutil.MustCheckClusterTLS(t, targetKube, ctx, 5*time.Minute)
+	time.Sleep(10 * time.Second)
+
+	// Check Prometheus is still functioning.
+	e2eutil.MustCheckPrometheus(t, targetKube, testCouchbase, ctx)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * TLS update event occurred
+	// * Client TLS updated (new CA)
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		// Race condition updating secrets.
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
+	}
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
