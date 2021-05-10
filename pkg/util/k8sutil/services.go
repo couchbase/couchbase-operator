@@ -375,16 +375,14 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 		if cluster.Spec.Networking.AdminConsoleServiceTemplate.Spec != nil {
 			service.Spec = *cluster.Spec.Networking.AdminConsoleServiceTemplate.Spec
 		}
+	} else {
+		service.Spec.Type = cluster.Spec.Networking.AdminConsoleServiceType
 	}
 
 	// Apply deprecated fields, these have precedence for backwards compatibility,
 	// but only apply if they have been set e.g. not the zero value.
 	if cluster.Spec.Networking.ServiceAnnotations != nil {
 		service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
-	}
-
-	if cluster.Spec.Networking.AdminConsoleServiceType != "" {
-		service.Spec.Type = cluster.Spec.Networking.AdminConsoleServiceType
 	}
 
 	if cluster.Spec.Networking.LoadBalancerSourceRanges != nil {
@@ -858,16 +856,14 @@ func generateExposedService(member couchbaseutil.Member, cluster *couchbasev2.Co
 		if cluster.Spec.Networking.ExposedFeatureServiceTemplate.Spec != nil {
 			service.Spec = *cluster.Spec.Networking.ExposedFeatureServiceTemplate.Spec
 		}
+	} else {
+		service.Spec.Type = cluster.Spec.Networking.ExposedFeatureServiceType
 	}
 
 	// Apply deprecated fields, these have precedence for backwards compatibility,
 	// but only apply if they have been set e.g. not the zero value.
 	if cluster.Spec.Networking.ServiceAnnotations != nil {
 		service.Annotations = mergeLabels(service.Annotations, cluster.Spec.Networking.ServiceAnnotations)
-	}
-
-	if cluster.Spec.Networking.ExposedFeatureServiceType != "" {
-		service.Spec.Type = cluster.Spec.Networking.ExposedFeatureServiceType
 	}
 
 	if cluster.Spec.Networking.LoadBalancerSourceRanges != nil {
