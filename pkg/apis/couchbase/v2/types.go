@@ -252,13 +252,15 @@ type CouchbaseBackupStatus struct {
 	Output string `json:"output,omitempty"`
 
 	// Pod tells us which pod is running/ran last.
-	Pod string `json:"pod"`
+	Pod string `json:"pod,omitempty"`
 
+	// DEPRECATED - field may no longer be populated.
 	// Job tells us which job is running/ran last.
-	Job string `json:"job"`
+	Job string `json:"job,omitempty"`
 
+	// DEPRECATED - field may no longer be populated.
 	// Cronjob tells us which Cronjob the job belongs to.
-	CronJob string `json:"cronjob"`
+	CronJob string `json:"cronjob,omitempty"`
 
 	// Duration tells us how long the last backup took.  More info:
 	// https://golang.org/pkg/time/#ParseDuration
@@ -471,10 +473,11 @@ type CouchbaseBackupRestoreStatus struct {
 	Output string `json:"output,omitempty"`
 
 	// Pod tells us which pod is running/ran last.
-	Pod string `json:"pod"`
+	Pod string `json:"pod,omitempty"`
 
+	// DEPRECATED - field may no longer be populated.
 	// Job tells us which job is running/ran last.
-	Job string `json:"job"`
+	Job string `json:"job,omitempty"`
 
 	// Duration tells us how long the last restore took.  More info:
 	// https://golang.org/pkg/time/#ParseDuration
@@ -1367,9 +1370,9 @@ type ClusterSpec struct {
 	// to lookup backup resources.
 	Backup Backup `json:"backup,omitempty"`
 
-	// EnablePreviewScaling enables autoscaling for stateful services and buckets.
 	// DEPRECATED - This option only exists for backwards compatibility and no longer
-	// restricts autoscaling to ephemeral services. To be removed in future releases.
+	// restricts autoscaling to ephemeral services.
+	// EnablePreviewScaling enables autoscaling for stateful services and buckets.
 	EnablePreviewScaling bool `json:"enablePreviewScaling,omitempty"`
 
 	// AutoscaleStabilizationPeriod defines how long after a rebalance the

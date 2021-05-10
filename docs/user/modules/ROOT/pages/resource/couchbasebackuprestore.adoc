@@ -452,11 +452,11 @@ Failed indicates whether the most recent restore has failed.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `string`
 
 ==== Description
+
+*DEPRECATED* - field may no longer be populated.
 
 Job tells us which job is running/ran last.
 
@@ -503,8 +503,6 @@ Output reports useful information from the backup process.
 === couchbasebackuprestores.status.pod
 
 ==== Constraints
-
-*Required*
 
 *Type*: `string`
 

@@ -365,11 +365,11 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Constraints
 
-*Required*
-
 *Type*: `string`
 
 ==== Description
+
+*DEPRECATED* - field may no longer be populated.
 
 Cronjob tells us which Cronjob the job belongs to.
 
@@ -400,11 +400,11 @@ Failed indicates whether the most recent backup has failed.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `string`
 
 ==== Description
+
+*DEPRECATED* - field may no longer be populated.
 
 Job tells us which job is running/ran last.
 
@@ -451,8 +451,6 @@ Output reports useful information from the backup_script.
 === couchbasebackups.status.pod
 
 ==== Constraints
-
-*Required*
 
 *Type*: `string`
 

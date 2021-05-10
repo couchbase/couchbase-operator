@@ -1000,10 +1000,9 @@ More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expa
 
 ==== Description
 
-EnablePreviewScaling enables autoscaling for stateful services and buckets.
 *DEPRECATED* - This option only exists for backwards compatibility and no longer restricts autoscaling to ephemeral services.
 
-To be removed in future releases.
+EnablePreviewScaling enables autoscaling for stateful services and buckets.
 
 === couchbaseclusters.spec.hibernate
 
