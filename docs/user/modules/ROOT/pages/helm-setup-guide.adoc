@@ -1,6 +1,5 @@
 = Helm Deployment
 include::partial$constants.adoc[]
-:tabs:
 
 [abstract]
 Use the official Couchbase Helm Chart to deploy multiple components, including the Autonomous Operator, Admission Controller, Couchbase clusters, and Sync Gateway.
@@ -166,6 +165,17 @@ cluster:
 
 Any values in `values.yaml` that weren't overridden will keep their defaults.
 --
+====
+
+[IMPORTANT]
+====
+As stated above, Helm works by override-only, with the chart providing various defaults.
+If you want to override a whole key in the chart, or replace it with another key, then you must _explicitly disable the default_ in addition to adding the new one.
+
+For example, a default bucket is created unless you configure one or otherwise set `buckets: null` in the values file or `buckets=null` on the command line.
+Likewise, the default server configuration will always be created unless you set `servers.default` to `null`.
+
+For additional information, refer to the Helm documentation on https://helm.sh/docs/chart_template_guide/values_files/#deleting-a-default-key[deleting a default key^].
 ====
 
 === Selective Deployment

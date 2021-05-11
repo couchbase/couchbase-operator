@@ -1,6 +1,5 @@
 = Helm Management Guide
 include::partial$constants.adoc[]
-:tabs:
 
 [abstract]
 When you install a Helm chart, Helm creates a release.
