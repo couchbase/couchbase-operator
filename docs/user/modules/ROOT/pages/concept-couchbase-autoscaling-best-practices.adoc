@@ -1,0 +1,3 @@
+= Couchbase Cluster Auto-scaling Best Practices
+
+//Placeholder file to resolve xrefs
