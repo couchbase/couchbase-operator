@@ -135,21 +135,31 @@ func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 	}
 }
 
+// getBucketInfo returns information of the bucket.
+func getBucketInfo(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string) (*couchbaseutil.BucketStatus, error) {
+	client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
+	defer cleanup()
+
+	info := &couchbaseutil.BucketStatus{}
+
+	request := &couchbaseutil.Request{
+		Path:   "/pools/default/buckets/" + bucket,
+		Result: info,
+	}
+
+	if err := client.client.Get(request, client.host); err != nil {
+		return info, err
+	}
+
+	return info, nil
+}
+
 // VerifyDocCountInBucket polls the Couchbase API for the named bucket and checks whether the
 // document count matches the expected number of items.
 func VerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
-		defer cleanup()
-
-		info := &couchbaseutil.BucketStatus{}
-
-		request := &couchbaseutil.Request{
-			Path:   "/pools/default/buckets/" + bucket,
-			Result: info,
-		}
-
-		if err := client.client.Get(request, client.host); err != nil {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
 			return err
 		}
 
@@ -167,21 +177,12 @@ func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couch
 	}
 }
 
-// VerifyDocCountInBucketNonZerp polls the Couchbase API for the named bucket and checks whether the
+// VerifyDocCountInBucketNonZero polls the Couchbase API for the named bucket and checks whether the
 // document count is non-zero.
 func VerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
-		client, cleanup := MustCreateAdminConsoleClient(t, k8s, cluster)
-		defer cleanup()
-
-		info := &couchbaseutil.BucketStatus{}
-
-		request := &couchbaseutil.Request{
-			Path:   "/pools/default/buckets/" + bucket,
-			Result: info,
-		}
-
-		if err := client.client.Get(request, client.host); err != nil {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
 			return err
 		}
 
@@ -195,6 +196,29 @@ func VerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *co
 
 func MustVerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
 	if err := VerifyDocCountInBucketNonZero(t, k8s, cluster, bucket, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// VerifyReplicaCount polls the Couchbase API for the named bucket and checks whether the
+// Replica number matches the expected replicaNumber.
+func VerifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
+			return err
+		}
+
+		if info.ReplicaNumber != 1 {
+			return fmt.Errorf("replica Number %d, expected %d", info.ReplicaNumber, 1)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
+	if err := VerifyReplicaCount(t, k8s, cluster, bucket, timeout); err != nil {
 		Die(t, err)
 	}
 }

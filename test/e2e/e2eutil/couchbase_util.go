@@ -839,29 +839,11 @@ func NodeServicesVerifier(t *testing.T, ci *couchbaseutil.ClusterInfo, servicesM
 	return reflect.DeepEqual(clusterServices, servicesMap)
 }
 
-func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) {
-	if responseData, err := DeployEventingFunction(t, targetKube, testCouchbase, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc, timeout); err != nil {
-		t.Log(string(responseData))
-		Die(t, err)
-	}
-}
-
-func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) ([]byte, error) {
-	requestType := "POST"
+func getEventingData(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, requestType, eventingJSONFunc string, timeout time.Duration) ([]byte, error) {
 	hostUsername := "Administrator"
 	hostPassword := "password"
 
 	var responseData []byte
-
-	eventingJSONFunc := `[{` +
-		`"appname": "` + eventingFuncName + `",` +
-		`"id": 0,` +
-		`"depcfg":{"buckets":[{"alias":"dst_bucket","bucket_name":"` + dstBucketName + `"}],"metadata_bucket":"` + metaBucketName + `","source_bucket":"` + srcBucketName + `"},` +
-		`"version":"", "handleruuid":0,` +
-		`"settings": {"dcp_stream_boundary":"everything","deadline_timeout":62,"deployment_status":true,"description":"","execution_timeout":60,"log_level":"INFO","processing_status":true,"user_prefix":"eventing","worker_count":3},` +
-		`"using_doc_timer": false,` +
-		`"appcode": "` + jsFunc + `"` +
-		`}]`
 
 	err := retryutil.RetryFor(timeout, func() error {
 		var eventingURL string
@@ -877,7 +859,7 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 
 		defer cleanup()
 
-		hostURL := "http://" + eventingURL + "/api/v1/functions?name=" + eventingFuncName
+		hostURL := "http://" + eventingURL + "/api/v1/functions/test"
 
 		request, err := http.NewRequest(requestType, hostURL, strings.NewReader(eventingJSONFunc))
 		if err != nil {
@@ -911,13 +893,75 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 	return responseData, nil
 }
 
-func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) ([]byte, error) {
+func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) ([]byte, error) {
+	eventingFuncName := "test"
+
+	eventingJSONFunc := `[{` +
+		`"appname": "` + eventingFuncName + `",` +
+		`"id": 0,` +
+		`"depcfg":{"buckets":[{"alias":"dst_bucket","bucket_name":"` + dstBucketName + `"}],"metadata_bucket":"` + metaBucketName + `","source_bucket":"` + srcBucketName + `"},` +
+		`"version":"", "handleruuid":0,` +
+		`"settings": {"dcp_stream_boundary":"everything","deadline_timeout":62,"deployment_status":true,"description":"","execution_timeout":60,"log_level":"INFO","processing_status":true,"user_prefix":"eventing","worker_count":3},` +
+		`"using_doc_timer": false,` +
+		`"appcode": "` + jsFunc + `"` +
+		`}]`
+
+	responseData, err := getEventingData(t, targetKube, cluster, "POST", eventingJSONFunc, timeout)
+
+	return responseData, err
+}
+
+func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) {
+	if responseData, err := DeployEventingFunction(t, targetKube, testCouchbase, srcBucketName, metaBucketName, dstBucketName, jsFunc, timeout); err != nil {
+		t.Log(string(responseData))
+		Die(t, err)
+	}
+}
+
+func DeleteEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) ([]byte, error) {
+	responseData, err := getEventingData(t, targetKube, cluster, "DELETE", "", timeout)
+
+	return responseData, err
+}
+
+func MustDeleteEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if responseData, err := DeleteEventingFunction(t, targetKube, testCouchbase, timeout); err != nil {
+		t.Log(string(responseData))
+		Die(t, err)
+	}
+}
+
+func GetEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) ([]byte, error) {
+	responseData, err := getEventingData(t, targetKube, cluster, "GET", "", timeout)
+
+	return responseData, err
+}
+
+func MustGetEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	if responseData, err := GetEventingFunction(t, targetKube, testCouchbase, timeout); err != nil {
+		t.Log(string(responseData))
+		return err
+	}
+
+	return nil
+}
+
+func ExecuteQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query, service string, timeout time.Duration) ([]byte, error) {
 	username := string(k8s.DefaultSecret.Data["username"])
 	password := string(k8s.DefaultSecret.Data["password"])
 
-	requestBody := map[string]string{
+	couchbaseservice := couchbasev2.AnalyticsService
+
+	var pretty interface{} = "true"
+
+	if strings.Contains(service, "query") {
+		couchbaseservice = couchbasev2.QueryService
+		pretty = true
+	}
+
+	requestBody := map[string]interface{}{
 		"statement":         query,
-		"pretty":            "true",
+		"pretty":            pretty,
 		"client_context_id": "",
 		"timeout":           "120s",
 	}
@@ -930,14 +974,14 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 	var data []byte
 
 	callback := func() error {
-		url, cleanup, err := GetHostURL(k8s, cluster, couchbasev2.AnalyticsService)
+		url, cleanup, err := GetHostURL(k8s, cluster, couchbaseservice)
 		if err != nil {
 			return err
 		}
 
 		defer cleanup()
 
-		hostURL := "http://" + url + "/analytics/service"
+		hostURL := "http://" + url + service
 
 		request, err := http.NewRequest("POST", hostURL, bytes.NewReader(requestBodyRaw))
 		if err != nil {
@@ -974,6 +1018,10 @@ func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 	return data, nil
 }
 
+func ExecuteAnalyticsQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) ([]byte, error) {
+	return ExecuteQuery(k8s, cluster, query, "/analytics/service", timeout)
+}
+
 func MustExecuteAnalyticsQuery(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) []byte {
 	data, err := ExecuteAnalyticsQuery(k8s, cluster, query, timeout)
 	if err != nil {
@@ -982,9 +1030,8 @@ func MustExecuteAnalyticsQuery(t *testing.T, k8s *types.Cluster, cluster *couchb
 
 	return data
 }
-
-func GetDatasetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, dataset string, timeout time.Duration) (int64, error) {
-	data, err := ExecuteAnalyticsQuery(k8s, cluster, "SELECT COUNT(*) AS count FROM "+dataset, timeout)
+func getAnalyticsData(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) (int64, error) {
+	data, err := ExecuteAnalyticsQuery(k8s, cluster, query, timeout)
 	if err != nil {
 		return 0, err
 	}
@@ -1000,6 +1047,12 @@ func GetDatasetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClust
 	return result.Results[0]["count"], nil
 }
 
+func GetDatasetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, dataset string, timeout time.Duration) (int64, error) {
+	query := "SELECT COUNT(*) AS count FROM " + dataset
+
+	return getAnalyticsData(k8s, cluster, query, timeout)
+}
+
 func MustGetDatasetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, dataset string, timeout time.Duration) int64 {
 	count, err := GetDatasetItemCount(k8s, cluster, dataset, timeout)
 	if err != nil {
@@ -1007,6 +1060,65 @@ func MustGetDatasetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbas
 	}
 
 	return count
+}
+
+func GetDatasetCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) (int64, error) {
+	query := "Select Count(*) AS count from Metadata.`Dataset` where DataverseName <> `Metadata`"
+	return getAnalyticsData(k8s, cluster, query, timeout)
+}
+
+func MustGetDatasetCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) int64 {
+	indexCount, err := GetDatasetCount(k8s, cluster, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return indexCount
+}
+
+func ExecuteIndexQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) ([]byte, error) {
+	return ExecuteQuery(k8s, cluster, query, "/query/service", timeout)
+}
+
+func MustExecuteIndexQuery(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) []byte {
+	data, err := ExecuteIndexQuery(k8s, cluster, query, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return data
+}
+
+func getIndexData(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) (int64, error) {
+	data, err := ExecuteIndexQuery(k8s, cluster, query, timeout)
+	if err != nil {
+		return 0, err
+	}
+
+	result := struct {
+		Results []map[string]int64 `json:"results"`
+	}{}
+
+	if err := json.Unmarshal(data, &result); err != nil {
+		return 0, err
+	}
+
+	return result.Results[0]["count"], nil
+}
+
+func GetIndexCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) (int64, error) {
+	query := "Select Count(*) AS count FROM system:indexes WHERE name = '#primary'"
+
+	return getIndexData(k8s, cluster, query, timeout)
+}
+
+func MustGetIndexCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) int64 {
+	indexCount, err := GetIndexCount(k8s, cluster, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return indexCount
 }
 
 func GetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) (int64, error) {
