@@ -22,6 +22,7 @@ require (
 	github.com/imdario/mergo v0.3.9
 	github.com/klauspost/cpuid v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/common v0.24.0 // indirect
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/securego/gosec v0.0.0-20200316084457-7da9f46445fd // indirect
 	github.com/sirupsen/logrus v1.7.0

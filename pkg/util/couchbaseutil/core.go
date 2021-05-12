@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
@@ -211,7 +212,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	// All requests send the username and password.
 	request.SetBasicAuth(c.username, c.password)
 
-	// Rrequest logging.  Careful here, higher levels of verbosity generate a huge
+	// Request logging.  Careful here, higher levels of verbosity generate a huge
 	// amount more log traffic. All requests have the following common attributes.
 	logLabels := []interface{}{
 		"cluster", c.cluster,
@@ -229,10 +230,17 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 		}
 	}
 
+	// Construct any additional variables we need for metrics
+	metricPath := request.URL.Path
+	metricHostname := request.URL.Hostname()
+
+	metrics.HTTPRequestTotalMetric.WithLabelValues(c.cluster, request.Method, metricPath, metricHostname).Inc()
+
 	// Logs are always emitted regardless of status.  Context is added to the log labels
 	// depending on the path taken.
 	defer func() {
 		delta := time.Since(start)
+		metrics.HTTPRequestDurationMSMetric.WithLabelValues(c.cluster, request.Method, metricPath, metricHostname).Observe(float64(delta.Milliseconds()))
 
 		logLabels = append(logLabels, "time_ms", float64(delta.Nanoseconds())/1000000.0)
 
@@ -243,10 +251,14 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	response, err := c.client.Do(request)
 	if err != nil {
 		logLabels = append(logLabels, "error", err)
+
+		metrics.HTTPRequestFailureMetric.WithLabelValues(c.cluster, request.Method, metricPath, metricHostname).Inc()
+
 		return errors.NewStackTracedError(err)
 	}
 
 	logLabels = append(logLabels, "status", response.Status)
+	metrics.HTTPRequestTotalCodeMetric.WithLabelValues(c.cluster, request.Method, IntToStr(response.StatusCode), metricPath, metricHostname).Inc()
 
 	// Read the body so we can display it for really verbose debugging.
 	defer response.Body.Close()

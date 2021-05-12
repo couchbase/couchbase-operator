@@ -365,3 +365,29 @@ func TestPrometheusMetricsUpgrade(t *testing.T) {
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
+
+func TestOperatorMetrics(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+
+	// Confirm we can scrape various metrics from the endpoint
+	e2eutil.MustCheckOperatorMetrics(t, targetKube, testCouchbase, nil)
+
+	// Check the events match what we expect:
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}

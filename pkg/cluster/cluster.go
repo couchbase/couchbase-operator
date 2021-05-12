@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -22,14 +23,12 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/golang/groupcache/lru"
-	"github.com/prometheus/client_golang/prometheus"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var log = logf.Log.WithName("cluster")
@@ -39,30 +38,7 @@ var (
 	// they stay Terminating forever.  This should emulate --grace-period=0 --force.
 	// See: https://github.com/kubernetes/kubernetes/issues/51835.
 	podTerminationGracePeriod = int64(0)
-
-	reconcileTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "couchbase_reconcile_total",
-		Help: "Total reconcile operations performed on a specifc cluster",
-	}, []string{"namespace", "name", "result"})
-
-	reconcileFailureMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "couchbase_reconcile_failures",
-		Help: "Total failed reconcile operations performed on a specifc cluster",
-	}, []string{"namespace", "name"})
-
-	reconcileDurationMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "couchbase_reconcile_time_seconds",
-		Help: "Length of time per reconcile for a specific cluster",
-	}, []string{"namespace", "name"})
 )
-
-func init() {
-	metrics.Registry.MustRegister(
-		reconcileTotalMetric,
-		reconcileFailureMetric,
-		reconcileDurationMetric,
-	)
-}
 
 const (
 	tlsOperatorSecretCert string = "couchbase-operator.crt"
@@ -428,14 +404,14 @@ func (c *Cluster) runReconcile() {
 		}
 
 		reconcileTime := time.Since(start)
-		reconcileDurationMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Observe(reconcileTime.Seconds())
+		metrics.ReconcileDurationMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Observe(reconcileTime.Seconds())
 	}()
 
 	// If the user has requested that we pause operations.
 	if c.cluster.Spec.Paused {
 		c.cluster.Status.PauseControl()
 		log.Info("Operator paused, skipping", "cluster", c.namespacedName())
-		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "paused").Inc()
+		metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "paused").Inc()
 
 		return
 	}
@@ -448,7 +424,7 @@ func (c *Cluster) runReconcile() {
 		// Pod startup might take long, e.g. pulling image. It would
 		// deterministically become running or succeeded/failed later.
 		log.Info("Pods pending creation, skipping", "cluster", c.namespacedName(), "running", len(running), "pending", len(pending))
-		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "pending").Inc()
+		metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "pending").Inc()
 
 		return
 	}
@@ -459,8 +435,8 @@ func (c *Cluster) runReconcile() {
 	// runtime and after a restart.
 	if err := c.updateMembers(); err != nil {
 		log.Error(err, "Failed to update members", "cluster", c.namespacedName())
-		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
-		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
+		metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
+		metrics.ReconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 
 		// When we call updateMembers, it's going to look at all running pods can try
 		// to dial Couchbase and get health status.  It's entirely possible that the
@@ -518,8 +494,8 @@ func (c *Cluster) runReconcile() {
 			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 		}
 
-		reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
-		reconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
+		metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
+		metrics.ReconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
 
 		return
 	}
@@ -530,7 +506,7 @@ func (c *Cluster) runReconcile() {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
 
-	reconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "success").Inc()
+	metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "success").Inc()
 }
 
 // Update is called periodically or on a CR change, print out any diffs in the spec

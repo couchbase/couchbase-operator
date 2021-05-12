@@ -21,101 +21,137 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// check that prometheus sidecar container is exporting the correct metrics
-// on all pods in the operator.
-func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) (string, error) {
-	// storing the prometheus metrics
-	responseDataStr := ""
+func getPodMetrics(k8s *types.Cluster, podName, podPort string, ctx *TLSContext) (string, error) {
+	forwardedPort, err := netutil.GetFreePort()
+	if err != nil {
+		return "", fmt.Errorf("unable to allocate port: %w", err)
+	}
 
+	pf := portforward.PortForwarder{
+		Config:    k8s.Config,
+		Client:    k8s.KubeClient,
+		Namespace: k8s.Namespace,
+		Pod:       podName,
+		Port:      forwardedPort + ":" + podPort,
+	}
+	if err := pf.ForwardPorts(); err != nil {
+		return "", err
+	}
+
+	defer pf.Close()
+
+	scheme := "http"
+	client := &http.Client{}
+
+	if ctx != nil {
+		scheme = "https"
+
+		clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
+		if err != nil {
+			return "", err
+		}
+
+		tlsConfig := &tls.Config{
+			RootCAs: x509.NewCertPool(),
+			Certificates: []tls.Certificate{
+				clientCert,
+			},
+		}
+
+		tlsConfig.RootCAs.AddCert(ctx.CA.certificate)
+
+		client.Transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+	}
+
+	uri := fmt.Sprintf("%s://localhost:%s%s", scheme, forwardedPort, "/metrics")
+
+	// Buffer up the responses
+	req, err := http.NewRequest(http.MethodGet, uri, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("unable to read response %s for pod %s", uri, podName)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("remote call failed with response: %s %s", resp.Status, string(body))
+	}
+
+	responseDataStr := string(body)
+	if len(responseDataStr) == 0 {
+		return responseDataStr, fmt.Errorf("empty response")
+	}
+
+	return responseDataStr, nil
+}
+
+func checkOperatorMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) error {
+	operatorPodSelector := "app=couchbase-operator"
+	operatorMetricsPort := "8383"
+
+	_, err := checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, "couchbase_http_")
+	if err != nil {
+		return err
+	}
+
+	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, "couchbase_reconcile_")
+
+	return err
+}
+
+func MustCheckOperatorMetrics(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) {
+	err := checkOperatorMetrics(k8s, couchbase, ctx)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, podPort, labelSelector, testString string) (string, error) {
 	listOptions := metav1.ListOptions{
-		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+		LabelSelector: labelSelector,
 	}
 
 	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
 	if err != nil {
-		return responseDataStr, err
+		return "", err
 	}
 
 	// check all pods
-	for _, pod := range pods.Items {
-		port, err := netutil.GetFreePort()
-		if err != nil {
-			return responseDataStr, fmt.Errorf("unable to allocate port: %w", err)
-		}
+	responseDataStr := ""
 
-		pf := portforward.PortForwarder{
-			Config:    k8s.Config,
-			Client:    k8s.KubeClient,
-			Namespace: k8s.Namespace,
-			Pod:       pod.Name,
-			Port:      port + ":9091",
-		}
-		if err := pf.ForwardPorts(); err != nil {
+	for _, pod := range pods.Items {
+		responseDataStr, err = getPodMetrics(k8s, pod.Name, podPort, ctx)
+		if err != nil {
 			return responseDataStr, err
 		}
 
-		defer pf.Close()
-
-		scheme := "http"
-		client := &http.Client{}
-
-		if ctx != nil {
-			scheme = "https"
-
-			clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
-			if err != nil {
-				return "", err
-			}
-
-			tlsConfig := &tls.Config{
-				RootCAs: x509.NewCertPool(),
-				Certificates: []tls.Certificate{
-					clientCert,
-				},
-			}
-
-			tlsConfig.RootCAs.AddCert(ctx.CA.certificate)
-
-			client.Transport = &http.Transport{
-				TLSClientConfig: tlsConfig,
-			}
-		}
-
-		uri := fmt.Sprintf("%s://localhost:%s%s", scheme, port, "/metrics")
-
-		// Buffer up the responses
-		req, err := http.NewRequest(http.MethodGet, uri, nil)
-		if err != nil {
-			return "", err
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return "", err
-		}
-
-		defer resp.Body.Close()
-
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return "", fmt.Errorf("unable to read response %s for pod %s", uri, pod.Name)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return responseDataStr, fmt.Errorf("remote call failed with response: %s %s", resp.Status, string(body))
-		}
-
-		responseDataStr = string(body)
-		if len(responseDataStr) == 0 {
-			return responseDataStr, fmt.Errorf("empty response")
-		}
-
-		if !strings.Contains(responseDataStr, "couchbase") {
-			return responseDataStr, fmt.Errorf("response data does not contain any couchbase metrics")
+		if !strings.Contains(responseDataStr, testString) {
+			return responseDataStr, fmt.Errorf("response data does not contain any %s metrics", testString)
 		}
 	}
 
 	return responseDataStr, nil
+}
+
+// check that prometheus sidecar container is exporting the correct metrics
+// on all pods in the operator.
+func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) (string, error) {
+	serverPodSelector := constants.CouchbaseServerClusterKey + "=" + couchbase.Name
+	serverMetricPort := "9091"
+
+	return checkAllPodMetrics(k8s, couchbase, ctx, serverMetricPort, serverPodSelector, "couchbase")
 }
 
 func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) string {
