@@ -814,18 +814,22 @@ func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 	}
 
 	for _, pod := range pods.Items {
-		logOpts := &v1.PodLogOptions{}
-		req := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).GetLogs(pod.Name, logOpts)
+		for _, container := range pod.Spec.Containers {
+			logOptions := &v1.PodLogOptions{
+				Container: container.Name,
+			}
+			req := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).GetLogs(pod.Name, logOptions)
 
-		data, err := req.DoRaw(context.Background())
-		if err != nil {
-			return err
-		}
+			data, err := req.DoRaw(context.Background())
+			if err != nil {
+				return err
+			}
 
-		logFile := filepath.Join(logDir, fmt.Sprintf("%s.log", pod.Name))
+			logFile := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", container.Name, pod.Name))
 
-		if err := ioutil.WriteFile(logFile, data, 0644); err != nil {
-			return err
+			if err := ioutil.WriteFile(logFile, data, 0644); err != nil {
+				return err
+			}
 		}
 	}
 
