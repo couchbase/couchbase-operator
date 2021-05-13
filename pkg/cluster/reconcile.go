@@ -2804,6 +2804,8 @@ func (c *Cluster) reconcileBackupRestore() error {
 
 			// cleanup completed restores
 			if currentjob.Status.Succeeded == 1 {
+				log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", currentRestore.Name)
+
 				if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), currentRestore.Name, *metav1.NewDeleteOptions(0)); err != nil {
 					return err
 				}
