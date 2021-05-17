@@ -31,7 +31,7 @@ pipeline {
     string(name: 'backup_image', defaultValue: 'spjmurray/couchbase-operator-backup:1.1.0-a3e581b9945e7141307eed435602d6afec09c808', description: 'Version of the Couchbase backup image to test')
     string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.3', description: 'Version of the Prometheus exporter to test')
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.3', description: 'Version of the Prometheus exporter to upgrade from')
-    string(name: 'logging_image', defaultValue: 'couchbase/fluent-bit:1.0.0', description: 'Version of the log shipping sidecar to test')
+    string(name: 'logging_image', defaultValue: 'couchbase/fluent-bit:1.0.1', description: 'Version of the log shipping sidecar to test')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.2-enterprise', description: 'Version of Sync-Gateway to test')
     choice(name: 'bucket_type', choices: ['couchbase', 'ephemeral', 'memcached'], description: 'Bucket type to test with, for tests where bucket type is dynamic')
     choice(name: 'compression_mode', choices: ['passive', 'active', 'off'], description: 'Bucket compression to test with, for tests where compression is dynamic')
