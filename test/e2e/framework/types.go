@@ -33,7 +33,6 @@ type Framework struct {
 	BucketType                    string
 	CompressionMode               string
 	EnableIstio                   bool
-	S3Bucket                      string
 	S3Region                      string
 	S3AccessKey                   string
 	S3SecretID                    string

@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/Masterminds/semver v1.5.0
+	github.com/aws/aws-sdk-go v1.38.40
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-lintpack/lintpack v0.5.2 // indirect

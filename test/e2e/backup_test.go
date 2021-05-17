@@ -7,6 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -23,7 +28,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule string, s3 bool) *v2.CouchbaseBackup {
+func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule, s3BucketName string, s3 bool) *v2.CouchbaseBackup {
 	backup := &v2.CouchbaseBackup{
 		ObjectMeta: v1.ObjectMeta{
 			Name: strings.ReplaceAll(string(strategy), "_", "-"),
@@ -45,7 +50,7 @@ func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule st
 	}
 
 	if s3 {
-		backup.Spec.S3Bucket = framework.Global.S3Bucket
+		backup.Spec.S3Bucket = "s3://" + s3BucketName
 	}
 
 	return backup
@@ -59,14 +64,170 @@ func cronScheduleOnceIn(duration time.Duration) string {
 	return fmt.Sprintf("%d * * * *", when.Minute())
 }
 
-func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool) *corev1.Secret {
-	if !s3 {
+func createS3Bucket(t *testing.T, bucket, accessKey, secretID, region string) error {
+	// create S3 bucket
+	token := ""
+
+	sess, err := session.NewSession(&aws.Config{
+		Region:      aws.String(region),
+		Credentials: credentials.NewStaticCredentials(accessKey, secretID, token)},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	// Create S3 service client
+	svc := s3.New(sess)
+
+	if MustGetS3Bucket(t, svc, bucket) {
 		return nil
+	}
+
+	// Create the S3 Bucket
+	_, err = svc.CreateBucket(&s3.CreateBucketInput{
+		ACL:    aws.String("private"),
+		Bucket: aws.String(bucket),
+		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+			LocationConstraint: aws.String(region),
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Make Objects of the bucket private
+	_, err = svc.PutPublicAccessBlock(&s3.PutPublicAccessBlockInput{
+		Bucket: aws.String(bucket),
+		PublicAccessBlockConfiguration: &s3.PublicAccessBlockConfiguration{
+			BlockPublicAcls:       aws.Bool(true),
+			IgnorePublicAcls:      aws.Bool(true),
+			BlockPublicPolicy:     aws.Bool(true),
+			RestrictPublicBuckets: aws.Bool(true),
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	err = svc.WaitUntilBucketExists(&s3.HeadBucketInput{
+		Bucket: aws.String(bucket),
+	})
+
+	if err != nil {
+		return fmt.Errorf("Error occurred while waiting for bucket to be created, %w", err)
+	}
+
+	return nil
+}
+
+func MustCreateS3Bucket(t *testing.T, bucket, accessKey, secretID, region string) {
+	if err := createS3Bucket(t, bucket, accessKey, secretID, region); err != nil {
+		MustDeleteS3Bucket(t, bucket, accessKey, secretID, region)
+		e2eutil.Die(t, err)
+	}
+}
+
+func getS3Bucket(svc *s3.S3, bucket string) (bool, error) {
+	result, err := svc.ListBuckets(&s3.ListBucketsInput{})
+
+	if err != nil {
+		return false, err
+	}
+
+	var bucketPresent bool = false
+
+	for _, s3bucket := range result.Buckets {
+		if bucket == *s3bucket.Name {
+			bucketPresent = true
+			break
+		}
+	}
+
+	return bucketPresent, nil
+}
+
+func MustGetS3Bucket(t *testing.T, svc *s3.S3, bucket string) bool {
+	bucketPresent, err := getS3Bucket(svc, bucket)
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	return bucketPresent
+}
+
+func deleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string) error {
+	// create S3 bucket
+	token := ""
+
+	sess, err := session.NewSession(&aws.Config{
+		Region:      aws.String(region),
+		Credentials: credentials.NewStaticCredentials(accessKey, secretID, token)},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	// Create S3 service client
+	svc := s3.New(sess)
+
+	// Check if the bucket is present
+	if bucketPresent := MustGetS3Bucket(t, svc, bucket); bucketPresent == false {
+		return nil
+	}
+
+	// Empty the bucket before deleting it
+	// Setup BatchDeleteIterator to iterate through a list of objects.
+	iter := s3manager.NewDeleteListIterator(svc, &s3.ListObjectsInput{
+		Bucket: aws.String(bucket),
+	})
+
+	// Traverse iterator deleting each object
+	if err := s3manager.NewBatchDeleteWithClient(svc).Delete(aws.BackgroundContext(), iter); err != nil {
+		return fmt.Errorf("Unable to delete objects from bucket %q, %w", bucket, err)
+	}
+
+	// Create the S3 Bucket
+	_, err = svc.DeleteBucket(&s3.DeleteBucketInput{
+		Bucket: aws.String(bucket),
+	})
+
+	if err != nil {
+		return fmt.Errorf("Bucket can not be deleted %w", err)
+	}
+
+	err = svc.WaitUntilBucketNotExists(&s3.HeadBucketInput{
+		Bucket: aws.String(bucket),
+	})
+
+	if err != nil {
+		return fmt.Errorf("Error occurred while waiting for bucket to be deleted, %w", err)
+	}
+
+	return nil
+}
+
+func MustDeleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string) {
+	if err := deleteS3Bucket(t, bucket, accessKey, secretID, region); err != nil {
+		e2eutil.Die(t, err)
+	}
+}
+
+func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool, cleanup func()) (*corev1.Secret, string, func()) {
+	if !s3 {
+		return nil, "", cleanup
 	}
 
 	f := framework.Global
 
-	var s3secret string = "s3-secret"
+	framework.Requires(t, targetKube).AtLeastVersion("6.6.0").HasS3Parameters()
+
+	s3secret := "s3-secret"
+	s3BucketName := "s3bucket-" + targetKube.Namespace
 
 	secret := &corev1.Secret{
 		ObjectMeta: v1.ObjectMeta{
@@ -83,26 +244,29 @@ func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool) *corev1.Se
 		e2eutil.Die(t, err)
 	}
 
-	return secret
+	MustCreateS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region)
+
+	cleanup1 := func() {
+		MustDeleteS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region)
+		cleanup()
+	}
+
+	return secret, s3BucketName, cleanup1
 }
 
 func testFullIncremental(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
-
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	// Create a normal cluster.
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
@@ -115,7 +279,7 @@ func testFullIncremental(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 3*time.Minute)
 
 	// Create a Backup object.
-	backup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
+	backup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
 	backup = e2eutil.MustNewBackup(t, targetKube, backup)
 	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
 
@@ -150,19 +314,15 @@ func testFullOnly(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
-
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	// Create a normal cluster.
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
@@ -175,7 +335,7 @@ func testFullOnly(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
+	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
 	backup = e2eutil.MustNewBackup(t, targetKube, backup)
 	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
 
@@ -210,19 +370,15 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
-
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	// Create cluster.
 	testCouchbase := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(targetKube)
@@ -244,7 +400,7 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	e2eutil.MustPopulateWithDataSize(t, targetKube, testCouchbase, bucket.GetName(), f.CouchbaseServerImage, 1<<30, time.Minute)
 
 	// create this backup to run every 2 minutes so we can test the backup still runs successfully after a failure.
-	fullBackup := createTestBackup(v2.FullOnly, "*/2 * * * *", "", s3)
+	fullBackup := createTestBackup(v2.FullOnly, "*/2 * * * *", "", s3BucketName, s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -303,21 +459,17 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create cluster.
 	numOfDocs := f.DocsCount
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -330,7 +482,7 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "", s3)
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "", s3BucketName, s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -385,21 +537,17 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -411,7 +559,7 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create initial backup
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -426,7 +574,7 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackupDeletion(t, targetKube, fullBackup, 2*time.Minute)
 
 	// create new backup
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
+	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
 	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
 
@@ -473,21 +621,17 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -499,7 +643,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create initial backup
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
+	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
 	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// wait for backup
@@ -516,7 +660,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackupDeletion(t, targetKube, fullIncrementalBackup, 2*time.Minute)
 
 	// create new backup
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
 
@@ -555,13 +699,11 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	fullFreq := 2
 	targetBucketName := "bucketty-mcbuccketface"
@@ -570,8 +712,6 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 
 	numOfDocs := f.DocsCount
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -583,7 +723,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3)
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -620,8 +760,8 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 		},
 	}
 
-	if f.S3Bucket != "" && s3 {
-		restore.Spec.S3Bucket = f.S3Bucket
+	if s3 {
+		restore.Spec.S3Bucket = "s3://" + s3BucketName
 	}
 
 	// delete bucket
@@ -677,20 +817,16 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
 	numOfDocs := f.DocsCount
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -702,7 +838,7 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -747,19 +883,15 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
 
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
-
 	clusterSize := constants.Size3
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -771,11 +903,11 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create Backup object 1.
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
+	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
 	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// Create Backup object 2.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "", s3)
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "", s3BucketName, s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backups
@@ -819,13 +951,11 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	clusterSize := constants.Size3
 	// Create the cluster.
@@ -833,8 +963,6 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -847,7 +975,7 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3)
+	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
 	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
 
 	// wait for backup
@@ -884,13 +1012,11 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	// Create the cluster.
 	clusterSize := constants.Size3
@@ -898,8 +1024,6 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tls)
-
-	s3secret := createS3Secret(t, targetKube, s3)
 
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, policy).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -912,7 +1036,7 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3)
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
 	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
 
 	// wait for backup
@@ -977,13 +1101,11 @@ func testBackupRetention(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, kubernetes, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	// Static configuration.
 	clusterSize := 3
@@ -992,13 +1114,11 @@ func testBackupRetention(t *testing.T, s3 bool) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	s3secret := createS3Secret(t, kubernetes, s3)
-
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// Trigger a full backup.
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(5*time.Minute), "", s3)
+	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(5*time.Minute), "", s3BucketName, s3)
 	backup.Spec.BackupRetention = e2espec.NewDurationS(60)
 	backup = e2eutil.MustNewBackup(t, kubernetes, backup)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
@@ -1027,13 +1147,11 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	targetKube, cleanup := f.SetupTest(t)
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
 	defer cleanup()
 
 	framework.Requires(t, targetKube).StaticCluster()
-
-	if s3 {
-		framework.Requires(t, targetKube).AtLeastVersion("6.6.0").AtLeastBackupVersion("6.6.0").HasS3Parameters()
-	}
 
 	// Static configuration.
 	clusterSize := 3
@@ -1042,7 +1160,6 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	// Create cluster.
 	numOfDocs := 100
 
-	s3secret := createS3Secret(t, targetKube, s3)
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
@@ -1054,7 +1171,7 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(4*time.Minute), "", s3)
+	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(4*time.Minute), "", s3BucketName, s3)
 	backup = e2eutil.MustNewBackup(t, targetKube, backup)
 
 	// wait for backup
@@ -1134,7 +1251,7 @@ func TestBackupAutoscaling(t *testing.T) {
 	// the thing.  Importantly, we set the threshold at 99% (e.g. we need 99% of the
 	// volume to be free), we increment by 200% (triple the existing 1Gi), and put a limit
 	// in of 1.5Gi. We wait for the backup to be updated
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", false)
+	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", "", false)
 	backup.Spec.Size = e2espec.NewResourceQuantityMi(1024)
 	backup.Spec.AutoScaling = &v2.CouchbaseBackupAutoScaling{
 		Limit:            volumeSizeLimit,

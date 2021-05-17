@@ -220,7 +220,6 @@ func configure() (err error) {
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
 	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
-	flag.StringVar(&params.S3Bucket, "s3-bucket", "", "S3 Bucket to use")
 	flag.StringVar(&params.S3Region, "s3-region", "us-west-2", "S3 Region to use")
 	flag.StringVar(&params.S3AccessKey, "s3-access-key", "", "S3 Access Key")
 	flag.StringVar(&params.S3SecretID, "s3-secret-id", "", "S3 Secret ID")
@@ -337,7 +336,6 @@ func setup() error {
 	logrus.Info(util.PrettyHeading("Framework Configuration"))
 	logrus.Info(" →  Bucket Type: " + Global.BucketType)
 	logrus.Info(" →  Compression Mode: " + Global.CompressionMode)
-	logrus.Info(" →  S3 Bucket: " + Global.S3Bucket)
 	logrus.Info(" →  Documents: " + strconv.Itoa(Global.DocsCount))
 	logrus.Info(" →  Logging Level: " + Global.LogLevel)
 
@@ -939,8 +937,8 @@ func (r *TestRequirement) NotVersion(v ...string) *TestRequirement {
 
 // HasS3Parameters skips the S3 tests if S3 parameters are not provided.
 func (r *TestRequirement) HasS3Parameters() *TestRequirement {
-	if Global.S3Bucket == "" || Global.S3AccessKey == "" || Global.S3SecretID == "" {
-		r.t.Skip("S3 parameters are not provided")
+	if Global.S3AccessKey == "" || Global.S3SecretID == "" {
+		r.t.Skip("S3 Config parameters are not provided")
 	}
 
 	return r
@@ -965,34 +963,6 @@ func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 
 	if v1.Less(v2) {
 		r.t.Skip("Couchbase Server Image version not supported (geriatric)")
-	}
-
-	return r
-}
-
-// AtLeastBackupVersion skips the test for Couchbase versions before this threshold.
-func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
-	parts := strings.Split(Global.CouchbaseBackupImage, ":")
-	if len(parts) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed Backup image: %v", Global.CouchbaseBackupImage))
-	}
-
-	if parts[1] == "latest" {
-		return r
-	}
-
-	v1, err := couchbaseutil.NewVersion(parts[1])
-	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed Backup version: %s: %v", parts[1], err))
-	}
-
-	v2, err := couchbaseutil.NewVersion(v)
-	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed backup version: %s: %v", v, err))
-	}
-
-	if v1.Less(v2) {
-		r.t.Skip("Couchbase Backup Image version not supported (geriatric)")
 	}
 
 	return r
