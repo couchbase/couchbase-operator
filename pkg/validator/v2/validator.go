@@ -30,10 +30,10 @@ import (
 
 const (
 	defaultFSGroup              = 1000
-	defaultMetricsImage         = "couchbase/exporter:1.0.3"
-	redhatMetricsImage          = "registry.connect.redhat.com/couchbase/exporter:1.0.3-1"
-	defaultBackupImage          = "couchbase/operator-backup:6.5.0"
-	redhatBackupImage           = "registry.connect.redhat.com/couchbase/operator-backup:6.5.0-5"
+	defaultMetricsImage         = "couchbase/exporter:1.0.4"
+	redhatMetricsImage          = "registry.connect.redhat.com/couchbase/exporter:1.0.4-1"
+	defaultBackupImage          = "couchbase/operator-backup:1.1.0"
+	redhatBackupImage           = "registry.connect.redhat.com/couchbase/operator-backup:1.1.0-1"
 	defaultBackupServiceAccount = "couchbase-backup"
 	bucketTTLMax                = (1 << 31) - 1 // Puny 32 bit signed integers
 )
