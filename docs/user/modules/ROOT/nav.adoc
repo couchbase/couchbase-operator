@@ -52,6 +52,7 @@
   *** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
   *** xref:howto-backup.adoc[Configure Backup & Restore]
   *** xref:howto-mds.adoc[Configure Multi-Dimensional Scaling]
+  *** xref:howto-couchbase-autoscaling.adoc[]
   *** xref:howto-xdcr.adoc[Configure XDCR]
   *** xref:howto-public-networking.adoc[Configure Public Networking]
   *** xref:howto-nodeport-networking.adoc[Configure Node Port Networking]

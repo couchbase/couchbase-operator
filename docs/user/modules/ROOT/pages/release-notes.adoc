@@ -13,6 +13,36 @@ Couchbase Autonomous Operator 2.2.0 was released in 2021.
 [#changes-in-behavior-v220]
 === Major Behavior Changes and Enhancements
 
+==== Couchbase Cluster Auto-scaling
+
+The Autonomous Operator now supports Couchbase cluster auto-scaling for _all_ Couchbase services.
+This means that Couchbase cluster server class configurations containing stateful services like Data and Index can now be configured to automatically scale in response to observed metrics.
+(Previously, only stateless deployments of the Query Service were supported.)
+
+To help users get started in production, an xref:concept-couchbase-autoscaling-best-practices.adoc[auto-scaling best practices guide] has been provided.
+This guide discusses relevant metrics for scaling individual Couchbase Services, and includes recommended settings based on internal benchmark testing performed by Couchbase.
+
+.About Auto-scaling Preview Mode
+[NOTE]
+====
+When cluster auto-scaling was introduced in Autonomous Operator 2.1, only stateless configurations that included the Query Service and Ephemeral buckets were supported.
+However, a special preview mode could be enabled that allowed stateful server configurations other than `query` to be auto-scaled.
+This preview mode was enabled by setting xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enablepreviewscaling[`couchbaseclusters.spec.enablePreviewScaling`] to `true`.
+
+In Autonomous Operator 2.2, cluster auto-scaling can be enabled for any service or configuration, whether stateful or stateless.
+As a result, xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enablepreviewscaling[`couchbaseclusters.spec.enablePreviewScaling`] has been deprecated and is now ignored by the Autonomous Operator.
+====
+
+.Related Links
+* *Learn*: xref:concept-couchbase-autoscaling.adoc[]
+* *Learn*: xref:concept-couchbase-autoscaling-best-practices.adoc[]
+* *Manage*: xref:howto-couchbase-autoscaling.adoc[]
+* *Tutorial*: xref:tutorial-autoscale-query.adoc[]
+* *Tutorial*: xref:tutorial-autoscale-data.adoc[]
+* *Tutorial*: xref:tutorial-autoscale-index.adoc[]
+* *Reference*: xref:resource/couchbaseautoscaler.adoc[]
+* *Reference*: xref:reference-couchbasecluster-events.adoc#autoscaling-lifecycle[Auto-scaling Lifecycle Events]
+
 ==== Online Expansion of Persistent Volumes
 
 The xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enableonlinevolumeexpansion[`couchbaseclusters.spec.enableOnlineVolumeExpansion`] has been added to allow for the expansion of persistent volumes that are already in use by Couchbase clusters, thus removing the need for a rolling upgrade of cluster pods.

@@ -6,6 +6,22 @@ The changes in this release enable several advancements in how you can manage, m
 
 Take a look at the xref:release-notes.adoc[release notes] for a more complete list of changes in this release, including known and fixed issues.
 
+== Couchbase Cluster Auto-scaling
+
+The Autonomous Operator now supports Couchbase cluster auto-scaling for _all_ Couchbase services.
+This means that Couchbase cluster server class configurations containing stateful services like Data and Index can now be configured to automatically scale in response to observed metrics.
+(Previously, only stateless deployments of the Query Service were supported.)
+
+The Autonomous Operator provides the necessary facilities for Couchbase clusters to be automatically scaled based on usage metrics.
+This capability is provided through an integration with the Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/[Horizontal Pod Autoscaler (HPA)^].
+Thresholds can be set for native Kubernetes metrics (such as pod CPU utilization) as well as Couchbase metrics (such as bucket memory utilization) that, once exceeded, trigger _horizontal scaling_ of individual server classes.
+Auto-scaling doesn't incur any cluster downtime, and allows for each Couchbase Service to be scaled independently based on different metrics.
+
+To help users get started in production, an xref:concept-couchbase-autoscaling-best-practices.adoc[auto-scaling best practices guide] has been provided.
+This guide discusses relevant metrics for scaling individual Couchbase Services, and includes recommended settings based on internal benchmark testing performed by Couchbase.
+
+For more information, refer to xref:concept-couchbase-autoscaling.adoc[].
+
 == Online Expansion of Persistent Volumes
 
 The Autonomous Operator now optionally allows for the expansion of persistent volumes that are already in use by Couchbase clusters, thus removing the need for a rolling upgrade of cluster pods.

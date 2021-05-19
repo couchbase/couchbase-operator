@@ -45,7 +45,7 @@ It is referred to by attributes in the xref:resource/couchbasecluster.adoc#couch
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-volumeclaimtemplates[`couchbaseclusters.spec.volumeClaimTemplates.spec.resources`] defines the size of the volume that will be allocated.
 
-
+[[resizing-persistent-volumes]]
 == Resizing Persistent Volumes
 
 You can expand or contract persistent storage by modifying the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] configuration.

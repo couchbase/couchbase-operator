@@ -1,4 +1,5 @@
 = Couchbase Cluster Auto-scaling Best Practices
+:HorizontalPodAutoscaler: pass:q[https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#horizontalpodautoscaler-v2beta2-autoscaling[`HorizontalPodAutoscaler`^]]
 
 [abstract]
 Recommended best practices, derived from tested performance metrics, for configuring Couchbase cluster auto-scaling using the Couchbase Autonomous Operator.
@@ -24,7 +25,7 @@ Recommended auto-scaling settings are presented in a tabular structure:
 * *Recommended Settings*: This tab presents the recommended settings in a table.
 Additional clarifying notes about the recommended settings, if any, are listed below the table.
 
-* *Example Configs*: This tab provides YAML snippets that show the recommended settings as they are applied in the relevant resources (e.g. xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] and `HorizontalPodAutoscaler`).
+* *Example Configs*: This tab provides YAML snippets that show the recommended settings as they are applied in the relevant resources (e.g. xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] and {HorizontalPodAutoscaler}).
 
 [{tabs}]
 ====
@@ -35,7 +36,7 @@ Recommended Settings::
 |===
 | Metric | Threshold | HPA Stabilization Windows | Couchbase Stabilization Period
 
-| The name of the metric that, when properly specified in the `HorizontalPodAutoscaler` resource, instructs the https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/[Horizontal Pod Autoscaler (HPA)^] to monitor the metric for auto-scaling purposes.
+| The name of the metric that, when properly specified in the {HorizontalPodAutoscaler} resource, instructs the https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/[Horizontal Pod Autoscaler (HPA)^] to monitor the metric for auto-scaling purposes.
 
 Example: `cpu`
 
@@ -118,15 +119,22 @@ spec:
 
 The following are general best practices that should be considered when configuring the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource for cluster auto-scaling:
 
-* It is recommended that a value always be defined for xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoscalestabilizationperiod[`couchbaseclusters.spec.autoscaleStabilizationPeriod`].
-** When a valid value is set for this field, even if it is `0s`, the HPA will be kept in maintenance mode until the rebalance operation has completed.
-** When no value is set for this field, the HPA may request scaling at any point during the rebalance operation.
-This is almost never desirable, since metrics are more likely to be unstable than not; and although any scaling request made by the HPA during a rebalance operation will not be honored until the current rebalance is complete, the risk remains that the request itself is based on invalid metrics that could've been avoided if the HPA was in maintenance mode.
+* It is recommended that you _always_ specify a value for xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoscalestabilizationperiod[`couchbaseclusters.spec.autoscaleStabilizationPeriod`].
++
+--
+** When a valid value is set for this field, even if it is `0s`, the Horizontal Pod Autoscaler will be kept in https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#implicit-maintenance-mode-deactivation[_maintenance mode_^] until the rebalance operation has completed.
+
+** When no value is set for this field, the Horizontal Pod Autoscaler may request scaling at any point during the rebalance operation.
+This is almost never desirable, since metrics are more likely to be unstable than not; and although any scaling request made by the Horizontal Pod Autoscaler during a rebalance operation will not be honored until the current rebalance is complete, the risk remains that the request itself is based on invalid metrics that could've been avoided if the Horizontal Pod Autoscaler was in maintenance mode.
 Therefore, it is recommended that most users set the value of this field to at least `0s`, unless there is a high degree of confidence in the stability of a metric _during_ rebalance.
+--
++
+A general rule of thumb is to set this field to `0s` until a high degree of confidence is established in the stability of a metric during rebalance.
+Refer to xref:concept-couchbase-autoscaling.adoc#couchbase-stabilization-period[Couchbase Stabilization Period] in the concept documentation for additional information about this setting.
 
 === `HorizontalPodAutoscaler` Resource
 
-The following are general best practices that should be considered when configuring the `HorizontalPodAutoscaler` resource for cluster auto-scaling:
+The following are general best practices that should be considered when configuring the {HorizontalPodAutoscaler} resource for cluster auto-scaling:
 
 * Setting a value for `maxReplicas` is required because it provides important protection against runaway scaling events.
 Due to the highly-configurable nature of cluster auto-scaling, setting a cap on the maximum number scaling nodes is the simplest, most valuable protection you can give yourself against a potentially costly misconfiguration.
@@ -138,6 +146,10 @@ This ensures a minimum level of protection against single-node failures.
 +
 CAUTION: You can technically set `minReplicas` to `0` by enabling the `HPAScaleToZero` https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/[feature gate^].
 You should never do this, as the Autonomous Operator prevents server class configurations from having sizes less than 1.
+
+* Depending on the cloud provider, provisioning of persistent volumes may take significantly longer than pods.
+Therefore, the chances of exceeding a metric threshold while trying to reach its desired value is higher when using persistent volumes.
+All disk-space related thresholds should rely on volume expansion rather than pod auto-scaling.
 
 == Data Service
 
@@ -190,8 +202,8 @@ Based on internal benchmark testing, we believe the following settings provide a
 |===
 
 IMPORTANT: A https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#autoscaling-on-more-specific-metrics[_label selector_^] must be used with `cbbucketinfo_basic_quota_user_percent` in order to scale the cluster based on the memory utilization of individual buckets.
-When configured to scale on this metric _without_ a label selector, the HPA will take the _sum_ memory utilization across buckets.
-(For example, if a cluster has two buckets -- `bucket1` and `bucket2` -- and both are utilizing 40% of their individual memory quotas, the HPA will read the metric as 80% and thus scale the cluster if the threshold is set to 70%.)
+When configured to scale on this metric _without_ a label selector, the Horizontal Pod Autoscaler will take the _sum_ memory utilization across buckets.
+(For example, if a cluster has two buckets -- `bucket1` and `bucket2` -- and both are utilizing 40% of their individual memory quotas, the Horizontal Pod Autoscaler will read the metric as 80% and thus scale the cluster if the threshold is set to 70%.)
 Refer to the *Example Configs* tab for an example of how to define a label selector for this metric.
 
 .General notes:
@@ -335,7 +347,7 @@ Our testing revealed 70% to be a good threshold when experiencing a peak of 90% 
 ** On average, an additional pod provided 5% CPU relief for workloads averaging 10 queries/sec at 500ms.
 Peak CPU should be less than 95% to ensure scaling will immediately improve CPU usage.
 
-* The default threshold tolerance of the https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#algorithm-details[HPA scaling algorithm] is 0.1.
+* The default threshold tolerance of the https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#algorithm-details[HPA scaling algorithm^] is 0.1.
 Auto-scaling the Query Service will not perform well if the workload results in CPU usage deviating ±10% at your workload's “steady state”.
 This is because auto-scaling will continually counterbalance itself over time.
 Therefore you should be mindful of this window when choosing a CPU scaling threshold.

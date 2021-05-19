@@ -126,7 +126,7 @@ A restore job was created.
 BackupRestoreDeleted::
 A restore job was deleted.  This condition indicates successful completion.
 
-== Autoscaling Lifecycle
+== Auto-scaling Lifecycle
 
 EventAutoscalerCreated::
 An autoscaling resource was created for a server class.
