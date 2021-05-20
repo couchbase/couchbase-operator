@@ -34,6 +34,12 @@ $ chmod +x ./cbopcfg
 ----
 $ sudo mv ./cbopcfg /usr/local/bin/cbopcfg
 ----
+
+NOTE: On newer versions of macOS, you may encounter errors such as `cannot execute binary file` when trying to use the tools included in the Autonomous Operator package.
+If you encounter such an error, you'll need to update your security settings as outlined in Apple's https://support.apple.com/en-us/HT202491[support article on macOS Gatekeeper^].
+In System Preferences, click Security & Privacy, then click General.
+Click the lock and enter your password to make changes.
+Select App Store and identified developers under the header “Allow apps downloaded from.”
 --
 
 Linux::
@@ -108,6 +114,12 @@ $ chmod +x ./cbopinfo
 ----
 $ sudo mv ./cbopinfo /usr/local/bin/cbopinfo
 ----
+
+NOTE: On newer versions of macOS, you may encounter errors such as `cannot execute binary file` when trying to use the tools included in the Autonomous Operator package.
+If you encounter such an error, you'll need to update your security settings as outlined in Apple's https://support.apple.com/en-us/HT202491[support article on macOS Gatekeeper^].
+In System Preferences, click Security & Privacy, then click General.
+Click the lock and enter your password to make changes.
+Select App Store and identified developers under the header “Allow apps downloaded from.”
 --
 
 Linux::
