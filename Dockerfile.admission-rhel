@@ -1,10 +1,12 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-200
 
 LABEL maintainer="docker@couchbase.com"
 
 # ubi-minimal updates frequently and has very few packages installed,
 # so no need for a "security-only" update.
-RUN microdnf update && microdnf clean all
+RUN microdnf update \
+ && microdnf -y install shadow-utils \
+ && microdnf clean all
 
 # Add licenses and help file
 RUN mkdir /license
