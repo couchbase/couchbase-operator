@@ -141,12 +141,14 @@ const (
 // annotations can only be accessed in volumes and not in environment variables.
 // https://docs.openshift.com/container-platform/4.3/nodes/containers/nodes-containers-downward-api.html
 var ImageDigests = map[string]string{
-	"e83852666816dd0a0d86180a0867aa25458c21702f28e5903bb012e079ebe055": "couchbase-6.0.4-1",
 	"b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501": "couchbase-6.5.0-3",
 	"fd6d9c0ef033009e76d60dc36f55ce7f3aaa942a7be9c2b66c335eabc8f5b11e": "couchbase-6.5.1-1",
-	"218080954d616b78405a42e0df7561b7cd1bae09c4b2addc9cc56244d1eab0e0": "backup-6.5.0-3",
-	"d499d8a7b1ee0682994a422ccaa5759dc9ba093ca48a60ea668a8149a747057d": "backup-6.5.1-1",
+	"01343aa7f613173a990d57ddc8923af217f4dd4b83873f4d130a675d8e31d682": "couchbase-6.5.2-1",
+	"187046a848f32233e7e92705c57fa864b1d373c2078a92b51c9706bec6e372e5": "couchbase-6.6.2-1",
 	"3d0a9de740110b924b1ad5e83bb1e36b308f1b53f9e76a50cffcbeda9d34ea78": "backup-6.5.1-104-1",
+	"c0ab51854294d117c4ecf867b541ed6dc67410294d72f560cc33b038d98e4b76": "backup-6.6.0-102-2",
 	"b5a052fab4c635ab2d880a6ac771c66f554b9a4b5b1b53a73ba8ef1b573be372": "metrics-1.0.0-2",
 	"18015c72d17a33a21ea221d48fddf493848fc1ca5702007f289369c5815fb3df": "metrics-1.0.0-5",
+	"0854d57c7249a940ab31b451b6d4053d79e85648452da86738315605c00aafcb": "metrics-1.0.4-2",
+	"43ecf7c8efc841c169425ea14a8d4c69a788fe47fad4d159ed4c9d7bb83bbde7": "fluent-1.0.1-1",
 }
