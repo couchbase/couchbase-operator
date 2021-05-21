@@ -20,8 +20,8 @@ ARG OPERATOR_BUILD
 # Install Couchbase Operator Admission Controller
 ADD build/bin/couchbase-operator-admission /usr/local/bin/
 
-RUN useradd -m -s /bin/false couchbase
-USER couchbase
+RUN useradd -u 8453 -m -s /bin/false couchbase
+USER 8453
 
 LABEL name="couchbase/admission-controller" \
       vendor="Couchbase" \

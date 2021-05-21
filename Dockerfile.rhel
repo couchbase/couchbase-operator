@@ -20,8 +20,8 @@ ARG OPERATOR_BUILD
 # Install Couchbase Operator
 COPY build/bin/couchbase-operator /usr/local/bin/couchbase-operator
 
-RUN useradd -m -s /bin/false couchbase
-USER couchbase
+RUN useradd -u 8453 -m -s /bin/false couchbase
+USER 8453
 
 LABEL name="couchbase/operator" \
       vendor="Couchbase" \
