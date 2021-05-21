@@ -284,6 +284,9 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 			},
 			Resources: []string{
 				couchbasev2.ClusterCRDResourcePlural,
+				// OCP related hack to support deletion of all subordinate
+				// resources before the cluster itself.
+				couchbasev2.ClusterCRDResourcePlural + "/finalizers",
 				// Not supported by GKE 1.13 for some odd reason
 				// couchbasev2.ClusterCRDResourcePlural + "/status",
 			},

@@ -14,6 +14,7 @@ The key distinction is that cluster-scoped roles can be specified once and used 
 The Couchbase Autonomous Operator is currently scoped to a namespace and needs access to various resources within that namespace in order to function correctly. The resources required by the Operator are:
 
 couchbase.com/couchbaseclusters::
+couchbase.com/couchbaseclusters/finalizers::
 The Operator lists available Couchbase clusters to manage, watches for changes to cluster resources and preforms the necessary steps to create a cluster according to the configuration that is defined in the cluster specification.
 The operator also updates the Couchbase cluster status to reflect cluster state.
 +
