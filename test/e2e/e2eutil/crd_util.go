@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -26,13 +25,7 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 		Enabled: true,
 	}
 
-	nonRoot := true
-	user := int64(1000)
-
-	cl.Spec.SecurityContext = &corev1.PodSecurityContext{
-		RunAsNonRoot: &nonRoot,
-		RunAsUser:    &user,
-	}
+	e2espec.ApplySecurityContext(cl, k8s.PlatformType)
 
 	// If we left the CPU requests as default, that would have some nasty side effects
 	// e.g. things failing more frequently, so set it low enough not to interfere :D

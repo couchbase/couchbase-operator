@@ -411,6 +411,7 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 		KubeConfPath:    c.Config,
 		Context:         c.Context,
 		Platform:        string(Global.Platform),
+		PlatformType:    Global.KubeType,
 	}, nil
 }
 

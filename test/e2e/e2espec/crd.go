@@ -555,3 +555,18 @@ func CreateResources(resourceName v1.ResourceName, request, limit int, scale str
 		},
 	}
 }
+
+// ApplySecurityContext adds security context to all the Couchbase server pods so that
+// they can run as Nonroot containers.
+func ApplySecurityContext(cluster *couchbasev2.CouchbaseCluster, platformType string) {
+	nonRoot := true
+
+	cluster.Spec.SecurityContext = &v1.PodSecurityContext{
+		RunAsNonRoot: &nonRoot,
+	}
+
+	if platformType != "openshift" {
+		user := int64(1000)
+		cluster.Spec.SecurityContext.RunAsUser = &user
+	}
+}

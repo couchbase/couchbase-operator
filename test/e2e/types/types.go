@@ -60,6 +60,8 @@ type Cluster struct {
 	Context string
 	// Platform is the platform we are running on.
 	Platform string
+	// PlatformType is the container type we are running on.
+	PlatformType string
 
 	// Dynamic configuration.
 
