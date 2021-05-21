@@ -1088,7 +1088,7 @@ func (r *TestRequirement) ExpandableStorage() *TestRequirement {
 		e2eutil.Die(r.t, err)
 	}
 
-	if !*sc.AllowVolumeExpansion {
+	if sc.AllowVolumeExpansion == nil || !*sc.AllowVolumeExpansion {
 		r.t.Skip("Storage Class does not have allowVolumeExpansion=true")
 	}
 
