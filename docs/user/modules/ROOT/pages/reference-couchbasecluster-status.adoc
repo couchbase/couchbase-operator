@@ -22,8 +22,6 @@ An example status object may look like the following, with individual attributes
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 status:
-  phase: Running
-  reason: ""
   controlPaused: false
   conditions:
   - type: Available
@@ -87,44 +85,12 @@ VERSION::
 SIZE::
 <<status-size,`status.size`>>
 
-STATUS::
-<<status-phase,`status.phase`>>
-
 UUID::
 <<status-clusterid,`status.clusterId`>>
 
 == `status`
 
 This section defines and describes individual status fields.
-
-=== `status.phase`
-
-The phase of cluster life-cycle the Operator is in.
-
-When the `CouchbaseCluster` is first created, the Operator will transition into the `Creating` phase.
-Cluster creation involves creating the first pod in the cluster and configuring it.
-If the Operator is restarted while any cluster is in the `Creating` phase, it will be considered `Failed` and will need to be recreated.
-
-If the creation operation succeeds, the Operator will transition into the `Running` phase and remain here for the lifetime of the cluster.
-The Operator may transition into the `Failed` state if it is unable to restart correctly.
-
-If the creation operation fails, the Operator will transition into the `Failed` phase and ignore the cluster.
-The <<status-reason,`status.reason`>> attribute will be populated with a detailed error message.
-
-____
-_Field rules:_ This field will be a string, and either `Creating`, `Running` or `Failed`.
-____
-
-=== `status.reason`
-
-The reason for a cluster creation failure.
-
-This field is only populated by the Operator when the <<status-phase,`status.phase`>> field is set to `Failed`.
-It gives a detailed reason why the Operator has declared the cluster `Failed`.
-
-____
-_Field rules:_ This field will be a string.
-____
 
 === `status.controlPaused`
 
