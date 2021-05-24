@@ -1,10 +1,16 @@
 = What's New?
 include::partial$constants.adoc[]
 
-Couchbase Autonomous Operator {operator-version-minor} is an incremental release that adds new features to the Operator 2.0 series.
+Couchbase Autonomous Operator {operator-version-minor} is a significant release that adds new features to the Autonomous Operator 2.0 series.
 The changes in this release enable several advancements in how you can manage, monitor, and deploy Couchbase clusters.
 
 Take a look at the xref:release-notes.adoc[release notes] for a more complete list of changes in this release, including known and fixed issues.
+
+== Online Expansion of Persistent Volumes
+
+The Autonomous Operator now optionally allows for the expansion of persistent volumes that are already in use by Couchbase clusters, thus removing the need for a rolling upgrade of cluster pods.
+
+For additional information and requirements, refer to xref:howto-persistent-volumes.adoc#online-volume-expansion[Online Volume Expansion].
 
 == Customizable Prometheus Metrics
 

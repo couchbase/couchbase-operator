@@ -49,7 +49,6 @@
   *** xref:howto-couchbase-scale.adoc[Scale a Couchbase Deployment]
  ** Configure
   *** xref:howto-persistent-volumes.adoc[Configure Persistent Volumes]
-  *** xref:howto-persistent-volume-resize.adoc[Resize Persistent Volumes]
   *** xref:howto-backup.adoc[Configure Backup & Restore]
   *** xref:howto-mds.adoc[Configure Multi-Dimensional Scaling]
   *** xref:howto-xdcr.adoc[Configure XDCR]

@@ -1,8 +1,7 @@
 = Release Notes for Couchbase Autonomous Operator {operator-version-minor}
 include::partial$constants.adoc[]
 
-Couchbase Autonomous Operator {operator-version-minor} is an incremental release that improves general behavior and security.
-It also extends functionality to allow automatic scaling of your Couchbase cluster resources, and provides additional configuration options.
+Couchbase Autonomous Operator {operator-version-minor} is a significant release that expands support for auto-scaling Couchbase clusters, and adds several improvements in the areas of logging and security.
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
@@ -14,8 +13,14 @@ Couchbase Autonomous Operator 2.2.0 was released in 2021.
 [#changes-in-behavior-v220]
 === Major Behavior Changes and Enhancements
 
-==== Log Forwarding and Audit Log Management
+==== Online Expansion of Persistent Volumes
 
+The xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enableonlinevolumeexpansion[`couchbaseclusters.spec.enableOnlineVolumeExpansion`] has been added to allow for the expansion of persistent volumes that are already in use by Couchbase clusters, thus removing the need for a rolling upgrade of cluster pods.
+The Autonomous Operator achieves this by working in conjunction with https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims[Kubernetes Persistent Volume Expansion^] to claim additional storage for running pods without any downtime.
+
+For additional information and requirements, refer to xref:howto-persistent-volumes.adoc#online-volume-expansion[Online Volume Expansion].
+
+==== Log Forwarding and Audit Log Management
 
 The Autonomous Operator now supports xref:concept-couchbase-logging.adoc#log-forwarding[_log forwarding_] through the optional deployment of a third party log processor.
 The log processor runs in a sidecar container on each Couchbase pod, which then reads the log files and forwards them to standard console output.
