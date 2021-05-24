@@ -136,3 +136,14 @@ EventAutoscaleUp::
 An autoscaler requested a server class to be scaled up.
 EventAutoscaleDown::
 An autoscaler requested a server class to be scaled down.
+
+
+== Volume Expansion Lifecycle
+
+EventReasonExpandVolumeStarted::
+An expansion event has started for a specific persistent volume.
+EventReasonExpandVolumeFallback::
+An expansion event has failed for a specific persistent volume.
+All subsequent volume expansion requests are canceled and cluster falls back to rolling upgrade of volumes.
+EventReasonExpandVolumeSucceeded::
+An expansion event has successfully completed for a specific persistent volume.
