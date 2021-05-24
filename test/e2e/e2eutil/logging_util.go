@@ -370,7 +370,7 @@ func SetLogStreamingConfig(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 
 func SetInvalidLogStreamingConfig(t *testing.T, k8s *types.Cluster, configName string) {
 	// Make sure we clear out any existing config maps just in case to ensure a clean run
-	if err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Delete(context.Background(), configName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+	if err := DeleteSecret(k8s, configName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		Die(t, err)
 	}
 	// Set up a invalid custom default - right name, just nothing in it but it is operator managed
@@ -379,7 +379,5 @@ func SetInvalidLogStreamingConfig(t *testing.T, k8s *types.Cluster, configName s
 			Name: configName,
 		},
 	}
-	if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(context.Background(), defaultConfig, metav1.CreateOptions{}); err != nil {
-		Die(t, err)
-	}
+	MustCreateSecret(t, k8s, defaultConfig)
 }
