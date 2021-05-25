@@ -109,6 +109,8 @@ If a Secret already exists with the same name, the Autonomous Operator overwrite
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-configurationname[`couchbaseclusters.spec.logging.server.configurationName`]: This field defines the name of the Secret that contains the log forwarding configuration that will be consumed by the `logging` sidecar container.
 This field defaults to `fluent-bit-config` and will be the name of the Secret that gets automatically created by the Autonomous Operator when xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`] is set to `true`.
++
+IMPORTANT: If running multiple clusters in the same Kubernetes namespace, make sure to use a different name for the Secret of each cluster rather than attempting to share the same Kubernetes Secret.
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-sidecar-image[`couchbaseclusters.spec.logging.server.sidecar.image`]: This field specifies the container image that the Autonomous Operator will use for deploying the `logging` sidecar container.
 This field defaults to `couchbase/{logging-version}`, which pulls the Couchbase-supplied https://hub.docker.com/r/couchbase/fluent-bit[log processor image^].

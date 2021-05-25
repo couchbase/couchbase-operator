@@ -415,7 +415,6 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"update", // used by the operator for persistent state
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
-				"delete", // required to cope with issues in OCP when changing ownerRef for logging secrets
 			},
 		},
 		// Require read/write of pod disruption budgets.

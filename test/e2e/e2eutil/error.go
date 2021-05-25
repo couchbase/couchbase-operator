@@ -97,3 +97,7 @@ func NewErrInvalidPathCheck(checkName, actual, expected string) error {
 func NewErrInvalidIntegerCheck(checkName string, actual, expected int) error {
 	return fmt.Errorf("%s not correct: %d != %d", checkName, actual, expected)
 }
+
+func NewErrInvalidLogConfigOwner(details string) error {
+	return fmt.Errorf("invalid owner for configuration: %s, ", details)
+}

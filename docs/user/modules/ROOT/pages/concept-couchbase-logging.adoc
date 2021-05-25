@@ -53,6 +53,14 @@ The log processor reads the logs that Couchbase Server has written to a persiste
 
 When log forwarding is enabled, the Autonomous Operator uses Couchbase-provided <<default-log-forwarding-image-and-configuration,defaults>> for both of these components.
 
+[NOTE]
+====
+A Kubernetes Secret for configuration per Couchbase cluster is recommended, rather than sharing configuration across clusters in the same Kubernetes namespace.
+The Kubernetes Secret is owned by the first cluster that creates it, so when that cluster is removed, the Kubernetes Secret is removed as well.
+Different Kubernetes namespaces require different Kubernetes Secrets, so the same name can be reused across Kubernetes namespaces.
+If a Kubernetes Secret is used that is created externally (e.g. for custom configuration), then ownership is not transferred so these can be reused in the same Kubernetes namespace.
+====
+
 .Log Forwarding Architecture
 image::logging-sidecar-overview.png[]
 

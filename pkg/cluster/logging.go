@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	// LoggingConfigurationManagedAnnotation is the annotation added to any managed secrets.
 	LoggingConfigurationManagedAnnotation = "logging.couchbase.com/managed"
 )
 
@@ -50,10 +51,6 @@ func (c *Cluster) reconcileLogConfig(client *client.Client) error {
 			Annotations: map[string]string{
 				LoggingConfigurationManagedAnnotation: strconv.FormatBool(true),
 			},
-			// Make the CouchbaseCluster the owner so it gets GC'd together
-			OwnerReferences: []metav1.OwnerReference{
-				c.cluster.AsOwner(),
-			},
 		},
 		// Whilst the container contains a default configuration we want to mount the whole directory - if you use sub-paths then it will not auto-update.
 		// https://github.com/kubernetes/kubernetes/issues/50345
@@ -68,6 +65,14 @@ func (c *Cluster) reconcileLogConfig(client *client.Client) error {
 		},
 	}
 
+	// Do not change ownership for existing Secrets as this requires additional permissions (delete).
+	// This implies a 1-1 mapping for CouchbaseCluster <--> Secret in the same namespace.
+	// Using the same Secret for multiple clusters would cause it to be GC'd when the original cluster that created it is.
+	if !exists {
+		// Ideally we would append all clusters as they use it but this requires `delete` permission on Secrets which may not be acceptable.
+		requestedConfig.ObjectMeta.OwnerReferences = append(requestedConfig.ObjectMeta.OwnerReferences, c.cluster.AsOwner())
+	}
+
 	// Add on the common annotations for version
 	k8sutil.ApplyBaseAnnotations(requestedConfig)
 
@@ -80,6 +85,7 @@ func (c *Cluster) reconcileLogConfig(client *client.Client) error {
 
 		log.Info("Updating default log config secret", "cluster", c.namespacedName(), "name", fbs.ConfigurationName)
 
+		// This will make any meta-data updates as well.
 		if _, err := client.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), requestedConfig, metav1.UpdateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}

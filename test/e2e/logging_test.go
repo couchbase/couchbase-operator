@@ -73,7 +73,8 @@ func TestLoggingAndAuditingDefaults(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Confirm that config is now correct
-	e2eutil.MustCheckLoggingConfig(t, targetKube, testCouchbase)
+	// Special case as we create the Secret first so the ownerRef should not be the cluster
+	e2eutil.MustCheckLoggingConfigNotOwned(t, targetKube, testCouchbase)
 	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
 
 	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
@@ -200,7 +201,7 @@ func TestCustomLogging(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
 
 	// Confirm that config is correct
-	e2eutil.MustCheckLoggingConfig(t, targetKube, testCouchbase)
+	e2eutil.MustCheckLoggingConfigNotOwned(t, targetKube, testCouchbase)
 	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
 
 	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs

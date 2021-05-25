@@ -2623,12 +2623,17 @@ type CouchbaseClusterLoggingConfigurationSpec struct {
 	// A boolean which indicates whether the operator should manage the configuration or not.
 	// If omitted then this defaults to true which means the operator will attempt to reconcile it to default values.
 	// To use a custom configuration make sure to set this to false.
+	// Note that the ownership of any Secret is not changed so if a Secret is created externally it can be updated by
+	// the operator but it's ownership stays the same so it will be cleaned up when it's owner is.
 	// +kubebuilder:default=true
 	ManageConfiguration *bool `json:"manageConfiguration,omitempty"`
 
 	// ConfigurationName is the name of the Secret to use holding the logging configuration in the namespace.
 	// A Secret is used to ensure we can safely store credentials but this can be populated from plaintext if acceptable too.
 	// If it does not exist then one will be created with defaults in the namespace so it can be easily updated whilst running.
+	// Note that if running multiple clusters in the same kubernetes namespace then you should use a separate Secret for each,
+	// otherwise the first cluster will take ownership (if created) and the Secret will be cleaned up when that cluster is
+	// removed. If running clusters in separate namespaces then they will be separate Secrets anyway.
 	// +kubebuilder:default="fluent-bit-config"
 	ConfigurationName string `json:"configurationName,omitempty"`
 

@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -170,7 +171,7 @@ func getLogsOfContainerInPod(k8s *types.Cluster, couchbase *couchbasev2.Couchbas
 	return buffer.String(), nil
 }
 
-func checkLoggingSecret(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) error {
+func checkLoggingSecret(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, isOwnedByCluster bool) error {
 	fbs := couchbase.Spec.Logging.Server
 	if fbs == nil || !fbs.Enabled {
 		return nil
@@ -214,6 +215,21 @@ func checkLoggingSecret(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 
 			return NewErrDefaultConfigPresent()
 		}
+	}
+
+	owners := config.GetOwnerReferences()
+	// only check if we have an owner (we usually don't for custom ones created by the tests directly)
+	if len(owners) > 0 {
+		uidEquals := (owners[0].UID == couchbase.UID)
+		if isOwnedByCluster != uidEquals {
+			if isOwnedByCluster {
+				return NewErrInvalidLogConfigOwner(fmt.Sprintf("not owned by cluster %q when it should be (%q)", couchbase.Name, owners[0].Name))
+			}
+
+			return NewErrInvalidLogConfigOwner(fmt.Sprintf("owned by cluster %q incorrectly", couchbase.Name))
+		}
+	} else if isOwnedByCluster {
+		return NewErrInvalidLogConfigOwner(fmt.Sprintf("no owner but should be cluster %q", couchbase.Name))
 	}
 
 	return nil
@@ -297,14 +313,21 @@ func checkLogging(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, t
 
 // MustCheckLoggingConfig verifies that the logging configuration is correct if enabled.
 func MustCheckLoggingConfig(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
-	err := checkLoggingSecret(k8s, couchbase)
+	err := checkLoggingSecret(k8s, couchbase, true)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func MustCheckLoggingConfigNotOwned(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
+	err := checkLoggingSecret(k8s, couchbase, false)
 	if err != nil {
 		Die(t, err)
 	}
 }
 
 func MustFailLoggingConfig(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
-	err := checkLoggingSecret(k8s, couchbase)
+	err := checkLoggingSecret(k8s, couchbase, false)
 	if err == nil {
 		Die(t, NewErrUnexpectedSuccess("checking log config"))
 	}
