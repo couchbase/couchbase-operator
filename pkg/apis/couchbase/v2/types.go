@@ -408,6 +408,12 @@ type BucketMapping struct {
 
 type CouchbaseBackupRestoreServices struct {
 	// BucketConfig maps to cbbackupmgr option --enable-bucket-config.
+	// If you are restoring to cluster with managed buckets, then this
+	// option may conflict with existing bucket settings, and the results
+	// are undefined, so avoid use.  This option is intended for use
+	// with unmanaged buckets.  Note that bucket durability settings are
+	// not restored in versions less than and equal to 1.1.0, and will
+	// need to be manually applied.
 	BucketConfig bool `json:"bucketConfig,omitempty"`
 
 	// View maps to cbbackupmgr option --disable-views.

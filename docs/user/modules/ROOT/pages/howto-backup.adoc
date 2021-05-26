@@ -214,15 +214,18 @@ In this example above, the Autonomous Operator would restore a range of backups 
 The omission of the `spec.repo` field means that the Autonomous Operator will look for the most recent backup repository either from the `CouchbaseBackup` object defined by `spec.backup` or from the PVC of the same name.
 If the `spec.repo` field is unable to be populated by the Autonomous Operator, then the resource will be rejected and no restore job will be created.
 
-[CAUTION]
-====
-When a `CouchbaseBackupRestore` resource is deleted, its associated `Job` and `Pod` resources are deleted immediately.
-====
-
-[NOTE]
+[IMPORTANT]
 ====
 Any `CouchbaseBackupRestore` edits performed with `kubectl edit` will not be reflected in the respective `Job` once the `Job` has been created.
 The `CouchbaseBackupRestore` resource will have to be deleted and created from scratch.
+When a `CouchbaseBackupRestore` resource is deleted, its associated `Job` and `Pod` resources are deleted immediately.
+====
+
+[CAUTION]
+====
+When using the `couchbase/operator-backup` image version 1.1.0 and lower, bucket durability settings are not backed up.
+This means that if you restore data to buckets that are _not_ managed by the Autonomous Operator, there will be no durability settings to be restored when xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-services-bucketconfig[`couchbasebackuprestores.spec.services.bucketConfig`] is set to `true`.
+If restoring to a cluster whose buckets _are_ managed by the Autonomous Operator, any durability settings currently defined in the bucket resources will be honored by the Autonomous Operator.
 ====
 
 [[additional-restore-options]]
