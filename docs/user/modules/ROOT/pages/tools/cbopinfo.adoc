@@ -185,7 +185,7 @@ The address and port of the Kubernetes API server
 --server-image::
 *Type*: string
 +
-*Default*: couchbase/server:enterprise-6.0.1
+*Default*: couchbase/server:6.6.2
 +
 Couchbase server image
 
