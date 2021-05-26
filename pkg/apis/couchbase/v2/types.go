@@ -1471,7 +1471,8 @@ type CouchbaseClusterLDAPSpec struct {
 	// List of LDAP hosts.
 	Hosts []string `json:"hosts"`
 
-	// LDAP port
+	// LDAP port.
+	// This is typically 389 for LDAP, and 636 for LDAPS.
 	Port int `json:"port"`
 
 	// Encryption method to communicate with LDAP servers.
@@ -1481,28 +1482,36 @@ type CouchbaseClusterLDAPSpec struct {
 	// Whether server certificate validation be enabled
 	EnableCertValidation bool `json:"serverCertValidation,omitempty"`
 
-	// Certificate in PEM format to be used in LDAP server certificate validation
+	// CA Certificate in PEM format to be used in LDAP server certificate validation
 	CACert string `json:"cacert,omitempty"`
 
-	// LDAP query, to get the users' groups by username in RFC4516 format.
+	// LDAP query, to get the users' groups by username in RFC4516 format.  More info:
+	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
 	GroupsQuery string `json:"groupsQuery,omitempty"`
 
-	// DN to use for searching users and groups synchronization.
+	// DN to use for searching users and groups synchronization. More info:
+	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
 	BindDN string `json:"bindDN,omitempty"`
 
 	// User to distinguished name (DN) mapping. If none is specified,
-	// the username is used as the user’s distinguished name.
+	// the username is used as the user’s distinguished name.  More info:
+	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
 	UserDNMapping LDAPUserDNMapping `json:"userDNMapping,omitempty"`
 
 	// If enabled Couchbase server will try to recursively search for groups
 	// for every discovered ldap group. groups_query will be user for the search.
+	// More info:
+	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
 	NestedGroupsEnabled bool `json:"nestedGroupsEnabled,omitempty"`
 
 	// Maximum number of recursive groups requests the server is allowed to perform.
 	// Requires NestedGroupsEnabled.  Values between 1 and 100: the default is 10.
+	// More info:
+	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
 	NestedGroupsMaxDepth uint64 `json:"nestedGroupsMaxDepth,omitempty"`
 
-	// Lifetime of values in cache in milliseconds. Default 300000 ms.
+	// Lifetime of values in cache in milliseconds. Default 300000 ms.  More info:
+	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
 	CacheValueLifetime uint64 `json:"cacheValueLifetime,omitempty"`
 }
 

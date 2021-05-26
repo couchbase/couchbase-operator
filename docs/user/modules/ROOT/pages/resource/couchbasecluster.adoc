@@ -1980,6 +1980,7 @@ Enables use of LDAP groups for authorization.
 ==== Description
 
 DN to use for searching users and groups synchronization.
+More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.bindSecret
 
@@ -2001,7 +2002,7 @@ BindSecret is the name of a Kubernetes secret to use containing password for LDA
 
 ==== Description
 
-Certificate in PEM format to be used in LDAP server certificate validation.
+CA Certificate in PEM format to be used in LDAP server certificate validation.
 
 === couchbaseclusters.spec.security.ldap.cacheValueLifetime
 
@@ -2013,6 +2014,7 @@ Certificate in PEM format to be used in LDAP server certificate validation.
 
 Lifetime of values in cache in milliseconds.
 Default 300000 ms.
+More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.encryption
 
@@ -2036,6 +2038,7 @@ Can be StartTLSExtension, TLS, or false.
 ==== Description
 
 LDAP query, to get the users' groups by username in RFC4516 format.
+More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.hosts
 
@@ -2059,6 +2062,7 @@ List of LDAP hosts.
 
 If enabled Couchbase server will try to recursively search for groups for every discovered ldap group.
 groups_query will be user for the search.
+More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.nestedGroupsMaxDepth
 
@@ -2071,6 +2075,7 @@ groups_query will be user for the search.
 Maximum number of recursive groups requests the server is allowed to perform.
 Requires NestedGroupsEnabled.
 Values between 1 and 100: the default is 10.
+More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.port
 
@@ -2083,6 +2088,7 @@ Values between 1 and 100: the default is 10.
 ==== Description
 
 LDAP port.
+This is typically 389 for LDAP, and 636 for LDAPS.
 
 === couchbaseclusters.spec.security.ldap.serverCertValidation
 
@@ -2114,6 +2120,7 @@ TLSSecret is the name of a Kubernetes secret to use for LDAP ca cert.
 
 User to distinguished name (DN) mapping.
 If none is specified, the username is used as the user’s distinguished name.
+More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.userDNMapping.query
 
