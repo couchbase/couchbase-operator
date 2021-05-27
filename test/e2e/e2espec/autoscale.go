@@ -14,7 +14,7 @@ import (
 const (
 	apiServerApp      = "custom-metrics-apiserver"
 	apiRBACRoleName   = "custom-metrics-resource-reader"
-	apiServerAppImage = "tahmmee/k8s-test-metrics-adapter-amd64:v1"
+	apiServerAppImage = "tahmmee/k8s-test-metrics-adapter-amd64:v2"
 )
 
 const (
