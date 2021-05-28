@@ -239,13 +239,14 @@ TIP: This validation is also helpful for debugging as the HPA takes the averages
 
 Now that we've confirmed that CPU metrics data are being collected, we can create a `HorizontalPodAutoscaler` resource that targets this metric.
 For this tutorial, we'll be configuring an HPA to scale the number of Couchbase `query`  nodes in our cluster when the CPU usage of a `query` pod exceeds 70%.
-(When CPU usage exceeds 70%, additional `query` nodes will be added, and when usage falls below 70% then the HPA will consider scaling down to reduce overhead.)
+When CPU usage exceeds 70%, additional `query` nodes will be added, and when usage falls below 70% then the HPA will consider scaling down to reduce overhead.
+This example shows both scaling up and scaling down.
 
 Run the following command to create a `HorizontalPodAutoscaler` resource that will take action when the CPU of a `query` pod exceeds 70%:
 
 [source,console]
 ----
-$ cat << EOF | kubectl create -f -
+$ cat << EOF | kubectl apply -f -
 ---
 kind: HorizontalPodAutoscaler
 apiVersion: autoscaling/v2beta2
@@ -264,7 +265,7 @@ spec:
         value: 1
         periodSeconds: 15
     scaleDown:
-      stabilizationWindowSeconds: 300
+      stabilizationWindowSeconds: 60 <.>
   minReplicas: 2 <.>
   maxReplicas: 6 <.>
   metrics:
@@ -293,6 +294,10 @@ $ kubectl get couchbaseautoscalers
 ----
 ====
 --
+
+<.> `scaleDown.stabilizationWindowSeconds`: This field can be used to control scaling down behavior, in this instance we indicate to https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#example-change-downscale-stabilization-window[scale down after 60 seconds^] as described in the https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#stabilization-window[official documentation^].
+Scaling down can also be prevented entirely using a policy of `selectPolicy: Disabled`.
+Other policies are available and fully documented in the https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#scaling-policies[Kubernetes documentation^].
 
 <.> `minReplicas`: This field sets the minimum number of Couchbase nodes for the specified server class.
 Here, we've set the minimum number of `query` nodes to `2`.
@@ -357,7 +362,7 @@ Run the following command to create a Kubernetes Job that loads the Travel Sampl
 
 [source,console]
 ----
-$ cat << EOF | kubectl create -f -
+$ cat << EOF | kubectl apply -f -
 ---
 apiVersion: batch/v1
 kind: Job
@@ -397,7 +402,7 @@ Run the following command to initiate the query workload:
 
 [source,console]
 ----
-$ cat << EOF | kubectl create -f -
+$ cat << EOF | kubectl apply -f -
 ---
 apiVersion: batch/v1
 kind: Job
@@ -467,9 +472,59 @@ desiredReplicas = ceil[currentReplicas * ( currentMetricValue / desiredMetricVal
 ----
 ====
 
-After 5 minutes the query generator will complete and the number of `query` nodes will eventually scale back down to the previously-configured minimum of two nodes.
+After 1 minute the query generator will complete and the number of `query` nodes will eventually scale back down to the previously-configured minimum of two nodes.
 
 NOTE: If your CPU utilization didn't reach the target value, you can try with a lower CPU utilization threshold, or apply additional query generators by adjusting the `concurrency` and `seed` values.
+
+=== Scaling down
+
+In the example above we have specified a https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#example-change-downscale-stabilization-window[stabilization window of 60 seconds^].
+This means that after the time has elapsed then the nodes will be monitored and if their loading has reduced then they will be considered for scaling down.
+They will then scale down according to the rules of the HPA policy being used.
+
+We could prevent scaling down by disabling the scale down https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#example-disable-scale-down[policy^].
+Once the example above has scaled back down you can change the configuration like so to disable scale down:
+
+[source,console]
+----
+$ cat << EOF | kubectl apply -f -
+---
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta2
+metadata:
+  name: query-cpu-hpa
+spec:
+  behavior:
+    scaleDown:
+      selectPolicy: Disabled
+EOF
+----
+
+This would mean that the cluster only ever scales up, this can be useful when sizing it to a maximum load and to keep it there.
+Now, run the workload generator again and you will see it scale up but once left for over a minute it will never scale down.
+
+We can then look to scale down in increments using the `Min` https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#example-limit-scale-down-rate[policy^] to reduce pod count by no more than 1 per minute:
+
+[source,console]
+----
+$ cat << EOF | kubectl apply -f -
+---
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta2
+metadata:
+  name: query-cpu-hpa
+spec:
+  behavior:
+    scaleDown:
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+EOF
+----
+
+Once this is applied to the previous example (locked at maximum), you can monitor the pods and see them drop back down eventually to their starting point at a rate of one per minute.
 
 == Cleaning up
 
