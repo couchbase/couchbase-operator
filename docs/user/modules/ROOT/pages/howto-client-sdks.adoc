@@ -78,7 +78,7 @@ Given our example cluster and namespace names:
 
 [IMPORTANT]
 ====
-XDCR in Couchbase Server 6.5.1 does not support load balancing, please see <<cbs-651>> for additional instructions.
+XDCR in Couchbase Server 6.5.1 and 6.5.2 does not support load balancing, please see <<cbs-651>> for additional instructions.
 ====
 
 DNS based addressing with External DNS is slightly different to plain DNS.
@@ -105,7 +105,7 @@ To mitigate the potential for errors, ensure your clients are not continually co
 
 [IMPORTANT]
 ====
-XDCR in Couchbase Server 6.5.1 does not support load balancing, please see <<cbs-651>> for additional instructions.
+XDCR in Couchbase Server 6.5.1 and 6.5.2 does not support load balancing, please see <<cbs-651>> for additional instructions.
 ====
 
 IP based addressing is only used when connecting a client SDK with a node-port service.
@@ -141,14 +141,14 @@ Use of client SDKs with this network configuration relies on support for DNAT, w
 ====
 
 [#cbs-651]
-== Special Considerations for XDCR in Couchbase Server 6.5.1
+== Special Considerations for XDCR in Couchbase Server 6.5.1 and 6.5.2
 
 The Operator allows Couchbase Server to advertise alternate addresses--for cluster service discovery--that are visible outside of the Kubernetes cluster.
 Such addresses may be public DNS names--referencing external load balancers--or node ports--referencing Kubernetes node IP addresses.
 Couchbase Server 6.5.1 introduced a feature whereby it can infer whether to use the internal or alternate addresses based on the supplied connection string.
 
 In order for XDCR to use alternate addresses, it expects an exact match between the connection string and one of the alternate addresses advertised by the remote cluster.
-Likewise, when configuring XDCR with Couchbase Server 6.5.1 you must supply an individual pod's alternate address.
+Likewise, when configuring XDCR with Couchbase Server 6.5.1 and 6.5.2 you must supply an individual pod's alternate address.
 
 As a result the connection string is not stable.
 You cannot remove a remote cluster reference and restore it, as the cluster topology and pod names may have changed in the intervening period.
