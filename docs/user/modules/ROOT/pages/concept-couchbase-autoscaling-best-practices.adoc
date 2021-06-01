@@ -220,7 +220,7 @@ Example Configs::
 +
 --
 NOTE: The examples below are incomplete configurations that are meant to show the implementation of the recommended settings within the relevant resources.
-//For a more complete example of how to implement the recommended auto-scaling settings, refer to xref:tutorial-autoscale-data.adoc[].
+For a more complete example of how to implement the recommended auto-scaling settings, refer to xref:tutorial-autoscale-data.adoc[].
 
 .Example `CouchbaseCluster` Recommended Settings
 [source,yaml]
@@ -485,7 +485,7 @@ Example Configs::
 +
 --
 NOTE: The examples below are incomplete configurations that are meant to show the implementation of the recommended settings within the relevant resources.
-//For a more complete example of how to implement the recommended auto-scaling settings, refer to xref:tutorial-autoscale-index.adoc[].
+For a more complete example of how to implement the recommended auto-scaling settings, refer to xref:tutorial-autoscale-index.adoc[].
 
 .Example `CouchbaseCluster` Recommended Settings
 [source,yaml]
