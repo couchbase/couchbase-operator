@@ -43,7 +43,6 @@ If image pull secrets are required to access the image, they are inherited from 
 
 [NOTE]
 ====
-
 If you wish to create a Kubernetes secret with a bearer token, simply edit and create the following definition:
 
 [source,yaml]
@@ -58,7 +57,6 @@ stringData:
 ----
 
 The `stringData` field allows you to put a non-base64 encoded string directly into the Secret, and Kubernetes will then encode the string for you when the Secret is created or updated.
-
 ====
 
 .Important Considerations
@@ -90,9 +88,48 @@ Once configured, active metrics can be collected from each Couchbase Server pod 
 
 The Autonomous Operator does not create or manage resources for third-party software.
 Prometheus scrape targets must be manually created by the user.
-However, you might find the following resources helpful when setting up your Prometheus environment:
+
+=== Couchbase Cluster Auto-scaling
+
+The Autonomous Operator supports xref:concept-couchbase-autoscaling.adoc[auto-scaling Couchbase clusters].
+In order to properly take advantage of this feature, users must xref:concept-couchbase-autoscaling.adoc#couchbase-metrics[expose Couchbase metrics through the Kubernetes custom metrics API].
+
+Discovery of available metrics can be performed through Prometheus https://github.com/couchbase/couchbase-exporter#queries[queries^].
+However, the Couchbase Exporter repository contains a convenient https://github.com/couchbase/couchbase-exporter/blob/master/example/config.json[list of the Couchbase metrics being exported^].
+
+Some metric names are further explained in the Couchbase Server documentation:
+
+* Data Service
+** xref:server:rest-api:rest-bucket-stats.adoc[Getting Bucket Statistics]
+** xref:server:rest-api:rest-buckets-summary.adoc[Getting Bucket Information]
+** xref:server:cli:cbstats/cbstats-all.adoc[`cbstats` all]
+
+* Index Service
+** xref:server:rest-api:rest-index-stats.adoc[Index Statistics API]
+
+* Query Service
+** xref:server:n1ql:n1ql-rest-api/admin.adoc#_statistics[Admin Rest API - Statistics]
+
+* Search Service
+** xref:server:rest-api:rest-fts-statistics.adoc[Getting Search Statistics]
+
+* Eventing Service
+** xref:server:eventing:eventing-api.adoc[Eventing Statistics API]
+
+* XDCR
+** xref:server:rest-api:rest-xdcr-statistics.adoc[Getting XDCR Stats]
+
+* Clusters and Nodes
+** xref:server:rest-api:rest-cluster-get.adoc[Retrieving Cluster Information]
+** xref:server:rest-api:rest-get-cluster-tasks.adoc[Getting Cluster Tasks]
+** xref:server:rest-api:rest-servergroup-get.adoc[Getting Group Information]
+** xref:server:rest-api:rest-node-get-info.adoc[Getting Server Node Information]
+
+== Related Links
+
+You might find the following resources helpful when setting up your Prometheus environment:
 
 * Couchbase Blog -- https://blog.couchbase.com/step-by-step-guide-for-running-couchbase-autonomous-operator-2-0-with-prometheus-part-1/[Part 1^] & https://blog.couchbase.com/step-by-step-guide-for-running-couchbase-autonomous-operator-2-0-with-prometheus-part-2/[Part 2^]
-* https://github.com/couchbase/couchbase-exporter[Couchbase Prometheus Exporter Project^]
-* https://github.com/coreos/prometheus-operator[CoreOS Prometheus Operator Project^]
-* https://github.com/helm/charts/tree/master/stable/prometheus-operator[Prometheus Operator Helm Chart^]
+* https://github.com/couchbase/couchbase-exporter[Couchbase Prometheus Exporter GitHub^]
+* https://prometheus-operator.dev[Prometheus Operator^]
+* https://github.com/prometheus-operator/kube-prometheus[kube-prometheus^]
