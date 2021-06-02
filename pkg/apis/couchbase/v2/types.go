@@ -379,11 +379,14 @@ type CouchbaseBackupRestoreSpec struct {
 // Specify which buckets to include and exclude in the restore.
 // If empty we default to restoring all buckets with a 1-1 exact name mapping.
 type CouchbaseBackupRestoreBuckets struct {
-
-	// Restore the buckets in the following list of strings.
+	// Include restores only the named buckets defined in this list.  Bucket names
+	// refer to the Couchbase bucket name, which may be that of the bucket's resource
+	// name, or the name defined in the bucket specification if overidden.
 	Include []string `json:"include,omitempty"`
 
-	// Exclude the buckets in the following list of strings
+	// Exclude stops the restoration of the named buckets defined in this list.
+	// Bucket names refer to the Couchbase bucket name, which may be that of the
+	// bucket's resource name, or the name defined in the bucket specification if overidden.
 	Exclude []string `json:"exclude,omitempty"`
 
 	// Maps a backup bucket to a destination bucket that has a different name than
@@ -407,40 +410,46 @@ type BucketMapping struct {
 }
 
 type CouchbaseBackupRestoreServices struct {
-	// BucketConfig maps to cbbackupmgr option --enable-bucket-config.
+	// BucketConfig restores all bucket configuration settings.
 	// If you are restoring to cluster with managed buckets, then this
 	// option may conflict with existing bucket settings, and the results
 	// are undefined, so avoid use.  This option is intended for use
 	// with unmanaged buckets.  Note that bucket durability settings are
 	// not restored in versions less than and equal to 1.1.0, and will
-	// need to be manually applied.
+	// need to be manually applied.  This field defaults to false.
 	BucketConfig bool `json:"bucketConfig,omitempty"`
 
-	// View maps to cbbackupmgr option --disable-views.
+	// Views restores views from the backup.  This field defaults to true.
 	// +kubebuilder:default=true
 	Views *bool `json:"views,omitempty"`
 
-	// GSIIndex maps to cbbackupmgr option --disable-gsi-indexes.
+	// GSIIndex restores document indexes from the backup.  This field
+	// defaults to true.
 	// +kubebuilder:default=true
 	GSIIndex *bool `json:"gsiIndex,omitempty"`
 
-	// FTIndex maps to cbbackupmgr option --disable-ft-indexes.
+	// FTIndex restores full-text search indexes from the backup.  This
+	// field defaults to true.
 	// +kubebuilder:default=true
 	FTIndex *bool `json:"ftIndex,omitempty"`
 
-	// FTAlias maps to cbbackupmgr option --disable-ft-alias.
+	// FTAlias restores full-text search aliases from the backup.  This
+	// field defaults to true.
 	// +kubebuilder:default=true
 	FTAlias *bool `json:"ftAlias,omitempty"`
 
-	// Data maps to cbbackupmgr option --disable-data.
+	// Data restores document data from the backup.  This field defaults
+	// to true.
 	// +kubebuilder:default=true
 	Data *bool `json:"data,omitempty"`
 
-	// Analytics maps to cbbackupmgr option --disable-analytics.
+	// Analytics restores analytics datasets from the backup.  This field
+	// defaults to true.
 	// +kubebuilder:default=true
 	Analytics *bool `json:"analytics,omitempty"`
 
-	// Eventing maps to cbbackupmgr option --disable-eventing.
+	// Eventing restores eventing functions from the backup.  This field
+	// defaults to true.
 	// +kubebuilder:default=true
 	Eventing *bool `json:"eventing,omitempty"`
 }
