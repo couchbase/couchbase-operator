@@ -13,7 +13,7 @@ operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-ope
 namespace = $(if $(KUBENAMESPACE),$(KUBENAMESPACE),default)
 deploymentSpec = $(if $(DEPLOYMENTSPEC),$(DEPLOYMENTSPEC),$(PREFIX)/example/deployment.yaml)
 bldNum = $(if $(BLD_NUM),$(BLD_NUM),999)
-version = $(if $(VERSION),$(VERSION),2.2.0)
+version = $(if $(VERSION),$(VERSION),2.3.0)
 testname = $(E2E_TEST)
 
 # This allows the container tags to be explicitly set.

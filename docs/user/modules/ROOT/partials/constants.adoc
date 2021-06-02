@@ -1,6 +1,6 @@
-:operator-version: 2.2.0
-:operator-version-minor: 2.2
-:admission-controller-version: 2.2.0
+:operator-version: 2.3.0
+:operator-version-minor: 2.3
+:admission-controller-version: 2.3.0
 :couchbase-version: 6.6.2
 :couchbase-version-upgrade-from: 6.6.1
 :couchbase-version-redhat: 6.6.2-1
