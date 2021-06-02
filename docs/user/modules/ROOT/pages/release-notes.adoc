@@ -5,13 +5,86 @@ Couchbase Autonomous Operator {operator-version-minor} is a significant release 
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
+== Installation
+
+For installation instructions, refer to:
+
+* xref:install-kubernetes.adoc[]
+* xref:install-openshift.adoc[]
+
+== Upgrading to Autonomous Operator {operator-version-minor}
+
+The necessary steps needed to upgrade to this release depend on which version of the Autonomous Operator you are upgrading from.
+
+* Version 1.x.x
+** There is no direct upgrade path from versions prior to 2.0.x.
+To upgrade from a 1.x.x release, you must first upgrade to 2.0.x, paying particular attention to supported Kubernetes platforms and Couchbase Server versions.
+Refer to the xref:2.0@operator::howto-operator-upgrade.adoc[2.0.x upgrade steps] if upgrading from a 1.x.x release.
+
+* Version 2.0.x
+** Additional steps and considerations are required when upgrading from version 2.0.x.
+Please refer to <<upgrade-v20x>>.
+
+* Version 2.1.x
+** There are no additional upgrade steps or considerations when upgrading from this version.
+You may follow xref:howto-operator-upgrade.adoc[standard upgrade process].
+
+[[upgrade-v20x]]
+=== Upgrading from Version 2.0.x
+
+First, ensure that you are running xref:prerequisite-and-setup.adoc[compatible versions] of Kubernetes and Couchbase Server before upgrading.
+
+==== TLS Requirements
+
+If you are *not* utilizing TLS, you can skip this section.
+
+The TLS requirements have been modified as of Autonomous Operator 2.1.
+In order to ease the migration from legacy client bootstrap (CCCP) to the newest version (GCCCP), the Autonomous Operator requires Couchbase cluster subject alternative names (SANs) to be updated.
+Consult the xref:tutorial-tls.adoc[TLS tutorial] for a full list of all the required SANs, and the xref:howto-tls-rotation.adoc[TLS rotation guide] in order to prepare for upgrade.
+Failure to perform this step will result in errors from the dynamic admission controller (DAC) once upgraded.
+
+==== Mandatory Couchbase Upgrade Cycle
+
+When upgrading from version 2.0.x, Couchbase clusters will undergo a mandatory upgrade cycle.
+
+Pod readiness checks were previously driven by an `exec` based readiness probe.
+This was a security concern because it granted the Autonomous Operator `pods/exec` privileges, which may not be acceptable in highly regulated environments.
+As of Autonomous Operator 2.1, readiness checks are performed using readiness gates that use the Kubernetes API exclusively.
+
+You can use the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] configuration parameter to speed up this upgrade.
+To enable this feature while upgrading the Autonomous Operator, stop the old Operator, replace the CRDs, edit the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] field to enable bulk upgrades, then start the new Operator.
+Refer to xref:howto-operator-upgrade.adoc[] for further details.
+
 [#release-v220]
 == Release 2.2.0
 
-Couchbase Autonomous Operator 2.2.0 was released in 2021.
+Couchbase Autonomous Operator 2.2.0 was released in June 2021.
+
+[#supported-platforms-v220]
+=== Platform Support
+
+For the latest platform support information, refer to xref:prerequisite-and-setup.adoc[].
+
+==== New Platform Support
+
+This release _adds_ support for the following platforms:
+
+* Open Source Kubernetes 1.20, 1.21
+* Red Hat OpenShift Container Platform 4.7
+
+This release also adds support for the following utilities:
+
+* Rancher
+
+==== Removed Platform Support
+
+This release _drops_ support for the following platforms:
+
+* Open Source Kubernetes 1.15, 1.16
+* Red Hat OpenShift Container Platform 4.3
 
 [#changes-in-behavior-v220]
-=== Major Behavior Changes and Enhancements
+=== New Features and Behavioral Changes
 
 ==== Couchbase Cluster Auto-scaling
 
@@ -66,7 +139,7 @@ Operator 2.2 makes TLS 1.2 the minimum by default, and will automatically update
 
 You can prevent this change from occurring when xref:howto-operator-upgrade.adoc[upgrading the Operator] on existing clusters by setting xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-tlsminimumversion[`couchbaseclusters.spec.networking.tls.tlsMinimumVersion`] to `TLS1.0` after upgrading the CRDs, and before restarting the Operator.
 
-==== TLS Certificate and Key Handling
+==== Improved TLS Certificate and Key Handling
 
 Couchbase Server requires that the TLS resources be called `pkey.key` and `chain.pem`, however the majority of 3rd-party certificate managers generate `tls.key` and `tls.crt`.
 This format is governed by the Kubernetes `kubernetes.io/tls` secret type.
@@ -107,7 +180,7 @@ This provides the ability to rotate passwords and certificates on the remote clu
 ==== Automatic Resource Allocation
 
 Kubernetes allows pods to reserve and limit compute resources.
-Resource reservation provides Kubernetes with the ability to fairly schedule pods so that they don't complete for CPU and memory.
+Resource reservation provides Kubernetes with the ability to fairly schedule pods so that they don't compete for CPU and memory.
 
 The Operator now provides the ability to automatically manage pod CPU and memory resource requests with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoresourceallocation[`couchbaseclusters.spec.autoResourceAllocation`] field.
 When in use, pods will have their resource requests automatically populated depending on the services enabled on that pod, and the individual Couchbase service quotas.
@@ -115,12 +188,12 @@ When in use, pods will have their resource requests automatically populated depe
 Updating quotas will cause the cluster to upgrade as pod resource requests are updated.
 A new dummy memory quota for the query service is introduced to allow management of memory resource requests, even though Couchbase itself does not provide the ability to constrain this service.
 
-==== Improved Upgrade Behavior
+==== Enhanced Couchbase Upgrade Behavior
 
 Prior to this release, the Operator allowed two types of upgrade -- a one pod at a time rolling upgrade, and a whole cluster upgrade.
 
 This release allows rolling upgrades to be extended to upgrade either a fixed number of pods, or a percentage of the cluster size.
-Both values can be set, and both will be considered, the Operator selecting the one resulting in the fewest number of pods being upgraded at a time.
+Both values can be set, and the Autonomous Operator will select the one that results in the fewest number of pods being upgraded at a time.
 
 Rolling upgrades can be configured with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] parameter.
 
@@ -130,7 +203,18 @@ A whole cluster "immediate" upgrade is now synonymous with a rolling upgrade set
 Immediate upgrades may be removed at some point in the future as it duplicates functionality.
 ====
 
-==== Online Backup Volume Resizing
+==== Enhanced Backup and Restore
+
+With the release of Autonomous Operator 2.2, the https://hub.docker.com/r/couchbase/operator-backup[`operator-backup`^] container image has been enhanced to support a wider range of Couchbase Server and Autonomous Operator versions.
+As part of this update, the `operator-backup` image has switched to semantic versioning which is no longer based on Couchbase Server version.
+
+At the time of this writing, the new image -- https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.1.0`^] -- is compatible with all versions of the Autonomous Operator that support xref:concept-backup.adoc[managed backup and restore] (version 2.0 and later).
+
+The new image is still based on the xref:server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr`] utility, therefore its ability to backup and restore data between different versions of Couchbase Server is still dependent on the xref:server:backup-restore:enterprise-backup-restore.adoc#version-compatibility[compatibility of the underlying `cbbackupmgr` version].
+However, the https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.1.0`^] image is based on xref:6.6@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 6.6.2`], which is capable of backing up and restoring data from all versions of Couchbase Server that have ever been supported by the Autonomous Operator up to this point.
+When support for new Couchbase Server versions is added to the Autonomous Operator, support for backing up those versions will be added to the latest https://hub.docker.com/r/couchbase/operator-backup[`operator-backup`^] image.
+
+===== Online Backup Volume Resizing
 
 While not a replacement for a properly implemented monitoring solution, it may be beneficial to have your backup storage grow with your requirements.
 To this end, the Autonomous Operator now supports xref:howto-backup.adoc#online-backup-volume-resizing[online resizing of backup volumes].
@@ -139,22 +223,20 @@ Backup volumes can be resized in one of two ways:
 
 . Backup volumes can be xref:howto-backup.adoc#manual-backup-volume-resizing[manually resized] by directly editing the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-size[`couchbasebackups.spec.size`] field.
 
-. Backup volumes can be xref:howto-backup.adoc#manual-backup-volume-resizing[automatically resized] by the Autonomous Operator, thus keeping backups to the minimum size necessary to operate, helping to reduce cost while also supporting future expansion.
+. Backup volumes can be xref:howto-backup.adoc#automated-backup-volume-resizing[automatically resized] by the Autonomous Operator, thus keeping backups to the minimum size necessary to operate, helping to reduce cost while also supporting future expansion.
 In this mode of operation, the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-autoscaling[`couchbasebackups.spec.autoScaling`] field controls the behavior.
 
 In order to use any of these resize capabilities, the underlying StorageClass associated with the backup volume must be configured to allow volume expansion.
 
-==== Improved Backup and Restore
+===== General Backup and Restore Enhancements
 
 By default, backup and restore operations execute with only a single thread of execution, which can sometimes lead to poor performance.
-To mitigate thread-related performance issues, xref:resource/couchbasebackup.adoc#couchbasebackups-spec-threads[`couchbasebackups.spec.threads`] and xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-threads[`couchbasebackuprestores.spec.threads`] can now be specified to configure the number of concurrent `cbbackupmgr` clients to use when backing up or restoring data.
+To mitigate thread-related performance issues, xref:resource/couchbasebackup.adoc#couchbasebackups-spec-threads[`couchbasebackups.spec.threads`] and xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-threads[`couchbasebackuprestores.spec.threads`] can now be specified to configure the number of concurrent xref:server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr`] clients to use when backing up or restoring data.
 
 This release also introduces filters that allow you to control exactly what is restored from a backup.
 In previous releases, restore operations were fairly inflexible in that the only option was to restore all data from a backup.
 Now you can choose to include or exclude specific buckets, restore data for a particular service, and even restore to a different bucket name when restoring documents.
 Refer to xref:howto-backup.adoc#additional-restore-options[Additional Restore Options] for more information.
-
-IMPORTANT: This release requires you to upgrade your backup image to at least `couchbase/operator-backup:6.6.0-XXX`.
 
 ==== Customizable Prometheus Metrics
 
@@ -165,6 +247,49 @@ The following customizations are currently supported:
 * Enable and disable whether a metric is exported to Prometheus.
 
 For more information, refer to xref:howto-prometheus.adoc#customizing-metrics[Customizing Metrics].
+
+[#fixed-issues-v220]
+=== Fixed Issues
+
+[#table-fixed-issues-v220,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2180[K8S-2180^]
+a| *Summary:* When using service types in both the console and exposed feature service templates, a logical problem meant that the deprecated service type field defaults overwrote those provided in the template.
+For example, when setting the template type to `LoadBalancer`, this may have ended up as `NodePort` due to the old defaults taking precedence.
+This has now been fixed so that the template will take precedence.
+
+a| https://issues.couchbase.com/browse/K8S-2128[K8S-2128^]
+a| *Summary:* Prior to backup images `couchbase/operator-backup:6.5.0-XXX`, `couchbase/operator-backup:6.6.0-XXX`, and `couchbase/operator-backup:1.0.0` a bug meant that all backup traffic between the job and Couchbase server was in plain text.
++
+While these backup images will work with plain TLS and mTLS, it will not work with mandatory mTLS configurations, as `cbbackupmgr` does not support client certificate authentication.
+Autonomous Operator 2.2 will fall back to plain text backup when using mandatory mTLS in order to facilitate functional backups.
+
+a| https://issues.couchbase.com/browse/K8S-2092[K8S-2092^]
+a| *Summary:* Istio in mTLS mode is unable to run using `Job` or `CronJob` resource types.
+This is due to the Envoy sidecar proxy not terminating when a backup or restore `Job` does, thus keeping the `Pod` alive and blocking further execution.
+This is remedied in Couchbase Operator Backup versions 1.0.0 and above by sending a termination signal to the Envoy side car on termination of the backup and restore `Job`.
+
+a| https://issues.couchbase.com/browse/K8S-2071[K8S-2071^]
+a| *Summary:* On dynamic platforms (GKE Autopilot being one example), where deployments can be rescheduled to better utilize system resources, we detected a deadlock situation.
+In this scenario, the Autonomous Operator could be terminated while a Couchbase Server pod was still being initialized, and thus on restart it would look okay, however Couchbase Server would refuse to respond to the Autonomous Operator.
+This has been remedied by annotating Couchbase Server pods when we know they have been fully initialized, and thus can be terminated when we know they are uninitialized and it's safe to do so, then re-created.
+
+a| https://issues.couchbase.com/browse/K8S-2060[K8S-2060^]
+a| *Summary:* A bug in the Autonomous Operator meant that when using LDAP groups, nesting could not be turned off.
+This is now fixed in this release.
+
+a| https://issues.couchbase.com/browse/K8S-2059[K8S-2059^]
+a| *Summary:* Prior to this release, setting the auto-compaction time window managed the wrong configuration settings, resulting in auto-compaction running at unexpected times.
+This has now been fixed to update the correct settings.
+Be aware that when upgrading to this release with non-default auto-compaction settings, this will cease to erroneously manage index auto-compaction, and start managing global auto-compaction.
+
+a| https://issues.couchbase.com/browse/K8S-2052[K8S-2052^]
+a| *Summary:* A race condition existed where the Autonomous Operator was restarted and a backup `Pod` was still executing.
+This `Pod` was erroneously considered as part of a metadata update routine and caused a crash loop until the backup terminated.
+This has now been fixed by correctly filtering the pods considered for metadata updates to only include Couchbase Server instances.
+|===
 
 ==== Other Notable Changes
 

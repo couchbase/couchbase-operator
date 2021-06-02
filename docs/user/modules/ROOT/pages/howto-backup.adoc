@@ -665,7 +665,7 @@ Backup and restore job affinity can be set, per `CouchbaseCluster`, with the xre
 
 == Backup and Restore to S3
 
-If you are running a cluster version 6.6.x and running the corresponding `operator-backup` image of tag 6.6.x, the ability to backup and restore to and from AWS S3 buckets is available.
+If you are running a Couchbase cluster version 6.6.x or higher and using the backup image `operator-backup:1.1.0` or higher, the ability to backup and restore to and from AWS S3 buckets is available.
 This option requires some extra configuration related to your AWS credentials and the name of the S3 bucket to perform operations on.
 
 First of all, a separate `Secret` must be created that holds the AWS region name, access key ID, and secret access key.

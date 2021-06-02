@@ -2,12 +2,6 @@
 :page-aliases: upgrading-the-operator
 :tabs:
 
-[IMPORTANT]
-====
-There is no direct upgrade path from versions prior it 2.0.x.
-To upgrade from a version 1.x.x release, first upgrade to 2.0.x paying particular attention to supported Kubernetes platforms and Couchbase server versions.
-====
-
 Upgrading the Couchbase Autonomous Operator is a four-step process:
 
 - <<download-operator, Step 1: Download the New Operator Package>>
@@ -15,7 +9,17 @@ Upgrading the Couchbase Autonomous Operator is a four-step process:
 - <<update-crd, Step 3: Update the CRDs>>
 - <<install-operator, Step 4: Install the New Operator>>
 
-Additional steps may be required on a per-release basis, consult the xref:whats-new.adoc[what's new?] and xref:release-notes.adoc[release notes] for details.
+== Before Upgrading
+
+Make sure to consult the xref:release-notes.adoc[Release Notes] and the xref:whats-new.adoc[What's New?] pages before upgrading, as there may be additional considerations or steps required on a per-release basis.
+
+.About Upgrading From Version 1.x.x
+[IMPORTANT]
+====
+There is no direct upgrade path to this release from versions prior to 2.0.x.
+To upgrade from a 1.x.x release, you must first upgrade to 2.0.x, paying particular attention to supported Kubernetes platforms and Couchbase Server versions.
+Refer to the xref:2.0@operator::howto-operator-upgrade.adoc[2.0.x version of this page] if upgrading from a 1.x.x release.
+====
 
 [#download-operator]
 == Step 1: Download the New Operator Package

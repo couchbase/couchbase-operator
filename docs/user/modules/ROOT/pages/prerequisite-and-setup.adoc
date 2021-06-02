@@ -1,95 +1,85 @@
 = Prerequisites and System Requirements
+include::partial$constants.adoc[]
 
-To install the Couchbase Autonomous Operator, all you need is a running Kubernetes or OpenShift cluster.
+[abstract]
+The Autonomous Operator supports several popular Kubernetes environments and cloud-native utilities.
 
-If you don't have access to a Kubernetes cluster, but still want to use the Operator for development, https://kubernetes.io/docs/tasks/tools/install-minikube/[Minikube^] (single-node Kubernetes cluster) and https://developers.redhat.com/products/codeready-containers/overview[Red Hat CodeReady Containers^] (single-node OpenShift cluster) make great free alternatives.
-Both of these products are much easier to install and deploy when compared to setting up and running an actual Kubernetes or OpenShift cluster.
+To install the Couchbase Autonomous Operator, all you need is a Kubernetes or OpenShift cluster running one of the <<kubernetes-platform-compatibility,compatible versions listed below>>.
 
-== Platform Compatibility
+NOTE: For all supported software versions listed on this page, maintenance/patch releases (x.x**.X**) inherit the same support level, unless noted otherwise.
 
-=== Support Definitions
+== Couchbase Compatibility
 
-Certified:: Couchbase has performed an extensive testing and review process to make sure that the Operator runs well out of the box on the specified platform.
-
-Supported:: Couchbase believes that the Operator will run well out of the box on the specified platform, but extensive testing has not been performed.
-Couchbase will make a best effort to investigate issues on a Supported platform version, but it is recommended that you run the Operator on a Certified platform version.
-
-Developer Preview:: Couchbase is still developing functionality for the specified platform, but you are encouraged to start your own testing and provide early feedback.
-
-=== Couchbase Server Compatibility
+This release supports the deployment of the following Couchbase software:
 
 [#table-operator-compatibility-couchbase,cols="1,1",options="header"]
 |===
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| Certified 6.5.1, 6.6
-
-_Unless otherwise stated, maintenance/patch releases (x.x**.X**) inherit the same support level._
+| 6.5.1+, 6.6
 |===
 
-=== Kubernetes Platform Compatibility
+[[couchbase-backup-and-restore-compatibility]]
+=== Couchbase Backup and Restore Compatibility
+
+This release supports the following container images for xref:concept-backup.adoc[managed backup and restore] of Couchbase clusters:
+
+[#table-operator-compatibility-couchbase-backup,cols="1,1,1",options="header"]
+|===
+| Container Image
+| Backup Utility
+| Backup From and Restore To
+
+a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.1.0`^]
+a| xref:6.6@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 6.6.2`]
+| Couchbase Server 6.6--5.5
+|===
+
+[[kubernetes-platform-compatibility]]
+== Kubernetes Compatibility
+
+This release supports the following Kubernetes platforms:
 
 [#table-operator-compatibility,cols="1,1",options="header"]
 |===
 | Platform | Version
 
 | Open Source Kubernetes
-| Certified 1.19
-
-Supported 1.17, 1.18, 1.20, 1.21
+| 1.17, 1.18, 1.19, 1.20, 1.21
 
 | Red Hat OpenShift Container Platform
-| Certified 4.6
-
-Supported 4.4, 4.5, 4.7
+| 4.4, 4.5, 4.6, 4.7
 |===
 
-=== Public Kubernetes Service Compatibility
+=== Managed Kubernetes Compatibility
 
-[#table-operator-compatibility-public,cols="1,1",options="header"]
-|===
-| Service | Support Level
+This release supports the following managed Kubernetes services and utilities:
 
-| Amazon EKS
-| Certified
-
-| Google GKE
-| Certified
-
-| Microsoft AKS
-| Certified
-|===
+* Amazon EKS
+* Google GKE
+* Microsoft AKS
+* Rancher
 
 [#compatibility-pv]
-=== Persistent Volume Compatibility
+== Persistent Volume Compatibility
 
 Persistent volumes are mandatory for production deployments.
-Review the xref:best-practices.adoc#persistent-volumes-best-practices[Operator best practices] for more information about cluster supportability requirements.
+Review the Autonomous Operator xref:best-practices.adoc#persistent-volumes-best-practices[best practices] for more information about cluster supportability requirements.
 
-.Persistent Volume Compatibility List
-[#table-operator-compatibility-pv,cols="1,1",options="header"]
-|===
-| Volume | Support Level
+This release supports the following persistent volume provisioners:
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#aws-ebs[AWS EBS^]
-| Certified
+* https://kubernetes.io/docs/concepts/storage/storage-classes/#aws-ebs[AWS EBS^]
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#azure-disk[Azure Disk^]
-| Certified
+* https://kubernetes.io/docs/concepts/storage/storage-classes/#azure-disk[Azure Disk^]
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#ceph-rbd[Ceph RBD^]
-| Certified
+* https://kubernetes.io/docs/concepts/storage/storage-classes/#ceph-rbd[Ceph RBD^]
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#gce-pd[GCE PD^]
-| Certified
+* https://kubernetes.io/docs/concepts/storage/storage-classes/#gce-pd[GCE PD^]
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[GlusterFS^]
-| Certified
+* https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[GlusterFS^]
 
-| https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Portworx Volume^]
-| Certified
-|===
+* https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Portworx Volume^]
 
 == CPU and Memory Requirements
 
@@ -111,9 +101,9 @@ You can read more about pod scheduling in the xref:best-practices.adoc#pod-sched
 Preparing the Kubernetes cluster to run the Operator may require setting up proper RBAC and network settings in your Kubernetes cluster.
 Before moving forward, review the following documentation:
 
-* xref:reference-operator-rbac.adoc[RBAC]
-* xref:concept-kubernetes-networking.adoc[Kubernetes Networking]
-* xref:concept-couchbase-networking.adoc[Couchbase Cluster Networking]
+* xref:reference-operator-rbac.adoc[]
+* xref:concept-kubernetes-networking.adoc[]
+* xref:concept-couchbase-networking.adoc[]
 
 == Next Steps
 
@@ -121,5 +111,5 @@ As you're setting up your Kubernetes environment, make sure that you're followin
 
 Once your Kubernetes environment is set up, you can move on to installing the admission controller and the Operator.
 
-* xref:install-kubernetes.adoc[Installing the Operator on Open Source Kubernetes]
-* xref:install-openshift.adoc[Installing the Operator on OpenShift]
+* xref:install-kubernetes.adoc[]
+* xref:install-openshift.adoc[]
