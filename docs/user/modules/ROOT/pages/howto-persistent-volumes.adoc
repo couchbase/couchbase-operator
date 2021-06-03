@@ -163,8 +163,11 @@ Therefore, it is important that you confirm that your volume type supports volum
 +
 In general, block storage volume types such as `GCE-PD`, `AWS-EBS`, A`zure Disk`, `Cinder`, and `Ceph RBD` typically require a full file system expansion, whereas network attached file systems like `Glusterfs` and `Azure File` can always be expanded online.
 
-* Volume size can only be increased.
-** Decreasing the amount of requested storage will result in a traditional rolling upgrade.
+* Volume size can only be _increased_.
+** Kubernetes does not currently support online reductions in volume size.
+** New storage sizes can only be specified in xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-volumeclaimtemplates[`volumeClaimTemplates.spec.resources.requests.storage`], and must be a larger value than the current size (values smaller than the current size will be blocked by the dynamic admission controller).
+Note that persistent volumes are fully managed by the Autonomous Operator, therefore any manual changes to the PersistentVolumeClaim size made outside of the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] spec will be reverted.
+** To reduce volume size, set xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enableonlinevolumeexpansion[`couchbaseclusters.spec.enableOnlineVolumeExpansion`] back to `false` and proceed with <<resizing-persistent-volumes,traditional resizing>> (which requires rolling upgrade).
 
 * If online volume expansion fails for some reason, the Autonomous Operator will fall back to a traditional rolling upgrade as a means to expand volumes.
 
