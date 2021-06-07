@@ -81,6 +81,13 @@ func TestLoggingAndAuditingDefaults(t *testing.T) {
 	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
 	// Note that the sidecars start fast but have to wait for logs to appear from the slower server container
 	e2eutil.MustCheckLogging(t, targetKube, testCouchbase, 5*time.Minute)
+	// Checks for extra information we have started adding, e.g.:
+	// "pod"=>{"namespace"=>"test-qmf56", "name"=>"test-couchbase-rjbbr-0000", "uid"=>"66c769fd-74b1-47bf-90a9-364eb649dcb9"}, "couchbase"=>{"cluster"=>"test-couchbase-rjbbr", "operator.version"=>"2.2.0", "server.version"=>"6.6.2", "node"=>"test-couchbase-rjbbr-0000", "node-config"=>"default", "server"=>"true", "data"=>"enabled", "index"=>"enabled"}
+	// We do not check for specific values, only that they're being provided.
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 10*time.Second, "\"pod\"=>{")
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 10*time.Second, "\"couchbase\"=>{")
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 10*time.Second, "operator.version")
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 10*time.Second, "server.version")
 
 	// Check that the user can see the cluster settings being edited but only once.
 	expectedEvents := []eventschema.Validatable{
