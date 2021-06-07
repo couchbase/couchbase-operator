@@ -6,13 +6,6 @@ The changes in this release enable several advancements in how you can manage, m
 
 Take a look at the xref:release-notes.adoc[release notes] for a more detailed and complete list of changes in this release, including known and fixed issues.
 
-== Log Forwarding and Audit Log Management
-
-The Autonomous Operator now supports xref:concept-couchbase-logging.adoc#log-forwarding[_log forwarding_] through the optional deployment of a third party log processor that can read Couchbase log files and forward them to standard console output and other configurable destinations.
-This feature is powered by a https://github.com/couchbase/couchbase-fluent-bit[Couchbase-supplied log processor image^] (based on https://fluentbit.io/[Fluent Bit^]) which has also been made available as an open source project on https://github.com/couchbase/couchbase-fluent-bit[Github^].
-
-In addition, audit logging can now be configured via the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification, thus allowing for xref:howto-manage-couchbase-logging.adoc#configuring-audit-logging[automated audit logging] via the Autonomous Operator.
-
 == Couchbase Cluster Auto-scaling
 
 The Autonomous Operator now supports Couchbase cluster auto-scaling for _all_ Couchbase services.
@@ -28,6 +21,13 @@ To help users get started in production, an xref:concept-couchbase-autoscaling-b
 This guide discusses relevant metrics for scaling individual Couchbase Services, and includes recommended settings based on internal benchmark testing performed by Couchbase.
 
 For more information, refer to xref:concept-couchbase-autoscaling.adoc[].
+
+== Log Forwarding and Audit Log Management
+
+The Autonomous Operator now supports xref:concept-couchbase-logging.adoc#log-forwarding[_log forwarding_] through the optional deployment of a third party log processor that can read Couchbase log files and forward them to standard console output and other configurable destinations.
+This feature is powered by a https://github.com/couchbase/couchbase-fluent-bit[Couchbase-supplied log processor image^] (based on https://fluentbit.io/[Fluent Bit^]) which has also been made available as an open source project on https://github.com/couchbase/couchbase-fluent-bit[Github^].
+
+In addition, audit logging can now be configured via the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification, thus allowing for xref:howto-manage-couchbase-logging.adoc#configuring-audit-logging[automated audit logging] via the Autonomous Operator.
 
 == Online Expansion of Persistent Volumes
 
