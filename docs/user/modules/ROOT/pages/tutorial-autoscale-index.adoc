@@ -43,7 +43,7 @@ We can do this by applying a scheduling tolerance with the following commands:
 
 [source,console]
 ----
-$ APP_NODE=$(kubectl get nodes | tail -1  | awk '{print $1}')
+$ APP_NODE=$(kubectl get nodes | grep Ready | head -1  | awk '{print $1}')
 ----
 
 [source,console]
@@ -61,11 +61,11 @@ Run the following command to create a file with the necessary override values fo
 
 [source,console,subs="attributes,verbatim"]
 ----
-$ cat << EOF >> autoscale_values.yaml
+$ cat << EOF > autoscale_values.yaml
 ---
 cluster:
   cluster:
-    dataServiceMemoryQuota: 12Gi
+    dataServiceMemoryQuota: 10Gi
     indexServiceMemoryQuota: 256Mi <.>
   monitoring:
     prometheus:
@@ -510,7 +510,7 @@ Remove the scheduling tolerance that we applied for the workload generator:
 
 [source,console]
 ----
-$ APP_NODE=$(kubectl get nodes | tail -1  | awk '{print $1}')
+$ APP_NODE=$(kubectl get nodes | grep Ready | head -1  | awk '{print $1}')
 ----
 
 [source,console]

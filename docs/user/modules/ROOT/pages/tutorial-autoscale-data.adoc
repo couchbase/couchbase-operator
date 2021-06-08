@@ -45,7 +45,7 @@ Run the following command to create a file with the necessary override values fo
 
 [source,console,subs="attributes,verbatim"]
 ----
-$ cat << EOF >> autoscale_values.yaml
+$ cat << EOF > autoscale_values.yaml
 ---
 cluster:
   cluster:
@@ -93,7 +93,7 @@ buckets:
   default:
     name: travel-sample
     kind: CouchbaseEphemeralBucket <.>
-    evictionPolicy: nruEviction
+    evictionPolicy: noEviction
     memoryQuota: 1Gi <.>
 EOF
 ----
@@ -266,7 +266,7 @@ spec:
         periodSeconds: 15
     scaleDown:
       stabilizationWindowSeconds: 300
-  minReplicas: 3 <.>
+  minReplicas: 2 <.>
   maxReplicas: 6 <.>
   metrics:
   - type: Pods
@@ -297,7 +297,7 @@ $ kubectl get couchbaseautoscalers
 --
 
 <.> `minReplicas`: This field sets the minimum number of Couchbase nodes for the specified server class.
-Here, we've set the minimum number of `default` nodes to `3`.
+Here, we've set the minimum number of `default` nodes to `2`.
 This means that the number of `default` nodes will never be down-scaled to fewer than two nodes, even if the HPA detects that the target metric is relatively below the target value.
 +
 Setting `minReplicas` is important for maintaining service availability.
@@ -312,7 +312,7 @@ Setting a value for `maxReplicas` is required because it provides important prot
 Refer to xref:concept-couchbase-autoscaling-best-practices.adoc[] for additional guidance on setting this value in production environments.
 +
 NOTE: The <<before-you-begin,prerequisites>> for this tutorial state that seven Kubernetes worker nodes are required.
-So far we're currently using four worker nodes for our Couchbase cluster (two `default` nodes and one `query` node).
+So far we're currently using three worker nodes for our Couchbase cluster (two `default` nodes and one `query` node).
 By setting `maxReplicas` to `6`, we're allowing the `default` server class to scale up to an additional four nodes if necessary, thus potentially requiring up to seven worker nodes for our entire setup.
 
 <.> `metrics.pods.metric.name`: The name of the target metric that will be monitored by the HPA for the purposes of auto-scaling.
@@ -337,7 +337,7 @@ Metrics:                                               ( current / target )
   "cbbucketinfo_basic_quota_user_percent" on pods:  2771m / 70 <.>
 Min replicas:                         2
 Max replicas:                         6
-CouchbaseAutoscaler pods:             3 current / 3 desired  <.>
+CouchbaseAutoscaler pods:             2 current / 2 desired  <.>
 ----
 
 <.> Here we see that the current bucket memory utilization is *~2%* (again, on a scale of 1000) out of the `70` percent target.
@@ -403,13 +403,13 @@ Metrics:                                               ( current / target )
 Events:
   Type    Reason             Age   From                       Message
   ----    ------             ----  ----                       -------
-  Normal  SuccessfulRescale  21s   horizontal-pod-autoscaler  New size: 4; reason: pods metric cbbucketinfo_basic_quota_user_percent above target <.>
-  Normal  SuccessfulRescale  48s    horizontal-pod-autoscaler  New size: 5; reason: pods metric cbbucketinfo_basic_quota_user_percent above target
+  Normal  SuccessfulRescale  21s   horizontal-pod-autoscaler  New size: 3; reason: pods metric cbbucketinfo_basic_quota_user_percent above target <.>
+  Normal  SuccessfulRescale  48s    horizontal-pod-autoscaler  New size: 4; reason: pods metric cbbucketinfo_basic_quota_user_percent above target
 ----
 
 <.> The HPA has detected *81%* memory utilization.
 
-<.> The number of `default` nodes has been scaled from *4* to *5*.
+<.> The number of `default` nodes has been scaled from *2* to *3*.
 +
 [NOTE]
 ====
