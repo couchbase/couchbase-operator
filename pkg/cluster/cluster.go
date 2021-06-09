@@ -425,6 +425,35 @@ func (c *Cluster) create() error {
 	return c.updateCRStatus()
 }
 
+// podInitialized tells us whether Couchbase server has been fully
+// initialized and the API will work as expected.  This came in with
+// 2.2.
+func (c *Cluster) podInitialized(pod *v1.Pod) bool {
+	// The initialized annotation came to be in 2.2...
+	versionAnnotation, ok := pod.Annotations[constants.ResourceVersionAnnotation]
+	if !ok {
+		return true
+	}
+
+	version, err := semver.NewVersion(versionAnnotation)
+	if err != nil {
+		log.Error(err, "Failed to parse pod version", "cluster", c.namespacedName(), "pod", pod.Name, "version", versionAnnotation)
+		return true
+	}
+
+	threshold := semver.MustParse(constants.PodInitializedAnnotationMinVersion)
+	if version.LessThan(threshold) {
+		return true
+	}
+
+	// Pod is initialized, let the normal reconcile process occur.
+	if _, ok := pod.Annotations[constants.PodInitializedAnnotation]; ok {
+		return true
+	}
+
+	return false
+}
+
 // runReconcile gathers a list of pods in cluster from Kubernetes, optionally
 // initializes our internal member list if we need to e.g. we have been restarted and
 // have lost state or a previous error may have resulted in inconsistent state, then
@@ -482,25 +511,7 @@ func (c *Cluster) runReconcile() {
 		// and thus will not respond to our pleas for help.  Execute any uninitialized
 		// nodes, so that we may recreate the cluster next time around.
 		for _, pod := range running {
-			// The initialized annotation came to be in 2.2...
-			versionAnnotation, ok := pod.Annotations[constants.ResourceVersionAnnotation]
-			if !ok {
-				continue
-			}
-
-			version, err := semver.NewVersion(versionAnnotation)
-			if err != nil {
-				log.Error(err, "Failed to parse pod version", "cluster", c.namespacedName(), "pod", pod.Name, "version", versionAnnotation)
-				continue
-			}
-
-			threshold := semver.MustParse(constants.PodInitializedAnnotationMinVersion)
-			if version.LessThan(threshold) {
-				continue
-			}
-
-			// Pod is initialized, let the normal reconcile process occur.
-			if _, ok := pod.Annotations[constants.PodInitializedAnnotation]; ok {
+			if c.podInitialized(pod) {
 				continue
 			}
 

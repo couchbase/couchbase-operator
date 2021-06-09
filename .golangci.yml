@@ -21,8 +21,6 @@ linters:
   - nestif # complicated code
   - gomnd # magic numbers
   - testpackage # packages for test, need to be marked as test
-  - gocognit # complicated functions
-  - gocyclo # complicated functions
   - godox # TODOs are bad, it suggests it's not finished
   - maligned # memory alignment - this is fine
   - funlen # complicated functions
@@ -63,6 +61,8 @@ issues:
   - path: test/.*
     linters:
     - goerr113
+    - gocognit
+    - gocyclo
   - path: cmd/.*
     linters:
     - goerr113
