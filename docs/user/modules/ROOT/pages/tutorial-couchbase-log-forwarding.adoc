@@ -61,7 +61,7 @@ spec:
     server:
       enabled: true # <.>
       manageConfiguration: true
-      configurationName: “fluent-bit-config”
+      configurationName: "fluent-bit-config"
       sidecar:
         image: "couchbase/{logging-version}"
     audit:
@@ -86,11 +86,10 @@ spec:
     - analytics
     volumeMounts:
       default: couchbase
-  volumeClaimTemplates:
+  volumeClaimTemplates: # <.>
   - metadata:
       name: couchbase
     spec:
-      storageClassName: standard
       resources:
         requests:
           storage: 1Gi
@@ -113,6 +112,10 @@ This field normally defaults to `false`.
 +
 Couchbase Server rotates audit logs, but cannot, itself, expire or delete them.
 Therefore, for the purposes of this tutorial, we want to enable garbage collection to clean up rotated audit logs so that they don't accidentally consume all available storage.
+
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-volumeclaimtemplates[`couchbaseclusters.spec.volumeClaimTemplates`]: This setting is not specifically for log forwarding, it is purely that log forwarding requires a persistent volume to access the logs so this shows an example of how to set one up.
+Refer to the storage documentation for your platform as well as the xref:concept-persistent-volumes.adoc[Couchbase documentation] for full details.
+You may want to tweak the resources allocated for example or the storage class.
 
 Copy the example cluster deployment configuration from above and save it to a file.
 (In this case we've named the file `couchbase-cluster-log-forwarding.yaml`.)
@@ -191,7 +194,7 @@ spec:
 _Therefore, we need to set this field to `false`._
 Setting this field to `false` is vital to ensure that the Autonomous Operator doesn't remove the custom configurations we're going to make in the rest of this tutorial.
 
-Modify your xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] configuration file so that xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`] is set to `false`, then run the following command to deploy it into Kubernetes:
+Modify your xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] configuration file so that xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`] is set to `false` (do not just use the snippet above), then run the following command to deploy it into Kubernetes:
 
 [source,console]
 ----
@@ -217,24 +220,24 @@ kind: Secret
 metadata:
   name: fluent-bit-config
 stringData:
-  fluent-bit.conf: | # <.>
+  fluent-bit.conf: |# <.>
     [SERVICE]
         flush        1
         daemon       Off
         log_level    Warning
-        parsers_file /fluent-bit/etc/parsers-couchbase.conf # <.>
-
-    @include /fluent-bit/etc/couchbase/in-audit-log.conf # <.>
-
+        parsers_file /fluent-bit/etc/parsers-couchbase.conf# <.>
+    # Include audit log only
+    @include /fluent-bit/etc/couchbase/in-audit-log.conf# <.>
+    # Add some extra information
     [FILTER]
         Name modify
         Match couchbase.log.*
         Add pod ${HOSTNAME}
         Add logshipper couchbase.sidecar.fluentbit
-
+    # Send to the standard output
     [OUTPUT]
         name  stdout
-        match couchbase.log.* # <.>
+        match couchbase.log.*# <.>
 ----
 
 <.> `stringData.fluent-bit.conf`: Log forwarding configuration files are defined in the `stringData` field of the Secret.
@@ -256,6 +259,7 @@ NOTE: This log forwarding configuration assumes that you've already enabled Couc
 If you deployed the <<cluster-config-log-forwarding,example cluster configuration>> from earlier in this tutorial, then audit logging is already enabled and no action is necessary.
 
 Copy the above secret configuration and save it to a file.
+Make sure to check for any formatting issues when copying from HTML to text format for YAML.
 (In this case we've named the file `fluent-bit-config.yaml`.)
 Run the following command to deploy it into Kubernetes:
 
@@ -276,6 +280,13 @@ If you're using a custom sidecar container image, be aware that Fluent Bit, on i
 Also note that the Couchbase-supplied log forwarding implementation does not currently support log buffering during restart.
 Therefore, log events that occur while Fluent Bit is restarting may be lost.
 ====
+
+If you want to check the configuration then a simple base64 decode command can be run using the Kubernetes `Secret` name:
+
+[source,console]
+----
+$ kubectl get secret "fluent-bit-config" -o go-template='{{range $k,$v := .data}}{{printf "%s: " $k}}{{if not $v}}{{$v}}{{else}}{{$v | base64decode}}{{end}}{{"\n"}}{{end}}'
+----
 
 === Next Steps
 
@@ -454,11 +465,11 @@ stringData:
     # Output to Elasticsearch
     [OUTPUT]
         name  es
-        match couchbase.log.* # <.>
+        match couchbase.log.*# <.>
         Logstash_Format On
         Include_Tag_Key On
         Tag_Key FluentBit-Key
-        Host elasticsearch # <.>
+        Host elasticsearch# <.>
         Port 9200
 ----
 
@@ -486,7 +497,7 @@ stringData:
     @include /fluent-bit/etc/fluent-bit.conf
 
     # Output only audit log by default
-    [OUTPUT] # <.>
+    [OUTPUT]# <.>
         name                  azure_blob
         match                 couchbase.log.audit
         account_name          YOUR_ACCOUNT_NAME
@@ -551,7 +562,6 @@ stringData:
   fluent-bit.conf: |
     # Just include the normal file and append to it the Azure Blob output
     @include /fluent-bit/etc/fluent-bit.conf
-
     # Output only audit log by default
     [OUTPUT]
         name                  azure_blob
@@ -583,7 +593,6 @@ stringData:
   fluent-bit.conf: |
     # Just include the normal file and append to it the S3 output
     @include /fluent-bit/etc/fluent-bit.conf
-
     # Output only audit log by default
     [OUTPUT] # <.>
         Name                         s3
