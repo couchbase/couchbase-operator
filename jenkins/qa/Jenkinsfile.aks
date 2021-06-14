@@ -28,13 +28,13 @@ pipeline {
   }
 
   parameters {
-    string(name: 'refspec', defaultValue: 'refs/heads/master')
-    string(name: 'operator_image', defaultValue: 'registry.gitlab.com/cb-vanilla/operator:latest')
-    string(name: 'admission_image', defaultValue: 'registry.gitlab.com/cb-vanilla/admission-controller:latest')
+    string(name: 'refspec', defaultValue: 'refs/heads/2.2.x')
+    string(name: 'operator_image', defaultValue: 'couchbase/operator:2.2.0')
+    string(name: 'admission_image', defaultValue: 'couchbase/admission-controller:2.2.0')
     string(name: 'server_image', defaultValue: 'couchbase/server:6.6.2')
     string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.1')
-    string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-vanilla/operator-backup:latest')
-    string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-vanilla/exporter:latest')
+    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:1.1.0')
+    string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.4')
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.3')
     string(name: 'logging_image', defaultValue: 'couchbase/fluent-bit:1.0.1')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.2-enterprise')
@@ -70,7 +70,7 @@ pipeline {
     AZURE_SUBSCRIPTION_ID = credentials('azure-subscription-id')
     AZURE_TENANT_ID = credentials('azure-tenant-id')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
-    NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+    NAME = "cao-pipeline-aks-22x-${env.BUILD_NUMBER}"
     TF_IN_AUTOMATION = "TRUE"
   }
 
