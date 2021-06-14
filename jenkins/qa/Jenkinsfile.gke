@@ -16,10 +16,10 @@ pipeline {
     // Don't use all the disk, these servers aren't monitored with Nagios or anything.
     buildDiscarder(
       logRotator(
-        artifactDaysToKeepStr: '7',
-        artifactNumToKeepStr: '10',
-        daysToKeepStr: '7',
-        numToKeepStr: '10',
+        artifactDaysToKeepStr: '14',
+        artifactNumToKeepStr: '20',
+        daysToKeepStr: '14',
+        numToKeepStr: '20',
       )
     )
 
@@ -35,15 +35,15 @@ pipeline {
     string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.1')
     string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-vanilla/operator-backup:latest')
     string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-vanilla/exporter:latest')
-    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.3')
-    string(name: 'logging_image', defaultValue: 'couchbase/fluent-bit:1.0.3')
+    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.4')
+    string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-vanilla/fluent-bit:latest')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.2-enterprise')
     string(name: 'platform', defaultValue: 'kubernetes')
-    string(name: 'kubernetes_version', defaultValue: '1.18')
+    string(name: 'kubernetes_version', defaultValue: '1.20')
     string(name: 'storage_class', defaultValue: 'standard-rwo')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
-    string(name: 'kubectl_version', defaultValue: '1.18.16')
+    string(name: 'kubectl_version', defaultValue: '1.20.7')
     string(name: 'gcloud_sdk_version', defaultValue: '341')
     choice(name: 'release_channel', choices: "None\nrapid\nregular\nstable")
     string(name: 's3_region', defaultValue: 'us-west-2')
