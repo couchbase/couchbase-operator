@@ -311,6 +311,7 @@ pipeline {
       dir("./test/e2e/resources/provisioners/eks") {
         sh "terraform destroy -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -var remote=true -auto-approve -no-color"
       }
+      sh 'rm /root/.aws/credentials'
       cleanWs()
     }
   }
