@@ -605,7 +605,7 @@ stringData:
 ----
 
 <.> Note that the `role_arn` key is an important setting to specify if not using something like instance roles.
-All the various options are described in the official Fluent Bit documentation for the https://docs.fluentbit.io/manual/pipeline/outputs/s3[Azure Blob output plugin^].
+All the various options are described in the official Fluent Bit documentation for the https://docs.fluentbit.io/manual/pipeline/outputs/s3[Amazon S3 output plugin^].
 
 == Log Redaction In-flight
 
