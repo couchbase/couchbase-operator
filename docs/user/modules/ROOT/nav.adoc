@@ -119,6 +119,3 @@ include::partial$autogen-reference.adoc[]
 
 .Release Notes
 * xref:release-notes.adoc[Release Notes]
-
-.Cloud-Native Database
-* xref:cloud-native-database::index.adoc[Go to Cloud-Native Database Documentation]
