@@ -90,14 +90,17 @@ def get_cluster_version(args, region):
                       '--region', region,
                       '--format', 'json')
     versions = json.loads(versions)
-    for master_version in versions['validMasterVersions']:
-        if master_version.startswith(args.cluster_version):
-            version = master_version
-            break
+    if args.release_channel == "None":
+        for master_version in versions['validMasterVersions']:
+            if master_version.startswith(args.cluster_version):
+                return master_version
     else:
-        raise RuntimeError('no valid versions found')
-
-    return version
+        for channel in versions['channels']:
+            if channel['channel'] == args.release_channel.upper():
+                for valid_version in channel['validVersions']:
+                    if valid_version.startswith(args.cluster_version):
+                        return valid_version
+    raise RuntimeError('no valid versions found')
 
 def start(args):
     """Creates a virutal network and per region Kubernetes cluster"""
@@ -128,13 +131,9 @@ def start(args):
     for region, _ in REGIONS.items():
         # Define any arguments that aren't static.
         dynamic_args = []
-        if args.release_channel:
-            dynamic_args.extend(('beta', 'container', 'clusters', 'create', args.name,
-                                 '--release-channel', args.release_channel))
-            gcloud('components', 'install', 'beta')
-        else:
-            dynamic_args.extend(('container', 'clusters', 'create', args.name,
-                                 '--cluster-version', get_cluster_version(args, region)))
+        dynamic_args.extend(('container', 'clusters', 'create', args.name,
+                            '--release-channel', args.release_channel, '--cluster-version',
+                            get_cluster_version(args, region)))
 
         # Create this regions's Kubernetes cluster.
         gcloud(*dynamic_args,
@@ -191,10 +190,8 @@ def main():
     parser.add_argument('command')
     parser.add_argument('-n', '--name', required=True)
     parser.add_argument('-m', '--machine', default=MACHINE)
-
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('-c', '--cluster-version')
-    group.add_argument('-r', '--release-channel', choices=['None', 'rapid', 'regular', 'stable'])
+    parser.add_argument('-c', '--cluster-version')
+    parser.add_argument('-r', '--release-channel', choices=['None', 'rapid', 'regular', 'stable'])
 
     args = parser.parse_args()
     if args.command == 'start' and not (args.cluster_version or args.release_channel):

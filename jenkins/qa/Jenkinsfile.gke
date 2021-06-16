@@ -44,7 +44,8 @@ pipeline {
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 'kubectl_version', defaultValue: '1.18.16')
-    string(name: 'release_channel', defaultValue: 'None')
+    string(name: 'gcloud_sdk_version', defaultValue: '341')
+    choice(name: 'release_channel', choices: "None\nrapid\nregular\nstable")
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '100')
     string(name: 'istio_version', defaultValue: '1.9.0')
@@ -99,15 +100,9 @@ pipeline {
 
     stage('GKE Provisioning') {
       steps {
-        sh "wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-314.0.0-linux-x86_64.tar.gz | tar xzf -"
+        sh "wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${params.gcloud_sdk_version}.0.0-linux-x86_64.tar.gz | tar xzf -"
         sh "gcloud auth activate-service-account ${GCLOUD_AUTH_ACCOUNT} --key-file ${GCLOUD_AUTH_JSON} --project ${GCLOUD_AUTH_PROJECT}"
-          script {
-              if (params.release_channel != 'None') {
-                  sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --release-channel ${params.release_channel} --machine n2-standard-4"
-              } else {
-                  sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --cluster-version ${params.kubernetes_version} --machine n2-standard-4"
-              }
-          }
+        sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --release-channel ${params.release_channel} --cluster-version ${params.kubernetes_version} --machine n2-standard-4"
 	      sh "KUBECONFIG=${env.WORKSPACE}/config1 gcloud container clusters get-credentials ${env.NAME} --region us-east1"
         sh "KUBECONFIG=${env.WORKSPACE}/config2 gcloud container clusters get-credentials ${env.NAME} --region us-west1"
       }
