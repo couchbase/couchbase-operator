@@ -36,15 +36,31 @@ This is to ensure that Helm can continue to update and manage all resources appr
 Upgrading the Autonomous Operator and Admission Controller to a newer version requires that you upgrade the _release_ to a newer version of its _chart_.
 This allows Helm to ensure that all dependencies specified by the chart get updated appropriately.
 
+====
+IMPORTANT: An upgrade also requires the CRDs to be updated, this is something that Helm is https://github.com/helm/community/blob/f9e06c16d89ccea1bea77c01a6a96ae3b309f823/architecture/crds.md#upgrading-crds[unable to do^].
+The CRDs must be replaced (not deleted as this will remove any existing clusters) with the version for the release you want to upgrade to.
+Refer to the xref:howto-operator-upgrade.adoc#update-crd[Operator upgrade documentation] for detailed information on this stage.
+====
+
 .To upgrade the Autonomous Operator using Helm:
+
+To upgrade the Autonomous Operator using Helm, start by updating the CRD:
+[source,console]
+----
+kubectl apply -f <crds.yaml>
+----
+
+Where `<crds.yaml>` is the CRD definitions for the release to upgrade to, refer to the xref:howto-operator-upgrade.adoc[Operator upgrade documentation] for details on these.
+If the original CRDs were added using `kubectl create` then errors may be reported  during `kubectl apply` indicating this but they can be ignored: these errors will include text similar to `non applied resources being applied`.
+The point is to ensure any old ones are updated or removed plus new ones are added.
+
+Once those are complete then upgrade the chart version:
 [source,console]
 ----
 helm upgrade --version <chart-version> <release-name> couchbase/couchbase-operator
 ----
 
-Where `<chart-version>` is the version of the Couchbase Helm Chart that you want to upgrade to, and  `<release-name>` is the name of the release that is managing the instance of the Autonomous Operator that you wish to upgrade.
-
-Refer to the xref:howto-operator-upgrade.adoc[Operator upgrade documentation] for more information about the upgrade process.
+Where `<chart-version>` is the version of the Couchbase Helm Chart that you want to upgrade to, and `<release-name>` is the name of the release that is managing the instance of the Autonomous Operator that you wish to upgrade.
 
 ==== Limitations
 

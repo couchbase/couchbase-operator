@@ -58,7 +58,8 @@ New CRDs may also be introduced that need installing.
 [IMPORTANT]
 ====
 CRDs are distributed as a single file.
-During the upgrade procedure, errors are expected during the `create` operation if a CRD already exists for a resource type.
+During the upgrade procedure, errors are expected during the `apply` operation if a CRD was previously created using a `create` operation.
+Using `apply` here allows the CRD to be replaced and created all in one operation.
 ====
 
 To update the CRDs, run the following command:
@@ -70,8 +71,7 @@ Kubernetes::
 --
 [source,console]
 ----
-$ kubectl replace -f crd.yaml
-$ kubectl create -f crd.yaml
+$ kubectl apply -f crd.yaml
 ----
 --
 
@@ -80,8 +80,7 @@ OpenShift::
 --
 [source,console]
 ----
-$ oc replace -f crd.yaml
-$ oc create -f crd.yaml
+$ oc apply -f crd.yaml
 ----
 --
 ====
