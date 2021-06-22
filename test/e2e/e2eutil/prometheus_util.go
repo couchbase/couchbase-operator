@@ -12,6 +12,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -100,13 +101,14 @@ func getPodMetrics(k8s *types.Cluster, podName, podPort string, ctx *TLSContext)
 func checkOperatorMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) error {
 	operatorPodSelector := "app=couchbase-operator"
 	operatorMetricsPort := "8383"
+	metricPrefix := metrics.MetricNamespace + "_" + metrics.MetricSubsystem + "_"
 
-	_, err := checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, "couchbase_http_")
+	_, err := checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"server_http_")
 	if err != nil {
 		return err
 	}
 
-	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, "couchbase_reconcile_")
+	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"reconcile_")
 
 	return err
 }
