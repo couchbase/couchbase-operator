@@ -40,7 +40,7 @@ pipeline {
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.2-enterprise')
     string(name: 'platform', defaultValue: 'kubernetes')
     string(name: 'kubernetes_version', defaultValue: '1.18.17')
-    string(name: 'storage_class', defaultValue: 'cao-azurefile')
+    string(name: 'storage_class', defaultValue: 'default')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 'kubectl_version', defaultValue: '1.18.16')
