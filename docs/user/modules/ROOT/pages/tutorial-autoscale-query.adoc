@@ -20,21 +20,7 @@ Before you begin this tutorial, you'll need to set up a few things first:
 * You'll need a Kubernetes cluster with at least 10 available worker nodes.
 ** Worker nodes should have 4 vCPU and 16 GiB memory in order to exhibit the expected auto-scaling behavior that you'll be initiating later on in this tutorial.
 
-* Your Kubernetes cluster must have https://github.com/kubernetes-sigs/metrics-server[Metrics Server^] deployed.
-** Metrics Server collects resource metrics such as `cpu` and `memory` from pods and nodes, and exposes them through the https://kubernetes.io/docs/tasks/debug-application-cluster/resource-metrics-pipeline/#the-metrics-api[Metrics API^].
-These metrics need to be available later on in the tutorial when we set up our Couchbase cluster to automatically scale the number of Query Service nodes based on `cpu` utilization.
-** Metrics Server may not be deployed by default in your Kubernetes cluster.
-Run the following command to verify that Metrics Server is properly installed and exposing the necessary resource metrics:
-+
-[source,console]
-----
-$ kubectl get --raw /apis/metrics.k8s.io/v1beta1
-----
-+
-The response should contain an `APIResourceList` with the type of resources that can be fetched.
-If you receive a `NotFound` error, then you'll need to https://github.com/kubernetes-sigs/metrics-server#installation[install Metrics Server^].
-
-* You'll need https://helm.sh/docs/intro/install/[Helm version 3.1] or higher for installing the necessary dependencies (e.g. the Autonomous Operator, the Couchbase cluster, etc.)
+* You'll need https://helm.sh/docs/intro/install/[Helm version 3.1^] or higher for installing the necessary dependencies (e.g. the Autonomous Operator, the Couchbase cluster, etc.)
 
 ** Once you have Helm installed, you'll need to add the Couchbase chart repository:
 +
@@ -50,6 +36,44 @@ Then make sure to update the repository index:
 $ helm repo update
 ----
 
+== Deploy Metrics Server
+
+Your Kubernetes cluster must have https://github.com/kubernetes-sigs/metrics-server[Metrics Server^] deployed.
+Metrics Server collects resource metrics such as `cpu` and `memory` from pods and nodes, and exposes them through the https://kubernetes.io/docs/tasks/debug-application-cluster/resource-metrics-pipeline/#the-metrics-api[Metrics API^].
+These metrics need to be available later on in this tutorial when we set up our Couchbase cluster to automatically scale the number of Query Service nodes based on `cpu` utilization.
+
+Metrics Server may not be deployed by default in your Kubernetes cluster.
+Run the following command to verify that Metrics Server is properly installed and exposing the necessary resource metrics:
+
+[source,console]
+----
+$ kubectl get --raw /apis/metrics.k8s.io/v1beta1
+----
+
+The response should contain an `APIResourceList` with the type of resources that can be fetched:
+
+----
+{"kind":"APIResourceList","apiVersion":"v1","groupVersion":"metrics.k8s.io/v1beta1","resources":[{"name":"nodes","singularName":"","namespaced":false,"kind":"NodeMetrics","verbs":["get","list"]},{"name":"pods","singularName":"","namespaced":true,"kind":"PodMetrics","verbs":["get","list"]}]}
+----
+
+If you receive a `NotFound` error, then you'll need to https://github.com/kubernetes-sigs/metrics-server#installation[install Metrics Server^]:
+
+[source,console]
+----
+$ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+----
+
+Verify Metrics Server has been successfully deployed:
+
+[source,console]
+----
+kubectl get deployment metrics-server -n kube-system
+----
+----
+NAME             READY   UP-TO-DATE   AVAILABLE   AGE
+metrics-server   1/1     1            1           2m2s
+----
+
 == Reserve Nodes for the Workload Generator
 
 Later on in this tutorial we'll be using a separate application to generate a query workload that will induce auto-scaling.
@@ -58,7 +82,7 @@ We can do this by applying a scheduling tolerance with the following commands:
 
 [source,console]
 ----
-$ APP_NODE=$(kubectl get nodes | tail -1  | awk '{print $1}')
+$ APP_NODE=$(kubectl get nodes | grep Ready | head -1  | awk '{print $1}')
 ----
 
 [source,console]
@@ -76,7 +100,7 @@ Run the following command to create a file with the necessary override values fo
 
 [source,console]
 ----
-$ cat << EOF >> autoscale_values.yaml
+$ cat << EOF > autoscale_values.yaml
 ---
 cluster:
   cluster:
@@ -235,6 +259,7 @@ $ kubectl get --raw="/apis/metrics.k8s.io/v1beta1/namespaces/default/pods/scale-
 
 TIP: This validation is also helpful for debugging as the HPA takes the averages of these values when making auto-scaling decisions.
 
+[[create-a-horizontal-pod-autoscaler]]
 == Create a Horizontal Pod Autoscaler
 
 Now that we've confirmed that CPU metrics data are being collected, we can create a `HorizontalPodAutoscaler` resource that targets this metric.
@@ -393,6 +418,7 @@ EOF
 You can check the Couchbase Web Console to ensure that the data set has been loaded.
 You should also see that indexes have been created for querying the documents.
 
+[[apply-query-workload]]
 === Apply Query Workload
 
 Now that the Travel Sample data has been loaded and indexed, we can put a CPU-intensive load on the Query Service that should trigger auto-scaling to occur.
@@ -463,7 +489,7 @@ Events:
 +
 [NOTE]
 ====
-The following https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#algorithm-details[scaling algorithm] was applied by the HPA to determine the desired replicas:
+The following https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#algorithm-details[scaling algorithm^] was applied by the HPA to determine the desired replicas:
 
 [source,console]
 ----
@@ -472,18 +498,22 @@ desiredReplicas = ceil[currentReplicas * ( currentMetricValue / desiredMetricVal
 ----
 ====
 
-After 1 minute the query generator will complete and the number of `query` nodes will eventually scale back down to the previously-configured minimum of two nodes.
+After 10 minutes the query generator will complete and the number of `query` nodes will eventually scale back down to the previously-configured minimum of two nodes.
 
 NOTE: If your CPU utilization didn't reach the target value, you can try with a lower CPU utilization threshold, or apply additional query generators by adjusting the `concurrency` and `seed` values.
 
-=== Scaling down
+=== Optional: Limit Scale Down Rate
 
-In the example above we have specified a https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#example-change-downscale-stabilization-window[stabilization window of 60 seconds^].
-This means that after the time has elapsed then the nodes will be monitored and if their loading has reduced then they will be considered for scaling down.
+When we created the `HorizontalPodAutoscaler` resource in a <<create-a-horizontal-pod-autoscaler,previous step>>, we specified a `scaleDown` xref:concept-couchbase-autoscaling.adoc#horizontal-pod-stabilization[stabilization window] of 60 seconds.
+During this time the nodes will be monitored, and if their loading has reduced below the target threshold, then they will be considered for scaling down.
 They will then scale down according to the rules of the HPA policy being used.
+Since the query generator cuts off the workload completely after a certain duration, down-scaling will happen rapidly after the generator has completed its run.
 
-We could prevent scaling down by disabling the scale down https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#example-disable-scale-down[policy^].
-Once the example above has scaled back down you can change the configuration like so to disable scale down:
+You may find that rapid down-scaling is not desirable for your environment and workload, or perhaps you want to disable automatic down-scaling completely in favor of manual down-scaling.
+These types of configurations can be accomplished by customizing the `scaleDown` policy in the `HorizontalPodAutoscaler` resource.
+
+First, let's consider the scenario where we want to reduce the rate of down-scaling.
+We can accomplish this by configuring a policy that scales in smaller xref:concept-couchbase-autoscaling.adoc#scaling-increments[_increments_]:
 
 [source,console]
 ----
@@ -494,16 +524,44 @@ apiVersion: autoscaling/v2beta2
 metadata:
   name: query-cpu-hpa
 spec:
+  scaleTargetRef:
+    apiVersion: couchbase.com/v2
+    kind: CouchbaseAutoscaler
+    name: query.scale-couchbase-cluster
   behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 15
     scaleDown:
-      selectPolicy: Disabled
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 1 <.>
+        periodSeconds: 60
+      selectPolicy: Min <.>
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
 EOF
 ----
 
-This would mean that the cluster only ever scales up, this can be useful when sizing it to a maximum load and to keep it there.
-Now, run the workload generator again and you will see it scale up but once left for over a minute it will never scale down.
+<.> This policy specifies that the HPA will only make scale-down recommendations in increments of one replica.
 
-We can then look to scale down in increments using the `Min` https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#example-limit-scale-down-rate[policy^] to reduce pod count by no more than 1 per minute:
+<.> Setting policy selection to `Min` tells the HPA to always select the policy that results in the least amount of down-scaling.
+
+To see this configuration in action, run the above command to apply it to the existing `HorizontalPodAutoscaler` resource, and then repeat <<apply-query-workload>>.
+You can monitor the pods and see them drop back down eventually to their starting point at a rate of one replica per minute.
+
+If you want to try disabling down-scaling completely, you can instead set policy selection to `Disabled`:
 
 [source,console]
 ----
@@ -514,17 +572,41 @@ apiVersion: autoscaling/v2beta2
 metadata:
   name: query-cpu-hpa
 spec:
+  scaleTargetRef:
+    apiVersion: couchbase.com/v2
+    kind: CouchbaseAutoscaler
+    name: query.scale-couchbase-cluster
   behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 15
     scaleDown:
+      stabilizationWindowSeconds: 60
       policies:
       - type: Pods
         value: 1
         periodSeconds: 60
-      selectPolicy: Min
+      selectPolicy: Disabled <.>
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
 EOF
 ----
 
-Once this is applied to the previous example (locked at maximum), you can monitor the pods and see them drop back down eventually to their starting point at a rate of one per minute.
+<.> Disabling down-scaling means that the cluster only ever scales up.
+This can be useful when sizing it to a maximum load and to keep it there.
+
+To see this configuration in action, run the above command to apply it to the existing `HorizontalPodAutoscaler` resource, and then repeat <<apply-query-workload>>.
+You can monitor the pods and see them scale up, after the workload generator finishes its run, the number of pods will never scale down.
 
 == Cleaning up
 
@@ -555,7 +637,7 @@ Remove the scheduling tolerance that we applied for the workload generator:
 
 [source,console]
 ----
-$ APP_NODE=$(kubectl get nodes | tail -1  | awk '{print $1}')
+$ APP_NODE=$(kubectl get nodes | grep Ready | head -1  | awk '{print $1}')
 ----
 
 [source,console]
