@@ -43,6 +43,7 @@ const (
 	TagFeatureScheduling        = "scheduling"
 	TagFeatureAutoScaling       = "autoscaling"
 	TagFeatureBackup            = "backup"
+	TagFeatureReconcile         = "reconcile"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -445,6 +446,7 @@ func registerTests() {
 		framework.NewTestDef(TestAutoscaleMultiConfigs).WithTags(TagSuiteP1, TagFeatureAutoScaling),
 		framework.NewTestDef(TestScheduleEvacuateAllPersistent).WithTags(TagSuiteP1, TagFeaturePersistentVolumes, TagFeatureScheduling),
 		framework.NewTestDef(TestScheduleCleanupUninitializedPod).WithTags(TagSuiteP1),
+		framework.NewTestDef(TestCustomAnnotationsAndLabelsStayAfterReconcile).WithTags(TagSuiteP1, TagFeatureReconcile),
 
 		// System tests.
 		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem),

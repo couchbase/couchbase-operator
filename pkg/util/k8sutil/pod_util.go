@@ -580,9 +580,27 @@ func NameForPersistentVolumeClaim(memberName string, index int, mountName couchb
 	return fmt.Sprintf("%s-%s-%02d", memberName, mountName, index)
 }
 
+// MaintainMutablePodConfiguration will preserve any annotations or labels that describe the metadata.
+// Preserve any labels or annotations that are updated by other means, typically
+// for pods this is only upgrades but also for Istio and similar third parties.
+func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
+	// Any duplicates are set based on what is in requested (overwriting actual/current)
+	requested.Labels = mergeLabels(actual.Labels, requested.Labels)
+
+	// We need to preserve some annotations particularly for upgrade so create a copy
+	newAnnotations := mergeLabels(actual.Annotations, requested.Annotations)
+
+	newAnnotations[constants.ResourceVersionAnnotation] = actual.Annotations[constants.ResourceVersionAnnotation]
+	newAnnotations[constants.PodSpecAnnotation] = actual.Annotations[constants.PodSpecAnnotation]
+	newAnnotations[constants.CouchbaseVersionAnnotationKey] = actual.Annotations[constants.CouchbaseVersionAnnotationKey]
+
+	// Now use the copy as the version to set
+	requested.Annotations = newAnnotations
+}
+
 // CreateCouchbasePodSpec creates an "idealized" pod specification.  This must be invariant
 // across creations e.g. init containers are only needed during the initial creation and not
-// required for recovery, therefore should not be done here.  We use this invaiance property
+// required for recovery, therefore should not be done here.  We use this invariance property
 // in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.

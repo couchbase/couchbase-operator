@@ -260,3 +260,33 @@ func TestAntiAffinityOff(t *testing.T) {
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
+
+func TestCustomAnnotationsAndLabelsStayAfterReconcile(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Create the cluster.
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+
+	// Add a custom annotation and label to the pod, wait for reconcile and then confirm the annotations are still present
+	newAnnotations := make(map[string]string)
+	newAnnotations["special.istio.annotation"] = "true"
+
+	newLabels := make(map[string]string)
+	newLabels["special.istio.label"] = "true"
+
+	// Add custom annotations and labels
+	e2eutil.MustAddCustomAnnotationAndLabels(t, targetKube, testCouchbase, newAnnotations, newLabels)
+	// Wait for reconcile period to pass
+	time.Sleep(time.Minute)
+	// Ensure we still have them after waiting for a reconcile period to pass
+	e2eutil.MustCheckCustomAnnotationAndLabels(t, targetKube, testCouchbase, newAnnotations, newLabels)
+}

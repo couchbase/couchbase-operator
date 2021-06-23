@@ -1845,15 +1845,9 @@ func (c *Cluster) reconcilePods() error {
 			return err
 		}
 
-		// Preserve any annotations that describe the metadata.  In this case the version
-		// represents the Operator version that created the pod.  Certain annotations may
-		// only be present on pods of a particular version.
-		requested.Annotations[constants.ResourceVersionAnnotation] = actual.Annotations[constants.ResourceVersionAnnotation]
-
-		// Preserve any labels or annotations that are updated by other means, typically
-		// for pods this is only upgrades.
-		requested.Annotations[constants.PodSpecAnnotation] = actual.Annotations[constants.PodSpecAnnotation]
-		requested.Annotations[constants.CouchbaseVersionAnnotationKey] = actual.Annotations[constants.CouchbaseVersionAnnotationKey]
+		// Preserve mutable metadata as this may be added and/or required by other tooling, e.g. Istio. Only enforce
+		// what we are told to enforce.
+		k8sutil.MaintainMutablePodConfiguration(actual, requested)
 
 		if reflect.DeepEqual(actual.Labels, requested.Labels) && reflect.DeepEqual(actual.Annotations, requested.Annotations) {
 			continue

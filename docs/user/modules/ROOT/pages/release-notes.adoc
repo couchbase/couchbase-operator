@@ -255,6 +255,12 @@ For more information, refer to xref:howto-prometheus.adoc#customizing-metrics[Cu
 |===
 | Issue | Description
 
+a| https://issues.couchbase.com/browse/K8S-2273[K8S-2273^]
+a| *Summary:* When using Istio with mTLS in STRICT mode, there is the possibility of a race condition that prevents traffic between the operator and new server pods.
+Typically this issue is observed as an `EOL` error when the operator uses the REST API of the new pods.
+On previous versions, the Istio annotations were not preserved.
+This has been remedied by ensure the Istio annotations are maintained on any pods and allow for mTLS in STRICT mode for everything except for the DAC, which requires PERMISSIVE mode regardless to communicate over TLS with the Kubernetes API.
+
 a| https://issues.couchbase.com/browse/K8S-2180[K8S-2180^]
 a| *Summary:* When using service types in both the console and exposed feature service templates, a logical problem meant that the deprecated service type field defaults overwrote those provided in the template.
 For example, when setting the template type to `LoadBalancer`, this may have ended up as `NodePort` due to the old defaults taking precedence.
@@ -262,7 +268,6 @@ This has now been fixed so that the template will take precedence.
 
 a| https://issues.couchbase.com/browse/K8S-2128[K8S-2128^]
 a| *Summary:* Prior to backup images `couchbase/operator-backup:6.5.0-XXX`, `couchbase/operator-backup:6.6.0-XXX`, and `couchbase/operator-backup:1.0.0` a bug meant that all backup traffic between the job and Couchbase server was in plain text.
-+
 While these backup images will work with plain TLS and mTLS, it will not work with mandatory mTLS configurations, as `cbbackupmgr` does not support client certificate authentication.
 Autonomous Operator 2.2 will fall back to plain text backup when using mandatory mTLS in order to facilitate functional backups.
 
