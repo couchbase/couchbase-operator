@@ -20,6 +20,11 @@ This release supports the deployment of the following Couchbase software:
 | 6.5.1+, 6.6
 |===
 
+The following diagram depicts Couchbase Server compatibility with the Operator for this, and previous releases, and can be used to calculate upgrade paths:
+
+.Couchbase Server Compatibility
+image:compatibility-server.png[]
+
 [[couchbase-backup-and-restore-compatibility]]
 === Couchbase Backup and Restore Compatibility
 
@@ -36,6 +41,11 @@ a| xref:6.6@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 6.6.2`]
 | Couchbase Server 6.6--5.5
 |===
 
+The following diagram depicts Operator Backup image compatibility with all supported Couchbase Server versions, you should consider this when upgrading Couchbase Server:
+
+.Operator Backup Compatibility
+image:compatibility-backup.png[]
+
 [[kubernetes-platform-compatibility]]
 == Kubernetes Compatibility
 
@@ -51,6 +61,14 @@ This release supports the following Kubernetes platforms:
 | Red Hat OpenShift Container Platform
 | 4.4, 4.5, 4.6, 4.7
 |===
+
+The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:
+
+.Kubernetes Compatibility
+image:compatibility-kubernetes.png[]
+
+.Red Hat OpenShift Compatibility
+image:compatibility-openshift.png[]
 
 === Managed Kubernetes Compatibility
 
