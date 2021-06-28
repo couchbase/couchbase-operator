@@ -67,7 +67,8 @@ pipeline {
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
     S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
     S3_SECRET_ID = credentials('cbqe-s3-secret-id')
-    AWS_CREDENTIALS = credentials('couchbaseqe-aws')
+    AWS_ACCESS_KEY_ID=credentials('couchbaseqe-aws-access-id')
+    AWS_SECRET_ACCESS_KEY=credentials('couchbaseqe-aws-access-secret')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
     NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     TF_IN_AUTOMATION = "TRUE"
@@ -101,8 +102,6 @@ pipeline {
 
     stage('EKS Provisioning') {
       steps {
-        sh "aws configure set aws_access_key_id ${env.AWS_CREDENTIALS_USR}"
-        sh "aws configure set aws_secret_access_key ${env.AWS_CREDENTIALS_PSW}"
         sh "aws configure set default.region us-west-2"
         sh "aws configure set default.output json"
         dir("./test/e2e/resources/provisioners/eks") {
@@ -311,7 +310,6 @@ pipeline {
       dir("./test/e2e/resources/provisioners/eks") {
         sh "terraform destroy -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -var remote=true -auto-approve -no-color"
       }
-      sh 'rm /root/.aws/credentials'
       cleanWs()
     }
   }
