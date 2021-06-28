@@ -16,10 +16,10 @@ pipeline {
     // Don't use all the disk, these servers aren't monitored with Nagios or anything.
     buildDiscarder(
       logRotator(
-        artifactDaysToKeepStr: '7',
-        artifactNumToKeepStr: '10',
-        daysToKeepStr: '7',
-        numToKeepStr: '10',
+        artifactDaysToKeepStr: '14',
+        artifactNumToKeepStr: '20',
+        daysToKeepStr: '14',
+        numToKeepStr: '20',
       )
     )
 

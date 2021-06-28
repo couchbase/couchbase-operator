@@ -150,6 +150,7 @@ module "cluster1" {
   cluster_version = var.kubernetes-version
   subnets         = module.vpc1.public_subnets
   vpc_id          = module.vpc1.vpc_id
+  wait_for_cluster_timeout = 600
 
   cluster_security_group_id             = aws_security_group.securitygroup1.id
   worker_additional_security_group_ids  = [aws_security_group.securitygroup1.id]
@@ -184,6 +185,7 @@ module "cluster2" {
   cluster_version = var.kubernetes-version
   subnets         = module.vpc2[0].public_subnets
   vpc_id          = module.vpc2[0].vpc_id
+  wait_for_cluster_timeout = 600
 
   cluster_security_group_id             = aws_security_group.securitygroup2[0].id
   worker_additional_security_group_ids  = [aws_security_group.securitygroup2[0].id]
