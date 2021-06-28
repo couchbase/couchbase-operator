@@ -79,9 +79,21 @@ Istio is currently the only supported service mesh.
 
 Use of service meshes should, for the most part, be transparent to the Autonomous Operator and Couchbase cluster, however there are a few things to be aware of:
 
-* You cannot enable/disable a service mesh in a namespace where an Autonomous Operator deployment is already running.
-The service mesh must be enabled in the namespace before you install the Autonomous Operator and provision any Couchbase clusters.
-* You should not configure the Autonomous Operator to use TLS if the service mesh is already providing an mTLS transport.
+* Dynamic Admission Controller Considerations
+
+** The DAC is part of the Kubernetes API, therefore governed by different rules to other Kubernetes services under Istio management.
+  The Kubernetes control plane does not have Istio enabled, therefore the DAC cannot be provisioned with strict mTLS as the client will not have an Envoy proxy.
+  The DAC may be provisioned with either no or permissive mTLS.
+
+* Couchbase Cluster Considerations
+
+** The service mesh must be enabled in the namespace before you install the Autonomous Operator and provision any Couchbase clusters.
+** You cannot enable/disable a service mesh in a namespace where an Autonomous Operator deployment is already running.
+   This is especially true of migration to strict mTLS as Couchbase cluster nodes will not be able to communicate with one another during the upgrade.
+   While an upgrade to permissive mTLS may work, it has not been tested, therefore is unsupported.
+** You should not configure the Autonomous Operator to use TLS if the service mesh is already providing an mTLS transport.
+** In order to establish connections between a client and server when strict mTLS is enabled, both the client and server need to be running with an Envoy proxy, and be part of the same Istio control plane.
+  For this reason, clients and XDCR connections originating from outside of the Kubernetes cluster must connect to a Couchbase cluster with either no or permissive mTLS.
 
 == Inter-Kubernetes Networking
 

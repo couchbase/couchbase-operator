@@ -158,4 +158,5 @@ $ oc delete -f crd.yaml
 
 == Next Steps
 
-* xref:howto-couchbase-create.adoc[How-to Deploy a Couchbase Cluster]
+* xref:howto-couchbase-create.adoc[How-to Deploy a Couchbase Cluster, a basic configuration]
+* xref:reference-reference-architecture.adoc[`CouchbaseCluster` Reference Architecture, an advanced production configuration]

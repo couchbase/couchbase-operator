@@ -255,6 +255,12 @@ For more information, refer to xref:howto-prometheus.adoc#customizing-metrics[Cu
 |===
 | Issue | Description
 
+a| https://issues.couchbase.com/browse/K8S-2273[K8S-2273^]
+a| *Summary:* When using Istio with mTLS in STRICT mode, there is the possibility of a race condition that prevents traffic between the operator and new server pods.
+Typically this issue is observed as an `EOL` error when the operator uses the REST API of the new pods.
+On previous versions, the Istio annotations were not preserved.
+This has been remedied by ensure the Istio annotations are maintained on any pods and allow for mTLS in STRICT mode for everything except for the DAC, which requires PERMISSIVE mode regardless to communicate over TLS with the Kubernetes API.
+
 a| https://issues.couchbase.com/browse/K8S-2180[K8S-2180^]
 a| *Summary:* When using service types in both the console and exposed feature service templates, a logical problem meant that the deprecated service type field defaults overwrote those provided in the template.
 For example, when setting the template type to `LoadBalancer`, this may have ended up as `NodePort` due to the old defaults taking precedence.
@@ -262,7 +268,6 @@ This has now been fixed so that the template will take precedence.
 
 a| https://issues.couchbase.com/browse/K8S-2128[K8S-2128^]
 a| *Summary:* Prior to backup images `couchbase/operator-backup:6.5.0-XXX`, `couchbase/operator-backup:6.6.0-XXX`, and `couchbase/operator-backup:1.0.0` a bug meant that all backup traffic between the job and Couchbase server was in plain text.
-+
 While these backup images will work with plain TLS and mTLS, it will not work with mandatory mTLS configurations, as `cbbackupmgr` does not support client certificate authentication.
 Autonomous Operator 2.2 will fall back to plain text backup when using mandatory mTLS in order to facilitate functional backups.
 
@@ -289,6 +294,21 @@ a| https://issues.couchbase.com/browse/K8S-2052[K8S-2052^]
 a| *Summary:* A race condition existed where the Autonomous Operator was restarted and a backup `Pod` was still executing.
 This `Pod` was erroneously considered as part of a metadata update routine and caused a crash loop until the backup terminated.
 This has now been fixed by correctly filtering the pods considered for metadata updates to only include Couchbase Server instances.
+|===
+
+[#known-issues-v220]
+=== Known Issues
+
+[#table-known-issues-v220,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2248[K8S-2248^]
+a| *Summary:* Issues exist with the default Prometheus Exporter container image set by the Dynamic Admission Controller.
+
+*Workaround:* It is recommended that you _manually_ set xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-monitoring-prometheus-image[`couchbaseclusters.spec.monitoring.prometheus.image`] to `couchbase/exporter:1.0.5` in order to take advantage of the latest fixes.
+Note that changing the Couchbase Prometheus Exporter image for an existing Couchbase cluster will result in a rolling upgrade of the cluster pods.
+This does not cause any loss of services, but may use system resources -- therefore it is recommended that this be done during non-peak workload.
 |===
 
 ==== Other Notable Changes
