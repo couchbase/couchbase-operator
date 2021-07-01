@@ -485,6 +485,11 @@ func (c *Cluster) runReconcile() {
 				continue
 			}
 
+			// Pod is initialized, let the normal reconcile process occur.
+			if _, ok := pod.Annotations[constants.PodInitializedAnnotation]; ok {
+				continue
+			}
+
 			log.Info("Killing uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
 
 			if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, pod.Name, metav1.DeleteOptions{}); err != nil {
@@ -680,6 +685,12 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	// Don't delete the volumes here, we need them to recover from, and they
 	// contain precious customer data.
 	if err := c.createPod(ctx, m, *config, false); err != nil {
+		return err
+	}
+
+	// To get here the pod would need to be initialized and clustered, so this is
+	// safe.
+	if err := k8sutil.SetPodInitialized(c.k8s, m.Name()); err != nil {
 		return err
 	}
 
