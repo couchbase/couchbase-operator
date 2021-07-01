@@ -676,7 +676,17 @@ func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
 	// We need to preserve some annotations particularly for upgrade so create a copy
 	newAnnotations := mergeLabels(actual.Annotations, requested.Annotations)
 
+	// Preserve the version as this dictates what labels and annotations are valid
+	// for a specific operator version.  In particular for 2.2+ there is a label
+	// that is added to say that Couchbase has been initialized, and thus cannot be
+	// safely considered for deletion (this solves a deadlock where server doesn't
+	// get fully configured and any attempts to get the cluster state are rejected
+	// by server because it refuses to work properly until it has been configured).
 	newAnnotations[constants.ResourceVersionAnnotation] = actual.Annotations[constants.ResourceVersionAnnotation]
+
+	// The specification and couchbase server version are retained so that any
+	// subsequent pod changes can be detected by the topology reconciler.  Not
+	// doing this means that upgrades won't happen as they should.
 	newAnnotations[constants.PodSpecAnnotation] = actual.Annotations[constants.PodSpecAnnotation]
 	newAnnotations[constants.CouchbaseVersionAnnotationKey] = actual.Annotations[constants.CouchbaseVersionAnnotationKey]
 
