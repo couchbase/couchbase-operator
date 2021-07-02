@@ -2670,7 +2670,7 @@ type LogShipperSidecarSpec struct {
 	// Image is the image to be used to deal with logging as a sidecar.
 	// No validation is carried out as this can be any arbitrary repo and tag.
 	// It will default to the latest supported version of Fluent Bit.
-	// +kubebuilder:default="couchbase/fluent-bit:1.0.1"
+	// +kubebuilder:default="couchbase/fluent-bit:1.0.4"
 	Image string `json:"image,omitempty"`
 
 	// ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
@@ -2749,7 +2749,7 @@ type CouchbaseClusterAuditCleanupSidecarSpec struct {
 
 	// Image is the image to be used to run the audit sidecar helper.
 	// No validation is carried out as this can be any arbitrary repo and tag.
-	// +kubebuilder:default="busybox:1.32.1"
+	// +kubebuilder:default="busybox:1.33.1"
 	Image string `json:"image,omitempty"`
 
 	// The minimum age of rotated log files to remove, defaults to one hour.

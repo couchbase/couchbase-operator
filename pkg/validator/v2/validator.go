@@ -30,8 +30,8 @@ import (
 
 const (
 	defaultFSGroup              = 1000
-	defaultMetricsImage         = "couchbase/exporter:1.0.4"
-	redhatMetricsImage          = "registry.connect.redhat.com/couchbase/exporter:1.0.4-1"
+	defaultMetricsImage         = "couchbase/exporter:1.0.5"
+	redhatMetricsImage          = "registry.connect.redhat.com/couchbase/exporter:1.0.5-1"
 	defaultBackupImage          = "couchbase/operator-backup:1.1.0"
 	redhatBackupImage           = "registry.connect.redhat.com/couchbase/operator-backup:1.1.0-1"
 	defaultBackupServiceAccount = "couchbase-backup"

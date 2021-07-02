@@ -36,7 +36,7 @@ pipeline {
     string(name: 'backup_image', defaultValue: 'registry.connect.redhat.com/couchbase/operator-backup:1.1.0-1')
     string(name: 'exporter_image', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.5-1')
     string(name: 'exporter_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.4-1')
-    string(name: 'logging_image', defaultValue: 'registry.connect.redhat.com/couchbase/fluent-bit:1.0.1-1')
+    string(name: 'logging_image', defaultValue: 'registry.connect.redhat.com/couchbase/fluent-bit:1.0.4-1')
     string(name: 'mobile_image', defaultValue: 'registry.connect.redhat.com/couchbase/sync-gateway:2.8.2-1')
     string(name: 'platform', defaultValue: 'openshift')
     string(name: 'openshift_version', defaultValue: '4.7')
