@@ -55,6 +55,66 @@ You can use the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rolli
 To enable this feature while upgrading the Autonomous Operator, stop the old Operator, replace the CRDs, edit the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] field to enable bulk upgrades, then start the new Operator.
 Refer to xref:howto-operator-upgrade.adoc[] for further details.
 
+[#release-v221]
+== Release 2.2.1
+
+Couchbase Autonomous Operator 2.2.1 was released in July 2021.
+
+[#changes-in-behavior-v221]
+=== New Features and Behavioral Changes
+
+==== New Prometheus and Logging Defaults
+
+The new default images are `couchbase/exporter:1.0.5` and `couchbase/fluent-bit:1.0.4` respectively.
+These images feature functional and security updates.
+
+Existing clusters will continue to use the component versions they were provisioned with.
+Should you wish to update existing Couchbase clusters to make use of these new images, then they will undergo a rolling upgrade to facilitate the update.
+You should plan a maintenance window accordingly.
+
+[#fixed-issues-v221]
+=== Fixed Issues
+
+[#table-fixed-issues-v221,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2273[K8S-2273^]
+a| *Summary:* When using Istio with mTLS in STRICT mode, there is the possibility of a race condition that prevents traffic between the operator and new server pods.
+Typically this issue is observed as an `EOL` error when the operator uses the REST API of the new pods.
+On previous versions, the Istio annotations were not preserved.
+This has been remedied by ensure the Istio annotations are maintained on any pods and allow for mTLS in STRICT mode for everything except for the DAC, which requires PERMISSIVE mode regardless to communicate over TLS with the Kubernetes API.
+
+a| https://issues.couchbase.com/browse/K8S-2288[K8S-2288^]
+a| *Summary:* A new pod annotation was added in 2.2.0 to record whether Couchbase Server was fully initialized or not, as Couchbase Server will not work as required by the Operator until initialization is performed.
+The intention was to remove a deadlock situation that the Operator was unable to recover from.
+
+Due to a combination of https://issues.couchbase.com/browse/K8S-2273[K8S-2273^], and the label not being correctly checked, it is possible -- in the event of a network partition between the Operator and all pods in a Couchbase cluster, for example -- for the Operator to determine all nodes are uninitialized, and for them to be deleted.
+
+For any type of cluster, this risks service disruption.  For an ephemeral cluster -- without persistent storage backing -- this would also result in total data loss.
+
+a| https://issues.couchbase.com/browse/K8S-2248[K8S-2248^]
+a| *Summary:* The Couchbase Prometheus Exporter image default has been updated to the most recent version.
+This provides numerous stability fixes and enhanced security.
+
+a| https://issues.couchbase.com/browse/K8S-2297[K8S-2297^]
+a| *Summary:* The node selector defined for backups was only applied to the backup `Cronjob`, and not the restore `Job` also.
+This behavior has been fixed so the restores happen on the same nodes as backups.
+
+a| https://issues.couchbase.com/browse/K8S-2293[K8S-2293^]
+a| *Summary:* A defect was discovered where view service ports were only enabled for Couchbase Server instances with the index service enabled, as opposed to the data service.
+This has now been fixed to enable the ports on data service instances.
+
+This defect only affects users of map-reduce views, and only when used over an exposed feature from a network outside of Kubernetes.
+
+a| https://issues.couchbase.com/browse/K8S-2302[K8S-2302^]
+a| *Summary:* The LDAP cache timeout configuration value was optional, and had no default.
+As a result, this would not equal the Couchbase Server provided default of 30000 and result in constant updates.
+The `CouchbaseCluster` CRD has now been amended to provide this default and avoid the problem.
+
+Additionally defaults have been provided for the LDAP port and LDAP group search depth, and better range checking.
+|===
+
 [#release-v220]
 == Release 2.2.0
 
@@ -254,12 +314,6 @@ For more information, refer to xref:howto-prometheus.adoc#customizing-metrics[Cu
 [#table-fixed-issues-v220,cols="25,66"]
 |===
 | Issue | Description
-
-a| https://issues.couchbase.com/browse/K8S-2273[K8S-2273^]
-a| *Summary:* When using Istio with mTLS in STRICT mode, there is the possibility of a race condition that prevents traffic between the operator and new server pods.
-Typically this issue is observed as an `EOL` error when the operator uses the REST API of the new pods.
-On previous versions, the Istio annotations were not preserved.
-This has been remedied by ensure the Istio annotations are maintained on any pods and allow for mTLS in STRICT mode for everything except for the DAC, which requires PERMISSIVE mode regardless to communicate over TLS with the Kubernetes API.
 
 a| https://issues.couchbase.com/browse/K8S-2180[K8S-2180^]
 a| *Summary:* When using service types in both the console and exposed feature service templates, a logical problem meant that the deprecated service type field defaults overwrote those provided in the template.
