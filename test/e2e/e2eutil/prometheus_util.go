@@ -13,10 +13,11 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	testconstants "github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,12 +104,12 @@ func checkOperatorMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCl
 	operatorMetricsPort := "8383"
 	metricPrefix := metrics.MetricNamespace + "_" + metrics.MetricSubsystem + "_"
 
-	_, err := checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"server_http_")
+	_, err := checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"server_http_", false)
 	if err != nil {
 		return err
 	}
 
-	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"reconcile_")
+	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"reconcile_", false)
 
 	return err
 }
@@ -120,7 +121,24 @@ func MustCheckOperatorMetrics(t *testing.T, k8s *types.Cluster, couchbase *couch
 	}
 }
 
-func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, podPort, labelSelector, testString string) (string, error) {
+func checkPrometheusAnnotations(annotations map[string]string) error {
+	expectedAnnotations := []string{
+		constants.AnnotationPrometheusScrape,
+		constants.AnnotationPrometheusPath,
+		constants.AnnotationPrometheusPort,
+	}
+
+	for _, expected := range expectedAnnotations {
+		_, exists := annotations[expected]
+		if !exists {
+			return fmt.Errorf("missing annotation %q", expected)
+		}
+	}
+
+	return nil
+}
+
+func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, podPort, labelSelector, testString string, checkAnnotations bool) (string, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
@@ -142,6 +160,13 @@ func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 		if !strings.Contains(responseDataStr, testString) {
 			return responseDataStr, fmt.Errorf("response data does not contain any %s metrics", testString)
 		}
+
+		if checkAnnotations {
+			err := checkPrometheusAnnotations(pod.Annotations)
+			if err != nil {
+				return responseDataStr, err
+			}
+		}
 	}
 
 	return responseDataStr, nil
@@ -150,10 +175,10 @@ func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 // check that prometheus sidecar container is exporting the correct metrics
 // on all pods in the operator.
 func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) (string, error) {
-	serverPodSelector := constants.CouchbaseServerClusterKey + "=" + couchbase.Name
+	serverPodSelector := testconstants.CouchbaseServerClusterKey + "=" + couchbase.Name
 	serverMetricPort := "9091"
 
-	return checkAllPodMetrics(k8s, couchbase, ctx, serverMetricPort, serverPodSelector, "couchbase")
+	return checkAllPodMetrics(k8s, couchbase, ctx, serverMetricPort, serverPodSelector, "couchbase", true)
 }
 
 func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) string {
@@ -188,7 +213,7 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 	responseDataStr := ""
 
 	listOptions := metav1.ListOptions{
-		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+		LabelSelector: testconstants.CouchbaseServerClusterKey + "=" + couchbase.Name,
 	}
 
 	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)

@@ -37,6 +37,7 @@ const (
 	defaultSubPathName                        = "default"
 	etcSubPathName                            = "etc"
 	prometheusPort                            = 9091
+	prometheusPath                            = "/metrics"
 	serverSecretMountPath                     = "/var/run/secrets/couchbase.com/couchbase-server-tls"
 	operatorSecretMountPath                   = "/var/run/secrets/couchbase.com/couchbase-operator-tls"
 	metricsTokenMountPath                     = "/var/run/secrets/couchbase.com/metrics-token"
@@ -46,6 +47,7 @@ const (
 	CouchbaseAuditCleanupSidecarContainerName = "audit-cleanup"
 	loggingSidecarMetadataMountDir            = "/etc/podinfo"
 	loggingSidecarMetadataMountName           = "podinfo"
+	loggingPort                               = 2020
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -761,6 +763,10 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		return nil, err
 	}
 
+	// Break out the detection and application of monitoring labels/annotations based on
+	// what is enabled, server version, etc.
+	applyMetadata(cluster, pod)
+
 	// If TLS is specified then add the certificate volume.
 	if err := applyPodTLSConfiguration(cluster, pod); err != nil {
 		return nil, err
@@ -874,6 +880,49 @@ func applyPodMonitoring(client *client.Client, cluster *couchbasev2.CouchbaseClu
 	return nil
 }
 
+func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+	// Are we using a version of Server that has its own metrics exporter
+	serverVersionPrometheus, _ := couchbaseutil.VersionAfter(cluster.Spec.Image, "7.0.0")
+
+	// Do we have the Prometheus exporter enabled
+	exporterEnabled := cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil && cluster.Spec.Monitoring.Prometheus.Enabled
+	// Do we have the logging side car enabled
+	loggingEnabled := cluster.Spec.Logging.Server != nil && cluster.Spec.Logging.Server.Enabled
+
+	// Set up the Prometheus exporter values as the defaults
+	metricsPath := prometheusPath
+	metricsPort := strconv.Itoa(int(prometheusPort))
+
+	// If we're using CBS 7 then assume it takes precedence over exporter
+	if serverVersionPrometheus {
+		// As always documentation is hard to come across but this appears to be the metrics path for CBS 7+
+		// :8091/metrics
+		metricsPort = strconv.Itoa(AdminServicePort)
+	} else if loggingEnabled && !exporterEnabled {
+		// logging metrics are only used if exporter and CBS 7 are not in place
+		metricsPath = "/api/v1/metrics/prometheus"
+		metricsPort = strconv.Itoa(loggingPort)
+	}
+
+	// Set up the annotations to apply by default
+	annotations := map[string]string{
+		// If we have at least one then we want to scrape, if not we want to make sure we disable scraping
+		constants.AnnotationPrometheusScrape: strconv.FormatBool(serverVersionPrometheus || exporterEnabled || loggingEnabled),
+		constants.AnnotationPrometheusPath:   metricsPath,
+		constants.AnnotationPrometheusPort:   metricsPort,
+	}
+
+	if loggingEnabled {
+		// Add a suggested parser to help with Fluent Bit usage as a daemonset
+		// https://docs.fluentbit.io/manual/pipeline/filters/kubernetes#kubernetes-annotations
+		annotations["fluentbit.io/parser_stdout-"+CouchbaseLogSidecarContainerName] = "couchbase_sidecar"
+		// Add default logging annotation: https://github.com/kubernetes/kubernetes/pull/87809
+		annotations["kubectl.kubernetes.io/default-logs-container"] = CouchbaseLogSidecarContainerName
+	}
+
+	pod.Annotations = mergeLabels(pod.Annotations, annotations)
+}
+
 func getLoggingMount(container *v1.Container) *v1.VolumeMount {
 	for i, mount := range container.VolumeMounts {
 		if mount.MountPath != CouchbaseVolumeMountLogsDir && mount.MountPath != couchbaseVolumeDefaultConfigDir {
@@ -978,6 +1027,13 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 			},
 		},
 		Resources: loggingResources,
+		Ports: []v1.ContainerPort{
+			{
+				Name:          "http",
+				ContainerPort: loggingPort,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
 	}
 
 	pod.Spec.Volumes = append(pod.Spec.Volumes,
@@ -1015,13 +1071,6 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	)
 
 	pod.Spec.Containers = append(pod.Spec.Containers, logging)
-
-	// Add a suggested parser to help with Fluent Bit usage as a daemonset
-	// https://docs.fluentbit.io/manual/pipeline/filters/kubernetes#kubernetes-annotations
-	parserAnnotation := map[string]string{
-		"fluentbit.io/parser_stdout-" + CouchbaseLogSidecarContainerName: "couchbase_sidecar",
-	}
-	pod.SetAnnotations(mergeLabels(pod.GetAnnotations(), parserAnnotation))
 
 	// Deal with audit log cleanup if both auditing is enabled and then GC is also enabled.
 	// Disgusting solution to remove all rotated audit logs after configurable amount of timeand output those deleted to stdout for reference.
@@ -1408,7 +1457,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 		ReadinessProbe: &v1.Probe{
 			Handler: v1.Handler{
 				HTTPGet: &v1.HTTPGetAction{
-					Path: "/metrics",
+					Path: prometheusPath,
 					Port: intstr.IntOrString{
 						Type:   intstr.Int,
 						IntVal: prometheusPort,

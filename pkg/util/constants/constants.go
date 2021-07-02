@@ -59,8 +59,11 @@ const (
 	LabelBackup        = "couchbase_backup"
 	LabelBackupRestore = "couchbase_restore"
 
-	AnnotationVolumeNodeConf  = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
-	AnnotationVolumeMountPath = "path"
+	AnnotationVolumeNodeConf   = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
+	AnnotationVolumeMountPath  = "path"
+	AnnotationPrometheusScrape = "prometheus.io/scrape"
+	AnnotationPrometheusPath   = "prometheus.io/path"
+	AnnotationPrometheusPort   = "prometheus.io/port"
 
 	ServerGroupLabel = "failure-domain.beta.kubernetes.io/zone"
 
