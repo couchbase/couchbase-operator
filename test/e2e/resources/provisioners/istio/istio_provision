@@ -18,6 +18,79 @@ Options:
 import argparse
 import subprocess
 import sys
+import tempfile
+
+OPERATORPEERAUTHENTICATION = """
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: peer-authentication-cluster
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT
+"""
+
+EXPORTERPEERAUTHENTICATION="""
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: peer-authentication-metrics
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: couchbase
+  portLevelMtls:
+    9091:
+      mode: PERMISSIVE
+"""
+
+DACPEERAUTHENTICATION="""
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: peer-authentication-dac
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: couchbase-admission-controller
+  mtls:
+    mode: PERMISSIVE
+"""
+
+def kubectl(*cmd):
+    """Runs a kubectl command raising an exception on error"""
+
+    return subprocess.check_output(['kubectl'] + list(cmd)).decode().strip()
+
+def apply_operator_peer_authentication(args):
+    """Runs a kubectl command raising an exception on error"""
+    with tempfile.NamedTemporaryFile() as manifest:
+        manifest.write(OPERATORPEERAUTHENTICATION.encode())
+        manifest.flush()
+
+        kubectl('apply', '-f', manifest.name,
+                '--kubeconfig', args.kubeconfig)
+
+def apply_exporter_peer_authentication(args):
+    """Runs a kubectl command raising an exception on error"""
+    with tempfile.NamedTemporaryFile() as manifest:
+        manifest.write(EXPORTERPEERAUTHENTICATION.encode())
+        manifest.flush()
+
+        kubectl('apply', '-f', manifest.name,
+                '--kubeconfig', args.kubeconfig)
+
+def apply_dac_peer_authentication(args):
+    """Runs a kubectl command raising an exception on error"""
+    with tempfile.NamedTemporaryFile() as manifest:
+        manifest.write(DACPEERAUTHENTICATION.encode())
+        manifest.flush()
+
+        kubectl('apply', '-f', manifest.name,
+                '--kubeconfig', args.kubeconfig)
 
 def istioctl(*cmd):
     """Runs a istioctl command raising an exception on error"""
@@ -32,6 +105,10 @@ def start(args):
     """
     istioctl('install', '-y', '--kubeconfig' , args.kubeconfig)
     istioctl('verify-install', '--kubeconfig' , args.kubeconfig)
+    if args.mode == 'strict':
+        apply_dac_peer_authentication(args)
+        apply_operator_peer_authentication(args)
+        apply_exporter_peer_authentication(args)
 
 def main():
     """Main entry point"""
@@ -40,6 +117,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('command')
     parser.add_argument('-c', '--kubeconfig', required=True)
+    parser.add_argument('-m', '--mode', default='permissive')
 
     args = parser.parse_args()
 

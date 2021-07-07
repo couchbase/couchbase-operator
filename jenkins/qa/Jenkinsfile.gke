@@ -48,8 +48,9 @@ pipeline {
     choice(name: 'release_channel', choices: "None\nrapid\nregular\nstable")
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '100')
-    string(name: 'istio_version', defaultValue: '1.10.2')
     booleanParam(name: 'enable_istio', defaultValue: false)
+    string(name: 'istio_version', defaultValue: '1.10.2')
+    string(name: 'istio_mode', defaultValue: 'strict')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
     booleanParam(name: 'p0', defaultValue: true)
@@ -129,8 +130,8 @@ pipeline {
       }
       steps {
         script {
-          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1"
-          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config2"
+          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1 --mode ${params.istio_mode}"
+          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config2 --mode ${params.istio_mode}"
         }
       }
     }
