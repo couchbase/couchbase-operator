@@ -133,7 +133,7 @@ func applyTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, job *batchv1.J
 		job.Template.Annotations = map[string]string{}
 	}
 
-	job.Template.Annotations[constants.PodTLSAnnotation] = "enabled"
+	job.Template.Annotations[constants.PodTLSAnnotation] = constants.EnabledValue
 
 	return nil
 }

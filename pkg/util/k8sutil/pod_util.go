@@ -1075,8 +1075,8 @@ func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.Ser
 	}
 
 	for _, s := range ns.Services {
-		k := "couchbase_service_" + s.String()
-		labels[k] = "enabled"
+		k := constants.LabelServicePrefix + s.String()
+		labels[k] = constants.EnabledValue
 	}
 
 	return labels
@@ -1337,7 +1337,7 @@ func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 		// Annotate the pod as having TLS enabled
-		pod.Annotations[constants.PodTLSAnnotation] = "enabled"
+		pod.Annotations[constants.PodTLSAnnotation] = constants.EnabledValue
 	}
 
 	return nil

@@ -144,6 +144,29 @@ var (
 			VolumeSize:  "1Gi",
 		},
 	}
+
+	// SplitEphemeralTopology is for testing where we want to cover the services split into
+	// separate server groups.
+	SplitEphemeralTopology = ClusterTopology{
+		{
+			Name: "data",
+			Services: []couchbasev2.Service{
+				couchbasev2.DataService,
+			},
+		},
+		{
+			Name: "index",
+			Services: []couchbasev2.Service{
+				couchbasev2.IndexService,
+			},
+		},
+		{
+			Name: "query",
+			Services: []couchbasev2.Service{
+				couchbasev2.QueryService,
+			},
+		},
+	}
 )
 
 // ClusterOptions allows things about a cluster to be modified.

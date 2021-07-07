@@ -58,6 +58,7 @@ const (
 	LabelServer        = "couchbase_server"
 	LabelBackup        = "couchbase_backup"
 	LabelBackupRestore = "couchbase_restore"
+	LabelServicePrefix = "couchbase_service_"
 
 	AnnotationVolumeNodeConf  = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
 	AnnotationVolumeMountPath = "path"
@@ -69,6 +70,8 @@ const (
 
 	CouchbaseContainerName = "couchbase-server"
 	CouchbaseTLSVolumeName = "couchbase-server-tls"
+
+	EnabledValue = "enabled"
 )
 
 // Represents the Kubernetes version by its major and minor parts. The first
