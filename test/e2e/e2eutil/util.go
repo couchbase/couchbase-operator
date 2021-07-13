@@ -1294,7 +1294,7 @@ func Die(t *testing.T, err error) {
 // TODO: Find a generic way of doing this on OpenShift.
 func MustKillCouchbaseService(t *testing.T, k8s *types.Cluster, member, kubernetesType string) {
 	if kubernetesType == "kubernetes" {
-		MustExecShellInPod(t, k8s, member, "mv /etc/service/couchbase-server /tmp/")
+		MustExecShellInPod(t, k8s, member, "rm -rf /opt/couchbase/*;killall5 -9")
 		return
 	}
 
