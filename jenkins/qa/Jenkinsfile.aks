@@ -33,10 +33,10 @@ pipeline {
     string(name: 'admission_image', defaultValue: 'registry.gitlab.com/cb-vanilla/admission-controller:latest')
     string(name: 'server_image', defaultValue: 'couchbase/server:6.6.2')
     string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.1')
-    string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-vanilla/operator-backup:latest')
-    string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-vanilla/exporter:latest')
+    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:1.1.0')
+    string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.5')
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.4')
-    string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-vanilla/fluent-bit:latest')
+    string(name: 'logging_image', defaultValue: 'couchbase/fluent-bit:1.0.4')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.2-enterprise')
     string(name: 'platform', defaultValue: 'kubernetes')
     string(name: 'kubernetes_version', defaultValue: '1.21.1')
@@ -46,9 +46,10 @@ pipeline {
     string(name: 'kubectl_version', defaultValue: '1.20.7')
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '100')
-    string(name: 'istio_version', defaultValue: '1.9.0')
     string(name: 'terraform_version', defaultValue: '1.0.0')
     booleanParam(name: 'enable_istio', defaultValue: false)
+    string(name: 'istio_version', defaultValue: '1.10.2')
+    string(name: 'istio_mode', defaultValue: 'strict')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
     booleanParam(name: 'p0', defaultValue: true)
@@ -134,8 +135,8 @@ pipeline {
       }
       steps {
         script {
-          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1"
-          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config2"
+          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1 --mode ${params.istio_mode}"
+          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config2 --mode ${params.istio_mode}"
         }
       }
     }

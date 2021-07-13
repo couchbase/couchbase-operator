@@ -123,7 +123,7 @@ Run the following command to deploy it into Kubernetes:
 
 [source,console]
 ----
-$ kubectl create -f couchbase-cluster-log-forwarding.yaml
+$ kubectl apply -f couchbase-cluster-log-forwarding.yaml
 ----
 
 Note that the Autonomous Operator must already be deployed and running in the current namespace in order for the above command to succeed (refer to the <<before-you-begin,prerequisites>>).
@@ -228,12 +228,6 @@ stringData:
         parsers_file /fluent-bit/etc/parsers-couchbase.conf# <.>
     # Include audit log only
     @include /fluent-bit/etc/couchbase/in-audit-log.conf# <.>
-    # Add some extra information
-    [FILTER]
-        Name modify
-        Match couchbase.log.*
-        Add pod ${HOSTNAME}
-        Add logshipper couchbase.sidecar.fluentbit
     # Send to the standard output
     [OUTPUT]
         name  stdout
@@ -265,7 +259,7 @@ Run the following command to deploy it into Kubernetes:
 
 [source,console]
 ----
-$ kubectl edit -f fluent-bit-config.yaml
+$ kubectl replace -f fluent-bit-config.yaml
 ----
 
 Once the Secret is updated in Kubernetes, the configuration changes will be populated into the volume that is mounted in the `logging` sidecar container on each Couchbase pod.

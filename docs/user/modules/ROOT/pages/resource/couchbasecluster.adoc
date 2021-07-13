@@ -1149,7 +1149,7 @@ Enable this sidecar by setting to true, defaults to being disabled.
 
 *Type*: `string`
 
-*Default*: `busybox:1.32.1`
+*Default*: `busybox:1.33.1`
 
 ==== Description
 
@@ -1323,7 +1323,7 @@ If another log shipping image is used that needs a different mount then modify t
 
 *Type*: `string`
 
-*Default*: `couchbase/fluent-bit:1.0.3`
+*Default*: `couchbase/fluent-bit:1.0.4`
 
 ==== Description
 
