@@ -2010,6 +2010,8 @@ CA Certificate in PEM format to be used in LDAP server certificate validation.
 
 *Type*: `integer`
 
+*Default*: `30000`
+
 ==== Description
 
 Lifetime of values in cache in milliseconds.
@@ -2070,6 +2072,12 @@ More info: https://docs.couchbase.com/server/current/manage/manage-security/conf
 
 *Type*: `integer`
 
+*Default*: `10`
+
+*Minimum*: `1`
+
+*Maximum*: `100`
+
 ==== Description
 
 Maximum number of recursive groups requests the server is allowed to perform.
@@ -2084,6 +2092,8 @@ More info: https://docs.couchbase.com/server/current/manage/manage-security/conf
 *Required*
 
 *Type*: `integer`
+
+*Default*: `389`
 
 ==== Description
 

@@ -1488,6 +1488,7 @@ type CouchbaseClusterLDAPSpec struct {
 
 	// LDAP port.
 	// This is typically 389 for LDAP, and 636 for LDAPS.
+	// +kubebuilder:default=389
 	Port int `json:"port"`
 
 	// Encryption method to communicate with LDAP servers.
@@ -1523,10 +1524,14 @@ type CouchbaseClusterLDAPSpec struct {
 	// Requires NestedGroupsEnabled.  Values between 1 and 100: the default is 10.
 	// More info:
 	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
+	// +kubebuilder:default=10
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
 	NestedGroupsMaxDepth uint64 `json:"nestedGroupsMaxDepth,omitempty"`
 
 	// Lifetime of values in cache in milliseconds. Default 300000 ms.  More info:
 	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
+	// +kubebuilder:default=30000
 	CacheValueLifetime uint64 `json:"cacheValueLifetime,omitempty"`
 }
 
