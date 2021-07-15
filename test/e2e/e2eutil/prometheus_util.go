@@ -14,6 +14,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -104,12 +105,12 @@ func checkOperatorMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCl
 	operatorMetricsPort := "8383"
 	metricPrefix := metrics.MetricNamespace + "_" + metrics.MetricSubsystem + "_"
 
-	_, err := checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"server_http_", false)
+	_, err := checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"server_http_")
 	if err != nil {
 		return err
 	}
 
-	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"reconcile_", false)
+	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"reconcile_")
 
 	return err
 }
@@ -138,7 +139,7 @@ func checkPrometheusAnnotations(annotations map[string]string) error {
 	return nil
 }
 
-func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, podPort, labelSelector, testString string, checkAnnotations bool) (string, error) {
+func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, podPort, labelSelector, testString string) (string, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: labelSelector,
 	}
@@ -161,11 +162,9 @@ func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 			return responseDataStr, fmt.Errorf("response data does not contain any %s metrics", testString)
 		}
 
-		if checkAnnotations {
-			err := checkPrometheusAnnotations(pod.Annotations)
-			if err != nil {
-				return responseDataStr, err
-			}
+		err := checkPrometheusAnnotations(pod.Annotations)
+		if err != nil {
+			return responseDataStr, err
 		}
 	}
 
@@ -178,7 +177,7 @@ func CheckPrometheus(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 	serverPodSelector := testconstants.CouchbaseServerClusterKey + "=" + couchbase.Name
 	serverMetricPort := "9091"
 
-	return checkAllPodMetrics(k8s, couchbase, ctx, serverMetricPort, serverPodSelector, "couchbase", true)
+	return checkAllPodMetrics(k8s, couchbase, ctx, serverMetricPort, serverPodSelector, "couchbase")
 }
 
 func MustCheckPrometheus(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext) string {
@@ -221,6 +220,14 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 		return responseDataStr, err
 	}
 
+	// CBS 7+ uses port 8091, exporter uses port 9091
+	metricsPort := "9091"
+
+	serverVersionPrometheus, _ := couchbaseutil.VersionAfter(couchbase.Spec.Image, "7.0.0")
+	if serverVersionPrometheus {
+		metricsPort = "8091"
+	}
+
 	// check all pods
 	for _, pod := range pods.Items {
 		port, err := netutil.GetFreePort()
@@ -233,7 +240,7 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 			Client:    k8s.KubeClient,
 			Namespace: k8s.Namespace,
 			Pod:       pod.Name,
-			Port:      port + ":9091",
+			Port:      port + ":" + metricsPort,
 		}
 		if err := pf.ForwardPorts(); err != nil {
 			return responseDataStr, err

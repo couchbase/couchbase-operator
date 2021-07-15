@@ -4,6 +4,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -528,6 +529,11 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						constants.AnnotationPrometheusScrape: "true",
+						constants.AnnotationPrometheusPath:   "/metrics",
+						constants.AnnotationPrometheusPort:   "8383",
+					},
 					Labels: map[string]string{
 						"app": OperatorResourceName,
 					},
