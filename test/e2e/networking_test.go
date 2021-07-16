@@ -36,19 +36,30 @@ func TestExposedFeatureIP(t *testing.T) {
 	// Static configuration.
 	clusterSize := constants.Size1
 
-	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
-		couchbasev2.FeatureClient,
+	// Repeat for the various topologies we want to test
+	testCases := []*e2eutil.ClusterOptions{
+		clusterOptions().WithEphemeralTopology(clusterSize),
+		clusterOptions().WithMixedEphemeralTopology(clusterSize),
+		clusterOptions().WithSplitEphemeralTopology(clusterSize),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	// Verify that all nodes advertise an IP based alternate address.
-	e2eutil.MustCheckForIPAlternateAddresses(t, targetKube, testCouchbase, time.Minute)
-	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeNodePort, time.Minute)
+	for _, options := range testCases {
+		// Create the cluster.
+		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+		e2eutil.MustNewBucket(t, targetKube, bucket)
+
+		testCouchbase := options.Generate(targetKube)
+		testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
+			couchbasev2.FeatureClient,
+		}
+		testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+		// Verify that all nodes advertise an IP based alternate address.
+		e2eutil.MustCheckForIPAlternateAddresses(t, targetKube, testCouchbase, time.Minute)
+		e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeNodePort, time.Minute)
+		e2eutil.MustCheckServicePorts(t, targetKube, testCouchbase, time.Minute)
+		e2eutil.MustDeleteBucket(t, targetKube, bucket)
+	}
 }
 
 // TestExposedFeatureDNS tests alternate addresses are populated with DNS addresses with

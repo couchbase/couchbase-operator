@@ -44,6 +44,7 @@ const (
 	TagFeatureAutoScaling       = "autoscaling"
 	TagFeatureBackup            = "backup"
 	TagFeatureReconcile         = "reconcile"
+	TagFeatureNetwork           = "network"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -213,14 +214,14 @@ func registerTests() {
 		framework.NewTestDef(TestUpgradeImmediate).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeConstrained).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeBucketDurability).WithTags(TagSuiteP0, TagFeatureUpgrade),
-		framework.NewTestDef(TestExposedFeatureIP).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestExposedFeatureDNS).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestExposedFeatureDNSModify).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestExposedFeatureServiceTypeModify).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestConsoleServiceDNS).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestConsoleServiceDNSModify).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestConsoleServiceTypeModify).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestExposedFeatureTrafficPolicyCluster).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestExposedFeatureIP).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestExposedFeatureDNS).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestExposedFeatureDNSModify).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestExposedFeatureServiceTypeModify).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestConsoleServiceDNS).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestConsoleServiceDNSModify).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestConsoleServiceTypeModify).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestExposedFeatureTrafficPolicyCluster).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestRBACDeleteUser).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACUpdateRole).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACDeleteRole).WithTags(TagSuiteP0, TagFeatureRBAC),

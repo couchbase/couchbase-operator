@@ -3,12 +3,18 @@ Setup for CI
 ============
 make
 make container
+kind delete cluster
 kind create cluster
-kind load docker-image couchbase/operator:2.1.0
-kind load docker-image couchbase/admission-controller:2.1.0
 kind load docker-image couchbase/couchbase-operator:v1
 kind load docker-image couchbase/couchbase-operator-admission:v1
+docker pull couchbase/operator:2.1.0
+kind load docker-image couchbase/operator:2.1.0
+docker pull couchbase/admission-controller:2.1.0
+kind load docker-image couchbase/admission-controller:2.1.0
+docker pull couchbase/server:6.6.0
 kind load docker-image couchbase/server:6.6.0
+docker pull couchbase/server:6.6.2
+kind load docker-image couchbase/server:6.6.2
 go test ./test/upgrade -v -race
 */
 
@@ -146,6 +152,8 @@ func TestUpgradeFull(t *testing.T) {
 
 	// Expect not to see an error condition.
 	util.MustCheckFor(t, util.NoResourceCondition(c, "couchbase.com", "v2", "CouchbaseCluster", util.Namespace, "cb-example", "Error"), time.Minute)
+
+	logrus.Info("Test complete.")
 }
 
 // TestUpgradePiecemeal upgrades the CRD and DAC only, while leaving existing operators
@@ -239,4 +247,6 @@ func TestUpgradePiecemeal(t *testing.T) {
 	// Expect not to see an error condition.  Note this will only be relevant on
 	// an upgrade from 2.2 as it has the requisite condition.
 	util.MustCheckFor(t, util.NoResourceCondition(c, "couchbase.com", "v2", "CouchbaseCluster", util.Namespace, "cb-example", "Error"), time.Minute)
+
+	logrus.Info("Test complete.")
 }

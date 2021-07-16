@@ -58,6 +58,7 @@ const (
 	LabelServer        = "couchbase_server"
 	LabelBackup        = "couchbase_backup"
 	LabelBackupRestore = "couchbase_restore"
+	LabelServicePrefix = "couchbase_service_"
 
 	AnnotationVolumeNodeConf   = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
 	AnnotationVolumeMountPath  = "path"
@@ -72,6 +73,8 @@ const (
 
 	CouchbaseContainerName = "couchbase-server"
 	CouchbaseTLSVolumeName = "couchbase-server-tls"
+
+	EnabledValue = "enabled"
 )
 
 // Represents the Kubernetes version by its major and minor parts. The first
@@ -138,11 +141,16 @@ const (
 )
 
 // ImageDigests is a sha256 to image conversion map
-// ¯\_(ツ)_/¯
+// The format is <image_type>-<semver>
+// Only the semver matters. The image_type is just for readability
+// to identify what kind of digest we are dealing with.
 //
-// TODO: Use downward api to VolumeMount annotations into Pod and do this lookup because
-// annotations can only be accessed in volumes and not in environment variables.
-// https://docs.openshift.com/container-platform/4.3/nodes/containers/nodes-containers-downward-api.html
+// When used in restricted mode all of these digests are pre-fetched.
+// And since only digests an be used, if someone upgrades to another
+// version we need to decode the from-to digest by looking at the semver.
+// In the event that the digest does not exist in this map, there is an
+// option to deploy a custom map via config map (EnvDigestsConfigMap),
+// but if config map also isn't there then disaster will ensue.
 var ImageDigests = map[string]string{
 	"b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501": "couchbase-6.5.0-3",
 	"fd6d9c0ef033009e76d60dc36f55ce7f3aaa942a7be9c2b66c335eabc8f5b11e": "couchbase-6.5.1-1",
@@ -150,8 +158,12 @@ var ImageDigests = map[string]string{
 	"187046a848f32233e7e92705c57fa864b1d373c2078a92b51c9706bec6e372e5": "couchbase-6.6.2-1",
 	"3d0a9de740110b924b1ad5e83bb1e36b308f1b53f9e76a50cffcbeda9d34ea78": "backup-6.5.1-104-1",
 	"c0ab51854294d117c4ecf867b541ed6dc67410294d72f560cc33b038d98e4b76": "backup-6.6.0-102-2",
+	"b470d46135ed798d89b21457aef97f949b46411cd0b74cb8e1de00122829885e": "backup-1.1.0-1",
 	"b5a052fab4c635ab2d880a6ac771c66f554b9a4b5b1b53a73ba8ef1b573be372": "metrics-1.0.0-2",
 	"18015c72d17a33a21ea221d48fddf493848fc1ca5702007f289369c5815fb3df": "metrics-1.0.0-5",
 	"0854d57c7249a940ab31b451b6d4053d79e85648452da86738315605c00aafcb": "metrics-1.0.4-2",
+	"b9ff3aec88f42f8e6164d61a1c5f845b4c3dd3f606ac552170d5c61311ce5784": "metrics-1.0.5-1",
 	"43ecf7c8efc841c169425ea14a8d4c69a788fe47fad4d159ed4c9d7bb83bbde7": "fluent-1.0.1-1",
+	"e7d0e6cdc03f62de16c4e62d38f16f0f54714fea2339301a38885001c16f3d43": "fluent-1.0.3-1",
+	"6eec92cceffeef11f37e2d3c82f3604f034f5f983bed2cce918a99883782e47a": "fluent-1.0.4-1",
 }

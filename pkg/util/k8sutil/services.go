@@ -43,12 +43,6 @@ const (
 	AdminServicePort        = 8091
 	AdminServicePortTLS     = tlsBasePort + AdminServicePort
 
-	// Index service constants.
-	indexServicePortName    = string(couchbasev2.IndexService)
-	indexServicePortNameTLS = string(couchbasev2.IndexService) + tlsPortNameSuffix
-	indexServicePort        = 8092
-	indexServicePortTLS     = tlsBasePort + indexServicePort
-
 	// Query service constants.
 	queryServicePortName    = string(couchbasev2.QueryService)
 	queryServicePortNameTLS = string(couchbasev2.QueryService) + tlsPortNameSuffix
@@ -73,11 +67,20 @@ const (
 	eventingServicePort        = 8096
 	eventingServicePortTLS     = tlsBasePort + eventingServicePort
 
+	// Index service constants - there are none!
+
 	// Data service constants.
 	dataServicePortName    = string(couchbasev2.DataService)
 	dataServicePortNameTLS = string(couchbasev2.DataService) + tlsPortNameSuffix
 	dataServicePort        = 11210
 	dataServicePortTLS     = 11207
+
+	// View service constants: part of the data service and not index service.
+	viewService            = "view"
+	viewServicePortName    = viewService
+	viewServicePortNameTLS = viewService + tlsPortNameSuffix
+	viewServicePort        = 8092
+	viewServicePortTLS     = tlsBasePort + viewServicePort
 )
 
 var (
@@ -133,7 +136,7 @@ var (
 
 	// servicePorts maps a service type to it's set of ports.  These are used in
 	// the generation of node ports to allow cluster access from outside of the
-	// pod (overlay) network.
+	// pod (overlay) network. Note that IndexService has no ports to map.
 	servicePorts = map[couchbasev2.Service][]v1.ServicePort{
 		couchbasev2.AdminService: {
 			{
@@ -144,18 +147,6 @@ var (
 			{
 				Name:     adminServicePortNameTLS,
 				Port:     AdminServicePortTLS,
-				Protocol: v1.ProtocolTCP,
-			},
-		},
-		couchbasev2.IndexService: {
-			{
-				Name:     indexServicePortName,
-				Port:     indexServicePort,
-				Protocol: v1.ProtocolTCP,
-			},
-			{
-				Name:     indexServicePortNameTLS,
-				Port:     indexServicePortTLS,
 				Protocol: v1.ProtocolTCP,
 			},
 		},
@@ -216,6 +207,17 @@ var (
 			{
 				Name:     dataServicePortNameTLS,
 				Port:     dataServicePortTLS,
+				Protocol: v1.ProtocolTCP,
+			},
+			// The data service also exposes the view service:
+			{
+				Name:     viewServicePortName,
+				Port:     viewServicePort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     viewServicePortNameTLS,
+				Port:     viewServicePortTLS,
 				Protocol: v1.ProtocolTCP,
 			},
 		},
@@ -352,8 +354,8 @@ func adminConsoleSelector(cluster *couchbasev2.CouchbaseCluster) map[string]stri
 	labels := SelectorForClusterResource(cluster)
 
 	for _, s := range cluster.Spec.Networking.AdminConsoleServices {
-		k := "couchbase_service_" + s.String()
-		labels[k] = "enabled"
+		k := constants.LabelServicePrefix + s.String()
+		labels[k] = constants.EnabledValue
 	}
 
 	return labels
@@ -676,12 +678,10 @@ var exposedfeatureSets = map[couchbasev2.ExposedFeature][]couchbasev2.Service{
 	},
 	couchbasev2.FeatureXDCR: {
 		couchbasev2.AdminService,
-		couchbasev2.IndexService,
 		couchbasev2.DataService,
 	},
 	couchbasev2.FeatureClient: {
 		couchbasev2.AdminService,
-		couchbasev2.IndexService,
 		couchbasev2.QueryService,
 		couchbasev2.SearchService,
 		couchbasev2.AnalyticsService,
@@ -796,12 +796,12 @@ func filterConfiguredPorts(ports []v1.ServicePort, services couchbasev2.ServiceL
 func memberServices(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member) (couchbasev2.ServiceList, error) {
 	class := cluster.Spec.GetServerConfigByName(member.Config())
 	if class == nil {
-		return nil, fmt.Errorf("%w: sever class %s missing for member %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), member.Config(), member.Name())
+		return nil, fmt.Errorf("%w: server class %s missing for member %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), member.Config(), member.Name())
 	}
 
 	// Always allow the admin service, this is not explicitly enabled
 	// per server class. Likewise always allow the data service irrespective
-	// of class as it's used for GCCCP client boot-strapping.
+	// of class as it's used for GCCCP client boot-strapping and XDCR.
 	services := couchbasev2.ServiceList{
 		couchbasev2.AdminService,
 		couchbasev2.DataService,
@@ -906,11 +906,7 @@ func ReconcilePodService(c *client.Client, cluster *couchbasev2.CouchbaseCluster
 		return err
 	}
 
-	if err := reconcileService(c, cluster, requested); err != nil {
-		return err
-	}
-
-	return nil
+	return reconcileService(c, cluster, requested)
 }
 
 // GetAlternateAddressExternalPorts polls the pod service for any alternate ports
@@ -937,10 +933,10 @@ func GetAlternateAddressExternalPorts(c *client.Client, namespace, name string) 
 			ports.AdminServicePort = port.NodePort
 		case adminServicePortNameTLS:
 			ports.AdminServicePortTLS = port.NodePort
-		case indexServicePortName:
-			ports.IndexServicePort = port.NodePort
-		case indexServicePortNameTLS:
-			ports.IndexServicePortTLS = port.NodePort
+		case viewServicePortName:
+			ports.ViewAndXDCRServicePort = port.NodePort
+		case viewServicePortNameTLS:
+			ports.ViewAndXDCRServicePortTLS = port.NodePort
 		case queryServicePortName:
 			ports.QueryServicePort = port.NodePort
 		case queryServicePortNameTLS:

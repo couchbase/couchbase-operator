@@ -173,10 +173,10 @@ type AlternateAddressesExternalPorts struct {
 	AdminServicePort int32 `url:"mgmt,omitempty" json:"mgmt"`
 	// AdminPortSSL is the admin service K8S node port (mapped to 18091)
 	AdminServicePortTLS int32 `url:"mgmtSSL,omitempty" json:"mgmtSSL"`
-	// IndexServicePort is the view service K8S node port (mapped to 8092)
-	IndexServicePort int32 `url:"capi,omitempty" json:"capi"`
-	// IndexServicePortSSL is the view service K8S node port (mapped to 8092)
-	IndexServicePortTLS int32 `url:"capiSSL,omitempty" json:"capiSSL"`
+	// ViewAndXDCRServicePort is the view service K8S node port (mapped to 8092)
+	ViewAndXDCRServicePort int32 `url:"capi,omitempty" json:"capi"`
+	// ViewAndXDCRServicePortTLS is the view service K8S node port (mapped to 8092)
+	ViewAndXDCRServicePortTLS int32 `url:"capiSSL,omitempty" json:"capiSSL"`
 	// QueryServicePort is the query service K8S node port (mapped to 8093)
 	QueryServicePort int32 `url:"n1ql,omitempty" json:"n1ql"`
 	// QueryServicePortTLS is the query service K8S node port (mapped to 18093)

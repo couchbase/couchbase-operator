@@ -17,6 +17,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/analyzer"
@@ -760,7 +761,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: namespacePrefix,
 			Labels: map[string]string{
-				"istio-injection": "enabled",
+				"istio-injection": constants.EnabledValue,
 			},
 		},
 	}

@@ -169,7 +169,7 @@ func SelectorForClusterResource(cluster *couchbasev2.CouchbaseCluster) map[strin
 
 func selectorForDataService(cluster *couchbasev2.CouchbaseCluster) map[string]string {
 	labels := LabelsForCluster(cluster)
-	labels["couchbase_service_data"] = "enabled"
+	labels[constants.LabelServicePrefix+string(couchbasev2.DataService)] = constants.EnabledValue
 
 	return labels
 }

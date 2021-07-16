@@ -1,6 +1,8 @@
 package util
 
 import (
+	"os"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	"k8s.io/client-go/dynamic"
@@ -20,7 +22,7 @@ type Clients struct {
 
 // NewClients initializes a new clients structure.
 func NewClients() (*Clients, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", "/home/simon/.kube/config")
+	config, err := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
 	if err != nil {
 		return nil, err
 	}

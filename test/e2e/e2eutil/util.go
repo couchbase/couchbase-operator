@@ -283,6 +283,20 @@ func (o *ClusterOptions) WithMixedTopology(size int) *ClusterOptions {
 	return o
 }
 
+// WithSplitEphemeralTopology is intended to split the data, index and query
+// services across separate server classes. Primarily to test data in isolation
+// from index which none of the other topologies do.
+func (o *ClusterOptions) WithSplitEphemeralTopology(size int) *ClusterOptions {
+	topology := e2espec.SplitEphemeralTopology.DeepCopy()
+	topology[0].Size = size
+	topology[1].Size = size
+	topology[2].Size = size
+
+	o.Options.Topology = topology
+
+	return o
+}
+
 func (o *ClusterOptions) WithDefaultLogStreaming() *ClusterOptions {
 	o.LogStreaming = &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
 		Enabled:           true,

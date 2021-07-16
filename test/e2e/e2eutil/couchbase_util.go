@@ -157,7 +157,7 @@ func GetPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, services 
 	selector = selector.Add(*appreq, *serverreq, *clusterreq)
 
 	for _, service := range services {
-		requirement, err := labels.NewRequirement(fmt.Sprintf("couchbase_service_%s", string(service)), selection.Equals, []string{"enabled"})
+		requirement, err := labels.NewRequirement(fmt.Sprintf("%s%s", constants.LabelServicePrefix, (service)), selection.Equals, []string{constants.EnabledValue})
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +196,6 @@ func GetHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, servi
 
 	portMap := map[couchbasev2.Service]string{
 		couchbasev2.AdminService:     "8091",
-		couchbasev2.IndexService:     "8092",
 		couchbasev2.QueryService:     "8093",
 		couchbasev2.SearchService:    "8094",
 		couchbasev2.AnalyticsService: "8095",

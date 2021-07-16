@@ -124,6 +124,126 @@ func getKubernetesNodeServices(k8s *types.Cluster, couchbase *couchbasev2.Couchb
 	return k8s.KubeClient.CoreV1().Services(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 }
 
+func checkServiceExposesPorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serviceName string, address *AlternateAddressExternal) error {
+	if address == nil {
+		return nil
+	}
+
+	service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	for k, v := range address.Ports {
+		found := false
+
+		for _, servicePort := range service.Spec.Ports {
+			if v == int(servicePort.NodePort) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return fmt.Errorf("port %d not found for service %s not found (expected for %q)", v, serviceName, k)
+		}
+	}
+
+	return nil
+}
+
+func checkForExpectedPorts(service corev1.Service, expectedPorts []int32) error {
+	for _, expectedPort := range expectedPorts {
+		found := false
+
+		for _, actualPort := range service.Spec.Ports {
+			if actualPort.Port == expectedPort {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return fmt.Errorf("missing required port %d for service %s", expectedPort, service.Name)
+		}
+	}
+
+	return nil
+}
+
+func checkServicePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		// Do a sanity check that we're exposing ports for NodePort types based on the Couchbase Service matrix.
+		services, err := getKubernetesNodeServices(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		// We replicate the matrix here rather than reuse the one in services.go as we want to check for errors there.
+		servicePorts := map[couchbasev2.Service][]int32{
+			couchbasev2.AdminService:     {8091, 18091},
+			couchbasev2.DataService:      {8092, 18092, 11210, 11207},
+			couchbasev2.QueryService:     {8093, 18093},
+			couchbasev2.SearchService:    {8094, 18094},
+			couchbasev2.AnalyticsService: {8095, 18095},
+			couchbasev2.EventingService:  {8096, 18096},
+			couchbasev2.IndexService:     {},
+		}
+
+		// We should always be exposing these on every service
+		allServicePorts := servicePorts[couchbasev2.DataService]
+
+		// For the service, check its matching pod to confirm what type of Couchbase Service is running (data, index, etc.).
+		// Using that confirm the appropriate ports are open on the service.
+		for _, service := range services.Items {
+			if service.Spec.Type != corev1.ServiceTypeNodePort {
+				continue
+			}
+			// Check it has all the ports every service must include.
+			err := checkForExpectedPorts(service, allServicePorts)
+			if err != nil {
+				return err
+			}
+
+			// Get matching pod and find out what types are attached to it.
+			podSelector := labels.Set(service.Spec.Selector)
+
+			podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podSelector.AsSelector().String()})
+			if err != nil {
+				return err
+			}
+
+			if podList == nil || len(podList.Items) < 1 {
+				return fmt.Errorf("unable to find pod associated with service %q, selector: %q", service.Name, podSelector.AsSelector().String())
+			}
+
+			// Get the first pod (likely only) and check its annotations.
+			pod := podList.Items[0]
+
+			// Use the type to lookup in our maps above.
+			for serviceType, expectedPorts := range servicePorts {
+				searchLabel := constants.LabelServicePrefix + serviceType.String()
+				labelValue, labelExists := pod.Labels[searchLabel]
+
+				if labelExists && labelValue == constants.EnabledValue {
+					err := checkForExpectedPorts(service, expectedPorts)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		return nil
+	})
+}
+
+func MustCheckServicePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := checkServicePorts(k8s, couchbase, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 // CheckForIPAlternateAddresses gets external addressability configuration from the Couchbase API
 // and checks that alternate addresses are defined and IPv4 addresses.
 func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
@@ -140,6 +260,12 @@ func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.Cou
 		for _, node := range nodeServices.NodesExt {
 			if net.ParseIP(node.AlternateAddresses.External.Hostname) == nil {
 				return fmt.Errorf("node %s alternate address %s not an IP", node.Hostname, node.AlternateAddresses.External.Hostname)
+			}
+
+			serviceName := node.Hostname[:strings.IndexByte(node.Hostname, '.')]
+			err := checkServiceExposesPorts(k8s, couchbase, serviceName, node.AlternateAddresses.External)
+			if err != nil {
+				return err
 			}
 		}
 
