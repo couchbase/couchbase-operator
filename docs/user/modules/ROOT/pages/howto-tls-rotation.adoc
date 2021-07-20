@@ -133,7 +133,68 @@ type: Opaque
 
 Each pod will have a copy of the new certificate and key in a mounted inbox on each node.
 
+=== What it Looks Like
+
+Once triggered, the server TLS rotation operation should be monitored for successful completion:
+
+[source,console]
+----
+$ kubectl describe couchbasecluster
+...
+Events:
+  Type    Reason              Age   From  Message
+  ----    ------              ----  ----  -------
+  Normal  TLSUpdated          8s          TLS certificate was updated for member test-couchbase-v92lg-0000 # <.>
+  Normal  TLSUpdated          7s          TLS certificate was updated for member test-couchbase-v92lg-0001
+  Normal  TLSUpdated          5s          TLS certificate was updated for member test-couchbase-v92lg-0002
+----
+
+<.> A successful TLS rotation will update each Couchbase Server pod in the cluster and raise the `TLSUpdated` event.
+
+[NOTE]
+====
+TLS keys and certificates are securely mounted in the `Pod` as a Kubernetes `Secret`, so they are never exposed over the network.
+When the `Secret` is updated, it will take a short period of time for `kubelet` to be notified of the update, and update to be made to the file system in the `Pod`.
+As such, there will be a delay -- in the order of about a minute -- between triggering the rotation and the Operator reporting progress.
+====
+
 == Replacing the entire PKI
 
 If the root CA is compromised, a full rotation and replacement of the PKI will be required.
 When you replace the PKI, you'll also need to replace the CA certificate in the server secret.
+
+=== What it Looks Like
+
+Once triggered, the PKI rotation operation should be monitored for successful completion:
+
+[source,console]
+----
+$ kubectl describe couchbasecluster
+...
+Events:
+  Type    Reason              Age   From  Message
+  ----    ------              ----  ----  -------
+  Normal  TLSUpdated          12s         TLS certificate was updated for member test-couchbase-1i25n-0000 # <.>
+  Normal  TLSUpdated          7s          TLS certificate was updated for member test-couchbase-1i25n-0001
+  Normal  TLSUpdated          5s          TLS certificate was updated for member test-couchbase-1i25n-0002
+  Normal  ClientTLSUpdated    4s          CA certificate was updated # <.>
+----
+
+<.> A successful TLS rotation will update each Couchbase Server pod in the cluster and raise the `TLSUpdated` event.
+<.> Once all the Server instances are updated, the Operator needs to start using the new CA certificate in order to trust the new server certificates.
+    This is indicated by the `ClientTLSUpdated` event.
+
+[NOTE]
+====
+TLS keys and certificates are securely mounted in the `Pod` as a Kubernetes `Secret`, so they are never exposed over the network.
+When the `Secret` is updated, it will take a short period of time for `kubelet` to be notified of the update, and update to be made to the file system in the `Pod`.
+As such, there will be a delay -- in the order of about a minute -- between triggering the rotation and the Operator reporting progress.
+====
+
+[IMPORTANT]
+====
+A full PKI rotation must not be interrupted once it has begun.
+Interruption risks severing communication between the Operator and the Couchbase cluster, as some certificates cannot be validated against the active CA.
+
+In the unlikely event something does go wrong, don't restart anything, it may make the problem worse, and seek immediate guidance from Couchbase support.
+====
