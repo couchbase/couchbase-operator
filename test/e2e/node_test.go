@@ -741,12 +741,7 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		e2eutil.PodDownEphemeralWithForcedFailover(t, 2, f.CouchbaseServerImage),
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

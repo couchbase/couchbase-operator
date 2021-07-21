@@ -2,6 +2,7 @@ package e2eutil
 
 import (
 	"fmt"
+	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -345,7 +346,41 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 // goes down with some ephemeral pods in the cluster.  The persistent pods will
 // be recovered first, then the operator needs to failover the ephemeral pods and
 // recreate them, they are gone as it is.
-func PodDownWithPVCRecoverySequenceWithEphemeral(clusterSize, persistentVictims, ephemeralVictims int) eventschema.Validatable {
+func PodDownWithPVCRecoverySequenceWithEphemeral(t *testing.T, clusterSize, persistentVictims, ephemeralVictims int, serverImage string) eventschema.Validatable {
+	tag, err := k8sutil.CouchbaseVersion(serverImage)
+	if err != nil {
+		Die(t, err)
+	}
+
+	version, err := couchbaseutil.NewVersion(tag)
+	if err != nil {
+		Die(t, err)
+	}
+
+	// In CBS7 a forced failover ejects the member due to metadata inconsistencies,
+	// so it behaves differently.
+	if version.GreaterEqualString("7.0.0") {
+		return eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+				eventschema.Repeat{
+					Times:     clusterSize - 1,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+				},
+				eventschema.Repeat{
+					Times:     persistentVictims - 1,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+				},
+				eventschema.Repeat{
+					Times:     ephemeralVictims,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+	}
+
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
@@ -395,6 +430,42 @@ func PodDownFailedWithPVCRecoverySequence(victims int) eventschema.Validatable {
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}
+
+func PodDownEphemeralWithForcedFailover(t *testing.T, victims int, serverImage string) eventschema.Validatable {
+	tag, err := k8sutil.CouchbaseVersion(serverImage)
+	if err != nil {
+		Die(t, err)
+	}
+
+	version, err := couchbaseutil.NewVersion(tag)
+	if err != nil {
+		Die(t, err)
+	}
+
+	// In CBS7 a forced failover ejects the member due to metadata inconsistencies,
+	// so it behaves differently.
+	if version.GreaterEqualString("7.0.0") {
+		return eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Repeat{Times: victims, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+				eventschema.Repeat{Times: victims, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+	}
+
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Repeat{Times: victims, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+			eventschema.Repeat{Times: victims, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
+			eventschema.Repeat{Times: victims, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Repeat{Times: victims, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
 	}

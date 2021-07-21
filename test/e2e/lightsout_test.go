@@ -79,7 +79,7 @@ func TestLightsOutPersistent(t *testing.T) {
 	// * Cluster recovered
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		e2eutil.PodDownWithPVCRecoverySequenceWithEphemeral(clusterSize, mdsGroupSize, mdsGroupSize),
+		e2eutil.PodDownWithPVCRecoverySequenceWithEphemeral(t, clusterSize, mdsGroupSize, mdsGroupSize, f.CouchbaseServerImage),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
