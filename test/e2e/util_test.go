@@ -262,6 +262,8 @@ func registerTests() {
 		framework.NewTestDef(TestBackupAndRestoreIncludeBucketsS3).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestoreExcludeBuckets).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestoreExcludeBucketsS3).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestBackupAndRestoreNodeSelector).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestBackupAndRestoreNodeSelectorS3).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestPrometheusMetricsTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS),
 		framework.NewTestDef(TestPrometheusMetricsMutualTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS),
 		framework.NewTestDef(TestPrometheusMetricsMandatoryMutualTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS),

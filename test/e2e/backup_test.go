@@ -2096,3 +2096,107 @@ func TestBackupAndRestoreExcludeBuckets(t *testing.T) {
 func TestBackupAndRestoreExcludeBucketsS3(t *testing.T) {
 	testBackupAndRestoreExcludeBuckets(t, true)
 }
+
+func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+
+	nodes, err := targetKube.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, fmt.Errorf("failed to get node list: %w", err))
+	}
+
+	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	defer cleanup()
+
+	framework.Requires(t, targetKube).StaticCluster()
+
+	// Static configuration.
+	fullFreq := 2
+	// Create a normal cluster.
+	clusterSize := constants.Size3
+	numOfDocs := f.DocsCount
+
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(targetKube)
+
+	zone, ok := nodes.Items[0].Labels[constants.FailureDomainZoneLabel]
+	if !ok {
+		e2eutil.Die(nil, fmt.Errorf("node %s missing label %s", nodes.Items[0].Name, constants.FailureDomainZoneLabel))
+	}
+
+	nodeSelector := map[string]string{
+		constants.FailureDomainZoneLabel: zone,
+	}
+
+	testCouchbase.Spec.Backup.NodeSelector = nodeSelector
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+
+	// Create a Backup object.
+	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
+	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+
+	// wait for backup
+	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+
+	// wait for backup to start
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	// wait for backup to complete
+	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	// wait for backup status update
+	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
+
+	// create restore object
+	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 5*time.Minute)
+
+	// create new restore
+	e2eutil.MustNewBackupRestore(t, targetKube, restore)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// restore job is too fast, just validate that no items were restored.
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * Remove Bucket
+	// * Bucket created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}
+
+func TestBackupAndRestoreNodeSelector(t *testing.T) {
+	testBackupAndRestoreNodeSelector(t, false)
+}
+
+func TestBackupAndRestoreNodeSelectorS3(t *testing.T) {
+	testBackupAndRestoreNodeSelector(t, true)
+}
