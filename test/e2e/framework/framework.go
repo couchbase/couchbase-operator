@@ -215,9 +215,9 @@ func configure() (err error) {
 	flag.StringVar(&params.CouchbaseServerImage, "server-image", "couchbase/server:6.6.2", "Docker image to use for couchbase server")
 	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade", "couchbase/server:6.6.1", "Docker image to use for couchbase server upgrades to upgrade from")
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.5", "Docker image to use for the couchbase exporter")
-	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.3", "Docker image to use for couchbase exporter upgrades to upgrade from")
+	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.4", "Docker image to use for couchbase exporter upgrades to upgrade from")
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:1.1.0", "Docker image to use for couchbase backup")
-	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image", "couchbase/fluent-bit:1.0.0", "Docker image to use for couchbase log shipping")
+	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image", "couchbase/fluent-bit:1.0.4", "Docker image to use for couchbase log shipping")
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
 	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
@@ -226,7 +226,7 @@ func configure() (err error) {
 	flag.StringVar(&params.S3SecretID, "s3-secret-id", "", "S3 Secret ID")
 	flag.StringVar(&suiteSuffix, "suite-suffix", "", "Suffix to apply to suite name in JUnit results, useful when running multiple versions of the same suite in parallel")
 	flag.BoolVar(&params.CollectLogs, "collect-logs", false, "Whether to collect logs on failure")
-	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs", false, "Whether to collect logs on failure")
+	flag.BoolVar(&params.CollectServerLogsOnFailure, "collect-server-logs", false, "Whether to collect logs from the server pods on failure")
 	flag.Var(&clusters, "cluster", "Kubernetes cluster configuration e.g. FILE,CONTEXT,NAMESPACE")
 	flag.Var(&registries, "registry", "Container image registry configuration e.g. SERVER,USERNAME,PASSWORD")
 	flag.Var(&suites, "suite", "Test suites to run")
@@ -834,12 +834,12 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 	cleanup := func() {
 		logDir := filepath.Join(f.LogDir, t.Name(), cluster.Namespace)
 
-		// Collect operator logs
+		// Collect operator and logging sidecar logs
 		if err := e2eutil.WriteLogs(cluster, logDir, ""); err != nil {
 			t.Logf("Error: %v", err)
 		}
 
-		// Collect any kubernetes/server logs.
+		// Collect any kubernetes/server logs using cbopinfo call.
 		if t.Failed() && f.CollectLogs {
 			e2eutil.CollectLogs(t, cluster, logDir, f.CbopinfoPath, f.OpImage, f.CollectServerLogsOnFailure)
 		}

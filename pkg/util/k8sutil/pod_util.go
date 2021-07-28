@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -48,6 +49,7 @@ const (
 	loggingSidecarMetadataMountDir            = "/etc/podinfo"
 	loggingSidecarMetadataMountName           = "podinfo"
 	loggingPort                               = 2020
+	LoggingConfigurationFile                  = "fluent-bit.conf"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -955,6 +957,9 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		ReadOnly:  true,
 	}
 
+	// Ensure we specify the configuration file to use - fixed currently.
+	configFile := filepath.Join(sidecarConfig.ConfigurationMountPath, LoggingConfigurationFile)
+
 	// Set up a duplicate volume mount but make sure to set it read-only
 	readonlyLogsMount := mount.DeepCopy()
 	readonlyLogsMount.ReadOnly = true
@@ -989,14 +994,22 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 			metaDataVolueMount,
 		},
 		Env: []v1.EnvVar{
+			// Where the logs are we want to consume.
 			{
 				Name:  "COUCHBASE_LOGS",
 				Value: CouchbaseVolumeMountLogsDir,
 			},
+			// The area to watch for updates to restart on.
 			{
 				Name:  "COUCHBASE_LOGS_DYNAMIC_CONFIG",
 				Value: sidecarConfig.ConfigurationMountPath,
 			},
+			// The actual location of the config file - required even though part of the Secret.
+			{
+				Name:  "COUCHBASE_LOGS_CONFIG_FILE",
+				Value: configFile,
+			},
+			// The location of the metadata we provide from k8s.
 			{
 				Name:  "COUCHBASE_K8S_CONFIG_DIR",
 				Value: loggingSidecarMetadataMountDir,

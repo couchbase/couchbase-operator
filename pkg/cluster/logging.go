@@ -57,7 +57,7 @@ func (c *Cluster) reconcileLogConfig() error {
 		// and then common stuff all in /fluent-bit/etc/.
 		Data: map[string][]byte{
 			// Just include the default configuration now
-			"fluent-bit.conf": []byte("@include /fluent-bit/etc/fluent-bit.conf\n"),
+			k8sutil.LoggingConfigurationFile: []byte("@include /fluent-bit/etc/fluent-bit.conf\n"),
 
 			// Redaction salt if required using default of cluster name
 			"redaction.salt": []byte(c.cluster.ClusterName),

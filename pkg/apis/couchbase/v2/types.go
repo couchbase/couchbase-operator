@@ -2681,6 +2681,9 @@ type LogShipperSidecarSpec struct {
 
 	// ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
 	// If another log shipping image is used that needs a different mount then modify this.
+	// Note that the configuration file must be called 'fluent-bit.conf' at the root of this path,
+	// there is no provision for overriding the name of the config file passed as the
+	// COUCHBASE_LOGS_CONFIG_FILE environment variable.
 	// +kubebuilder:default="/fluent-bit/config/"
 	ConfigurationMountPath string `json:"configurationMountPath,omitempty"`
 

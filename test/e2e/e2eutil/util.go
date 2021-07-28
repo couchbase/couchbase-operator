@@ -316,7 +316,9 @@ func (o *ClusterOptions) WithCustomLogStreaming() *ClusterOptions {
 		Enabled:             true,
 		ManageConfiguration: &[]bool{false}[0],
 		ConfigurationName:   "custom-fluent-bit-config",
-		Sidecar:             &couchbasev2.LogShipperSidecarSpec{},
+		Sidecar: &couchbasev2.LogShipperSidecarSpec{
+			ConfigurationMountPath: "/test/custom",
+		},
 	}
 
 	if imageName := strings.TrimSpace(o.Options.LoggingImage); imageName != "" {

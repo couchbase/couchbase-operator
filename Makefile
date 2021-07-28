@@ -47,6 +47,9 @@ CONTAINER_GOENV = $(GOENV) GOOS=linux GOARCH=amd64
 # that a binary came from.
 LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(version) -X github.com/couchbase/couchbase-operator/pkg/version.Revision=$(revision) -X github.com/couchbase/couchbase-operator/pkg/version.BuildNumber=$(bldNum) -X github.com/couchbase/couchbase-operator/pkg/revision.gitRevision=$(GIT_REVISION)"
 
+# Common flags to apply during build (and test build)
+BUILDFLAGS = "-trimpath"
+
 .PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs docs-lint
 
 all: binaries crd
@@ -121,19 +124,19 @@ binaries: $(OPERATOR_BINARY) $(ADMISSION_BINARY) $(CBOPCFG_BINARY) $(CBOPINFO_BI
 
 # Operator binary build target.
 $(OPERATOR_BINARY): $(GENERATED_FILES) $(SOURCE)
-	$(CONTAINER_GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/operator
+	$(CONTAINER_GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/operator
 
 # DAC binary build target.
 $(ADMISSION_BINARY): $(GENERATED_FILES) $(SOURCE)
-	$(CONTAINER_GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/admission
+	$(CONTAINER_GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/admission
 
 # cbopcfg binary build target.
 $(CBOPCFG_BINARY): $(GENERATED_FILES) $(SOURCE)
-	$(GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/cbopcfg
+	$(GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/cbopcfg
 
 # cbopinfo binary build target.
 $(CBOPINFO_BINARY): $(GENERATED_FILES) $(SOURCE)
-	$(GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/cbopinfo
+	$(GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/cbopinfo
 
 # Build target for the CRD files.
 crd: $(CRD_FILE)
@@ -147,7 +150,7 @@ $(CRD_FILE): $(APISRC_V2)
 
 # Build target to test that e2e testing compiles.
 build-test: $(GENERATED_FILES) $(SOURCE)
-	go test -c $(PACKAGE_BASE)/test/e2e
+	go test $(BUILDFLAGS) -c $(PACKAGE_BASE)/test/e2e
 
 # Lint target to test source code compliance.
 lint: $(GENERATED_FILES)
@@ -199,16 +202,16 @@ tools-openshift: tools-platform-specific
 tools: generated
 	$(MAKE) tools-kubernetes
 	$(MAKE) tools-openshift
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/darwin/x86_64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o build/darwin/arm64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/linux/x86_64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/windows/amd64/bin/cbopinfo.exe -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/x86_64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/arm64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/linux/x86_64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/windows/amd64/bin/cbopinfo.exe -ldflags $(LDFLAGS) ./cmd/cbopinfo/
 
 tools-platform-specific:
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o build/${PLATFORM}/darwin/arm64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/linux/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o build/${PLATFORM}/windows/amd64/bin/cbopcfg.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/darwin/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/darwin/arm64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/linux/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/windows/amd64/bin/cbopcfg.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 
 artifacts: tools crd
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --arch x86_64 --version $(revisionedVersion) --bld_num $(bldNum)
@@ -259,10 +262,10 @@ prod: container tools artifacts
 prod-rhel: container-rhel tools-rhel artifacts
 
 test-operator: $(GENERATED_FILES)
-	go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race -timeout 240m
+	go test $(BUILDFLAGS) github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race -timeout 240m
 
 test-unit:
-	go test -v ./pkg/...
+	go test $(BUILDFLAGS) -v ./pkg/...
 
 test-helm:
 	ct install --charts helm/test-resources/ --namespace ci-testnamespace
