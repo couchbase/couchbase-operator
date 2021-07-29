@@ -46,6 +46,26 @@ The following diagram depicts Operator Backup image compatibility with all suppo
 .Operator Backup Compatibility
 image:compatibility-backup.png[]
 
+[[couchbase-fluent-bit-compatibility]]
+=== Couchbase Fluent Bit Compatibility
+
+This release supports the following versions of the Couchbase Fluent Bit image for log forwarding:
+
+[#table-fluent-bit-compatibility,cols="1,1",options="header"]
+|===
+| Couchbase Operator Version
+| Supported Couchbase Fluent Bit Versions
+
+| 2.2.0
+| 1.0.0 - 1.0.4
+
+| 2.2.1
+| 1.0.0 - 1.0.4, 1.1.0
+|===
+
+.Operator Fluent Bit Compatibility
+image:compatibility-fluentbit.png[]
+
 [[kubernetes-platform-compatibility]]
 == Kubernetes Compatibility
 
