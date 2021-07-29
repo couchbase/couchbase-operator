@@ -813,7 +813,7 @@ func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec *couchbasev2.Ser
 		return err
 	}
 
-	indexSettings.StorageMode = couchbaseutil.IndexStorageMode(settings.IndexStorageSetting)
+	indexSettings.StorageMode = couchbaseutil.IndexStorageMode(c.cluster.IndexStorageMode())
 
 	if err := couchbaseutil.SetIndexSettings(indexSettings).On(c.api, m); err != nil {
 		return err

@@ -459,6 +459,17 @@ func (c *CouchbaseCluster) AnySupportable() bool {
 	return false
 }
 
+// IndexStorageMode returns the correct index storage setting for the cluster,
+// taking into account precedence and deprecated fields.  Both of these fields
+// have an API provided default.
+func (c *CouchbaseCluster) IndexStorageMode() CouchbaseClusterIndexStorageSetting {
+	if c.Spec.ClusterSettings.Indexer != nil {
+		return c.Spec.ClusterSettings.Indexer.StorageMode
+	}
+
+	return c.Spec.ClusterSettings.IndexStorageSetting
+}
+
 // IsSupportable tells us whether a specific server class is supportable, it must
 // have volume mounts, the default claim, or the logs claim if all enabled services
 // are stateless.
