@@ -52,6 +52,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseBuckets().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbaseclusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseClusters().Informer()}, nil
+	case v2.SchemeGroupVersion.WithResource("couchbasecollections"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseCollections().Informer()}, nil
+	case v2.SchemeGroupVersion.WithResource("couchbasecollectiongroups"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseCollectionGroups().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbaseephemeralbuckets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseEphemeralBuckets().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbasegroups"):
@@ -62,6 +66,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseReplications().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbaserolebindings"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseRoleBindings().Informer()}, nil
+	case v2.SchemeGroupVersion.WithResource("couchbasescopes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseScopes().Informer()}, nil
+	case v2.SchemeGroupVersion.WithResource("couchbasescopegroups"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseScopeGroups().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbaseusers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseUsers().Informer()}, nil
 

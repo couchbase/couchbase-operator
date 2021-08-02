@@ -17,6 +17,10 @@ type CouchbaseBucketExpansion interface{}
 
 type CouchbaseClusterExpansion interface{}
 
+type CouchbaseCollectionExpansion interface{}
+
+type CouchbaseCollectionGroupExpansion interface{}
+
 type CouchbaseEphemeralBucketExpansion interface{}
 
 type CouchbaseGroupExpansion interface{}
@@ -26,5 +30,9 @@ type CouchbaseMemcachedBucketExpansion interface{}
 type CouchbaseReplicationExpansion interface{}
 
 type CouchbaseRoleBindingExpansion interface{}
+
+type CouchbaseScopeExpansion interface{}
+
+type CouchbaseScopeGroupExpansion interface{}
 
 type CouchbaseUserExpansion interface{}

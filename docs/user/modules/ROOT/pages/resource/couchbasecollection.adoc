@@ -1,0 +1,88 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseCollection Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbasecollection]
+:resource-name-singular: couchbasecollection
+:resource-name-plural: couchbasecollections
+:resource-name-kind: CouchbaseCollection
+
+CouchbaseCollection represent the finest grained size of data storage in Couchbase.
+Collections contain all documents and indexes in the system.
+Collections also form the finest grain basis for role-based access control (RBAC) and cross-datacenter replication (XDCR).
+In order to be considered by the Operator, every collection must be referenced by a `CouchbaseScope` or `CouchbaseScopeGroup` resource.
+
+== couchbasecollections.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbasecollections.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasecollection]
+
+== couchbasecollections.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+*Default*: `{}`
+
+=== Description
+
+Spec defines the desired state of the resource.
+
+=== couchbasecollections.spec.maxTTL
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+MaxTTL defines how long a document is permitted to exist for, without modification, until it is automatically deleted.
+This field takes precedence over any TTL defined at the bucket level.
+This is a default, and maximum time-to-live and may be set to a lower value by the client.
+If the client specifies a higher value, then it is truncated to the maximum durability.
+Documents are removed by Couchbase, after they have expired, when either accessed, the expiry pager is run, or the bucket is compacted.
+When set to 0, then documents are not expired by default.
+This field must be a duration in the range 0-2147483648s, defaulting to 0.
+More info: https://golang.org/pkg/time/#ParseDuration.
+
+=== couchbasecollections.spec.name
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `30`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+
+==== Description
+
+Name specifies the name of the collection.
+By default, the metadata.name is used to define the collection name, however, due to the limited character set, this field can be used to override the default and provide the full functionality.
+Collection names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.

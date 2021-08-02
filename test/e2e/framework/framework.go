@@ -275,10 +275,10 @@ func configure() (err error) {
 		"couchbase/sync-gateway:2.8.2-enterprise",
 		"Docker image to use for couchbase mobile.")
 	flag.StringVar(&params.CouchbaseServerImage, "server-image",
-		"couchbase/server:6.6.2",
+		"couchbase/server:7.0.0",
 		"Docker image to use for couchbase server.")
 	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade",
-		"couchbase/server:6.6.1",
+		"couchbase/server:6.6.3",
 		"Docker image to use for couchbase server upgrades to upgrade from.")
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image",
 		"couchbase/exporter:1.0.5",

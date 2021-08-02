@@ -23,6 +23,10 @@ type Interface interface {
 	CouchbaseBuckets() CouchbaseBucketInformer
 	// CouchbaseClusters returns a CouchbaseClusterInformer.
 	CouchbaseClusters() CouchbaseClusterInformer
+	// CouchbaseCollections returns a CouchbaseCollectionInformer.
+	CouchbaseCollections() CouchbaseCollectionInformer
+	// CouchbaseCollectionGroups returns a CouchbaseCollectionGroupInformer.
+	CouchbaseCollectionGroups() CouchbaseCollectionGroupInformer
 	// CouchbaseEphemeralBuckets returns a CouchbaseEphemeralBucketInformer.
 	CouchbaseEphemeralBuckets() CouchbaseEphemeralBucketInformer
 	// CouchbaseGroups returns a CouchbaseGroupInformer.
@@ -33,6 +37,10 @@ type Interface interface {
 	CouchbaseReplications() CouchbaseReplicationInformer
 	// CouchbaseRoleBindings returns a CouchbaseRoleBindingInformer.
 	CouchbaseRoleBindings() CouchbaseRoleBindingInformer
+	// CouchbaseScopes returns a CouchbaseScopeInformer.
+	CouchbaseScopes() CouchbaseScopeInformer
+	// CouchbaseScopeGroups returns a CouchbaseScopeGroupInformer.
+	CouchbaseScopeGroups() CouchbaseScopeGroupInformer
 	// CouchbaseUsers returns a CouchbaseUserInformer.
 	CouchbaseUsers() CouchbaseUserInformer
 }
@@ -73,6 +81,16 @@ func (v *version) CouchbaseClusters() CouchbaseClusterInformer {
 	return &couchbaseClusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// CouchbaseCollections returns a CouchbaseCollectionInformer.
+func (v *version) CouchbaseCollections() CouchbaseCollectionInformer {
+	return &couchbaseCollectionInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CouchbaseCollectionGroups returns a CouchbaseCollectionGroupInformer.
+func (v *version) CouchbaseCollectionGroups() CouchbaseCollectionGroupInformer {
+	return &couchbaseCollectionGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // CouchbaseEphemeralBuckets returns a CouchbaseEphemeralBucketInformer.
 func (v *version) CouchbaseEphemeralBuckets() CouchbaseEphemeralBucketInformer {
 	return &couchbaseEphemeralBucketInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -96,6 +114,16 @@ func (v *version) CouchbaseReplications() CouchbaseReplicationInformer {
 // CouchbaseRoleBindings returns a CouchbaseRoleBindingInformer.
 func (v *version) CouchbaseRoleBindings() CouchbaseRoleBindingInformer {
 	return &couchbaseRoleBindingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CouchbaseScopes returns a CouchbaseScopeInformer.
+func (v *version) CouchbaseScopes() CouchbaseScopeInformer {
+	return &couchbaseScopeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CouchbaseScopeGroups returns a CouchbaseScopeGroupInformer.
+func (v *version) CouchbaseScopeGroups() CouchbaseScopeGroupInformer {
+	return &couchbaseScopeGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // CouchbaseUsers returns a CouchbaseUserInformer.

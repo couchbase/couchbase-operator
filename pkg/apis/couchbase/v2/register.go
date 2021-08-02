@@ -28,20 +28,34 @@ const (
 	RoleBindingCRDResourcePlural     = "couchbaserolebindings"
 	AutoscalerCRDResourceKind        = "CouchbaseAutoscaler"
 	AutoscalerCRDResourcePlural      = "couchbaseautoscalers"
-	GroupVersion                     = "v2"
-	GroupName                        = "couchbase.com"
-	Group                            = GroupName + "/" + GroupVersion
-	ClusterCRDName                   = ClusterCRDResourcePlural + "." + GroupName
-	BackupCRDName                    = BackupCRDResourcePlural + "." + GroupName
-	BackupRestoreCRDName             = BackupRestoreCRDResourcePlural + "." + GroupName
-	BucketCRDName                    = BucketCRDResourcePlural + "." + GroupName
-	EphemeralBucketCRDName           = EphemeralBucketCRDResourcePlural + "." + GroupName
-	MemcachedBucketCRDName           = MemcachedBucketCRDResourcePlural + "." + GroupName
-	ReplicationCRDName               = ReplicationCRDResourcePlural + "." + GroupName
-	UserCRDName                      = UserCRDResourcePlural + "." + GroupName
-	GroupCRDName                     = GroupCRDResourcePlural + "." + GroupName
-	RoleBindingCRDName               = RoleBindingCRDResourcePlural + "." + GroupName
-	AutoscalerCRDName                = AutoscalerCRDResourcePlural + "." + GroupName
+	CollectionCRDResourceKind        = "CouchbaseCollection"
+	CollectionCRDResourcePlural      = "couchbasecollections"
+	CollectionGroupCRDResourceKind   = "CouchbaseCollectionGroup"
+	CollectionGroupCRDResourcePlural = "couchbasecollectiongroups"
+	ScopeCRDResourceKind             = "CouchbaseScope"
+	ScopeCRDResourcePlural           = "couchbasescopes"
+	ScopeGroupCRDResourceKind        = "CouchbaseScopeGroup"
+	ScopeGroupCRDResourcePlural      = "couchbasescopegroups"
+
+	GroupVersion = "v2"
+	GroupName    = "couchbase.com"
+	Group        = GroupName + "/" + GroupVersion
+
+	ClusterCRDName         = ClusterCRDResourcePlural + "." + GroupName
+	BackupCRDName          = BackupCRDResourcePlural + "." + GroupName
+	BackupRestoreCRDName   = BackupRestoreCRDResourcePlural + "." + GroupName
+	BucketCRDName          = BucketCRDResourcePlural + "." + GroupName
+	EphemeralBucketCRDName = EphemeralBucketCRDResourcePlural + "." + GroupName
+	MemcachedBucketCRDName = MemcachedBucketCRDResourcePlural + "." + GroupName
+	ReplicationCRDName     = ReplicationCRDResourcePlural + "." + GroupName
+	UserCRDName            = UserCRDResourcePlural + "." + GroupName
+	GroupCRDName           = GroupCRDResourcePlural + "." + GroupName
+	RoleBindingCRDName     = RoleBindingCRDResourcePlural + "." + GroupName
+	AutoscalerCRDName      = AutoscalerCRDResourcePlural + "." + GroupName
+	CollectionCRDName      = CollectionCRDResourcePlural + "." + GroupName
+	CollectionGroupCRDName = CollectionGroupCRDResourcePlural + "." + GroupName
+	ScopeCRDName           = ScopeCRDResourcePlural + "." + GroupName
+	ScopeGroupCRDName      = ScopeGroupCRDResourcePlural + "." + GroupName
 )
 
 var (
@@ -64,6 +78,10 @@ func init() {
 	SchemeBuilder.Register(&CouchbaseBackup{}, &CouchbaseBackupList{})
 	SchemeBuilder.Register(&CouchbaseBackupRestore{}, &CouchbaseBackupRestoreList{})
 	SchemeBuilder.Register(&CouchbaseAutoscaler{}, &CouchbaseAutoscalerList{})
+	SchemeBuilder.Register(&CouchbaseCollection{}, &CouchbaseCollectionList{})
+	SchemeBuilder.Register(&CouchbaseCollectionGroup{}, &CouchbaseCollectionGroupList{})
+	SchemeBuilder.Register(&CouchbaseScope{}, &CouchbaseScopeList{})
+	SchemeBuilder.Register(&CouchbaseScopeGroup{}, &CouchbaseScopeGroupList{})
 }
 
 func Resource(resource string) schema.GroupResource {
@@ -90,6 +108,14 @@ func Resource(resource string) schema.GroupResource {
 		return schema.GroupResource{Group: GroupName, Resource: BackupRestoreCRDResourceKind}
 	case "couchbaseautoscaler":
 		return schema.GroupResource{Group: GroupName, Resource: AutoscalerCRDResourceKind}
+	case "couchbasecollection":
+		return schema.GroupResource{Group: GroupName, Resource: CollectionCRDResourceKind}
+	case "couchbasecollectiongroup":
+		return schema.GroupResource{Group: GroupName, Resource: CollectionGroupCRDResourceKind}
+	case "couchbasescope":
+		return schema.GroupResource{Group: GroupName, Resource: ScopeCRDResourceKind}
+	case "couchbasescopegroup":
+		return schema.GroupResource{Group: GroupName, Resource: ScopeGroupCRDResourceKind}
 	default:
 		return schema.GroupResource{}
 	}

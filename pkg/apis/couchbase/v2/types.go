@@ -515,6 +515,285 @@ type CouchbaseBackupRestoreList struct {
 	Items           []CouchbaseBackupRestore `json:"items"`
 }
 
+// ScopeOrCollectionName is a generic type to capture a valid
+// scope or collection name.  These must consist of 1-30 characters,
+// include only A-Z, a-z, 0-9, -, _ or %, and must not start with
+// _ (which is an internal marker) or % (which is probably an escape
+// character in language X).
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:MaxLength=30
+// +kubebuilder:validation:Pattern="^[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29}$"
+type ScopeOrCollectionName string
+
+// CouchbaseCollection represent the finest grained size of data storage in Couchbase.
+// Collections contain all documents and indexes in the system.  Collections also form
+// the finest grain basis for role-based access control (RBAC) and cross-datacenter
+// replication (XDCR).  In order to be considered by the Operator, every collection
+// must be referenced by a `CouchbaseScope` or `CouchbaseScopeGroup` resource.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+type CouchbaseCollection struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Spec defines the desired state of the resource.
+	// +kubebuilder:default="x-couchbase-object"
+	Spec CouchbaseCollectionSpec `json:"spec"`
+}
+
+// CouchbaseCollectionSpecCommon is a set of common parameters for all collections,
+// be they part of a single collection or a group.
+type CouchbaseCollectionSpecCommon struct {
+	// MaxTTL defines how long a document is permitted to exist for, without
+	// modification, until it is automatically deleted.  This field takes precedence over
+	// any TTL defined at the bucket level.  This is a default, and maximum
+	// time-to-live and may be set to a lower value by the client.  If the client specifies
+	// a higher value, then it is truncated to the maximum durability.  Documents are
+	// removed by Couchbase, after they have expired, when either accessed, the expiry
+	// pager is run, or the bucket is compacted.  When set to 0, then documents are not
+	// expired by default.  This field must be a duration in the range 0-2147483648s,
+	// defaulting to 0.  More info:
+	// https://golang.org/pkg/time/#ParseDuration
+	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
+}
+
+type CouchbaseCollectionSpec struct {
+	CouchbaseCollectionSpecCommon `json:",inline"`
+
+	// Name specifies the name of the collection.  By default, the metadata.name is
+	// used to define the collection name, however, due to the limited character set,
+	// this field can be used to override the default and provide the full functionality.
+	// Collection names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%]
+	// and not start with either _ or %.
+	Name ScopeOrCollectionName `json:"name,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseCollectionList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseCollection `json:"items"`
+}
+
+// CouchbaseCollectionGroup represent the finest grained size of data storage in Couchbase.
+// Collections contain all documents and indexes in the system.  Collections also form
+// the finest grain basis for role-based access control (RBAC) and cross-datacenter
+// replication (XDCR).  In order to be considered by the Operator, every collection group
+// must be referenced by a `CouchbaseScope` or `CouchbaseScopeGroup` resource.  Unlike the
+// CouchbaseCollection resource, a collection group represents multiple collections, with
+// common configuration parameters, to be expressed as a single resource, minimizing required
+// configuration and Kubernetes API traffic.  It also forms the basis of Couchbase RBAC
+// security boundaries.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+type CouchbaseCollectionGroup struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Spec defines the desired state of the resource.
+	Spec CouchbaseCollectionGroupSpec `json:"spec"`
+}
+
+type CouchbaseCollectionGroupSpec struct {
+	CouchbaseCollectionSpecCommon `json:",inline"`
+
+	// Names specifies the names of the collections.  Unlike CouchbaseCollection, which
+	// specifies a single collection, a collection group specifies multiple, and the
+	// collection group must specify at least one collection name.
+	// Any collection names specified must be unique.
+	// Collection names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%]
+	// and not start with either _ or %.
+	// +kubebuilder:validation:MinimumItems=1
+	// +listType=set
+	Names []ScopeOrCollectionName `json:"names"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseCollectionGroupList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseCollectionGroup `json:"items"`
+}
+
+// CouchbaseScope represents a logical unit of data storage that sits between buckets and
+// collections e.g. a bucket may contain multiple scopes, and a scope may contain multiple
+// collections.  At present, scopes are not nested, so provide only a single level of
+// abstraction.  Scopes provide a coarser grained basis for role-based access control (RBAC)
+// and cross-datacenter replication (XDCR) than collections, but finer that buckets.
+// In order to be considered by the Operator, a scope must be referenced by either a
+// `CouchbaseBucket` or `CouchbaseEphemeralBucket` resource.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+type CouchbaseScope struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Spec defines the desired state of the resource.
+	// +kubebuilder:default="x-couchbase-object"
+	Spec CouchbaseScopeSpec `json:"spec"`
+}
+
+// CouchbaseScopeSpecCommon contains common configuration shared across single scopes
+// or groups of scopes.
+type CouchbaseScopeSpecCommon struct {
+	// Collections defines how to collate collections included in this scope or scope group.
+	// Any of the provided methods may be used to collate a set of collections to
+	// manage.  Collated collections must have unique names, otherwise it is
+	// considered ambiguous, and an error condition.
+	Collections *CollectionSelector `json:"collections,omitempty"`
+}
+
+type CouchbaseScopeSpec struct {
+	CouchbaseScopeSpecCommon `json:",inline"`
+
+	// Name specifies the name of the scope.  By default, the metadata.name is
+	// used to define the scope name, however, due to the limited character set,
+	// this field can be used to override the default and provide the full functionality.
+	// Scope names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%]
+	// and not start with either _ or %.
+	Name ScopeOrCollectionName `json:"name,omitempty"`
+
+	// DefaultScope indicates whether this resource represents the default scope
+	// for a bucket.  When set to `true`, this allows the user to refer to and
+	// manage collections within the default scope.  When not defined, the Operator
+	// will implicitly manage the default scope as the default scope can not be
+	// deleted from Couchbase Server.  The Operator defined default scope will
+	// also have the `persistDefaultCollection` flag set to `true`.  Only one
+	// default scope is permitted to be contained in a bucket.
+	DefaultScope bool `json:"defaultScope,omitempty"`
+}
+
+type CollectionLocalObjectReference struct {
+	// Kind indicates the kind of resource that is being referenced.  A scope
+	// can only reference `CouchbaseCollection` and `CouchbaseCollectionGroup`
+	// resource kinds.  This field defaults to `CouchbaseCollection` if not
+	// specified.
+	// +kubebuilder:validation:Enum=CouchbaseCollection;CouchbaseCollectionGroup
+	// +kubebuilder:default=CouchbaseCollection
+	Kind string `json:"kind,omitempty"`
+
+	// Name is the name of the Kubernetes resource name that is being referenced.
+	Name string `json:"name"`
+}
+
+type CollectionSelector struct {
+	// Managed indicates whether collections within this scope are managed.
+	// If not then you can dynamically create and delete collections with
+	// the Couchbase UI or SDKs.
+	Managed bool `json:"managed,omitempty"`
+
+	// PreserveDefaultCollection indicates whether the Operator should manage the
+	// default collection within the default scope.  The default collection can
+	// be deleted, but can not be recreated by Couchbase Server.  By setting this
+	// field to `true`, the Operator will implicitly manage the default collection
+	// within the default scope.  The default collection cannot be modified and
+	// will have no document time-to-live (TTL).  When set to `false`, the operator
+	// will not manage the default collection, which will be deleted and cannot be
+	// used or recreated.
+	PreserveDefaultCollection bool `json:"preserveDefaultCollection,omitempty"`
+
+	// Resources is an explicit list of named resources that will be considered
+	// for inclusion in this scope or scopes.  If a resource reference doesn't
+	// match a resource, then no error conditions are raised due to undefined
+	// resource creation ordering and eventual consistency.
+	Resources []CollectionLocalObjectReference `json:"resources,omitempty"`
+
+	// Selector allows resources to be implicitly considered for inclusion in this
+	// scope or scopes.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseScopeList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseScope `json:"items"`
+}
+
+// CouchbaseScopeGroup represents a logical unit of data storage that sits between buckets and
+// collections e.g. a bucket may contain multiple scopes, and a scope may contain multiple
+// collections.  At present, scopes are not nested, so provide only a single level of
+// abstraction.  Scopes provide a coarser grained basis for role-based access control (RBAC)
+// and cross-datacenter replication (XDCR) than collections, but finer that buckets.
+// In order to be considered by the Operator, a scope must be referenced by either a
+// `CouchbaseBucket` or `CouchbaseEphemeralBucket` resource.
+// Unlike `CouchbaseScope` resources, scope groups represents multiple scopes, with the same
+// common set of collections, to be expressed as a single resource, minimizing required
+// configuration and Kubernetes API traffic.  It also forms the basis of Couchbase RBAC
+// security boundaries.
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+type CouchbaseScopeGroup struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Spec defines the desired state of the resource.
+	Spec CouchbaseScopeGroupSpec `json:"spec"`
+}
+
+type CouchbaseScopeGroupSpec struct {
+	CouchbaseScopeSpecCommon `json:",inline"`
+
+	// Names specifies the names of the scopes.  Unlike CouchbaseScope, which
+	// specifies a single scope, a scope group specifies multiple, and the
+	// scope group must specify at least one scope name.
+	// Any scope names specified must be unique.
+	// Scope names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%]
+	// and not start with either _ or %.
+	// +kubebuilder:validation:MinimumItems=1
+	// +listType=set
+	Names []ScopeOrCollectionName `json:"names"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseScopeGroupList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseScopeGroup `json:"items"`
+}
+
+type ScopeLocalObjectReference struct {
+	// Kind indicates the kind of resource that is being referenced.  A scope
+	// can only reference `CouchbaseScope` and `CouchbaseScopeGroup`
+	// resource kinds.  This field defaults to `CouchbaseScope` if not
+	// specified.
+	// +kubebuilder:validation:Enum=CouchbaseScope;CouchbaseScopeGroup
+	// +kubebuilder:default=CouchbaseScope
+	Kind string `json:"kind,omitempty"`
+
+	// Name is the name of the Kubernetes resource name that is being referenced.
+	Name string `json:"name"`
+}
+
+type ScopeSelector struct {
+	// Managed defines whether scopes are managed for this bucket.
+	// This field is `false` by default, and the Operator will take no actions that
+	// will affect scopes and collections in this bucket.  The default scope and
+	// collection will be present.  When set to `true`, the Operator will manage
+	// user defined scopes, and optionally, their collections as defined by the
+	// `CouchbaseScope`, `CouchbaseScopeGroup`, `CouchbaseCollection` and
+	// `CouchbaseCollectionGroup` resource documentation.  If this field is set to
+	// `false` while the  already managed, then the Operator will leave whatever
+	// configuration is already present.
+	Managed bool `json:"managed,omitempty"`
+
+	// Resources is an explicit list of named resources that will be considered
+	// for inclusion in this bucket.  If a resource reference doesn't
+	// match a resource, then no error conditions are raised due to undefined
+	// resource creation ordering and eventual consistency.
+	Resources []ScopeLocalObjectReference `json:"resources,omitempty"`
+
+	// Selector allows resources to be implicitly considered for inclusion in this
+	// bucket.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+}
+
 // The CouchbaseBucket resource defines a set of documents in Couchbase server.
 // A Couchbase client connects to and operates on a bucket, which provides independent
 // management of a set documents and a security boundary for role based access control.
@@ -633,6 +912,10 @@ type CouchbaseBucketSpec struct {
 	// defaulting to 0.  More info:
 	// https://golang.org/pkg/time/#ParseDuration
 	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
+
+	// Scopes defines whether the Operator manages scopes for the bucket or not, and
+	// the set of scopes defined for the bucket.
+	Scopes *ScopeSelector `json:"scopes,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -752,6 +1035,10 @@ type CouchbaseEphemeralBucketSpec struct {
 	// defaulting to 0.  More info:
 	// https://golang.org/pkg/time/#ParseDuration
 	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
+
+	// Scopes defines whether the Operator manages scopes for the bucket or not, and
+	// the set of scopes defined for the bucket.
+	Scopes *ScopeSelector `json:"scopes,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -1653,7 +1940,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// service type defined and any other options that Kubernetes provides.  When using
 	// a LoadBalancer service type, TLS and dynamic DNS must also be enabled. The Operator
 	// reserves the right to modify or replace any field.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#service-v1-core
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#service-v1-core
 	AdminConsoleServiceTemplate *ServiceTemplateSpec `json:"adminConsoleServiceTemplate,omitempty"`
 
 	// DEPRECATED - by adminConsoleServiceTemplate.
@@ -1681,7 +1968,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// service type defined and any other options that Kubernetes provides.  When using
 	// a LoadBalancer service type, TLS and dynamic DNS must also be enabled. The Operator
 	// reserves the right to modify or replace any field.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#service-v1-core
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#service-v1-core
 	ExposedFeatureServiceTemplate *ServiceTemplateSpec `json:"exposedFeatureServiceTemplate,omitempty"`
 
 	// DEPRECATED - by exposedFeatureServiceTemplate.
@@ -2217,7 +2504,7 @@ type ServerConfig struct {
 	// update the pod in-place.  Any other modification will result in a cluster
 	// upgrade in order to fulfill the request. The Operator reserves the right
 	// to modify or replace any field.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.19/#pod-v1-core
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#pod-v1-core
 	Pod *PodTemplate `json:"pod,omitempty"`
 
 	// VolumeMounts define persistent volume claims to attach to pod.

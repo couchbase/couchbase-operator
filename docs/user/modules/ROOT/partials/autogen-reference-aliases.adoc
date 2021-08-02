@@ -60,3 +60,15 @@ Page aliases -- https://docs.antora.org/antora/latest/page/page-aliases/
 // tag::couchbaseuser[]
 :page-aliases: reference-couchbaseuser.adoc
 // end::couchbaseuser[]
+
+// tag::couchbasecollection[]
+// end::couchbasecollection[]
+
+// tag::couchbasecollectiongroup[]
+// end::couchbasecollectiongroup[]
+
+// tag::couchbasescope[]
+// end::couchbasescope[]
+
+// tag::couchbasescopegroup[]
+// end::couchbasescopegroup[]

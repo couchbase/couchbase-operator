@@ -47,6 +47,22 @@ type CouchbaseClusterListerExpansion interface{}
 // CouchbaseClusterNamespaceLister.
 type CouchbaseClusterNamespaceListerExpansion interface{}
 
+// CouchbaseCollectionListerExpansion allows custom methods to be added to
+// CouchbaseCollectionLister.
+type CouchbaseCollectionListerExpansion interface{}
+
+// CouchbaseCollectionNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseCollectionNamespaceLister.
+type CouchbaseCollectionNamespaceListerExpansion interface{}
+
+// CouchbaseCollectionGroupListerExpansion allows custom methods to be added to
+// CouchbaseCollectionGroupLister.
+type CouchbaseCollectionGroupListerExpansion interface{}
+
+// CouchbaseCollectionGroupNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseCollectionGroupNamespaceLister.
+type CouchbaseCollectionGroupNamespaceListerExpansion interface{}
+
 // CouchbaseEphemeralBucketListerExpansion allows custom methods to be added to
 // CouchbaseEphemeralBucketLister.
 type CouchbaseEphemeralBucketListerExpansion interface{}
@@ -86,6 +102,22 @@ type CouchbaseRoleBindingListerExpansion interface{}
 // CouchbaseRoleBindingNamespaceListerExpansion allows custom methods to be added to
 // CouchbaseRoleBindingNamespaceLister.
 type CouchbaseRoleBindingNamespaceListerExpansion interface{}
+
+// CouchbaseScopeListerExpansion allows custom methods to be added to
+// CouchbaseScopeLister.
+type CouchbaseScopeListerExpansion interface{}
+
+// CouchbaseScopeNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseScopeNamespaceLister.
+type CouchbaseScopeNamespaceListerExpansion interface{}
+
+// CouchbaseScopeGroupListerExpansion allows custom methods to be added to
+// CouchbaseScopeGroupLister.
+type CouchbaseScopeGroupListerExpansion interface{}
+
+// CouchbaseScopeGroupNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseScopeGroupNamespaceLister.
+type CouchbaseScopeGroupNamespaceListerExpansion interface{}
 
 // CouchbaseUserListerExpansion allows custom methods to be added to
 // CouchbaseUserLister.

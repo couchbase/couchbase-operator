@@ -30,6 +30,14 @@ magic Debbie!
 // end::couchbaserolebinding[]
 // tag::couchbaseuser[]
 // end::couchbaseuser[]
+// tag::couchbasecollection[]
+// end::couchbasecollection[]
+// tag::couchbasecollectiongroup[]
+// end::couchbasecollectiongroup[]
+// tag::couchbasescope[]
+// end::couchbasescope[]
+// tag::couchbasescopegroup[]
+// end::couchbasescopegroup[]
 
 === Constraints
 

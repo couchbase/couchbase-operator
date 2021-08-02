@@ -20,11 +20,15 @@ type CouchbaseV2Interface interface {
 	CouchbaseBackupRestoresGetter
 	CouchbaseBucketsGetter
 	CouchbaseClustersGetter
+	CouchbaseCollectionsGetter
+	CouchbaseCollectionGroupsGetter
 	CouchbaseEphemeralBucketsGetter
 	CouchbaseGroupsGetter
 	CouchbaseMemcachedBucketsGetter
 	CouchbaseReplicationsGetter
 	CouchbaseRoleBindingsGetter
+	CouchbaseScopesGetter
+	CouchbaseScopeGroupsGetter
 	CouchbaseUsersGetter
 }
 
@@ -53,6 +57,14 @@ func (c *CouchbaseV2Client) CouchbaseClusters(namespace string) CouchbaseCluster
 	return newCouchbaseClusters(c, namespace)
 }
 
+func (c *CouchbaseV2Client) CouchbaseCollections(namespace string) CouchbaseCollectionInterface {
+	return newCouchbaseCollections(c, namespace)
+}
+
+func (c *CouchbaseV2Client) CouchbaseCollectionGroups(namespace string) CouchbaseCollectionGroupInterface {
+	return newCouchbaseCollectionGroups(c, namespace)
+}
+
 func (c *CouchbaseV2Client) CouchbaseEphemeralBuckets(namespace string) CouchbaseEphemeralBucketInterface {
 	return newCouchbaseEphemeralBuckets(c, namespace)
 }
@@ -71,6 +83,14 @@ func (c *CouchbaseV2Client) CouchbaseReplications(namespace string) CouchbaseRep
 
 func (c *CouchbaseV2Client) CouchbaseRoleBindings(namespace string) CouchbaseRoleBindingInterface {
 	return newCouchbaseRoleBindings(c, namespace)
+}
+
+func (c *CouchbaseV2Client) CouchbaseScopes(namespace string) CouchbaseScopeInterface {
+	return newCouchbaseScopes(c, namespace)
+}
+
+func (c *CouchbaseV2Client) CouchbaseScopeGroups(namespace string) CouchbaseScopeGroupInterface {
+	return newCouchbaseScopeGroups(c, namespace)
 }
 
 func (c *CouchbaseV2Client) CouchbaseUsers(namespace string) CouchbaseUserInterface {

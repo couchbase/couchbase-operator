@@ -37,6 +37,14 @@ func (c *FakeCouchbaseV2) CouchbaseClusters(namespace string) v2.CouchbaseCluste
 	return &FakeCouchbaseClusters{c, namespace}
 }
 
+func (c *FakeCouchbaseV2) CouchbaseCollections(namespace string) v2.CouchbaseCollectionInterface {
+	return &FakeCouchbaseCollections{c, namespace}
+}
+
+func (c *FakeCouchbaseV2) CouchbaseCollectionGroups(namespace string) v2.CouchbaseCollectionGroupInterface {
+	return &FakeCouchbaseCollectionGroups{c, namespace}
+}
+
 func (c *FakeCouchbaseV2) CouchbaseEphemeralBuckets(namespace string) v2.CouchbaseEphemeralBucketInterface {
 	return &FakeCouchbaseEphemeralBuckets{c, namespace}
 }
@@ -55,6 +63,14 @@ func (c *FakeCouchbaseV2) CouchbaseReplications(namespace string) v2.CouchbaseRe
 
 func (c *FakeCouchbaseV2) CouchbaseRoleBindings(namespace string) v2.CouchbaseRoleBindingInterface {
 	return &FakeCouchbaseRoleBindings{c, namespace}
+}
+
+func (c *FakeCouchbaseV2) CouchbaseScopes(namespace string) v2.CouchbaseScopeInterface {
+	return &FakeCouchbaseScopes{c, namespace}
+}
+
+func (c *FakeCouchbaseV2) CouchbaseScopeGroups(namespace string) v2.CouchbaseScopeGroupInterface {
+	return &FakeCouchbaseScopeGroups{c, namespace}
 }
 
 func (c *FakeCouchbaseV2) CouchbaseUsers(namespace string) v2.CouchbaseUserInterface {

@@ -34,6 +34,10 @@ NATIVE_TYPES = [
     'couchbaseclusters.spec.servers.resources',
     'couchbaseclusters.spec.volumeClaimTemplates',
     'couchbaseclusters.spec.xdcr.remoteClusters.replications.selector',
+    'couchbasescopes.spec.collections.selector',
+    'couchbasescopegroups.spec.collections.selector',
+    'couchbasebuckets.spec.scopesAndCollections.scopes.selector',
+    'couchbaseephemeralbuckets.spec.scopesAndCollections.scopes.selector',
 ]
 
 def get_effective_reference(reference):
