@@ -6,6 +6,48 @@ data:
   ca: YmxhaCBibGFoIGJsYWgK
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseCollection
+metadata:
+  name: collection0
+  labels:
+    collections: antique
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCollectionGroup
+metadata:
+  name: collectiongroup0
+spec:
+  names:
+  - bugs
+  - lola
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseScope
+metadata:
+  name: scope0
+spec:
+  name: scope0
+  collections:
+    managed: true
+    resources:
+    - kind: CouchbaseCollection
+      name: collection0
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseScopeGroup
+metadata:
+  name: scopegroup0
+spec:
+  names:
+  - donald
+  - daffy
+  collections:
+    managed: true
+    selector:
+      matchLabels:
+        collections: antique
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
   name: bucket0
@@ -20,6 +62,13 @@ spec:
   compressionMode: passive
   minimumDurability: none
   maxTTL: 60s
+  scopes:
+    managed: true
+    resources:
+    - kind: CouchbaseScope
+      name: scope0
+    - kind: CouchbaseScopeGroup
+      name: scopegroup0
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBucket

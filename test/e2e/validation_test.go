@@ -1458,6 +1458,77 @@ func TestNegValidationCreateCouchbaseBackupRestore(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
+func TestNegValidationCreateCouchbaseScopesAndCollections(t *testing.T) {
+	testDefs := []testDef{
+		// The name type is shared across all scopes and collections types, so
+		// adding explicit tests for each type should be a waste of time and effort.
+		{
+			name:           "TestValidateScopeNameTooShort",
+			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name`},
+		},
+		{
+			name:           "TestValidateScopeNameTooLong",
+			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "1234567890123456789012345678901")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name`},
+		},
+		{
+
+			name:           "TestValidateScopeNameIllegalCharacter",
+			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "abc&")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name`},
+		},
+		{
+
+			name:           "TestValidateScopeNameIllegalFirstCharacter",
+			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "%pewpew")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.name`},
+		},
+		// Check that array names are working as designed as they are slightly
+		// different from above.
+		{
+			name:           "TestValidateScopeGroupEmptyNamesIllegal",
+			mutations:      patchMap{"scopegroup0": jsonpatch.NewPatchSet().Remove("/spec/names")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.names`},
+		},
+		{
+			name:           "TestValidateScopeGroupNameIllegal",
+			mutations:      patchMap{"scopegroup0": jsonpatch.NewPatchSet().Replace("/spec/names/0", "_default")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.names`},
+		},
+		{
+			name:           "TestValidateScopeGroupNamesUnique",
+			mutations:      patchMap{"scopegroup0": jsonpatch.NewPatchSet().Add("/spec/names/-", "daffy")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.names`},
+		},
+		// Check that scope collection selection is working.  This is shared between
+		// scopes and scope groups, so we only need to do this once.
+		{
+			name:           "TestValidateScopeSelectorTypeIllegal",
+			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Replace("/spec/collections/resources/0/kind", "CouchbaseScope")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.collections.resources.kind`},
+		},
+		// Check that bucket scope collection is working.  This shared between
+		// couchbase and ephemeral buckets, so we only need to do this once.
+		{
+			name:           "TestValidateBucketSelectorTypeIllegal",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/scopes/resources/0/kind", "CouchbaseCollection")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.scopes.resources.kind`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
 func TestValidationDefaultCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
@@ -1561,6 +1632,16 @@ func TestValidationDefaultCreate(t *testing.T) {
 				Test("/spec/cluster/autoCompaction/viewFragmentationThreshold/percent", 30).
 				Test("/spec/cluster/autoCompaction/tombstonePurgeInterval", "72h"),
 			},
+		},
+		{
+			name:        "TestScopeCollectionReferenceKindDefault",
+			mutations:   patchMap{"scope0": jsonpatch.NewPatchSet().Remove("/spec/collections/resources/0/kind")},
+			validations: patchMap{"scope0": jsonpatch.NewPatchSet().Test("/spec/collections/resources/0/kind", "CouchbaseCollection")},
+		},
+		{
+			name:        "TestBucketScopeReferenceKindDefault",
+			mutations:   patchMap{"bucket0": jsonpatch.NewPatchSet().Remove("/spec/scopes/resources/0/kind")},
+			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().Test("/spec/scopes/resources/0/kind", "CouchbaseScope")},
 		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
