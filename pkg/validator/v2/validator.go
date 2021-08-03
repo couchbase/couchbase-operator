@@ -862,14 +862,8 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if bucket.Spec.MaxTTL != nil {
-		timeout := int(bucket.Spec.MaxTTL.Duration.Seconds())
-
-		if timeout < 0 {
-			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false, nil))
-		}
-
-		if timeout > bucketTTLMax {
-			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false, nil))
+		if err := checkMaxTTL("spec.maxTTL", bucket.Spec.MaxTTL); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
@@ -878,6 +872,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if err := validateMemoryConstraints(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkBucketScopesUnique(v, bucket.Namespace, couchbasev2.BucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -898,14 +896,8 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	}
 
 	if bucket.Spec.MaxTTL != nil {
-		timeout := int(bucket.Spec.MaxTTL.Duration.Seconds())
-
-		if timeout < 0 {
-			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false, nil))
-		}
-
-		if timeout > bucketTTLMax {
-			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false, nil))
+		if err := checkMaxTTL("spec.maxTTL", bucket.Spec.MaxTTL); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
@@ -914,6 +906,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	}
 
 	if err := validateMemoryConstraints(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkBucketScopesUnique(v, bucket.Namespace, couchbasev2.EphemeralBucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -1593,6 +1589,383 @@ func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name s
 	return nil
 }
 
+// checkMaxTTL is a generic check for document TTL, shared across buckets and collections.
+func checkMaxTTL(path string, value *metav1.Duration) error {
+	if value == nil {
+		return nil
+	}
+
+	timeout := int(value.Duration.Seconds())
+
+	if timeout < 0 {
+		return errors.ExceedsMinimumInt(path, "body", 0, false, nil)
+	}
+
+	if timeout > bucketTTLMax {
+		return errors.ExceedsMaximumInt(path, "body", bucketTTLMax, false, nil)
+	}
+
+	return nil
+}
+
+func CheckConstraintsCollection(v *types.Validator, collection *couchbasev2.CouchbaseCollection) error {
+	var errs []error
+
+	if collection.Spec.MaxTTL != nil {
+		if err := checkMaxTTL("spec.maxTTL", collection.Spec.MaxTTL); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if err := checkAllScopeCollectionsUnique(v, collection.Namespace); err != nil {
+		errs = append(errs, err)
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func CheckConstraintsCollectionGroup(v *types.Validator, collectionGroup *couchbasev2.CouchbaseCollectionGroup) error {
+	var errs []error
+
+	if collectionGroup.Spec.MaxTTL != nil {
+		if err := checkMaxTTL("spec.maxTTL", collectionGroup.Spec.MaxTTL); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if err := checkAllScopeCollectionsUnique(v, collectionGroup.Namespace); err != nil {
+		errs = append(errs, err)
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func CheckConstraintsScope(v *types.Validator, scope *couchbasev2.CouchbaseScope) error {
+	var errs []error
+
+	if err := checkScopeCollectionsUnique(v, scope.Namespace, couchbasev2.ScopeCRDResourceKind, scope.Name, scope.Spec.Collections); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkAllBucketScopesUnique(v, scope.Namespace); err != nil {
+		errs = append(errs, err)
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func CheckConstraintsScopeGroup(v *types.Validator, scopeGroup *couchbasev2.CouchbaseScopeGroup) error {
+	var errs []error
+
+	if err := checkScopeCollectionsUnique(v, scopeGroup.Namespace, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, scopeGroup.Spec.Collections); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkAllBucketScopesUnique(v, scopeGroup.Namespace); err != nil {
+		errs = append(errs, err)
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkAllScopeCollectionsUnique is a somewhat heavyweight beast.  When we create a collection
+// we check every scope in the namespace in case a scope references the collection, before validating
+// each of those scopes individually.
+func checkAllScopeCollectionsUnique(v *types.Validator, namespace string) error {
+	scopes, err := v.Abstraction.GetCouchbaseScopes(namespace, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, scope := range scopes.Items {
+		if err := checkScopeCollectionsUnique(v, namespace, couchbasev2.ScopeCRDResourceKind, scope.Name, scope.Spec.Collections); err != nil {
+			return err
+		}
+	}
+
+	scopeGroups, err := v.Abstraction.GetCouchbaseScopeGroups(namespace, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, scopeGroup := range scopeGroups.Items {
+		if err := checkScopeCollectionsUnique(v, namespace, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, scopeGroup.Spec.Collections); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// nameFirstDefinition provides tracking of what resource first defines a name in the event
+// of a collision.
+type nameFirstDefinition struct {
+	// kind is the resource type.
+	kind string
+
+	// name is the resource name.
+	name string
+}
+
+// nameFirstDefinitionMap provides tracking of what resource first defines a name in the event
+// of a collision.  The map key is the couchbase name.
+type nameFirstDefinitionMap map[string]nameFirstDefinition
+
+// checkScopeCollectionsUnique accepts a collection selector from either a scope or scope group
+// and runs through every referenced collection and checks for duplicate names.
+func checkScopeCollectionsUnique(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.CollectionSelector) error {
+	if selector == nil {
+		return nil
+	}
+
+	names := nameFirstDefinitionMap{}
+
+	if err := checkScopeCollectionsUniqueExplicit(v, namespace, kind, resourceName, selector, names); err != nil {
+		return err
+	}
+
+	if err := checkScopeCollectionsUniqueImplicit(v, namespace, kind, resourceName, selector, names); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// checkScopeCollectionsUniqueExplicit checks collections included in a scope by reference have
+// unique names.
+func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.CollectionSelector, names nameFirstDefinitionMap) error {
+	for _, resource := range selector.Resources {
+		switch resource.Kind {
+		case couchbasev2.CollectionCRDResourceKind:
+			collection, err := v.Abstraction.GetCouchbaseCollection(namespace, resource.Name)
+			if err != nil {
+				return err
+			}
+
+			if first, ok := names[collection.CouchbaseName()]; ok {
+				return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", collection.CouchbaseName(), kind, resourceName, couchbasev2.CollectionCRDResourceKind, collection.Name, first.kind, first.name)
+			}
+
+			names[collection.CouchbaseName()] = nameFirstDefinition{
+				kind: couchbasev2.CollectionCRDResourceKind,
+				name: collection.Name,
+			}
+		case couchbasev2.CollectionGroupCRDResourceKind:
+			collectionGroup, err := v.Abstraction.GetCouchbaseCollectionGroup(namespace, resource.Name)
+			if err != nil {
+				return err
+			}
+
+			for _, name := range collectionGroup.Spec.Names {
+				if first, ok := names[string(name)]; ok {
+					return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name, first.kind, first.name)
+				}
+
+				names[string(name)] = nameFirstDefinition{
+					kind: couchbasev2.CollectionGroupCRDResourceKind,
+					name: collectionGroup.Name,
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// checkScopeCollectionsUniqueImplicit checks collections included in a scope by label selector have
+// unique names.
+func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.CollectionSelector, names nameFirstDefinitionMap) error {
+	if selector.Selector == nil {
+		return nil
+	}
+
+	collections, err := v.Abstraction.GetCouchbaseCollections(namespace, selector.Selector)
+	if err != nil {
+		return err
+	}
+
+	for _, collection := range collections.Items {
+		if first, ok := names[collection.CouchbaseName()]; ok {
+			return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", collection.CouchbaseName(), kind, resourceName, couchbasev2.CollectionCRDResourceKind, collection.Name, first.kind, first.name)
+		}
+
+		names[collection.CouchbaseName()] = nameFirstDefinition{
+			kind: couchbasev2.CollectionCRDResourceKind,
+			name: collection.Name,
+		}
+	}
+
+	collectionGroups, err := v.Abstraction.GetCouchbaseCollectionGroups(namespace, selector.Selector)
+	if err != nil {
+		return err
+	}
+
+	for _, collectionGroup := range collectionGroups.Items {
+		for _, name := range collectionGroup.Spec.Names {
+			if first, ok := names[string(name)]; ok {
+				return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name, first.kind, first.name)
+			}
+
+			names[string(name)] = nameFirstDefinition{
+				kind: couchbasev2.CollectionGroupCRDResourceKind,
+				name: collectionGroup.Name,
+			}
+		}
+	}
+
+	return nil
+}
+
+// checkAllBucketScopesUnique is a somewhat heavyweight beast.  When we create a scope
+// we check every bucket in the namespace in case a bucket references the scope, before validating
+// each of those buckets individually.
+func checkAllBucketScopesUnique(v *types.Validator, namespace string) error {
+	buckets, err := v.Abstraction.GetCouchbaseBuckets(namespace, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, bucket := range buckets.Items {
+		if err := checkBucketScopesUnique(v, namespace, couchbasev2.BucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
+			return err
+		}
+	}
+
+	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(namespace, nil)
+	if err != nil {
+		return err
+	}
+
+	for _, ephemeralBucket := range ephemeralBuckets.Items {
+		if err := checkBucketScopesUnique(v, namespace, couchbasev2.EphemeralBucketCRDResourceKind, ephemeralBucket.Name, ephemeralBucket.Spec.Scopes); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkBucketScopesUnique accepts a scope selector from either a bucket or ephemeral bucket
+// and runs through every referenced scope and checks for duplicate names.
+func checkBucketScopesUnique(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.ScopeSelector) error {
+	if selector == nil {
+		return nil
+	}
+
+	names := nameFirstDefinitionMap{}
+
+	if err := checkBucketScopesUniqueExplicit(v, namespace, kind, resourceName, selector, names); err != nil {
+		return err
+	}
+
+	if err := checkBucketScopesUniqueImplicit(v, namespace, kind, resourceName, selector, names); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// checkBucketScopesUniqueExplicit checks scopes included in a bucket by reference have
+// unique names.
+func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.ScopeSelector, names nameFirstDefinitionMap) error {
+	for _, resource := range selector.Resources {
+		switch resource.Kind {
+		case couchbasev2.ScopeCRDResourceKind:
+			scope, err := v.Abstraction.GetCouchbaseScope(namespace, resource.Name)
+			if err != nil {
+				return err
+			}
+
+			if first, ok := names[scope.CouchbaseName()]; ok {
+				return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", scope.CouchbaseName(), kind, resourceName, couchbasev2.ScopeCRDResourceKind, scope.Name, first.kind, first.name)
+			}
+
+			names[scope.CouchbaseName()] = nameFirstDefinition{
+				kind: couchbasev2.ScopeCRDResourceKind,
+				name: scope.Name,
+			}
+		case couchbasev2.ScopeGroupCRDResourceKind:
+			scopeGroup, err := v.Abstraction.GetCouchbaseScopeGroup(namespace, resource.Name)
+			if err != nil {
+				return err
+			}
+
+			for _, name := range scopeGroup.Spec.Names {
+				if first, ok := names[string(name)]; ok {
+					return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, first.kind, first.name)
+				}
+
+				names[string(name)] = nameFirstDefinition{
+					kind: couchbasev2.ScopeGroupCRDResourceKind,
+					name: scopeGroup.Name,
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// checkBucketScopesUniqueImplicit checks scopes included in a bucket by label selector have
+// unique names.
+func checkBucketScopesUniqueImplicit(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.ScopeSelector, names nameFirstDefinitionMap) error {
+	if selector.Selector == nil {
+		return nil
+	}
+
+	scopes, err := v.Abstraction.GetCouchbaseScopes(namespace, selector.Selector)
+	if err != nil {
+		return err
+	}
+
+	for _, scope := range scopes.Items {
+		if first, ok := names[scope.CouchbaseName()]; ok {
+			return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", scope.CouchbaseName(), kind, resourceName, couchbasev2.ScopeCRDResourceKind, scope.Name, first.kind, first.name)
+		}
+
+		names[scope.CouchbaseName()] = nameFirstDefinition{
+			kind: couchbasev2.ScopeCRDResourceKind,
+			name: scope.Name,
+		}
+	}
+
+	scopeGroups, err := v.Abstraction.GetCouchbaseScopeGroups(namespace, selector.Selector)
+	if err != nil {
+		return err
+	}
+
+	for _, scopeGroup := range scopeGroups.Items {
+		for _, name := range scopeGroup.Spec.Names {
+			if first, ok := names[string(name)]; ok {
+				return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", name, kind, resourceName, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, first.kind, first.name)
+			}
+
+			names[string(name)] = nameFirstDefinition{
+				kind: couchbasev2.ScopeGroupCRDResourceKind,
+				name: scopeGroup.Name,
+			}
+		}
+	}
+
+	return nil
+}
+
 // CheckImmutableFields checks whether the user is trying to change something
 // that cannot be changed.  Think long and hard about adding stuff here... is it
 // technically impossible to be updated?  Are you just being lazy?  History
@@ -1861,6 +2234,58 @@ func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler)
 	// Referenced server group cannot be changed
 	if prev.Spec.Servers != curr.Spec.Servers {
 		errs = append(errs, util.NewUpdateError("spec.servers", "body"))
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func CheckImmutableFieldsCollection(prev, curr *couchbasev2.CouchbaseCollection) error {
+	var errs []error
+
+	prevTTL := &metav1.Duration{}
+
+	if prev.Spec.MaxTTL != nil {
+		prevTTL = prev.Spec.MaxTTL
+	}
+
+	currTTL := &metav1.Duration{}
+
+	if curr.Spec.MaxTTL != nil {
+		currTTL = curr.Spec.MaxTTL
+	}
+
+	if prevTTL.Duration != currTTL.Duration {
+		errs = append(errs, util.NewUpdateError("spec.maxTTL", "body"))
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func CheckImmutableFieldsCollectionGroup(prev, curr *couchbasev2.CouchbaseCollectionGroup) error {
+	var errs []error
+
+	prevTTL := &metav1.Duration{}
+
+	if prev.Spec.MaxTTL != nil {
+		prevTTL = prev.Spec.MaxTTL
+	}
+
+	currTTL := &metav1.Duration{}
+
+	if curr.Spec.MaxTTL != nil {
+		currTTL = curr.Spec.MaxTTL
+	}
+
+	if prevTTL.Duration != currTTL.Duration {
+		errs = append(errs, util.NewUpdateError("spec.maxTTL", "body"))
 	}
 
 	if errs != nil {

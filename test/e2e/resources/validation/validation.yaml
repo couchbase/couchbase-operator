@@ -32,6 +32,8 @@ spec:
     resources:
     - kind: CouchbaseCollection
       name: collection0
+    - kind: CouchbaseCollectionGroup
+      name: collectiongroup0
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseScopeGroup

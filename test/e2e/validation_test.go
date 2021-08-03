@@ -1524,6 +1524,32 @@ func TestNegValidationCreateCouchbaseScopesAndCollections(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.scopes.resources.kind`},
 		},
+		// Check TTLs are working.
+		{
+			name:           "TestCollectionTTLUnderflow",
+			mutations:      patchMap{"collectiongroup0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "-15s")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.maxTTL`},
+		},
+		{
+			name:           "TestCollectionTTLOverflow",
+			mutations:      patchMap{"collectiongroup0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "2147483648s")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.maxTTL`},
+		},
+		// Name aliasing testing... if etcd explodes, don't blame me.
+		{
+			name:           "TestCollectionNameAlias",
+			mutations:      patchMap{"collection0": jsonpatch.NewPatchSet().Add("/spec", emptyObject).Add("/spec/name", "bugs")},
+			shouldFail:     true,
+			expectedErrors: []string{"couchbase collection name `bugs` in CouchbaseScope/scope0 redefined by CouchbaseCollectionGroup/collectiongroup0, first seen in CouchbaseCollection/collection0"},
+		},
+		{
+			name:           "TestScopeNameAlias",
+			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "daffy")},
+			shouldFail:     true,
+			expectedErrors: []string{"couchbase scope name `daffy` in CouchbaseBucket/bucket0 redefined by CouchbaseScopeGroup/scopegroup0, first seen in CouchbaseScope/scope0"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1757,6 +1783,19 @@ func TestNegValidationApply(t *testing.T) {
 			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Add("/spec/start/str", "oldest")},
 			shouldFail:     true,
 			expectedErrors: []string{`specify just one value, either Str or Int`},
+		},
+		// Check Collection immutability.
+		{
+			name:           "TestValidateCollectionTTLImmutable",
+			mutations:      patchMap{"collection0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "30s")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.maxTTL"},
+		},
+		{
+			name:           "TestValidateCollectionGroupTTLImmutable",
+			mutations:      patchMap{"collectiongroup0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "30s")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.maxTTL"},
 		},
 	}
 

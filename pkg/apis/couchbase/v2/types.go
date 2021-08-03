@@ -525,6 +525,9 @@ type CouchbaseBackupRestoreList struct {
 // +kubebuilder:validation:Pattern="^[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29}$"
 type ScopeOrCollectionName string
 
+// DefaultScopeOrCollection is the name of the default scope and collection.
+const DefaultScopeOrCollection = "_default"
+
 // CouchbaseCollection represent the finest grained size of data storage in Couchbase.
 // Collections contain all documents and indexes in the system.  Collections also form
 // the finest grain basis for role-based access control (RBAC) and cross-datacenter

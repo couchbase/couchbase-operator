@@ -34,6 +34,14 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) error {
 		return validationv2.CheckConstraintsBackup(v, t)
 	case *couchbasev2.CouchbaseBackupRestore:
 		return validationv2.CheckConstraintsBackupRestore(v, t)
+	case *couchbasev2.CouchbaseCollection:
+		return validationv2.CheckConstraintsCollection(v, t)
+	case *couchbasev2.CouchbaseCollectionGroup:
+		return validationv2.CheckConstraintsCollectionGroup(v, t)
+	case *couchbasev2.CouchbaseScope:
+		return validationv2.CheckConstraintsScope(v, t)
+	case *couchbasev2.CouchbaseScopeGroup:
+		return validationv2.CheckConstraintsScopeGroup(v, t)
 	}
 
 	return nil
@@ -68,6 +76,14 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 	case *couchbasev2.CouchbaseAutoscaler:
 		if t2, ok := updated.(*couchbasev2.CouchbaseAutoscaler); ok {
 			return validationv2.CheckImmutableFieldsAutoscaler(t, t2)
+		}
+	case *couchbasev2.CouchbaseCollection:
+		if t2, ok := updated.(*couchbasev2.CouchbaseCollection); ok {
+			return validationv2.CheckImmutableFieldsCollection(t, t2)
+		}
+	case *couchbasev2.CouchbaseCollectionGroup:
+		if t2, ok := updated.(*couchbasev2.CouchbaseCollectionGroup); ok {
+			return validationv2.CheckImmutableFieldsCollectionGroup(t, t2)
 		}
 	}
 

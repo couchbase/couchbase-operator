@@ -880,3 +880,26 @@ func (b *CouchbaseMemcachedBucket) GetMemoryQuota() *resource.Quantity {
 func (b *CouchbaseMemcachedBucket) GetType() BucketType {
 	return BucketTypeMemcached
 }
+
+// Abstractions for scopes and collections.
+// ACHTUNG! You cannot add a GetName() receiver to a raw type as it will override
+// that provided by Kubernetes and break cache indexes and numerous other subtle things.
+func (c *CouchbaseCollection) CouchbaseName() string {
+	if c.Spec.Name != "" {
+		return string(c.Spec.Name)
+	}
+
+	return c.Name
+}
+
+func (s *CouchbaseScope) CouchbaseName() string {
+	if s.Spec.DefaultScope {
+		return DefaultScopeOrCollection
+	}
+
+	if s.Spec.Name != "" {
+		return string(s.Spec.Name)
+	}
+
+	return s.Name
+}
