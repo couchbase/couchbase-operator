@@ -93,6 +93,11 @@ const (
 	EventAutoscaleDown     = "EventAutoscaleDown"
 
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
+
+	// Scopes and collections.
+	// Note, this is kept artificially vague as flooding the system with thousands
+	// of events won't win us any fans.
+	EventScopesAndCollectionsUpdated = "EventScopesAndCollectionsUpdated"
 )
 
 func EventReasonAdminPasswordChangedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
@@ -445,6 +450,15 @@ func TLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonTLSInvalid
 	event.Message = EventReasonTLSInvalidMessage
+
+	return event
+}
+
+func ScopesAndCollectionsUpdated(cl *couchbasev2.CouchbaseCluster, bucket string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventScopesAndCollectionsUpdated
+	event.Message = fmt.Sprintf("Scopes and collections updated for bucket %s", bucket)
 
 	return event
 }

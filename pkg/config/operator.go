@@ -311,6 +311,10 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.GroupCRDResourcePlural,
 				couchbasev2.RoleBindingCRDResourcePlural,
 				couchbasev2.BackupCRDResourcePlural,
+				couchbasev2.ScopeCRDResourcePlural,
+				couchbasev2.ScopeGroupCRDResourcePlural,
+				couchbasev2.CollectionCRDResourcePlural,
+				couchbasev2.CollectionGroupCRDResourcePlural,
 			},
 			Verbs: []string{
 				"list",  // used by the operator for caching

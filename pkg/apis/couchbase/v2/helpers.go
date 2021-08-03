@@ -13,6 +13,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -785,6 +786,16 @@ func (c *CouchbaseCluster) GetHibernationStrategy() HibernationStrategy {
 	return *c.Spec.HibernationStrategy
 }
 
+// GetBucketLabelSelector returns a label selector to select buckets for
+// inclusion in the cluster.
+func (c *CouchbaseCluster) GetBucketLabelSelector() (labels.Selector, error) {
+	if c.Spec.Buckets.Selector == nil {
+		return labels.Everything(), nil
+	}
+
+	return metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector)
+}
+
 // GetMinimumDurability returns a safe default for the bucket durability, because it's
 // always set to something, it allows the feature to be disabled when posted to the API.
 func (b *CouchbaseBucket) GetMinimumDurability() CouchbaseBucketMinimumDurability {
@@ -820,11 +831,17 @@ type AbstractBucket interface {
 	// to DNS names).
 	GetName() string
 
+	// GetLabels returns any metadata labels.
+	GetLabels() map[string]string
+
 	// GetMemoryQuota simply returns the buckets resource allocation.
 	GetMemoryQuota() *resource.Quantity
 
 	// GetType returns the bucket type.
 	GetType() BucketType
+
+	// GetScopes gets the scopes and collections specification.
+	GetScopes() *ScopeSelector
 }
 
 func (b *CouchbaseBucket) GetName() string {
@@ -837,12 +854,20 @@ func (b *CouchbaseBucket) GetName() string {
 	return name
 }
 
+func (b *CouchbaseBucket) GetLabels() map[string]string {
+	return b.Labels
+}
+
 func (b *CouchbaseBucket) GetMemoryQuota() *resource.Quantity {
 	return b.Spec.MemoryQuota
 }
 
 func (b *CouchbaseBucket) GetType() BucketType {
 	return BucketTypeCouchbase
+}
+
+func (b *CouchbaseBucket) GetScopes() *ScopeSelector {
+	return b.Spec.Scopes
 }
 
 func (b *CouchbaseEphemeralBucket) GetName() string {
@@ -855,12 +880,20 @@ func (b *CouchbaseEphemeralBucket) GetName() string {
 	return name
 }
 
+func (b *CouchbaseEphemeralBucket) GetLabels() map[string]string {
+	return b.Labels
+}
+
 func (b *CouchbaseEphemeralBucket) GetMemoryQuota() *resource.Quantity {
 	return b.Spec.MemoryQuota
 }
 
 func (b *CouchbaseEphemeralBucket) GetType() BucketType {
 	return BucketTypeEphemeral
+}
+
+func (b *CouchbaseEphemeralBucket) GetScopes() *ScopeSelector {
+	return b.Spec.Scopes
 }
 
 func (b *CouchbaseMemcachedBucket) GetName() string {
@@ -873,12 +906,20 @@ func (b *CouchbaseMemcachedBucket) GetName() string {
 	return name
 }
 
+func (b *CouchbaseMemcachedBucket) GetLabels() map[string]string {
+	return b.Labels
+}
+
 func (b *CouchbaseMemcachedBucket) GetMemoryQuota() *resource.Quantity {
 	return b.Spec.MemoryQuota
 }
 
 func (b *CouchbaseMemcachedBucket) GetType() BucketType {
 	return BucketTypeMemcached
+}
+
+func (b *CouchbaseMemcachedBucket) GetScopes() *ScopeSelector {
+	return nil
 }
 
 // Abstractions for scopes and collections.

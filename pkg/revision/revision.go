@@ -8,9 +8,5 @@ var (
 // pinpoint the exact source code tree a defect was raised against.  If the
 // information is not available we default to an official release.
 func Revision() string {
-	if gitRevision == "" {
-		gitRevision = "release"
-	}
-
 	return gitRevision
 }

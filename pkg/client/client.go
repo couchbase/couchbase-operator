@@ -81,6 +81,18 @@ type Client struct {
 
 	// CronJobs is a read only cache of cronjobs
 	CronJobs *CronJobCache
+
+	// CouchbaseScopes is a read only cache of scopes (namespace scoped)
+	CouchbaseScopes *CouchbaseScopeCache
+
+	// CouchbaseScopeGroups is a read only cache of scope groups (namespace scoped)
+	CouchbaseScopeGroups *CouchbaseScopeGroupCache
+
+	// CouchbaseCollections is a read only cache of collections (namespace scoped)
+	CouchbaseCollections *CouchbaseCollectionCache
+
+	// CouchbaseCollectionGroups is a read only cache of collection groups (namespace scoped)
+	CouchbaseCollectionGroups *CouchbaseCollectionGroupCache
 }
 
 // NewClient initializes all Kubernetes clients and caches.
@@ -189,6 +201,26 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
+	c.CouchbaseScopes, err = newCouchbaseScopeCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseScopeGroups, err = newCouchbaseScopeGroupCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseCollections, err = newCouchbaseCollectionCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	c.CouchbaseCollectionGroups, err = newCouchbaseCollectionGroupCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -211,4 +243,8 @@ func (c *Client) Shutdown() {
 	c.CouchbaseBackups.stop()
 	c.CouchbaseBackupRestores.stop()
 	c.CouchbaseAutoscalers.stop()
+	c.CouchbaseScopes.stop()
+	c.CouchbaseScopeGroups.stop()
+	c.CouchbaseCollections.stop()
+	c.CouchbaseCollectionGroups.stop()
 }

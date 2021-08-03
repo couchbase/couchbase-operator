@@ -811,3 +811,33 @@ func SetMemcachedGlobalSettings(settings *MemcachedGlobals) *Request {
 
 	return NewRequest((*Client).Post, "/pools/default/settings/memcached/global", data, nil)
 }
+
+// ListScopes is a misnomer as this returns literally everything, there is no method
+// to list collections.
+func ListScopes(bucket string, scopes *ScopeList) *Request {
+	return NewRequest((*Client).Get, fmt.Sprintf("/pools/default/buckets/%s/scopes", bucket), nil, scopes)
+}
+
+func CreateScope(bucket, scope string) *Request {
+	data := url.Values{}
+	data.Add("name", scope)
+
+	return NewRequest((*Client).Post, fmt.Sprintf("/pools/default/buckets/%s/scopes", bucket), []byte(data.Encode()), nil)
+}
+
+func DeleteScope(bucket, scope string) *Request {
+	return NewRequest((*Client).Delete, fmt.Sprintf("/pools/default/buckets/%s/scopes/%s", bucket, scope), nil, nil)
+}
+
+func CreateCollection(bucket, scope string, collection Collection) *Request {
+	data, err := urlencoding.Marshal(collection)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, fmt.Sprintf("/pools/default/buckets/%s/scopes/%s/collections", bucket, scope), data, nil)
+}
+
+func DeleteCollection(bucket, scope, collection string) *Request {
+	return NewRequest((*Client).Delete, fmt.Sprintf("/pools/default/buckets/%s/scopes/%s/collections/%s", bucket, scope, collection), nil, nil)
+}

@@ -917,3 +917,203 @@ func (c *CouchbaseAutoscalerCache) List() (resources []*couchbasev2.CouchbaseAut
 func (c *CouchbaseAutoscalerCache) stop() {
 	c.resourceCache.stop()
 }
+
+// CouchbaseScopeCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseScope resources.
+type CouchbaseScopeCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseScopeCache creates a new synchronized cache.
+func newCouchbaseScopeCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseScopeCache, error) {
+	selector := labels.Everything()
+
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseScope{}, selector, couchbasev2.ScopeCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CouchbaseScopeCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested resource based on name.
+func (c *CouchbaseScopeCache) Get(name string) (*couchbasev2.CouchbaseScope, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*couchbasev2.CouchbaseScope), true
+}
+
+// list returns all resources.
+func (c *CouchbaseScopeCache) List() (resources []*couchbasev2.CouchbaseScope) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseScope))
+	}
+
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseScopeCache) stop() {
+	c.resourceCache.stop()
+}
+
+// CouchbaseScopeGroupCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseScopeGroup resources.
+type CouchbaseScopeGroupCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseScopeGroupCache creates a new synchronized cache.
+func newCouchbaseScopeGroupCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseScopeGroupCache, error) {
+	selector := labels.Everything()
+
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseScopeGroup{}, selector, couchbasev2.ScopeGroupCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CouchbaseScopeGroupCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested resource based on name.
+func (c *CouchbaseScopeGroupCache) Get(name string) (*couchbasev2.CouchbaseScopeGroup, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*couchbasev2.CouchbaseScopeGroup), true
+}
+
+// list returns all resources.
+func (c *CouchbaseScopeGroupCache) List() (resources []*couchbasev2.CouchbaseScopeGroup) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseScopeGroup))
+	}
+
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseScopeGroupCache) stop() {
+	c.resourceCache.stop()
+}
+
+// CouchbaseCollectionCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseCollection resources.
+type CouchbaseCollectionCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseCollectionCache creates a new synchronized cache.
+func newCouchbaseCollectionCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseCollectionCache, error) {
+	selector := labels.Everything()
+
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseCollection{}, selector, couchbasev2.CollectionCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CouchbaseCollectionCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested resource based on name.
+func (c *CouchbaseCollectionCache) Get(name string) (*couchbasev2.CouchbaseCollection, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*couchbasev2.CouchbaseCollection), true
+}
+
+// list returns all resources.
+func (c *CouchbaseCollectionCache) List() (resources []*couchbasev2.CouchbaseCollection) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseCollection))
+	}
+
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseCollectionCache) stop() {
+	c.resourceCache.stop()
+}
+
+// CouchbaseCollectionGroupCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseCollectionGroup resources.
+type CouchbaseCollectionGroupCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseCollectionGroupCache creates a new synchronized cache.
+func newCouchbaseCollectionGroupCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseCollectionGroupCache, error) {
+	selector := labels.Everything()
+
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseCollectionGroup{}, selector, couchbasev2.CollectionGroupCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CouchbaseCollectionGroupCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested resource based on name.
+func (c *CouchbaseCollectionGroupCache) Get(name string) (*couchbasev2.CouchbaseCollectionGroup, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*couchbasev2.CouchbaseCollectionGroup), true
+}
+
+// list returns all resources.
+func (c *CouchbaseCollectionGroupCache) List() (resources []*couchbasev2.CouchbaseCollectionGroup) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseCollectionGroup))
+	}
+
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseCollectionGroupCache) stop() {
+	c.resourceCache.stop()
+}

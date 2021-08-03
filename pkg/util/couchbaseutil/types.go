@@ -1134,3 +1134,52 @@ type MemcachedGlobals struct {
 	NumReaderThreads int `json:"num_reader_threads" url:"num_reader_threads,omitempty"`
 	NumWriterThreads int `json:"num_writer_threads" url:"num_writer_threads,omitempty"`
 }
+
+// ScopeList defines all scopes for a bucket, and all nested collections.
+type ScopeList struct {
+	Scopes []Scope `json:"scopes"`
+}
+
+type Scope struct {
+	Name        string       `json:"name"`
+	Collections []Collection `json:"collections"`
+}
+
+type Collection struct {
+	Name   string `json:"name" url:"name"`
+	MaxTTL int    `json:"maxTTL" url:"maxTTL"`
+}
+
+// HasScope determines whether the named scope exists in the list.
+func (l ScopeList) HasScope(name string) bool {
+	for _, scope := range l.Scopes {
+		if scope.Name == name {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetScope returns the named configuration in lieu of an actual
+// API not existing.
+func (l ScopeList) GetScope(name string) Scope {
+	for _, scope := range l.Scopes {
+		if scope.Name == name {
+			return scope
+		}
+	}
+
+	return Scope{}
+}
+
+// HasCollection determines whether the named collection exists in the scope.
+func (s Scope) HasCollection(name string) bool {
+	for _, collection := range s.Collections {
+		if collection.Name == name {
+			return true
+		}
+	}
+
+	return false
+}

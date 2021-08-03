@@ -192,6 +192,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcilePods,
 		(*Cluster).reconcileClusterSettings,
 		(*Cluster).reconcileBuckets,
+		(*Cluster).reconcileScopesAndCollections,
 		(*Cluster).reconcileXDCR,
 		(*Cluster).reconcileReadiness,
 		(*Cluster).reconcileAdminService,
@@ -451,13 +452,9 @@ func (c *Cluster) cancelAddMember(member couchbaseutil.Member) error {
 
 // gatherBuckets loads up bucket configurations from Kubernetes and marshalls them into canonical form.
 func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
-	selector := labels.Everything()
-
-	if c.cluster.Spec.Buckets.Selector != nil {
-		var err error
-		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Buckets.Selector); err != nil {
-			return nil, err
-		}
+	selector, err := c.cluster.GetBucketLabelSelector()
+	if err != nil {
+		return nil, err
 	}
 
 	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
