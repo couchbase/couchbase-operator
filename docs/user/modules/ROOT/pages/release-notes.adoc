@@ -58,7 +58,7 @@ Refer to xref:howto-operator-upgrade.adoc[] for further details.
 [#release-v221]
 == Release 2.2.1
 
-Couchbase Autonomous Operator 2.2.1 was released in July 2021.
+Couchbase Autonomous Operator 2.2.1 was released in August 2021.
 
 [#changes-in-behavior-v221]
 === New Features and Behavioral Changes
