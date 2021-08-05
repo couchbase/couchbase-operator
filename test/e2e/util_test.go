@@ -45,6 +45,7 @@ const (
 	TagFeatureBackup            = "backup"
 	TagFeatureReconcile         = "reconcile"
 	TagFeatureNetwork           = "network"
+	TagFeatureCollections       = "collections"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -324,6 +325,22 @@ func registerTests() {
 		framework.NewTestDef(TestRebalanceLogProcessing).WithTags(TagSuiteP0, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingDynamicConfigReload).WithTags(TagSuiteP0, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingUpgrade).WithTags(TagSuiteP0, TagFeatureLogging, TagFeatureUpgrade),
+		framework.NewTestDef(TestScopeCreateExplicit).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestScopeCreateImplicit).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestScopeCreateMixed).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestScopeDelete).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestScopeUnmanaged).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestCollectionCreateExplicit).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestCollectionCreateImplicit).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestCollectionCreateMixed).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestCollectionDelete).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestCollectionUnmanaged).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestDefaultCollectionDeletion).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestScopesAndCollectionsSharedScopeTopology).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestScopesAndCollectionsSharedCollectionTopology).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestScopesAndCollectionsCascadingScopeDeletion).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestScopeOverflow).WithTags(TagSuiteP1, TagFeatureCollections),
+		framework.NewTestDef(TestCollectionOverflow).WithTags(TagSuiteP1, TagFeatureCollections),
 
 		// Low priority tests.
 		framework.NewTestDef(TestInvalidBaseImage).WithTags(TagSuiteP1, TagSuitePlatform),
