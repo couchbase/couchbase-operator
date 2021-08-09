@@ -1297,7 +1297,7 @@ type ClusterSpec struct {
 	// by `spec.autoResourceAllocation.overheadPercent`.Changing individual allocations for
 	// a service will cause a cluster upgrade as allocations are modified in the underlying
 	// pods.  This field also allows default pod CPU requests and limits to be applied.
-	// All resource allocations can be overridden by explcitly configuring them in the
+	// All resource allocations can be overridden by explicitly configuring them in the
 	// `spec.servers.resources` field.
 	AutoResourceAllocation *AutoResourceAllocation `json:"autoResourceAllocation,omitempty"`
 
@@ -1412,7 +1412,7 @@ type ClusterSpec struct {
 	// Volumes can only be expanded and not reduced to a smaller size.
 	// See: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#resizing-an-in-use-persistentvolumeclaim
 	//
-	// If "EnableOnlineVolumeExpansion" is enabled for use within an evironment that does
+	// If "EnableOnlineVolumeExpansion" is enabled for use within an environment that does
 	// not actually support online volume and file system expansion then the cluster will fallback to
 	// rolling upgrade procedure to create a new set of Pods for use with resized Volumes.
 	// More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims
@@ -1669,7 +1669,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// triggers the creation of per-pod services used by clients to connect to the Couchbase
 	// cluster.  When admin, only the administrator port is exposed, allowing remote
 	// administration.  When xdcr, only the services required for remote replication are exposed.
-	// The xdcr feature is only required when the cluster is the destrination of an XDCR
+	// The xdcr feature is only required when the cluster is the destination of an XDCR
 	// replication.  When client, all services are exposed as required for client SDK operation.
 	// This field may contain any of "admin", "xdcr" and "client".  Each feature may only be
 	// included once.
@@ -1772,7 +1772,7 @@ type AutoResourceAllocation struct {
 	OverheadPercent int `json:"overheadPercent,omitempty"`
 
 	// CPURequests automatically populates the CPU requests across all Couchbase
-	// server pods.  The default vaule of "2", is the minimum recommended number of
+	// server pods.  The default value of "2", is the minimum recommended number of
 	// CPUs required to run Couchbase Server.  Explicitly specifying the CPU request
 	// for a particular server class will override this value. More info:
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
@@ -1827,7 +1827,7 @@ type ClusterConfig struct {
 	IndexServiceMemQuota *resource.Quantity `json:"indexServiceMemoryQuota,omitempty"`
 
 	// QueryServiceMemQuota is a dummy field.  By default, Couchbase server provides no
-	// memory resource constrints for the query service, so this has no effect on Couchbase
+	// memory resource constraints for the query service, so this has no effect on Couchbase
 	// server.  It is, however, used when the spec.autoResourceAllocation feature is enabled,
 	// and is used to define the amount of memory reserved by the query service for use with
 	// Kubernetes resource scheduling. More info:
@@ -1983,7 +1983,7 @@ type CouchbaseClusterQuerySettings struct {
 	TemporarySpace *resource.Quantity `json:"temporarySpace,omitempty"`
 
 	// TemporarySpaceUnlimited allows the temporary storage used by
-	// the query service backfill, per-pod, to be unconstrainend.  This field
+	// the query service backfill, per-pod, to be unconstrained.  This field
 	// requires `backfillEnabled` to be set to true in order to have any effect.
 	// This field overrides `temporarySpace`.
 	TemporarySpaceUnlimited bool `json:"temporarySpaceUnlimited,omitempty"`
@@ -2002,7 +2002,7 @@ type CouchbaseClusterDataSettings struct {
 
 	// ReaderThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This setting is especially relevant when
-	// using "durable writes", increaing this field will have a large
+	// using "durable writes", increasing this field will have a large
 	// impact on performance.  This value must be between 4 and 64 threads,
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use. If not specified, this defaults to the
@@ -2157,7 +2157,11 @@ type XDCR struct {
 }
 
 type Buckets struct {
-	// Managed defines whether buckets are managed by us or the clients.
+	// Managed defines whether buckets are managed by the Operator (true), or user managed (false).
+	// When Operator managed, all buckets must be defined with either CouchbaseBucket,
+	// CouchbaseEphemeralBucket or CouchbaseMemcachedBucket resources.  Manual addition
+	// of buckets will be reverted by the Operator.  When user managed, the Operator
+	// will not interrogate buckets at all.  This field defaults to false.
 	Managed bool `json:"managed,omitempty"`
 	// Selector is a label selector used to list buckets in the namespace
 	// that are managed by the Operator.
@@ -2381,7 +2385,7 @@ type StaticTLS struct {
 }
 
 type TLSSecretSource struct {
-	// ServerSecretName specfies the secret name, in the same namespace as the cluster,
+	// ServerSecretName specifies the secret name, in the same namespace as the cluster,
 	// that contains server TLS data.  The secret is expected to contain "tls.crt" and
 	// "tls.key" as per the kubernetes.io/tls secret type.  It also additionally
 	// must contain "ca.crt".

@@ -43,7 +43,7 @@ pipeline {
     string(name: 'storage_class', defaultValue: 'standard-rwo')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
-    string(name: 'kubectl_version', defaultValue: '1.20.7')
+    string(name: 'kubectl_version', defaultValue: '1.20.9')
     string(name: 'gcloud_sdk_version', defaultValue: '341')
     choice(name: 'release_channel', choices: "None\nrapid\nregular\nstable")
     string(name: 's3_region', defaultValue: 'us-west-2')

@@ -66,6 +66,7 @@ Specified values represent the defaults for their respective fields unless other
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 spec:
+  logging:
     audit:
       enabled: true # <.>
       disabledEvents: # <.>

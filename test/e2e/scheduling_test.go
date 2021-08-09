@@ -91,7 +91,7 @@ func TestScheduleEvacuateAllPersistent(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
-		e2eutil.PodDownWithPVCRecoverySequenceWithEphemeral(clusterSize, mdsSize, mdsSize),
+		e2eutil.PodDownWithPVCRecoverySequenceWithEphemeral(t, clusterSize, mdsSize, mdsSize, f.CouchbaseServerImage),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

@@ -9,6 +9,13 @@ The official Couchbase Helm Chart can help you easily set up the Couchbase Auton
 
 This page describes how to use the Couchbase Helm Chart to create various deployments of the Autonomous Operator, Admission Controller, Couchbase clusters, and Sync Gateway.
 
+The Couchbase Helm Chart is primarily intended to make it easy to deploy with the defaults to get a working system in an empty cluster.
+For more complex scenarios, make sure to refer to the operator documentation as well, particularly the xref:concept-operator.adoc[operator architecture] and xref:reference-reference-architecture.adoc[reference architecture].
+
+A particular use case that is complex is upgrading so make sure to cover all the xref:howto-operator-upgrade.adoc[Autonomous Operator upgrade] and xref:concept-upgrade.adoc[Couchbase Server upgrade] sections.
+
+The recommendation, for more complex scenarios, is to manage the operator directly rather than relying on Helm to do it as the operator provides a lot more direct control and this approach simplifies the upgrade process.
+
 [IMPORTANT]
 ====
 The official Couchbase Helm Chart may only be used with Enterprise Edition products, such as Couchbase Server Enterprise Edition and Sync Gateway Enterprise Edition.
@@ -178,6 +185,7 @@ Likewise, the default server configuration will always be created unless you set
 For additional information, refer to the Helm documentation on https://helm.sh/docs/chart_template_guide/values_files/#deleting-a-default-key[deleting a default key^].
 ====
 
+[#selective-deployment]
 === Selective Deployment
 
 In many cases you may only want to install a single component, such as a Couchbase cluster, or an instance of Sync Gateway.
@@ -249,7 +257,7 @@ There is an issue (https://issues.couchbase.com/browse/K8S-1900[K8S-1900^]) that
 certificate cannot be verified for zone
 ----
 
-This issue is caused by the certificate not having the necessary subject alternative names (SANs) required by the new version of the Autonomous Operator. 
+This issue is caused by the certificate not having the necessary subject alternative names (SANs) required by the new version of the Autonomous Operator.
 
 To resolve this issue, start by regenerating the Secrets from the new chart version:
 
@@ -295,6 +303,15 @@ helm install my-release -f tls_values.yaml couchbase/couchbase-operator
 
 The example installation commands on this page assume the default namespace is used (these commands don't specify the `-n` option).
 This is important to note because the Couchbase Helm Chart deploys both the Autonomous Operator and the Admission Controller by default, _and these components should not be deployed more than once in the same namespace_.
+
+_The Admission Controller should only be deployed once per Kubernetes cluster_ as indicated in <<selective-deployment,Selective Deployment>> and in the xref:concept-operator.adoc#dynamic-admission-controller[operator architecture].
+To prevent deployment of the Admission Controller by the Couchbase Helm Chart, you can set the `install.admissionController=false` parameter either in the values file or on the command line:
+
+[source,console]
+----
+helm install my-release couchbase/couchbase-operator --set install.admissionController=false
+----
+
 If you install the default Couchbase Helm Chart multiple times in the same namespace, then you'll end up with multiple instances of the Autonomous Operator and the Admission Controller, which will cause errors in your deployments.
 
 In addition, the example installation commands on this page also specify `my-release` as the name for the https://helm.sh/docs/glossary/#release[chart release^].
@@ -308,6 +325,11 @@ helm install -g couchbase/couchbase-operator
 ----
 
 === Chart Versions
+
+[IMPORTANT]
+====
+It is *not* recommended to install different versions of the Couchbase Helm Chart in the same Kubernetes cluster.
+====
 
 The `helm install` command will always pull the highest version of a chart.
 To list the versions of the Couchbase Helm Chart that are available for installation, you can use the `helm search` command:
