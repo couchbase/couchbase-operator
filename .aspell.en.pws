@@ -125,6 +125,7 @@ vBuckets
 namespace
 namespaces
 namespaced
+namespacing
 tolerations
 stateful
 Stateful
@@ -187,7 +188,7 @@ autoscaled
 autoscaler
 autoscaling
 Autoscaler
-AutoScaling
+Autoscaling
 subresource
 reprovisioned
 snapshotted
@@ -217,3 +218,4 @@ customizable
 README
 configs
 provisioners
+datacenter

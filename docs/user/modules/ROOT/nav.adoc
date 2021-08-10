@@ -17,24 +17,36 @@
  ** xref:concept-operator.adoc[Operator Architecture]
  ** xref:concept-operator-logging.adoc[Operator Logging]
 * Couchbase Cluster Concepts
- ** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
- ** xref:concept-rbac.adoc[Couchbase Resource RBAC]
- ** xref:concept-user-rbac.adoc[Couchbase User RBAC]
- ** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
- ** xref:concept-mds.adoc[Couchbase Multi-Dimensional Scaling]
- ** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
- ** xref:concept-sizing.adoc[Couchbase Sizing]
- ** xref:concept-vertical-scaling.adoc[Couchbase Cluster Vertical Scaling]
- ** xref:concept-couchbase-autoscaling.adoc[]
- *** xref:concept-couchbase-autoscaling-best-practices.adoc[Auto-scaling Best Practices]
- ** xref:concept-couchbase-networking.adoc[Couchbase Networking]
- ** xref:concept-tls.adoc[Couchbase TLS]
- ** xref:concept-credential-rotation.adoc[Couchbase Credential Rotation]
- ** xref:concept-server-groups.adoc[Couchbase Server Groups]
- ** xref:concept-upgrade.adoc[Couchbase Upgrades]
- ** xref:concept-hibernation.adoc[Couchbase Cluster Hibernation]
- ** xref:concept-couchbase-logging.adoc[Couchbase Logging]
- ** xref:concept-backup.adoc[Couchbase Backup and Restore]
+ ** Authentication and Authorization
+  *** xref:concept-user-rbac.adoc[Couchbase User RBAC]
+  *** xref:concept-credential-rotation.adoc[Couchbase Credential Rotation]
+ ** Autoscaling
+  *** xref:concept-couchbase-autoscaling.adoc[]
+  *** xref:concept-couchbase-autoscaling-best-practices.adoc[Auto-scaling Best Practices]
+ ** Backup
+  *** xref:concept-backup.adoc[Couchbase Backup and Restore]
+ ** Configuration
+  *** xref:concept-label-selection.adoc[Couchbase Resource Label Selection]
+  *** xref:concept-rbac.adoc[Couchbase Resource RBAC]
+  *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
+ ** Data Management
+  *** xref:concept-scopes-and-collections.adoc[Couchbase Scopes and Collections]
+ ** Hibernation
+  *** xref:concept-hibernation.adoc[Couchbase Cluster Hibernation]
+ ** Logging
+  *** xref:concept-couchbase-logging.adoc[Couchbase Logging]
+ ** Networking
+  *** xref:concept-couchbase-networking.adoc[Couchbase Networking]
+ ** TLS
+  *** xref:concept-tls.adoc[Couchbase TLS]
+ ** Topology
+  *** xref:concept-mds.adoc[Couchbase Multi-Dimensional Scaling]
+  *** xref:concept-scheduling.adoc[Couchbase Scheduling and Isolation]
+  *** xref:concept-sizing.adoc[Couchbase Sizing]
+  *** xref:concept-vertical-scaling.adoc[Couchbase Cluster Vertical Scaling]
+  *** xref:concept-server-groups.adoc[Couchbase Server Groups]
+ ** Upgrade
+  *** xref:concept-upgrade.adoc[Couchbase Upgrades]
 
 .Manage
 * Operator

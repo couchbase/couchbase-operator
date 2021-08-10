@@ -1,10 +1,10 @@
-:operator-version: 2.3.0
+:operator-version: 2.3.0-beta1
 :operator-version-minor: 2.3
-:admission-controller-version: 2.3.0
-:couchbase-version: 6.6.2
-:couchbase-version-upgrade-from: 6.6.1
-:couchbase-version-redhat: 6.6.2-1
-:couchbase-version-redhat-upgrade-from: 6.6.1-1
+:admission-controller-version: 2.3.0-beta1
+:couchbase-version: 7.0.0
+:couchbase-version-upgrade-from: 6.6.2
+:couchbase-version-redhat: 7.0.0-1
+:couchbase-version-redhat-upgrade-from: 6.6.2-1
 :prometheus-version: 1.0.5
 :logging-version: fluent-bit:1.0.4
 :logging-helper: busybox:1.32.1
