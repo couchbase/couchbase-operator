@@ -958,3 +958,13 @@ func (l BucketScopeOrCollectionNameWithDefaultsList) StringSlice() []string {
 
 	return s
 }
+
+// Scope object name as string.
+func (s ScopeLocalObjectReference) StrName() string {
+	return string(s.Name)
+}
+
+// Collection object name as string.
+func (c CollectionLocalObjectReference) StrName() string {
+	return string(c.Name)
+}

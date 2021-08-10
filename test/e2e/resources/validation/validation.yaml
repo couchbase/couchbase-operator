@@ -234,6 +234,21 @@ spec:
    - name: data_writer
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: scoped-group
+spec:
+  roles:
+   - name: data_writer
+     bucket: default
+     scopes:
+       name: scope0
+       kind: CouchbaseScope
+     collections:
+       name: collection0
+       kind: CouchbaseCollection
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseRoleBinding
 metadata:
   name: role-binding
@@ -253,6 +268,18 @@ spec:
   roleRef:
     kind: CouchbaseGroup
     name: data-group
+  subjects:
+  - kind: CouchbaseUser
+    name: user1
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: scope-role-binding
+spec:
+  roleRef:
+    kind: CouchbaseGroup
+    name: scoped-group
   subjects:
   - kind: CouchbaseUser
     name: user1

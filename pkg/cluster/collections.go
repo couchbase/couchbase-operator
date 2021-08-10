@@ -211,7 +211,7 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 		// are valid, and are always populated though defaulting.
 		switch resource.Kind {
 		case couchbasev2.ScopeCRDResourceKind:
-			scope, ok := c.k8s.CouchbaseScopes.Get(resource.Name)
+			scope, ok := c.k8s.CouchbaseScopes.Get(resource.StrName())
 			if !ok {
 				log.V(1).Info("Unable to find scope resource", "kind", couchbasev2.ScopeCRDResourceKind, "name", resource.Name)
 				break
@@ -225,7 +225,7 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 		case couchbasev2.ScopeGroupCRDResourceKind:
 			// Expand groups into individual scopes to make handing easier
 			// e.g. you're only dealing with one type.
-			scopeGroup, ok := c.k8s.CouchbaseScopeGroups.Get(resource.Name)
+			scopeGroup, ok := c.k8s.CouchbaseScopeGroups.Get(resource.StrName())
 			if !ok {
 				log.V(1).Info("Unable to find scope resource", "kind", couchbasev2.ScopeGroupCRDResourceKind, "name", resource.Name)
 				break
@@ -387,7 +387,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 		// are valid, and are always populated though defaulting.
 		switch resource.Kind {
 		case couchbasev2.CollectionCRDResourceKind:
-			collection, ok := c.k8s.CouchbaseCollections.Get(resource.Name)
+			collection, ok := c.k8s.CouchbaseCollections.Get(resource.StrName())
 			if !ok {
 				log.V(1).Info("Unable to find collection resource", "kind", couchbasev2.CollectionCRDResourceKind, "name", resource.Name)
 				continue
@@ -397,7 +397,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 		case couchbasev2.CollectionGroupCRDResourceKind:
 			// Expand groups into individual collections to make handing easier
 			// e.g. you're only dealing with one type.
-			collectionGroup, ok := c.k8s.CouchbaseCollectionGroups.Get(resource.Name)
+			collectionGroup, ok := c.k8s.CouchbaseCollectionGroups.Get(resource.StrName())
 			if !ok {
 				log.V(1).Info("Unable to find collection resource", "kind", couchbasev2.CollectionGroupCRDResourceKind, "name", resource.Name)
 				continue

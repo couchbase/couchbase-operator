@@ -861,7 +861,9 @@ type CollectionLocalObjectReference struct {
 	Kind string `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
-	Name string `json:"name"`
+	// Legal collection names have a maximum length of 30
+	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
+	Name ScopeOrCollectionName `json:"name"`
 }
 
 type CollectionSelector struct {
@@ -952,7 +954,9 @@ type ScopeLocalObjectReference struct {
 	Kind string `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
-	Name string `json:"name"`
+	// Legal scope names have a maximum length of 30
+	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
+	Name ScopeOrCollectionName `json:"name"`
 }
 
 type ScopeSelector struct {
@@ -1554,6 +1558,42 @@ type Role struct {
 	// to a specific bucket, the role will apply to all buckets in the cluster.
 	// +kubebuilder:validation:Pattern="^\\*$|^[a-zA-Z0-9-_%\\.]+$"
 	Bucket string `json:"bucket,omitempty"`
+
+	// Scope level access to apply to specified role.  The scope must exist.  When not specified,
+	// the role will apply to selected bucket or all buckets in the cluster.
+	Scopes ScopeRoleSpec `json:"scopes,omitempty"`
+
+	// Collection level access to apply to the specified role.  The collection must exist.
+	// When not specified, the role is subject to scope or bucket level access.
+	Collections CollectionRoleSpec `json:"collections,omitempty"`
+}
+
+type ScopeRoleSpec struct {
+
+	// Resources is an explicit list of named resources that will be considered
+	// for inclusion in this scope or scopes.  If a resource reference doesn't
+	// match a resource, then no error conditions are raised due to undefined
+	// resource creation ordering and eventual consistency.
+	ScopeLocalObjectReference `json:",inline"`
+
+	// Selector allows resources to be implicitly considered for inclusion in this
+	// scope or scopes.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+}
+
+type CollectionRoleSpec struct {
+
+	// Resources is an explicit list of named resources that will be considered
+	// for inclusion in this collection or collections.  If a resource reference doesn't
+	// match a resource, then no error conditions are raised due to undefined
+	// resource creation ordering and eventual consistency.
+	CollectionLocalObjectReference `json:",inline"`
+
+	// Selector allows resources to be implicitly considered for inclusion in this
+	// collection or collections.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 // CouchbaseGroupList is a list of Couchbase users.

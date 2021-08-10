@@ -84,6 +84,8 @@ func registerTests() {
 		framework.NewTestDef(TestNegValidationConstraintsApply).WithTags(TagSuiteValidation),
 		framework.NewTestDef(TestNegValidationImmutableApply).WithTags(TagSuiteValidation),
 		framework.NewTestDef(TestRBACValidationCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestRBACScopeValidationCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestRBACCollectionValidationCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestRBACValidationLDAP).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAutoscalerValidation).WithTags(TagSuiteValidation),
 

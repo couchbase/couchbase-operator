@@ -2116,7 +2116,7 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 	for _, resource := range selector.Resources {
 		switch resource.Kind {
 		case couchbasev2.CollectionCRDResourceKind:
-			collection, err := v.Abstraction.GetCouchbaseCollection(namespace, resource.Name)
+			collection, err := v.Abstraction.GetCouchbaseCollection(namespace, resource.StrName())
 			if err != nil {
 				return err
 			}
@@ -2130,7 +2130,7 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 				name: collection.Name,
 			}
 		case couchbasev2.CollectionGroupCRDResourceKind:
-			collectionGroup, err := v.Abstraction.GetCouchbaseCollectionGroup(namespace, resource.Name)
+			collectionGroup, err := v.Abstraction.GetCouchbaseCollectionGroup(namespace, resource.StrName())
 			if err != nil {
 				return err
 			}
@@ -2250,7 +2250,7 @@ func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resour
 	for _, resource := range selector.Resources {
 		switch resource.Kind {
 		case couchbasev2.ScopeCRDResourceKind:
-			scope, err := v.Abstraction.GetCouchbaseScope(namespace, resource.Name)
+			scope, err := v.Abstraction.GetCouchbaseScope(namespace, resource.StrName())
 			if err != nil {
 				return err
 			}
@@ -2264,7 +2264,7 @@ func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resour
 				name: scope.Name,
 			}
 		case couchbasev2.ScopeGroupCRDResourceKind:
-			scopeGroup, err := v.Abstraction.GetCouchbaseScopeGroup(namespace, resource.Name)
+			scopeGroup, err := v.Abstraction.GetCouchbaseScopeGroup(namespace, resource.StrName())
 			if err != nil {
 				return err
 			}

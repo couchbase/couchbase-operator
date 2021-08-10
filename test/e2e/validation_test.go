@@ -2278,6 +2278,86 @@ func TestRBACValidationCreate(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
+func TestRBACScopeValidationCreate(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestRejectsLeadingUnderscoreScopeName",
+			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/scopes/name", "_underscore")},
+			shouldFail: true,
+		},
+		{
+			name:       "TestAllowsSpecialChar",
+			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/scopes/name", "un_der")},
+			shouldFail: false,
+		},
+		{
+			name:       "TestRejectsBadChar",
+			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/scopes/name", "excit!ng")},
+			shouldFail: true,
+		},
+		{
+			name:       "TestAllowsNonExistentScope",
+			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/scopes/name", "missingscope")},
+			shouldFail: false,
+		},
+		{
+			name: "TestRBACScopeGroupAllowed",
+			mutations: patchMap{"scoped-group": jsonpatch.NewPatchSet().
+				Replace("/spec/roles/0/scopes/name", "scopegroup0").
+				Replace("/spec/roles/0/scopes/kind", "CouchbaseScopeGroup")},
+			shouldFail: false,
+		},
+		{
+			name: "TestRBACScopeGroupBadKind",
+			mutations: patchMap{"scoped-group": jsonpatch.NewPatchSet().
+				Replace("/spec/roles/0/scopes/kind", "UnknownScopeGroup")},
+			shouldFail: true,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestRBACCollectionValidationCreate(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestRejectsLeadingUnderscoreCollectionName",
+			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/collections/name", "_underscore")},
+			shouldFail: true,
+		},
+		{
+			name:       "TestAllowsSpecialChar",
+			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/collections/name", "un_der")},
+			shouldFail: false,
+		},
+		{
+			name:       "TestRejectsBadChar",
+			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/collections/name", "excit!ng")},
+			shouldFail: true,
+		},
+		{
+			name:       "TestAllowsNonExistentScope",
+			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/collections/name", "missingscope")},
+			shouldFail: false,
+		},
+		{
+			name: "TestRBACCollectionGroupAllowed",
+			mutations: patchMap{"scoped-group": jsonpatch.NewPatchSet().
+				Replace("/spec/roles/0/collections/name", "collectiongroup0").
+				Replace("/spec/roles/0/collections/kind", "CouchbaseCollectionGroup")},
+			shouldFail: false,
+		},
+		{
+			name: "TestRBACCollectionGroupBadKind",
+			mutations: patchMap{"scoped-group": jsonpatch.NewPatchSet().
+				Replace("/spec/roles/0/scopes/kind", "UnknownCollectionGroup")},
+			shouldFail: true,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
 // Test cases for LDAP Validation.
 func TestRBACValidationLDAP(t *testing.T) {
 	testDefs := []testDef{

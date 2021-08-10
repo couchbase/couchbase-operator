@@ -277,9 +277,16 @@ This field defaults to `CouchbaseScope` if not specified.
 
 *Type*: `string`
 
+*Minimum Length*: `1`
+
+*Maximum Length*: `30`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+
 ==== Description
 
 Name is the name of the Kubernetes resource name that is being referenced.
+Legal scope names have a maximum length of 30 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
 
 === couchbaseephemeralbuckets.spec.scopes.selector
 

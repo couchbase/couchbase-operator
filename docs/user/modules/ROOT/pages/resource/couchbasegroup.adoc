@@ -82,6 +82,125 @@ Roles is a list of roles that this group is granted.
 Bucket name for bucket admin roles.
 When not specified for a role that can be scoped to a specific bucket, the role will apply to all buckets in the cluster.
 
+=== couchbasegroups.spec.roles.collections
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Collection level access to apply to the specified role.
+The collection must exist.
+When not specified, the role is subject to scope or bucket level access.
+
+=== couchbasegroups.spec.roles.collections.kind
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `CouchbaseCollection`
+
+*Enumerations*: `CouchbaseCollection, CouchbaseCollectionGroup`
+
+==== Description
+
+Kind indicates the kind of resource that is being referenced.
+A scope can only reference `CouchbaseCollection` and `CouchbaseCollectionGroup` resource kinds.
+This field defaults to `CouchbaseCollection` if not specified.
+
+=== couchbasegroups.spec.roles.collections.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `30`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+
+==== Description
+
+Name is the name of the Kubernetes resource name that is being referenced.
+Legal collection names have a maximum length of 30 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
+
+=== couchbasegroups.spec.roles.collections.selector
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selector allows resources to be implicitly considered for inclusion in this collection or collections.
+More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta.
+
+=== couchbasegroups.spec.roles.collections.selector.matchExpressions
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+matchExpressions is a list of label selector requirements.
+The requirements are ANDed.
+
+=== couchbasegroups.spec.roles.collections.selector.matchExpressions.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+key is the label key that the selector applies to.
+
+=== couchbasegroups.spec.roles.collections.selector.matchExpressions.operator
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.
+
+=== couchbasegroups.spec.roles.collections.selector.matchExpressions.values
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+values is an array of string values.
+If the operator is In or NotIn, the values array must be non-empty.
+If the operator is Exists or DoesNotExist, the values array must be empty.
+This array is replaced during a strategic merge patch.
+
+=== couchbasegroups.spec.roles.collections.selector.matchLabels
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+matchLabels is a map of {key,value} pairs.
+A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value".
+The requirements are ANDed.
+
 === couchbasegroups.spec.roles.name
 
 ==== Constraints
@@ -95,3 +214,122 @@ When not specified for a role that can be scoped to a specific bucket, the role 
 ==== Description
 
 Name of role.
+
+=== couchbasegroups.spec.roles.scopes
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Scope level access to apply to specified role.
+The scope must exist.
+When not specified, the role will apply to selected bucket or all buckets in the cluster.
+
+=== couchbasegroups.spec.roles.scopes.kind
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `CouchbaseScope`
+
+*Enumerations*: `CouchbaseScope, CouchbaseScopeGroup`
+
+==== Description
+
+Kind indicates the kind of resource that is being referenced.
+A scope can only reference `CouchbaseScope` and `CouchbaseScopeGroup` resource kinds.
+This field defaults to `CouchbaseScope` if not specified.
+
+=== couchbasegroups.spec.roles.scopes.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `30`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+
+==== Description
+
+Name is the name of the Kubernetes resource name that is being referenced.
+Legal scope names have a maximum length of 30 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
+
+=== couchbasegroups.spec.roles.scopes.selector
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selector allows resources to be implicitly considered for inclusion in this scope or scopes.
+More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta.
+
+=== couchbasegroups.spec.roles.scopes.selector.matchExpressions
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+matchExpressions is a list of label selector requirements.
+The requirements are ANDed.
+
+=== couchbasegroups.spec.roles.scopes.selector.matchExpressions.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+key is the label key that the selector applies to.
+
+=== couchbasegroups.spec.roles.scopes.selector.matchExpressions.operator
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.
+
+=== couchbasegroups.spec.roles.scopes.selector.matchExpressions.values
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+values is an array of string values.
+If the operator is In or NotIn, the values array must be non-empty.
+If the operator is Exists or DoesNotExist, the values array must be empty.
+This array is replaced during a strategic merge patch.
+
+=== couchbasegroups.spec.roles.scopes.selector.matchLabels
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+matchLabels is a map of {key,value} pairs.
+A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value".
+The requirements are ANDed.

@@ -98,12 +98,12 @@ func (s *Scope) Generate() *couchbasev2.CouchbaseScope {
 			case *couchbasev2.CouchbaseCollection:
 				r.Spec.Collections.Resources = append(r.Spec.Collections.Resources, couchbasev2.CollectionLocalObjectReference{
 					Kind: couchbasev2.CollectionCRDResourceKind,
-					Name: t.Name,
+					Name: couchbasev2.ScopeOrCollectionName(t.Name),
 				})
 			case *couchbasev2.CouchbaseCollectionGroup:
 				r.Spec.Collections.Resources = append(r.Spec.Collections.Resources, couchbasev2.CollectionLocalObjectReference{
 					Kind: couchbasev2.CollectionGroupCRDResourceKind,
-					Name: t.Name,
+					Name: couchbasev2.ScopeOrCollectionName(t.Name),
 				})
 			}
 		}
@@ -212,12 +212,12 @@ func (s *ScopeGroup) Generate() *couchbasev2.CouchbaseScopeGroup {
 			case *couchbasev2.CouchbaseCollection:
 				r.Spec.Collections.Resources = append(r.Spec.Collections.Resources, couchbasev2.CollectionLocalObjectReference{
 					Kind: couchbasev2.CollectionCRDResourceKind,
-					Name: t.Name,
+					Name: couchbasev2.ScopeOrCollectionName(t.Name),
 				})
 			case *couchbasev2.CouchbaseCollectionGroup:
 				r.Spec.Collections.Resources = append(r.Spec.Collections.Resources, couchbasev2.CollectionLocalObjectReference{
 					Kind: couchbasev2.CollectionGroupCRDResourceKind,
-					Name: t.Name,
+					Name: couchbasev2.ScopeOrCollectionName(t.Name),
 				})
 			}
 		}
@@ -438,12 +438,12 @@ func LinkBucketToScopesExplicit(bucket metav1.Object, scopes ...metav1.Object) {
 			case *couchbasev2.CouchbaseScope:
 				b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, couchbasev2.ScopeLocalObjectReference{
 					Kind: couchbasev2.ScopeCRDResourceKind,
-					Name: s.Name,
+					Name: couchbasev2.ScopeOrCollectionName(s.Name),
 				})
 			case *couchbasev2.CouchbaseScopeGroup:
 				b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, couchbasev2.ScopeLocalObjectReference{
 					Kind: couchbasev2.ScopeGroupCRDResourceKind,
-					Name: s.Name,
+					Name: couchbasev2.ScopeOrCollectionName(s.Name),
 				})
 			}
 		case *couchbasev2.CouchbaseEphemeralBucket:
@@ -457,12 +457,12 @@ func LinkBucketToScopesExplicit(bucket metav1.Object, scopes ...metav1.Object) {
 			case *couchbasev2.CouchbaseScope:
 				b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, couchbasev2.ScopeLocalObjectReference{
 					Kind: couchbasev2.ScopeCRDResourceKind,
-					Name: s.Name,
+					Name: couchbasev2.ScopeOrCollectionName(s.Name),
 				})
 			case *couchbasev2.CouchbaseScopeGroup:
 				b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, couchbasev2.ScopeLocalObjectReference{
 					Kind: couchbasev2.ScopeGroupCRDResourceKind,
-					Name: s.Name,
+					Name: couchbasev2.ScopeOrCollectionName(s.Name),
 				})
 			}
 		}
