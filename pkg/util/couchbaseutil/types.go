@@ -525,8 +525,57 @@ type LDAPStatus struct {
 }
 
 type UserRole struct {
-	Role       string `json:"role"`
-	BucketName string `json:"bucket_name"`
+	Role           string `json:"role"`
+	BucketName     string `json:"bucket_name"`
+	ScopeName      string `json:"scope_name"`
+	CollectionName string `json:"collection_name"`
+}
+
+func (u *UserRole) IsBucketRole() bool {
+	return u.BucketName != "" && (u.ScopeName == "*" || u.ScopeName == "")
+}
+
+func (u *UserRole) IsScopeRole() bool {
+	return u.ScopeName != "*" && u.ScopeName != "" && (u.CollectionName == "*" || u.CollectionName == "")
+}
+
+func (u *UserRole) IsCollectionRole() bool {
+	return u.CollectionName != "*" && u.CollectionName != ""
+}
+
+// This is to remove "*" from collection_name and scope_name as we can't
+// pass those back to the API, so we might as well dump it.
+func (u *UserRole) UnmarshalJSON(data []byte) error {
+	var dat map[string]interface{}
+	if err := json.Unmarshal(data, &dat); err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	if val, ok := dat["bucket_name"]; ok {
+		u.BucketName, _ = val.(string)
+	}
+
+	if val, ok := dat["role"]; ok {
+		u.Role, _ = val.(string)
+	}
+
+	if val, ok := dat["scope_name"]; ok {
+		u.ScopeName, _ = val.(string)
+	}
+
+	if val, ok := dat["collection_name"]; ok {
+		u.CollectionName, _ = val.(string)
+	}
+
+	if u.CollectionName == "*" {
+		u.CollectionName = ""
+	}
+
+	if u.ScopeName == "*" {
+		u.ScopeName = ""
+	}
+
+	return nil
 }
 
 type LogMessage struct {
@@ -941,22 +990,33 @@ func (u *User) FormEncode() []byte {
 	return []byte(data.Encode())
 }
 
-// RoleToStr translates roles to string array.
+// RolesToStr translates roles to string array and sorts them.
 func RolesToStr(userRoles []UserRole) []string {
 	roles := []string{}
 
 	for _, role := range userRoles {
-		if role.BucketName != "" {
-			// bucket roles are enclosed in brackets
-			roles = append(roles, fmt.Sprintf("%s[%s]", role.Role, role.BucketName))
-		} else {
-			roles = append(roles, role.Role)
-		}
+		roles = append(roles, RoleToStr(role))
 	}
 
 	sort.Strings(roles)
 
 	return roles
+}
+
+// RoleToStr  translates a single role to a string representation.
+func RoleToStr(userRole UserRole) string {
+	roleStr := userRole.Role
+
+	switch {
+	case userRole.IsCollectionRole():
+		roleStr += fmt.Sprintf("[%s:%s:%s]", userRole.BucketName, userRole.ScopeName, userRole.CollectionName)
+	case userRole.IsScopeRole():
+		roleStr += fmt.Sprintf("[%s:%s]", userRole.BucketName, userRole.ScopeName)
+	case userRole.IsBucketRole():
+		roleStr += fmt.Sprintf("[%s]", userRole.BucketName)
+	}
+
+	return roleStr
 }
 
 // Normal unmarshlling doesn't work because LDAP DN Mapping returns a string when unset.
