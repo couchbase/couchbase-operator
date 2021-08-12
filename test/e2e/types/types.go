@@ -62,6 +62,8 @@ type Cluster struct {
 	Platform string
 	// PlatformType is the container type we are running on.
 	PlatformType string
+	// IPv6 is whether or not we are using IPv6.
+	IPv6 bool
 
 	// Dynamic configuration.
 

@@ -236,6 +236,7 @@ func configure() (err error) {
 	flag.StringVar(&params.LogLevel, "log-level", "debug", "Log Level to use")
 	flag.Var(&podCreateTimeout, "pod-creation-timeout", "Time before giving up on pod creation")
 	flag.BoolVar(&params.EnableIstio, "istio", false, "Enable istio injection")
+	flag.BoolVar(&params.IPv6, "ipv6", false, "Use IPv6")
 
 	flag.Parse()
 
@@ -413,6 +414,7 @@ func createKubeClusterObject(c ClusterConfig) (*types.Cluster, error) {
 		Context:         c.Context,
 		Platform:        string(Global.Platform),
 		PlatformType:    Global.KubeType,
+		IPv6:            Global.IPv6,
 	}, nil
 }
 

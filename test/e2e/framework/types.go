@@ -38,6 +38,7 @@ type Framework struct {
 	S3SecretID                    string
 	DocsCount                     int
 	LogLevel                      string
+	IPv6                          bool
 
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual

@@ -25,6 +25,11 @@ func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 		Enabled: true,
 	}
 
+	if k8s.IPv6 {
+		ipv6 := couchbasev2.AFInet6
+		cl.Spec.Networking.AddressFamily = &ipv6
+	}
+
 	e2espec.ApplySecurityContext(cl, k8s.PlatformType)
 
 	// If we left the CPU requests as default, that would have some nasty side effects
