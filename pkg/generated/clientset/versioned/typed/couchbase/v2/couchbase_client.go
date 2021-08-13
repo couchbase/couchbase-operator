@@ -25,6 +25,7 @@ type CouchbaseV2Interface interface {
 	CouchbaseEphemeralBucketsGetter
 	CouchbaseGroupsGetter
 	CouchbaseMemcachedBucketsGetter
+	CouchbaseMigrationReplicationsGetter
 	CouchbaseReplicationsGetter
 	CouchbaseRoleBindingsGetter
 	CouchbaseScopesGetter
@@ -75,6 +76,10 @@ func (c *CouchbaseV2Client) CouchbaseGroups(namespace string) CouchbaseGroupInte
 
 func (c *CouchbaseV2Client) CouchbaseMemcachedBuckets(namespace string) CouchbaseMemcachedBucketInterface {
 	return newCouchbaseMemcachedBuckets(c, namespace)
+}
+
+func (c *CouchbaseV2Client) CouchbaseMigrationReplications(namespace string) CouchbaseMigrationReplicationInterface {
+	return newCouchbaseMigrationReplications(c, namespace)
 }
 
 func (c *CouchbaseV2Client) CouchbaseReplications(namespace string) CouchbaseReplicationInterface {

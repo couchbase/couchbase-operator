@@ -93,6 +93,9 @@ type Client struct {
 
 	// CouchbaseCollectionGroups is a read only cache of collection groups (namespace scoped)
 	CouchbaseCollectionGroups *CouchbaseCollectionGroupCache
+
+	// CouchbaseMigrationReplications is a read only cache of couchbase migration replications (namespace scoped)
+	CouchbaseMigrationReplications *CouchbaseMigrationReplicationCache
 }
 
 // NewClient initializes all Kubernetes clients and caches.
@@ -221,6 +224,11 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
+	c.CouchbaseMigrationReplications, err = newCouchbaseMigrationReplicationCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -247,4 +255,5 @@ func (c *Client) Shutdown() {
 	c.CouchbaseScopeGroups.stop()
 	c.CouchbaseCollections.stop()
 	c.CouchbaseCollectionGroups.stop()
+	c.CouchbaseMigrationReplications.stop()
 }

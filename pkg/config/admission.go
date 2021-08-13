@@ -375,6 +375,7 @@ func (o *generateAdmissionOptions) getAdmissionRole() runtime.Object {
 				couchbasev2.CollectionGroupCRDResourcePlural,
 				couchbasev2.ScopeCRDResourcePlural,
 				couchbasev2.ScopeGroupCRDResourcePlural,
+				couchbasev2.MigrationReplicationCRDResourcePlural,
 			},
 			Verbs: []string{
 				"get",
@@ -670,6 +671,7 @@ func (o *generateAdmissionOptions) getAdmissionValidatingWebhook(namespace strin
 								couchbasev2.CollectionGroupCRDResourcePlural,
 								couchbasev2.ScopeCRDResourcePlural,
 								couchbasev2.ScopeGroupCRDResourcePlural,
+								couchbasev2.MigrationReplicationCRDResourcePlural,
 							},
 							APIVersions: []string{
 								"v1",

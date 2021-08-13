@@ -309,6 +309,20 @@ func GetReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseReplicati
 	return replication
 }
 
+func GetMigrationReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseMigrationReplication {
+	migration := &couchbasev2.CouchbaseMigrationReplication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.DefaultReplication,
+		},
+		Spec: couchbasev2.CouchbaseReplicationSpec{
+			Bucket:       couchbasev2.BucketName(srcBucket),
+			RemoteBucket: couchbasev2.BucketName(dstBucket),
+		},
+	}
+
+	return migration
+}
+
 func NewResourceQuantityMi(value int64) *resource.Quantity {
 	return resource.NewQuantity(value<<20, resource.BinarySI)
 }

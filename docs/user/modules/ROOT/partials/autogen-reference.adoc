@@ -9,6 +9,7 @@
 ** xref:resource/couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
 ** xref:resource/couchbasegroup.adoc[CouchbaseGroup Resource]
 ** xref:resource/couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
+** xref:resource/couchbasemigrationreplication.adoc[CouchbaseMigrationReplication Resource]
 ** xref:resource/couchbasereplication.adoc[CouchbaseReplication Resource]
 ** xref:resource/couchbaserolebinding.adoc[CouchbaseRoleBinding Resource]
 ** xref:resource/couchbasescopegroup.adoc[CouchbaseScopeGroup Resource]

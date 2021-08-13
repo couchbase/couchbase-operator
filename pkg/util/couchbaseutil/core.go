@@ -109,7 +109,7 @@ func (c *Client) makeClient() {
 		},
 	}
 
-	c.client = client
+	c.Client = client
 }
 
 // doRequest is the generic request handler for all client calls.
@@ -160,7 +160,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	}()
 
 	// Do the request.
-	response, err := c.client.Do(request)
+	response, err := c.Client.Do(request)
 	if err != nil {
 		logLabels = append(logLabels, "error", err)
 

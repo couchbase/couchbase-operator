@@ -38,6 +38,8 @@ magic Debbie!
 // end::couchbasescope[]
 // tag::couchbasescopegroup[]
 // end::couchbasescopegroup[]
+// tag::couchbasemigrationreplication[]
+// end::couchbasemigrationreplication[]
 
 === Constraints
 

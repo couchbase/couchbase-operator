@@ -578,7 +578,8 @@ func podVolumeSpecForClaim(claimName string) v1.Volume {
 		Name: claimName,
 		VolumeSource: v1.VolumeSource{
 			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-				ClaimName: claimName},
+				ClaimName: claimName,
+			},
 		},
 	}
 }
@@ -1424,8 +1425,10 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
 	initContainer.Args = []string{"bash", "-c", "if [[ ! -e /mnt/etc ]]; then cp -a /opt/couchbase/etc /mnt/; fi"}
 	initContainer.VolumeMounts = []v1.VolumeMount{
-		{Name: claimName,
-			MountPath: "/mnt"},
+		{
+			Name:      claimName,
+			MountPath: "/mnt",
+		},
 	}
 
 	return initContainer

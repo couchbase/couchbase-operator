@@ -27,6 +27,8 @@ type CouchbaseGroupExpansion interface{}
 
 type CouchbaseMemcachedBucketExpansion interface{}
 
+type CouchbaseMigrationReplicationExpansion interface{}
+
 type CouchbaseReplicationExpansion interface{}
 
 type CouchbaseRoleBindingExpansion interface{}

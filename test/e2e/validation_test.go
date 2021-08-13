@@ -60,11 +60,13 @@ type testDef struct {
 	expectedErrors []string
 }
 
-type failureList []failure
-type failure struct {
-	testName  string
-	testError error
-}
+type (
+	failureList []failure
+	failure     struct {
+		testName  string
+		testError error
+	}
+)
 
 func (failures *failureList) AppendFailure(name string, err error) {
 	newFailure := failure{
@@ -945,64 +947,69 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 		},
 		{
 			name: "TestValidateLoggingFailsForNoPersistentVolume",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Add("/spec/logging/server", &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
-					Enabled: true,
-				}).Remove("/spec/servers/0/volumeMounts"), // only need to remove first as we validate only on that
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/server", &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled: true,
+					}).Remove("/spec/servers/0/volumeMounts"), // only need to remove first as we validate only on that
 			},
 			shouldFail: true,
 		},
 		{
 			name: "TestValidateLoggingIgnoresGCWithNoAudit",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
-					Enabled: false,
-					GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
-						Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
-							Enabled: true,
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						Enabled: false,
+						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+							Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
+								Enabled: true,
+							},
 						},
-					},
-				}),
+					}),
 			},
 			shouldFail: false,
 		},
 		{
 			name: "TestValidateLoggingFailsAuditGCWithNoPersistentVolume",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
-					Enabled: true,
-					GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
-						Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
-							Enabled: true,
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						Enabled: true,
+						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+							Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
+								Enabled: true,
+							},
 						},
-					},
-				}).
-				Remove("/spec/servers/0/volumeMounts"),
+					}).
+					Remove("/spec/servers/0/volumeMounts"),
 			},
 			shouldFail: true,
 		},
 		{
 			name: "TestValidateLoggingFailsForInvalidAuditUser",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
-					DisabledUsers: []couchbasev2.AuditDisabledUser{
-						"Cthulu",
-					},
-				}),
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						DisabledUsers: []couchbasev2.AuditDisabledUser{
+							"Cthulu",
+						},
+					}),
 			},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.logging.audit.disabledUsers"},
 		},
 		{
 			name: "TestValidateLoggingAllowsAuditUser",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
-					DisabledUsers: []couchbasev2.AuditDisabledUser{
-						"localusername/local",
-						"externalusername/external",
-						"@internalusername/local",
-					},
-				}),
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						DisabledUsers: []couchbasev2.AuditDisabledUser{
+							"localusername/local",
+							"externalusername/external",
+							"@internalusername/local",
+						},
+					}),
 			},
 			shouldFail: false,
 		},
@@ -1355,6 +1362,133 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.bucket`},
 		},
+		// Scopes and collections tests - this is only validation checks so does not actually need server 7 to run.
+		// For replication we can source and target either a scope or a scope.collection which is
+		// referred to as a keyspace. We use the same validation as the ScopeOrCollectionName type
+		// but also support usage of _default scopes and collections.
+		// https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html
+		//
+		// This means the following are allowed:
+		// _default._default
+		// _default
+		// scope.collection
+		// scope
+		// scope._default
+		// Whilst the following are not:
+		// _scopefail
+		// scope._collectionfail
+		// scopefail.
+		//
+		// See: https://regex101.com/r/6b4mKs/1
+		{
+			name:           "TestValidateXDCRKeyspaceTooShort",
+			mutations:      patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().Replace("/explicitMapping/allowRules/0/sourceKeyspace/scope", "")},
+			shouldFail:     true,
+			expectedErrors: []string{`explicitMapping.allowRules.sourceKeyspace`}, // the regex validation does not give you the array index
+		},
+		{
+			name:           "TestValidateXDCRKeyspaceTooLong",
+			mutations:      patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().Replace("/explicitMapping/allowRules/0/targetKeyspace/collection", "123456789012345678901234567890.1234567890123456789012345678901")},
+			shouldFail:     true,
+			expectedErrors: []string{`explicitMapping.allowRules.targetKeyspace`},
+		},
+		{
+			name:           "TestValidateXDCRKeyspaceInvalidFirstCharacter",
+			mutations:      patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().Replace("/explicitMapping/allowRules/0/targetKeyspace/scope", "_scopefail")},
+			shouldFail:     true,
+			expectedErrors: []string{`explicitMapping.allowRules.targetKeyspace`},
+		},
+		{
+			name: "TestValidateXDCRKeyspaceInvalidFirstCharacterCollection",
+			mutations: patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().
+				Replace("/explicitMapping/allowRules/0/targetKeyspace/scope", "scope").
+				Replace("/explicitMapping/allowRules/0/targetKeyspace/collection", "_collectionfail")},
+			shouldFail:     true,
+			expectedErrors: []string{`explicitMapping.allowRules.targetKeyspace`},
+		},
+		// Test that source and target keyspaces are the same size, i.e. either both contain collections or scopes only or neither.
+		{
+			name: "TestValidateXDCRReplicationKeyspaceInvalidSource",
+			mutations: patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().
+				Replace("/explicitMapping/allowRules/0/sourceKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope: "scopeonly",
+				}).
+				Replace("/explicitMapping/allowRules/0/targetKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scopeand",
+					Collection: "collection",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`explicitMapping.allowRules[0].sourceKeyspace`},
+		},
+		// Test that a source collection is not permitted to be mapped (by means of multiple rules) to multiple target collections.
+		{
+			name: "TestValidateXDCRReplicationMultipleSourceRulesInvalid",
+			mutations: patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().
+				Replace("/explicitMapping/allowRules/0/sourceKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scope0",
+					Collection: "bugs",
+				}).
+				Replace("/explicitMapping/allowRules/0/targetKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scope0",
+					Collection: "lola"}).
+				Replace("/explicitMapping/allowRules/1/sourceKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scope0",
+					Collection: "bugs",
+				}).
+				Replace("/explicitMapping/allowRules/1/targetKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scope0",
+					Collection: "collection0"})},
+			shouldFail:     true,
+			expectedErrors: []string{`explicitMapping.allowRules[1].sourceKeyspace`},
+		},
+		// Test that multiple source collections are not permitted to be mapped (by means of multiples rules) to a single target collection.
+		{
+			name: "TestValidateXDCRReplicationMultipleTargetRulesInvalid",
+			mutations: patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().
+				Replace("/explicitMapping/allowRules/0/sourceKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scope1",
+					Collection: "bugs",
+				}).
+				Replace("/explicitMapping/allowRules/0/targetKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scope0",
+					Collection: "lola"}).
+				Replace("/explicitMapping/allowRules/1/sourceKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scope0",
+					Collection: "collection0",
+				}).
+				Replace("/explicitMapping/allowRules/1/targetKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      "scope0",
+					Collection: "lola",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`explicitMapping.allowRules[1].targetKeyspace`},
+		},
+		// Test that if you have an allow rule for a scope you do not have a more specific allow rule for a
+		// collection inside it, but you can have a deny rule for a collection.
+		{
+			name: "TestValidateXDCRMultipleMoreSpecificRulesInvalid",
+			mutations: patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().
+				Replace("/explicitMapping/allowRules/1/sourceKeyspace/scope", "scope0")},
+			shouldFail:     true,
+			expectedErrors: []string{`explicitMapping.allowRules[1].sourceKeyspace`},
+		},
+		// Test that for migration you can only have one rule if using the _default collection as the source.
+		{
+			name: "TestValidateXDCRMigrationRulesInvalid",
+			mutations: patchMap{"migrationscopesandcollections": jsonpatch.NewPatchSet().
+				Replace("/migrationMapping/mappings/0/filter", "_default._default")},
+			shouldFail:     true,
+			expectedErrors: []string{`migrationMapping.mappings[0].filter`},
+		},
+		// Test that you cannot have migration and replication rules together in the same definition
+		{
+			name: "TestValidateXDCRMigrationRulesMutualExclusionReplicationInvalid",
+			mutations: patchMap{"migrationscopesandcollections": jsonpatch.NewPatchSet().
+				Replace("/spec/bucket", "bucket0").
+				Replace("/spec/remoteBucket", "bucket0")},
+			shouldFail:     true,
+			expectedErrors: []string{`duplicate rule`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1661,84 +1795,93 @@ func TestValidationDefaultCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name: "TestValidateClusterDefault",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				// Data cannot be tested as we require at least 500Mi of buckets
-				Remove("/spec/cluster/indexServiceMemoryQuota").
-				Remove("/spec/cluster/searchServiceMemoryQuota").
-				Remove("/spec/cluster/eventingServiceMemoryQuota").
-				Remove("/spec/cluster/analyticsServiceMemoryQuota").
-				Remove("/spec/cluster/indexStorageSetting").
-				Remove("/spec/cluster/autoFailoverTimeout").
-				Remove("/spec/cluster/autoFailoverMaxCount").
-				Remove("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod"),
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					// Data cannot be tested as we require at least 500Mi of buckets
+					Remove("/spec/cluster/indexServiceMemoryQuota").
+					Remove("/spec/cluster/searchServiceMemoryQuota").
+					Remove("/spec/cluster/eventingServiceMemoryQuota").
+					Remove("/spec/cluster/analyticsServiceMemoryQuota").
+					Remove("/spec/cluster/indexStorageSetting").
+					Remove("/spec/cluster/autoFailoverTimeout").
+					Remove("/spec/cluster/autoFailoverMaxCount").
+					Remove("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod"),
 			},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Test("/spec/cluster/indexServiceMemoryQuota", "256Mi").
-				Test("/spec/cluster/searchServiceMemoryQuota", "256Mi").
-				Test("/spec/cluster/eventingServiceMemoryQuota", "256Mi").
-				Test("/spec/cluster/analyticsServiceMemoryQuota", "1Gi").
-				Test("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
-				Test("/spec/cluster/autoFailoverTimeout", "120s").
-				Test("/spec/cluster/autoFailoverMaxCount", 3).
-				Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "120s"),
+			validations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Test("/spec/cluster/indexServiceMemoryQuota", "256Mi").
+					Test("/spec/cluster/searchServiceMemoryQuota", "256Mi").
+					Test("/spec/cluster/eventingServiceMemoryQuota", "256Mi").
+					Test("/spec/cluster/analyticsServiceMemoryQuota", "1Gi").
+					Test("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
+					Test("/spec/cluster/autoFailoverTimeout", "120s").
+					Test("/spec/cluster/autoFailoverMaxCount", 3).
+					Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "120s"),
 			},
 		},
 		{
 			name:      "TestValidateIndexerDefault",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer", emptyObject)},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Test("/spec/cluster/indexer/logLevel", "info").
-				Test("/spec/cluster/indexer/maxRollbackPoints", 2).
-				Test("/spec/cluster/indexer/memorySnapshotInterval", "200ms").
-				Test("/spec/cluster/indexer/stableSnapshotInterval", "5s").
-				Test("/spec/cluster/indexer/storageMode", "memory_optimized"),
+			validations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Test("/spec/cluster/indexer/logLevel", "info").
+					Test("/spec/cluster/indexer/maxRollbackPoints", 2).
+					Test("/spec/cluster/indexer/memorySnapshotInterval", "200ms").
+					Test("/spec/cluster/indexer/stableSnapshotInterval", "5s").
+					Test("/spec/cluster/indexer/storageMode", "memory_optimized"),
 			},
 		},
 		{
 			name: "TestValidateCouchbaseBucketDefault",
-			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().
-				Remove("/spec/memoryQuota").
-				Remove("/spec/replicas").
-				Remove("/spec/ioPriority").
-				Remove("/spec/evictionPolicy").
-				Remove("/spec/conflictResolution").
-				Remove("/spec/compressionMode"),
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().
+					Remove("/spec/memoryQuota").
+					Remove("/spec/replicas").
+					Remove("/spec/ioPriority").
+					Remove("/spec/evictionPolicy").
+					Remove("/spec/conflictResolution").
+					Remove("/spec/compressionMode"),
 			},
-			validations: patchMap{"bucket0": jsonpatch.NewPatchSet().
-				Test("/spec/memoryQuota", "100Mi").
-				Test("/spec/replicas", 1).
-				Test("/spec/ioPriority", couchbasev2.CouchbaseBucketIOPriorityLow).
-				Test("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly).
-				Test("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber).
-				Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive),
+			validations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().
+					Test("/spec/memoryQuota", "100Mi").
+					Test("/spec/replicas", 1).
+					Test("/spec/ioPriority", couchbasev2.CouchbaseBucketIOPriorityLow).
+					Test("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly).
+					Test("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber).
+					Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive),
 			},
 		},
 		{
 			name: "TestValidateEphemeralBucketDefault",
-			mutations: patchMap{"bucket3": jsonpatch.NewPatchSet().
-				Remove("/spec/memoryQuota").
-				Remove("/spec/replicas").
-				Remove("/spec/ioPriority").
-				Remove("/spec/evictionPolicy").
-				Remove("/spec/conflictResolution").
-				Remove("/spec/compressionMode"),
+			mutations: patchMap{
+				"bucket3": jsonpatch.NewPatchSet().
+					Remove("/spec/memoryQuota").
+					Remove("/spec/replicas").
+					Remove("/spec/ioPriority").
+					Remove("/spec/evictionPolicy").
+					Remove("/spec/conflictResolution").
+					Remove("/spec/compressionMode"),
 			},
-			validations: patchMap{"bucket3": jsonpatch.NewPatchSet().
-				Test("/spec/memoryQuota", "100Mi").
-				Test("/spec/replicas", 1).
-				Test("/spec/ioPriority", couchbasev2.CouchbaseBucketIOPriorityLow).
-				Test("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction).
-				Test("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber).
-				Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive),
+			validations: patchMap{
+				"bucket3": jsonpatch.NewPatchSet().
+					Test("/spec/memoryQuota", "100Mi").
+					Test("/spec/replicas", 1).
+					Test("/spec/ioPriority", couchbasev2.CouchbaseBucketIOPriorityLow).
+					Test("/spec/evictionPolicy", couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction).
+					Test("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber).
+					Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive),
 			},
 		},
 		{
 			name: "TestValidateMemcachedBucketDefault",
-			mutations: patchMap{"bucket2": jsonpatch.NewPatchSet().
-				Remove("/spec/memoryQuota"),
+			mutations: patchMap{
+				"bucket2": jsonpatch.NewPatchSet().
+					Remove("/spec/memoryQuota"),
 			},
-			validations: patchMap{"bucket2": jsonpatch.NewPatchSet().
-				Test("/spec/memoryQuota", "100Mi"),
+			validations: patchMap{
+				"bucket2": jsonpatch.NewPatchSet().
+					Test("/spec/memoryQuota", "100Mi"),
 			},
 		},
 		{
@@ -1755,10 +1898,11 @@ func TestValidationDefaultCreate(t *testing.T) {
 		{
 			name:      "TestAutoCompactionDefault",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/autoCompaction")},
-			validations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Test("/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", 30).
-				Test("/spec/cluster/autoCompaction/viewFragmentationThreshold/percent", 30).
-				Test("/spec/cluster/autoCompaction/tombstonePurgeInterval", "72h"),
+			validations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Test("/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", 30).
+					Test("/spec/cluster/autoCompaction/viewFragmentationThreshold/percent", 30).
+					Test("/spec/cluster/autoCompaction/tombstonePurgeInterval", "72h"),
 			},
 		},
 		{
@@ -2148,22 +2292,26 @@ func TestRBACValidationLDAP(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/tlsSecret")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.security.ldap.tlsSecret"},
-		}, {
+		},
+		{
 			name:           "TestValidateGroupRequired",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/groupsQuery")},
 			shouldFail:     true,
 			expectedErrors: []string{"security.ldap.groupsQuery in body is required"},
-		}, {
+		},
+		{
 			name:           "TestValidateAuthSecretRejected",
 			mutations:      patchMap{"user2": jsonpatch.NewPatchSet().Add("/spec/authSecret", "auth-secret")},
 			shouldFail:     true,
 			expectedErrors: []string{"secret auth-secret not allowed for LDAP user `user2`"},
-		}, {
+		},
+		{
 			name:           "TestValidateAuthDomain",
 			mutations:      patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "upnorth")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.authDomain"},
-		}, {
+		},
+		{
 			name:        "TestValidateAuthenticationDefault",
 			mutations:   patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/authenticationEnabled")},
 			validations: patchMap{"cluster": jsonpatch.NewPatchSet().Test("/spec/security/ldap/authenticationEnabled", true)},

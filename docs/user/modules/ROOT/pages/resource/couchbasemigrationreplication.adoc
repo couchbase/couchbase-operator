@@ -1,0 +1,208 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= CouchbaseMigrationReplication Resource
+include::partial$autogen-reference-aliases.adoc[tags=couchbasemigrationreplication]
+:resource-name-singular: couchbasemigrationreplication
+:resource-name-plural: couchbasemigrationreplications
+:resource-name-kind: CouchbaseMigrationReplication
+
+The CouchbaseScopeMigration resource represents the use of the special migration mapping within XDCR to take a filtered list from the default scope and collection of the source bucket, replicate it to named scopes and collections within the target bucket.
+The bucket-to-bucket replication cannot duplicate any used by the CouchbaseReplication resource, as these two types of replication are mutually exclusive between buckets.
+https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html#migration.
+
+== couchbasemigrationreplications.apiVersion
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+APIVersion defines the versioned schema of this representation of an object.
+Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
+
+== couchbasemigrationreplications.kind
+
+=== Constraints
+
+*Type*: `string`
+
+=== Description
+
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+Cannot be updated.
+In CamelCase.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds.
+
+include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasemigrationreplication]
+
+== couchbasemigrationreplications.migrationMapping
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+The migration mappings to use, should never be empty as that is just an implicit bucket-to-bucket replication then.
+
+=== couchbasemigrationreplications.migrationMapping.mappings
+
+==== Constraints
+
+*Required*
+
+*Type*: `[]object`
+
+==== Description
+
+The migration mappings to use, should never be empty as that is just an implicit bucket-to-bucket replication then.
+
+=== couchbasemigrationreplications.migrationMapping.mappings.filter
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `\_default.\_default`
+
+==== Description
+
+A filter to select from the source default scope and collection.
+Defaults to select everything in the default scope and collection.
+
+=== couchbasemigrationreplications.migrationMapping.mappings.targetKeyspace
+
+==== Constraints
+
+*Required*
+
+*Type*: `object`
+
+==== Description
+
+The destination of our migration, must be a scope and collection.
+
+=== couchbasemigrationreplications.migrationMapping.mappings.targetKeyspace.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `30`
+
+*Pattern (Regular Expression)*: `^(\_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})$`
+
+==== Description
+
+The optional collection within the scope.
+May be empty to just work at scope level.
+
+=== couchbasemigrationreplications.migrationMapping.mappings.targetKeyspace.scope
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `30`
+
+*Pattern (Regular Expression)*: `^(\_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})$`
+
+==== Description
+
+The scope to use.
+
+== couchbasemigrationreplications.spec
+
+=== Constraints
+
+*Required*
+
+*Type*: `object`
+
+=== Description
+
+CouchbaseReplicationSpec allows configuration of an XDCR replication.
+
+=== couchbasemigrationreplications.spec.bucket
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Maximum Length*: `100`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-\_%\.]\{1,100}$`
+
+==== Description
+
+Bucket is the source bucket to replicate from.
+This refers to the Couchbase bucket name, not the resource name of the bucket.
+A bucket with this name must be defined on this cluster.
+Legal bucket names have a maximum length of 100 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
+
+=== couchbasemigrationreplications.spec.compressionType
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `Auto`
+
+*Enumerations*: `None, Auto`
+
+==== Description
+
+CompressionType is the type of compression to apply to the replication.
+When None, no compression will be applied to documents as they are transferred between clusters.
+When Auto, Couchbase server will automatically compress documents as they are transferred to reduce bandwidth requirements.
+This field must be one of "None" or "Auto", defaulting to "Auto".
+
+=== couchbasemigrationreplications.spec.filterExpression
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+FilterExpression allows certain documents to be filtered out of the replication.
+
+=== couchbasemigrationreplications.spec.paused
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Paused allows a replication to be stopped and restarted without having to restart the replication from the beginning.
+
+=== couchbasemigrationreplications.spec.remoteBucket
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Maximum Length*: `100`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-\_%\.]\{1,100}$`
+
+==== Description
+
+RemoteBucket is the remote bucket name to synchronize to.
+This refers to the Couchbase bucket name, not the resource name of the bucket.
+Legal bucket names have a maximum length of 100 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".

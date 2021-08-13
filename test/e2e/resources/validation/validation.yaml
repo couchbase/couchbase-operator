@@ -138,6 +138,61 @@ spec:
   bucket: explicit-name # refers to explicit name, not implicit name
   remoteBucket: bucket0
 ---
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replicationscopesandcollections
+spec:
+  bucket: bucket0
+  remoteBucket: anotherbucket
+explicitMapping:
+  allowRules:
+    - sourceKeyspace:
+        scope: "scope0"
+      targetKeyspace:
+        scope: "scope0"
+    - sourceKeyspace:
+        scope: scope1
+        collection: collection1
+      targetKeyspace:
+        scope: targetscope1
+        collection: targetcollection1
+    - sourceKeyspace:
+        scope: scope1
+        collection: collection2
+      targetKeyspace:
+        scope: targetscope1
+        collection: targetcollection2
+    - sourceKeyspace:
+        scope: scope2
+        collection: collection2
+      targetKeyspace:
+        scope: targetscope2
+        collection: targetcollection2
+  denyRules:
+    # More specific denial rule of the scope0 implicit mappings
+    - sourceKeyspace:
+        scope: scope0
+        collection: bugs
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseMigrationReplication
+metadata:
+  name: migrationscopesandcollections
+spec:
+  bucket: explicit-name
+  remoteBucket: explicit-name
+migrationMapping:
+  mappings:
+    - targetKeyspace:
+        scope: donald
+        collection: antique
+      filter: "type=duck && age=old"
+    - filter: "Iamnotaduck"
+      targetKeyspace:
+        scope: migrationscope
+        collection: migrationcollection
+---
 apiVersion: v1
 kind: Secret
 metadata:
@@ -222,7 +277,7 @@ metadata:
   name: cluster
   namespace: default
 spec:
-  image: couchbase/server:enterprise-6.5.0
+  image: couchbase/server:7.0.0
   antiAffinity: false
   paused: false
   upgradePolicy: RollingUpgrade

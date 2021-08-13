@@ -307,6 +307,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.EphemeralBucketCRDResourcePlural,
 				couchbasev2.MemcachedBucketCRDResourcePlural,
 				couchbasev2.ReplicationCRDResourcePlural,
+				couchbasev2.MigrationReplicationCRDResourcePlural,
 				couchbasev2.UserCRDResourcePlural,
 				couchbasev2.GroupCRDResourcePlural,
 				couchbasev2.RoleBindingCRDResourcePlural,

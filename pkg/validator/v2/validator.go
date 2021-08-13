@@ -52,6 +52,8 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintAuditLoggingPermissible,
 		checkConstraintXDCRRemoteAuthentication,
 		checkConstraintXDCRReplicationBuckets,
+		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
+		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
 		checkConstraintClusterSupportable,
 		checkConstraintServiceEnabledForVolumeMount,
@@ -376,6 +378,254 @@ func checkConstraintXDCRRemoteAuthentication(v *types.Validator, cluster *couchb
 	return nil
 }
 
+func areKeyspacesValid(allowRule couchbasev2.CouchbaseAllowReplicationMapping) error {
+	// Scopes must be set
+	if allowRule.SourceKeyspace.Scope == "" {
+		return fmt.Errorf("invalid source scope")
+	}
+
+	if allowRule.TargetKeyspace.Scope == "" {
+		return fmt.Errorf("invalid target scope")
+	}
+
+	// Collections must be set on both or neither
+	if allowRule.SourceKeyspace.Collection != "" && allowRule.TargetKeyspace.Collection == "" {
+		return fmt.Errorf("source collection with no target collection")
+	}
+
+	if allowRule.SourceKeyspace.Collection == "" && allowRule.TargetKeyspace.Collection != "" {
+		return fmt.Errorf("target collection with no source collection")
+	}
+
+	return nil
+}
+
+func checkConstraintXDCRReplicationMappings(m couchbasev2.CouchbaseReplication) error {
+	// We build up a set of errors overall or nothing
+	var errs []error
+
+	// All the keyspaces we're handling
+	sourceKeyspacesHandled := make(map[string]bool)
+	targetKeyspacesHandled := make(map[string]bool)
+
+	for index, allowRule := range m.ExplicitMapping.AllowRules {
+		// Helpers to handle our custom string type and shrink code.
+		sourceKeyspace := fmt.Sprintf("%s.%s", allowRule.SourceKeyspace.Scope, allowRule.SourceKeyspace.Collection)
+		targetKeyspace := fmt.Sprintf("%s.%s", allowRule.TargetKeyspace.Scope, allowRule.TargetKeyspace.Collection)
+
+		// Check that source and target keyspaces are the same size, i.e. either both contain collections or scopes only or neither.
+		if err := areKeyspacesValid(allowRule); err != nil {
+			errs = append(errs, fmt.Errorf("explicitMapping.allowRules[%d].sourceKeyspace for %s invalid as source and target keyspaces must both target a scope or a collection: %s => %s (%w)", index, m.Name, sourceKeyspace, targetKeyspace, err))
+			continue
+		}
+
+		// If we have a collection-level rule then we cannot have a scope-level rule unless it is the inverse: deny and allow.
+		if allowRule.SourceKeyspace.Collection != "" {
+			scopeOnlyKeyspace := fmt.Sprintf("%s.", allowRule.SourceKeyspace.Scope)
+			if _, exists := sourceKeyspacesHandled[scopeOnlyKeyspace]; exists {
+				errs = append(errs, fmt.Errorf("explicitMapping.allowRules[%d].sourceKeyspace for %s invalid as less specific rule already exists for source at scope level: %s", index, m.Name, sourceKeyspace))
+				continue
+			}
+		}
+
+		// Make sure no rules exist using the same source or target multiple times.
+		if _, exists := sourceKeyspacesHandled[sourceKeyspace]; exists {
+			errs = append(errs, fmt.Errorf("explicitMapping.allowRules[%d].sourceKeyspace for %s invalid as rule already exists for source: %s", index, m.Name, sourceKeyspace))
+			continue
+		}
+
+		if _, exists := targetKeyspacesHandled[targetKeyspace]; exists {
+			errs = append(errs, fmt.Errorf("explicitMapping.allowRules[%d].targetKeyspace for %s invalid as rule already exists for target: %s", index, m.Name, targetKeyspace))
+			continue
+		}
+
+		sourceKeyspacesHandled[sourceKeyspace] = true
+		targetKeyspacesHandled[targetKeyspace] = true
+	}
+
+	// Keep track of any specific to deny rules
+	denyKeyspacesHandled := make(map[string]bool)
+
+	for index, denyRule := range m.ExplicitMapping.DenyRules {
+		// Check that we have at least a scope
+		if denyRule.SourceKeyspace.Scope == "" {
+			errs = append(errs, fmt.Errorf("explicitMapping.denyRules[%d].sourceKeyspace for %s invalid as source no scope defined", index, m.Name))
+			continue
+		}
+
+		sourceKeyspace := fmt.Sprintf("%s.%s", denyRule.SourceKeyspace.Scope, denyRule.SourceKeyspace.Collection)
+
+		// If we have a collection-level rule then we cannot have a scope-level rule unless it is the inverse: deny and allow.
+		if denyRule.SourceKeyspace.Collection != "" {
+			scopeOnlyKeyspace := fmt.Sprintf("%s.", denyRule.SourceKeyspace.Scope)
+			// Check that it is not in the list of one for deny only, fine to be in the total list
+			if _, exists := denyKeyspacesHandled[scopeOnlyKeyspace]; exists {
+				errs = append(errs, fmt.Errorf("explicitMapping.denyRules[%d].sourceKeyspace for %s invalid as less specific rule already exists for source at scope level: %s", index, m.Name, sourceKeyspace))
+				continue
+			}
+		}
+
+		// Check for duplicate source keyspace rules in allow and deny
+		if _, exists := sourceKeyspacesHandled[sourceKeyspace]; exists {
+			errs = append(errs, fmt.Errorf("explicitMapping.denyRules[%d].sourceKeyspace for %s invalid as rule already exists for source: %s", index, m.Name, sourceKeyspace))
+			continue
+		}
+
+		sourceKeyspacesHandled[sourceKeyspace] = true
+		denyKeyspacesHandled[sourceKeyspace] = true
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintXDCRMigrationMappings(m couchbasev2.CouchbaseMigrationReplication) error {
+	// We build up a set of errors overall or nothing
+	var errs []error
+
+	for index, migrationMapping := range m.MigrationMapping.Mappings {
+		source := migrationMapping.Filter
+
+		// Check that we only have one source using the default collection.
+		if source == "_default._default" && len(m.MigrationMapping.Mappings) > 1 {
+			errs = append(errs, fmt.Errorf("migrationMapping.mappings[%d].filter for %s invalid as multiple uses of the default collection as a source", index, m.Name))
+		}
+
+		// We must always have a target collection specified
+		if migrationMapping.TargetKeyspace.Collection == "" {
+			errs = append(errs, fmt.Errorf("migrationMapping.mappings[%d].filter for %s invalid as no target collection specified", index, m.Name))
+		}
+	}
+
+	// No short cut errors here to build up full list
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func isScopesAndCollectionsSupported(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
+	// Minimum supported version for scopes and collections is 7
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return false, err
+	}
+
+	return couchbaseutil.VersionAfter(tag, "7.0.0")
+}
+
+func createReplicationHash(spec couchbasev2.CouchbaseReplicationSpec) string {
+	return fmt.Sprintf("%s/%s", spec.Bucket, spec.RemoteBucket)
+}
+
+func checkConstraintXDCRReplicationRules(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.XDCR.Managed {
+		return nil
+	}
+
+	var errs []error
+
+	// We cannot have the same buckets involved in both replication and migration rules
+	// or in fact no duplicates in general. We do this by hashing the source and destination buckets to search for.
+	currentRules := make(map[string]bool)
+
+	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+		replications, err := v.Abstraction.GetCouchbaseReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, replication := range replications.Items {
+			hash := createReplicationHash(replication.Spec)
+			if _, exists := currentRules[hash]; exists {
+				errs = append(errs, fmt.Errorf("duplicate rule (%s) for XDCR replication in couchbasereplications.couchbase.com/%s", hash, replication.Name))
+				continue
+			}
+
+			currentRules[hash] = true
+
+			err := checkConstraintXDCRReplicationMappings(replication)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("invalid rule for XDCR replication in couchbasereplications.couchbase.com/%s: %w", replication.Name, err))
+			}
+		}
+
+		migrations, err := v.Abstraction.GetCouchbaseMigrationReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, migration := range migrations.Items {
+			hash := createReplicationHash(migration.Spec)
+			if _, exists := currentRules[hash]; exists {
+				errs = append(errs, fmt.Errorf("duplicate rule (%s) for XDCR migration in couchbasereplications.couchbase.com/%s", hash, migration.Name))
+				continue
+			}
+
+			currentRules[hash] = true
+
+			err := checkConstraintXDCRMigrationMappings(migration)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("invalid rule for XDCR migration in couchbasemigrations.couchbase.com/%s: %w", migration.Name, err))
+			}
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintXDCRReplicationScopesAndCollectionsSupported(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.XDCR.Managed {
+		return nil
+	}
+
+	supportedXDCRScopesAndCollections, err := isScopesAndCollectionsSupported(cluster)
+	if err != nil {
+		return fmt.Errorf("unable to check server version %s for scopes and collections support: %w", cluster.Spec.Image, err)
+	}
+
+	var errs []error
+
+	if !supportedXDCRScopesAndCollections {
+		for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+			replications, err := v.Abstraction.GetCouchbaseReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+			if err != nil {
+				errs = append(errs, err)
+			} else {
+				for _, replication := range replications.Items {
+					// Check we have no replication rules for scopes and collections
+					if len(replication.ExplicitMapping.AllowRules) > 0 || len(replication.ExplicitMapping.DenyRules) > 0 {
+						errs = append(errs, fmt.Errorf("invalid server version (%s) to support XDCR replication of scopes and collections in couchbasereplications.couchbase.com/%s", cluster.Spec.Image, replication.Name))
+					}
+				}
+			}
+
+			migrations, err := v.Abstraction.GetCouchbaseMigrationReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+			if err != nil {
+				errs = append(errs, err)
+			} else if len(migrations.Items) > 0 {
+				errs = append(errs, fmt.Errorf("invalid server version (%s) to support XDCR migration of scopes and collections in couchbasemigrations.couchbase.com", cluster.Spec.Image))
+			}
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
 func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.Spec.XDCR.Managed {
 		return nil
@@ -393,6 +643,18 @@ func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbas
 		for _, replication := range replications.Items {
 			if err := validateBucketExists(v, cluster, string(replication.Spec.Bucket)); err != nil {
 				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist: %w", replication.Spec.Bucket, replication.Name, err))
+			}
+		}
+
+		migrations, err := v.Abstraction.GetCouchbaseMigrationReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, migration := range migrations.Items {
+			if err := validateBucketExists(v, cluster, string(migration.Spec.Bucket)); err != nil {
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must exist: %w", migration.Spec.Bucket, migration.Name, err))
 			}
 		}
 	}

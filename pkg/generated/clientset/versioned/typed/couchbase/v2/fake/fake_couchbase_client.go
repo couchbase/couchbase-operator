@@ -57,6 +57,10 @@ func (c *FakeCouchbaseV2) CouchbaseMemcachedBuckets(namespace string) v2.Couchba
 	return &FakeCouchbaseMemcachedBuckets{c, namespace}
 }
 
+func (c *FakeCouchbaseV2) CouchbaseMigrationReplications(namespace string) v2.CouchbaseMigrationReplicationInterface {
+	return &FakeCouchbaseMigrationReplications{c, namespace}
+}
+
 func (c *FakeCouchbaseV2) CouchbaseReplications(namespace string) v2.CouchbaseReplicationInterface {
 	return &FakeCouchbaseReplications{c, namespace}
 }

@@ -12,6 +12,8 @@ type versionTest struct {
 }
 
 func TestCouchbaseVersionAfter(t *testing.T) {
+	t.Parallel()
+
 	testcases := []versionTest{
 		{
 			"1.0.0",

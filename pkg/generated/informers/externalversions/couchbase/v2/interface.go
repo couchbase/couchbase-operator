@@ -33,6 +33,8 @@ type Interface interface {
 	CouchbaseGroups() CouchbaseGroupInformer
 	// CouchbaseMemcachedBuckets returns a CouchbaseMemcachedBucketInformer.
 	CouchbaseMemcachedBuckets() CouchbaseMemcachedBucketInformer
+	// CouchbaseMigrationReplications returns a CouchbaseMigrationReplicationInformer.
+	CouchbaseMigrationReplications() CouchbaseMigrationReplicationInformer
 	// CouchbaseReplications returns a CouchbaseReplicationInformer.
 	CouchbaseReplications() CouchbaseReplicationInformer
 	// CouchbaseRoleBindings returns a CouchbaseRoleBindingInformer.
@@ -104,6 +106,11 @@ func (v *version) CouchbaseGroups() CouchbaseGroupInformer {
 // CouchbaseMemcachedBuckets returns a CouchbaseMemcachedBucketInformer.
 func (v *version) CouchbaseMemcachedBuckets() CouchbaseMemcachedBucketInformer {
 	return &couchbaseMemcachedBucketInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CouchbaseMigrationReplications returns a CouchbaseMigrationReplicationInformer.
+func (v *version) CouchbaseMigrationReplications() CouchbaseMigrationReplicationInformer {
+	return &couchbaseMigrationReplicationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // CouchbaseReplications returns a CouchbaseReplicationInformer.

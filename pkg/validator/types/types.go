@@ -62,6 +62,8 @@ type KubeAbstraction interface {
 	GetCouchbaseScopes(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeList, error)
 	// GetCouchbaseScopeGroups returns the selected scope groups.
 	GetCouchbaseScopeGroups(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeGroupList, error)
+	// GetCouchbaseMigrationeplications returns all migration replications for a specified selector.
+	GetCouchbaseMigrationReplications(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseMigrationReplicationList, error)
 }
 
 // kubeAbstractionImpl Implements KubeAbstraction, operating on a real kubernetes cluster.
@@ -185,6 +187,16 @@ func (ab *kubeAbstractionImpl) GetCouchbaseReplications(namespace string, select
 	}
 
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseReplications(namespace).List(context.Background(), listOpts)
+}
+
+func (ab *kubeAbstractionImpl) GetCouchbaseMigrationReplications(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMigrationReplicationList, error) {
+	listOpts := metav1.ListOptions{}
+
+	if selector != nil {
+		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	}
+
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseMigrationReplications(namespace).List(context.Background(), listOpts)
 }
 
 // GetCouchbaseUsers returns all users for a specified selector.

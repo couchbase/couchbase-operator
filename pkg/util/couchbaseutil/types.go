@@ -879,6 +879,7 @@ const (
 )
 
 // Replication describes an XDCR replication as set with /controller/createReplication.
+// Note we unmarshall this explicitly...
 type Replication struct {
 	FromBucket       string                     `url:"fromBucket"`
 	ToCluster        string                     `url:"toCluster"`
@@ -888,6 +889,11 @@ type Replication struct {
 	CompressionType  string                     `url:"compressionType,omitempty"`
 	FilterExpression string                     `url:"filterExpression,omitempty"`
 	PauseRequested   bool                       `url:"pauseRequested"`
+	// These are subject to scopes and collections support in CBS 7+
+	ExplicitMapping  bool `url:"collectionsExplicitMapping,omitempty"`
+	MigrationMapping bool `url:"collectionsMigrationMode,omitempty"`
+	// This is really a map of strings to strings or pointers to strings but easier to handle here this way then deal with explicitly in code.
+	MappingRules string `url:"colMappingRules,omitempty"`
 }
 
 type ReplicationList []Replication
@@ -897,6 +903,25 @@ type ReplicationList []Replication
 type ReplicationSettings struct {
 	CompressionType string `json:"compressionType" url:"compressionType,omitempty"`
 	PauseRequested  bool   `json:"pauseRequested" url:"pauseRequested"`
+	// These are subject to scopes and collections support in CBS 7+
+	ExplicitMapping  bool `json:"collectionsExplicitMapping,omitempty" url:"collectionsExplicitMapping,omitempty"`
+	MigrationMapping bool `json:"collectionsMigrationMode,omitempty" url:"collectionsMigrationMode,omitempty"`
+	// One API uses a map, the other wants it as a JSON-ified string already.
+	MappingRules map[string]*string `json:"colMappingRules,omitempty" url:"colMappingRules,omitempty"`
+}
+
+// Convert from one API call to the other.
+func MappingRulesToStr(rules map[string]*string) (string, error) {
+	if len(rules) > 0 {
+		bytes, err := json.Marshal(rules)
+		if err != nil {
+			return "", err
+		}
+
+		return string(bytes), nil
+	}
+
+	return "", nil
 }
 
 // FormEncode represents user type in api compatible form.

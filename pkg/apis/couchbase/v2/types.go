@@ -1292,6 +1292,34 @@ type CouchbaseReplication struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CouchbaseReplicationSpec `json:"spec"`
+	// The explicit mappings to use for replication which are optional.
+	// For Scopes and Collection replication support we can specify a set of implicit and
+	// explicit mappings to use. If none is specified then it is assumed to be existing
+	// bucket level replication.
+	// https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html#explicit-mapping
+	ExplicitMapping CouchbaseExplicitMappingSpec `json:"explicitMapping,omitempty"`
+}
+
+// The CouchbaseScopeMigration resource represents the use of the special migration mapping
+// within XDCR to take a filtered list from the default scope and collection of the source bucket,
+// replicate it to named scopes and collections within the target bucket.
+// The bucket-to-bucket replication cannot duplicate any used by the CouchbaseReplication resource,
+// as these two types of replication are mutually exclusive between buckets.
+// https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html#migration
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:categories=all;couchbase
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="bucket",type="string",JSONPath=".spec.bucket"
+// +kubebuilder:printcolumn:name="remote bucket",type="string",JSONPath=".spec.remoteBucket"
+// +kubebuilder:printcolumn:name="paused",type="boolean",JSONPath=".spec.paused"
+// +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+type CouchbaseMigrationReplication struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              CouchbaseReplicationSpec `json:"spec"`
+	// The migration mappings to use, should never be empty as that is just an implicit bucket-to-bucket replication then.
+	MigrationMapping CouchbaseMigrationMappingSpec `json:"migrationMapping"`
 }
 
 // CompressionType represents all allowable XDCR compression modes.
@@ -1304,6 +1332,81 @@ const (
 	// CompressionTypeAuto automatically applies compression based on internal heuristics.
 	CompressionTypeAuto CompressionType = "Auto"
 )
+
+// For the replication we can use the default scope or collection so we are reusing
+// the type for ScopeOrCollectionName but with extra support for _default
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:MaxLength=30
+// +kubebuilder:validation:Pattern="^(_default|[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29})$"
+type ScopeOrCollectionNameIncludingDefault string
+
+// For replication we can source and target either a scope or a scope.collection which is
+// referred to as a keyspace. We use the same validation as the ScopeOrCollectionName type
+// but also support usage of _default scopes and collections.
+// https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html
+type CouchbaseReplicationKeyspace struct {
+	// The scope to use.
+	Scope ScopeOrCollectionNameIncludingDefault `json:"scope"`
+	// The optional collection within the scope. May be empty to just work at scope level.
+	Collection ScopeOrCollectionNameIncludingDefault `json:"collection,omitempty"`
+}
+
+// The various rules we want to define for an explicit mapping between scopes and collections in the
+// source and target buckets.
+type CouchbaseExplicitMappingSpec struct {
+	// The list of explicit replications to carry out including any nested implicit replications:
+	// specifying a scope implicitly replicates all collections within it.
+	// There should be no duplicates, including more-specific duplicates, e.g. if you specify replication
+	// of a scope then you can only deny replication of collections within it.
+	AllowRules []CouchbaseAllowReplicationMapping `json:"allowRules,omitempty"`
+	// The list of explicit replications to prevent including any nested implicit denials:
+	// specifying a scope implicitly denies all collections within it.
+	// There should be no duplicates, including more-specific duplicates, e.g. if you specify denial of
+	// replication of a scope then you can only specify replication of collections within it.
+	DenyRules []CouchbaseDenyReplicationMapping `json:"denyRules,omitempty"`
+}
+
+// CouchbaseAllowReplicationMapping is to cover Scope and Collection explicit replication.
+// If a scope is defined then it implicitly allows all collections unless a more specific
+// CouchbaseDenyReplicationMapping rule is present to block it.
+// Once a rule is defined at scope level it should not be redefined at collection level.
+// https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html
+type CouchbaseAllowReplicationMapping struct {
+	// The source keyspace: where to replicate from.
+	// Source and target must match whether they have a collection or not, i.e. you cannot
+	// replicate from a scope to a collection.
+	SourceKeyspace CouchbaseReplicationKeyspace `json:"sourceKeyspace"`
+	// The target keyspace: where to replicate to.
+	// Source and target must match whether they have a collection or not, i.e. you cannot
+	// replicate from a scope to a collection.
+	TargetKeyspace CouchbaseReplicationKeyspace `json:"targetKeyspace"`
+}
+
+// Provide rules to block implicit replication at scope or collection level.
+// You may want to implicitly map all scopes or collections except a specific one (or set) so this
+// is a better way to express that by creating rules just for those to deny.
+type CouchbaseDenyReplicationMapping struct {
+	// The source keyspace: where to block replication from.
+	SourceKeyspace CouchbaseReplicationKeyspace `json:"sourceKeyspace"`
+}
+
+// Provide all the migration mapping replication details and rules.
+type CouchbaseMigrationMappingSpec struct {
+	// The migration mappings to use, should never be empty as that is just an implicit bucket-to-bucket replication then.
+	// +kubebuilder:validation:MinimumItems=1
+	Mappings []CouchbaseMigrationMapping `json:"mappings"`
+}
+
+// Indicates whether this is using migration mapping or not.
+// This is only valid when using the default scope/collection.
+type CouchbaseMigrationMapping struct {
+	// A filter to select from the source default scope and collection.
+	// Defaults to select everything in the default scope and collection.
+	// +kubebuilder:default="_default._default"
+	Filter string `json:"filter,omitempty"`
+	// The destination of our migration, must be a scope and collection.
+	TargetKeyspace CouchbaseReplicationKeyspace `json:"targetKeyspace"`
+}
 
 // CouchbaseReplicationSpec allows configuration of an XDCR replication.
 type CouchbaseReplicationSpec struct {
@@ -1341,6 +1444,13 @@ type CouchbaseReplicationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CouchbaseReplication `json:"items"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type CouchbaseMigrationReplicationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []CouchbaseMigrationReplication `json:"items"`
 }
 
 // CouchbaseUser allows the automation of Couchbase user management.

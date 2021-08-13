@@ -87,6 +87,14 @@ type CouchbaseMemcachedBucketListerExpansion interface{}
 // CouchbaseMemcachedBucketNamespaceLister.
 type CouchbaseMemcachedBucketNamespaceListerExpansion interface{}
 
+// CouchbaseMigrationReplicationListerExpansion allows custom methods to be added to
+// CouchbaseMigrationReplicationLister.
+type CouchbaseMigrationReplicationListerExpansion interface{}
+
+// CouchbaseMigrationReplicationNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseMigrationReplicationNamespaceLister.
+type CouchbaseMigrationReplicationNamespaceListerExpansion interface{}
+
 // CouchbaseReplicationListerExpansion allows custom methods to be added to
 // CouchbaseReplicationLister.
 type CouchbaseReplicationListerExpansion interface{}

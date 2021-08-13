@@ -395,6 +395,8 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRRotateClientMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotateCAMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotateClientMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
+		framework.NewTestDef(TestXDCRReplicateLocalScopesAndCollections).WithTags(TagSuiteP1, TagFeatureXDCR, TagFeatureCollections),
+		framework.NewTestDef(TestXDCRMigrationLocalScopesAndCollections).WithTags(TagSuiteP1, TagFeatureXDCR, TagFeatureCollections),
 		framework.NewTestDef(TestXDCRRotateCAMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR, TagSuitePlatform),
 		framework.NewTestDef(TestRzaAntiAffinityOn).WithTags(TagSuiteP1, TagFeatureServerGroups, TagFeatureScheduling),
 		framework.NewTestDef(TestRzaAntiAffinityOff).WithTags(TagSuiteP1, TagFeatureServerGroups, TagFeatureScheduling),

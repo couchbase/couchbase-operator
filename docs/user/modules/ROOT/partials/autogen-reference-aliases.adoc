@@ -72,3 +72,6 @@ Page aliases -- https://docs.antora.org/antora/latest/page/page-aliases/
 
 // tag::couchbasescopegroup[]
 // end::couchbasescopegroup[]
+
+// tag::couchbasemigrationreplication[]
+// end::couchbasemigrationreplication[]

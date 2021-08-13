@@ -1,3 +1,4 @@
+//go:build !redhat
 // +build !redhat
 
 package framework

@@ -62,6 +62,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseGroups().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbasememcachedbuckets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseMemcachedBuckets().Informer()}, nil
+	case v2.SchemeGroupVersion.WithResource("couchbasemigrationreplications"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseMigrationReplications().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbasereplications"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Couchbase().V2().CouchbaseReplications().Informer()}, nil
 	case v2.SchemeGroupVersion.WithResource("couchbaserolebindings"):

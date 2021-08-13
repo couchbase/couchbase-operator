@@ -59,11 +59,12 @@ type Client struct {
 	// to authenticate the server is trustworthy
 	tls *TLSAuth
 
-	// client is a persistent connection pool to be used by all endpoints
+	// Client is a persistent connection pool to be used by all endpoints
 	// associated with this connection context.  It will become invalid
 	// if any parameters used in the TLS handshake, or HTTP UUID check
 	// are updated.
-	client *http.Client
+	// We export it to allow for mocking.
+	Client HTTPClient
 
 	// ctx is the context used to cancel requests.
 	ctx context.Context
@@ -85,6 +86,11 @@ func New(ctx context.Context, cluster, username, password string) *Client {
 	c.makeClient()
 
 	return c
+}
+
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+	CloseIdleConnections()
 }
 
 // SetUUID updates the cluster UUID to check new connections against.  Creates
@@ -114,7 +120,7 @@ func (c *Client) GetTLS() *TLSAuth {
 // it will sometime prioritize keeping a client happy rather than being in the
 // correct state.
 func (c *Client) CloseIdleConnections() {
-	c.client.CloseIdleConnections()
+	c.Client.CloseIdleConnections()
 }
 
 // RequestMethod is a common HTTP call.

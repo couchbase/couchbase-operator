@@ -1117,3 +1117,53 @@ func (c *CouchbaseCollectionGroupCache) List() (resources []*couchbasev2.Couchba
 func (c *CouchbaseCollectionGroupCache) stop() {
 	c.resourceCache.stop()
 }
+
+// CouchbaseMigrationReplicationCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseMigrationReplication resources.
+type CouchbaseMigrationReplicationCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseCollectionGroupCache creates a new synchronized cache.
+func newCouchbaseMigrationReplicationCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseMigrationReplicationCache, error) {
+	selector := labels.Everything()
+
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseMigrationReplication{}, selector, couchbasev2.MigrationReplicationCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CouchbaseMigrationReplicationCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested resource based on name.
+func (c *CouchbaseMigrationReplicationCache) Get(name string) (*couchbasev2.CouchbaseMigrationReplication, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*couchbasev2.CouchbaseMigrationReplication), true
+}
+
+// list returns all resources.
+func (c *CouchbaseMigrationReplicationCache) List() (resources []*couchbasev2.CouchbaseMigrationReplication) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseMigrationReplication))
+	}
+
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseMigrationReplicationCache) stop() {
+	c.resourceCache.stop()
+}
