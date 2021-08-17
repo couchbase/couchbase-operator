@@ -217,7 +217,8 @@ func configure() (err error) {
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image", "couchbase/exporter:1.0.5", "Docker image to use for the couchbase exporter")
 	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade", "couchbase/exporter:1.0.4", "Docker image to use for couchbase exporter upgrades to upgrade from")
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image", "couchbase/operator-backup:1.1.0", "Docker image to use for couchbase backup")
-	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image", "couchbase/fluent-bit:1.0.4", "Docker image to use for couchbase log shipping")
+	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image", "couchbase/fluent-bit:1.1.0", "Docker image to use for couchbase log shipping")
+	flag.StringVar(&params.CouchbaseLoggingImageUpgrade, "logging-image-upgrade", "couchbase/fluent-bit:1.0.4", "Docker image to use for couchbase log shipping upgrades to upgrade from")
 	flag.StringVar(&params.StorageClassName, "storage-class", "", "Storage class to use")
 	flag.StringVar(&params.BucketType, "bucket-type", "couchbase", "Bucket type to use")
 	flag.StringVar(&params.CompressionMode, "compression-mode", "passive", "Compression mode to use")
@@ -334,6 +335,7 @@ func setup() error {
 	logrus.Info(" →  couchbase exporter upgrade: " + Global.CouchbaseExporterImageUpgrade)
 	logrus.Info(" →  couchbase backup: " + Global.CouchbaseBackupImage)
 	logrus.Info(" →  couchbase logging: " + Global.CouchbaseLoggingImage)
+	logrus.Info(" →  couchbase logging upgrade: " + Global.CouchbaseLoggingImageUpgrade)
 
 	logrus.Info(util.PrettyHeading("Framework Configuration"))
 	logrus.Info(" →  Bucket Type: " + Global.BucketType)
@@ -1001,6 +1003,50 @@ func (r *TestRequirement) Upgradable() *TestRequirement {
 
 	if upgrade.GreaterEqual(version) {
 		r.t.Skip("Upgrade from version greater than or equal to upgrade to version")
+	}
+
+	return r
+}
+
+func (r *TestRequirement) LoggingUpgradable() *TestRequirement {
+	if Global.CouchbaseLoggingImageUpgrade == "" {
+		r.t.Skip("Logging image upgrade version not specified")
+	}
+
+	if Global.CouchbaseLoggingImageUpgrade == "latest" {
+		r.t.Skip("Cannot upgrade logging image from latest version")
+	}
+
+	parts1 := strings.Split(Global.CouchbaseLoggingImage, ":")
+	if len(parts1) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseLoggingImage))
+	}
+
+	parts2 := strings.Split(Global.CouchbaseLoggingImageUpgrade, ":")
+	if len(parts2) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseLoggingImageUpgrade))
+	}
+
+	if parts1[1] == parts2[1] {
+		r.t.Skip("Logging image upgrade and base version are the same")
+	}
+
+	if parts1[1] == "latest" {
+		return r
+	}
+
+	version, err := couchbaseutil.NewVersion(parts1[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts1[1], err))
+	}
+
+	upgrade, err := couchbaseutil.NewVersion(parts2[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts2[1], err))
+	}
+
+	if upgrade.GreaterEqual(version) {
+		r.t.Skip(fmt.Sprintf("Logging image upgrade version %s greater than or equal to base version %s", parts2[1], parts1[1]))
 	}
 
 	return r

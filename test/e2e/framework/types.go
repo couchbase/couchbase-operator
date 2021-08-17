@@ -30,6 +30,7 @@ type Framework struct {
 	CouchbaseExporterImageUpgrade string
 	CouchbaseBackupImage          string
 	CouchbaseLoggingImage         string
+	CouchbaseLoggingImageUpgrade  string
 	BucketType                    string
 	CompressionMode               string
 	EnableIstio                   bool

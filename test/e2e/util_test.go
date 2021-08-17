@@ -322,6 +322,7 @@ func registerTests() {
 		framework.NewTestDef(TestInflightLogRedaction).WithTags(TagSuiteP0, TagFeatureLogging, TagSuitePlatform),
 		framework.NewTestDef(TestRebalanceLogProcessing).WithTags(TagSuiteP0, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingDynamicConfigReload).WithTags(TagSuiteP0, TagFeatureLogging),
+		framework.NewTestDef(TestLoggingUpgrade).WithTags(TagSuiteP0, TagFeatureLogging, TagFeatureUpgrade),
 
 		// Low priority tests.
 		framework.NewTestDef(TestInvalidBaseImage).WithTags(TagSuiteP1, TagSuitePlatform),
@@ -535,6 +536,13 @@ func clusterOptionsUpgrade() *e2eutil.ClusterOptions {
 func clusterOptionsUpgradeMonitoring() *e2eutil.ClusterOptions {
 	options := clusterOptions()
 	options.Options.MonitoringImage = framework.Global.CouchbaseExporterImageUpgrade
+
+	return options
+}
+
+func clusterOptionsUpgradeLogging() *e2eutil.ClusterOptions {
+	options := clusterOptions()
+	options.Options.LoggingImage = framework.Global.CouchbaseLoggingImageUpgrade
 
 	return options
 }

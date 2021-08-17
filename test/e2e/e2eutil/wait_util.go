@@ -41,7 +41,7 @@ func resourceExists(resource *unstructured.Unstructured, lookupError error) erro
 // resourceNotExists checks that a resource does not exist.
 func resourceNotExists(resource *unstructured.Unstructured, lookupError error) error {
 	if lookupError == nil {
-		return fmt.Errorf("resource nust not exist")
+		return fmt.Errorf("resource must not exist")
 	}
 
 	return nil

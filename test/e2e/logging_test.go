@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -401,4 +403,51 @@ func TestLoggingDynamicConfigReload(t *testing.T) {
 	// Note the old tag may still be in older parts of the log so do not search for it
 	// e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, tag1)
 	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, tag2)
+}
+
+// TestLoggingUpgrade starts the logging sidecar with the logging upgrade image,
+// waits for the cluster to be healthy, then updates to the logging image, and
+// checks the cluster has successfully upgraded.
+func TestLoggingUpgrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, targetKube).LoggingUpgradable()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the cluster.
+	testCouchbase := clusterOptionsUpgradeLogging().WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, targetKube)
+
+	// Wait for the cluster to be ready.
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckLogging(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Upgrade the cluster with new logging image and check again if logging is enabled.
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/logging/server/sidecar/image", f.CouchbaseLoggingImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, targetKube, v2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+
+	// Wait for Fluent Bit to be ready on each pod, then check that each pod is exporting the expected Couchbase logs.
+	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckLogging(t, targetKube, testCouchbase, 5*time.Minute)
+
+	// Check that the image is the new version. This won't work if using the 'latest' tag.
+	targetVersion := strings.Split(f.CouchbaseLoggingImage, ":")[1]
+	searchString := fmt.Sprintf(`"version":"%s (build `, targetVersion)
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, searchString)
+
+	// Check the events match what we expect:
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
