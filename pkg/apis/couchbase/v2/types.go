@@ -5,7 +5,31 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
+
+// BucketName is the name of a bucket.
+// +kubebuilder:validation:MaxLength=100
+// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]{1,100}$"
+type BucketName string
+
+// BucketScopeOrCollectionName is the name of a fully qualifed bucket, scope or collection.
+// The _default scope or collection are not valid for this type.
+// As these names are period separated, and buckets can contain periods, the latter need
+// to be escaped.  This specification is based on cbbackupmgr.
+// +kubebuilder:validation:Pattern="^([a-zA-Z0-9\\-_%]|\\\\.){1,100}(\\.[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29}(\\.[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29})?)?$"
+type BucketScopeOrCollectionName string
+
+// BucketScopeOrCollectionNameWithDefaults is the name of a fully qualifed bucket, scope or collection.
+// The _default scope and collection are valid for this type.
+// As these names are period separated, and buckets can contain periods, the latter need
+// to be escaped.  This specification is based on cbbackupmgr.
+// +kubebuilder:validation:Pattern="^(?:[a-zA-Z0-9\\-_%]|\\\\.){1,100}(\\._default(\\._default)?|\\.[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29}(\\.[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29})?)?$"
+type BucketScopeOrCollectionNameWithDefaults string
+
+// S3BucketURI is an Amazon object storage reference.
+// +kubebuilder:validation:Pattern="^s3://[a-z0-9-\\.]{3,63}$"
+type S3BucketURI string
 
 // CouchbaseBucketCompressionMode defines the available compression modes for Couchbase
 // and Ephemeral bucket types.
@@ -136,7 +160,14 @@ type CouchbaseBackup struct {
 // configured, including when backups are performed, how long they are retained
 // for, and where they are backed up to.
 type CouchbaseBackupSpec struct {
-	// CB backup strategy - Full/Incremental, Full only. Default: Full/Incremental
+	// Strategy defines how to perform backups.  `full_only` will only perform full
+	// backups, and you must define a schedule in the `spec.full` field.  `full_incremental`
+	// will perform periodic full backups, and incremental backups in between.  You must
+	// define full and incremental schedules in the `spec.full` and `spec.incremental` fields
+	// respectively.  Care should be taken to ensure full and incremental schedules do not
+	// overlap, taking into account the backup time, as this will cause failures as the jobs
+	// attempt to mount the same backup volume. This field default to `full_incremental`.
+	// Info: https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-strategies.html
 	// +kubebuilder:default="full_incremental"
 	Strategy Strategy `json:"strategy"`
 
@@ -189,12 +220,113 @@ type CouchbaseBackupSpec struct {
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
 	// Name of S3 bucket to backup to. If non-empty this overrides local backup.
-	S3Bucket string `json:"s3bucket,omitempty"`
+	S3Bucket S3BucketURI `json:"s3bucket,omitempty"`
 
-	// How many threads to use during the backup.
+	// How many threads to use during the backup.  This field defaults to 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	Threads int `json:"threads,omitempty"`
+
+	// Services allows control over what services are included in the backup.
+	// By default, all service data and metadata are included.  Modifications
+	// to this field will only take effect on the next full backup.
+	// +kubebuilder:default="x-couchbase-object"
+	Services CouchbaseBackupServiceFilter `json:"services,omitempty"`
+
+	// Data allows control over what key-value/document data is included in the
+	// backup.  By default, all data is included.  Modifications
+	// to this field will only take effect on the next full backup.
+	Data *CouchbaseBackupDataFilter `json:"data,omitempty"`
+}
+
+// CouchbaseBackupServiceFilter allows backup filtering per-service.
+// It may look the same as the restore one, implying aggregation of a common struct,
+// but I've taken some liberties to make the names more consistent with the rest of
+// the product.  We can converge with a V3 CRD, backups are more common than restores
+// so by getting it right now, we need to do less coversion in the future.
+type CouchbaseBackupServiceFilter struct {
+	// BucketConfig enables the backup of bucket configuration.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	BucketConfig *bool `json:"bucketConfig,omitempty"`
+
+	// Views enables the backup of view definitions for all buckets.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	Views *bool `json:"views,omitempty"`
+
+	// GSIndexes enables the backup of global secondary index definitions for all buckets.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	GSIndexes *bool `json:"gsIndexes,omitempty"`
+
+	// FTSIndexes enables the backup of full-text search index definitions for all buckets.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	FTSIndexes *bool `json:"ftsIndexes,omitempty"`
+
+	// FTSAliases enables the backup of full-text search alias definitions.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	FTSAliases *bool `json:"ftsAliases,omitempty"`
+
+	// Data enables the backup of key-value data/documents for all buckets.
+	// This can be further refined with the couchbasebackups.spec.data configuration.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	Data *bool `json:"data,omitempty"`
+
+	// Analytics enables the backup of analytics data.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	Analytics *bool `json:"analytics,omitempty"`
+
+	// Eventing enables the backup of eventing service metadata.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	Eventing *bool `json:"eventing,omitempty"`
+
+	// ClusterAnalytics enables the backup of cluster-wide analytics data, for example synonyms.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	ClusterAnalytics *bool `json:"clusterAnalytics,omitempty"`
+
+	// BucketQuery enables the backup of query metadata for all buckets.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	BucketQuery *bool `json:"bucketQuery,omitempty"`
+
+	// ClusterQuery enables the backup of cluster level query metadata.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	ClusterQuery *bool `json:"clusterQuery,omitempty"`
+}
+
+// CouchbaseBackupDataFilter allows filtering of backup data by bucket, scope or collection.
+type CouchbaseBackupDataFilter struct {
+	// Include defines the buckets, scopes or collections that are included in the backup.
+	// When this field is set, it implies that by default nothing will be backed up,
+	// and data items must be explicitly included.  You may define an inclusion as a bucket
+	// -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+	// Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as
+	// period is the separator used to delimit scopes and collections.  Included data cannot overlap
+	// e.g. specifying `my-bucket` and `my-bucket.my-scope` is illegal.  This field cannot
+	// be used at the same time as excluded items.
+	// +listType=set
+	// +kubebuilder:validation:MinItems=1
+	Include []BucketScopeOrCollectionNameWithDefaults `json:"include,omitempty"`
+
+	// Exclude defines the buckets, scopes or collections that are excluded from the backup.
+	// When this field is set, it implies that by default everything will be backed up,
+	// and data items can be explicitly excluded.  You may define an exclusion as a bucket
+	// -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+	// Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as
+	// period is the separator used to delimit scopes and collections.  Excluded data cannot overlap
+	// e.g. specifying `my-bucket` and `my-bucket.my-scope` is illegal.  This field cannot
+	// be used at the same time as included items.
+	// +listType=set
+	// +kubebuilder:validation:MinItems=1
+	Exclude []BucketScopeOrCollectionNameWithDefaults `json:"exclude,omitempty"`
 }
 
 type CouchbaseBackupAutoScaling struct {
@@ -208,7 +340,7 @@ type CouchbaseBackupAutoScaling struct {
 	// This represents the percentage of free space remaining on the volume,
 	// when less than this threshold, it will trigger a volume expansion.
 	// For example, if the volume is 100Gi, and the threshold 20%, then a resize
-	// will be triggered when the used capcity exceeds 80Gi, and free space is
+	// will be triggered when the used capacity exceeds 80Gi, and free space is
 	// less than 20Gi.  This field defaults to 20 if not specified.
 	// +kubebuilder:default=20
 	// +kubebuilder:validation:Minimum=0
@@ -248,9 +380,11 @@ type CouchbaseBackupStatus struct {
 	// Failed indicates whether the most recent backup has failed.
 	Failed bool `json:"failed"`
 
+	// DEPRECATED - field may no longer be populated.
 	// Output reports useful information from the backup_script.
 	Output string `json:"output,omitempty"`
 
+	// DEPRECATED - field may no longer be populated.
 	// Pod tells us which pod is running/ran last.
 	Pod string `json:"pod,omitempty"`
 
@@ -335,17 +469,22 @@ type CouchbaseBackupRestore struct {
 // the time range of data to be restored.
 type CouchbaseBackupRestoreSpec struct {
 	// The backup resource name associated with this restore, or the backup PVC
-	// we want to restore from.
+	// name to restore from.
 	Backup string `json:"backup"`
 
-	// Repo is the backup folder to restore from.
+	// Repo is the backup folder to restore from.  If no repository is specified,
+	// the backup container will choose the latest.
 	Repo string `json:"repo"`
 
-	// Start denotes the first backup to restore from.
-	Start *StrOrInt `json:"start"`
+	// Start denotes the first backup to restore from.  This may be specified as
+	// an integer index (starting from 1), a string specifying a short date
+	// DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
+	Start *StrOrInt `json:"start,omitempty"`
 
 	// End denotes the last backup to restore from.  Omitting this field will only
-	// restore the backup referenced by start.
+	// restore the backup referenced by start.  This may be specified as
+	// an integer index (starting from 1), a string specifying a short date
+	// DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
 	End *StrOrInt `json:"end,omitempty"`
 
 	// Number of hours to hold restore script logs for, everything older will be deleted.
@@ -359,16 +498,21 @@ type CouchbaseBackupRestoreSpec struct {
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 
 	// Name of S3 bucket to restore from. If non-empty this overrides local backup.
-	S3Bucket string `json:"s3bucket,omitempty"`
+	S3Bucket S3BucketURI `json:"s3bucket,omitempty"`
 
+	// DEPRECATED - by spec.data.
 	// Specific buckets can be explicitly included or excluded in the restore,
-	// as well as bucket mappings.
-	// +kubebuilder:default="x-couchbase-object"
-	Buckets *CouchbaseBackupRestoreBuckets `json:"buckets,omitempty"`
+	// as well as bucket mappings.  This field is now ignored.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	Buckets *runtime.RawExtension `json:"buckets,omitempty"`
 
 	// This list accepts a certain set of parameters that will disable that data and prevent it being restored.
 	// +kubebuilder:default="x-couchbase-object"
 	Services CouchbaseBackupRestoreServices `json:"services,omitempty"`
+
+	// Data allows control over what key-value/document data is included in the
+	// restore.  By default, all data is included.
+	Data *CouchbaseBackupRestoreDataFilter `json:"data,omitempty"`
 
 	// How many threads to use during the restore.
 	// +kubebuilder:default=1
@@ -376,37 +520,58 @@ type CouchbaseBackupRestoreSpec struct {
 	Threads int `json:"threads,omitempty"`
 }
 
-// Specify which buckets to include and exclude in the restore.
-// If empty we default to restoring all buckets with a 1-1 exact name mapping.
-type CouchbaseBackupRestoreBuckets struct {
-	// Include restores only the named buckets defined in this list.  Bucket names
-	// refer to the Couchbase bucket name, which may be that of the bucket's resource
-	// name, or the name defined in the bucket specification if overidden.
-	Include []string `json:"include,omitempty"`
+// CouchbaseBackupRestoreDataFilter allows filtering of restore data by bucket, scope or collection.
+type CouchbaseBackupRestoreDataFilter struct {
+	// Include defines the buckets, scopes or collections that are included in the restore.
+	// When this field is set, it implies that by default nothing will be restored,
+	// and data items must be explicitly included.  You may define an inclusion as a bucket
+	// -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+	// Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as
+	// period is the separator used to delimit scopes and collections.  Included data cannot overlap
+	// e.g. specifying `my-bucket` and `my-bucket.my-scope` is illegal.  This field cannot
+	// be used at the same time as excluded items.
+	// +listType=set
+	// +kubebuilder:validation:MinItems=1
+	Include []BucketScopeOrCollectionNameWithDefaults `json:"include,omitempty"`
 
-	// Exclude stops the restoration of the named buckets defined in this list.
-	// Bucket names refer to the Couchbase bucket name, which may be that of the
-	// bucket's resource name, or the name defined in the bucket specification if overidden.
-	Exclude []string `json:"exclude,omitempty"`
+	// Exclude defines the buckets, scopes or collections that are excluded from the backup.
+	// When this field is set, it implies that by default everything will be backed up,
+	// and data items can be explicitly excluded.  You may define an exclusion as a bucket
+	// -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+	// Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as
+	// period is the separator used to delimit scopes and collections.  Excluded data cannot overlap
+	// e.g. specifying `my-bucket` and `my-bucket.my-scope` is illegal.  This field cannot
+	// be used at the same time as included items.
+	// +listType=set
+	// +kubebuilder:validation:MinItems=1
+	Exclude []BucketScopeOrCollectionNameWithDefaults `json:"exclude,omitempty"`
 
-	// Maps a backup bucket to a destination bucket that has a different name than
-	// the bucket that was originally backed up.
-	// This parameter takes a list of mappings since multiple buckets may be restored at the same time.
-	// Each bucket mapping is separated by an "="
-	// If we have two buckets, bucket-1 and bucket-2, and we want to restore them to renamed-1 and renamed-2 then we
-	// would denote the mapping as "bucket-1=renamed-1,bucket-2=renamed-2".
-	// This option will only restore data to the Data service and will not restore the metadata for any other service.
+	// Map allows data items in the restore to be remapped to a different named container.
+	// Buckets can be remapped to other buckets e.g. "source=target", scopes and collections
+	// can be remapped to other scopes and collections within the same bucket only e.g.
+	// "bucket.scope=bucket.other" or "bucket.scope.collection=bucket.scope.other".  Map
+	// sources may only be specified once, and may not overlap.
 	// +listType=map
 	// +listMapKey=source
-	BucketMap []BucketMapping `json:"bucketMap,omitempty"`
+	Map []RestoreMapping `json:"map,omitempty"`
+
+	// FilterKeys only restores documents whose names match the provided regular expression.
+	FilterKeys string `json:"filterKeys,omitempty"`
+
+	// FilterValues only restores documents whose values match the provided regular expression.
+	FilterValues string `json:"filterValues,omitempty"`
 }
 
-type BucketMapping struct {
-	// Source is the source bucket name in the backup.
-	Source string `json:"source"`
+// RestoreMapping allows data to be migrated on restore.
+type RestoreMapping struct {
+	// Source defines the data source of the mapping, this may be either
+	// a bucket, scope or collection.
+	Source BucketScopeOrCollectionNameWithDefaults `json:"source"`
 
-	// Destination is the destination bucket name in the Couchbase cluster.
-	Destination string `json:"destination"`
+	// Target defines the data target of the mapping, this may be either
+	// a bucket, scope or collection, and must refer to the same type
+	// as the restore source.
+	Target BucketScopeOrCollectionNameWithDefaults `json:"target"`
 }
 
 type CouchbaseBackupRestoreServices struct {
@@ -452,6 +617,21 @@ type CouchbaseBackupRestoreServices struct {
 	// defaults to true.
 	// +kubebuilder:default=true
 	Eventing *bool `json:"eventing,omitempty"`
+
+	// ClusterAnalytics enables the backup of cluster-wide analytics data, for example synonyms.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	ClusterAnalytics *bool `json:"clusterAnalytics,omitempty"`
+
+	// BucketQuery enables the backup of query metadata for all buckets.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	BucketQuery *bool `json:"bucketQuery,omitempty"`
+
+	// ClusterQuery enables the backup of cluster level query metadata.
+	// This field defaults to `true`.
+	// +kubebuilder:default=true
+	ClusterQuery *bool `json:"clusterQuery,omitempty"`
 }
 
 // struct we use in CouchbaseBackupRestoreSpec to enforce type-safeness
@@ -484,9 +664,11 @@ type CouchbaseBackupRestoreStatus struct {
 	// Failed indicates whether the most recent restore has failed.
 	Failed bool `json:"failed"`
 
+	// DEPRECATED - field may no longer be populated.
 	// Output reports useful information from the backup process.
 	Output string `json:"output,omitempty"`
 
+	// DEPRECATED - field may no longer be populated.
 	// Pod tells us which pod is running/ran last.
 	Pod string `json:"pod,omitempty"`
 
@@ -827,9 +1009,7 @@ type CouchbaseBucketSpec struct {
 	// field only supports a subset of the supported character set.  When specified, this
 	// field overrides `metadata.name`.  Legal bucket names have a maximum length of 100
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
-	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
-	// +kubebuilder:validation:MaxLength=100
-	Name string `json:"name,omitempty"`
+	Name BucketName `json:"name,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
 	// documents will be evicted from memory to disk as defined by the eviction policy.  The
@@ -959,9 +1139,7 @@ type CouchbaseEphemeralBucketSpec struct {
 	// field only supports a subset of the supported character set.  When specified, this
 	// field overrides `metadata.name`.  Legal bucket names have a maximum length of 100
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
-	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
-	// +kubebuilder:validation:MaxLength=100
-	Name string `json:"name,omitempty"`
+	Name BucketName `json:"name,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
 	// documents will be evicted from memory defined by the eviction policy.  The memory quota
@@ -1077,9 +1255,7 @@ type CouchbaseMemcachedBucketSpec struct {
 	// field only supports a subset of the supported character set.  When specified, this
 	// field overrides `metadata.name`.  Legal bucket names have a maximum length of 100
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
-	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
-	// +kubebuilder:validation:MaxLength=100
-	Name string `json:"name,omitempty"`
+	Name BucketName `json:"name,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket. The memory quota
 	// is defined per Couchbase pod running the data service.  This field defaults to, and must
@@ -1135,17 +1311,13 @@ type CouchbaseReplicationSpec struct {
 	// bucket name, not the resource name of the bucket.  A bucket with this name must
 	// be defined on this cluster.  Legal bucket names have a maximum length of 100
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
-	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
-	// +kubebuilder:validation:MaxLength=100
-	Bucket string `json:"bucket"`
+	Bucket BucketName `json:"bucket"`
 
 	// RemoteBucket is the remote bucket name to synchronize to.  This refers to the
 	// Couchbase bucket name, not the resource name of the bucket.  Legal bucket names
 	// have a maximum length of 100 characters and may be composed of any character from
 	// "a-z", "A-Z", "0-9" and "-_%\.".
-	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]+$"
-	// +kubebuilder:validation:MaxLength=100
-	RemoteBucket string `json:"remoteBucket"`
+	RemoteBucket BucketName `json:"remoteBucket"`
 
 	// CompressionType is the type of compression to apply to the replication.
 	// When None, no compression will be applied to documents as they are
@@ -1718,33 +1890,36 @@ type Backup struct {
 	// Managed defines whether backups are managed by us or the clients.
 	Managed bool `json:"managed,omitempty"`
 
-	// The Backup Image to run on backup pods
+	// The Backup Image to run on backup pods.
+	// +kubebuilder:default="couchbase/operator-backup:1.2.0"
 	Image string `json:"image,omitempty"`
 
 	// The Service Account to run backup (and restore) pods under.
-	// Without this backup pods will not be able to update status
+	// Without this backup pods will not be able to update status.
 	ServiceAccount string `json:"serviceAccountName,omitempty"`
 
 	// NodeSelector defines which nodes to constrain the pods that
-	// run any backup operations to
+	// run any backup and restore operations to.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
-	// Resources is the resource requirements for the backup container.
-	// Will be populated by defaults if not specified.
+	// Resources is the resource requirements for the backup and restore
+	// containers.  Will be populated by defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 
 	// Selector allows CouchbaseBackup and CouchbaseBackupRestore
 	// resources to be filtered based on labels.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
-	// Tolerations specifies all backup pod tolerations.
+	// Tolerations specifies all backup and restore pod tolerations.
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 
 	// ImagePullSecrets allow you to use an image from private
 	// repositories and non-dockerhub ones.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
-	// S3Secret contains the region and credentials for operating backups in S3
+	// S3Secret contains the region and credentials for operating backups in S3.
+	// This field must be popluated when the `spec.s3bucket` field is specified
+	// for a backup or restore resource.
 	S3Secret string `json:"s3Secret,omitempty"`
 }
 

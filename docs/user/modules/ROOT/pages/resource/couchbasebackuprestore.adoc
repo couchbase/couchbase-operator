@@ -70,7 +70,7 @@ Number of times the restore job should try to execute.
 
 ==== Description
 
-The backup resource name associated with this restore, or the backup PVC we want to restore from.
+The backup resource name associated with this restore, or the backup PVC name to restore from.
 
 === couchbasebackuprestores.spec.buckets
 
@@ -78,13 +78,85 @@ The backup resource name associated with this restore, or the backup PVC we want
 
 *Type*: `object`
 
-*Default*: `{}`
+==== Description
+
+*DEPRECATED* - by spec.data.
+
+Specific buckets can be explicitly included or excluded in the restore, as well as bucket mappings.
+This field is now ignored.
+
+=== couchbasebackuprestores.spec.data
+
+==== Constraints
+
+*Type*: `object`
 
 ==== Description
 
-Specific buckets can be explicitly included or excluded in the restore, as well as bucket mappings.
+Data allows control over what key-value/document data is included in the restore.
+By default, all data is included.
 
-=== couchbasebackuprestores.spec.buckets.bucketMap
+=== couchbasebackuprestores.spec.data.exclude
+
+==== Constraints
+
+*Type*: `[]string`
+
+*Minimum Items*: `1`
+
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-\_%]|\\.)\{1,100}(\.\_default(\.\_default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})?)?$`
+
+==== Description
+
+Exclude defines the buckets, scopes or collections that are excluded from the backup.
+When this field is set, it implies that by default everything will be backed up, and data items can be explicitly excluded.
+You may define an exclusion as a bucket -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as period is the separator used to delimit scopes and collections.
+Excluded data cannot overlap e.g.
+specifying `my-bucket` and `my-bucket.my-scope` is illegal.
+This field cannot be used at the same time as included items.
+
+=== couchbasebackuprestores.spec.data.filterKeys
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+FilterKeys only restores documents whose names match the provided regular expression.
+
+=== couchbasebackuprestores.spec.data.filterValues
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+FilterValues only restores documents whose values match the provided regular expression.
+
+=== couchbasebackuprestores.spec.data.include
+
+==== Constraints
+
+*Type*: `[]string`
+
+*Minimum Items*: `1`
+
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-\_%]|\\.)\{1,100}(\.\_default(\.\_default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})?)?$`
+
+==== Description
+
+Include defines the buckets, scopes or collections that are included in the restore.
+When this field is set, it implies that by default nothing will be restored, and data items must be explicitly included.
+You may define an inclusion as a bucket -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as period is the separator used to delimit scopes and collections.
+Included data cannot overlap e.g.
+specifying `my-bucket` and `my-bucket.my-scope` is illegal.
+This field cannot be used at the same time as excluded items.
+
+=== couchbasebackuprestores.spec.data.map
 
 ==== Constraints
 
@@ -92,24 +164,13 @@ Specific buckets can be explicitly included or excluded in the restore, as well 
 
 ==== Description
 
-Maps a backup bucket to a destination bucket that has a different name than the bucket that was originally backed up.
-This parameter takes a list of mappings since multiple buckets may be restored at the same time.
-Each bucket mapping is separated by an "=" If we have two buckets, bucket-1 and bucket-2, and we want to restore them to renamed-1 and renamed-2 then we would denote the mapping as "bucket-1=renamed-1,bucket-2=renamed-2".
-This option will only restore data to the Data service and will not restore the metadata for any other service.
+Map allows data items in the restore to be remapped to a different named container.
+Buckets can be remapped to other buckets e.g.
+"source=target", scopes and collections can be remapped to other scopes and collections within the same bucket only e.g.
+"bucket.scope=bucket.other" or "bucket.scope.collection=bucket.scope.other".
+Map sources may only be specified once, and may not overlap.
 
-=== couchbasebackuprestores.spec.buckets.bucketMap.destination
-
-==== Constraints
-
-*Required*
-
-*Type*: `string`
-
-==== Description
-
-Destination is the destination bucket name in the Couchbase cluster.
-
-=== couchbasebackuprestores.spec.buckets.bucketMap.source
+=== couchbasebackuprestores.spec.data.map.source
 
 ==== Constraints
 
@@ -117,31 +178,25 @@ Destination is the destination bucket name in the Couchbase cluster.
 
 *Type*: `string`
 
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-\_%]|\\.)\{1,100}(\.\_default(\.\_default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})?)?$`
+
 ==== Description
 
-Source is the source bucket name in the backup.
+Source defines the data source of the mapping, this may be either a bucket, scope or collection.
 
-=== couchbasebackuprestores.spec.buckets.exclude
+=== couchbasebackuprestores.spec.data.map.target
 
 ==== Constraints
 
-*Type*: `[]string`
+*Required*
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-\_%]|\\.)\{1,100}(\.\_default(\.\_default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})?)?$`
 
 ==== Description
 
-Exclude stops the restoration of the named buckets defined in this list.
-Bucket names refer to the Couchbase bucket name, which may be that of the bucket's resource name, or the name defined in the bucket specification if overidden.
-
-=== couchbasebackuprestores.spec.buckets.include
-
-==== Constraints
-
-*Type*: `[]string`
-
-==== Description
-
-Include restores only the named buckets defined in this list.
-Bucket names refer to the Couchbase bucket name, which may be that of the bucket's resource name, or the name defined in the bucket specification if overidden.
+Target defines the data target of the mapping, this may be either a bucket, scope or collection, and must refer to the same type as the restore source.
 
 === couchbasebackuprestores.spec.end
 
@@ -153,6 +208,7 @@ Bucket names refer to the Couchbase bucket name, which may be that of the bucket
 
 End denotes the last backup to restore from.
 Omitting this field will only restore the backup referenced by start.
+This may be specified as an integer index (starting from 1), a string specifying a short date DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
 
 === couchbasebackuprestores.spec.end.int
 
@@ -200,12 +256,15 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 ==== Description
 
 Repo is the backup folder to restore from.
+If no repository is specified, the backup container will choose the latest.
 
 === couchbasebackuprestores.spec.s3bucket
 
 ==== Constraints
 
 *Type*: `string`
+
+*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]\{3,63}$`
 
 ==== Description
 
@@ -250,6 +309,45 @@ If you are restoring to cluster with managed buckets, then this option may confl
 This option is intended for use with unmanaged buckets.
 Note that bucket durability settings are not restored in versions less than and equal to 1.1.0, and will need to be manually applied.
 This field defaults to false.
+
+=== couchbasebackuprestores.spec.services.bucketQuery
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+BucketQuery enables the backup of query metadata for all buckets.
+This field defaults to `true`.
+
+=== couchbasebackuprestores.spec.services.clusterAnalytics
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+ClusterAnalytics enables the backup of cluster-wide analytics data, for example synonyms.
+This field defaults to `true`.
+
+=== couchbasebackuprestores.spec.services.clusterQuery
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+ClusterQuery enables the backup of cluster level query metadata.
+This field defaults to `true`.
 
 === couchbasebackuprestores.spec.services.data
 
@@ -333,13 +431,12 @@ This field defaults to true.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `object`
 
 ==== Description
 
 Start denotes the first backup to restore from.
+This may be specified as an integer index (starting from 1), a string specifying a short date DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
 
 === couchbasebackuprestores.spec.start.int
 
@@ -513,6 +610,8 @@ LastSuccess gives us the time the last successful restore finished.
 
 ==== Description
 
+*DEPRECATED* - field may no longer be populated.
+
 Output reports useful information from the backup process.
 
 === couchbasebackuprestores.status.pod
@@ -522,6 +621,8 @@ Output reports useful information from the backup process.
 *Type*: `string`
 
 ==== Description
+
+*DEPRECATED* - field may no longer be populated.
 
 Pod tells us which pod is running/ran last.
 

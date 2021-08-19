@@ -505,10 +505,10 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 	switch action {
 	case Incremental:
 		schedule = backup.Spec.Incremental.Schedule
-		container = c.generateBackupContainer("cbbackupmgr-incremental", backup.Spec, backup.Spec.Strategy, false)
+		container = c.generateBackupContainer("cbbackupmgr-incremental", backup, false)
 	case Full:
 		schedule = backup.Spec.Full.Schedule
-		container = c.generateBackupContainer("cbbackupmgr-full", backup.Spec, backup.Spec.Strategy, true)
+		container = c.generateBackupContainer("cbbackupmgr-full", backup, true)
 	}
 
 	if c.cluster.Spec.AntiAffinity {
@@ -601,7 +601,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 // with the correct image and executable command and arguments
 // config is a boolean that determines whether we take want to config a new repo
 // and then take a Full backup (true) or just an incremental backup (false).
-func (c *Cluster) generateBackupContainer(containerName string, spec couchbasev2.CouchbaseBackupSpec, strategy couchbasev2.Strategy, config bool) corev1.Container {
+func (c *Cluster) generateBackupContainer(containerName string, backup *couchbasev2.CouchbaseBackup, full bool) corev1.Container {
 	var resources corev1.ResourceRequirements
 
 	if c.cluster.Spec.Backup.Resources != nil {
@@ -609,18 +609,53 @@ func (c *Cluster) generateBackupContainer(containerName string, spec couchbasev2
 	}
 
 	args := []string{
-		"--strategy", string(strategy),
-		"--config", strconv.FormatBool(config),
 		"--mode", "backup",
-		"--backup-ret", fmt.Sprintf("%.2f", spec.BackupRetention.Hours()),
-		"--log-ret", fmt.Sprintf("%.2f", spec.LogRetention.Hours()),
+		"--backup-ret", fmt.Sprintf("%.2f", backup.Spec.BackupRetention.Hours()),
+		"--log-ret", fmt.Sprintf("%.2f", backup.Spec.LogRetention.Hours()),
 		"-v", "INFO",
 		c.cluster.Name,
 	}
 
+	if full {
+		args = append(args, "--full")
+	} else {
+		args = append(args, "--incremental")
+	}
+
 	// Old resources won't have this set until written.
-	if spec.Threads != 0 {
-		args = append(args, "--threads", strconv.Itoa(spec.Threads))
+	if backup.Spec.Threads != 0 {
+		args = append(args, "--threads", strconv.Itoa(backup.Spec.Threads))
+	}
+
+	// These will all be set, to something due to defaulting, so the dereference is safe.
+	flags := map[string]*bool{
+		"--disable-bucket-config":     backup.Spec.Services.BucketConfig,
+		"--disable-views":             backup.Spec.Services.Views,
+		"--disable-gsi-indexes":       backup.Spec.Services.GSIndexes,
+		"--disable-ft-indexes":        backup.Spec.Services.FTSIndexes,
+		"--disable-ft-aliases":        backup.Spec.Services.FTSAliases,
+		"--disable-data":              backup.Spec.Services.Data,
+		"--disable-analytics":         backup.Spec.Services.Analytics,
+		"--disable-eventing":          backup.Spec.Services.Eventing,
+		"--disable-cluster-analytics": backup.Spec.Services.ClusterAnalytics,
+		"--disable-bucket-query":      backup.Spec.Services.BucketQuery,
+		"--disable-cluster-query":     backup.Spec.Services.ClusterQuery,
+	}
+
+	for flag, value := range flags {
+		if !*value {
+			args = append(args, flag)
+		}
+	}
+
+	if backup.Spec.Data != nil {
+		if len(backup.Spec.Data.Include) > 0 {
+			args = append(args, "--include-data", strings.Join(couchbasev2.BucketScopeOrCollectionNameWithDefaultsList(backup.Spec.Data.Include).StringSlice(), ","))
+		}
+
+		if len(backup.Spec.Data.Exclude) > 0 {
+			args = append(args, "--exclude-data", strings.Join(couchbasev2.BucketScopeOrCollectionNameWithDefaultsList(backup.Spec.Data.Exclude).StringSlice(), ","))
+		}
 	}
 
 	container := corev1.Container{
@@ -643,15 +678,15 @@ func (c *Cluster) generateBackupContainer(containerName string, spec couchbasev2
 		Resources: resources,
 	}
 
-	if len(spec.S3Bucket) != 0 {
-		c.applyS3Configuration(&container, spec.S3Bucket)
+	if len(backup.Spec.S3Bucket) != 0 {
+		c.applyS3Configuration(&container, backup.Spec.S3Bucket)
 	}
 
 	return container
 }
 
 // generateRestoreJob returns a job that performs a cbbackupmgr restore command.
-func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore) (*batchv1.Job, error) {
+func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore) (*batchv1.Job, error) {
 	var start string
 
 	if restore.Spec.Start.Int != nil {
@@ -703,9 +738,10 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 					ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
 					InitContainers:     nil,
 					Containers: []corev1.Container{
-						c.generateRestoreContainer(restore.Spec, start, end),
+						c.generateRestoreContainer(restore, start, end),
 					},
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy:   corev1.RestartPolicyNever,
+					SecurityContext: c.cluster.Spec.SecurityContext,
 					Volumes: []corev1.Volume{
 						{
 							Name: "couchbase-cluster-backup-volume",
@@ -739,19 +775,31 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 
 // generateRestoreContainer returns a container that uses the operator-backup image
 // but specifies the restore mode to the backup_script instead of the backup mode.
-func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupRestoreSpec, start, end string) corev1.Container {
+func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupRestore, start, end string) corev1.Container {
 	var resources corev1.ResourceRequirements
 
 	if c.cluster.Spec.Backup.Resources != nil {
 		resources = *c.cluster.Spec.Backup.Resources
 	}
 
+	spec := restore.Spec
+
 	args := []string{
 		"--mode", "restore",
-		"--repo", spec.Repo,
-		"--start", start, "--end", end,
 		"--log-ret", fmt.Sprintf("%.2f", spec.LogRetention.Hours()),
 		c.cluster.Name,
+	}
+
+	if spec.Repo != "" {
+		args = append(args, "--repo", spec.Repo)
+	}
+
+	if start != "" {
+		args = append(args, "--start", start)
+	}
+
+	if end != "" {
+		args = append(args, "--end", end)
 	}
 
 	// Old resources won't have this set until written.
@@ -760,23 +808,31 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 	}
 
 	// check if any bucket config has been defined
-	if spec.Buckets != nil {
-		if len(spec.Buckets.Include) != 0 {
-			args = append(args, "--include-buckets", strings.Join(spec.Buckets.Include, ","))
+	if spec.Data != nil {
+		if len(spec.Data.Include) != 0 {
+			args = append(args, "--include-data", strings.Join(couchbasev2.BucketScopeOrCollectionNameWithDefaultsList(spec.Data.Include).StringSlice(), ","))
 		}
 
-		if len(spec.Buckets.Exclude) != 0 {
-			args = append(args, "--exclude-buckets", strings.Join(spec.Buckets.Exclude, ","))
+		if len(spec.Data.Exclude) != 0 {
+			args = append(args, "--exclude-data", strings.Join(couchbasev2.BucketScopeOrCollectionNameWithDefaultsList(spec.Data.Exclude).StringSlice(), ","))
 		}
 
-		if len(spec.Buckets.BucketMap) != 0 {
-			var buckets []string
+		if len(spec.Data.Map) != 0 {
+			var mappings []string
 
-			for _, m := range spec.Buckets.BucketMap {
-				buckets = append(buckets, m.Source+"="+m.Destination)
+			for _, m := range spec.Data.Map {
+				mappings = append(mappings, string(m.Source)+"="+string(m.Target))
 			}
 
-			args = append(args, "--map-buckets", strings.Join(buckets, ","))
+			args = append(args, "--map-data", strings.Join(mappings, ","))
+		}
+
+		if spec.Data.FilterKeys != "" {
+			args = append(args, "--filter-keys", spec.Data.FilterKeys)
+		}
+
+		if spec.Data.FilterValues != "" {
+			args = append(args, "--filter-values", spec.Data.FilterValues)
 		}
 	}
 
@@ -784,32 +840,24 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 		args = append(args, "--enable-bucket-config")
 	}
 
-	if !*spec.Services.Views {
-		args = append(args, "--disable-views")
+	// These will all be set, to something due to defaulting, so the dereference is safe.
+	flags := map[string]*bool{
+		"--disable-views":             spec.Services.Views,
+		"--disable-gsi-indexes":       spec.Services.GSIIndex,
+		"--disable-ft-indexes":        spec.Services.FTIndex,
+		"--disable-ft-aliases":        spec.Services.FTAlias,
+		"--disable-data":              spec.Services.Data,
+		"--disable-analytics":         spec.Services.Analytics,
+		"--disable-eventing":          spec.Services.Eventing,
+		"--disable-cluster-analytics": spec.Services.ClusterAnalytics,
+		"--disable-bucket-query":      spec.Services.BucketQuery,
+		"--disable-cluster-query":     spec.Services.ClusterQuery,
 	}
 
-	if !*spec.Services.GSIIndex {
-		args = append(args, "--disable-gsi-indexes")
-	}
-
-	if !*spec.Services.FTIndex {
-		args = append(args, "--disable-ft-indexes")
-	}
-
-	if !*spec.Services.FTAlias {
-		args = append(args, "--disable-ft-alias")
-	}
-
-	if !*spec.Services.Data {
-		args = append(args, "--disable-data")
-	}
-
-	if !*spec.Services.Analytics {
-		args = append(args, "--disable-analytics")
-	}
-
-	if !*spec.Services.Eventing {
-		args = append(args, "--disable-eventing")
+	for flag, value := range flags {
+		if !*value {
+			args = append(args, flag)
+		}
 	}
 
 	container := corev1.Container{
@@ -839,8 +887,8 @@ func (c *Cluster) generateRestoreContainer(spec couchbasev2.CouchbaseBackupResto
 	return container
 }
 
-func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName string) {
-	container.Args = append(container.Args, "--s3-bucket", s3BucketName)
+func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName couchbasev2.S3BucketURI) {
+	container.Args = append(container.Args, "--s3-bucket", string(s3BucketName))
 
 	container.Env = []corev1.EnvVar{
 		{
@@ -877,36 +925,6 @@ func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName
 			},
 		},
 	}
-}
-
-// get the Repo value from a Backup Object to use in a Restore object.
-func (c *Cluster) getBackupRepo(restore *couchbasev2.CouchbaseBackupRestore) error {
-	var backupFound bool
-
-	backupNameFromRestore := restore.Spec.Backup
-	backups := c.k8s.CouchbaseBackups.List()
-
-	if len(backups) == 0 {
-		return fmt.Errorf("no CouchbaseBackups exist currently: %w", errors.NewStackTracedError(errors.ErrResourceRequired))
-	}
-
-	// check currently existing backups
-	for _, backup := range backups {
-		if backup.Name == backupNameFromRestore {
-			if len(backup.Status.Repo) != 0 {
-				restore.Spec.Repo = backup.Status.Repo
-				backupFound = true
-
-				break
-			}
-		}
-	}
-
-	if !backupFound {
-		return fmt.Errorf("no corresponding CouchbaseBackup Repo found: %w", errors.NewStackTracedError(errors.ErrResourceRequired))
-	}
-
-	return nil
 }
 
 // generateBackupPVC returns the PVC that backups will be stored on.

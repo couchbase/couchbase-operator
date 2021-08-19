@@ -162,6 +162,8 @@ Backup defines whether the Operator should manage automated backups, and how to 
 
 *Type*: `string`
 
+*Default*: `couchbase/operator-backup:1.2.0`
+
 ==== Description
 
 The Backup Image to run on backup pods.
@@ -206,7 +208,7 @@ Managed defines whether backups are managed by us or the clients.
 
 ==== Description
 
-NodeSelector defines which nodes to constrain the pods that run any backup operations to.
+NodeSelector defines which nodes to constrain the pods that run any backup and restore operations to.
 
 === couchbaseclusters.spec.backup.resources
 
@@ -216,7 +218,7 @@ NodeSelector defines which nodes to constrain the pods that run any backup opera
 
 ==== Description
 
-Resources is the resource requirements for the backup container.
+Resources is the resource requirements for the backup and restore containers.
 Will be populated by defaults if not specified.
 
 === couchbaseclusters.spec.backup.s3Secret
@@ -228,6 +230,7 @@ Will be populated by defaults if not specified.
 ==== Description
 
 S3Secret contains the region and credentials for operating backups in S3.
+This field must be popluated when the `spec.s3bucket` field is specified for a backup or restore resource.
 
 === couchbaseclusters.spec.backup.selector
 
@@ -258,7 +261,7 @@ Without this backup pods will not be able to update status.
 
 ==== Description
 
-Tolerations specifies all backup pod tolerations.
+Tolerations specifies all backup and restore pod tolerations.
 
 === couchbaseclusters.spec.backup.tolerations.effect
 

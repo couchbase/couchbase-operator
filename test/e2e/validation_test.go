@@ -1404,6 +1404,48 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.incremental`},
 		},
+		{
+			name:           "TestValidateBackupIncludeInvalidBucketName",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "buck^et")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateBackupIncludeInvalidScopeName",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket._scope")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateBackupIncludeInvalidCollectionName",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket.scope._collection")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateBackupIncludeInvalidFormat",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket.nested.scope.collection")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateBackupIncludeInvalidDefault",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket.scope._default")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateBackupIncludeInvalidOverlap",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket1.scope")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateBackupIncludeExcludeMutuallyExclusive",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Add("/spec/data/exclude", []string{"anything"})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`, `spec.data.exclude`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1452,6 +1494,66 @@ func TestNegValidationCreateCouchbaseBackupRestore(t *testing.T) {
 			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/end/str", 17)},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.end.str`},
+		},
+		{
+			name:           "TestValidateRestoreIncludeInvalidBucketName",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "buck^et")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateRestoreIncludeInvalidScopeName",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket._scope")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateRestoreIncludeInvalidCollectionName",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket.scope._collection")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateRestoreIncludeInvalidFormat",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket.nested.scope.collection")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateRestoreIncludeInvalidDefault",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket.scope._default")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateRestoreIncludeInvalidOverlap",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/include/-", "bucket1.scope")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`},
+		},
+		{
+			name:           "TestValidateRestoreIncludeExcludeMutuallyExclusive",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/exclude", []string{"anything"})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.include`, `spec.data.exclude`},
+		},
+		{
+			name:           "TestValidateRestoreMapSameSourceInvalid",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/map/-", map[string]string{"source": "bucket1", "target": "bucket99"})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.map`},
+		},
+		{
+			name:           "TestValidateRestoreMapSourceInvalidOverlap",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Add("/spec/data/map/-", map[string]string{"source": "bucket1.scope", "target": "bucket99"})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.map`},
+		},
+		{
+			name:           "TestValidateRestoreMapMixedScopeInvalid",
+			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Replace("/spec/data/map/0/target", "bucket2.scope")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.data.map`},
 		},
 	}
 

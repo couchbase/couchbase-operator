@@ -487,7 +487,7 @@ func getBucketName(bucket interface{}) (string, error) {
 		name := typed.Name
 
 		if typed.Spec.Name != "" {
-			name = typed.Spec.Name
+			name = string(typed.Spec.Name)
 		}
 
 		return name, nil
@@ -495,7 +495,7 @@ func getBucketName(bucket interface{}) (string, error) {
 		name := typed.Name
 
 		if typed.Spec.Name != "" {
-			name = typed.Spec.Name
+			name = string(typed.Spec.Name)
 		}
 
 		return name, nil
@@ -503,7 +503,7 @@ func getBucketName(bucket interface{}) (string, error) {
 		name := typed.Name
 
 		if typed.Spec.Name != "" {
-			name = typed.Spec.Name
+			name = string(typed.Spec.Name)
 		}
 
 		return name, nil

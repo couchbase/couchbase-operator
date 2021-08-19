@@ -848,7 +848,7 @@ func (b *CouchbaseBucket) GetName() string {
 	name := b.Name
 
 	if b.Spec.Name != "" {
-		name = b.Spec.Name
+		name = string(b.Spec.Name)
 	}
 
 	return name
@@ -874,7 +874,7 @@ func (b *CouchbaseEphemeralBucket) GetName() string {
 	name := b.Name
 
 	if b.Spec.Name != "" {
-		name = b.Spec.Name
+		name = string(b.Spec.Name)
 	}
 
 	return name
@@ -900,7 +900,7 @@ func (b *CouchbaseMemcachedBucket) GetName() string {
 	name := b.Name
 
 	if b.Spec.Name != "" {
-		name = b.Spec.Name
+		name = string(b.Spec.Name)
 	}
 
 	return name
@@ -943,4 +943,18 @@ func (s *CouchbaseScope) CouchbaseName() string {
 	}
 
 	return s.Name
+}
+
+// BucketScopeOrCollectionNameWithDefaultsList provides some helpers to convert betwixt types.
+type BucketScopeOrCollectionNameWithDefaultsList []BucketScopeOrCollectionNameWithDefaults
+
+// StringSlice converts the typed names to strings.
+func (l BucketScopeOrCollectionNameWithDefaultsList) StringSlice() []string {
+	s := make([]string, len(l))
+
+	for i, name := range l {
+		s[i] = string(name)
+	}
+
+	return s
 }

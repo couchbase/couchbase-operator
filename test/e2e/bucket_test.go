@@ -422,7 +422,7 @@ func TestBucketWithExplicitName(t *testing.T) {
 
 	// Create the cluster.
 	bucketTyped := e2espec.DefaultBucket()
-	bucketTyped.Spec.Name = bucketName
+	bucketTyped.Spec.Name = couchbasev2.BucketName(bucketName)
 	e2eutil.MustNewBucket(t, kubernetes, bucketTyped)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucketTyped, time.Minute)
@@ -462,7 +462,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketTyped1.Name = ""
 	bucketTyped1.GenerateName = "bucket-"
 	bucketTyped1.Labels = labels1
-	bucketTyped1.Spec.Name = bucketName
+	bucketTyped1.Spec.Name = couchbasev2.BucketName(bucketName)
 
 	var bucketUntyped1 metav1.Object = bucketTyped1
 
@@ -481,7 +481,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketTyped2.Name = ""
 	bucketTyped2.GenerateName = "bucket-"
 	bucketTyped2.Labels = labels2
-	bucketTyped2.Spec.Name = bucketName
+	bucketTyped2.Spec.Name = couchbasev2.BucketName(bucketName)
 
 	var bucketUntyped2 metav1.Object = bucketTyped2
 

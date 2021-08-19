@@ -426,6 +426,14 @@ spec:
   failedJobsHistoryLimit: 3
   logRetention: 2h
   size: "20Gi"
+  data:
+    include:
+    - bucket1
+    - bucket2.scope
+    - bucket3.scope.collection
+    - bucket4\.with\.periods.scope.collection
+    - bucket5._default
+    - bucket6._default._default
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBackup
@@ -463,6 +471,17 @@ spec:
     str: oldest
   end:
     str: latest
+  data:
+    include:
+    - bucket1
+    - bucket2.scope
+    - bucket3.scope.collection
+    - bucket4\.with\.periods.scope.collection
+    - bucket5._default
+    - bucket6._default._default
+    map:
+    - source: bucket1
+      target: bucket2
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseAutoscaler

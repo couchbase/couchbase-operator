@@ -5,6 +5,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -390,7 +391,7 @@ func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbas
 		}
 
 		for _, replication := range replications.Items {
-			if err := validateBucketExists(v, cluster, replication.Spec.Bucket); err != nil {
+			if err := validateBucketExists(v, cluster, string(replication.Spec.Bucket)); err != nil {
 				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist: %w", replication.Spec.Bucket, replication.Name, err))
 			}
 		}
@@ -987,6 +988,89 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 	return nil
 }
 
+// commonArrayPrefixMatchString takes two arrays, it picks the longest common length
+// e.g. the shortest array length, and returns true if the prefixes match.
+func commonArrayPrefixMatchString(a, b []string) bool {
+	min := len(a)
+	if len(b) < min {
+		min = len(b)
+	}
+
+	for i := 0; i < min; i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// checkBucketScopeOrCollectionNamesWithDefaultsOverlap checks each path in the given array for overlap e.g.
+// "bucket" overlaps with "bucket.scope".  Algorithmically, we only care about paths whose lengths differ,
+// and they have a maximal common prefix e.g. if one path is 10 elements, and another is 20, then 10 is the
+// maximal common prefix length.  It turns out that CRD validation ensures each path is unique, so if
+// a seen and the current path have the same length, they cannot be the same and alias.
+func checkBucketScopeOrCollectionNamesWithDefaultsOverlap(paths []couchbasev2.BucketScopeOrCollectionNameWithDefaults) error {
+	r := regexp.MustCompile(`(?:[^\\.]|\\.)+`)
+
+	// Record all the keys we've seen so far, comparing each new key to this list.
+	seen := [][]string{}
+
+	for _, path := range paths {
+		// Parse the raw path string into an array of parts.
+		// The CRD schema validation ensures this is between 1-3 elements long.
+		matches := r.FindAllStringSubmatch(string(path), -1)
+		if len(matches) == 0 {
+			return fmt.Errorf("unable to parse `%v`", path)
+		}
+
+		parts := make([]string, len(matches))
+
+		for i := 0; i < len(matches); i++ {
+			parts[i] = matches[i][0]
+		}
+
+		for _, s := range seen {
+			// CRD schema validation ensures that no two paths are the same.
+			if len(s) == len(parts) {
+				continue
+			}
+
+			// Different length, and with a common prefix, this is an alias.
+			if commonArrayPrefixMatchString(s, parts) {
+				return fmt.Errorf("%s aliases with %s", strings.Join(s, "."), path)
+			}
+		}
+
+		seen = append(seen, parts)
+	}
+
+	return nil
+}
+
+// checkBucketScopeOrCollectionNamesWithDefaultSameScope checks that two fully qualified data
+// sources have the same level e.g. bucket -> bucket, scope -> scope, while bucket -> collection
+// is illegal.
+func checkBucketScopeOrCollectionNamesWithDefaultSameScope(a, b couchbasev2.BucketScopeOrCollectionNameWithDefaults) error {
+	r := regexp.MustCompile(`(?:[^\\.]|\\.)+`)
+
+	matches1 := r.FindAllStringSubmatch(string(a), -1)
+	if len(matches1) == 0 {
+		return fmt.Errorf("unable to parse `%v`", a)
+	}
+
+	matches2 := r.FindAllStringSubmatch(string(b), -1)
+	if len(matches2) == 0 {
+		return fmt.Errorf("unable to parse `%v`", b)
+	}
+
+	if len(matches1) != len(matches2) {
+		return fmt.Errorf("%v is not in the same scope as %v", a, b)
+	}
+
+	return nil
+}
+
 func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
 	var errs []error
 
@@ -998,8 +1082,22 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = append(errs, fmt.Errorf("spec.size %d must be greater than 0", backup.Spec.Size.Value()))
 	}
 
-	if len(backup.Spec.S3Bucket) != 0 && !strings.HasPrefix(backup.Spec.S3Bucket, "s3://") {
-		errs = append(errs, fmt.Errorf("spec.s3bucket %s is not a valid S3 bucket URI format", backup.Spec.S3Bucket))
+	if backup.Spec.Data != nil {
+		if len(backup.Spec.Data.Include) > 0 && len(backup.Spec.Data.Exclude) > 0 {
+			errs = append(errs, fmt.Errorf("spec.data.include and spec.data.exclude are mututally exclusive"))
+		}
+
+		if len(backup.Spec.Data.Include) > 0 {
+			if err := checkBucketScopeOrCollectionNamesWithDefaultsOverlap(backup.Spec.Data.Include); err != nil {
+				errs = append(errs, fmt.Errorf("spec.data.include invalid: %w", err))
+			}
+		}
+
+		if len(backup.Spec.Data.Exclude) > 0 {
+			if err := checkBucketScopeOrCollectionNamesWithDefaultsOverlap(backup.Spec.Data.Exclude); err != nil {
+				errs = append(errs, fmt.Errorf("spec.data.exclude invalid: %w", err))
+			}
+		}
 	}
 
 	if errs != nil {
@@ -1014,8 +1112,7 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		checkContraintRestoreStart,
 		checkContraintRestoreEnd,
 		checkContraintRestoreRange,
-		checkContraintRestoreBucketsMutuallyExclusive,
-		checkConstraintRestoreMappedBucketNotExcluded,
+		checkContraintRestoreData,
 	}
 
 	var errs []error
@@ -1043,6 +1140,10 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 func checkContraintRestoreStart(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	start := restore.Spec.Start
 
+	if start == nil {
+		return nil
+	}
+
 	if start.Str != nil && start.Int != nil {
 		return fmt.Errorf("specify just one value, either Str or Int")
 	}
@@ -1069,14 +1170,8 @@ func checkContraintRestoreRange(v *types.Validator, restore *couchbasev2.Couchba
 	start := restore.Spec.Start
 	end := restore.Spec.End
 
-	if end == nil {
+	if start == nil || end == nil {
 		return nil
-	}
-
-	if end.Str != nil && start.Str != nil {
-		if *end.Str == "oldest" && *start.Str == "newest" {
-			return fmt.Errorf("start point %s is after end point %s", *start.Str, *end.Str)
-		}
 	}
 
 	// start and end are using integer arguments
@@ -1089,35 +1184,41 @@ func checkContraintRestoreRange(v *types.Validator, restore *couchbasev2.Couchba
 	return nil
 }
 
-func checkContraintRestoreBucketsMutuallyExclusive(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+func checkContraintRestoreData(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	var errs []error
 
-	for _, b := range restore.Spec.Buckets.Exclude {
-		for _, b1 := range restore.Spec.Buckets.Include {
-			if b1 == b {
-				errs = append(errs, fmt.Errorf("bucket to be excluded cannot also be in bucket include list"))
-				break
-			}
+	if restore.Spec.Data == nil {
+		return nil
+	}
+
+	if len(restore.Spec.Data.Include) > 0 && len(restore.Spec.Data.Exclude) > 0 {
+		errs = append(errs, fmt.Errorf("spec.data.include and spec.data.exclude are mututally exclusive"))
+	}
+
+	if len(restore.Spec.Data.Include) > 0 {
+		if err := checkBucketScopeOrCollectionNamesWithDefaultsOverlap(restore.Spec.Data.Include); err != nil {
+			errs = append(errs, fmt.Errorf("spec.data.include invalid: %w", err))
 		}
 	}
 
-	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+	if len(restore.Spec.Data.Exclude) > 0 {
+		if err := checkBucketScopeOrCollectionNamesWithDefaultsOverlap(restore.Spec.Data.Exclude); err != nil {
+			errs = append(errs, fmt.Errorf("spec.data.exclude invalid: %w", err))
+		}
 	}
 
-	return nil
-}
+	var mappingSources []couchbasev2.BucketScopeOrCollectionNameWithDefaults
 
-func checkConstraintRestoreMappedBucketNotExcluded(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
-	var errs []error
-
-	for _, m := range restore.Spec.Buckets.BucketMap {
-		for _, b := range restore.Spec.Buckets.Exclude {
-			if m.Source == b {
-				errs = append(errs, fmt.Errorf("bucket to be excluded cannot also be in a source field of the bucketMap"))
-				break
-			}
+	for _, mapping := range restore.Spec.Data.Map {
+		if err := checkBucketScopeOrCollectionNamesWithDefaultSameScope(mapping.Source, mapping.Target); err != nil {
+			errs = append(errs, fmt.Errorf("spec.data.map invalid: %w", err))
 		}
+
+		mappingSources = append(mappingSources, mapping.Source)
+	}
+
+	if err := checkBucketScopeOrCollectionNamesWithDefaultsOverlap(mappingSources); err != nil {
+		errs = append(errs, fmt.Errorf("spec.data.map invalid: %w", err))
 	}
 
 	if errs != nil {

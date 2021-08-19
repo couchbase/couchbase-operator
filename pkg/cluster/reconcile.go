@@ -480,7 +480,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 		name := bucket.Name
 		if bucket.Spec.Name != "" {
-			name = bucket.Spec.Name
+			name = string(bucket.Spec.Name)
 		}
 
 		b := couchbaseutil.Bucket{
@@ -515,7 +515,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		name := bucket.Name
 
 		if bucket.Spec.Name != "" {
-			name = bucket.Spec.Name
+			name = string(bucket.Spec.Name)
 		}
 
 		b := couchbaseutil.Bucket{
@@ -549,7 +549,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		name := bucket.Name
 
 		if bucket.Spec.Name != "" {
-			name = bucket.Spec.Name
+			name = string(bucket.Spec.Name)
 		}
 
 		buckets = append(buckets, couchbaseutil.Bucket{
@@ -2140,9 +2140,9 @@ func (c *Cluster) generateXDCRReplications(cluster couchbasev2.RemoteCluster) ([
 		}
 
 		replications = append(replications, couchbaseutil.Replication{
-			FromBucket:       replication.Spec.Bucket,
+			FromBucket:       string(replication.Spec.Bucket),
 			ToCluster:        cluster.Name,
-			ToBucket:         replication.Spec.RemoteBucket,
+			ToBucket:         string(replication.Spec.RemoteBucket),
 			Type:             couchbaseutil.ReplicationTypeXMEM,
 			ReplicationType:  couchbaseutil.ReplicationReplicationTypeContinuous,
 			CompressionType:  string(replication.Spec.CompressionType),
@@ -2724,15 +2724,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 
 	// for the current CouchbaseBackupRestores, loop through and see if they have a Job created
 	for i := range currentRestores {
-		currentRestore := currentRestores[i]
-
-		// check if Repo field is populated, if not, try and find the repo
-		// TODO: why in the (#&@! is the script not doing this itself??
-		if len(currentRestore.Spec.Repo) == 0 {
-			if err := c.getBackupRepo(&currentRestore); err != nil {
-				return err
-			}
-		}
+		currentRestore := &currentRestores[i]
 
 		requested, err := c.generateRestoreJob(currentRestore)
 		if err != nil {

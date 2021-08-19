@@ -52,13 +52,14 @@ func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule, s
 	}
 
 	if s3 {
-		backup.Spec.S3Bucket = "s3://" + s3BucketName
+		backup.Spec.S3Bucket = v2.S3BucketURI("s3://" + s3BucketName)
 	}
 
 	return backup
 }
 
 func createTestRestoreBackup(backup *v2.CouchbaseBackup, repo reflect.Value, s3BucketName string, s3 bool) *v2.CouchbaseBackupRestore {
+	oldest := "oldest"
 	latest := "latest"
 
 	restore := &v2.CouchbaseBackupRestore{
@@ -69,6 +70,9 @@ func createTestRestoreBackup(backup *v2.CouchbaseBackup, repo reflect.Value, s3B
 			Backup: backup.Name,
 			Repo:   repo.String(),
 			Start: &v2.StrOrInt{
+				Str: &oldest,
+			},
+			End: &v2.StrOrInt{
 				Str: &latest,
 			},
 			Threads: 4,
@@ -76,7 +80,7 @@ func createTestRestoreBackup(backup *v2.CouchbaseBackup, repo reflect.Value, s3B
 	}
 
 	if s3 {
-		restore.Spec.S3Bucket = "s3://" + s3BucketName
+		restore.Spec.S3Bucket = v2.S3BucketURI("s3://" + s3BucketName)
 	}
 
 	return restore
@@ -780,7 +784,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	}
 
 	if s3 {
-		restore.Spec.S3Bucket = "s3://" + s3BucketName
+		restore.Spec.S3Bucket = v2.S3BucketURI("s3://" + s3BucketName)
 	}
 
 	// delete bucket
@@ -1334,7 +1338,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataQuota
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	for i := range make([]int, 3) {
+	for i := 0; i < 3; i++ {
 		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
@@ -1850,16 +1854,14 @@ func testBackupAndRestoreMapBuckets(t *testing.T, s3 bool) {
 	// Create a Restore object for later.
 	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
 
-	bucketMapping := &v2.BucketMapping{
-		Source:      bucket.GetName(),
-		Destination: targetBucketName,
+	restore.Spec.Data = &v2.CouchbaseBackupRestoreDataFilter{
+		Map: []v2.RestoreMapping{
+			{
+				Source: v2.BucketScopeOrCollectionNameWithDefaults(bucket.GetName()),
+				Target: v2.BucketScopeOrCollectionNameWithDefaults(targetBucketName),
+			},
+		},
 	}
-
-	bucketsMap := &v2.CouchbaseBackupRestoreBuckets{
-		BucketMap: []v2.BucketMapping{*bucketMapping},
-	}
-
-	restore.Spec.Buckets = bucketsMap
 
 	// delete bucket
 	e2eutil.MustDeleteBucket(t, targetKube, bucket)
@@ -1921,7 +1923,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	for i := range make([]int, 2) {
+	for i := 0; i < 2; i++ {
 		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
@@ -1948,11 +1950,11 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
 
 	// include the buckets to be restored
-	includeBuckets := &v2.CouchbaseBackupRestoreBuckets{
-		Include: []string{buckets[0].GetName()},
+	restore.Spec.Data = &v2.CouchbaseBackupRestoreDataFilter{
+		Include: []v2.BucketScopeOrCollectionNameWithDefaults{
+			v2.BucketScopeOrCollectionNameWithDefaults(buckets[0].GetName()),
+		},
 	}
-
-	restore.Spec.Buckets = includeBuckets
 
 	// delete bucket and then create
 	for _, bucket := range buckets {
@@ -2018,7 +2020,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
-	for i := range make([]int, 2) {
+	for i := 0; i < 2; i++ {
 		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
@@ -2048,11 +2050,11 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
 
 	// Specify the bucket to be excluded from getting restored.
-	excludeBuckets := &v2.CouchbaseBackupRestoreBuckets{
-		Exclude: []string{buckets[0].GetName()},
+	restore.Spec.Data = &v2.CouchbaseBackupRestoreDataFilter{
+		Exclude: []v2.BucketScopeOrCollectionNameWithDefaults{
+			v2.BucketScopeOrCollectionNameWithDefaults(buckets[0].GetName()),
+		},
 	}
-
-	restore.Spec.Buckets = excludeBuckets
 
 	// delete buckets and then create it.
 	for _, bucket := range buckets {

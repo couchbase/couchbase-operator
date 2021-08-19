@@ -103,7 +103,7 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ThresholdPercent determines the point at which a volume is autoscaled.
 This represents the percentage of free space remaining on the volume, when less than this threshold, it will trigger a volume expansion.
-For example, if the volume is 100Gi, and the threshold 20%, then a resize will be triggered when the used capcity exceeds 80Gi, and free space is less than 20Gi.
+For example, if the volume is 100Gi, and the threshold 20%, then a resize will be triggered when the used capacity exceeds 80Gi, and free space is less than 20Gi.
 This field defaults to 20 if not specified.
 
 === couchbasebackups.spec.backoffLimit
@@ -131,6 +131,58 @@ Once it hits the BackoffLimit it will not run until the next scheduled job.
 
 Number of hours to hold backups for, everything older will be deleted.
 More info: https://golang.org/pkg/time/#ParseDuration.
+
+=== couchbasebackups.spec.data
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Data allows control over what key-value/document data is included in the backup.
+By default, all data is included.
+Modifications to this field will only take effect on the next full backup.
+
+=== couchbasebackups.spec.data.exclude
+
+==== Constraints
+
+*Type*: `[]string`
+
+*Minimum Items*: `1`
+
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-\_%]|\\.)\{1,100}(\.\_default(\.\_default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})?)?$`
+
+==== Description
+
+Exclude defines the buckets, scopes or collections that are excluded from the backup.
+When this field is set, it implies that by default everything will be backed up, and data items can be explicitly excluded.
+You may define an exclusion as a bucket -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as period is the separator used to delimit scopes and collections.
+Excluded data cannot overlap e.g.
+specifying `my-bucket` and `my-bucket.my-scope` is illegal.
+This field cannot be used at the same time as included items.
+
+=== couchbasebackups.spec.data.include
+
+==== Constraints
+
+*Type*: `[]string`
+
+*Minimum Items*: `1`
+
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-\_%]|\\.)\{1,100}(\.\_default(\.\_default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})?)?$`
+
+==== Description
+
+Include defines the buckets, scopes or collections that are included in the backup.
+When this field is set, it implies that by default nothing will be backed up, and data items must be explicitly included.
+You may define an inclusion as a bucket -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as period is the separator used to delimit scopes and collections.
+Included data cannot overlap e.g.
+specifying `my-bucket` and `my-bucket.my-scope` is illegal.
+This field cannot be used at the same time as excluded items.
 
 === couchbasebackups.spec.failedJobsHistoryLimit
 
@@ -211,10 +263,170 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 
 *Type*: `string`
 
+*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]\{3,63}$`
+
 ==== Description
 
 Name of S3 bucket to backup to.
 If non-empty this overrides local backup.
+
+=== couchbasebackups.spec.services
+
+==== Constraints
+
+*Type*: `object`
+
+*Default*: `{}`
+
+==== Description
+
+Services allows control over what services are included in the backup.
+By default, all service data and metadata are included.
+Modifications to this field will only take effect on the next full backup.
+
+=== couchbasebackups.spec.services.analytics
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+Analytics enables the backup of analytics data.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.bucketConfig
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+BucketConfig enables the backup of bucket configuration.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.bucketQuery
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+BucketQuery enables the backup of query metadata for all buckets.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.clusterAnalytics
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+ClusterAnalytics enables the backup of cluster-wide analytics data, for example synonyms.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.clusterQuery
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+ClusterQuery enables the backup of cluster level query metadata.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.data
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+Data enables the backup of key-value data/documents for all buckets.
+This can be further refined with the couchbasebackups.spec.data configuration.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.eventing
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+Eventing enables the backup of eventing service metadata.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.ftsAliases
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+FTSAliases enables the backup of full-text search alias definitions.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.ftsIndexes
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+FTSIndexes enables the backup of full-text search index definitions for all buckets.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.gsIndexes
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+GSIndexes enables the backup of global secondary index definitions for all buckets.
+This field defaults to `true`.
+
+=== couchbasebackups.spec.services.views
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+Views enables the backup of view definitions for all buckets.
+This field defaults to `true`.
 
 === couchbasebackups.spec.size
 
@@ -255,8 +467,13 @@ Name of StorageClass to use.
 
 ==== Description
 
-CB backup strategy - Full/Incremental, Full only.
-Default: Full/Incremental.
+Strategy defines how to perform backups.
+`full_only` will only perform full backups, and you must define a schedule in the `spec.full` field.
+`full_incremental` will perform periodic full backups, and incremental backups in between.
+You must define full and incremental schedules in the `spec.full` and `spec.incremental` fields respectively.
+Care should be taken to ensure full and incremental schedules do not overlap, taking into account the backup time, as this will cause failures as the jobs attempt to mount the same backup volume.
+This field default to `full_incremental`.
+Info: https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-strategies.html.
 
 === couchbasebackups.spec.successfulJobsHistoryLimit
 
@@ -285,6 +502,7 @@ Amount of successful jobs to keep.
 ==== Description
 
 How many threads to use during the backup.
+This field defaults to 1.
 
 == couchbasebackups.status
 
@@ -446,6 +664,8 @@ LastSuccess gives us the time the last successful backup finished.
 
 ==== Description
 
+*DEPRECATED* - field may no longer be populated.
+
 Output reports useful information from the backup_script.
 
 === couchbasebackups.status.pod
@@ -455,6 +675,8 @@ Output reports useful information from the backup_script.
 *Type*: `string`
 
 ==== Description
+
+*DEPRECATED* - field may no longer be populated.
 
 Pod tells us which pod is running/ran last.
 

@@ -58,7 +58,7 @@ CouchbaseReplicationSpec allows configuration of an XDCR replication.
 
 *Maximum Length*: `100`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9-\_%\.]+$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-\_%\.]\{1,100}$`
 
 ==== Description
 
@@ -114,7 +114,7 @@ Paused allows a replication to be stopped and restarted without having to restar
 
 *Maximum Length*: `100`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9-\_%\.]+$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-\_%\.]\{1,100}$`
 
 ==== Description
 

@@ -301,8 +301,8 @@ func GetReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseReplicati
 			Name: e2e_constants.DefaultReplication,
 		},
 		Spec: couchbasev2.CouchbaseReplicationSpec{
-			Bucket:       srcBucket,
-			RemoteBucket: dstBucket,
+			Bucket:       couchbasev2.BucketName(srcBucket),
+			RemoteBucket: couchbasev2.BucketName(dstBucket),
 		},
 	}
 
