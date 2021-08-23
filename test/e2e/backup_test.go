@@ -3,8 +3,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -27,72 +24,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 )
 
-func createTestBackup(strategy v2.Strategy, fullSchedule, incrementalSchedule, s3BucketName string, s3 bool) *v2.CouchbaseBackup {
-	backup := &v2.CouchbaseBackup{
-		ObjectMeta: v1.ObjectMeta{
-			Name: strings.ReplaceAll(string(strategy), "_", "-"),
-		},
-		Spec: v2.CouchbaseBackupSpec{
-			Strategy: strategy,
-			Incremental: &v2.CouchbaseBackupSchedule{
-				Schedule: incrementalSchedule,
-			},
-			Full: &v2.CouchbaseBackupSchedule{
-				Schedule: fullSchedule,
-			},
-			Size: e2espec.NewResourceQuantityMi(2048),
-		},
-	}
-
-	if framework.Global.StorageClassName != "" {
-		backup.Spec.StorageClassName = &framework.Global.StorageClassName
-	}
-
-	if s3 {
-		backup.Spec.S3Bucket = v2.S3BucketURI("s3://" + s3BucketName)
-	}
-
-	return backup
-}
-
-func createTestRestoreBackup(backup *v2.CouchbaseBackup, repo reflect.Value, s3BucketName string, s3 bool) *v2.CouchbaseBackupRestore {
-	oldest := "oldest"
-	latest := "latest"
-
-	restore := &v2.CouchbaseBackupRestore{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "test-restore",
-		},
-		Spec: v2.CouchbaseBackupRestoreSpec{
-			Backup: backup.Name,
-			Repo:   repo.String(),
-			Start: &v2.StrOrInt{
-				Str: &oldest,
-			},
-			End: &v2.StrOrInt{
-				Str: &latest,
-			},
-			Threads: 4,
-		},
-	}
-
-	if s3 {
-		restore.Spec.S3Bucket = v2.S3BucketURI("s3://" + s3BucketName)
-	}
-
-	return restore
-}
-
-// cronScheduleOnceIn returns a one-time, predictable cron schedule.  It is
-// highly recommended that this be at least 2 minutes to give things a chance
-// to become created.
-func cronScheduleOnceIn(duration time.Duration) string {
-	when := time.Now().UTC().Add(duration)
-	return fmt.Sprintf("%d * * * *", when.Minute())
-}
+const (
+	fullBackupResourceName = "full"
+)
 
 func createS3Bucket(t *testing.T, bucket, accessKey, secretID, region string) error {
 	// create S3 bucket
@@ -247,17 +183,17 @@ func MustDeleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string
 	}
 }
 
-func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool, cleanup func()) (*corev1.Secret, string, func()) {
+func createS3Secret(t *testing.T, kubernetes *types.Cluster, s3 bool) (*corev1.Secret, string, func()) {
 	if !s3 {
-		return nil, "", cleanup
+		return nil, "", func() {}
 	}
 
 	f := framework.Global
 
-	framework.Requires(t, targetKube).AtLeastVersion("6.6.0").HasS3Parameters()
+	framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").HasS3Parameters()
 
 	s3secret := "s3-secret"
-	s3BucketName := "s3bucket-" + targetKube.Namespace
+	s3BucketName := "s3bucket-" + kubernetes.Namespace
 
 	secret := &corev1.Secret{
 		ObjectMeta: v1.ObjectMeta{
@@ -270,56 +206,54 @@ func createS3Secret(t *testing.T, targetKube *types.Cluster, s3 bool, cleanup fu
 		},
 	}
 
-	if _, err := targetKube.KubeClient.CoreV1().Secrets(targetKube.Namespace).Create(context.Background(), secret, v1.CreateOptions{}); err != nil {
+	if _, err := kubernetes.KubeClient.CoreV1().Secrets(kubernetes.Namespace).Create(context.Background(), secret, v1.CreateOptions{}); err != nil {
 		e2eutil.Die(t, err)
 	}
 
 	MustCreateS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region)
 
 	// Note: deferred functions must not call Die.
-	cleanup1 := func() {
+	cleanup := func() {
 		_ = deleteS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region)
-
-		cleanup()
 	}
 
-	return secret, s3BucketName, cleanup1
+	return secret, s3BucketName, cleanup
 }
 
 func testFullIncremental(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
 	// Create a normal cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 3*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 3*time.Minute)
 
 	// Create a Backup object.
-	backup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
-	backup = e2eutil.MustNewBackup(t, targetKube, backup)
-	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	// Expect the full backup to complete, followed by the the incremental.
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupStartedEvent(testCouchbase, backup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupStartedEvent(testCouchbase, backup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -328,10 +262,10 @@ func testFullIncremental(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupFullIncremental(t *testing.T) {
@@ -345,35 +279,35 @@ func TestBackupFullIncrementalS3(t *testing.T) {
 func testFullOnly(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
 	// Create a normal cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
-	backup = e2eutil.MustNewBackup(t, targetKube, backup)
-	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	// Expect the full backup to complete.
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupStartedEvent(testCouchbase, backup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -382,10 +316,10 @@ func testFullOnly(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupFullOnly(t *testing.T) {
@@ -401,65 +335,65 @@ func TestBackupFullOnlyS3(t *testing.T) {
 func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
 
 	// Create cluster.
-	testCouchbase := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(targetKube)
+	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(kubernetes)
 
 	if s3secret != nil {
-		testCouchbase.Spec.Backup.S3Secret = s3secret.Name
+		cluster.Spec.Backup.S3Secret = s3secret.Name
 	}
 
-	testCouchbase.Spec.Backup.Image = f.CouchbaseBackupImage
+	cluster.Spec.Backup.Image = f.CouchbaseBackupImage
 
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup, make a lot, we need this backup to be slow to the point
 	// we can vaguely reliably kill pods while it's happening.
-	e2eutil.MustPopulateWithDataSize(t, targetKube, testCouchbase, bucket.GetName(), f.CouchbaseServerImage, 1<<30, time.Minute)
+	e2eutil.MustPopulateWithDataSize(t, kubernetes, cluster, bucket.GetName(), f.CouchbaseServerImage, 1<<30, time.Minute)
 
 	// create this backup to run every 2 minutes so we can test the backup still runs successfully after a failure.
-	fullBackup := createTestBackup(v2.FullOnly, "*/2 * * * *", "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup("*/2 * * * *").ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// Wait for the failure now, the backup has a tendency to fail and raise the event
 	// while we are still deleting the pods.
-	backupFailWait := e2eutil.WaitForPendingClusterEvent(targetKube, fullBackup, e2eutil.BackupFailedEvent(testCouchbase, fullBackup.Name), 15*time.Minute)
+	backupFailWait := e2eutil.WaitForPendingClusterEvent(kubernetes, backup, e2eutil.BackupFailedEvent(cluster, backup.Name), 15*time.Minute)
 
 	// wait for the backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// kill the cluster
 	for i := 0; i < mdsGroupSize; i++ {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, i, false)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, i, false)
 	}
 
 	// backup should fail
 	e2eutil.MustReceiveErrorValue(t, backupFailWait)
 
 	// check backup and cronjob are still up
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
-	e2eutil.MustWaitForCronjob(t, targetKube, testCouchbase, string(cluster.Full), time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+	e2eutil.MustWaitForCronjob(t, kubernetes, cluster, fullBackupResourceName, time.Minute)
 
 	// Expect the full backup to now complete.
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 15*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -470,11 +404,11 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, mdsGroupSize),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestFailedBackupBehaviour(t *testing.T) {
@@ -490,12 +424,13 @@ func TestFailedBackupBehaviourS3(t *testing.T) {
 func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -503,37 +438,36 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	// Create cluster.
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.ScheduleIn(7*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	// check pvc exists
-	pvc, err := targetKube.KubeClient.CoreV1().PersistentVolumeClaims(targetKube.Namespace).Get(context.Background(), fullBackup.Name, v1.GetOptions{})
+	pvc, err := kubernetes.KubeClient.CoreV1().PersistentVolumeClaims(kubernetes.Namespace).Get(context.Background(), backup.Name, v1.GetOptions{})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
 	// check pvc has same name as backup
-	if pvc.Name != fullBackup.Name {
-		e2eutil.Die(t, fmt.Errorf("pvc name %s is a mismatch with backup name %s", pvc.Name, fullBackup.Name))
+	if pvc.Name != backup.Name {
+		e2eutil.Die(t, fmt.Errorf("pvc name %s is a mismatch with backup name %s", pvc.Name, backup.Name))
 	}
 
 	// Expect backup to complete
-	e2eutil.MustDeletePVC(t, targetKube, pvc, 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 10*time.Minute)
+	e2eutil.MustDeletePVC(t, kubernetes, pvc, 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -544,11 +478,11 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupUpdated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupUpdated, FuzzyMessage: backup.Name},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupPVCReconcile(t *testing.T) {
@@ -568,12 +502,13 @@ func TestBackupPVCReconcileS3(t *testing.T) {
 func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -581,40 +516,38 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create initial backup
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup1 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
 
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Minute)
 
 	// wait for backup to be deleted
-	e2eutil.MustDeleteBackup(t, targetKube, fullBackup)
-	e2eutil.MustWaitForBackupDeletion(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustDeleteBackup(t, kubernetes, backup1)
+	e2eutil.MustWaitForBackupDeletion(t, kubernetes, backup1, 2*time.Minute)
 
 	// create new backup
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
-	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
-	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
+	backup2 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup2, 2*time.Minute)
 
 	// wait for backups to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 10*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 10*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -625,14 +558,14 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: fullBackup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
 		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted, FuzzyMessage: fullBackup.Name},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup2.Name},
 		}},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestReplaceFullOnlyBackup(t *testing.T) {
@@ -652,12 +585,13 @@ func TestReplaceFullOnlyBackupS3(t *testing.T) {
 func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -665,40 +599,38 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// create initial backup
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
-	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
+	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
 
 	// wait for backups completion and confirm they ran without error
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 2*time.Minute)
 
 	// wait for backup to be deleted
-	e2eutil.MustDeleteBackup(t, targetKube, fullIncrementalBackup)
-	e2eutil.MustWaitForBackupDeletion(t, targetKube, fullIncrementalBackup, 2*time.Minute)
+	e2eutil.MustDeleteBackup(t, kubernetes, backup1)
+	e2eutil.MustWaitForBackupDeletion(t, kubernetes, backup1, 2*time.Minute)
 
 	// create new backup
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	backup2 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup2, 2*time.Minute)
 
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -709,14 +641,14 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup1.Name},
 		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted, FuzzyMessage: string(cluster.Incremental)},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted, FuzzyMessage: backup1.Name},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup2.Name},
 		}},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestReplaceFullIncrementalBackup(t *testing.T) {
@@ -730,80 +662,56 @@ func TestReplaceFullIncrementalBackupS3(t *testing.T) {
 func testBackupAndRestore(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
 
-	fullFreq := 2
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	latest := "latest"
-	// Create a Restore object for later.
-	restore := &v2.CouchbaseBackupRestore{
-		ObjectMeta: v1.ObjectMeta{
-			Name: "test-restore",
-		},
-		Spec: v2.CouchbaseBackupRestoreSpec{
-			Backup: fullBackup.Name,
-			Repo:   repo.String(),
-			Start: &v2.StrOrInt{
-				Str: &latest,
-			},
-			Threads: 4,
-		},
-	}
-
-	if s3 {
-		restore.Spec.S3Bucket = v2.S3BucketURI("s3://" + s3BucketName)
-	}
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
-	e2eutil.MustDeleteBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
 	// wait for new bucket to be created and create new bucket
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 5*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// restore job is too fast, just validate bucket item count
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -815,13 +723,13 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestore(t *testing.T) {
@@ -838,47 +746,46 @@ func TestBackupAndRestoreS3(t *testing.T) {
 func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to finish
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 3*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 3*time.Minute)
 
 	// check for backup status updates
-	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "LastRun", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Archive", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Backups", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "LastSuccess", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Duration", time.Minute)
-	e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Output", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, kubernetes, backup.Name, "LastRun", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, kubernetes, backup.Name, "Archive", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, kubernetes, backup.Name, "Repo", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, kubernetes, backup.Name, "Backups", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, kubernetes, backup.Name, "LastSuccess", time.Minute)
+	e2eutil.MustWaitStatusUpdate(t, kubernetes, backup.Name, "Duration", time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -887,10 +794,10 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestUpdateBackupStatus(t *testing.T) {
@@ -904,46 +811,45 @@ func TestUpdateBackupStatusS3(t *testing.T) {
 func testMultipleBackups(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	clusterSize := constants.Size3
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create Backup object 1.
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
-	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
+	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// Create Backup object 2.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(7*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup2 := e2eutil.NewFullBackup(e2eutil.ScheduleIn(7*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backups
-	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup2, 2*time.Minute)
 
 	// wait for backups to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Minute)
 
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 8*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 8*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -953,12 +859,12 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Set{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: fullIncrementalBackup.Name},
-			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: fullBackup.Name},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup1.Name},
+			eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup2.Name},
 		}},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestMultipleBackups(t *testing.T) {
@@ -972,42 +878,42 @@ func TestMultipleBackupsS3(t *testing.T) {
 func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	clusterSize := constants.Size3
 	// Create the cluster.
 	numOfDocs := f.DocsCount
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullIncrementalBackup := createTestBackup(v2.FullIncremental, cronScheduleOnceIn(2*time.Minute), cronScheduleOnceIn(5*time.Minute), s3BucketName, s3)
-	fullIncrementalBackup = e2eutil.MustNewBackup(t, targetKube, fullIncrementalBackup)
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullIncrementalBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backups to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupStartedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullIncrementalBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullIncrementalBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1016,10 +922,10 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Incremental)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupFullIncrementalOverTLS(t *testing.T) {
@@ -1033,40 +939,40 @@ func TestBackupFullIncrementalOverTLSS3(t *testing.T) {
 func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2.ClientCertificatePolicy) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Create the cluster.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, tls)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tls)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, policy).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, policy).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1078,10 +984,10 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupFullOnlyOverTLS(t *testing.T) {
@@ -1123,9 +1029,10 @@ func testBackupRetention(t *testing.T, s3 bool) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, kubernetes, s3, cleanup)
 	defer cleanup()
+
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1140,18 +1047,16 @@ func testBackupRetention(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// Trigger a full backup.
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(5*time.Minute), "", s3BucketName, s3)
-	backup.Spec.BackupRetention = e2espec.NewDurationS(60)
-	backup = e2eutil.MustNewBackup(t, kubernetes, backup)
+	backup := e2eutil.NewFullBackup(e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).WithRetention(time.Minute).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// Trigger another full backup, the old one should be discarded because it is
 	// too old.
-	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/spec/full/schedule", cronScheduleOnceIn(2*time.Minute)), time.Minute)
+	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/spec/full/schedule", e2eutil.ScheduleIn(2*time.Minute)), time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// And one more time to make sure the discard didn't do anything stupid...
-	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/spec/full/schedule", cronScheduleOnceIn(2*time.Minute)), time.Minute)
+	e2eutil.MustPatchBackup(t, kubernetes, backup, jsonpatch.NewPatchSet().Replace("/spec/full/schedule", e2eutil.ScheduleIn(2*time.Minute)), time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 }
 
@@ -1168,12 +1073,13 @@ func TestBackupRetentionS3(t *testing.T) {
 func testBackupPVCResize(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	clusterSize := 3
@@ -1182,35 +1088,34 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	// Create cluster.
 	numOfDocs := 100
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	// Create a Backup object.
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(4*time.Minute), "", s3BucketName, s3)
-	backup = e2eutil.MustNewBackup(t, targetKube, backup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, backup, time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 10*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// edit CouchbaseBackup to trigger another backup which then triggers the PVC resize
 	patchset := jsonpatch.NewPatchSet().
-		Replace("/spec/full/schedule", cronScheduleOnceIn(4*time.Minute)).
+		Replace("/spec/full/schedule", e2eutil.ScheduleIn(4*time.Minute)).
 		Replace("/spec/size", newBackupSize)
-	e2eutil.MustPatchBackup(t, targetKube, backup, patchset, time.Minute)
+	e2eutil.MustPatchBackup(t, kubernetes, backup, patchset, time.Minute)
 
 	// Expect backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, backup, e2eutil.BackupCompletedEvent(testCouchbase, backup.Name), 10*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// check pvc has been resized
-	e2eutil.MustWaitForPVCSize(t, targetKube, backup.Name, &newBackupSize, 3*time.Minute)
+	e2eutil.MustWaitForPVCSize(t, kubernetes, backup.Name, &newBackupSize, 3*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1220,11 +1125,11 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupUpdated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupUpdated, FuzzyMessage: backup.Name},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupPVCResize(t *testing.T) {
@@ -1273,15 +1178,7 @@ func TestBackupAutoscaling(t *testing.T) {
 	// the thing.  Importantly, we set the threshold at 99% (e.g. we need 99% of the
 	// volume to be free), we increment by 200% (triple the existing 1Gi), and put a limit
 	// in of 1.5Gi. We wait for the backup to be updated
-	backup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(2*time.Minute), "", "", false)
-	backup.Spec.Size = e2espec.NewResourceQuantityMi(1024)
-	backup.Spec.AutoScaling = &v2.CouchbaseBackupAutoScaling{
-		Limit:            volumeSizeLimit,
-		ThresholdPercent: 99,
-		IncrementPercent: 200,
-	}
-
-	backup = e2eutil.MustNewBackup(t, kubernetes, backup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).WithSize(e2espec.NewResourceQuantityMi(1024)).WithAutoscaling(volumeSizeLimit, 99, 200).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupUpdateEvent(backup.Name, cluster), 20*time.Minute)
 
 	// Trigger another backup, this will cause volume expansion when it's remounted.
@@ -1289,7 +1186,7 @@ func TestBackupAutoscaling(t *testing.T) {
 	// and also test that another update doesn't happen erroneously.  Beware of rounding,
 	// My request for 1.5Gi turned into 2Gi in reality!!
 	patchset := jsonpatch.NewPatchSet().
-		Replace("/spec/full/schedule", cronScheduleOnceIn(2*time.Minute)).
+		Replace("/spec/full/schedule", e2eutil.ScheduleIn(2*time.Minute)).
 		Replace("/spec/autoScaling/thresholdPercent", 1)
 
 	e2eutil.MustPatchBackup(t, kubernetes, backup, patchset, time.Minute)
@@ -1318,83 +1215,75 @@ func TestBackupAutoscaling(t *testing.T) {
 func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
 
-	fullFreq := 2
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
 	clusterSize := constants.Size3
 	dataQuota := e2espec.NewResourceQuantityMi(int64(256 * 3))
 	buckets := []v1.Object{}
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
 
-	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, v2.EventingService)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataQuota
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, v2.EventingService)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = dataQuota
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for i := 0; i < 3; i++ {
 		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
-		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 	}
 
 	// create eventing function and verify
-	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, "test", buckets[0].GetName(), buckets[1].GetName(), buckets[2].GetName(), function, time.Minute)
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, buckets[0].GetName(), 0, f.DocsCount)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, buckets[2].GetName(), f.DocsCount, 5*time.Minute)
+	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", buckets[0].GetName(), buckets[1].GetName(), buckets[2].GetName(), function, time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, buckets[0].GetName(), 0, f.DocsCount)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[2].GetName(), f.DocsCount, 5*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	// create restore resource either with eventing disabled.
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
-	restore.Spec.Services.Eventing = pointer.BoolPtr(false)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
 	for _, bucket := range buckets {
-		e2eutil.MustDeleteBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 	}
 
 	// delete the eventing function
-	e2eutil.MustDeleteEventingFunction(t, targetKube, testCouchbase, time.Minute)
+	e2eutil.MustDeleteEventingFunction(t, kubernetes, cluster, time.Minute)
 	time.Sleep(30 * time.Second)
 
 	for _, bucket := range buckets {
-		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 	}
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithoutEventing().MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// if eventing function is restored raise error.
-	if err := e2eutil.MustGetEventingFunction(t, targetKube, testCouchbase, time.Minute); err == nil {
+	if err := e2eutil.MustGetEventingFunction(t, kubernetes, cluster, time.Minute); err == nil {
 		e2eutil.Die(t, err)
 	}
 
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, buckets[0].GetName(), f.DocsCount, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, buckets[2].GetName(), f.DocsCount, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), f.DocsCount, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[2].GetName(), f.DocsCount, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1406,13 +1295,13 @@ func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted}},
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreDisableEventing(t *testing.T) {
@@ -1426,77 +1315,70 @@ func TestBackupAndRestoreDisableEventingS3(t *testing.T) {
 func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
 
-	fullFreq := 2
+	framework.Requires(t, kubernetes).StaticCluster()
+
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// populate the bucket
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// create eventing function and verify
 	query := "CREATE PRIMARY INDEX `#primary` ON `default` USING GSI"
-	e2eutil.MustExecuteIndexQuery(t, targetKube, testCouchbase, query, time.Minute)
+	e2eutil.MustExecuteIndexQuery(t, kubernetes, cluster, query, time.Minute)
 
 	// verify index creation
 	time.Sleep(20 * time.Second)
-	indexCount := e2eutil.MustGetIndexCount(t, targetKube, testCouchbase, 2*time.Minute)
+	indexCount := e2eutil.MustGetIndexCount(t, kubernetes, cluster, 2*time.Minute)
 
 	if indexCount == 0 {
 		e2eutil.Die(t, fmt.Errorf("Index `#primary` not created"))
 	}
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	// disable GSI
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
-	restore.Spec.Services.GSIIndex = pointer.BoolPtr(false)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
-	e2eutil.MustDeleteBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
 	// wait for new bucket to be created and create new bucket
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithoutGSI().MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check Index is not restored.
-	indexCount = e2eutil.MustGetIndexCount(t, targetKube, testCouchbase, 2*time.Minute)
+	indexCount = e2eutil.MustGetIndexCount(t, kubernetes, cluster, 2*time.Minute)
 	if indexCount != 0 {
 		e2eutil.Die(t, fmt.Errorf("Index `#primary` restored"))
 	}
 
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1508,13 +1390,13 @@ func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreDisableGSI(t *testing.T) {
@@ -1528,30 +1410,30 @@ func TestBackupAndRestoreDisableGSIS3(t *testing.T) {
 func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
-	fullFreq := 2
 	numOfDocs := f.DocsCount
 	clusterSize := constants.Size3
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
 
-	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, v2.AnalyticsService)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, v2.AnalyticsService)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// populate the bucket
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// create eventing function and verify
 	analyticsDataset := "testDataset1"
@@ -1561,56 +1443,49 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
 	}
 
 	for _, query := range queries {
-		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
+		e2eutil.MustExecuteAnalyticsQuery(t, kubernetes, cluster, query, time.Minute)
 	}
 
 	time.Sleep(time.Minute) // let analytics catch up
-	datasetItemCount := e2eutil.MustGetDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset, time.Minute)
+	datasetItemCount := e2eutil.MustGetDatasetItemCount(t, kubernetes, cluster, analyticsDataset, time.Minute)
 
 	if datasetItemCount != int64(numOfDocs) {
 		e2eutil.Die(t, fmt.Errorf("dataset item mismatch %v/%v", datasetItemCount, numOfDocs))
 	}
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	// disable analytics
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
-	restore.Spec.Services.Analytics = pointer.BoolPtr(false)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
-	e2eutil.MustDeleteBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
 	// drop dataset
 	query := "DROP DATASET " + analyticsDataset
-	e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
+	e2eutil.MustExecuteAnalyticsQuery(t, kubernetes, cluster, query, time.Minute)
 
 	// wait for new bucket to be created and create new bucket
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithoutAnalytics().MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
-	datasetCount := e2eutil.MustGetDatasetCount(t, targetKube, testCouchbase, time.Minute)
+	datasetCount := e2eutil.MustGetDatasetCount(t, kubernetes, cluster, time.Minute)
 	if datasetCount != 0 {
 		e2eutil.Die(t, fmt.Errorf("dataset restored"))
 	}
 
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1622,13 +1497,13 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreDisableAnalytics(t *testing.T) {
@@ -1642,62 +1517,55 @@ func TestBackupAndRestoreDisableAnalyticsS3(t *testing.T) {
 func testBackupAndRestoreDisableData(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
-	fullFreq := 2
-	// Create a normal cluster.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
-	restore.Spec.Services.Data = pointer.BoolPtr(false)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
-	e2eutil.MustDeleteBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
 	// wait for new bucket to be created and create new bucket
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 5*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithoutData().MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that no items were restored.
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 0, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1709,13 +1577,13 @@ func testBackupAndRestoreDisableData(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreDisableData(t *testing.T) {
@@ -1729,60 +1597,54 @@ func TestBackupAndRestoreDisableDataS3(t *testing.T) {
 func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
-	fullFreq := 2
 	numOfDocs := f.DocsCount
 	clusterSize := constants.Size3
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
-	restore.Spec.Services.BucketConfig = true
-
-	e2eutil.MustDeleteBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
 	// wait for new bucket to be created and create new bucket
 	newBucket := e2espec.DefaultBucketTwoReplicas()
-	e2eutil.MustNewBucket(t, targetKube, newBucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, newBucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, newBucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, newBucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithBucketConfig().MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// verify replica count was restored.
-	e2eutil.MustVerifyReplicaCount(t, targetKube, testCouchbase, newBucket.GetName(), 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyReplicaCount(t, kubernetes, cluster, newBucket.GetName(), 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1794,16 +1656,22 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		eventschema.Optional{
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+				},
+			},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreEnableBucketConfig(t *testing.T) {
@@ -1817,65 +1685,50 @@ func TestBackupAndRestoreEnableBucketConfigS3(t *testing.T) {
 func testBackupAndRestoreMapBuckets(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
 
-	fullFreq := 2
+	framework.Requires(t, kubernetes).StaticCluster()
+
 	targetBucketName := "bucketty-mcbuccketface"
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	// Create a Restore object for later.
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
-
-	restore.Spec.Data = &v2.CouchbaseBackupRestoreDataFilter{
-		Map: []v2.RestoreMapping{
-			{
-				Source: v2.BucketScopeOrCollectionNameWithDefaults(bucket.GetName()),
-				Target: v2.BucketScopeOrCollectionNameWithDefaults(targetBucketName),
-			},
-		},
-	}
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
-	e2eutil.MustDeleteBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
 	newBucket := e2espec.DefaultBucket()
 	newBucket.SetName(targetBucketName)
-	e2eutil.MustNewBucket(t, targetKube, newBucket)
+	e2eutil.MustNewBucket(t, kubernetes, newBucket)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithMapping(bucket.GetName(), targetBucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, newBucket.GetName(), f.DocsCount, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, newBucket.GetName(), f.DocsCount, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1887,13 +1740,13 @@ func testBackupAndRestoreMapBuckets(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreMapBuckets(t *testing.T) {
@@ -1907,70 +1760,57 @@ func TestBackupAndRestoreMapBucketsS3(t *testing.T) {
 func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
 
-	fullFreq := 2
+	framework.Requires(t, kubernetes).StaticCluster()
+
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 	buckets := []v1.Object{}
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for i := 0; i < 2; i++ {
 		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
-		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
-		e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, f.DocsCount)
-		e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), f.DocsCount, 5*time.Minute)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+		e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, f.DocsCount)
+		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), f.DocsCount, 5*time.Minute)
 	}
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	// Create a Restore object for later.
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
-
-	// include the buckets to be restored
-	restore.Spec.Data = &v2.CouchbaseBackupRestoreDataFilter{
-		Include: []v2.BucketScopeOrCollectionNameWithDefaults{
-			v2.BucketScopeOrCollectionNameWithDefaults(buckets[0].GetName()),
-		},
-	}
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket and then create
 	for _, bucket := range buckets {
-		e2eutil.MustDeleteBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
-		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 	}
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithIncludes(buckets[0].GetName()).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, buckets[0].GetName(), f.DocsCount, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, buckets[1].GetName(), 0, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), f.DocsCount, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[1].GetName(), 0, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1982,7 +1822,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
@@ -1990,7 +1830,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreIncludeBuckets(t *testing.T) {
@@ -2004,73 +1844,60 @@ func TestBackupAndRestoreIncludeBucketsS3(t *testing.T) {
 func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
-
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
 
-	fullFreq := 2
+	framework.Requires(t, kubernetes).StaticCluster()
+
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 	buckets := []v1.Object{}
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for i := 0; i < 2; i++ {
 		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
 
-		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 		// Populate the bucket
-		e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, f.DocsCount)
-		e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), f.DocsCount, 5*time.Minute)
+		e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, f.DocsCount)
+		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), f.DocsCount, 5*time.Minute)
 	}
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	// Create a Restore object for later.
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
-
-	// Specify the bucket to be excluded from getting restored.
-	restore.Spec.Data = &v2.CouchbaseBackupRestoreDataFilter{
-		Exclude: []v2.BucketScopeOrCollectionNameWithDefaults{
-			v2.BucketScopeOrCollectionNameWithDefaults(buckets[0].GetName()),
-		},
-	}
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete buckets and then create it.
 	for _, bucket := range buckets {
-		e2eutil.MustDeleteBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
-		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 	}
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithExcludes(buckets[0].GetName()).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, buckets[0].GetName(), 0, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, buckets[1].GetName(), f.DocsCount, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), 0, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[1].GetName(), f.DocsCount, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -2082,7 +1909,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
@@ -2090,7 +1917,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreExcludeBuckets(t *testing.T) {
@@ -2104,25 +1931,24 @@ func TestBackupAndRestoreExcludeBucketsS3(t *testing.T) {
 func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
 
-	nodes, err := targetKube.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{})
+	nodes, err := kubernetes.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{})
 	if err != nil {
 		e2eutil.Die(t, fmt.Errorf("failed to get node list: %w", err))
 	}
 
-	s3secret, s3BucketName, cleanup := createS3Secret(t, targetKube, s3, cleanup)
-	defer cleanup()
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
-	fullFreq := 2
-	// Create a normal cluster.
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
 
 	zone, ok := nodes.Items[0].Labels[constants.FailureDomainZoneLabel]
 	if !ok {
@@ -2133,50 +1959,44 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 		constants.FailureDomainZoneLabel: zone,
 	}
 
-	testCouchbase.Spec.Backup.NodeSelector = nodeSelector
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster.Spec.Backup.NodeSelector = nodeSelector
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
 
 	// Create a Backup object.
-	fullBackup := createTestBackup(v2.FullOnly, cronScheduleOnceIn(time.Duration(fullFreq)*time.Minute), "", s3BucketName, s3)
-	fullBackup = e2eutil.MustNewBackup(t, targetKube, fullBackup)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).WithStorageClass(f.StorageClassName).MustCreate(t, kubernetes)
 
 	// wait for backup
-	e2eutil.MustWaitForBackup(t, targetKube, fullBackup, 2*time.Minute)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
 	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupStartedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, targetKube, fullBackup, e2eutil.BackupCompletedEvent(testCouchbase, fullBackup.Name), 5*time.Minute)
-	// wait for backup status update
-	repo := e2eutil.MustWaitStatusUpdate(t, targetKube, fullBackup.Name, "Repo", 5*time.Minute)
-
-	// create restore object
-	restore := createTestRestoreBackup(fullBackup, repo, s3BucketName, s3)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
-	e2eutil.MustDeleteBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, bucket.GetName(), 2*time.Minute)
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
 	// wait for new bucket to be created and create new bucket
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 5*time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.MustNewBackupRestore(t, targetKube, restore)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that no items were restored.
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 0, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -2188,13 +2008,13 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: string(cluster.Full)},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBackupAndRestoreNodeSelector(t *testing.T) {
@@ -2203,4 +2023,83 @@ func TestBackupAndRestoreNodeSelector(t *testing.T) {
 
 func TestBackupAndRestoreNodeSelectorS3(t *testing.T) {
 	testBackupAndRestoreNodeSelector(t, true)
+}
+
+// TestBackupBucketInclusion tests we can selectively include a bucket in the backup.
+func TestBackupBucketInclusion(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+
+	// Create two buckets.
+	// TODO: The typing in types.Cluster need to change.
+	bucket1 := e2eutil.NewBucket(e2eutil.BucketType(f.BucketType)).WithCompressionMode(v2.CouchbaseBucketCompressionMode(f.CompressionMode)).WithFlush().MustCreate(t, kubernetes)
+	bucket2 := e2eutil.NewBucket(e2eutil.BucketType(f.BucketType)).WithCompressionMode(v2.CouchbaseBucketCompressionMode(f.CompressionMode)).WithFlush().MustCreate(t, kubernetes)
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket1, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket2, time.Minute)
+
+	// Add some data to both buckets.
+	e2eutil.MustPopulateBucket(t, kubernetes, cluster, bucket1.GetName(), f.DocsCount)
+	e2eutil.MustPopulateBucket(t, kubernetes, cluster, bucket2.GetName(), f.DocsCount)
+
+	// Create and wait for a backup
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).Include(bucket1).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// Flush the buckets.
+	e2eutil.MustFlushBucket(t, kubernetes, cluster, bucket1, time.Minute)
+	e2eutil.MustFlushBucket(t, kubernetes, cluster, bucket2, time.Minute)
+
+	// Create and wait for restore.
+	restore := e2eutil.NewRestore(backup).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForResourceDeletion(t, kubernetes, restore, time.Minute)
+
+	// Expect bucket1 to be included, and bucket2 to be ignored.
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket1.GetName(), f.DocsCount, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket2.GetName(), 0, time.Minute)
+}
+
+// TestBackupBucketExclusion tests we can selectively exclude a bucket from the backup.
+func TestBackupBucketExclusion(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+
+	// Create two buckets.
+	bucket1 := e2eutil.NewBucket(e2eutil.BucketType(f.BucketType)).WithCompressionMode(v2.CouchbaseBucketCompressionMode(f.CompressionMode)).WithFlush().MustCreate(t, kubernetes)
+	bucket2 := e2eutil.NewBucket(e2eutil.BucketType(f.BucketType)).WithCompressionMode(v2.CouchbaseBucketCompressionMode(f.CompressionMode)).WithFlush().MustCreate(t, kubernetes)
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket1, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket2, time.Minute)
+
+	// Add some data to both buckets.
+	e2eutil.MustPopulateBucket(t, kubernetes, cluster, bucket1.GetName(), f.DocsCount)
+	e2eutil.MustPopulateBucket(t, kubernetes, cluster, bucket2.GetName(), f.DocsCount)
+
+	// Create and wait for a backup
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).Exclude(bucket2).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// Flush the buckets.
+	e2eutil.MustFlushBucket(t, kubernetes, cluster, bucket1, time.Minute)
+	e2eutil.MustFlushBucket(t, kubernetes, cluster, bucket2, time.Minute)
+
+	// Create and wait for restore.
+	restore := e2eutil.NewRestore(backup).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForResourceDeletion(t, kubernetes, restore, time.Minute)
+
+	// Expect bucket1 to be implicitly included, and bucket2 to be explicitly excluded.
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket1.GetName(), f.DocsCount, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket2.GetName(), 0, time.Minute)
 }

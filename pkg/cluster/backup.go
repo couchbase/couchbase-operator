@@ -689,13 +689,15 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore) (*batchv1.Job, error) {
 	var start string
 
-	if restore.Spec.Start.Int != nil {
-		start = strconv.Itoa(*restore.Spec.Start.Int)
-	} else {
-		start = *restore.Spec.Start.Str
+	if restore.Spec.Start != nil {
+		if restore.Spec.Start.Int != nil {
+			start = strconv.Itoa(*restore.Spec.Start.Int)
+		} else {
+			start = *restore.Spec.Start.Str
+		}
 	}
 
-	end := start
+	var end string
 
 	if restore.Spec.End != nil {
 		if restore.Spec.End.Int != nil {

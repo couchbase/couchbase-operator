@@ -446,8 +446,8 @@ func (o *ClusterOptions) MustNotCreate(t *testing.T, k8s *types.Cluster) {
 	}
 }
 
-// NewBucket creates a bucket.
-func NewBucket(k8s *types.Cluster, bucket metav1.Object) (metav1.Object, error) {
+// NewBucketOld creates a bucket.
+func NewBucketOld(k8s *types.Cluster, bucket metav1.Object) (metav1.Object, error) {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
 		return k8s.CRClient.CouchbaseV2().CouchbaseBuckets(k8s.Namespace).Create(context.Background(), t, metav1.CreateOptions{})
@@ -461,7 +461,7 @@ func NewBucket(k8s *types.Cluster, bucket metav1.Object) (metav1.Object, error) 
 }
 
 func MustNewBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object) metav1.Object {
-	object, err := NewBucket(k8s, bucket)
+	object, err := NewBucketOld(k8s, bucket)
 	if err != nil {
 		Die(t, err)
 	}
@@ -523,32 +523,6 @@ func MustGetBucket(t *testing.T, bucketType, compressionMode string) metav1.Obje
 	bucket := GetBucket(bucketType, compressionMode)
 
 	return bucket
-}
-
-func NewBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseBackup, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(k8s.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
-}
-
-func MustNewBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) *couchbasev2.CouchbaseBackup {
-	object, err := NewBackup(k8s, backup)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return object
-}
-
-func NewBackupRestore(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackupRestore) (*couchbasev2.CouchbaseBackupRestore, error) {
-	return k8s.CRClient.CouchbaseV2().CouchbaseBackupRestores(k8s.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
-}
-
-func MustNewBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) *couchbasev2.CouchbaseBackupRestore {
-	object, err := NewBackupRestore(k8s, restore)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return object
 }
 
 func DeleteBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) error {

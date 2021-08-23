@@ -194,6 +194,12 @@ func ResourceDeleted(k8s *types.Cluster, resource runtime.Object) func() error {
 	return ResourceConstraints(k8s, resource, resourceNotExists)
 }
 
+func MustWaitForResourceDeletion(t *testing.T, k8s *types.Cluster, resource runtime.Object, timeout time.Duration) {
+	if err := retryutil.RetryFor(timeout, ResourceDeleted(k8s, resource)); err != nil {
+		Die(t, err)
+	}
+}
+
 // ResourceCondition checks if a given resource has the given condition. This returns a closure
 // that should be used with RetryFor().
 func ResourceCondition(k8s *types.Cluster, resource runtime.Object, conditionType, conditionStatus string) func() error {
