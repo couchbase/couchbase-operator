@@ -81,6 +81,131 @@ Roles is a list of roles that this group is granted.
 
 Bucket name for bucket admin roles.
 When not specified for a role that can be scoped to a specific bucket, the role will apply to all buckets in the cluster.
+Deprecated:  Couchbase Autonomous Operator 2.3.
+
+=== couchbasegroups.spec.roles.buckets
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Bucket level access to apply to specified role.
+The bucket must exist.
+When not specified, the bucket field will be checked.
+If both are empty and the role can be scoped to a specific bucket, the role will apply to all buckets in the cluster.
+
+=== couchbasegroups.spec.roles.buckets.resources
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Resources is an explicit list of named bucket resources that will be considered for inclusion in this role.
+If a resource reference doesn't match a resource, then no error conditions are raised due to undefined resource creation ordering and eventual consistency.
+
+=== couchbasegroups.spec.roles.buckets.resources.kind
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `CouchbaseBucket`
+
+*Enumerations*: `CouchbaseBucket`
+
+==== Description
+
+Kind indicates the kind of resource that is being referenced.
+A Role can only reference `CouchbaseBucket` kind.
+This field defaults to `CouchbaseBucket` if not specified.
+
+=== couchbasegroups.spec.roles.buckets.resources.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name is the name of the Kubernetes resource name that is being referenced.
+
+=== couchbasegroups.spec.roles.buckets.selector
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selector allows resources to be implicitly considered for inclusion in this role.
+More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta.
+
+=== couchbasegroups.spec.roles.buckets.selector.matchExpressions
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+matchExpressions is a list of label selector requirements.
+The requirements are ANDed.
+
+=== couchbasegroups.spec.roles.buckets.selector.matchExpressions.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+key is the label key that the selector applies to.
+
+=== couchbasegroups.spec.roles.buckets.selector.matchExpressions.operator
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.
+
+=== couchbasegroups.spec.roles.buckets.selector.matchExpressions.values
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+values is an array of string values.
+If the operator is In or NotIn, the values array must be non-empty.
+If the operator is Exists or DoesNotExist, the values array must be empty.
+This array is replaced during a strategic merge patch.
+
+=== couchbasegroups.spec.roles.buckets.selector.matchLabels
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+matchLabels is a map of {key,value} pairs.
+A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value".
+The requirements are ANDed.
 
 === couchbasegroups.spec.roles.collections
 
@@ -94,7 +219,18 @@ Collection level access to apply to the specified role.
 The collection must exist.
 When not specified, the role is subject to scope or bucket level access.
 
-=== couchbasegroups.spec.roles.collections.kind
+=== couchbasegroups.spec.roles.collections.resources
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Resources is an explicit list of named resources that will be considered for inclusion in this collection or collections.
+If a resource reference doesn't match a resource, then no error conditions are raised due to undefined resource creation ordering and eventual consistency.
+
+=== couchbasegroups.spec.roles.collections.resources.kind
 
 ==== Constraints
 
@@ -110,7 +246,7 @@ Kind indicates the kind of resource that is being referenced.
 A scope can only reference `CouchbaseCollection` and `CouchbaseCollectionGroup` resource kinds.
 This field defaults to `CouchbaseCollection` if not specified.
 
-=== couchbasegroups.spec.roles.collections.name
+=== couchbasegroups.spec.roles.collections.resources.name
 
 ==== Constraints
 
@@ -227,7 +363,18 @@ Scope level access to apply to specified role.
 The scope must exist.
 When not specified, the role will apply to selected bucket or all buckets in the cluster.
 
-=== couchbasegroups.spec.roles.scopes.kind
+=== couchbasegroups.spec.roles.scopes.resources
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Resources is an explicit list of named resources that will be considered for inclusion in this scope or scopes.
+If a resource reference doesn't match a resource, then no error conditions are raised due to undefined resource creation ordering and eventual consistency.
+
+=== couchbasegroups.spec.roles.scopes.resources.kind
 
 ==== Constraints
 
@@ -243,7 +390,7 @@ Kind indicates the kind of resource that is being referenced.
 A scope can only reference `CouchbaseScope` and `CouchbaseScopeGroup` resource kinds.
 This field defaults to `CouchbaseScope` if not specified.
 
-=== couchbasegroups.spec.roles.scopes.name
+=== couchbasegroups.spec.roles.scopes.resources.name
 
 ==== Constraints
 

@@ -746,6 +746,36 @@ func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *c
 	}
 }
 
+func WaitUntilGroupExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, group string, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		// find user in cluster status
+		_, found := couchbasev2.HasItem(group, currCluster.Status.Groups)
+		if !found {
+			return fmt.Errorf("waiting for group `%s` to be created", group)
+		}
+
+		// user must also be in couchbase
+		client, err := CreateAdminConsoleClient(k8s, currCluster)
+		if err != nil {
+			return err
+		}
+
+		g := &couchbaseutil.Group{}
+		return couchbaseutil.GetGroup(group, g).On(client.client, client.host)
+	})
+}
+
+func MustWaitUntilGroupExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, group string, timeout time.Duration) {
+	if err := WaitUntilGroupExists(k8s, couchbase, group, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})

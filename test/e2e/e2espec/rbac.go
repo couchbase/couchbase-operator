@@ -72,6 +72,356 @@ func NewBucketAdminGroup() *couchbasev2.CouchbaseGroup {
 	}
 }
 
+type GroupDefinition struct {
+	Buckets            []metav1.Object
+	BucketSelector     *metav1.LabelSelector
+	Scopes             []*couchbasev2.CouchbaseScope
+	ScopeGroups        []*couchbasev2.CouchbaseScopeGroup
+	ScopeSelector      *metav1.LabelSelector
+	Collections        []*couchbasev2.CouchbaseCollection
+	CollectionGroups   []*couchbasev2.CouchbaseCollectionGroup
+	CollectionSelector *metav1.LabelSelector
+	StringBucket       string
+	Name               couchbasev2.RoleName
+}
+
+func NewGroup(name couchbasev2.RoleName) *GroupDefinition {
+	def := &GroupDefinition{
+		Buckets:            []metav1.Object{},
+		BucketSelector:     nil,
+		Scopes:             []*couchbasev2.CouchbaseScope{},
+		ScopeGroups:        []*couchbasev2.CouchbaseScopeGroup{},
+		ScopeSelector:      nil,
+		Collections:        []*couchbasev2.CouchbaseCollection{},
+		CollectionGroups:   []*couchbasev2.CouchbaseCollectionGroup{},
+		CollectionSelector: nil,
+		StringBucket:       "",
+		Name:               name,
+	}
+
+	return def
+}
+
+func (g *GroupDefinition) WithBuckets(buckets ...metav1.Object) *GroupDefinition {
+	g.Buckets = append(g.Buckets, buckets...)
+	return g
+}
+
+func (g *GroupDefinition) WithScopes(scopes ...*couchbasev2.CouchbaseScope) *GroupDefinition {
+	g.Scopes = append(g.Scopes, scopes...)
+	return g
+}
+
+func (g *GroupDefinition) WithCollections(collections ...*couchbasev2.CouchbaseCollection) *GroupDefinition {
+	g.Collections = append(g.Collections, collections...)
+	return g
+}
+
+func (g *GroupDefinition) WithBucketSelector(selector *metav1.LabelSelector) *GroupDefinition {
+	g.BucketSelector = selector
+	return g
+}
+
+func (g *GroupDefinition) WithScopeSelector(selector *metav1.LabelSelector) *GroupDefinition {
+	g.ScopeSelector = selector
+	return g
+}
+
+func (g *GroupDefinition) WithCollectionSelector(selector *metav1.LabelSelector) *GroupDefinition {
+	g.CollectionSelector = selector
+	return g
+}
+
+func (g *GroupDefinition) WithScopeGroups(group ...*couchbasev2.CouchbaseScopeGroup) *GroupDefinition {
+	g.ScopeGroups = append(g.ScopeGroups, group...)
+	return g
+}
+
+func (g *GroupDefinition) WithCollectionGroups(group ...*couchbasev2.CouchbaseCollectionGroup) *GroupDefinition {
+	g.CollectionGroups = append(g.CollectionGroups, group...)
+	return g
+}
+
+func (g *GroupDefinition) Create() *couchbasev2.CouchbaseGroup {
+	scopeSpec := couchbasev2.ScopeRoleSpec{}
+
+	if len(g.Scopes) > 0 || len(g.ScopeGroups) > 0 {
+		scopeSpec.Resources = []couchbasev2.ScopeLocalObjectReference{}
+
+		for _, scope := range g.Scopes {
+			ref := couchbasev2.ScopeLocalObjectReference{
+				Kind: couchbasev2.CouchbaseScopeKind,
+				Name: couchbasev2.ScopeOrCollectionName(scope.GetName()),
+			}
+			scopeSpec.Resources = append(scopeSpec.Resources, ref)
+		}
+
+		for _, group := range g.ScopeGroups {
+			ref := couchbasev2.ScopeLocalObjectReference{
+				Kind: couchbasev2.CouchbaseScopeGroupKind,
+				Name: couchbasev2.ScopeOrCollectionName(group.GetName()),
+			}
+			scopeSpec.Resources = append(scopeSpec.Resources, ref)
+		}
+	}
+
+	if g.ScopeSelector != nil {
+		scopeSpec.Selector = g.ScopeSelector
+	}
+
+	collectionSpec := couchbasev2.CollectionRoleSpec{}
+
+	if len(g.CollectionGroups) > 0 || len(g.Collections) > 0 {
+		collectionSpec.Resources = []couchbasev2.CollectionLocalObjectReference{}
+
+		for _, collection := range g.Collections {
+			ref := couchbasev2.CollectionLocalObjectReference{
+				Kind: couchbasev2.CouchbaseCollectionKind,
+				Name: couchbasev2.ScopeOrCollectionName(collection.GetName()),
+			}
+			collectionSpec.Resources = append(collectionSpec.Resources, ref)
+		}
+
+		for _, group := range g.CollectionGroups {
+			ref := couchbasev2.CollectionLocalObjectReference{
+				Kind: couchbasev2.CouchbaseCollectionGroupKind,
+				Name: couchbasev2.ScopeOrCollectionName(group.GetName()),
+			}
+			collectionSpec.Resources = append(collectionSpec.Resources, ref)
+		}
+	}
+
+	if g.CollectionSelector != nil {
+		collectionSpec.Selector = g.CollectionSelector
+	}
+
+	bucketSpec := &couchbasev2.BucketRoleSpec{}
+
+	if len(g.Buckets) > 0 {
+		bucketSpec.Resources = []couchbasev2.BucketLocalObjectReference{}
+
+		for _, bucket := range g.Buckets {
+			ref := couchbasev2.BucketLocalObjectReference{
+				Kind: "CouchbaseBucket",
+				Name: bucket.GetName(),
+			}
+			bucketSpec.Resources = append(bucketSpec.Resources, ref)
+		}
+	}
+
+	if g.BucketSelector != nil {
+		bucketSpec.Selector = g.BucketSelector
+	}
+
+	if g.BucketSelector == nil && len(g.Buckets) == 0 {
+		bucketSpec = nil
+	}
+
+	bucketRole := couchbasev2.Role{
+		Name:        g.Name,
+		Bucket:      g.StringBucket,
+		Buckets:     *bucketSpec,
+		Scopes:      scopeSpec,
+		Collections: collectionSpec,
+	}
+
+	spec := couchbasev2.CouchbaseGroupSpec{
+		Roles: []couchbasev2.Role{bucketRole},
+	}
+
+	// crd
+	return &couchbasev2.CouchbaseGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.BucketRoleName,
+		},
+		Spec: spec,
+	}
+}
+
+func NewBucketScopeCollectionGroup(role couchbasev2.RoleName, bucket string, scope *couchbasev2.CouchbaseScope, collection *couchbasev2.CouchbaseCollection) *couchbasev2.CouchbaseGroup {
+	group := NewBucketScopeGroup(role, bucket, scope)
+	collectionSpec := couchbasev2.CollectionRoleSpec{
+		Resources: []couchbasev2.CollectionLocalObjectReference{
+			{
+				Kind: couchbasev2.CouchbaseCollectionKind,
+				Name: couchbasev2.ScopeOrCollectionName(collection.Name),
+			},
+		},
+	}
+	group.Spec.Roles[0].Collections = collectionSpec
+
+	return group
+}
+
+func NewBucketScopeCollectionGroupViaSelector(role couchbasev2.RoleName, bucket string, labelKey string, labelValue string) *couchbasev2.CouchbaseGroup {
+	scopeSpec := couchbasev2.ScopeRoleSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				labelKey: labelValue,
+			},
+		},
+	}
+
+	collectionSpec := couchbasev2.CollectionRoleSpec{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				labelKey: labelValue,
+			},
+		},
+	}
+
+	bucketRole := couchbasev2.Role{
+		Name:        role,
+		Bucket:      bucket,
+		Scopes:      scopeSpec,
+		Collections: collectionSpec,
+	}
+
+	spec := couchbasev2.CouchbaseGroupSpec{
+		Roles: []couchbasev2.Role{bucketRole},
+	}
+
+	// crd
+	return &couchbasev2.CouchbaseGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.BucketRoleName,
+		},
+		Spec: spec,
+	}
+}
+
+func NewBucketScopeCollectionsGroup(role couchbasev2.RoleName, bucket string, scope *couchbasev2.CouchbaseScope, collections *couchbasev2.CouchbaseCollectionGroup) *couchbasev2.CouchbaseGroup {
+	group := NewBucketScopeGroup(role, bucket, scope)
+	collectionSpec := couchbasev2.CollectionRoleSpec{
+		Resources: []couchbasev2.CollectionLocalObjectReference{
+			{
+				Kind: couchbasev2.CouchbaseCollectionGroupKind,
+				Name: couchbasev2.ScopeOrCollectionName(collections.Name),
+			},
+		},
+	}
+	group.Spec.Roles[0].Collections = collectionSpec
+
+	return group
+}
+
+func NewBucketScopesCollectionsGroup(role couchbasev2.RoleName, bucket string, scopes *couchbasev2.CouchbaseScopeGroup, collections *couchbasev2.CouchbaseCollectionGroup) *couchbasev2.CouchbaseGroup {
+	scopeSpec := couchbasev2.ScopeRoleSpec{
+		Resources: []couchbasev2.ScopeLocalObjectReference{
+			{
+				Kind: couchbasev2.CouchbaseScopeGroupKind,
+				Name: couchbasev2.ScopeOrCollectionName(scopes.Name),
+			},
+		},
+	}
+
+	collectionSpec := couchbasev2.CollectionRoleSpec{
+		Resources: []couchbasev2.CollectionLocalObjectReference{
+			{
+				Kind: couchbasev2.CouchbaseCollectionGroupKind,
+				Name: couchbasev2.ScopeOrCollectionName(collections.Name),
+			},
+		},
+	}
+
+	bucketRole := couchbasev2.Role{
+		Name:        role,
+		Bucket:      bucket,
+		Scopes:      scopeSpec,
+		Collections: collectionSpec,
+	}
+
+	spec := couchbasev2.CouchbaseGroupSpec{
+		Roles: []couchbasev2.Role{bucketRole},
+	}
+
+	// crd
+	return &couchbasev2.CouchbaseGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.BucketRoleName,
+		},
+		Spec: spec,
+	}
+}
+
+func NewBucketScopesGroup(role couchbasev2.RoleName, bucket string, scopes *couchbasev2.CouchbaseScopeGroup) *couchbasev2.CouchbaseGroup {
+	scopeSpec := couchbasev2.ScopeRoleSpec{
+		Resources: []couchbasev2.ScopeLocalObjectReference{
+			{
+				Kind: couchbasev2.CouchbaseScopeGroupKind,
+				Name: couchbasev2.ScopeOrCollectionName(scopes.Name),
+			},
+		},
+	}
+
+	bucketRole := couchbasev2.Role{
+		Name:   role,
+		Bucket: bucket,
+		Scopes: scopeSpec,
+	}
+
+	spec := couchbasev2.CouchbaseGroupSpec{
+		Roles: []couchbasev2.Role{bucketRole},
+	}
+
+	// crd
+	return &couchbasev2.CouchbaseGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.BucketRoleName,
+		},
+		Spec: spec,
+	}
+}
+
+func NewBucketScopeGroup(role couchbasev2.RoleName, bucket string, scope *couchbasev2.CouchbaseScope) *couchbasev2.CouchbaseGroup {
+	scopeSpec := couchbasev2.ScopeRoleSpec{
+		Resources: []couchbasev2.ScopeLocalObjectReference{
+			{
+				Kind: couchbasev2.CouchbaseScopeKind,
+				Name: couchbasev2.ScopeOrCollectionName(scope.Name),
+			},
+		},
+	}
+
+	bucketRole := couchbasev2.Role{
+		Name:   role,
+		Bucket: bucket,
+		Scopes: scopeSpec,
+	}
+
+	spec := couchbasev2.CouchbaseGroupSpec{
+		Roles: []couchbasev2.Role{bucketRole},
+	}
+
+	// crd
+	return &couchbasev2.CouchbaseGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.BucketRoleName,
+		},
+		Spec: spec,
+	}
+}
+
+func NewBucketGroup(role couchbasev2.RoleName, bucket string) *couchbasev2.CouchbaseGroup {
+	// couchbase bucket role
+	bucketRole := couchbasev2.Role{
+		Name:   role,
+		Bucket: bucket,
+	}
+
+	spec := couchbasev2.CouchbaseGroupSpec{
+		Roles: []couchbasev2.Role{bucketRole},
+	}
+
+	// crd
+	return &couchbasev2.CouchbaseGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.BucketRoleName,
+		},
+		Spec: spec,
+	}
+}
+
 // NewClusterRoleBinding creates spec with default user bound to the cluster admin role.
 func NewClusterRoleBinding() *couchbasev2.CouchbaseRoleBinding {
 	users := []string{e2e_constants.CouchbaseUserName}

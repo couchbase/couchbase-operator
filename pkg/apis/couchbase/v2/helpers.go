@@ -692,29 +692,52 @@ var clusterRoles = []RoleName{
 	RoleQueryCurlAccess,
 	RoleQuestySystemAccess,
 	RoleAnalyticsReader,
+	RoleSecurityAdminExternal,
+	RoleSecurityAdminLocal,
+	RoleBackupAdmin,
+	RoleQueryManageGlobalFunctions,
+	RoleQueryExecuteGlobalFunctions,
+	RoleQueryManageGlobalExternalFunctions,
+	RoleQueryExecuteGlobalExternalFunctions,
+	RoleAnalyticsAdmin,
+	RoleExternalStatsReader,
 }
 
 // bucketRoles can be bucket scoped.
 var bucketRoles = []RoleName{
 	RoleBucketAdmin,
-	RoleViewsAdmin,
 	RoleSearchAdmin,
 	RoleApplicationAccess,
+	RoleBackup,
+	RoleXDCRInbound,
+	RoleAnalyticsManager,
+	RoleViewsAdmin,
+	RoleViewsReader,
+	RoleSyncGateway,
+}
+
+// scopeRoles can be bucket + scope scoped.
+var scopeRoles = []RoleName{
+	RoleScopeAdmin,
+	RoleQueryManageFunctions,
+	RoleQueryExecuteFunctions,
+	RoleQueryManageExternalFunctions,
+	RoleQueryExecuteExternalFunctions,
+}
+
+// collectionRoles can be bucket + scope + collection scoped.
+var collectionRoles = []RoleName{
 	RoleDataReader,
 	RoleDataWriter,
 	RoleDCPReader,
-	RoleBackup,
 	RoleMonitor,
-	RoleXDCRInbound,
-	RoleAnalyticsManager,
-	RoleViewsReader,
-	RoleSearchReader,
 	RoleQuerySelect,
 	RoleQueryUpdate,
 	RoleQueryInsert,
 	RoleQueryDelete,
 	RoleQueryManageIndex,
-	RoleSyncGateway,
+	RoleSearchReader,
+	RoleAnalyticsSelect,
 }
 
 func ValidRolePattern() string {
@@ -731,6 +754,26 @@ func ValidRolePattern() string {
 	return strings.Join(patterns, "|")
 }
 
+func IsCollectionRole(role RoleName) bool {
+	for _, r := range collectionRoles {
+		if r == role {
+			return true
+		}
+	}
+
+	return false
+}
+
+func IsScopeRole(role RoleName) bool {
+	for _, r := range scopeRoles {
+		if r == role {
+			return true
+		}
+	}
+
+	return IsCollectionRole(role)
+}
+
 func IsBucketRole(role RoleName) bool {
 	for _, r := range bucketRoles {
 		if r == role {
@@ -738,7 +781,7 @@ func IsBucketRole(role RoleName) bool {
 		}
 	}
 
-	return false
+	return IsScopeRole(role)
 }
 
 func IsClusterRole(role RoleName) bool {

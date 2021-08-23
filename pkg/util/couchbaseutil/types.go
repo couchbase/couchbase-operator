@@ -462,6 +462,16 @@ type Group struct {
 	LDAPGroupRef string     `json:"ldap_group_ref"`
 }
 
+func (g *Group) HasRole(role UserRole) bool {
+	for _, gRole := range g.Roles {
+		if RoleToStr(gRole) == RoleToStr(role) {
+			return true
+		}
+	}
+
+	return false
+}
+
 type GroupList []Group
 
 type LDAPEncryption string
@@ -541,6 +551,15 @@ func (u *UserRole) IsScopeRole() bool {
 
 func (u *UserRole) IsCollectionRole() bool {
 	return u.CollectionName != "*" && u.CollectionName != ""
+}
+
+func NewRole(role, bucket, scope, collection string) *UserRole {
+	return &UserRole{
+		Role:           role,
+		BucketName:     bucket,
+		ScopeName:      scope,
+		CollectionName: collection,
+	}
 }
 
 // This is to remove "*" from collection_name and scope_name as we can't

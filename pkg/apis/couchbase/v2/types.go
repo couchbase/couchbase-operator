@@ -858,7 +858,7 @@ type CollectionLocalObjectReference struct {
 	// specified.
 	// +kubebuilder:validation:Enum=CouchbaseCollection;CouchbaseCollectionGroup
 	// +kubebuilder:default=CouchbaseCollection
-	Kind string `json:"kind,omitempty"`
+	Kind CouchbaseRoleAccessKind `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
 	// Legal collection names have a maximum length of 30
@@ -951,7 +951,7 @@ type ScopeLocalObjectReference struct {
 	// specified.
 	// +kubebuilder:validation:Enum=CouchbaseScope;CouchbaseScopeGroup
 	// +kubebuilder:default=CouchbaseScope
-	Kind string `json:"kind,omitempty"`
+	Kind CouchbaseRoleAccessKind `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
 	// Legal scope names have a maximum length of 30
@@ -1520,33 +1520,49 @@ type CouchbaseGroupSpec struct {
 type RoleName string
 
 const (
-	RoleFullAdmin          RoleName = "admin"
-	RoleClusterAdmin       RoleName = "cluster_admin"
-	RoleSecurityAdmin      RoleName = "security_admin"
-	RoleReadOnlyAdmin      RoleName = "ro_admin"
-	RoleXDCRAdmin          RoleName = "replication_admin"
-	RoleQueryCurlAccess    RoleName = "query_external_access"
-	RoleQuestySystemAccess RoleName = "query_system_catalog"
-	RoleAnalyticsReader    RoleName = "analytics_reader"
-	RoleBucketAdmin        RoleName = "bucket_admin"
-	RoleViewsAdmin         RoleName = "views_admin"
-	RoleSearchAdmin        RoleName = "fts_admin"
-	RoleApplicationAccess  RoleName = "bucket_full_access"
-	RoleDataReader         RoleName = "data_reader"
-	RoleDataWriter         RoleName = "data_writer"
-	RoleDCPReader          RoleName = "data_dcp_reader"
-	RoleBackup             RoleName = "data_backup"
-	RoleMonitor            RoleName = "data_monitoring"
-	RoleXDCRInbound        RoleName = "replication_target"
-	RoleAnalyticsManager   RoleName = "analytics_manager"
-	RoleViewsReader        RoleName = "views_reader"
-	RoleSearchReader       RoleName = "fts_searcher"
-	RoleQuerySelect        RoleName = "query_select"
-	RoleQueryUpdate        RoleName = "query_update"
-	RoleQueryInsert        RoleName = "query_insert"
-	RoleQueryDelete        RoleName = "query_delete"
-	RoleQueryManageIndex   RoleName = "query_manage_index"
-	RoleSyncGateway        RoleName = "mobile_sync_gateway"
+	RoleFullAdmin    RoleName = "admin"
+	RoleClusterAdmin RoleName = "cluster_admin"
+	// RoleSecurityAdmin Does not exist in 7.0.0.
+	RoleSecurityAdmin                       RoleName = "security_admin"
+	RoleSecurityAdminLocal                  RoleName = "security_admin_local"
+	RoleSecurityAdminExternal               RoleName = "security_admin_external"
+	RoleReadOnlyAdmin                       RoleName = "ro_admin"
+	RoleExternalStatsReader                 RoleName = "external_stats_reader"
+	RoleXDCRAdmin                           RoleName = "replication_admin"
+	RoleQueryCurlAccess                     RoleName = "query_external_access"
+	RoleQuestySystemAccess                  RoleName = "query_system_catalog"
+	RoleQueryManageGlobalFunctions          RoleName = "query_manage_global_functions"
+	RoleQueryExecuteGlobalFunctions         RoleName = "query_execute_global_functions"
+	RoleQueryManageFunctions                RoleName = "query_manage_functions"
+	RoleQueryExecuteFunctions               RoleName = "query_execute_functions"
+	RoleQueryManageGlobalExternalFunctions  RoleName = "query_manage_global_external_functions"
+	RoleQueryExecuteGlobalExternalFunctions RoleName = "query_execute_global_external_functions"
+	RoleQueryManageExternalFunctions        RoleName = "query_manage_external_functions"
+	RoleQueryExecuteExternalFunctions       RoleName = "query_execute_external_functions"
+	RoleAnalyticsReader                     RoleName = "analytics_reader"
+	RoleBucketAdmin                         RoleName = "bucket_admin"
+	RoleScopeAdmin                          RoleName = "scope_admin"
+	RoleViewsAdmin                          RoleName = "views_admin"
+	RoleSearchAdmin                         RoleName = "fts_admin"
+	RoleApplicationAccess                   RoleName = "bucket_full_access"
+	RoleDataReader                          RoleName = "data_reader"
+	RoleDataWriter                          RoleName = "data_writer"
+	RoleDCPReader                           RoleName = "data_dcp_reader"
+	RoleBackup                              RoleName = "data_backup"
+	RoleMonitor                             RoleName = "data_monitoring"
+	RoleXDCRInbound                         RoleName = "replication_target"
+	RoleAnalyticsManager                    RoleName = "analytics_manager"
+	RoleViewsReader                         RoleName = "views_reader"
+	RoleSearchReader                        RoleName = "fts_searcher"
+	RoleQuerySelect                         RoleName = "query_select"
+	RoleQueryUpdate                         RoleName = "query_update"
+	RoleQueryInsert                         RoleName = "query_insert"
+	RoleQueryDelete                         RoleName = "query_delete"
+	RoleQueryManageIndex                    RoleName = "query_manage_index"
+	RoleSyncGateway                         RoleName = "mobile_sync_gateway"
+	RoleBackupAdmin                         RoleName = "backup_admin"
+	RoleAnalyticsSelect                     RoleName = "analytics_select"
+	RoleAnalyticsAdmin                      RoleName = "analytics_admin"
 )
 
 type Role struct {
@@ -1556,8 +1572,14 @@ type Role struct {
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped
 	// to a specific bucket, the role will apply to all buckets in the cluster.
+	// Deprecated:  Couchbase Autonomous Operator 2.3
 	// +kubebuilder:validation:Pattern="^\\*$|^[a-zA-Z0-9-_%\\.]+$"
 	Bucket string `json:"bucket,omitempty"`
+
+	// Bucket level access to apply to specified role. The bucket must exist.  When not specified,
+	// the bucket field will be checked. If both are empty and the role can be scoped to a specific bucket, the role
+	// will apply to all buckets in the cluster
+	Buckets BucketRoleSpec `json:"buckets,omitempty"`
 
 	// Scope level access to apply to specified role.  The scope must exist.  When not specified,
 	// the role will apply to selected bucket or all buckets in the cluster.
@@ -1568,13 +1590,37 @@ type Role struct {
 	Collections CollectionRoleSpec `json:"collections,omitempty"`
 }
 
+type BucketRoleSpec struct {
+	// Resources is an explicit list of named bucket resources that will be considered
+	// for inclusion in this role.  If a resource reference doesn't
+	// match a resource, then no error conditions are raised due to undefined
+	// resource creation ordering and eventual consistency.
+	Resources []BucketLocalObjectReference `json:"resources,omitempty"`
+	// Selector allows resources to be implicitly considered for inclusion in this
+	// role.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+}
+
+type BucketLocalObjectReference struct {
+	// Kind indicates the kind of resource that is being referenced.  A Role
+	// can only reference `CouchbaseBucket` kind.  This field defaults
+	// to `CouchbaseBucket` if not specified.
+	// +kubebuilder:validation:Enum=CouchbaseBucket
+	// +kubebuilder:default=CouchbaseBucket
+	Kind CouchbaseRoleAccessKind `json:"kind,omitempty"`
+
+	// Name is the name of the Kubernetes resource name that is being referenced.
+	Name string `json:"name"`
+}
+
 type ScopeRoleSpec struct {
 
 	// Resources is an explicit list of named resources that will be considered
 	// for inclusion in this scope or scopes.  If a resource reference doesn't
 	// match a resource, then no error conditions are raised due to undefined
 	// resource creation ordering and eventual consistency.
-	ScopeLocalObjectReference `json:",inline"`
+	Resources []ScopeLocalObjectReference `json:"resources,omitempty"`
 
 	// Selector allows resources to be implicitly considered for inclusion in this
 	// scope or scopes.  More info:
@@ -1582,13 +1628,22 @@ type ScopeRoleSpec struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
+type CouchbaseRoleAccessKind string
+
+const (
+	CouchbaseScopeKind           CouchbaseRoleAccessKind = "CouchbaseScope"
+	CouchbaseScopeGroupKind      CouchbaseRoleAccessKind = "CouchbaseScopeGroup"
+	CouchbaseCollectionKind      CouchbaseRoleAccessKind = "CouchbaseCollection"
+	CouchbaseCollectionGroupKind CouchbaseRoleAccessKind = "CouchbaseCollectionGroup"
+)
+
 type CollectionRoleSpec struct {
 
 	// Resources is an explicit list of named resources that will be considered
 	// for inclusion in this collection or collections.  If a resource reference doesn't
 	// match a resource, then no error conditions are raised due to undefined
 	// resource creation ordering and eventual consistency.
-	CollectionLocalObjectReference `json:",inline"`
+	Resources []CollectionLocalObjectReference `json:"resources,omitempty"`
 
 	// Selector allows resources to be implicitly considered for inclusion in this
 	// collection or collections.  More info:

@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/urlencoding"
-
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -693,7 +692,7 @@ func DeleteGroup(group *Group) *Request {
 
 // GetGroup gets a named group.
 func GetGroup(id string, group *Group) *Request {
-	return NewRequest((*Client).Get, fmt.Sprintf("/settings/rbac/groups/%v", group.ID), nil, group)
+	return NewRequest((*Client).Get, fmt.Sprintf("/settings/rbac/groups/%v", id), nil, group)
 }
 
 // GetLDAPSettings gets the LDAP settings for the cluster.

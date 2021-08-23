@@ -29,3 +29,4 @@ couchbase-operator-certification*.tar.bz2
 
 *terraform.*
 package-lock.json
+/.vscode/

@@ -2,10 +2,12 @@ package e2eutil
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
@@ -46,6 +48,8 @@ func MustNewGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.Couchbase
 	if err != nil {
 		Die(t, err)
 	}
+
+	newGroup.Name = group.Name
 
 	return newGroup
 }
@@ -120,4 +124,72 @@ func MustPatchRoleBinding(t *testing.T, k8s *types.Cluster, binding *couchbasev2
 	}
 
 	return binding
+}
+
+func GetGroup(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, group *couchbasev2.CouchbaseGroup) *couchbaseutil.Group {
+	client, err := CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		Die(t, err)
+	}
+
+	createdGroup := &couchbaseutil.Group{}
+
+	err = couchbaseutil.GetGroup(group.Name, createdGroup).On(client.client, client.host)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return createdGroup
+}
+
+func MustHaveRoles(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, group *couchbasev2.CouchbaseGroup, roles ...couchbaseutil.UserRole) {
+	createdGroup := GetGroup(t, kubernetes, cluster, group)
+
+	for _, role := range roles {
+		if !createdGroup.HasRole(role) {
+			Die(t, fmt.Errorf("group %s does not have role %s", group.Name, couchbaseutil.RoleToStr(role)))
+		}
+	}
+}
+
+func MustNotHaveRoles(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, group *couchbasev2.CouchbaseGroup, roles ...couchbaseutil.UserRole) {
+	createdGroup := GetGroup(t, kubernetes, cluster, group)
+
+	for _, role := range roles {
+		if createdGroup.HasRole(role) {
+			Die(t, fmt.Errorf("group %s does have role %s", group.Name, couchbaseutil.RoleToStr(role)))
+		}
+	}
+}
+
+type Role struct {
+	role       string
+	bucket     string
+	collection string
+	scope      string
+}
+
+func NewRole(role string) *Role {
+	return &Role{
+		role: role,
+	}
+}
+
+func (r *Role) WithBucket(bucket string) *Role {
+	r.bucket = bucket
+	return r
+}
+
+func (r *Role) WithScope(scope string) *Role {
+	r.scope = scope
+	return r
+}
+
+func (r *Role) WithCollection(collection string) *Role {
+	r.collection = collection
+	return r
+}
+
+func (r *Role) Create() couchbaseutil.UserRole {
+	return *couchbaseutil.NewRole(r.role, r.bucket, r.scope, r.collection)
 }

@@ -1054,6 +1054,29 @@ func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 	return r
 }
 
+func (r *TestRequirement) BeforeVersion(v string) *TestRequirement {
+	parts := strings.Split(Global.CouchbaseServerImage, ":")
+	if len(parts) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+	}
+
+	v2, err := couchbaseutil.NewVersion(v)
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+	}
+
+	if v2.Less(v1) {
+		r.t.Skip("Couchbase Server Image version not supported (immature)")
+	}
+
+	return r
+}
+
 // Upgradable skips the test if the upgrade version is greater than or equal to the
 // test version.
 func (r *TestRequirement) Upgradable() *TestRequirement {
