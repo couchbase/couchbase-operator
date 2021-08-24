@@ -365,7 +365,7 @@ def main():
 
     crd_path = 'example/crd.yaml'
 
-    with open(crd_path, encoding="utf-8") as f:
+    with open(crd_path, encoding='utf-8') as f:
         crd_data = f.read()
 
     crds = yaml.load_all(crd_data, Loader=yaml.SafeLoader)
@@ -390,7 +390,7 @@ def main():
         adoc_file_name = '{}.adoc'.format(names['singular'])
         adoc_file_path = '{}/{}'.format(adoc_autogen_dir, adoc_file_name)
 
-        with open(adoc_file_path, 'w', encoding="utf-8") as adoc_file:
+        with open(adoc_file_path, 'w', encoding='utf-8') as adoc_file:
             adoc_file.write("\n".join(content))
 
         generated_docs.append({
@@ -398,7 +398,7 @@ def main():
             'xref': '{}/{}'.format(AUTOGEN_DIR, adoc_file_name),
         })
 
-    with open('docs/user/modules/ROOT/partials/autogen-reference.adoc', 'w', encoding="utf-8") as nav_file:
+    with open('docs/user/modules/ROOT/partials/autogen-reference.adoc', 'w', encoding='utf-8') as nav_file:
         nav_file.write("// THIS FILE IS AUTO-GENERATED - DO NOT EDIT\n")
         for generated_doc in generated_docs:
             nav_file.write("** xref:{}[{} Resource]\n".format(generated_doc['xref'], generated_doc['names']['kind']))
