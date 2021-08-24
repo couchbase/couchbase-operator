@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/certification/util"
@@ -20,6 +22,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -43,11 +47,20 @@ const (
 	// resourceExistsMessage is used to provide a safe way of detecting existing runs
 	// and not killing them.
 	resourceExistsMessage = "requested resource already exists, ensure no one else is running the suite and rerun with --clean"
+
+	// pullSecretLabel is the label applied to secrets created by the certification image for pulling private images.
+	pullSecretLabel = "certification.couchbase.com/pull-secret"
+
+	// pullSecretValue is the value given to the pullSecretLabel.
+	pullSecretValue = "true"
 )
 
 var (
 	// ErrNonZeroExit is returned when a "subprocess" exits reporting an error.
 	ErrNonZeroExit = errors.New("terminated with non-zero exit code")
+
+	// ErrInvalidRegistryString is returned when a registry string is provided that cannot be parsed.
+	ErrInvalidRegistryString = errors.New("invalid cluster config value, expected SERVER,USERNAME,PASSWORD")
 
 	// serviceAccountTemplate is the service account the certification pod runs under.
 	serviceAccountTemplate = &corev1.ServiceAccount{
@@ -189,6 +202,60 @@ type certifyOptions struct {
 
 	// fsGroup allows the file system group to be set.
 	fsGroup int
+	// RegistryConfigs define private container registries that need to be defined
+	// as docker pull secrets in order to access private container images.
+	registries RegistryConfigValue
+}
+
+// RegistryConfig defines a container image registry.  Registry configurations will
+// automatically be added to all Operator/DAC deployments as image pull secrets.  They
+// will be added to all Couchbase clusters also.  This allows testing of all assets
+// from any private repository.
+type RegistryConfig struct {
+	// Server is the registry server to use e.g. "https://index.docker.io/v1/".
+	Server string `json:"server"`
+
+	// Username is the user/organization to authenticate as.
+	Username string `json:"username"`
+
+	// Password is the authentication password for the organization.
+	Password string `json:"password"`
+}
+
+func (v *RegistryConfig) String() string {
+	return fmt.Sprintf("%s,%s,%s", v.Server, v.Username, v.Password)
+}
+
+// RegistryConfigValue allows multiple container image registries to be passed on the command
+// line e.g:
+// --registry https://index.docker.io/v1/,organization,password.
+type RegistryConfigValue struct {
+	values []RegistryConfig
+}
+
+func (v *RegistryConfigValue) Set(value string) error {
+	fields := strings.Split(value, ",")
+	if len(fields) != 3 {
+		return fmt.Errorf("%w", ErrInvalidRegistryString)
+	}
+
+	config := RegistryConfig{
+		Server:   fields[0],
+		Username: fields[1],
+		Password: fields[2],
+	}
+
+	v.values = append(v.values, config)
+
+	return nil
+}
+
+func (v *RegistryConfigValue) String() string {
+	return ""
+}
+
+func (v *RegistryConfigValue) Type() string {
+	return "string"
 }
 
 // getCertifyCommand returns a new Cobra certification command.
@@ -231,6 +298,9 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 
 			# Run platform certification with a custom storage class
 			cao certify -- -storage-class my-class
+
+			# Run platform certification with private image repository
+			cao certify --registry=https://index.docker.io/v1/,username,password
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.certify(flags, args); err != nil {
@@ -248,6 +318,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&o.clean, "clean", false, "Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run")
 	cmd.Flags().BoolVar(&o.useFSGroup, "use-fsgroup", true, "Use a file system group for persistent volumes.")
 	cmd.Flags().IntVar(&o.fsGroup, "fsgroup", 1000, "Set the file system group for persistent volumes.")
+	cmd.Flags().Var(&o.registries, "registry", "Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.")
 
 	return cmd
 }
@@ -392,9 +463,72 @@ func (o *certifyOptions) createVolume() (func(), error) {
 	return cleanup, nil
 }
 
+// RecreateDockerAuthSecret deletes existing secrets and creates a new one if specified.
+// This secret, if defined, will be added to the operator and admission controllers in
+// order to pull from a private repository.
+func (o *certifyOptions) createPullSecrets() ([]string, func(), error) {
+	fmt.Println("Creating pull secrets ...")
+
+	cleanup := func() {
+		o.deletePullSecrets()
+	}
+
+	pullSecrets := make([]string, len(o.registries.values))
+
+	// If specified create the authentication secrets
+	for i, registry := range o.registries.values {
+		// auth string is simply "username:password" base64 encoded
+		auth := registry.Username + ":" + registry.Password
+		auth = base64.StdEncoding.EncodeToString([]byte(auth))
+
+		// authentication data is encoded as per "~/.docker/config.json", and created by "docker login"
+		data := `{"auths":{"` + registry.Server + `":{"auth":"` + auth + `"}}}`
+
+		// create the new secret
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-docker-pull-secret-",
+				Labels: map[string]string{
+					pullSecretLabel: pullSecretValue,
+				},
+			},
+			Type: corev1.SecretTypeDockerConfigJson,
+			Data: map[string][]byte{
+				".dockerconfigjson": []byte(data),
+			},
+		}
+
+		newSecret, err := o.client.CoreV1().Secrets(o.namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+		if err != nil {
+			return nil, cleanup, err
+		}
+
+		// Register that we have a pull secret, this will be used for all couchbase
+		// clusters and deployments.
+		pullSecrets[i] = newSecret.Name
+	}
+
+	return pullSecrets, cleanup, nil
+}
+
+func (o *certifyOptions) deletePullSecrets() {
+	fmt.Println("Deleting pull secrets ...")
+
+	requirement, err := labels.NewRequirement(pullSecretLabel, selection.Equals, []string{pullSecretValue})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	selector := labels.NewSelector().Add(*requirement).String()
+
+	if err := o.client.CoreV1().Secrets(o.namespace).DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: selector}); err != nil {
+		fmt.Println(err)
+	}
+}
+
 // createCertificationPod is responsible for creating the certification pod and acting
 // as an interface between this command's parameters and the actual container's.
-func (o *certifyOptions) createCertificationPod(args []string) (func(), error) {
+func (o *certifyOptions) createCertificationPod(args []string, secrets []string) (func(), error) {
 	fmt.Println("Creating certification pod ...")
 
 	certificationArgs := []string{
@@ -411,9 +545,22 @@ func (o *certifyOptions) createCertificationPod(args []string) (func(), error) {
 	certificationArgs = append(certificationArgs, args...)
 
 	certificationPod := podTemplate.DeepCopy()
+
+	for _, registry := range o.registries.values {
+		certificationArgs = append(certificationArgs, "-registry", registry.String())
+	}
+
 	certificationPod.Spec.ServiceAccountName = serviceAccount
 	certificationPod.Spec.Containers[0].Image = o.image
 	certificationPod.Spec.Containers[0].Args = certificationArgs
+
+	for _, secret := range secrets {
+		reference := corev1.LocalObjectReference{
+			Name: secret,
+		}
+
+		certificationPod.Spec.ImagePullSecrets = append(certificationPod.Spec.ImagePullSecrets, reference)
+	}
 
 	// All our images should be run as non root as we have control.
 	runAsNonRoot := true
@@ -565,7 +712,7 @@ func (o *certifyOptions) deleteArtifactsPod() {
 
 // createArtifactsPod creates a basic pod that can consume artifacts generated by the
 // main certification pod.
-func (o *certifyOptions) createArtifactsPod() (func(), error) {
+func (o *certifyOptions) createArtifactsPod(secrets []string) (func(), error) {
 	fmt.Println("Creating artifact pod ...")
 
 	artifactPod := podTemplate.DeepCopy()
@@ -576,6 +723,14 @@ func (o *certifyOptions) createArtifactsPod() (func(), error) {
 	}
 	artifactPod.Spec.Containers[0].Args = []string{
 		"3600",
+	}
+
+	for _, secret := range secrets {
+		reference := corev1.LocalObjectReference{
+			Name: secret,
+		}
+
+		artifactPod.Spec.ImagePullSecrets = append(artifactPod.Spec.ImagePullSecrets, reference)
 	}
 
 	// I'm having issues finding a suitable non root image with tar in it, so as a
@@ -674,6 +829,7 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 		o.deleteServiceAccount()
 		o.deleteClusterRole()
 		o.deleteClusterRoleBinding()
+		o.deletePullSecrets()
 
 		// Delete the pods first, the PVC wont terminate until it's unused.
 		_ = o.deleteCertificationPod()
@@ -716,8 +872,16 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 
 	defer cleanVolume()
 
+	// Create the pull secrets.
+	secrets, cleanPullSecrets, err := o.createPullSecrets()
+	if err != nil {
+		return err
+	}
+
+	defer cleanPullSecrets()
+
 	// Create the certification pod.
-	cleanCertificationPod, err := o.createCertificationPod(args)
+	cleanCertificationPod, err := o.createCertificationPod(args, secrets)
 	if err != nil {
 		return err
 	}
@@ -745,7 +909,7 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 	}
 
 	// Create the artifacts volume.
-	cleanArtifactsPod, err := o.createArtifactsPod()
+	cleanArtifactsPod, err := o.createArtifactsPod(secrets)
 	if err != nil {
 		return err
 	}

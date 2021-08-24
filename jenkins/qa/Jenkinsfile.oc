@@ -31,11 +31,12 @@ pipeline {
     string(name: 'refspec', defaultValue: 'refs/heads/master')
     string(name: 'operator_image', defaultValue: 'registry.gitlab.com/cb-rhcc/operator:latest')
     string(name: 'admission_image', defaultValue: 'registry.gitlab.com/cb-rhcc/admission-controller:latest')
-    string(name: 'server_image', defaultValue: 'registry.connect.redhat.com/couchbase/server:6.6.2-1')
-    string(name: 'server_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/server:6.6.1-2')
+    string(name: 'certification_image', defaultValue: 'registry.gitlab.com/cb-rhcc/certification:latest')
+    string(name: 'server_image', defaultValue: 'registry.connect.redhat.com/couchbase/server:7.0.1-1')
+    string(name: 'server_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/server:6.6.3-1')
     string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-rhcc/operator-backup:1.1.0-104')
     string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-rhcc/exporter:latest')
-    string(name: 'exporter_image_upgrade', defaultValue: 'registry.gitlab.com/cb-rhcc/exporter:latest')
+    string(name: 'exporter_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.5-1')
     string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-rhcc/fluent-bit:1.1.0')
     string(name: 'logging_image_upgrade', defaultValue: 'registry.gitlab.com/ch-rhcc/fluent-bit:1.0.4')
     string(name: 'mobile_image', defaultValue: 'registry.connect.redhat.com/couchbase/sync-gateway:2.8.2-1')
@@ -46,7 +47,7 @@ pipeline {
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '100')
-    string(name: 'terraform_version', defaultValue: '1.0.0')
+    string(name: 'terraform_version', defaultValue: '1.0.5')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
     booleanParam(name: 'p0', defaultValue: true)
@@ -107,8 +108,7 @@ pipeline {
         script {
           currentBuild.description = "refspec:${params.refspec}, operator_version:${params.operator_image}, server_version:${params.server_image}, upgrade_version:${params.server_image_upgrade}, kubernetes_version:${params.kubernetes_version}"
         }
-        sh 'make touch-generated'
-        sh 'make'
+        sh 'make build/bin/cao'
       }
     }
 
@@ -123,25 +123,51 @@ pipeline {
         }
       }
       steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
-
-        // Newer versions can use the warnError closure, which can flag
-        // individual stages as broken, not the whole build.  That said
-        // none of this would be necessary if tests were stable...
-
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 6 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -logging-image ${params.logging_image} -logging-image-upgrade ${params.logging_image_upgrade} -suite validation -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -docs ${params.docs} -compression-mode ${params.compression_mode}  -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            --clean \
+            --parallel 8 \
+            --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image ${params.certification_image} \
+            --archive-name validation \
+            -- \
+            -suite validation \
+            -platform-type openshift \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -storage-class ${params.storage_class} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
           }
+          sh 'tar xf validation.tar.bz2'
         }
       }
       post {
         always {
-          junit 'test/e2e/*.xml'
-          sh 'tar czf validation.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf validation.tar.gz artifacts/logs'
           archiveArtifacts artifacts: 'validation.tar.gz', fingerprint: true
         }
       }
@@ -154,20 +180,51 @@ pipeline {
         }
       }
       steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 6 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -logging-image ${params.logging_image} -logging-image-upgrade ${params.logging_image_upgrade} -suite sanity -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -docs ${params.docs} -compression-mode ${params.compression_mode}  -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            --clean \
+            --parallel 8 \
+            --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image ${params.certification_image} \
+            --archive-name sanity \
+            -- \
+            -suite sanity \
+            -platform-type openshift \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -storage-class ${params.storage_class} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
           }
+          sh 'tar xf sanity.tar.bz2'
         }
       }
       post {
         always {
-          junit 'test/e2e/*.xml'
-          sh 'tar czf sanity.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf sanity.tar.gz artifacts/logs'
           archiveArtifacts artifacts: 'sanity.tar.gz', fingerprint: true
         }
       }
@@ -180,20 +237,51 @@ pipeline {
         }
       }
       steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 6 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -logging-image ${params.logging_image} -logging-image-upgrade ${params.logging_image_upgrade} -suite p0 -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -docs ${params.docs} -compression-mode ${params.compression_mode}  -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            --clean \
+            --parallel 8 \
+            --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image ${params.certification_image} \
+            --archive-name p0 \
+            -- \
+            -suite p0 \
+            -platform-type openshift \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -storage-class ${params.storage_class} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
           }
+          sh 'tar xf p0.tar.bz2'
         }
       }
       post {
         always {
-          junit 'test/e2e/*.xml'
-          sh 'tar czf p0.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf p0.tar.gz artifacts/logs'
           archiveArtifacts artifacts: 'p0.tar.gz', fingerprint: true
         }
       }
@@ -206,20 +294,51 @@ pipeline {
         }
       }
       steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 6 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -logging-image ${params.logging_image} -logging-image-upgrade ${params.logging_image_upgrade} -suite p1 -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -docs ${params.docs} -compression-mode ${params.compression_mode}  -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            --clean \
+            --parallel 8 \
+            --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image ${params.certification_image} \
+            --archive-name p1 \
+            -- \
+            -suite p1 \
+            -platform-type openshift \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -storage-class ${params.storage_class} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
           }
+          sh 'tar xf p1.tar.bz2'
         }
       }
       post {
         always {
-          junit 'test/e2e/*.xml'
-          sh 'tar czf p1.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf p1.tar.gz artifacts/logs'
           archiveArtifacts artifacts: 'p1.tar.gz', fingerprint: true
         }
       }
@@ -232,21 +351,52 @@ pipeline {
         }
       }
       steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 6 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -logging-image ${params.logging_image} -logging-image-upgrade ${params.logging_image_upgrade} -suite platform -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -docs ${params.docs} -compression-mode ${params.compression_mode}  -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            --clean \
+            --parallel 8 \
+            --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image ${params.certification_image} \
+            --archive-name platform \
+            -- \
+            -suite platform \
+            -platform-type openshift \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -storage-class ${params.storage_class} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
           }
+          sh 'tar xf platform.tar.bz2'
         }
       }
       post {
         always {
-          junit 'test/e2e/*.xml'
-          sh 'tar czf platformcert.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
-          archiveArtifacts artifacts: 'platformcert.tar.gz', fingerprint: true
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf platform.tar.gz artifacts/logs'
+          archiveArtifacts artifacts: 'platform.tar.gz', fingerprint: true
         }
       }
     }
@@ -258,19 +408,51 @@ pipeline {
         }
       }
       steps {
-        sh 'rm -rf test/e2e/logs test/e2e/*.xml'
         script {
           try {
-            sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 6 -args -platform-type ${params.platform} -operator-image ${params.operator_image} -admission-image ${params.admission_image} -mobile-image ${params.mobile_image} -server-image ${params.server_image} -server-image-upgrade ${params.server_image_upgrade} -exporter-image ${params.exporter_image} -exporter-image-upgrade ${params.exporter_image_upgrade} -backup-image ${params.backup_image} -logging-image ${params.logging_image} -logging-image-upgrade ${params.logging_image_upgrade} ${params.custom_args} -storage-class ${params.storage_class} -bucket-type ${params.bucket_type} -docs ${params.docs} -compression-mode ${params.compression_mode}  -s3-region ${params.s3_region} -s3-access-key ${env.S3_ACCESS_KEY} -s3-secret-id ${env.S3_SECRET_ID} -cluster ${env.WORKSPACE}/config1 -registry https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} -registry https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} -collect-logs"
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            --clean \
+            --parallel 8 \
+            --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image ${params.certification_image} \
+            --archive-name custom \
+            -- \
+            ${params.custom_args} \
+            -platform-type openshift \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -storage-class ${params.storage_class} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
           }
+          sh 'tar xf custom.tar.bz2'
         }
       }
       post {
         always {
-          sh 'tar czf custom.tar.gz -C test/e2e/logs --exclude=\'*.zip\' .'
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf custom.tar.gz artifacts/logs'
           archiveArtifacts artifacts: 'custom.tar.gz', fingerprint: true
         }
       }
