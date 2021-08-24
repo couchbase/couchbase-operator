@@ -179,11 +179,17 @@ type certifyOptions struct {
 	// clean assumes the previous run was aborted and there are some resources
 	// left lying about.
 	clean bool
+
+	// archiveName allows us to set a unique archive name for each run, in case
+	// there are any races.
+	archiveName string
 }
 
 // getCertifyCommand returns a new Cobra certification command.
 func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := certifyOptions{}
+
+	archiveName := fmt.Sprintf("couchbase-platform-certification-%s", time.Now().Format("20060102T150405-0700"))
 
 	cmd := &cobra.Command{
 		Use:   "certify",
@@ -231,6 +237,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 
 	cmd.Flags().StringVar(&o.image, "image", imageDefault, "Certification image to use")
 	cmd.Flags().StringVar(&o.timeout, "timeout", "12h", "Maximum runtime to allow.  4h is enough for all tests on most platforms with 8 way concurrency.  It may take over a day running with 1 way concurrency")
+	cmd.Flags().StringVar(&o.archiveName, "archive-name", archiveName, "Set the default test archive name")
 	cmd.Flags().IntVar(&o.parallel, "parallel", 8, "Test concurrency")
 	cmd.Flags().BoolVar(&o.clean, "clean", false, "Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run")
 
@@ -611,7 +618,7 @@ func (o *certifyOptions) downloadArtifacts() error {
 		return err
 	}
 
-	if err := ioutil.WriteFile("couchbase-platform-certification.tar.bz2", stdout.Bytes(), 0644); err != nil {
+	if err := ioutil.WriteFile(o.archiveName+".tar.bz2", stdout.Bytes(), 0644); err != nil {
 		return err
 	}
 

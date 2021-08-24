@@ -122,12 +122,13 @@ pipeline {
                 certify \
                 --image ${DOCKER_CREDENTIALS_USR}/couchbase-operator-certification:${GIT_COMMIT} \
                 --timeout 10m \
+                --archive-name logs-${version} \
                 -- \
                 -suite validation \
                 -suite-suffix ${version} \
                 -operator-image ${DOCKER_CREDENTIALS_USR}/couchbase-operator:${GIT_COMMIT} \
                 -admission-image ${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:${GIT_COMMIT}'
-              sh 'tar xf couchbase-platform-certification.tar.bz2'
+              sh 'tar xf logs-${version}.tar.bz2'
             }
 
             post {
@@ -149,6 +150,7 @@ pipeline {
             --clean \
             --parallel 8 \
             --image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-certification:${GIT_COMMIT} \
+            --archive-name logs \
             -- \
             -suite sanity \
             ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} \
@@ -173,7 +175,7 @@ pipeline {
             -s3-access-key \${AWS_CREDENTIALS_USR} \
             -s3-secret-id \${AWS_CREDENTIALS_PSW}"
         }
-        sh 'tar xf couchbase-platform-certification.tar.bz2'
+        sh 'tar xf logs.tar.bz2'
       }
     }
   }
