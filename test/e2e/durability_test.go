@@ -102,8 +102,8 @@ func TestLoadDurableBucket(t *testing.T) {
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 1, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),

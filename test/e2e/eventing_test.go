@@ -111,8 +111,8 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	// bucket based on source bucket documents. Populate the source and ensure the
 	// documents appear in the destination.
 	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, sourceBucket.Name, 1, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, targetKube, testCouchbase)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -164,7 +164,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	time.Sleep(time.Minute) // Wait for eventing to catch up
 
 	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, sourceBucket.Name, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, int(itemCount), 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, int(itemCount), time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -224,7 +224,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	time.Sleep(time.Minute) // Wait for eventing to catch up
 
 	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, sourceBucket.Name, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, int(itemCount), 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, int(itemCount), time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

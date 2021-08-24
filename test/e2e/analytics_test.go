@@ -73,7 +73,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 
 	// When ready, insert documents into our bucket.  Create a dataset and link to our bucket.
 	// Verify the number of documents in the dataset match those in the bucket.
-	e2eutil.MustInsertJSONDocsIntoBucket(t, targetKube, testCouchbase, bucket.GetName(), 0, numOfDocs)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, targetKube, testCouchbase)
 
 	for _, query := range queries {
 		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)

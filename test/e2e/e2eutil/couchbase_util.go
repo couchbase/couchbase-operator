@@ -147,21 +147,79 @@ func getBucket(client *CouchbaseClient, bucketName string) (*couchbaseutil.Bucke
 	return bucket, nil
 }
 
-// Inserts Json docs into couchbase bucket.
-func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) error {
+// DocumentSet defines the parameters for adding documents to a Couchbase cluster.
+type DocumentSet struct {
+	test       *testing.T
+	count      int
+	kubernetes *types.Cluster
+	cluster    *couchbasev2.CouchbaseCluster
+	bucket     string
+	scope      string
+	collection string
+	prefix     string
+}
+
+// NewDocumentSet creates a basic DocumentSet, specifying the bucket to insert to and the number of
+// documents to insert.
+func NewDocumentSet(bucket string, count int) *DocumentSet {
+	return &DocumentSet{
+		count:  count,
+		bucket: bucket,
+		prefix: RandomSuffix(),
+	}
+}
+
+// IntoCollection defines the scope and collection that documents should be inserted into;
+// if not set, DocumentSet will use the scope's default scope and collection.
+func (d *DocumentSet) IntoScopeAndCollection(scope string, collection string) *DocumentSet {
+	d.scope = scope
+	d.collection = collection
+
+	return d
+}
+
+// WithPrefix lets a specific key prefix be given to all the docs added (which will be appended
+// with a number to create the key. If not specified, the prefix will be 5 random characters.
+func (d *DocumentSet) WithPrefix(prefix string) *DocumentSet {
+	d.prefix = prefix
+
+	return d
+}
+
+// MustCreate creates the documents with the specified options, dying on error.
+func (d *DocumentSet) MustCreate(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
+	d.test = t
+	d.kubernetes = kubernetes
+	d.cluster = cluster
+
+	if err := addDocs(d); err != nil {
+		Die(d.test, err)
+	}
+}
+
+// addDocs uses the Couchbase Go SDK to add documents, with a DocumentSet used to specify options.
+func addDocs(d *DocumentSet) error {
 	opts := gocb.ClusterOptions{
-		Username: string(k8s.DefaultSecret.Data["username"]),
-		Password: string(k8s.DefaultSecret.Data["password"]),
+		Username: string(d.kubernetes.DefaultSecret.Data["username"]),
+		Password: string(d.kubernetes.DefaultSecret.Data["password"]),
 	}
 
-	c, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", cluster.Name, cluster.Namespace), opts)
+	c, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", d.cluster.Name, d.cluster.Namespace), opts)
 	if err != nil {
 		return err
 	}
 
-	b := c.Bucket(bucketName)
+	bucket := c.Bucket(d.bucket)
 
-	collection := b.DefaultCollection()
+	scope := bucket.DefaultScope()
+	if d.scope != "" {
+		scope = bucket.Scope(d.scope)
+	}
+
+	collection := bucket.DefaultCollection()
+	if d.collection != "" {
+		collection = scope.Collection(d.collection)
+	}
 
 	document := map[string]interface{}{
 		"key1": "dummyVal1",
@@ -170,29 +228,17 @@ func InsertJSONDocsIntoBucket(k8s *types.Cluster, cluster *couchbasev2.Couchbase
 		"key4": "dummyVal4",
 	}
 
-	for i := 0; i < numOfDocs; i++ {
+	for i := 0; i < d.count; i++ {
 		id := i
 
-		callback := func() error {
-			if _, err := collection.Upsert(fmt.Sprintf("doc%d", docStartIndex+id), document, &gocb.UpsertOptions{}); err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		if err := retryutil.RetryFor(time.Minute, callback); err != nil {
+		if _, err := collection.Upsert(fmt.Sprintf("%s%d", d.prefix, id), document, &gocb.UpsertOptions{
+			Timeout: time.Minute,
+		}); err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-func MustInsertJSONDocsIntoBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, docStartIndex, numOfDocs int) {
-	if err := InsertJSONDocsIntoBucket(k8s, cluster, bucketName, docStartIndex, numOfDocs); err != nil {
-		Die(t, err)
-	}
 }
 
 func CompactBucket(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket metav1.Object) error {

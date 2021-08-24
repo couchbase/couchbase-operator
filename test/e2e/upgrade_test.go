@@ -1053,8 +1053,8 @@ func TestUpgradeBucketDurability(t *testing.T) {
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
@@ -1067,8 +1067,8 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Add("/spec/minimumDurability", couchbasev2.CouchbaseBucketMinimumDurabilityMajority), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityMinLevel", couchbaseutil.DurabilityMajority), time.Minute)
 
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 2*numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 2*numOfDocs, time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),

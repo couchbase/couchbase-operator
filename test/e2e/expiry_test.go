@@ -37,7 +37,7 @@ func TestBucketTTL(t *testing.T) {
 
 	// Insert some docs into the bucket and verify, then expect them to be deleted
 	// in a minute.
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// In order to expire a document it must be read, compacted, or expired.  It's easiest to

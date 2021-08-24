@@ -11,7 +11,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -224,8 +223,8 @@ func TestPrometheusMetricsPerformOps(t *testing.T) {
 	e2eutil.MustNewBucket(t, targetKube, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
 
-	// Perform Bucket Ops: Inserting 200 documents in the default Bucket
-	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, e2espec.DefaultBucket().Name, numOfDocs)
+	// Perform Bucket Ops: Inserting documents in the default Bucket
+	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, targetKube, testCouchbase)
 
 	// Perform ClusterOps: Failover a given node.
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, true)

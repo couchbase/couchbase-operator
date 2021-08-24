@@ -958,14 +958,14 @@ func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 
 	// Start Adding Docs
-	e2eutil.MustPopulateBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs)
+	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, targetKube, testCouchbase)
 
 	// Verify resize state
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
 	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcName, requestedQuantity, 5*time.Minute)
 
 	// Check all docs were added during resize
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Events indirectly verify that upgrade did not occur
 	// since no scale up events should be present

@@ -242,8 +242,8 @@ func testFullIncremental(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 3*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -298,8 +298,8 @@ func testFullOnly(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -445,8 +445,8 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.ScheduleIn(7*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -522,8 +522,8 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// create initial backup
 	backup1 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -605,8 +605,8 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// create initial backup
 	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -681,8 +681,8 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -711,7 +711,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
 
 	// restore job is too fast, just validate bucket item count
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -765,7 +765,7 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
@@ -829,8 +829,8 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create Backup object 1.
 	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -900,8 +900,8 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -961,8 +961,8 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -1079,7 +1079,7 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
 	defer s3cleanup()
 
-	framework.Requires(t, kubernetes).StaticCluster()
+	framework.Requires(t, kubernetes).StaticCluster().ExpandableStorage()
 
 	// Static configuration.
 	clusterSize := 3
@@ -1095,8 +1095,8 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -1227,6 +1227,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 	dataQuota := e2espec.NewResourceQuantityMi(int64(256 * 3))
 	buckets := []v1.Object{}
+	numOfDocs := f.DocsCount
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
 
@@ -1244,7 +1245,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 
 	// create eventing function and verify
 	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", buckets[0].GetName(), buckets[1].GetName(), buckets[2].GetName(), function, time.Minute)
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, buckets[0].GetName(), 0, f.DocsCount)
+	e2eutil.NewDocumentSet(buckets[0].GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[2].GetName(), f.DocsCount, 5*time.Minute)
 
 	// Create a Backup object.
@@ -1334,8 +1335,8 @@ func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// populate the bucket
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// create eventing function and verify
 	query := "CREATE PRIMARY INDEX `#primary` ON `default` USING GSI"
@@ -1378,7 +1379,7 @@ func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
 		e2eutil.Die(t, fmt.Errorf("Index `#primary` restored"))
 	}
 
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1432,8 +1433,8 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// populate the bucket
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// create eventing function and verify
 	analyticsDataset := "testDataset1"
@@ -1536,8 +1537,8 @@ func testBackupAndRestoreDisableData(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -1616,8 +1617,8 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -1644,7 +1645,7 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
 
 	// verify replica count was restored.
 	e2eutil.MustVerifyReplicaCount(t, kubernetes, cluster, newBucket.GetName(), 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1702,8 +1703,8 @@ func testBackupAndRestoreMapBuckets(t *testing.T, s3 bool) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
@@ -1771,6 +1772,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 	buckets := []v1.Object{}
+	numOfDocs := f.DocsCount
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
@@ -1782,8 +1784,8 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 		buckets = append(buckets, bucket)
 		e2eutil.MustNewBucket(t, kubernetes, bucket)
 		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
-		e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, f.DocsCount)
-		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), f.DocsCount, 5*time.Minute)
+		e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), f.DocsCount, time.Minute)
 	}
 
 	// Create a Backup object.
@@ -1809,8 +1811,8 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithIncludes(buckets[0].GetName()).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), f.DocsCount, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[1].GetName(), 0, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), f.DocsCount, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[1].GetName(), 0, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1855,6 +1857,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 	buckets := []v1.Object{}
+	numOfDocs := f.DocsCount
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
@@ -1869,8 +1872,8 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 		// Populate the bucket
-		e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, f.DocsCount)
-		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), f.DocsCount, 5*time.Minute)
+		e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), f.DocsCount, time.Minute)
 	}
 
 	// Create a Backup object.
@@ -1896,8 +1899,8 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithExcludes(buckets[0].GetName()).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), 0, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[1].GetName(), f.DocsCount, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), 0, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[1].GetName(), f.DocsCount, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1967,8 +1970,8 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// insert docs to backup
-	e2eutil.MustInsertJSONDocsIntoBucket(t, kubernetes, cluster, bucket.GetName(), 0, numOfDocs)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).WithStorageClass(f.StorageClassName).MustCreate(t, kubernetes)
@@ -1996,7 +1999,7 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that no items were restored.
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 0, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 0, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -2045,8 +2048,8 @@ func TestBackupBucketInclusion(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket2, time.Minute)
 
 	// Add some data to both buckets.
-	e2eutil.MustPopulateBucket(t, kubernetes, cluster, bucket1.GetName(), f.DocsCount)
-	e2eutil.MustPopulateBucket(t, kubernetes, cluster, bucket2.GetName(), f.DocsCount)
+	e2eutil.NewDocumentSet(bucket1.GetName(), f.DocsCount).MustCreate(t, kubernetes, cluster)
+	e2eutil.NewDocumentSet(bucket2.GetName(), f.DocsCount).MustCreate(t, kubernetes, cluster)
 
 	// Create and wait for a backup
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).Include(bucket1).MustCreate(t, kubernetes)
@@ -2084,8 +2087,8 @@ func TestBackupBucketExclusion(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket2, time.Minute)
 
 	// Add some data to both buckets.
-	e2eutil.MustPopulateBucket(t, kubernetes, cluster, bucket1.GetName(), f.DocsCount)
-	e2eutil.MustPopulateBucket(t, kubernetes, cluster, bucket2.GetName(), f.DocsCount)
+	e2eutil.NewDocumentSet(bucket1.GetName(), f.DocsCount).MustCreate(t, kubernetes, cluster)
+	e2eutil.NewDocumentSet(bucket2.GetName(), f.DocsCount).MustCreate(t, kubernetes, cluster)
 
 	// Create and wait for a backup
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).Exclude(bucket2).MustCreate(t, kubernetes)

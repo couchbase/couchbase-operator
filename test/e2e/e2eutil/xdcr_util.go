@@ -12,71 +12,9 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
-	gocb "github.com/couchbase/gocb/v2"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// PopulateBucket selects a random pod from the cluster and then uses the API
-// to create a defined number of documents.  The prefix is randomized so subsequent
-// runs do not collide.  Documents are inserted one at a time, so we can keep a count
-// of exactly how many were successfully committed.
-func PopulateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int) error {
-	prefix := RandomSuffix()
-
-	opts := gocb.ClusterOptions{
-		Username: string(k8s.DefaultSecret.Data["username"]),
-		Password: string(k8s.DefaultSecret.Data["password"]),
-	}
-
-	c, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", cluster.Name, cluster.Namespace), opts)
-	if err != nil {
-		return err
-	}
-
-	b := c.Bucket(bucket)
-
-	collection := b.DefaultCollection()
-
-	document := map[string]interface{}{
-		"flags": "24",
-		"value": map[string]interface{}{
-			"key": "value",
-		},
-	}
-
-	start := time.Now()
-
-	for i := 0; i < items; i++ {
-		id := i
-
-		callback := func() error {
-			if _, err := collection.Upsert(fmt.Sprintf("%s%d", prefix, id), document, &gocb.UpsertOptions{}); err != nil {
-				return err
-			}
-
-			return nil
-		}
-
-		// SDKs are not infallible :/
-		if err := retryutil.RetryFor(time.Minute, callback); err != nil {
-			return err
-		}
-	}
-
-	defer func() {
-		t.Logf("inserted %d documents in %v", items, time.Since(start))
-	}()
-
-	return nil
-}
-
-func MustPopulateBucket(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucket string, items int) {
-	if err := PopulateBucket(t, k8s, couchbase, bucket, items); err != nil {
-		Die(t, err)
-	}
-}
 
 // getBucketInfo returns information of the bucket.
 func getBucketInfo(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string) (*couchbaseutil.BucketStatus, error) {
