@@ -46,6 +46,12 @@ pipeline {
         sh "go run github.com/spjmurray/hub-scrub/cmd/hub-scrub -u ${env.DOCKER_CREDENTIALS_USR} -p ${env.DOCKER_CREDENTIALS_PSW} -i couchbase-operator-admission -t ${env.THRESHOLD}"
       }
     }
+
+    stage('Clean Certification Images') {
+      steps {
+        sh "go run github.com/spjmurray/hub-scrub/cmd/hub-scrub -u ${env.DOCKER_CREDENTIALS_USR} -p ${env.DOCKER_CREDENTIALS_PSW} -i couchbase-operator-certification -t ${env.THRESHOLD}"
+      }
+    }
   }
 
   post {
