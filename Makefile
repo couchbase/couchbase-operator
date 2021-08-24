@@ -270,9 +270,7 @@ image-artifacts: binaries
 	cp Dockerfile.admission $(ADMISSION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.admission-rhel $(ADMISSION_ARTIFACTS)/Dockerfile.rhel
 	# Create a subdirectory for self certification
-	# Note: we are linux company, building linux software, however do most of the dev on
-	# Mac OS (lusers!), so need to build in a container due to certain constraints.  The
-	# copy command should mirror 
+	mkdir -p $(CERTIFICATION_ARTIFACTS)
 	cp -a Makefile .git go.mod go.sum cmd pkg scripts test docs/License.txt docs/README.txt $(CERTIFICATION_ARTIFACTS)
 	cp Dockerfile.qa $(CERTIFICATION_ARTIFACTS)/Dockerfile
 	# Create the archive
