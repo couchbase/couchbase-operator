@@ -270,8 +270,9 @@ image-artifacts: binaries
 	cp Dockerfile.admission $(ADMISSION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.admission-rhel $(ADMISSION_ARTIFACTS)/Dockerfile.rhel
 	# Create a subdirectory for self certification
-	mkdir -p $(CERTIFICATION_ARTIFACTS)
-	cp -a Makefile .git go.mod go.sum cmd pkg scripts test docs/License.txt docs/README.txt $(CERTIFICATION_ARTIFACTS)
+	mkdir -p $(CERTIFICATION_ARTIFACTS)/docs
+	cp -a Makefile .git go.mod go.sum cmd pkg scripts test $(CERTIFICATION_ARTIFACTS)
+	cp -a docs/License.txt docs/README.txt $(CERTIFICATION_ARTIFACTS)/docs
 	cp Dockerfile.qa $(CERTIFICATION_ARTIFACTS)/Dockerfile
 	# Create the archive
 	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(revisionedProductVersion).tgz .
