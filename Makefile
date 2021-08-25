@@ -227,16 +227,16 @@ tools: generated
 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/arm64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/linux/x86_64/bin/cbopinfo -ldflags $(LDFLAGS) ./cmd/cbopinfo/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/windows/amd64/bin/cbopinfo.exe -ldflags $(LDFLAGS) ./cmd/cbopinfo/
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/x86_64/bin/cao -ldflags $(LDFLAGS) ./cmd/cao/
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/arm64/bin/cao -ldflags $(LDFLAGS) ./cmd/cao/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/linux/x86_64/bin/cao -ldflags $(LDFLAGS) ./cmd/cao/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/windows/amd64/bin/cao.exe -ldflags $(LDFLAGS) ./cmd/cao/
 
 tools-platform-specific:
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/darwin/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/darwin/arm64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/linux/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/windows/amd64/bin/cbopcfg.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/x86_64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/arm64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/linux/x86_64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/windows/amd64/bin/cao.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
 
 artifacts: tools crd
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --arch x86_64 --version $(revisionedVersion) --bld_num $(bldNum)
@@ -272,8 +272,10 @@ image-artifacts: binaries
 	# Create a subdirectory for self certification
 	mkdir -p $(CERTIFICATION_ARTIFACTS)/docs
 	cp -a Makefile .git go.mod go.sum cmd pkg scripts test $(CERTIFICATION_ARTIFACTS)
+	rm -rf $(CERTIFICATION_ARTIFACTS)/pkg/generated
 	cp -a docs/License.txt docs/README.txt $(CERTIFICATION_ARTIFACTS)/docs
 	cp Dockerfile.qa $(CERTIFICATION_ARTIFACTS)/Dockerfile
+	cp Dockerfile.qa-rhel $(CERTIFICATION_ARTIFACTS)/Dockerfile.rhel
 	# Create the archive
 	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(revisionedProductVersion).tgz .
 	rm -rf $(ARTIFACTS)

@@ -266,10 +266,10 @@ func configure() (err error) {
 		"",
 		"Controls handling of platform specific behavior. Either 'aws', 'gce' or 'azure'.")
 	flag.StringVar(&params.OpImage, "operator-image",
-		fmt.Sprintf("couchbase/operator:%s", version.Version),
+		fmt.Sprintf("couchbase/operator:%s", operatorImageDefault),
 		"Docker image to use for the operator.")
 	flag.StringVar(&params.AdmissionControllerImage, "admission-image",
-		fmt.Sprintf("couchbase/admission-controller:%s", version.Version),
+		fmt.Sprintf("couchbase/admission-controller:%s", admissionImageDefault),
 		"Docker image to use for the admission controller.")
 	flag.StringVar(&params.SyncGatewayImage, "mobile-image",
 		"couchbase/sync-gateway:2.8.2-enterprise",

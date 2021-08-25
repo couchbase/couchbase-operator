@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/certification/util"
-	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	"github.com/spf13/cobra"
 
@@ -230,7 +229,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.image, "image", "couchbase/platform-certification:"+version.Version, "Certification image to use")
+	cmd.Flags().StringVar(&o.image, "image", imageDefault, "Certification image to use")
 	cmd.Flags().StringVar(&o.timeout, "timeout", "12h", "Maximum runtime to allow.  4h is enough for all tests on most platforms with 8 way concurrency.  It may take over a day running with 1 way concurrency")
 	cmd.Flags().IntVar(&o.parallel, "parallel", 8, "Test concurrency")
 	cmd.Flags().BoolVar(&o.clean, "clean", false, "Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run")

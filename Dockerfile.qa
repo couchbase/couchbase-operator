@@ -5,7 +5,7 @@ FROM golang:1.16.3 as build
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
 
 # Create the working directory to build in.
-RUN mkdir -p ${WORKDIR}go
+RUN mkdir -p ${WORKDIR}
 WORKDIR ${WORKDIR}
 
 # Copy the go module files and download, this effectively caches the modules.

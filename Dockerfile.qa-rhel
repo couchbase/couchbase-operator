@@ -1,0 +1,50 @@
+# This bit is very much linux only, so we do the build in a container
+# to tolerate the Mac users.
+FROM registry.access.redhat.com/ubi8/go-toolset:1.15.14-3 as build
+
+ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
+
+# Create the working directory to build in.
+RUN mkdir -p ${WORKDIR}
+WORKDIR ${WORKDIR}
+
+# Copy the go module files and download, this effectively caches the modules.
+COPY go.* .
+RUN go mod download
+
+# Copy in the rest of the source and compile, caching any build objects.
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/go-build make crd binaries certification-binary -e BUILDFLAGS='-tags redhat -trimpath'
+
+# This builds the actual container, copying the binaries over from
+# the build container, and installing any other static dependencies.
+FROM registry.access.redhat.com/ubi8/go-toolset:1.15.14-3
+
+ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
+
+COPY --from=build ${WORKDIR}/build/bin/cbopinfo /
+COPY --from=build ${WORKDIR}/build/bin/cbopcfg /
+COPY --from=build ${WORKDIR}/build/bin/certification /
+COPY --from=build ${WORKDIR}/example/crd.yaml /
+
+COPY docs/License.txt /licenses/License.txt
+COPY docs/README.txt /help.1
+
+COPY test/e2e/resources/validation /resources/validation/
+
+ENTRYPOINT ["/certification"]
+
+ARG PROD_VERSION
+ARG OS_BUILD
+ARG OPERATOR_BUILD
+
+LABEL name="couchbase/operator-certification" \
+      vendor="Couchbase" \
+      version="${PROD_VERSION}" \
+      openshift_build="${OS_BUILD}" \
+      operator_build="${OPERATOR_BUILD}" \
+      release="Latest" \
+      summary="Couchbase Autonomous Operator Certification ${PROD_VERSION}" \
+      description="Couchbase Autonomous Operator Certification ${PROD_VERSION}" \
+      architecture="x86_64" \
+      run="docker run -d --name couchbase-operator-certification registry.connect.redhat.com/couchbase/operator-certification:${PROD_VERSION}-${OS_BUILD}"
