@@ -536,13 +536,15 @@ func UpdateAutoscaler(client *client.Client, namespace string, requestedAutoscal
 
 	// update status with phase
 	if !reflect.DeepEqual(autoscaler.Status, requestedAutoscaler.Status) {
-		requestedAutoscaler, err = client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(namespace).UpdateStatus(context.Background(), requestedAutoscaler, metav1.UpdateOptions{})
+		updatedAutoscaler := autoscaler.DeepCopy()
+		updatedAutoscaler.Status = requestedAutoscaler.Status
+		updatedAutoscaler, err = client.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(namespace).UpdateStatus(context.Background(), updatedAutoscaler, metav1.UpdateOptions{})
 
 		if err != nil {
 			return nil, err
 		}
 
-		autoscaler.Status = requestedAutoscaler.Status
+		autoscaler = updatedAutoscaler.DeepCopy()
 	}
 
 	return autoscaler, nil

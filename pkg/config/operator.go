@@ -342,6 +342,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.AutoscalerCRDResourcePlural,
 			},
 			Verbs: []string{
+				"get",    // used to get specific resource
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"create", // used by the operator to create resources

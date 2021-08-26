@@ -1007,7 +1007,7 @@ func (r *ReconcileMachine) handleAutoscaleServerConfigs(c *Cluster) error {
 			if err := c.startAutoscalingMaintenanceMode(); err != nil {
 				return err
 			}
-		} else {
+		} else if c.autoscalingReady() {
 			if err := c.endAutoscalingMaintenanceMode(); err != nil {
 				return err
 			}

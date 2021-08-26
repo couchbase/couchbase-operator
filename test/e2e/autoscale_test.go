@@ -398,6 +398,7 @@ func TestAutoscaleConflict(t *testing.T) {
 	clusterStabilization := e2espec.DefaultClusterStabilizationPeriod
 	options := clusterOptions().WithEphemeralTopology(clusterSize).WithAutoscaleStabilizationPeriod(clusterStabilization).Options
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
+	config.Behavior.ScaleUp.Policies[0].PeriodSeconds = 120
 
 	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
 	defer hpaManager.Cleanup()
@@ -412,15 +413,14 @@ func TestAutoscaleConflict(t *testing.T) {
 	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
 	e2eutil.MustUpdateScale(t, targetKube, testCouchbase.Namespace, autoscalerName, 6)
 
+	// Allow cluster to finish rebalancing
+	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
+
 	// Also Change CouchbaseCluster size to 2 before cluster finishes scaling.
 	// This would occur if user observes an autoscale happening but wanted to manually go
 	// back to original size.  When the operator finishes scaling it will have conflicting
 	// requests, but since the Autoscaler is in maintenance mode the change to CouchbaseCluster wins.
 	testCouchbase = e2eutil.MustResizeCluster(t, 0, 2, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-
-	// Allow cluster to finish rebalancing
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
 
 	// Verify Cluster autoscales up and then rollsback to 2
 	expectedEvents := []eventschema.Validatable{
@@ -430,6 +430,7 @@ func TestAutoscaleConflict(t *testing.T) {
 		e2eutil.ClusterScaleUpSequence(1),
 		e2eutil.ClusterScaleDownSequence(1),
 	}
+
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
 

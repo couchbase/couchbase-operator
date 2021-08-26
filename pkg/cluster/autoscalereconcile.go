@@ -57,8 +57,11 @@ func (c *Cluster) reconcileAutoscalers() error {
 
 		// Check if autoscaler is requesting size change
 		if config.Size != autoscaler.Spec.Size {
+			requestedSize := autoscaler.Spec.Size
+			currentSize := config.Size
+
 			// Apply requested autoscaler size to CouchbaseCluster
-			if err := c.applyAutoscaleSize(*config, autoscaler.Spec.Size); err != nil {
+			if err := c.applyAutoscaleSize(config.Name, requestedSize); err != nil {
 				return err
 			}
 
@@ -68,10 +71,20 @@ func (c *Cluster) reconcileAutoscalers() error {
 				if err := c.applyAutoscaleStabilization(); err != nil {
 					return err
 				}
-
-				// stop reconciling autoscalers since size change has occurred
-				break
 			}
+
+			// Scaling Events
+			message := fmt.Sprintf("Autoscaling service config %q from %d -> %d", config.Name, currentSize, requestedSize)
+			log.Info(message, "cluster", c.namespacedName(), "name", config.Name)
+
+			if currentSize < requestedSize {
+				c.raiseEventCached(k8sutil.AutoscaleUpEvent(c.cluster, config.Name, currentSize, requestedSize))
+			} else {
+				c.raiseEventCached(k8sutil.AutoscaleDownEvent(c.cluster, config.Name, currentSize, requestedSize))
+			}
+
+			// stop reconciling autoscalers since size change has occurred
+			break
 		}
 	}
 
@@ -129,6 +142,15 @@ func (c *Cluster) autoscalingReady() bool {
 				message := fmt.Sprintf("cluster autoscaling is stabilizing: %s remaining", timeRemaining.String())
 				log.Info(message, "cluster", c.namespacedName())
 
+				// ensure that autoscalers remain in maintenance mode as it's possible
+				// for some external client to manual change size of CouchbaseAutoscale
+				// resource.  When this happens HPA thinks we are live and starts
+				// sending scaling recommendations
+				err := c.applyAutoscaleMaintenanceMode(c.getAutoscalersToDisable())
+				if err != nil {
+					log.Error(err, message, "cluster", c.namespacedName())
+				}
+
 				break
 			}
 		}
@@ -148,7 +170,7 @@ func (c *Cluster) autoscalingReady() bool {
 // to CouchbaseCluster resource if the two differ.
 // When size values differ the cluster is put into
 // maintenance mode since scaling will occur as a result.
-func (c *Cluster) applyAutoscaleSize(config couchbasev2.ServerConfig, requestedSize int) error {
+func (c *Cluster) applyAutoscaleSize(configName string, requestedSize int) error {
 	// Fetching most recent version of the cluster spec
 	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(context.Background(), c.cluster.Name, metav1.GetOptions{})
 	if err != nil {
@@ -156,7 +178,7 @@ func (c *Cluster) applyAutoscaleSize(config couchbasev2.ServerConfig, requestedS
 	}
 
 	for i := range c.cluster.Spec.Servers {
-		if cluster.Spec.Servers[i].Name == config.Name {
+		if cluster.Spec.Servers[i].Name == configName {
 			cluster.Spec.Servers[i].Size = requestedSize
 		}
 	}
@@ -167,17 +189,6 @@ func (c *Cluster) applyAutoscaleSize(config couchbasev2.ServerConfig, requestedS
 	}
 
 	c.cluster = updatedCluster
-
-	// Scaling Events
-	currentSize := config.Size
-	message := fmt.Sprintf("Autoscaling service config %q from %d -> %d", config.Name, currentSize, requestedSize)
-	log.Info(message, "cluster", c.namespacedName(), "name", config.Name)
-
-	if currentSize < requestedSize {
-		c.raiseEventCached(k8sutil.AutoscaleUpEvent(c.cluster, config.Name, currentSize, requestedSize))
-	} else {
-		c.raiseEventCached(k8sutil.AutoscaleDownEvent(c.cluster, config.Name, currentSize, requestedSize))
-	}
 
 	return nil
 }
@@ -208,10 +219,14 @@ func (c *Cluster) updateAutoscalerStatusSize(autoscaler *couchbasev2.CouchbaseAu
 
 	// update status subresource to actual ready pods from group
 	if configPods != autoscaler.Status.Size {
-		requestedAutoscaler := autoscaler.DeepCopy()
-		requestedAutoscaler.Status.Size = configPods
+		requestedAutoscaler, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).Get(context.Background(), autoscaler.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
 
-		requestedAutoscaler, err := k8sutil.UpdateAutoscaler(c.k8s, c.cluster.Namespace, requestedAutoscaler)
+		requestedAutoscaler.Status.Size = configPods
+		requestedAutoscaler, err = k8sutil.UpdateAutoscaler(c.k8s, c.cluster.Namespace, requestedAutoscaler)
+
 		if err != nil {
 			return nil, fmt.Errorf("%w: failed to update autoscaler status: %s", errors.NewStackTracedError(err), autoscaler.Name)
 		}
@@ -276,20 +291,44 @@ func (c *Cluster) updateRequestedAutoscalers() ([]string, error) {
 // This causes the referencing HorizontalPodAutoscaler to stop adjusting the desired size.
 // https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#implicit-maintenance-mode-deactivation
 func (c *Cluster) startAutoscalingMaintenanceMode() error {
+	requestedAutoscalers := c.getAutoscalersToDisable()
+	if len(requestedAutoscalers) > 0 {
+		c.cluster.Status.SetAutoscalerUnreadyCondition("autoscaling is paused")
+		return c.applyAutoscaleMaintenanceMode(requestedAutoscalers)
+	}
+
+	return nil
+}
+
+// Gets list of autoscalers that need to be disabled for autoscaling mode.
+func (c *Cluster) getAutoscalersToDisable() []*couchbasev2.CouchbaseAutoscaler {
+	autoscalers := []*couchbasev2.CouchbaseAutoscaler{}
+
 	for _, autoscaler := range c.k8s.CouchbaseAutoscalers.List() {
-		// only update autoscalers not already in maintenance mode
 		if autoscaler.Spec.Size != 0 {
-			msg := fmt.Sprintf("Autoscaler for service config %q is entering maintenance mode", autoscaler.Spec.Servers)
-			log.Info(msg, "cluster", c.namespacedName())
-			c.cluster.Status.SetAutoscalerUnreadyCondition("autoscaling is paused")
+			autoscalers = append(autoscalers, autoscaler)
+		}
+	}
 
-			requestedAutoscaler := autoscaler.DeepCopy()
-			requestedAutoscaler.Spec.Size = 0
+	return autoscalers
+}
 
-			_, err := k8sutil.UpdateAutoscaler(c.k8s, c.cluster.Namespace, requestedAutoscaler)
-			if err != nil {
-				return err
-			}
+// Applies size of `0` to autoscalers to indicate maintenance mode.
+func (c *Cluster) applyAutoscaleMaintenanceMode(autoscalers []*couchbasev2.CouchbaseAutoscaler) error {
+	for _, autoscaler := range autoscalers {
+		requestedAutoscaler, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).Get(context.Background(), autoscaler.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		requestedAutoscaler.Spec.Size = 0
+
+		msg := fmt.Sprintf("Autoscaler for service config %q is entering maintenance mode", requestedAutoscaler.Spec.Servers)
+		log.Info(msg, "cluster", c.namespacedName())
+		_, err = k8sutil.UpdateAutoscaler(c.k8s, c.cluster.Namespace, requestedAutoscaler)
+
+		if err != nil {
+			return err
 		}
 	}
 
@@ -310,8 +349,8 @@ func (c *Cluster) endAutoscalingMaintenanceMode() error {
 			// Restore autoscaler size from the config size
 			requestedAutoscaler := autoscaler.DeepCopy()
 			requestedAutoscaler.Spec.Size = config.Size
-
 			_, err := k8sutil.UpdateAutoscaler(c.k8s, c.cluster.Namespace, requestedAutoscaler)
+
 			if err != nil {
 				return err
 			}
