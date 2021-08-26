@@ -1113,8 +1113,11 @@ const (
 	// Insecure, do not use.
 	TLS11 TLSVersion = "tlsv1.1"
 
-	// Obsolete, use 1.3... which isn't supported.
+	// Obsolete, do not use.
 	TLS12 TLSVersion = "tlsv1.2"
+
+	// Latest and greatest.
+	TLS13 TLSVersion = "tlsv1.3"
 )
 
 // ClusterEncryptionLevel is used to fully encrypt everything.

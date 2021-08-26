@@ -3000,7 +3000,7 @@ const (
 )
 
 // TLSVersion defines the minimum TLS version to use.
-// +kubebuilder:validation:Enum=TLS1.0;TLS1.1;TLS1.2
+// +kubebuilder:validation:Enum=TLS1.0;TLS1.1;TLS1.2;TLS1.3
 type TLSVersion string
 
 const (
@@ -3010,8 +3010,11 @@ const (
 	// Insecure, don't use.
 	TLS11 TLSVersion = "TLS1.1"
 
-	// Obsolete, don't... oh wait.
+	// Obsolete, don't use.
 	TLS12 TLSVersion = "TLS1.2"
+
+	// Latest and greatest!
+	TLS13 TLSVersion = "TLS1.3"
 )
 
 // TLSPolicy defines the TLS policy of an Couchbase cluster
@@ -3042,8 +3045,8 @@ type TLSPolicy struct {
 	NodeToNodeEncryption *NodeToNodeEncryptionType `json:"nodeToNodeEncryption,omitempty"`
 
 	// TLSMinimumVersion specifies the minimum TLS version the Couchbase server can
-	// negotiate with a client.  Must be one of TLS1.0, TLS1.1 or TLS1.2, defaulting
-	// to TLS1.2.
+	// negotiate with a client.  Must be one of TLS1.0, TLS1.1 TLS1.2 or TLS1.3,
+	// defaulting to TLS1.2.  TLS1.3 is only valid for Couchbase Server 7.1.0 onward.
 	// +kubebuilder:default=TLS1.2
 	TLSMinimumVersion TLSVersion `json:"tlsMinimumVersion,omitempty"`
 

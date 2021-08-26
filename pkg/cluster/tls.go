@@ -1036,6 +1036,8 @@ func (c *Cluster) updateSecuritySettings() error {
 			tlsVersion = couchbaseutil.TLS11
 		case couchbasev2.TLS12:
 			tlsVersion = couchbaseutil.TLS12
+		case couchbasev2.TLS13:
+			tlsVersion = couchbaseutil.TLS13
 		}
 
 		requestedSecuritySettings.TLSMinVersion = tlsVersion
