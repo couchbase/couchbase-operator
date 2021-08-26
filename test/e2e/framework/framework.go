@@ -272,28 +272,28 @@ func configure() (err error) {
 		fmt.Sprintf("couchbase/admission-controller:%s", admissionImageDefault),
 		"Docker image to use for the admission controller.")
 	flag.StringVar(&params.SyncGatewayImage, "mobile-image",
-		"couchbase/sync-gateway:2.8.2-enterprise",
+		mobileImageDefault,
 		"Docker image to use for couchbase mobile.")
 	flag.StringVar(&params.CouchbaseServerImage, "server-image",
-		"couchbase/server:7.0.0",
+		serverImageDefault,
 		"Docker image to use for couchbase server.")
 	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade",
-		"couchbase/server:6.6.3",
+		serverImageUpgradeFromDefault,
 		"Docker image to use for couchbase server upgrades to upgrade from.")
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image",
-		"couchbase/exporter:1.0.5",
+		exporterImageDefault,
 		"Docker image to use for the couchbase exporter.")
 	flag.StringVar(&params.CouchbaseExporterImageUpgrade, "exporter-image-upgrade",
-		"couchbase/exporter:1.0.4",
+		exporterImageUpgradeFromDefault,
 		"Docker image to use for couchbase exporter upgrades to upgrade from.")
 	flag.StringVar(&params.CouchbaseBackupImage, "backup-image",
-		"couchbase/operator-backup:1.1.0",
+		backupImageDefault,
 		"Docker image to use for couchbase backup.")
 	flag.StringVar(&params.CouchbaseLoggingImage, "logging-image",
-		"couchbase/fluent-bit:1.0.4",
+		loggingImageDefault,
 		"Docker image to use for couchbase log shipping.")
 	flag.StringVar(&params.CouchbaseLoggingImageUpgrade, "logging-image-upgrade",
-		"couchbase/fluent-bit:1.0.4",
+		loggingImageUpgradeFromDefault,
 		"Docker image to use for couchbase log shipping upgrades to upgrade from.")
 	flag.StringVar(&params.StorageClassName, "storage-class",
 		"",
