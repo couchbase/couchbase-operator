@@ -26,15 +26,13 @@ DOCKER_TAG = v1
 # Set this to, for example beta1, for a beta release.
 # This will affect the "-v" version strings and docker images.
 # This is analogous to revisions in DEB and RPM archives.
-revision = $(if $(REVISION),$(REVISION),)
+revision = $(if $(REVISION),$(REVISION),beta1)
 
 # Revisioned version is used for package creation.
 ifeq ($(revision),)
 revisionedVersion = $(version)
-revisionedProductVersion = $(version)-$(bldNum)
 else
 revisionedVersion = $(version)-$(revision)
-revisionedProductVersion = $(version)-$(revision)-$(bldNum)
 endif
 
 # What exact revision is this?
@@ -277,7 +275,7 @@ image-artifacts: binaries
 	cp Dockerfile.qa $(CERTIFICATION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.qa-rhel $(CERTIFICATION_ARTIFACTS)/Dockerfile.rhel
 	# Create the archive
-	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(revisionedProductVersion).tgz .
+	tar -C $(ARTIFACTS) -czf build/couchbase-operator-image_$(version)-$(bldNum).tgz .
 	rm -rf $(ARTIFACTS)
 
 # This target (and only this target) is invoked by the production build job.
