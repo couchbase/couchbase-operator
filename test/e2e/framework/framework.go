@@ -472,6 +472,19 @@ func createKubeClusterObject() (*types.Cluster, error) {
 		return nil, err
 	}
 
+	// Istio hack, because it's rubbish and starts the container before networking works.
+	callback := func() error {
+		if _, err := discoveryClient.ServerVersion(); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
+		return nil, fmt.Errorf("unable to poll kubernetes version, check authentication tokens are enabled, any network sidecars are running and no firewalls are preventing communication")
+	}
+
 	groupresources, err := restmapper.GetAPIGroupResources(discoveryClient)
 	if err != nil {
 		return nil, err

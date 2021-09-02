@@ -442,7 +442,13 @@ func (o *certifyOptions) waitCertificationPodReady() error {
 // This is useful for everyone as it shows it's doing something, and you can abort
 // early if you've gubbed everything.
 func (o *certifyOptions) streamLogs(since *metav1.Time) error {
-	request := o.client.CoreV1().Pods(o.namespace).GetLogs(certificationName, &corev1.PodLogOptions{Follow: true, SinceTime: since})
+	options := &corev1.PodLogOptions{
+		Follow:    true,
+		SinceTime: since,
+		Container: certificationName,
+	}
+
+	request := o.client.CoreV1().Pods(o.namespace).GetLogs(certificationName, options)
 
 	readCloser, err := request.Stream(context.TODO())
 	if err != nil {
