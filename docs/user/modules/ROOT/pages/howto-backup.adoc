@@ -31,11 +31,12 @@ spec:
 
 <.> The only required field to enable automated backup is xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-managed[`couchbaseclusters.spec.backup.managed`].
 
-<.> If the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-image[`couchbaseclusters.spec.backup.image`] field is left unspecified, then the dynamic admission controller will automatically populate it with the most recent container image that was available when the installed version of the Autonomous Operator was released.
+<.> If the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-image[`couchbaseclusters.spec.backup.image`] field is left unspecified, then it will be automatically populated with the most recent container image that was available when the installed version of the Autonomous Operator was released.
 The default image for open source Kubernetes comes from https://hub.docker.com/r/couchbase/operator-backup[Docker Hub^], and the default image for OpenShift comes from the https://access.redhat.com/containers/#/vendor/couchbase[Red Hat Container Catalog^].
 +
-If pulling directly from the the Red Hat Container Catalog, then the path will be something similar to `registry.connect.redhat.com/couchbase/operator-backup:{backup-version}` (you can refer to the catalog for the most recent images).
-If image pull secrets are required to access the image, they are inherited from the Couchbase Server Pod and can be set explicitly with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-pod[`couchbaseclusters.spec.servers.pod.spec.imagePullSecrets`] field or implicitly with a service account specified with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-pod[`couchbaseclusters.spec.servers.pod.spec.serviceAccountName`] field.
+When running on Red Hat OpenShift, you will want to modify this to use the Red Hat Container Catalog image.
+The image will be something similar to `registry.connect.redhat.com/couchbase/operator-backup:{backup-version}` (you can refer to the catalog for the most recent images).
+If image pull secrets are required to access the image, they can be set explicitly with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-imagepullsecrets[`couchbaseclusters.spec.backup.imagePullSecrets`] field or implicitly with a service account specified with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-serviceaccountname[`couchbaseclusters.spec.backup.serviceAccountName`] field.
 
 <.> If left unspecified, xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-serviceaccountname[`couchbaseclusters.spec.backup.serviceAccountName`] will default to the value of `couchbase-backup`.
 These Kubernetes resources *must* exist, otherwise backup jobs will not have the required permissions to complete successfully.
@@ -211,8 +212,7 @@ spec:
 ----
 
 In this example above, the Autonomous Operator would restore a range of backups from the latest backup repository.
-The omission of the `spec.repo` field means that the Autonomous Operator will look for the most recent backup repository either from the `CouchbaseBackup` object defined by `spec.backup` or from the PVC of the same name.
-If the `spec.repo` field is unable to be populated by the Autonomous Operator, then the resource will be rejected and no restore job will be created.
+The omission of the `spec.repo` field means that the Autonomous Operator will look for the most recent backup repository.
 
 [IMPORTANT]
 ====
@@ -221,12 +221,57 @@ The `CouchbaseBackupRestore` resource will have to be deleted and created from s
 When a `CouchbaseBackupRestore` resource is deleted, its associated `Job` and `Pod` resources are deleted immediately.
 ====
 
-[CAUTION]
-====
-When using the `couchbase/operator-backup` image version 1.1.0 and lower, bucket durability settings are not backed up.
-This means that if you restore data to buckets that are _not_ managed by the Autonomous Operator, there will be no durability settings to be restored when xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-services-bucketconfig[`couchbasebackuprestores.spec.services.bucketConfig`] is set to `true`.
-If restoring to a cluster whose buckets _are_ managed by the Autonomous Operator, any durability settings currently defined in the bucket resources will be honored by the Autonomous Operator.
-====
+=== Additional Backup Options
+
+Backups allow data to be filtered so that you only backup what you need, minimizing storage space and improving performance.
+Backup options can only be modified on creation of a new backup repository, so when using a full/incremental backup strategy, modifications will be deferred until the next full backup.
+
+Consider the following specification:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: my-backup
+spec:
+  data:
+    include: # <.>
+    - bucket1
+    - bucket1.scope
+    - bucket2.scope.collection
+    exclude: # <.>
+    - bucket3
+  services: # <.>
+    analytics: true
+    bucketConfig: true
+    bucketQuery: true
+    clusterAnalytics: true
+    clusterQuery: true
+    data: true
+    eventing: true
+    ftsAliases: true
+    ftsIndexes: true
+    gsIndexes: true
+    views: true
+  threads: 16 # <.>
+----
+
+<.> xref:resource/couchbasebackup.adoc#couchbasebackups-spec-data-include[`couchbasebackups.spec.data.include`] allows data sources to be explicitly selected.
+    When this field is set, the backup will exclude all data by default, and you have to opt-in to data items being included.
+    Data items cannot alias, e.g. `bucket` and `bucket.scope` alias, because latter is contained in the former.
+    This field cannot be specified at the same time as xref:resource/couchbasebackup.adoc#couchbasebackups-spec-data-exclude[`couchbasebackups.spec.data.exclude`].
+<.> xref:resource/couchbasebackup.adoc#couchbasebackups-spec-data-exclude[`couchbasebackups.spec.data.exclude`] allows data sources to be explicitly excluded.
+    When this field is set, the backup will include all data by default, and you have to opt-out from data items being included.
+    Data items cannot alias, e.g. `bucket` and `bucket.scope` alias, because latter is contained in the former.
+    This field cannot be specified at the same time as xref:resource/couchbasebackup.adoc#couchbasebackups-spec-data-include[`couchbasebackups.spec.data.include`].
+<.> xref:resource/couchbasebackup.adoc#couchbasebackups-spec-services[`couchbasebackups.spec.services`] allows the selection of what services are backed up.
+    By default all available services are include in the backup, and you have to opt-out.
+<.> xref:resource/couchbasebackup.adoc#couchbasebackups-spec-threads[`couchbasebackups.spec.threads`] allows the number of threads used by the backup to be tailored.
+    Increasing this value improves performance.
+    Ensure any value used here is less than that provided for backup pod CPU resource requests.
+
+Further details can be found on the xref:resource/couchbasebackup.adoc[`CouchbaseBackup` resource reference].
 
 [[additional-restore-options]]
 === Additional Restore Options
@@ -244,59 +289,65 @@ spec:
   repo: cb-example-2020-02-12T19_00_03
   start:
     int: 1
-  buckets:
-    include: # <1>
-      - default
-      - peanutbutter
-    exclude: # <1>
-      - horseman
-    bucketMap: # <2>
+  data:
+    include: # <.>
+    - default
+    - peanutbutter
+    - princess.caroline
+    exclude:
+    - horseman
+    map: # <.>
     - source: default
-      destination: new-default
+      target: new-default
     - source: peanutbutter
-      destination: pickles
-  services: # <3>
+      target: pickles
+    filterKeys: "^cat.*" # <.>
+  services: # <.>
     analytics: true
     bucketConfig: false
+    bucketQuery: true
+    clusterAnalytics: true
+    clusterQuery: true
     data: true
     eventing: true
     ftAlias: true
     ftIndex: true
     gsiIndex: true
     views: true
-  threads: 1 # <4>
+  threads: 1 # <.>
 ----
 
-<1> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-include[`couchbasebackuprestores.spec.data.include`]: Explicitly restore only the specified list of buckets.
+<.> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-include[`couchbasebackuprestores.spec.data.include`]: Explicitly restore only the specified list of buckets, scopes and collections.
 +
-xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-exclude[`couchbasebackuprestores.spec.data.exclude`]: Restore all buckets _except_ the list of specified buckets.
+xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-exclude[`couchbasebackuprestores.spec.data.exclude`]: Restore all buckets _except_ the list of specified buckets, scopes and collections.
 +
 [NOTE]
 ====
-The Dynamic Admission Controller will throw errors if discrepancies are found, such as:
-* a bucket being included in both lists, or
-* a bucket in the exclude list is also found in xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-map[`couchbasebackuprestores.spec.data.map`] as a source bucket.
+Include and exclude are mutually exclusive and cannot be specified at the same time.
+Data items cannot alias, e.g. `bucket` contains `bucket.scope`, and therefore cannot be defined at the same time.
 ====
 
-<2> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-map[`couchbasebackuprestores.spec.data.map`]: Specified when you want to restore a backup to a destination bucket that has a different name than the bucket that was originally backed up.
+<.> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-map[`couchbasebackuprestores.spec.data.map`]: Specified when you want to restore a backup to a destination bucket, scope or collection that has a different name than the bucket, scope or collection that was originally backed up.
 +
 This field requires a pair of fields named `source` and `destination`.
 +
 --
-* `source` refers to the name of the bucket to restore from in the backup archive
-* `destination` refers to the name of the existing (renamed) bucket to restore to in the Couchbase cluster
+* `source` refers to the name of the bucket, scope or collection to restore from in the backup archive
+* `target` refers to the name of the existing (renamed) bucket, scope or collection to restore to in the Couchbase cluster
 --
 +
-Multiple `source`/`destination` pairs may be specified.
+Multiple `source`/`target` pairs may be specified.
 Note that this option will only restore data to the Data Service and will not restore the metadata for any other service.
 Refer to the xref:server:backup-restore:cbbackupmgr-restore.adoc#options[`cbbackupmgr restore --map-buckets`] documentation for more information.
 
-<3> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-services[`couchbasebackuprestores.spec.services`]: By default, all data and configuration settings, for all services, are restored to the Couchbase cluster, _apart from bucket configuration settings_.
+<.> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-filterkeys[`couchbasebackuprestores.spec.data.filterKeys`] allows only those documents whose name matches a regular expression to be restored.
+
+<.> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-services[`couchbasebackuprestores.spec.services`]: By default, all data and configuration settings, for all services, are restored to the Couchbase cluster, _apart from bucket configuration settings_.
 +
 In order to skip restoring a particular service, simply set the service to `false` (these options correspond to the xref:server:backup-restore:cbbackupmgr-restore.adoc#options[`cbbackupmgr restore --disable-<service>`] flags).
 In order to restore bucket configuration settings, set xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-services-bucketconfig[`couchbasebackuprestores.spec.services.bucketConfig`] to `true` (this option corresponds to the xref:server:backup-restore:cbbackupmgr-restore.adoc#options[`cbbackupmgr restore --enable-bucket-config`] flag).
 
-<4> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-threads[`couchbasebackuprestores.spec.threads`]: An integer that specifies the number of concurrent `cbbackupmgr` clients to use when restoring data.
+<.> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-threads[`couchbasebackuprestores.spec.threads`]: An integer that specifies the number of concurrent `cbbackupmgr` clients to use when restoring data.
 Refer to the xref:server:backup-restore:cbbackupmgr-restore.adoc#options[`cbbackupmgr restore --threads`] documentation for more information.
 
 == Monitor and Manage Backups
@@ -353,16 +404,10 @@ status:
     - 2020-02-12T15_22_11.215924706Z
     name: cb-example-2020-02-12T15_15_07
   capacityUsed: 1.47Gi
-  cronjob: cbbackup-full-incr-incremental
   duration: 17s
   job: cbbackup-full-incr-incremental-1587137280
   lastRun: "2020-02-12T15:28:11Z"
   lastSuccess: "2020-02-12T15:28:28Z"
-  output: '{"location": "2020-02-12T15_28_11.986341497Z", "duration_seconds": "15.429305462",
-    "avg_data_transfer_rate_bytes_sec": 1853, "total_items": 0, "total_items_size_bytes":
-    28672, "buckets": {"default": {"mutations_backedup": "0", "mutations_failed":
-    "0", "deletions_backedup": "0", "deletions_failed": "0"}}}'
-  pod: cbbackup-full-incr-incremental-1581521912-mnng9
   repo: repo
   running: false
 ----

@@ -75,6 +75,19 @@ Scopes and collections provide fine grained access control and replication, and 
 
 For further information consult the xref:concept-scopes-and-collections.adoc[Scopes and Collections Concepts] documentation.
 
+==== Backup and Restore Improvements
+
+Due to interface changes introduced in Couchbase Server 7.0, a new backup image (1.2.0) is the only supported version that will run with Operator 2.3.
+It continues to support operation with Couchbase Server version 6.5 and 6.6.
+
+[IMPORTANT]
+====
+Ensure that any backup jobs are upgraded to use the new image when moving to Operator 2.3.
+====
+
+Backup 1.2.0 fully supports operation with Couchbase scopes and collections.
+Additional improvements include support for filtering of backup source data -- thus minimizing backup size and improving performance, and the addition of new options for filtering restore data -- such as with document key and value regular expressions.
+
 [#fixed-issues-v230-beta1]
 === Fixed Issues
 
