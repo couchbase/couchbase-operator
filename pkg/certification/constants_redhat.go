@@ -8,5 +8,5 @@ import (
 
 var (
 	imageRepo    = "registry.connect.redhat.com"
-	imageDefault = imageRepo + "/couchbase/platform-certification:" + version.WithRevision()
+	imageDefault = imageRepo + "/couchbase/operator-certification:" + version.WithRevision()
 )

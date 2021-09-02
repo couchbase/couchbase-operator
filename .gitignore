@@ -19,7 +19,7 @@ test/e2e/*.zip
 test/e2e/*.tar.gz
 e2e.test
 example-logs/
-couchbase-platform-certification*.tar.bz2
+couchbase-operator-certification*.tar.bz2
 /artifacts/
 
 # These are for CI/CD shizzle.

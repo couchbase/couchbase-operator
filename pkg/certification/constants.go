@@ -7,5 +7,5 @@ import (
 )
 
 var (
-	imageDefault = "couchbase/platform-certification:" + version.Version
+	imageDefault = "couchbase/operator-certification:" + version.Version
 )

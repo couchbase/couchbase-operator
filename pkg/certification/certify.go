@@ -29,7 +29,7 @@ import (
 
 const (
 	// rbacName is the name of RBAC resources.
-	rbacName = "couchbase-platform-certification"
+	rbacName = "couchbase-operator-certification"
 
 	// certificationName is the name used by certification resources.
 	certificationName = "certification"
@@ -38,7 +38,7 @@ const (
 	artifactsName = "artifacts"
 
 	// serviceAccount is the default service account to use.
-	serviceAccount = "couchbase-platform-certification"
+	serviceAccount = "couchbase-operator-certification"
 
 	// resourceExistsMessage is used to provide a safe way of detecting existing runs
 	// and not killing them.
@@ -189,7 +189,7 @@ type certifyOptions struct {
 func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := certifyOptions{}
 
-	archiveName := fmt.Sprintf("couchbase-platform-certification-%s", time.Now().Format("20060102T150405-0700"))
+	archiveName := fmt.Sprintf("couchbase-operator-certification-%s", time.Now().Format("20060102T150405-0700"))
 
 	cmd := &cobra.Command{
 		Use:   "certify",
