@@ -183,6 +183,12 @@ type certifyOptions struct {
 	// archiveName allows us to set a unique archive name for each run, in case
 	// there are any races.
 	archiveName string
+
+	// useFSGroup dictates whether to set the file system group.
+	useFSGroup bool
+
+	// fsGroup allows the file system group to be set.
+	fsGroup int
 }
 
 // getCertifyCommand returns a new Cobra certification command.
@@ -240,6 +246,8 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().StringVar(&o.archiveName, "archive-name", archiveName, "Set the default test archive name")
 	cmd.Flags().IntVar(&o.parallel, "parallel", 8, "Test concurrency")
 	cmd.Flags().BoolVar(&o.clean, "clean", false, "Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run")
+	cmd.Flags().BoolVar(&o.useFSGroup, "use-fsgroup", true, "Use a file system group for persistent volumes.")
+	cmd.Flags().IntVar(&o.fsGroup, "fsgroup", 1000, "Set the file system group for persistent volumes.")
 
 	return cmd
 }
@@ -407,6 +415,17 @@ func (o *certifyOptions) createCertificationPod(args []string) (func(), error) {
 	certificationPod.Spec.Containers[0].Image = o.image
 	certificationPod.Spec.Containers[0].Args = certificationArgs
 
+	// All our images should be run as non root as we have control.
+	runAsNonRoot := true
+	certificationPod.Spec.SecurityContext = &corev1.PodSecurityContext{
+		RunAsNonRoot: &runAsNonRoot,
+	}
+
+	if o.useFSGroup {
+		fsGroup := int64(o.fsGroup)
+		certificationPod.Spec.SecurityContext.FSGroup = &fsGroup
+	}
+
 	if _, err := o.client.CoreV1().Pods(o.namespace).Create(context.TODO(), certificationPod, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("%s: %w", resourceExistsMessage, err)
 	}
@@ -551,12 +570,25 @@ func (o *certifyOptions) createArtifactsPod() (func(), error) {
 
 	artifactPod := podTemplate.DeepCopy()
 	artifactPod.Name = artifactsName
-	artifactPod.Spec.Containers[0].Image = "busybox"
+	artifactPod.Spec.Containers[0].Image = o.image
 	artifactPod.Spec.Containers[0].Command = []string{
 		"/bin/sleep",
 	}
 	artifactPod.Spec.Containers[0].Args = []string{
 		"3600",
+	}
+
+	// I'm having issues finding a suitable non root image with tar in it, so as a
+	// compromise, we'll just force the container into a specific non-root user.
+	// All our images should be run as non root as we have control.
+	runAsNonRoot := true
+	artifactPod.Spec.SecurityContext = &corev1.PodSecurityContext{
+		RunAsNonRoot: &runAsNonRoot,
+	}
+
+	if o.useFSGroup {
+		fsGroup := int64(o.fsGroup)
+		artifactPod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 
 	if _, err := o.client.CoreV1().Pods(o.namespace).Create(context.TODO(), artifactPod, metav1.CreateOptions{}); err != nil {

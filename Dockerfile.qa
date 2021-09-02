@@ -20,6 +20,12 @@ RUN --mount=type=cache,target=/root/.cache/go-build make crd binaries certificat
 # the build container, and installing any other static dependencies.
 FROM golang:1.16.3
 
+# Install whatever compression and archival stuff we need to stream off
+# the test archive (logs).
+RUN --mount=type=cache,target=/var/cache/apt apt-get update \
+ && apt-get install -y tar bzip2 \
+ && rm -rf /var/lib/apt/lists/*
+
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
 
 COPY --from=build ${WORKDIR}/build/bin/cbopinfo /
@@ -30,5 +36,9 @@ COPY --from=build ${WORKDIR}/example/crd.yaml /
 COPY docs/README.txt /
 COPY docs/License.txt /
 COPY test/e2e/resources/validation /resources/validation/
+
+# Create a non-root user to run as.
+RUN useradd -u 8453 -s /bin/false couchbase
+USER 8453
 
 ENTRYPOINT ["/certification"]
