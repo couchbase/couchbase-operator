@@ -508,17 +508,17 @@ func TestValidationCreate(t *testing.T) {
 	supportedTimeUnits := []string{"ns", "us", "ms", "s", "m", "h"}
 
 	supportedImagePatterns := []string{
-		"registry.tld/org/image:6.5.0",
-		"registry.tld:1234/org/image:6.5.0",
-		"registry.tld:1234/org/image:prefix-6.5.0",
-		"registry.tld:1234/org/image:6.5.0-s",
-		"192.168.0.1/org/image:6.5.0",
-		"192.168.0.1:1234/org/image:6.5.0",
-		"org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
-		"registry.tld/org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
-		"registry.tld:1234/org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
-		"192.168.0.1/org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
-		"192.168.0.1:1234/org/image@sha256:b21765563ba510c0b1ca43bc9287567761d901b8d00fee704031e8f405bfa501",
+		"registry.tld/org/image:7.0.0",
+		"registry.tld:1234/org/image:7.0.0",
+		"registry.tld:1234/org/image:prefix-7.0.0",
+		"registry.tld:1234/org/image:7.0.0-s",
+		"192.168.0.1/org/image:7.0.0",
+		"192.168.0.1:1234/org/image:7.0.0",
+		"org/image@sha256:43a5c1abd5f85ec09019b8794e082e28ae2562195046660d2ead7f059ba67f64",
+		"registry.tld/org/image@sha256:43a5c1abd5f85ec09019b8794e082e28ae2562195046660d2ead7f059ba67f64",
+		"registry.tld:1234/org/image@sha256:43a5c1abd5f85ec09019b8794e082e28ae2562195046660d2ead7f059ba67f64",
+		"192.168.0.1/org/image@sha256:43a5c1abd5f85ec09019b8794e082e28ae2562195046660d2ead7f059ba67f64",
+		"192.168.0.1:1234/org/image@sha256:43a5c1abd5f85ec09019b8794e082e28ae2562195046660d2ead7f059ba67f64",
 		"192.168.0.1:1234/org/image@sha256:0000000000000000000000000000000000000000000000000000000000000000",
 	}
 

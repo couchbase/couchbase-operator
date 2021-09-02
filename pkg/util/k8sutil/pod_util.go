@@ -884,7 +884,12 @@ func applyPodMonitoring(client *client.Client, cluster *couchbasev2.CouchbaseClu
 
 func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	// Are we using a version of Server that has its own metrics exporter
-	serverVersionPrometheus, _ := couchbaseutil.VersionAfter(cluster.Spec.Image, "7.0.0")
+	serverVersionPrometheus := false
+
+	tag, err := CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		serverVersionPrometheus, _ = couchbaseutil.VersionAfter(tag, "7.0.0")
+	}
 
 	// Do we have the Prometheus exporter enabled
 	exporterEnabled := cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil && cluster.Spec.Monitoring.Prometheus.Enabled

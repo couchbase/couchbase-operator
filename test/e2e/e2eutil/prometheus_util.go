@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -222,8 +223,13 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 
 	// CBS 7+ uses port 8091, exporter uses port 9091
 	metricsPort := "9091"
+	serverVersionPrometheus := false
 
-	serverVersionPrometheus, _ := couchbaseutil.VersionAfter(couchbase.Spec.Image, "7.0.0")
+	tag, err := k8sutil.CouchbaseVersion(couchbase.Spec.Image)
+	if err != nil {
+		serverVersionPrometheus, _ = couchbaseutil.VersionAfter(tag, "7.0.0")
+	}
+
 	if serverVersionPrometheus {
 		metricsPort = "8091"
 	}
