@@ -136,7 +136,7 @@ Therefore, manual scaling is also possible using `kubectl`:
 
 [source,console]
 ----
-$ kubectl scale --replicas=6 query.cb-example
+$ kubectl scale couchbaseautoscalers --replicas=6 query.cb-example
 ----
 
 The above command results in scaling the server class named `query` to support `6` replicas.
