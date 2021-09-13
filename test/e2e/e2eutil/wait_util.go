@@ -276,6 +276,10 @@ func waitForResourceEvent(ctx context.Context, ready chan struct{}, k8s *types.C
 			return fmt.Errorf("%w: failed to wait for event %v/%v", ctx.Err(), event.Reason, event.Message)
 
 		case watchEvent := <-resultChan:
+			if watchEvent.Object == nil {
+				continue
+			}
+
 			ev := watchEvent.Object.(*v1.Event)
 			// Watch() returns every event since the dawn of time, so ensure we
 			// only return things after we started the wait.  This avoids matching
