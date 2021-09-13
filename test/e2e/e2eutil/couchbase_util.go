@@ -1282,3 +1282,27 @@ func MustVerifyReaderWriterThreads(t *testing.T, k8s *types.Cluster, cluster *co
 		Die(t, err)
 	}
 }
+
+// GetCouchbaseMetric gets the specified metric from Couchbase Server, using the specified labels, and returns them in a MetricsResponse.
+func GetCouchbaseMetric(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, metric string, labels map[string]string, timeout time.Duration) (*couchbaseutil.MetricsResponse, error) {
+	client := MustCreateAdminConsoleClient(t, k8s, cluster)
+
+	result := &couchbaseutil.MetricsResponse{}
+
+	path := fmt.Sprintf("/pools/default/stats/range/%s?", metric)
+
+	for k, v := range labels {
+		path = fmt.Sprintf("%s%s=%s&", path, k, v)
+	}
+
+	request := &couchbaseutil.Request{
+		Path:   path,
+		Result: result,
+	}
+
+	if err := client.client.Get(request, client.host); err != nil {
+		return result, err
+	}
+
+	return result, nil
+}

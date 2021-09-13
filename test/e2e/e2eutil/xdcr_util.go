@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -55,6 +56,52 @@ func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couch
 	if err := VerifyDocCountInBucket(t, k8s, cluster, bucket, items, timeout); err != nil {
 		Die(t, err)
 	}
+}
+
+func MustVerifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) {
+	if err := VerifyDocCountInCollection(t, k8s, cluster, bucket, scope, collection, items, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// VerifyDocCountInCollection uses Server 7.0's metrics to check that the current number of items in a collection is equal to a given number.
+func VerifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		// Labels are passed to specify which collection we're looking at.
+		labels := make(map[string]string)
+		labels["bucket"] = bucket
+		labels["scope"] = scope
+		labels["collection"] = collection
+
+		// Metric name of doc count in bucket. See: https://docs.couchbase.com/server/current/metrics-reference/metrics-reference.html
+		metricName := "kv_collection_item_count"
+
+		metrics, err := GetCouchbaseMetric(t, k8s, cluster, metricName, labels, time.Minute)
+		if err != nil {
+			return err
+		}
+
+		// We're only getting a single metric, so we can just get the first 'Data'.
+		if len(metrics.Data) == 0 {
+			return fmt.Errorf("metrics response had no data")
+		}
+		values := metrics.Data[0].Values
+		// Server returns multiple values, and we want the most recent/last one, and turn it into an int from a string.
+		if len(values) == 0 {
+			return fmt.Errorf("metrics response had no values")
+		}
+
+		itemCount, err := strconv.Atoi(values[len(values)-1][1].(string))
+		if err != nil {
+			return err
+		}
+
+		if itemCount != items {
+			return fmt.Errorf("document count %d, expected %d", itemCount, items)
+		}
+
+		return nil
+	})
 }
 
 // VerifyDocCountInBucketNonZero polls the Couchbase API for the named bucket and checks whether the

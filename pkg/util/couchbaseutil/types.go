@@ -1208,3 +1208,35 @@ func (s Scope) HasCollection(name string) bool {
 
 	return false
 }
+
+// MetricsResponse (and it's derivatives) are the format of the JSON returned from the prometheus endpoints provided by CB Server 7.0.
+// See: https://docs.couchbase.com/server/current/rest-api/rest-statistics-single.html#responses
+type MetricsResponse struct {
+	Data      []MetricsData  `json:"data"`
+	Err       []MetricsError `json:"errors"`
+	StartTime int            `json:"startTimestamp"`
+	EndTime   int            `json:"endTimestamp"`
+}
+
+// MetricsError is an error returned from a metrics endpoint, containing the errored node, and an error message.
+type MetricsError struct {
+	Node string `json:"node"`
+	Err  string `json:"error"`
+}
+
+// MetricsData is the meat of a metrics query, containing some metadata about the query, and the values for the metric.
+type MetricsData struct {
+	Metric MetricsInfo `json:"metric"`
+	// Values is a 2D array containing timestamps and the metric value (in that order). This seems to return up to 7 values,
+	// each is spaced 10 seconds apart, and are chronologically ordered.
+	Values [][]interface{} `json:"values"`
+}
+
+// MetricsInfo contains metadata about the query.
+type MetricsInfo struct {
+	Nodes      []string `json:"nodes"`
+	Bucket     string   `json:"bucket"`
+	Collection string   `json:"collection"`
+	Scope      string   `json:"scope"`
+	MetricName string   `json:"name"`
+}

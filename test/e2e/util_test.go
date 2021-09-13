@@ -277,6 +277,7 @@ func registerTests() {
 		framework.NewTestDef(TestPrometheusMetricsBearerTokenAuth).WithTags(TagSuiteP0, TagFeatureMetrics),
 		framework.NewTestDef(TestPrometheusMetricsUpgrade).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureUpgrade),
 		framework.NewTestDef(TestPrometheusMetricsOperator).WithTags(TagSuiteP0, TagFeatureMetrics),
+		framework.NewTestDef(TestCouchbaseMetricsDocumentCount).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureCollections),
 		framework.NewTestDef(TestCreateClusterWithTLSAndControlPlaneNodeToNode).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureTLS),
 		framework.NewTestDef(TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenScale).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenKillPod).WithTags(TagSuiteP0, TagFeatureTLS),
