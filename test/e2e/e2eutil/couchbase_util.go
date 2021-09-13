@@ -1126,6 +1126,81 @@ func MustCheckLDAPStatus(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.
 	}
 }
 
+// Get LDAP settings from couchbase server.
+func GetLDAPSettings(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) (*couchbaseutil.LDAPSettings, error) {
+	client, err := CreateAdminConsoleClient(k8s, couchbase)
+	if err != nil {
+		return nil, err
+	}
+
+	settings := &couchbaseutil.LDAPSettings{}
+	if err := couchbaseutil.GetLDAPSettings(settings).On(client.client, client.host); err != nil {
+		return nil, err
+	}
+
+	return settings, nil
+}
+
+// Requires fetching of couchbase server.
+func MustGetLDAPSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
+	if _, err := GetLDAPSettings(k8s, couchbase); err != nil {
+		Die(t, err)
+	}
+}
+
+// VerifyLDAPConfigured checks that most basic LDAP configuration has been applied to Couchbase Server.
+// Does not check connectivity... see CheckLDAPStatus.
+func VerifyLDAPConfigured(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) error {
+	settings, err := GetLDAPSettings(k8s, couchbase)
+	if err != nil {
+		return err
+	}
+
+	// Host must be specified
+	if len(settings.Hosts) == 0 {
+		return fmt.Errorf("ldap settings does not specify any hosts")
+	}
+
+	// Bind DN is used by most sensible people... or tests at least
+	if settings.BindDN == "" {
+		return fmt.Errorf("ldap settings missing bind distinguished name")
+	}
+
+	return nil
+}
+
+// MustVerifyLDAPConfigured requires LDAP configuration to exist.
+func MustVerifyLDAPConfigured(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
+	if err := VerifyLDAPConfigured(k8s, couchbase); err != nil {
+		Die(t, err)
+	}
+}
+
+// CheckLDAPSettingsRemoved waits for LDAP settings to be cleared from Couchbase cluster.
+func CheckLDAPSettingsRemoved(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		// check is successful when required hostname is removed
+		settings, err := GetLDAPSettings(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		if len(settings.Hosts) != 0 {
+			return fmt.Errorf("ldap server is still configured")
+		}
+
+		return nil
+	})
+}
+
+// MustCheckLDAPSettingsPersisted requires that LDAP settings remain for the specified duration.
+func MustCheckLDAPSettingsPersisted(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	err := CheckLDAPSettingsRemoved(k8s, couchbase, timeout)
+	if err == nil {
+		Die(t, fmt.Errorf("ldap settings were removed"))
+	}
+}
+
 // CheckN2N checks that all nodes are in the requested encryption state.
 func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled bool, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) error {
 	callback := func() error {

@@ -2169,6 +2169,11 @@ func (c *Cluster) reconcileBackupRestore() error {
 
 // reconcileRBAC reconciles users, groups, along with ldap settings.
 func (c *Cluster) reconcileRBAC() error {
+	// Skip reconciliation when RBAC disabled
+	if !c.cluster.Spec.Security.RBAC.Managed {
+		return nil
+	}
+
 	if err := c.reconcileLDAPSettings(); err != nil {
 		return err
 	}

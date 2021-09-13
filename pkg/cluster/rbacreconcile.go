@@ -24,10 +24,6 @@ const (
 // reconcileRBACResources compares requested and actual rbac resources
 // creates, updates, and deletes where necessary.
 func (c *Cluster) reconcileRBACResources() error {
-	if !c.cluster.Spec.Security.RBAC.Managed {
-		return nil
-	}
-
 	groups, err := c.reconcileGroups()
 	if err != nil {
 		return err

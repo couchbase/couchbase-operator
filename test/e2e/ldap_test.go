@@ -297,3 +297,52 @@ func TestLDAPDeleteBinding(t *testing.T) {
 	}
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
+
+// TestVerifyLDAPConfigRetention tests that LDAP configuration is retained when RBAC is unmanaged.
+func TestVerifyLDAPConfigRetention(t *testing.T) {
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	timeout := 2 * time.Minute
+
+	// Create Cluster
+	clusterSize := 1
+	testCouchbase := setupLDAP(t, targetKube)
+
+	// Expect user delete event to eventually occur
+	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, testCouchbase)
+	echan := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, event, timeout)
+
+	defer echan.Cancel()
+
+	// Create User
+	user, _, _ := mustCreateLDAPBoundUser(t, targetKube)
+	e2eutil.MustWaitUntilUserExists(t, targetKube, testCouchbase, user, timeout)
+
+	// Check that couchbase LDAP url setting exists
+	e2eutil.MustVerifyLDAPConfigured(t, targetKube, testCouchbase)
+
+	// Set RBAC to unmanaged
+	patches := jsonpatch.NewPatchSet().Replace("/spec/security/rbac/managed", false)
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patches, time.Minute)
+
+	// Verify that LDAP url settings still exist
+	e2eutil.MustCheckLDAPSettingsPersisted(t, targetKube, testCouchbase, 15*time.Second)
+
+	// Remove LDAP settings
+	patches = jsonpatch.NewPatchSet().Remove("/spec/security/ldap")
+	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patches, time.Minute)
+
+	// Verify that LDAP url settings still exist
+	e2eutil.MustCheckLDAPSettingsPersisted(t, targetKube, testCouchbase, 15*time.Second)
+
+	// Validation
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+	}
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}

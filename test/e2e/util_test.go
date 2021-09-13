@@ -233,6 +233,7 @@ func registerTests() {
 		framework.NewTestDef(TestLDAPDeleteUser).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureRBAC, TagFeatureLDAP),
 		framework.NewTestDef(TestLDAPDeleteRole).WithTags(TagSuiteP0, TagFeatureRBAC, TagFeatureLDAP),
 		framework.NewTestDef(TestLDAPUpdateRole).WithTags(TagSuiteP0, TagFeatureRBAC, TagFeatureLDAP),
+		framework.NewTestDef(TestVerifyLDAPConfigRetention).WithTags(TagSuiteP0, TagFeatureRBAC, TagFeatureLDAP),
 		framework.NewTestDef(TestBackupFullOnly).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureBackup),
 		framework.NewTestDef(TestBackupFullOnlyS3).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestore).WithTags(TagSuiteP0, TagFeatureBackup),
