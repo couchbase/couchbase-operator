@@ -9,6 +9,12 @@ This guide walks through the recommended procedure for installing the Couchbase 
 If you are looking to upgrade an existing installation of the Operator, see xref:howto-operator-upgrade.adoc[Upgrading the Autonomous Operator].
 ====
 
+== Helm Installation
+
+The Operator is able to be installed via Helm, see xref:helm-setup-guide.adoc[Helm Deployment] for setup instructions.
+
+The guide below is for installing the Operator package _directly_.
+
 == Prerequisites
 
 Download the Operator https://www.couchbase.com/downloads[package^] and unpack it on the same computer where you normally run `kubectl`.
