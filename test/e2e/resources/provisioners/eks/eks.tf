@@ -158,9 +158,9 @@ module "cluster1" {
   worker_groups = [
     {
       instance_type         = "m5.xlarge"
-      asg_min_size          = 2
-      asg_desired_capacity  = 3
-      asg_max_size          = 4
+      asg_min_size          = 5
+      asg_desired_capacity  = 6
+      asg_max_size          = 7
       root_volume_type      = "gp2"
     }
   ]
@@ -193,9 +193,9 @@ module "cluster2" {
   worker_groups = [
     {
       instance_type         = "m5.xlarge"
-      asg_min_size          = 2
-      asg_desired_capacity  = 3
-      asg_max_size          = 4
+      asg_min_size          = 5
+      asg_desired_capacity  = 6
+      asg_max_size          = 7
       root_volume_type      = "gp2"
     }
   ]

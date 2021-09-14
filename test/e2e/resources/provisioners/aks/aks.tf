@@ -53,7 +53,7 @@ resource "azurerm_kubernetes_cluster" "cluster1" {
 
   default_node_pool {
     name                = "nodepool1"
-    node_count          = 3
+    node_count          = 6
     vm_size             = "Standard_D4s_v4"
     availability_zones  = ["1", "2", "3"]
     os_disk_size_gb     = 30
@@ -115,7 +115,7 @@ resource "azurerm_kubernetes_cluster" "cluster2" {
 
   default_node_pool {
     name                = "nodepool2"
-    node_count          = 3
+    node_count          = 6
     vm_size             = "Standard_D4s_v4"
     availability_zones  = ["1", "2", "3"]
     os_disk_size_gb     = 30

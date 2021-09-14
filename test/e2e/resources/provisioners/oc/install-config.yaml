@@ -7,7 +7,7 @@ compute:
   platform:
     aws:
       type: m5.xlarge
-  replicas: 3
+  replicas: 6
 controlPlane:
   architecture: amd64
   hyperthreading: Enabled
