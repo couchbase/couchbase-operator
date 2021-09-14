@@ -296,9 +296,11 @@ func DefaultMemcachedBucket() *couchbasev2.CouchbaseMemcachedBucket {
 }
 
 func GetReplication(srcBucket, dstBucket string) *couchbasev2.CouchbaseReplication {
+	generateName := "test-replication-"
+
 	replication := &couchbasev2.CouchbaseReplication{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: e2e_constants.DefaultReplication,
+			GenerateName: generateName,
 		},
 		Spec: couchbasev2.CouchbaseReplicationSpec{
 			Bucket:       couchbasev2.BucketName(srcBucket),

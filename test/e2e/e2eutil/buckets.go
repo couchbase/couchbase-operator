@@ -39,6 +39,9 @@ type Bucket struct {
 
 	// flush allows the bucket to be flushed.
 	flush bool
+
+	// scopes is a slice containing the scopes to be added.
+	scopes []metav1.Object
 }
 
 // NewBucket creates a bucket with any required parameters.
@@ -58,6 +61,13 @@ func (b *Bucket) WithCompressionMode(compressionMode couchbasev2.CouchbaseBucket
 // WithFlush allows the bucket to be flushed.
 func (b *Bucket) WithFlush() *Bucket {
 	b.flush = true
+
+	return b
+}
+
+// WithScopes takes a variable amount of scope objects, and adds them to the bucket.
+func (b *Bucket) WithScopes(scopes ...metav1.Object) *Bucket {
+	b.scopes = append(b.scopes, scopes...)
 
 	return b
 }
@@ -82,6 +92,29 @@ func (b *Bucket) MustCreate(t *testing.T, kubernetes *types.Cluster) metav1.Obje
 			bucket.Spec.CompressionMode = b.compressionMode
 		}
 
+		if b.scopes != nil {
+			if bucket.Spec.Scopes == nil {
+				bucket.Spec.Scopes = &couchbasev2.ScopeSelector{}
+			}
+
+			bucket.Spec.Scopes.Managed = true
+
+			for _, scope := range b.scopes {
+				switch s := scope.(type) {
+				case *couchbasev2.CouchbaseScope:
+					bucket.Spec.Scopes.Resources = append(bucket.Spec.Scopes.Resources, couchbasev2.ScopeLocalObjectReference{
+						Kind: couchbasev2.ScopeCRDResourceKind,
+						Name: couchbasev2.ScopeOrCollectionName(s.Name),
+					})
+				case *couchbasev2.CouchbaseScopeGroup:
+					bucket.Spec.Scopes.Resources = append(bucket.Spec.Scopes.Resources, couchbasev2.ScopeLocalObjectReference{
+						Kind: couchbasev2.ScopeGroupCRDResourceKind,
+						Name: couchbasev2.ScopeOrCollectionName(s.Name),
+					})
+				}
+			}
+		}
+
 		newBucket, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBuckets(kubernetes.Namespace).Create(context.Background(), bucket, metav1.CreateOptions{})
 		if err != nil {
 			Die(t, err)
@@ -100,6 +133,29 @@ func (b *Bucket) MustCreate(t *testing.T, kubernetes *types.Cluster) metav1.Obje
 
 		if b.compressionMode != "" {
 			bucket.Spec.CompressionMode = b.compressionMode
+		}
+
+		if b.scopes != nil {
+			if bucket.Spec.Scopes == nil {
+				bucket.Spec.Scopes = &couchbasev2.ScopeSelector{}
+			}
+
+			bucket.Spec.Scopes.Managed = true
+
+			for _, scope := range b.scopes {
+				switch s := scope.(type) {
+				case *couchbasev2.CouchbaseScope:
+					bucket.Spec.Scopes.Resources = append(bucket.Spec.Scopes.Resources, couchbasev2.ScopeLocalObjectReference{
+						Kind: couchbasev2.ScopeCRDResourceKind,
+						Name: couchbasev2.ScopeOrCollectionName(s.Name),
+					})
+				case *couchbasev2.CouchbaseScopeGroup:
+					bucket.Spec.Scopes.Resources = append(bucket.Spec.Scopes.Resources, couchbasev2.ScopeLocalObjectReference{
+						Kind: couchbasev2.ScopeGroupCRDResourceKind,
+						Name: couchbasev2.ScopeOrCollectionName(s.Name),
+					})
+				}
+			}
 		}
 
 		newBucket, err := kubernetes.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(kubernetes.Namespace).Create(context.Background(), bucket, metav1.CreateOptions{})

@@ -17,6 +17,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type XDCRInfo struct {
+	Replication *couchbasev2.CouchbaseReplication
+	SecretName  string
+}
+
 // getBucketInfo returns information of the bucket.
 func getBucketInfo(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string) (*couchbaseutil.BucketStatus, error) {
 	client := MustCreateAdminConsoleClient(t, k8s, cluster)
@@ -102,6 +107,63 @@ func VerifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couch
 
 		return nil
 	})
+}
+
+func VerifyDocCountInScope(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, items int, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		// Labels are passed to specify which collection we're looking at.
+		labels := make(map[string]string)
+		labels["bucket"] = bucket
+		labels["scope"] = scope
+
+		// Metric name of doc count in bucket. See: https://docs.couchbase.com/server/current/metrics-reference/metrics-reference.html
+		metricName := "kv_collection_item_count"
+
+		metrics, err := GetCouchbaseMetric(t, k8s, cluster, metricName, labels, time.Minute)
+		if err != nil {
+			return err
+		}
+
+		// We're only getting a single type of metric (doc count), so we can just get the first 'Data'.
+		if len(metrics.Data) == 0 {
+			return fmt.Errorf("metrics response had no data")
+		}
+		totalCount := 0
+
+		// The doc count is returned per collection, so we need to add them all up to get the count in the scope.
+		for _, d := range metrics.Data {
+			// Server returns multiple values, and we want the most recent/last one, and turn it into an int from a string.
+			if len(d.Values) == 0 {
+				return fmt.Errorf("metrics response had no values")
+			}
+
+			itemCount, err := getLatestMetric(d.Values)
+			if err != nil {
+				return err
+			}
+
+			totalCount += itemCount
+		}
+
+		if totalCount != items {
+			return fmt.Errorf("document count %d, expected %d", totalCount, items)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyDocCountInScope(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, items int, timeout time.Duration) {
+	if err := VerifyDocCountInScope(t, k8s, cluster, bucket, scope, items, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// getLatestMetric takes the 2D array that server returns - an array of [timestamp, value] - and gets the last/most recent one.
+// Naturally, the returned value is a string, so we convert it to an int, then return it as the value we're looking for.
+// Sorry.
+func getLatestMetric(values [][]interface{}) (int, error) {
+	return strconv.Atoi(values[len(values)-1][1].(string))
 }
 
 // VerifyDocCountInBucketNonZero polls the Couchbase API for the named bucket and checks whether the
@@ -256,45 +318,47 @@ func getRemoteUUIDAndHost(kubernetes *types.Cluster, cluster *couchbasev2.Couchb
 
 func createRemoteClusterSecret(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster) (string, error) {
 	// Create the remote cluster secret.
-	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
+	xdcrSecret := fmt.Sprintf("%s-auth-", target.Name)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: xdcrSecret,
+			GenerateName: xdcrSecret,
 		},
 		Data: dstK8s.DefaultSecret.Data,
 	}
 
 	// Caller is responsible for deletion.
-	_, err := srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	secret, err := srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	return xdcrSecret, nil
+	return secret.GetName(), nil
 }
 
 func createRemoteCluster(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, xdcrSecret string) (string, error) {
 	// Create the XDCR remote cluster.
-	clusterName := "remote"
+	clusterName := target.Name
 
 	uuid, host, err := getRemoteUUIDAndHostGeneric(dstK8s, target)
 	if err != nil {
 		return "", err
 	}
 
-	xdcr := couchbasev2.XDCR{
-		Managed: true,
-		RemoteClusters: []couchbasev2.RemoteCluster{
-			{
-				Name:                 clusterName,
-				UUID:                 uuid,
-				Hostname:             host,
-				AuthenticationSecret: &xdcrSecret,
-			},
+	xdcr := []couchbasev2.RemoteCluster{
+		{
+			Name:                 clusterName,
+			UUID:                 uuid,
+			Hostname:             host,
+			AuthenticationSecret: &xdcrSecret,
 		},
 	}
 
-	_, err = patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/spec/xdcr", xdcr), time.Minute)
+	_, err = patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/spec/xdcr/managed", true), time.Minute)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Add("/spec/xdcr/remoteClusters", xdcr), time.Minute)
 
 	return clusterName, err
 }
@@ -311,7 +375,7 @@ func waitForRemoteClusterConnection(srcK8s *types.Cluster, source *couchbasev2.C
 
 // establishXDCRReplicationGeneric creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket.  If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func establishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (*couchbasev2.CouchbaseReplication, error) {
+func establishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (*XDCRInfo, error) {
 	// Populate the namespace manually as we don't return the API object.
 	replication.Namespace = srcK8s.Namespace
 
@@ -338,7 +402,12 @@ func establishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 		return nil, err
 	}
 
-	return replicationSpec, nil
+	info := &XDCRInfo{
+		Replication: replicationSpec,
+		SecretName:  xdcrSecret,
+	}
+
+	return info, nil
 }
 
 func establishXDCRMigrationGeneric(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, migration *couchbasev2.CouchbaseMigrationReplication) (*couchbasev2.CouchbaseMigrationReplication, error) {
@@ -468,10 +537,8 @@ func EstablishXDCRReplication(srcK8s, dstK8s *types.Cluster, source, target *cou
 	return
 }
 
-func MustRotateXDCRReplicationPassword(t *testing.T, src *types.Cluster, dst *types.Cluster, target *couchbasev2.CouchbaseCluster) {
-	xdcrSecret := fmt.Sprintf("%s-auth", target.Name)
-
-	secret, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Get(context.Background(), xdcrSecret, metav1.GetOptions{})
+func MustRotateXDCRReplicationPassword(t *testing.T, src *types.Cluster, dst *types.Cluster, target string) {
+	secret, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Get(context.Background(), target, metav1.GetOptions{})
 	if err != nil {
 		Die(t, err)
 	}
@@ -511,13 +578,13 @@ func DeleteXDCRReplication(k8s *types.Cluster, source *couchbasev2.CouchbaseClus
 	})
 }
 
-func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) *couchbasev2.CouchbaseReplication {
-	replication, err := establishXDCRReplicationGeneric(srcK8s, dstK8s, source, target, replication)
+func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) *XDCRInfo {
+	info, err := establishXDCRReplicationGeneric(srcK8s, dstK8s, source, target, replication)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return replication
+	return info
 }
 
 func MustEstablishXDCRMigrationReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseMigrationReplication) *couchbasev2.CouchbaseMigrationReplication {
