@@ -20,6 +20,7 @@ var (
 	ErrConditionMissing    = errors.New("pod condition missing")
 	ErrConditionUnready    = errors.New("pod condition unready")
 	ErrConditionRunning    = errors.New("pod condition runnning")
+	ErrStatusTerminated    = errors.New("pod status is terminated")
 	ErrStatusNotTerminated = errors.New("pod status not terminated")
 	ErrVolumeExists        = errors.New("pvc still exists")
 )
@@ -27,7 +28,7 @@ var (
 // WaitFunc is a callback that stops a wait when nil.
 type WaitFunc func() error
 
-// WaitFor waits until a condition is nil.
+// WaitFor waits until a condition is nil or the container is terminated.
 func WaitFor(f WaitFunc, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -36,6 +37,9 @@ func WaitFor(f WaitFunc, timeout time.Duration) error {
 	defer tick.Stop()
 
 	for err := f(); err != nil; err = f() {
+		if errors.Is(err, ErrStatusTerminated) {
+			return ErrStatusTerminated
+		}
 		select {
 		case <-tick.C:
 		case <-ctx.Done():
@@ -56,6 +60,10 @@ func PodReady(client kubernetes.Interface, namespace, name string) error {
 		if condition.Type == corev1.PodReady {
 			if condition.Status == corev1.ConditionTrue {
 				return nil
+			}
+
+			if condition.Status == corev1.ConditionFalse && pod.Status.ContainerStatuses[0].State.Terminated != nil {
+				return ErrStatusTerminated
 			}
 
 			return ErrConditionUnready

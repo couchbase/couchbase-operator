@@ -891,6 +891,13 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 
 	// Wait for the certification pod to start.
 	if err := o.waitCertificationPodReady(); err != nil {
+		if errors.Is(err, util.ErrStatusTerminated) {
+			// Certification pod has already terminated stream all logs
+			if err := o.streamLogs(nil); err != nil {
+				fmt.Println("Log stream terminated with error:", err)
+			}
+		}
+
 		return err
 	}
 
