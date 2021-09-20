@@ -13,6 +13,8 @@ This guide is meant to supplement the regular Amazon EKS https://docs.aws.amazon
 Create the EKS cluster(s) according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-create-cluster[documentation^], with either `eksctl` or via the AWS Management Console.
 Actual cluster creation in EKS can take some time (around 10-15 minutes per cluster).
 
+Note: We support BottleRocket OS for EKS workloads. To create EKS cluster with BottleRocket OS follow the steps https://kubernetes.io/docs/concepts/storage/storage-classes/#aws-ebs[here^].
+
 === Configure `kubectl`
 
 [NOTE]
