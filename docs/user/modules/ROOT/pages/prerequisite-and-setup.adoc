@@ -99,6 +99,8 @@ This release supports the following managed Kubernetes services and utilities:
 * Microsoft AKS
 * Rancher
 
+Note: We support BottleRocket OS for EKS workloads. To create EKS cluster with BottleRocket OS follow the steps https://kubernetes.io/docs/concepts/storage/storage-classes/#aws-ebs[here^].
+
 [#compatibility-pv]
 == Persistent Volume Compatibility
 
