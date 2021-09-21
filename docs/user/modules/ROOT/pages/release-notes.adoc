@@ -108,6 +108,20 @@ Some defaults were not able to be migrated so have been removed entirely:
   Up to date images can be found on Docker hub and the Red Hat container catalog.
   See the xref:prerequisite-and-setup.adoc[prerequisites] documentation for compatible image versions.
 
+==== Tooling Updates
+
+Previous releases came bundled with `cbopcfg` and `cbopinfo` binaries to aid installation and support requests respectively.
+While these binaries are still part of the distribution, the new xref:tools/cao.adoc[`cao`] binary features all the existing functionality of these tools, and extends the feature set to allow self-service platform certification.
+The existing `cbopcfg` and `cbopinfo` binaries are now deprecated and will be removed in a later release.
+
+You should update any tooling to use `cao`, or you can alias existing commands to use the new binary:
+
+[source,console]
+----
+$ alias cbopcfg='cao'
+$ alias cbopinfo='cao collect-logs'
+----
+
 [#fixed-issues-v230-beta1]
 === Fixed Issues
 

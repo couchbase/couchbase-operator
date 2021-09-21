@@ -104,8 +104,9 @@ include::partial$autogen-reference.adoc[]
 * Helm
  ** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]
 * Tools
- ** xref:tools/cbopcfg.adoc[cbopcfg]
- ** xref:tools/cbopinfo.adoc[cbopinfo]
+ ** xref:tools/cao.adoc[`cao`]
+ ** xref:tools/cbopcfg.adoc[`cbopcfg`]
+ ** xref:tools/cbopinfo.adoc[`cbopinfo`]
 
 .Tutorials
 * Authentication and Authorization

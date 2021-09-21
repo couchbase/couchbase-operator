@@ -67,11 +67,11 @@ You may use any combination of tag you wish.
 
 == Using the Custom Images
 
-When installing the Operator with xref:tools/cbopcfg.adoc[`cbopcfg`] you can specify the images to use.
+When installing the Operator with xref:tools/cao.adoc[`cao`] you can specify the images to use.
 Consider the following command that uses the images we created in the prior steps:
 
 [source,console,subs="attributes"]
 ----
-$ cbopcfg generate admission --image my-company/couchbase-operator-admission:{operator-version} | kubectl create -f -
-$ cbopcfg generate operator --image my-company/couchbase-operator:{operator-version} | kubectl create -f -
+$ cao create admission --image my-company/couchbase-operator-admission:{operator-version}
+$ cao create operator --image my-company/couchbase-operator:{operator-version}
 ----

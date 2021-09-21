@@ -1,0 +1,1841 @@
+// THIS FILE IS AUTO-GENERATED - DO NOT EDIT
+= cao
+include::partial$autogen-tools-aliases.adoc[tags=cao]
+
+include::partial$autogen-tools-install.adoc[tags=cao]
+
+== cao
+
+Couchbase Autonomous Operator Utility Tool
+
+== cao certify [flags]
+
+Runs the platform certification suite
+
+It's impossible to officially test every combination of Kubernetes
+platform, CNI and CSI plugin in order to give confidence that your
+specific combination will work as intended with the Operator.  To
+this end, the certify command will run a platform certification
+subset of the official Operator tests to give confidence that your
+plaform will work in a safe and supportable manner with managed
+Couchbase Server.
+
+The certification process is relatively invasive, so we recommend
+that this command be executed on a dedicated test Kubernetes cluster
+and not a production one.
+
+The certification process requires that it be allowed to create
+and delete namespaces in order to facilitate testing concurrently.
+It also requires permission to create roles and rolebindings in
+order to deploy the operator and dynamic admission controller.
+As such it will not be able to run without cluster wide roles that
+allow such functionality.
+
+Resource access is scoped so that only couchbase.com CRDs are managed
+and namespace with the name 'test-*'.
+
+=== Examples
+
+[source,console]
+----
+# Run platform certification with defaults
+cao certify
+
+# Run platform certification with a custom storage class
+cao certify -- -storage-class my-class
+
+# Run platform certification with private image repository
+cao certify --registry=https://index.docker.io/v1/,username,password
+----
+
+=== Flags
+
+--archive-name::
+*Type*: string
++
+*Default*: couchbase-operator-certification
++
+Set the default test archive name
+
+--clean::
+*Type*: bool
++
+*Default*: false
++
+Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run
+
+--fsgroup::
+*Type*: int
++
+*Default*: 1000
++
+Set the file system group for persistent volumes.
+
+--image::
+*Type*: string
++
+*Default*: couchbase/operator-certification:
++
+Certification image to use
+
+--parallel::
+*Type*: int
++
+*Default*: 8
++
+Test concurrency
+
+--registry::
+*Type*: string
++
+Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.
+
+--timeout::
+*Type*: string
++
+*Default*: 12h
++
+Maximum runtime to allow.  4h is enough for all tests on most platforms with 8 way concurrency.  It may take over a day running with 1 way concurrency
+
+--use-fsgroup::
+*Type*: bool
++
+*Default*: true
++
+Use a file system group for persistent volumes.
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao collect-logs [flags]
+
+Log and resource collection for Couchbase Autonomous Operator support.
+
+When you encounter a problem with the Autonomous Operator, our support
+teams require more than just the last line of the logs to diagnose and,
+ultimately, resolve the issue quickly.
+
+log collection, in its most basic form, collects all resources associated
+with the Autonomous Operator and Couchbase clusters in the specified
+namespace, this includes associated logs and events.  Most resource
+types are filtered, so the tool collects only what is necessary. Where
+filtering is not possible, all instances of that resource are collected,
+so it may be desirable to segregate the Autonomous Operator into its
+own namespace.  Secrets, for example, are not filtered, but the tool
+redacts values, so if your support request relates to TLS, you may
+need to manually collect these resources and include them in your
+support request.
+
+=== Examples
+
+[source,console]
+----
+# Collect operator and all couchbase cluster resources
+cao collect-logs
+
+# Collect operator and a named cluster's resources
+cao collect-logs --couchbase-cluster my-cluster
+
+# Collect operator resources and Couchbase Server logs
+cao collect-logs --collectinfo --collectinfo-collect=all
+
+# Collect operator and system (kube-system) resources
+cao collect-logs --system
+
+# Collect all known resources, applying no filtering
+cao collect-logs --all
+----
+
+=== Flags
+
+--all::
+*Type*: bool
++
+*Default*: false
++
+Collect all resources from the namespace
+
+--collectinfo::
+*Type*: bool
++
+*Default*: false
++
+Collect couchbase server logs
+
+--collectinfo-collect::
+*Type*: string
++
+Collect couchbase server logs non-interactively, requires the -collectinfo flag to be set
+
+--collectinfo-list::
+*Type*: bool
++
+*Default*: false
++
+List all log sources in json and exit, requires the -collectinfo flag to be set
+
+--collectinfo-redact::
+*Type*: bool
++
+*Default*: false
++
+Redact couchbase server logs, requires the -collectinfo flag to be set
+
+--couchbase-cluster::
+*Type*: string
++
+Collect only resource for the named CouchbaseCluster, may be used multiple times
+
+--directory::
+*Type*: string
++
+Collect logs in a specific directory
+
+--operator-image::
+*Type*: string
++
+*Default*: couchbase/operator:
++
+Operator image name
+
+--operator-metrics-port::
+*Type*: string
++
+*Default*: 8383
++
+Operator metrics port
+
+--operator-rest-port::
+*Type*: string
++
+*Default*: 8080
++
+Operator rest port
+
+--server-image::
+*Type*: string
++
+*Default*: couchbase/server:6.6.2
++
+Couchbase server image
+
+--system::
+*Type*: bool
++
+*Default*: false
++
+Collect kube-system resources and logs
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao create
+
+Creates Couchbase Autonomous Operator components
+
+== cao create admission [flags]
+
+Creates the dynamic admission controller.
+
+The DAC is designed to be deployed at the cluster scope (default).
+It monitors Couchbase resources as they are created and modified,
+accepting, or rejecting them, before they are persisted in etcd.
+
+Use of the DAC is encouraged as it will report any configuration
+errors that are specific to deployment of Couchbase resources that
+aren't available by default in the Kubernetes API.  For example,
+this includes validating memory quotas are satisfiable, TLS
+certificates are correctly configured, and any resources referenced
+actually exist.
+
+=== Examples
+
+[source,console]
+----
+# Create admission controller (recommended).
+cao create admission
+
+# Create admission controller scoped to a namespace.
+cao create admission --scope namespace --namespace-selector key=value
+
+# Create admission controller with custom image and secure image registry.
+cao create admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
+
+# Create admission controller without secret access.
+cao create admission --validate-secrets=false
+
+# Create admission controller with debug logging.
+cao create admission --log-level debug
+----
+
+=== Flags
+
+--cpu-limit::
+*Type*: quantity
++
+*Default*: 1
++
+CPU limit for constraining, only valid when used with --with-resources
+
+--cpu-request::
+*Type*: quantity
++
+*Default*: 500m
++
+CPU requested for scheduling, only valid when used with --with-resources
+
+--default-file-system-group::
+*Type*: bool
++
+*Default*: true
++
+Fills in default file system group information on Couchbase volumes
+
+--image::
+*Type*: string
++
+*Default*: couchbase/admission-controller:
++
+Operator image to use
+
+--image-pull-secret::
+*Type*: string
++
+Image pull secret to allow access to the operator image
+
+--log-level::
+*Type*: string
++
+*Default*: info
++
+Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information.
+
+--memory-limit::
+*Type*: quantity
++
+*Default*: 200Mi
++
+Memory limit for constraining, only valid when used with --with-resources
+
+--memory-request::
+*Type*: quantity
++
+*Default*: 100Mi
++
+Memory requested for scheduling, only valid when used with --with-resources
+
+--namespace-selector::
+*Type*: map
++
+Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].
+
+--replicas::
+*Type*: int
++
+*Default*: 1
++
+The number of replicas in the deployment
+
+--scope::
+*Type*: string
++
+*Default*: cluster
++
+Whether to scope the Operator to a 'namespace' or to the 'cluster'.
+
+--validate-secrets::
+*Type*: bool
++
+*Default*: true
++
+Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity
+
+--validate-storage-classes::
+*Type*: bool
++
+*Default*: true
++
+Validates storage classes referenced by Couchbase resources
+
+--with-resources::
+*Type*: bool
++
+*Default*: false
++
+Populates pod resource requests and limits
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao create backup
+
+Creates backup roles.
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao create operator [flags]
+
+Creates the Couchbase Autonomous Operator.
+
+The Operator is designed to be run at the namespace scope (default).
+It watches for creation of CouchbaseCluster resources in that namespace
+and provides automated provisioning, management and disaster recovery
+of Couchbase Server.
+
+=== Examples
+
+[source,console]
+----
+# Create operator (recommended).
+cao create operator
+
+# Create operator scoped to the cluster.
+cao create operator --scope cluster
+
+# Create operator with a custom image and secure image registry.
+cao create operator --image acme.corp/operator:1.0.0 --image-pull-secret secret-name
+
+# Create operator with debug logging.
+cao create operator --log-level debug
+
+# Create operator with extended timeouts (for slow platforms).
+cao create operator --pod-creation-timeout 1h
+----
+
+=== Flags
+
+--cpu-limit::
+*Type*: quantity
++
+*Default*: 1
++
+CPU limit for constraining
+
+--cpu-request::
+*Type*: quantity
++
+*Default*: 500m
++
+CPU requested for scheduling
+
+--image::
+*Type*: string
++
+*Default*: couchbase/operator:
++
+Operator image to use.
+
+--image-pull-secret::
+*Type*: string
++
+Image pull secret to allow access to the operator image.
+
+--log-level::
+*Type*: string
++
+*Default*: info
++
+Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information and API calls. "2" prints very detailed logs, including full API payloads that may contain passwords and keys.
+
+--memory-limit::
+*Type*: quantity
++
+*Default*: 400Mi
++
+Memory limit for constraining
+
+--memory-request::
+*Type*: quantity
++
+*Default*: 200Mi
++
+Memory requested for scheduling
+
+--pod-creation-timeout::
+*Type*: string
++
+*Default*: 10m0s
++
+How long to wait before declaring an error when provisioning a pod.
+
+--scope::
+*Type*: string
++
+*Default*: namespace
++
+Whether to scope the Operator to a 'namespace' or to the 'cluster'.
+
+--with-resources::
+*Type*: bool
++
+*Default*: false
++
+Populates pod resource requests and limits
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao delete
+
+Deletes Couchbase Autonomous Operator components
+
+== cao delete admission [flags]
+
+Deletes the dynamic admission controller.
+
+=== Examples
+
+[source,console]
+----
+# Delete admission controller (recommended).
+cao delete admission
+
+# Delete admission controller scoped to a namespace.
+cao delete admission --scope namespace
+----
+
+=== Flags
+
+--scope::
+*Type*: string
++
+*Default*: cluster
++
+Whether to scope the Operator to a 'namespace' or to the 'cluster'.
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao delete backup
+
+Deletes backup roles.
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao delete operator [flags]
+
+Deletes the Couchbase Autonomous Operator.
+
+=== Examples
+
+[source,console]
+----
+# Delete operator (recommended).
+cao delete operator
+
+# Delete operator scoped to the cluster.
+cao delete operator --scope cluster
+----
+
+=== Flags
+
+--scope::
+*Type*: string
++
+*Default*: namespace
++
+Whether to scope the Operator to a 'namespace' or to the 'cluster'.
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao generate
+
+Generates YAML manifests for various Operator components
+
+== cao generate admission [flags]
+
+Generates YAML for the dynamic admission controller.
+
+The DAC is designed to be deployed at the cluster scope (default).
+It monitors Couchbase resources as they are created and modified,
+accepting, or rejecting them, before they are persisted in etcd.
+
+Use of the DAC is encouraged as it will report any configuration
+errors that are specific to deployment of Couchbase resources that
+aren't available by default in the Kubernetes API.  For example,
+this includes validating memory quotas are satisfiable, TLS
+certificates are correctly configured, and any resources referenced
+actually exist.
+
+=== Examples
+
+[source,console]
+----
+# Create admission controller (recommended).
+cao generate admission
+
+# Create admission controller scoped to a namespace.
+cao generate admission --scope namespace --namespace-selector key=value
+
+# Create admission controller with custom image and secure image registry.
+cao generate admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
+
+# Create admission controller without secret access.
+cao generate admission --validate-secrets=false
+
+# Create admission controller with debug logging.
+cao generate admission --log-level debug
+----
+
+=== Flags
+
+--cpu-limit::
+*Type*: quantity
++
+*Default*: 1
++
+CPU limit for constraining, only valid when used with --with-resources
+
+--cpu-request::
+*Type*: quantity
++
+*Default*: 500m
++
+CPU requested for scheduling, only valid when used with --with-resources
+
+--default-file-system-group::
+*Type*: bool
++
+*Default*: true
++
+Fills in default file system group information on Couchbase volumes
+
+--image::
+*Type*: string
++
+*Default*: couchbase/admission-controller:
++
+Operator image to use
+
+--image-pull-secret::
+*Type*: string
++
+Image pull secret to allow access to the operator image
+
+--log-level::
+*Type*: string
++
+*Default*: info
++
+Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information.
+
+--memory-limit::
+*Type*: quantity
++
+*Default*: 200Mi
++
+Memory limit for constraining, only valid when used with --with-resources
+
+--memory-request::
+*Type*: quantity
++
+*Default*: 100Mi
++
+Memory requested for scheduling, only valid when used with --with-resources
+
+--namespace-selector::
+*Type*: map
++
+Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].
+
+--replicas::
+*Type*: int
++
+*Default*: 1
++
+The number of replicas in the deployment
+
+--scope::
+*Type*: string
++
+*Default*: cluster
++
+Whether to scope the Operator to a 'namespace' or to the 'cluster'.
+
+--validate-secrets::
+*Type*: bool
++
+*Default*: true
++
+Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity
+
+--validate-storage-classes::
+*Type*: bool
++
+*Default*: true
++
+Validates storage classes referenced by Couchbase resources
+
+--with-resources::
+*Type*: bool
++
+*Default*: false
++
+Populates pod resource requests and limits
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao generate backup
+
+Generates YAML for backup jobs.
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao generate operator [flags]
+
+Generates YAML for the Couchbase Autonomous Operator.
+
+The Operator is designed to be run at the namespace scope (default).
+It watches for creation of CouchbaseCluster resources in that namespace
+and provides automated provisioning, management and disaster recovery
+of Couchbase Server.
+
+=== Examples
+
+[source,console]
+----
+# Create operator (recommended).
+cao generate operator
+
+# Create operator scoped to the cluster.
+cao generate operator --scope cluster
+
+# Create operator with a custom image and secure image registry.
+cao generate operator --image acme.corp/operator:1.0.0 --image-pull-secret secret-name
+
+# Create operator with debug logging.
+cao generate operator --log-level debug
+
+# Create operator with extended timeouts (for slow platforms).
+cao generate operator --pod-creation-timeout 1h
+----
+
+=== Flags
+
+--cpu-limit::
+*Type*: quantity
++
+*Default*: 1
++
+CPU limit for constraining
+
+--cpu-request::
+*Type*: quantity
++
+*Default*: 500m
++
+CPU requested for scheduling
+
+--image::
+*Type*: string
++
+*Default*: couchbase/operator:
++
+Operator image to use.
+
+--image-pull-secret::
+*Type*: string
++
+Image pull secret to allow access to the operator image.
+
+--log-level::
+*Type*: string
++
+*Default*: info
++
+Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information and API calls. "2" prints very detailed logs, including full API payloads that may contain passwords and keys.
+
+--memory-limit::
+*Type*: quantity
++
+*Default*: 400Mi
++
+Memory limit for constraining
+
+--memory-request::
+*Type*: quantity
++
+*Default*: 200Mi
++
+Memory requested for scheduling
+
+--pod-creation-timeout::
+*Type*: string
++
+*Default*: 10m0s
++
+How long to wait before declaring an error when provisioning a pod.
+
+--scope::
+*Type*: string
++
+*Default*: namespace
++
+Whether to scope the Operator to a 'namespace' or to the 'cluster'.
+
+--with-resources::
+*Type*: bool
++
+*Default*: false
++
+Populates pod resource requests and limits
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao version
+
+Prints the command version
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+

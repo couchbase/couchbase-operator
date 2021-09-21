@@ -124,7 +124,7 @@ func (o *generateAdmissionOptions) registerAdmissionGenerateFlags(cmd *cobra.Com
 }
 
 // getGenerateAdmissionCommand creates YAML capable of creating the dynamic admission controller.
-func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getGenerateAdmissionCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
@@ -144,22 +144,22 @@ func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Co
 			certificates are correctly configured, and any resources referenced
 			actually exist.
 		`),
-		Example: normalize(`
+		Example: normalize(fmt.Sprintf(`
 			# Create admission controller (recommended).
-			cbopcfg generate admission
+			%[1]s generate admission
 
 			# Create admission controller scoped to a namespace.
-			cbopcfg generate admission --scope namespace --namespace-selector key=value
+			%[1]s generate admission --scope namespace --namespace-selector key=value
 
 			# Create admission controller with custom image and secure image registry.
-			cbopcfg generate admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
+			%[1]s generate admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
 
                         # Create admission controller without secret access.
-                        cbopcfg generate admission --validate-secrets=false
+                        %[1]s generate admission --validate-secrets=false
 
                         # Create admission controller with debug logging.
-                        cbopcfg generate admission --log-level debug
-		`),
+                        %[1]s generate admission --log-level debug
+		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := o.validate(); err != nil {
 				return err
@@ -184,7 +184,7 @@ func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Co
 }
 
 // getCreateAdmissionCommand creates the admission controller.
-func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getCreateAdmissionCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
@@ -204,22 +204,22 @@ func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
                         certificates are correctly configured, and any resources referenced
                         actually exist.
 		`),
-		Example: normalize(`
+		Example: normalize(fmt.Sprintf(`
                         # Create admission controller (recommended).
-                        cbopcfg create admission
+                        %[1]s create admission
 
                         # Create admission controller scoped to a namespace.
-                        cbopcfg create admission --scope namespace --namespace-selector key=value
+                        %[1]s create admission --scope namespace --namespace-selector key=value
 
                         # Create admission controller with custom image and secure image registry.
-                        cbopcfg create admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
+                        %[1]s create admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
 
 			# Create admission controller without secret access.
-			cbopcfg create admission --validate-secrets=false
+			%[1]s create admission --validate-secrets=false
 
                         # Create admission controller with debug logging.
-                        cbopcfg create admission --log-level debug
-                `),
+                        %[1]s create admission --log-level debug
+                `, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := o.validate(); err != nil {
 				return err
@@ -244,20 +244,20 @@ func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Comm
 }
 
 // getDeleteAdmissionCommand deletes the admission controller.
-func getDeleteAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getDeleteAdmissionCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
 		Use:   "admission",
 		Short: "Deletes the dynamic admission controller.",
 		Long:  "Deletes the dynamic admission controller.",
-		Example: normalize(`
+		Example: normalize(fmt.Sprintf(`
 			# Delete admission controller (recommended).
-			cbopcfg delete admission
+			%[1]s delete admission
 
 			# Delete admission controller scoped to a namespace.
-			cbopcfg delete admission --scope namespace
-		`),
+			%[1]s delete admission --scope namespace
+		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := o.validate(); err != nil {
 				return err

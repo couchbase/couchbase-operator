@@ -74,8 +74,6 @@ func (v *AppendStringVar) Set(s string) error {
 }
 
 func (c *Configuration) AddFlags(flags *pflag.FlagSet) {
-	c.ConfigFlags.AddFlags(flags)
-
 	// Parse command line flags into our configuration
 	flags.StringVar(&c.OperatorImage, operatorImageFlag, "couchbase/operator:"+version.Version, "Operator image name")
 	flags.StringVar(&c.OperatorRestPort, operatorRestPortFlag, "8080", "Operator rest port")

@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/couchbase/couchbase-operator/pkg/config"
+	"github.com/couchbase/couchbase-operator/pkg/info/command"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	"github.com/spf13/cobra"
@@ -33,20 +35,23 @@ func GenerateCommand() *cobra.Command {
 		Short: "Prints the command version",
 		Long:  "Prints the command version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("cbopcfg", version.WithBuildNumber())
+			fmt.Println("cao", version.WithBuildNumber())
 		},
 	}
 
 	root := &cobra.Command{
 		Use:   "cao",
-		Short: "Couchbase Autonomous Operator platform certification utility",
-		Long:  "Couchbase Autonomous Operator platform certification utility",
+		Short: "Couchbase Autonomous Operator Utility Tool",
+		Long:  "Couchbase Autonomous Operator Utility Tool",
 	}
 
 	flags.AddFlags(root.PersistentFlags())
 
 	root.AddCommand(version)
 	root.AddCommand(getCertifyCommand(flags))
+
+	config.ApplySubCommands(root, flags)
+	command.ApplySubCommands(root, flags)
 
 	return root
 }

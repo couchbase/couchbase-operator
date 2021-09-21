@@ -22,8 +22,7 @@ FROM registry.access.redhat.com/ubi8/go-toolset:1.15.14-3
 
 ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
 
-COPY --from=build ${WORKDIR}/build/bin/cbopinfo /
-COPY --from=build ${WORKDIR}/build/bin/cbopcfg /
+COPY --from=build ${WORKDIR}/build/bin/cao /
 COPY --from=build ${WORKDIR}/build/bin/certification /
 COPY --from=build ${WORKDIR}/example/crd.yaml /
 

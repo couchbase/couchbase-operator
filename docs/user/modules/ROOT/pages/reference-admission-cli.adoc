@@ -6,7 +6,7 @@ Command line options for the Autonomous Operator Dynamic Admission Controller.
 == Dynamic Admission Controller Deployment
 
 The Dynamic Admission Controller (DAC) configuration is defined below:
-This is intended as a reference only, and you should prefer the use of the xref:tools/cbopcfg.adoc[`cbopcfg` utility] or xref:helm-setup-guide.adoc[Helm], as these will handle configuration for you and provide an abstraction layer, less prone to modification.
+This is intended as a reference only, and you should prefer the use of the xref:tools/cao.adoc[`cao` utility] or xref:helm-setup-guide.adoc[Helm], as these will handle configuration for you and provide an abstraction layer, less prone to modification.
 
 [source,yaml]
 ----

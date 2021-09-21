@@ -333,7 +333,7 @@ func setup() error {
 		cluster,
 	}
 
-	Global.CbopinfoPath = "/cbopinfo"
+	Global.CbopinfoPath = "/cao"
 
 	if len(Global.RegistryConfigs) > 0 {
 		logrus.Info(util.PrettyHeading("Docker Registries"))
@@ -824,7 +824,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 			args = append(args, "--image-pull-secret="+secret)
 		}
 
-		if _, err := exec.Command("/cbopcfg", args...).CombinedOutput(); err != nil {
+		if _, err := exec.Command("/cao", args...).CombinedOutput(); err != nil {
 			e2eutil.Die(t, err)
 		}
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -105,7 +106,7 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 }
 
 // getGenerateOperatorCommand creates YAML capable of creating the Operator.
-func getGenerateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getGenerateOperatorCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateOperatorOptions()
 
 	cmd := &cobra.Command{
@@ -119,22 +120,22 @@ func getGenerateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 			and provides automated provisioning, management and disaster recovery
 			of Couchbase Server.
 		`),
-		Example: normalize(`
+		Example: normalize(fmt.Sprintf(`
                         # Create operator (recommended).
-                        cbopcfg generate operator
+                        %[1]s generate operator
 
 			# Create operator scoped to the cluster.
-			cbopcfg generate operator --scope cluster
+			%[1]s generate operator --scope cluster
 
 			# Create operator with a custom image and secure image registry.
-			cbopcfg generate operator --image acme.corp/operator:1.0.0 --image-pull-secret secret-name
+			%[1]s generate operator --image acme.corp/operator:1.0.0 --image-pull-secret secret-name
 
 			# Create operator with debug logging.
-			cbopcfg generate operator --log-level debug
+			%[1]s generate operator --log-level debug
 
 			# Create operator with extended timeouts (for slow platforms).
-			cbopcfg generate operator --pod-creation-timeout 1h
-		`),
+			%[1]s generate operator --pod-creation-timeout 1h
+		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
 			if err != nil {
@@ -155,7 +156,7 @@ func getGenerateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 }
 
 // getCreateOperatorCommand creates the Operator.
-func getCreateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getCreateOperatorCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateOperatorOptions()
 
 	cmd := &cobra.Command{
@@ -169,22 +170,22 @@ func getCreateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Comma
                         and provides automated provisioning, management and disaster recovery
                         of Couchbase Server.
 		`),
-		Example: normalize(`
+		Example: normalize(fmt.Sprintf(`
                         # Create operator (recommended).
-                        cbopcfg create operator
+                        %[1]s create operator
 
                         # Create operator scoped to the cluster.
-                        cbopcfg create operator --scope cluster
+                        %[1]s create operator --scope cluster
 
                         # Create operator with a custom image and secure image registry.
-                        cbopcfg create operator --image acme.corp/operator:1.0.0 --image-pull-secret secret-name
+                        %[1]s create operator --image acme.corp/operator:1.0.0 --image-pull-secret secret-name
 
                         # Create operator with debug logging.
-                        cbopcfg create operator --log-level debug
+                        %[1]s create operator --log-level debug
 
                         # Create operator with extended timeouts (for slow platforms).
-                        cbopcfg create operator --pod-creation-timeout 1h
-                `),
+                        %[1]s create operator --pod-creation-timeout 1h
+                `, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
 			if err != nil {
@@ -205,20 +206,20 @@ func getCreateOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Comma
 }
 
 // getDeleteOperatorCommand deletes the Operator.
-func getDeleteOperatorCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getDeleteOperatorCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateOperatorOptions()
 
 	cmd := &cobra.Command{
 		Use:   "operator",
 		Short: "Deletes the Couchbase Autonomous Operator.",
 		Long:  "Deletes the Couchbase Autonomous Operator.",
-		Example: normalize(`
+		Example: normalize(fmt.Sprintf(`
 			# Delete operator (recommended).
-			cbopcfg delete operator
+			%[1]s delete operator
 
 			# Delete operator scoped to the cluster.
-			cbopcfg delete operator --scope cluster
-		`),
+			%[1]s delete operator --scope cluster
+		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
 			if err != nil {

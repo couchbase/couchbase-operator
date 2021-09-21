@@ -27,7 +27,7 @@ Used the the DAC to lookup the namespace a cluster is running in.
 This is used on determine whether the cluster is running on Red Hat OpenShift.
 This information is used to determine correct defaults for the platform.
 +
-You can opt out of this requirement with the xref:tools/cbopcfg.adoc[`--default-file-system-group` cbopcfg flag].
+You can opt out of this requirement with the xref:tools/cao.adoc[`--default-file-system-group` `cao` flag].
 +
 _Required Permissions_: `get`
 
@@ -36,7 +36,7 @@ Used by the DAC to look for secrets references in the `CouchbaseCluster` specifi
 It will ensure that the username and password secrets exist.
 It will ensure that, if specified, the TLS secrets are present and correct, and are valid for the cluster.
 +
-You can opt out of this requirement with the xref:tools/cbopcfg.adoc[`--validate-secrets` cbopcfg flag].
+You can opt out of this requirement with the xref:tools/cao.adoc[`--validate-secrets` `cao` flag].
 +
 _Required Permissions_: `get`
 
@@ -44,7 +44,7 @@ storage.k8s.io/storageclasses::
 Used by the DAC to look for storage class references in the `CouchbaseCluster` specification.
 It will ensure that, if present, any storage class templates reference existing storage classes.
 +
-You can opt out of this requirement with the xref:tools/cbopcfg.adoc[`--validate-storage-classes` cbopcfg flag].
+You can opt out of this requirement with the xref:tools/cao.adoc[`--validate-storage-classes` `cao` flag].
 +
 _Required Permissions_: `get`
 
@@ -57,5 +57,5 @@ These resources will never be leaked through logs and are never persisted by the
 If, however, your security policies declare that such permissions cannot be granted to an application, then they can be safely removed from the admission controller's role.
 You will then no longer be informed about missing secrets and storage classes, incorrectly formatted secrets, and invalid TLS configurations.
 
-For further information on opting out of these checks, see the documentation for the xref:tools/cbopcfg.adoc[`cbopcfg generate admission`] command.
+For further information on opting out of these checks, see the documentation for the xref:tools/cao.adoc[`cao generate admission`] command.
 ====

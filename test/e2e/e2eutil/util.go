@@ -1527,7 +1527,10 @@ func (a ArgumentList) Clone() ArgumentList {
 
 // Generic function to run cbopinfo command.
 func Cbopinfo(path string, cmdArgs []string) ([]byte, error) {
-	return exec.Command(path, cmdArgs...).CombinedOutput()
+	args := []string{"collect-logs"}
+	args = append(args, cmdArgs...)
+
+	return exec.Command(path, args...).CombinedOutput()
 }
 
 func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPath, operatorImage string, collectServerLogs bool) {

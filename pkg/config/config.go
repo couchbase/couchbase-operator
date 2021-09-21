@@ -18,19 +18,9 @@ const (
 	versionAnnotation = "config.couchbase.com/version"
 )
 
-func GenerateCommand() *cobra.Command {
-	flags := genericclioptions.NewConfigFlags(true)
-
-	// 'cbopcfg version' prints out the Operator version this binary belongs to.
-	version := &cobra.Command{
-		Use:   "version",
-		Short: "Prints the command version",
-		Long:  "Prints the command version",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("cbopcfg", version.WithBuildNumber())
-		},
-	}
-
+// ApplySubCommands attaches the configuration (create/delete/generate) sub commands to
+// an arbitrary root command.
+func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags) {
 	// 'cbopcfg generate' creates YAML for various Operator deployments.
 	generate := &cobra.Command{
 		Use:   "generate",
@@ -38,8 +28,8 @@ func GenerateCommand() *cobra.Command {
 		Long:  "Generates YAML manifests for various Operator components",
 	}
 
-	generate.AddCommand(getGenerateOperatorCommand(flags))
-	generate.AddCommand(getGenerateAdmissionCommand(flags))
+	generate.AddCommand(getGenerateOperatorCommand(root.UseLine(), flags))
+	generate.AddCommand(getGenerateAdmissionCommand(root.UseLine(), flags))
 	generate.AddCommand(getGenerateBackupCommand(flags))
 
 	// 'cbopcfg create' actually creates resources.
@@ -52,8 +42,8 @@ func GenerateCommand() *cobra.Command {
 		},
 	}
 
-	create.AddCommand(getCreateOperatorCommand(flags))
-	create.AddCommand(getCreateAdmissionCommand(flags))
+	create.AddCommand(getCreateOperatorCommand(root.UseLine(), flags))
+	create.AddCommand(getCreateAdmissionCommand(root.UseLine(), flags))
 	create.AddCommand(getCreateBackupCommand(flags))
 
 	// 'cbopcfg create' actually deletes resources.
@@ -66,9 +56,27 @@ func GenerateCommand() *cobra.Command {
 		},
 	}
 
-	deleteCmd.AddCommand(getDeleteOperatorCommand(flags))
-	deleteCmd.AddCommand(getDeleteAdmissionCommand(flags))
+	deleteCmd.AddCommand(getDeleteOperatorCommand(root.UseLine(), flags))
+	deleteCmd.AddCommand(getDeleteAdmissionCommand(root.UseLine(), flags))
 	deleteCmd.AddCommand(getDeleteBackupCommand(flags))
+
+	root.AddCommand(generate)
+	root.AddCommand(create)
+	root.AddCommand(deleteCmd)
+}
+
+func GenerateCommand() *cobra.Command {
+	flags := genericclioptions.NewConfigFlags(true)
+
+	// 'cbopcfg version' prints out the Operator version this binary belongs to.
+	version := &cobra.Command{
+		Use:   "version",
+		Short: "Prints the command version",
+		Long:  "Prints the command version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("cbopcfg", version.WithBuildNumber())
+		},
+	}
 
 	// 'cbopcfg' is the top level command.
 	root := &cobra.Command{
@@ -94,9 +102,8 @@ func GenerateCommand() *cobra.Command {
 	flags.AddFlags(root.PersistentFlags())
 
 	root.AddCommand(version)
-	root.AddCommand(generate)
-	root.AddCommand(create)
-	root.AddCommand(deleteCmd)
+
+	ApplySubCommands(root, flags)
 
 	return root
 }

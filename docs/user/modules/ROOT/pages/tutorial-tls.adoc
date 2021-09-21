@@ -110,7 +110,7 @@ $ openssl rsa -in pkey.key.der -inform DER -out pkey.key -outform PEM
 == Creating a Dynamic Admission Controller Server Certificate
 
 This section is only relevant if you wish to manually deploy the dynamic admission controller.
-Most users should use `cbopcfg` to automatically install the DAC.
+Most users should use `cao` to automatically install the DAC.
 
 To create a server certificate that can be used by the dynamic admission controller, simply specify the service name that the Kubernetes API webhooks will connect to.
 This is in the form `_<service>_._<namespace>_.svc`, so if our service is called `couchbase-operator-admission` and we were deploying it in the `operator-admission` namespace, run the following:

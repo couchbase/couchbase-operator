@@ -1,3 +1,6 @@
+// tag::cao[]
+// end::cao[]
+
 // tag::cbopinfo[]
 :page-alias: reference-cbopinfo.adoc
 // end::cbopinfo[]

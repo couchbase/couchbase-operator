@@ -49,9 +49,9 @@ func LoadYAMLs(path string) ([]*unstructured.Unstructured, error) {
 	return parseYAMLs(data)
 }
 
-// CouchbaseOperatorConfig runs cbopcfg and unmarshals the output.
+// CouchbaseOperatorConfig runs cao and unmarshals the output.
 func CouchbaseOperatorConfig(args ...string) error {
-	output, err := exec.Command("../../build/bin/cbopcfg", args...).CombinedOutput()
+	output, err := exec.Command("../../build/bin/cao", args...).CombinedOutput()
 	logrus.Infof("Command output:\n%s", string(output))
 
 	return err

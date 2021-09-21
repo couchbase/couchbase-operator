@@ -2,7 +2,93 @@
 Because Eric is going to insist on this :D
 ////
 
+// tag::cao[]
+== Installation
+
+Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package^] and unpacked it.
+
+After you unpack the download, the resulting directory will be titled something like `couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64`.
+
+[{tabs}]
+====
+macOS::
++
+--
+. Open a Terminal window and go to the directory where the `cao` binary is located:
++
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-macos_x86_64/bin/
+----
+
+. Make the `cao` binary executable:
++
+[source,console]
+----
+$ chmod +x ./cao
+----
+
+. Move the binary into your PATH:
++
+[source,console]
+----
+$ sudo mv ./cao /usr/local/bin/cao
+----
+
+NOTE: On newer versions of macOS, you may encounter errors such as `cannot execute binary file` when trying to use the tools included in the Autonomous Operator package.
+If you encounter such an error, you'll need to update your security settings as outlined in Apple's https://support.apple.com/en-us/HT202491[support article on macOS Gatekeeper^].
+In System Preferences, click Security & Privacy, then click General.
+Click the lock and enter your password to make changes.
+Select App Store and identified developers under the header “Allow apps downloaded from.”
+--
+
+Linux::
++
+--
+. Open a command prompt and go to the directory where the `cao` binary is located:
++
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-linux_x86_64/bin/
+----
+
+. Make the `cao` binary executable:
++
+[source,console]
+----
+$ chmod +x ./cao
+----
+
+. Move the binary into your PATH:
++
+[source,console]
+----
+$ sudo mv ./cao /usr/local/bin/cao
+----
+--
+
+Windows::
++
+--
+. Open a command prompt and go to the directory where the `cao` binary is located:
++
+[source,console]
+----
+$ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
+----
+
+. Add the `cao` binary into your PATH.
+--
+====
+// end::cao[]
+
 // tag::cbopcfg[]
+[IMPORTANT]
+====
+The `cbopcfg` binary is deprecated and will be removed in a later release.
+Please use the xref:tools/cao.adoc[`cao`] binary that features all the same sub commands.
+====
+
 == Installation
 
 Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package^] and unpacked it.
@@ -83,6 +169,12 @@ $ cd couchbase-autonomous-operator-kubernetes_x.x.x-windows_x86_64\bin\
 // end::cbopcfg[]
 
 // tag::cbopinfo[]
+[IMPORTANT]
+====
+The `cbopinfo` binary is deprecated and will be removed in a later release.
+Please use the xref:tools/cao.adoc[`cao`] binary that features all the same functionality under the `cao collect-logs` subcommand.
+====
+
 == Installation
 
 Make sure that you have downloaded the Operator https://www.couchbase.com/downloads[package^] and unpacked it on the same computer where you normally run `kubectl` or `oc`.

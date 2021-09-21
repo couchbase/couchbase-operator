@@ -52,7 +52,7 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		args = append(args, "--image-pull-secret="+secret)
 	}
 
-	output, err := exec.Command("/cbopcfg", args...).CombinedOutput()
+	output, err := exec.Command("/cao", args...).CombinedOutput()
 	if err != nil {
 		logrus.Info(string(output))
 		logrus.Fatal(err.Error())
@@ -89,7 +89,7 @@ func deleteAdmissionController(k8s *types.Cluster) error {
 		args = append(args, "--context="+k8s.Context)
 	}
 
-	output, err := exec.Command("/cbopcfg", args...).CombinedOutput()
+	output, err := exec.Command("/cao", args...).CombinedOutput()
 	if err != nil {
 		logrus.Info(string(output))
 		logrus.Fatal(err.Error())

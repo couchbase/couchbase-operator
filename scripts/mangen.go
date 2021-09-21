@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	cao "github.com/couchbase/couchbase-operator/pkg/certification"
 	cbopcfg "github.com/couchbase/couchbase-operator/pkg/config"
 	cbopinfo "github.com/couchbase/couchbase-operator/pkg/info/command"
 
@@ -116,6 +117,10 @@ func generateDocumentation(file io.StringWriter, command *cobra.Command) {
 
 func main() {
 	documents := []documenter{
+		{
+			name:  "cao",
+			cobra: cao.GenerateCommand(),
+		},
 		{
 			name:  "cbopcfg",
 			cobra: cbopcfg.GenerateCommand(),

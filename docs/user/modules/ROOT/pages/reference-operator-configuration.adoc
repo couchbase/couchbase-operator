@@ -4,7 +4,7 @@
 == Operator Deployment
 
 The Couchbase Autonomous Operator configuration is defined below.
-This is intended as a reference only, and you should prefer the use of the xref:tools/cbopcfg.adoc[`cbopcfg` utility] or xref:helm-setup-guide.adoc[Helm], as these will handle configuration for you and provide an abstraction layer, less prone to modification.
+This is intended as a reference only, and you should prefer the use of the xref:tools/cao.adoc[`cao` utility] or xref:helm-setup-guide.adoc[Helm], as these will handle configuration for you and provide an abstraction layer, less prone to modification.
 
 IMPORTANT: Most of the fields in the Operator configuration should never be changed and it is recommended that you use the configuration as is. However, there are some exceptions noted below.
 
@@ -56,7 +56,7 @@ spec:
 <.> The container arguments can be modified to suit your requirements.
     Valid flags are documented <<command-line-arguments,below>>.
 <.> The `WATCH_NAMESPACE` and `POD_NAME` environment variables are required by the underlying library and can not be modified.
-<.> The HTTP container port can be modified, however this will affect log collection with the xref:tools/cbopinfo.adoc[`cbopinfo`] tool.
+<.> The HTTP container port can be modified, however this will affect log collection with the xref:tools/cao.adoc[`cao`] tool.
 <.> The Prometheus container port is fixed and cannot be modified at present.
 <.> The Operator must be run as a service account with the xref:reference-operator-rbac.adoc[correct roles] to function.
 

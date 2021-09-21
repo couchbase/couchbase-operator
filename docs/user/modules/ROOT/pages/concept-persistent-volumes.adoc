@@ -76,7 +76,7 @@ This mounts the persistent volume so the Couchbase Server user is able to write 
 
 The xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-securitycontext[`couchbaseclusters.spec.securityContext.fsGroup`] parameter allows this to be explicitly set.
 By default, the Operator dynamic admission controller will populate this parameter for you based on whether you are deploying on Kubernetes or Red Hat OCP.
-You can disable this behavior with xref:tools/cbopcfg.adoc#cbopcfg-generate-admission[`installer configuration parameters`].
+You can disable this behavior with xref:tools/cao.adoc#cao-generate-admission[`installer configuration parameters`].
 
 [TIP]
 ====

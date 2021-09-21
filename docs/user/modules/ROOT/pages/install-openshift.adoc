@@ -57,8 +57,8 @@ The following command will install both the DAC and the Operator in the current 
 
 [source,console]
 ----
-$ bin/cbopcfg create admission --image-pull-secret rh-catalog
-$ bin/cbopcfg create operator --image-pull-secret rh-catalog
+$ bin/cao create admission --image-pull-secret rh-catalog
+$ bin/cao create operator --image-pull-secret rh-catalog
 ----
 
 === Custom Installation
@@ -68,7 +68,7 @@ Alternatively, you may wish to install just the DAC in the `camelot` namespace:
 [source,console]
 ----
 $ oc project camelot
-$ bin/cbopcfg create admission --image-pull-secret rh-catalog
+$ bin/cao create admission --image-pull-secret rh-catalog
 ----
 
 And then install just the Operator into the `asgard` namespace:
@@ -76,10 +76,10 @@ And then install just the Operator into the `asgard` namespace:
 [source,console]
 ----
 $ oc project asgard
-$ bin/cbopcfg create operator --image-pull-secret rh-catalog
+$ bin/cao create operator --image-pull-secret rh-catalog
 ----
 
-For further installation options please see the xref:tools/cbopcfg.adoc[cbopcfg] reference manual.
+For further installation options please see the xref:tools/cao.adoc[`cao`] reference manual.
 
 == Check the Status of the Operator
 
@@ -151,8 +151,8 @@ Failure to do so will result in the deletion of all Couchbase clusters.
 
 [source,console]
 ----
-$ bin/cbopcfg delete operator
-$ bin/cbopcfg delete admission
+$ bin/cao delete operator
+$ bin/cao delete admission
 $ oc delete -f crd.yaml
 ----
 

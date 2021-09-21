@@ -135,8 +135,6 @@ backend
 latencies
 scalable
 scalability
-cbopcfg
-cbopinfo
 ulimit
 ulimits
 cron

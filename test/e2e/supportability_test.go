@@ -768,10 +768,8 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	t.Logf("Context: %v", context)
 
 	// Validate args which won't produce output file
-	for _, arg := range []string{"--help", "version"} {
-		if _, err := e2eutil.Cbopinfo(f.CbopinfoPath, []string{arg}); err != nil {
-			e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %w", arg, err))
-		}
+	if _, err := e2eutil.Cbopinfo(f.CbopinfoPath, []string{"--help"}); err != nil {
+		e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %w", "--help", err))
 	}
 
 	// Validate all other arguments

@@ -38,7 +38,7 @@ Before continuing with this tutorial, please ensure the following:
 Follow the official installation guides at https://cert-manager.io/docs/installation/[cert-manager.io^].
 
 * You have installed Autonomous Operator 2.2 or higher.
-This tutorial assumes that the installed resources are present, and also leverages the xref:tools/cbopcfg.adoc[`cbopcfg`] command line tool that comes with the Autonomous Operator binary package.
+This tutorial assumes that the installed resources are present, and also leverages the xref:tools/cao.adoc[`cao`] command line tool that comes with the Autonomous Operator binary package.
 +
 NOTE: You can actually integrate/perform the steps in this tutorial as part of the process of installing the Autonomous Operator.
 However, for the sake of making the tutorial more straightforward, it is assumed that you've already performed a basic xref:install-kubernetes.adoc[installation] of the Autonomous Operator.
@@ -133,7 +133,7 @@ Before we can continue with the tutorial, we need to _uninstall_ the DAC.
 
 [source,console]
 ----
-$ cbopcfg delete admission
+$ cao delete admission
 ----
 
 === Create the DAC Certificate
@@ -168,7 +168,7 @@ spec:
 ----
 
 <.> This is the secret that will be generated containing the TLS certificate and key.
-The name used in this example is the same as the default one created by xref:tools/cbopcfg.adoc[`cbopcfg`] during standard xref:install-kubernetes.adoc[installation], so we'll just reuse it to make integration simpler.
+The name used in this example is the same as the default one created by xref:tools/cao.adoc[`cao`] during standard xref:install-kubernetes.adoc[installation], so we'll just reuse it to make integration simpler.
 
 <.> The certificate will be issued immediately and will be valid for 6 hours.
 
@@ -178,8 +178,8 @@ The name used in this example is the same as the default one created by xref:too
 
 <.> The certificate needs a subject alternative name that matches the network name used to connect to it.
 This name is comprised of `_<service-name>_._<namespace>_.svc`.
-The xref:tools/cbopcfg.adoc[`cbopcfg`] tool usually handles this for you, however, as TLS generation is delegated to a 3rd party, we need to be aware of it.
-Again, like the secret name, this is the default service name created by xref:tools/cbopcfg.adoc[`cbopcfg`], so we'll just keep this as is.
+The xref:tools/cao.adoc[`cao`] tool usually handles this for you, however, as TLS generation is delegated to a 3rd party, we need to be aware of it.
+Again, like the secret name, this is the default service name created by xref:tools/cao.adoc[`cao`], so we'll just keep this as is.
 
 <.> The issuer, `ca`, refers to the CA we defined in the section <<creating-a-common-configuration>>.
 
@@ -210,7 +210,7 @@ couchbase-operator-admission   True    couchbase-operator-admission   4s
 
 === Update the DAC Configuration Settings
 
-When you install the Autonomous Operator, the xref:tools/cbopcfg.adoc[`cbopcfg`] tool automatically creates a default TLS configuration for you.
+When you install the Autonomous Operator, the xref:tools/cao.adoc[`cao`] tool automatically creates a default TLS configuration for you.
 However, we don't have to worry about this default configuration because we removed it entirely when we uninstalled the DAC in the section <<uninstall-the-existing-dac>>.
 Therefore, in this next step, we will generate a brand new DAC configuration, modify it to make use of our managed certificates, and then submit it to Kubernetes to redeploy the DAC.
 
@@ -218,7 +218,7 @@ Start by generating a copy of the default configuration template for the DAC:
 
 [source,console]
 ----
-$ cbopcfg generate admission > admission.yaml
+$ cao generate admission > admission.yaml
 ----
 
 Open `admission.yaml` with your editor of choice.

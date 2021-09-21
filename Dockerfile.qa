@@ -28,8 +28,7 @@ RUN --mount=type=cache,target=/var/cache/apt apt-get update \
 
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
 
-COPY --from=build ${WORKDIR}/build/bin/cbopinfo /
-COPY --from=build ${WORKDIR}/build/bin/cbopcfg /
+COPY --from=build ${WORKDIR}/build/bin/cao /
 COPY --from=build ${WORKDIR}/build/bin/certification /
 COPY --from=build ${WORKDIR}/example/crd.yaml /
 

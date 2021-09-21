@@ -120,32 +120,32 @@ NOTE: Changing the location of the audit log is not supported, as it would break
 
 == Collecting Logs
 
-The Autonomous Operator package is distributed with a support tool -- xref:tools/cbopinfo.adoc[`cbopinfo`] -- which can be used to collect logs from Couchbase Server deployments.
-The xref:tools/cbopinfo.adoc[`cbopinfo`] tool performs _explicit logging_, which means it captures a snapshot of the current logs at the time the tool is was run.
+The Autonomous Operator package is distributed with a support tool -- xref:tools/cao.adoc[`cao`] -- which can be used to collect logs from Couchbase Server deployments.
+The xref:tools/cao.adoc[`cao`] tool performs _explicit logging_, which means it captures a snapshot of the current logs at the time the tool is was run.
 Explicit logging can either be performed for all nodes in the cluster, or for one or more individual nodes.
 The results are saved as zip files: each zip file contains the log-data generated for an individual node.
 
-Note, however, there are some limitations to be aware of when collecting logs with xref:tools/cbopinfo.adoc[`cbopinfo`]:
+Note, however, there are some limitations to be aware of when collecting logs with xref:tools/cao.adoc[`cao`]:
 
 * Only active, non-rotated log files are collected.
-* xref:tools/cbopinfo.adoc[`cbopinfo`] requires `pods/exec` permissions in order to execute log collection scripts and run the xref:server:cli:cbcollect-info-tool.adoc[`cbcollect_info`] command locally on each pod in a Couchbase Server deployment, which may not be desirable for security and performance reasons.
+* xref:tools/cao.adoc[`cao`] requires `pods/exec` permissions in order to execute log collection scripts and run the xref:server:cli:cbcollect-info-tool.adoc[`cbcollect_info`] command locally on each pod in a Couchbase Server deployment, which may not be desirable for security and performance reasons.
 
 To avoid these limitations, you can choose to configure xref:concept-couchbase-logging.adoc#log-forwarding[log forwarding] as an alternative method for collecting logs.
 
-[[collect-logs-with-cbopinfo]]
-=== Collecting Logs with `cbopinfo`
+[[collect-logs-with-cao]]
+=== Collecting Logs with `cao`
 
-When run without any flags or options, the xref:tools/cbopinfo.adoc[`cbopinfo`] tool collects a filtered list of the Kubernetes resources associated with the Autonomous Operator in a given namespace.
-However, to also collect logs from Couchbase Server deployments, the xref:tools/cbopinfo.adoc#flags[`--collectinfo`] flag is required.
+When run without any flags or options, the xref:tools/cao.adoc[`cao`] tool collects a filtered list of the Kubernetes resources associated with the Autonomous Operator in a given namespace.
+However, to also collect logs from Couchbase Server deployments, the xref:tools/cao.adoc#cao-collect-logs[`--collectinfo`] flag is required.
 
-When xref:tools/cbopinfo.adoc[`cbopinfo`] is run unscoped with the xref:tools/cbopinfo.adoc#flags[`--collectinfo`] flag, it will look for logs from all Couchbase Server deployments that are managed by the Autonomous Operator.
+When xref:tools/cao.adoc[`cao`] is run unscoped with the xref:tools/cao.adoc#cao-collect-logs[`--collectinfo`] flag, it will look for logs from all Couchbase Server deployments that are managed by the Autonomous Operator.
 However, you can scope the command to a particular cluster in order to look for just the logs from that cluster.
 
 Run the following command to begin the log collection process for the Couchbase Server deployment named `cb-example`:
 
 [source,console]
 ----
-$ cbopinfo --couchbase-cluster cb-example
+$ cao collect-logs --couchbase-cluster cb-example
 ----
 
 Note that no logs have been downloaded yet.
@@ -193,39 +193,39 @@ As an added security measure, this field defaults to `yes` when left blank.
 .About Collecting Logs from Detached Volumes
 [[collecting-detached-volumes]]
 ****
-The xref:tools/cbopinfo.adoc[`cbopinfo`] tool collects logs from all log volumes in a Couchbase Server deployment, even PersistentVolumeClaims (PVCs) that are _detached_ from pods.
+The xref:tools/cao.adoc[`cao`] tool collects logs from all log volumes in a Couchbase Server deployment, even PersistentVolumeClaims (PVCs) that are _detached_ from pods.
 Detached PVCs can occur more commonly when running xref:best-practices.adoc#ephemeral-clusters[ephemeral clusters].
 
-When a detached PVC is encountered, xref:tools/cbopinfo.adoc[`cbopinfo`] will automatically create a temporary Couchbase Server pod, mount the log volume to it, and then run xref:server:cli:cbcollect-info-tool.adoc[`cbcollect_info`] to collect the logs.
+When a detached PVC is encountered, xref:tools/cao.adoc[`cao`] will automatically create a temporary Couchbase Server pod, mount the log volume to it, and then run xref:server:cli:cbcollect-info-tool.adoc[`cbcollect_info`] to collect the logs.
 Once the logs have been downloaded, the Autonomous Operator will delete the temporary pod (but will _not_ delete the PVC).
 
 [TIP]
 ====
-The xref:tools/cbopinfo.adoc[`cbopinfo`] tool uses a default Couchbase Server container image when creating the temporary pod.
+The xref:tools/cao.adoc[`cao`] tool uses a default Couchbase Server container image when creating the temporary pod.
 However, this container image may not match the version of the Couchbase Server container that the PVC was previously attached to.
-To avoid compatibility issues when collecting logs from detached PVCs, make sure to use the xref:tools/cbopinfo.adoc#flags[`--server-image`] flag to specify a matching Couchbase Server container image when running xref:tools/cbopinfo.adoc[`cbopinfo`].
+To avoid compatibility issues when collecting logs from detached PVCs, make sure to use the xref:tools/cao.adoc#cao-collect-logs[`--server-image`] flag to specify a matching Couchbase Server container image when running xref:tools/cao.adoc[`cao`].
 For a Couchbase Server deployment named `cb-example`, the command would resemble the following:
 
 [source,console,subs="attributes"]
 ----
-$ cbopinfo --collectinfo cb-example --server-image couchbase/server:{couchbase-version}
+$ cao collect-logs --collectinfo cb-example --server-image couchbase/server:{couchbase-version}
 ----
 ====
 
 It should be noted that detached PVCs can sometimes be caused by more serious issues.
-Some of these issues may also cause xref:tools/cbopinfo.adoc[`cbopinfo`] to encounter errors while attempting to collect and download logs from detached PVCs.
+Some of these issues may also cause xref:tools/cao.adoc[`cao`] to encounter errors while attempting to collect and download logs from detached PVCs.
 If you encounter such errors, you can try to work around the issue by <<manually-collect-logs-from-detached-volumes, manually collecting the logs>>.
 ****
 
 [[manually-collect-logs-from-detached-volumes]]
 === Manually Collecting Logs from Detached Volumes
 
-In most situations, the xref:tools/cbopinfo.adoc[`cbopinfo`] tool will allow logs to be collected and downloaded successfully.
-Even in cases where logs are found to exist on detached PersistentVolumeClaims (PVCs), xref:tools/cbopinfo.adoc[`cbopinfo`] will <<collecting-detached-volumes, automatically attempt to collect them>> by creating temporary pods that mount the PVCs.
+In most situations, the xref:tools/cao.adoc[`cao`] tool will allow logs to be collected and downloaded successfully.
+Even in cases where logs are found to exist on detached PersistentVolumeClaims (PVCs), xref:tools/cao.adoc[`cao`] will <<collecting-detached-volumes, automatically attempt to collect them>> by creating temporary pods that mount the PVCs.
 
-However, a case may arise where xref:tools/cbopinfo.adoc[`cbopinfo`] fails to collect logs from a detached PVC.
-For example, if a stateful service -- such as Data, Index, or Analytics -- were to crash, and then continue to crash each time the Autonomous Operator recovered the pod, xref:tools/cbopinfo.adoc[`cbopinfo`] would unlikely be able to collect the Couchbase Server logs from the pod without manual intervention.
-This is because in this hypothetical situation, the pod does not remain alive long enough for xref:tools/cbopinfo.adoc[`cbopinfo`] to perform normal log collection; xref:tools/cbopinfo.adoc[`cbopinfo`] also doesn't see the PVC as detached, and therefore doesn't automatically create a temporary pod to collect the logs as it normally would for a detached PVC.
+However, a case may arise where xref:tools/cao.adoc[`cao`] fails to collect logs from a detached PVC.
+For example, if a stateful service -- such as Data, Index, or Analytics -- were to crash, and then continue to crash each time the Autonomous Operator recovered the pod, xref:tools/cao.adoc[`cao`] would unlikely be able to collect the Couchbase Server logs from the pod without manual intervention.
+This is because in this hypothetical situation, the pod does not remain alive long enough for xref:tools/cao.adoc[`cao`] to perform normal log collection; xref:tools/cao.adoc[`cao`] also doesn't see the PVC as detached, and therefore doesn't automatically create a temporary pod to collect the logs as it normally would for a detached PVC.
 
 The general process for manual log collection is as follows:
 

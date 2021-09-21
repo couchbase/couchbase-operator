@@ -195,7 +195,7 @@ type certifyOptions struct {
 
 	// archiveName allows us to set a unique archive name for each run, in case
 	// there are any races.
-	archiveName string
+	archiveName archiveNameConfigValue
 
 	// useFSGroup dictates whether to set the file system group.
 	useFSGroup bool
@@ -258,11 +258,44 @@ func (v *RegistryConfigValue) Type() string {
 	return "string"
 }
 
+// archiveNameConfigValue is a bit of a hack, in order to have deterministic
+// documentation, then it needs to be fixed, however, the ask was to have timestamps
+// which quite frankly isn't... sigh.
+type archiveNameConfigValue struct {
+	name     string
+	explicit bool
+}
+
+func (v *archiveNameConfigValue) Set(value string) error {
+	v.name = value
+	v.explicit = true
+
+	return nil
+}
+
+func (v *archiveNameConfigValue) String() string {
+	return v.name
+}
+
+func (v *archiveNameConfigValue) Type() string {
+	return "string"
+}
+
+func (v *archiveNameConfigValue) archiveName() string {
+	if !v.explicit {
+		return fmt.Sprintf("%s-%s.tar.bz2", v.name, time.Now().Format("20060102T150405-0700"))
+	}
+
+	return fmt.Sprintf("%s.tar.bz2", v.name)
+}
+
 // getCertifyCommand returns a new Cobra certification command.
 func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
-	o := certifyOptions{}
-
-	archiveName := fmt.Sprintf("couchbase-operator-certification-%s", time.Now().Format("20060102T150405-0700"))
+	o := certifyOptions{
+		archiveName: archiveNameConfigValue{
+			name: "couchbase-operator-certification",
+		},
+	}
 
 	cmd := &cobra.Command{
 		Use:   "certify",
@@ -313,7 +346,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 
 	cmd.Flags().StringVar(&o.image, "image", imageDefault, "Certification image to use")
 	cmd.Flags().StringVar(&o.timeout, "timeout", "12h", "Maximum runtime to allow.  4h is enough for all tests on most platforms with 8 way concurrency.  It may take over a day running with 1 way concurrency")
-	cmd.Flags().StringVar(&o.archiveName, "archive-name", archiveName, "Set the default test archive name")
+	cmd.Flags().Var(&o.archiveName, "archive-name", "Set the default test archive name")
 	cmd.Flags().IntVar(&o.parallel, "parallel", 8, "Test concurrency")
 	cmd.Flags().BoolVar(&o.clean, "clean", false, "Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run")
 	cmd.Flags().BoolVar(&o.useFSGroup, "use-fsgroup", useFSGroup, "Use a file system group for persistent volumes.")
@@ -812,7 +845,7 @@ func (o *certifyOptions) downloadArtifacts() error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(o.archiveName+".tar.bz2", stdout.Bytes(), 0644); err != nil {
+	if err := ioutil.WriteFile(o.archiveName.archiveName(), stdout.Bytes(), 0644); err != nil {
 		return err
 	}
 

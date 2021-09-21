@@ -24,11 +24,11 @@ By default, Couchbase cluster deployments process logs within the Couchbase Serv
 When a Couchbase cluster deployment is configured to use xref:concept-persistent-volumes.adoc[persistent volumes] -- as is xref:best-practices.adoc#storage[recommended] for all production deployments -- log files are written to either the `default` or `logs` volume.
 
 When using default logging, logs cannot be collected from the Couchbase Server container's standard console output, as is https://kubernetes.io/docs/concepts/cluster-administration/logging/[typical^] in Kubernetes environments.
-Instead, the Autonomous Operator package is distributed with a support tool -- xref:tools/cbopinfo.adoc[`cbopinfo`] -- which can be used to collect a log snapshot at any time.
+Instead, the Autonomous Operator package is distributed with a support tool -- xref:tools/cao.adoc[`cao`] -- which can be used to collect a log snapshot at any time.
 This tool is often used for collecting resources, logs, and events from the Kubernetes cluster for use in Couchbase Support requests.
 It is also capable of collecting just Couchbase-related logs via its `--collectinfo` option.
 
-The xref:tools/cbopinfo.adoc[`cbopinfo`] tool only captures a snapshot of the current logs at the time it was run, and is not intended to capture 100% of all logs at all times (rotated log files are not included in the snapshot).
+The xref:tools/cao.adoc[`cao`] tool only captures a snapshot of the current logs at the time it was run, and is not intended to capture 100% of all logs at all times (rotated log files are not included in the snapshot).
 In addition, the tool requires `pods/exec` permissions in order to execute log collection scripts and run the xref:server:cli:cbcollect-info-tool.adoc[`cbcollect_info`] command locally on each pod belonging to a Couchbase cluster, which may not be desirable for security and performance reasons.
 To avoid these limitations, you can choose to configure <<log-forwarding,log forwarding>> as an alternative method for logging.
 
