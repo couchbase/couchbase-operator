@@ -127,14 +127,14 @@ This field defaults to `CouchbaseCollection` if not specified.
 
 *Minimum Length*: `1`
 
-*Maximum Length*: `30`
+*Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250}$`
 
 ==== Description
 
 Name is the name of the Kubernetes resource name that is being referenced.
-Legal collection names have a maximum length of 30 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
+Legal collection names have a maximum length of 251 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
 
 === couchbasescopes.spec.collections.selector
 
@@ -169,12 +169,13 @@ Only one default scope is permitted to be contained in a bucket.
 
 *Minimum Length*: `1`
 
-*Maximum Length*: `30`
+*Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250}$`
 
 ==== Description
 
 Name specifies the name of the scope.
 By default, the metadata.name is used to define the scope name, however, due to the limited character set, this field can be used to override the default and provide the full functionality.
-Scope names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.
+Additionally the `metadata.name` field is a DNS label, and thus limited to 63 characters, this field must be used if the name is longer than this limit.
+Scope names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.

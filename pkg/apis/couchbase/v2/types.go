@@ -698,13 +698,13 @@ type CouchbaseBackupRestoreList struct {
 }
 
 // ScopeOrCollectionName is a generic type to capture a valid
-// scope or collection name.  These must consist of 1-30 characters,
+// scope or collection name.  These must consist of 1-251 characters,
 // include only A-Z, a-z, 0-9, -, _ or %, and must not start with
 // _ (which is an internal marker) or % (which is probably an escape
 // character in language X).
 // +kubebuilder:validation:MinLength=1
-// +kubebuilder:validation:MaxLength=30
-// +kubebuilder:validation:Pattern="^[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29}$"
+// +kubebuilder:validation:MaxLength=251
+// +kubebuilder:validation:Pattern="^[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,250}$"
 type ScopeOrCollectionName string
 
 // DefaultScopeOrCollection is the name of the default scope and collection.
@@ -749,7 +749,9 @@ type CouchbaseCollectionSpec struct {
 	// Name specifies the name of the collection.  By default, the metadata.name is
 	// used to define the collection name, however, due to the limited character set,
 	// this field can be used to override the default and provide the full functionality.
-	// Collection names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%]
+	// Additionally the `metadata.name` field is a DNS label, and thus limited to 63
+	// characters, this field must be used if the name is longer than this limit.
+	// Collection names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%]
 	// and not start with either _ or %.
 	Name ScopeOrCollectionName `json:"name,omitempty"`
 }
@@ -788,7 +790,7 @@ type CouchbaseCollectionGroupSpec struct {
 	// specifies a single collection, a collection group specifies multiple, and the
 	// collection group must specify at least one collection name.
 	// Any collection names specified must be unique.
-	// Collection names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%]
+	// Collection names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%]
 	// and not start with either _ or %.
 	// +kubebuilder:validation:MinimumItems=1
 	// +listType=set
@@ -837,7 +839,9 @@ type CouchbaseScopeSpec struct {
 	// Name specifies the name of the scope.  By default, the metadata.name is
 	// used to define the scope name, however, due to the limited character set,
 	// this field can be used to override the default and provide the full functionality.
-	// Scope names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%]
+	// Additionally the `metadata.name` field is a DNS label, and thus limited to 63
+	// characters, this field must be used if the name is longer than this limit.
+	// Scope names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%]
 	// and not start with either _ or %.
 	Name ScopeOrCollectionName `json:"name,omitempty"`
 
@@ -861,7 +865,7 @@ type CollectionLocalObjectReference struct {
 	Kind CouchbaseRoleAccessKind `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
-	// Legal collection names have a maximum length of 30
+	// Legal collection names have a maximum length of 251
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
 	Name ScopeOrCollectionName `json:"name"`
 }
@@ -930,7 +934,7 @@ type CouchbaseScopeGroupSpec struct {
 	// specifies a single scope, a scope group specifies multiple, and the
 	// scope group must specify at least one scope name.
 	// Any scope names specified must be unique.
-	// Scope names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%]
+	// Scope names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%]
 	// and not start with either _ or %.
 	// +kubebuilder:validation:MinimumItems=1
 	// +listType=set
@@ -954,7 +958,7 @@ type ScopeLocalObjectReference struct {
 	Kind CouchbaseRoleAccessKind `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
-	// Legal scope names have a maximum length of 30
+	// Legal scope names have a maximum length of 251
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
 	Name ScopeOrCollectionName `json:"name"`
 }
@@ -1340,8 +1344,8 @@ const (
 // For the replication we can use the default scope or collection so we are reusing
 // the type for ScopeOrCollectionName but with extra support for _default
 // +kubebuilder:validation:MinLength=1
-// +kubebuilder:validation:MaxLength=30
-// +kubebuilder:validation:Pattern="^(_default|[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,29})$"
+// +kubebuilder:validation:MaxLength=251
+// +kubebuilder:validation:Pattern="^(_default|[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,250})$"
 type ScopeOrCollectionNameIncludingDefault string
 
 // For replication we can source and target either a scope or a scope.collection which is

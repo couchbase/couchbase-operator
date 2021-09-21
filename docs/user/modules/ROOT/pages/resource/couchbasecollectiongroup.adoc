@@ -79,13 +79,13 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 
 *Minimum Length*: `1`
 
-*Maximum Length*: `30`
+*Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250}$`
 
 ==== Description
 
 Names specifies the names of the collections.
 Unlike CouchbaseCollection, which specifies a single collection, a collection group specifies multiple, and the collection group must specify at least one collection name.
 Any collection names specified must be unique.
-Collection names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.
+Collection names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.

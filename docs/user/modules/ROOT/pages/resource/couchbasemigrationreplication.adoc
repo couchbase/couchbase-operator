@@ -94,9 +94,9 @@ The destination of our migration, must be a scope and collection.
 
 *Minimum Length*: `1`
 
-*Maximum Length*: `30`
+*Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^(\_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})$`
+*Pattern (Regular Expression)*: `^(\_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250})$`
 
 ==== Description
 
@@ -113,9 +113,9 @@ May be empty to just work at scope level.
 
 *Minimum Length*: `1`
 
-*Maximum Length*: `30`
+*Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^(\_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})$`
+*Pattern (Regular Expression)*: `^(\_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250})$`
 
 ==== Description
 

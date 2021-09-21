@@ -1706,7 +1706,7 @@ func TestNegValidationCreateCouchbaseScopesAndCollections(t *testing.T) {
 		},
 		{
 			name:           "TestValidateScopeNameTooLong",
-			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "1234567890123456789012345678901")},
+			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "000000000011111111112222222222333333333344444444445555555555666666666677777777778888888888999999999900000000001111111111222222222233333333334444444444555555555566666666667777777777888888888899999999990000000000111111111122222222223333333333444444444455")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.name`},
 		},

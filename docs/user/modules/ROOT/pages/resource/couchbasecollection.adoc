@@ -77,12 +77,13 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 
 *Minimum Length*: `1`
 
-*Maximum Length*: `30`
+*Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250}$`
 
 ==== Description
 
 Name specifies the name of the collection.
 By default, the metadata.name is used to define the collection name, however, due to the limited character set, this field can be used to override the default and provide the full functionality.
-Collection names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.
+Additionally the `metadata.name` field is a DNS label, and thus limited to 63 characters, this field must be used if the name is longer than this limit.
+Collection names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.

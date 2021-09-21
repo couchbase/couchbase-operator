@@ -127,14 +127,14 @@ This field defaults to `CouchbaseCollection` if not specified.
 
 *Minimum Length*: `1`
 
-*Maximum Length*: `30`
+*Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250}$`
 
 ==== Description
 
 Name is the name of the Kubernetes resource name that is being referenced.
-Legal collection names have a maximum length of 30 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
+Legal collection names have a maximum length of 251 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
 
 === couchbasescopegroups.spec.collections.selector
 
@@ -157,13 +157,13 @@ More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#
 
 *Minimum Length*: `1`
 
-*Maximum Length*: `30`
+*Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250}$`
 
 ==== Description
 
 Names specifies the names of the scopes.
 Unlike CouchbaseScope, which specifies a single scope, a scope group specifies multiple, and the scope group must specify at least one scope name.
 Any scope names specified must be unique.
-Scope names must be 1-30 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.
+Scope names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.
