@@ -2281,36 +2281,16 @@ func TestRBACValidationCreate(t *testing.T) {
 func TestRBACScopeValidationCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:       "TestRejectsLeadingUnderscoreScopeName",
-			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/scopes/name", "_underscore")},
-			shouldFail: true,
-		},
-		{
-			name:       "TestAllowsSpecialChar",
-			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/scopes/name", "un_der")},
-			shouldFail: false,
-		},
-		{
-			name:       "TestRejectsBadChar",
-			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/scopes/name", "excit!ng")},
-			shouldFail: true,
-		},
-		{
-			name:       "TestAllowsNonExistentScope",
-			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/scopes/name", "missingscope")},
-			shouldFail: false,
-		},
-		{
 			name: "TestRBACScopeGroupAllowed",
 			mutations: patchMap{"scoped-group": jsonpatch.NewPatchSet().
-				Replace("/spec/roles/0/scopes/name", "scopegroup0").
-				Replace("/spec/roles/0/scopes/kind", "CouchbaseScopeGroup")},
+				Replace("/spec/roles/0/scopes/resources/0/name", "scopegroup0").
+				Replace("/spec/roles/0/scopes/resources/0/kind", "CouchbaseScopeGroup")},
 			shouldFail: false,
 		},
 		{
 			name: "TestRBACScopeGroupBadKind",
 			mutations: patchMap{"scoped-group": jsonpatch.NewPatchSet().
-				Replace("/spec/roles/0/scopes/kind", "UnknownScopeGroup")},
+				Replace("/spec/roles/0/scopes/resources/0/kind", "UnknownScopeGroup")},
 			shouldFail: true,
 		},
 	}
@@ -2321,36 +2301,16 @@ func TestRBACScopeValidationCreate(t *testing.T) {
 func TestRBACCollectionValidationCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:       "TestRejectsLeadingUnderscoreCollectionName",
-			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/collections/name", "_underscore")},
-			shouldFail: true,
-		},
-		{
-			name:       "TestAllowsSpecialChar",
-			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/collections/name", "un_der")},
-			shouldFail: false,
-		},
-		{
-			name:       "TestRejectsBadChar",
-			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/collections/name", "excit!ng")},
-			shouldFail: true,
-		},
-		{
-			name:       "TestAllowsNonExistentScope",
-			mutations:  patchMap{"scoped-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/collections/name", "missingscope")},
-			shouldFail: false,
-		},
-		{
 			name: "TestRBACCollectionGroupAllowed",
 			mutations: patchMap{"scoped-group": jsonpatch.NewPatchSet().
-				Replace("/spec/roles/0/collections/name", "collectiongroup0").
-				Replace("/spec/roles/0/collections/kind", "CouchbaseCollectionGroup")},
+				Replace("/spec/roles/0/collections/resources/0/name", "collectiongroup0").
+				Replace("/spec/roles/0/collections/resources/0/kind", "CouchbaseCollectionGroup")},
 			shouldFail: false,
 		},
 		{
 			name: "TestRBACCollectionGroupBadKind",
 			mutations: patchMap{"scoped-group": jsonpatch.NewPatchSet().
-				Replace("/spec/roles/0/scopes/kind", "UnknownCollectionGroup")},
+				Replace("/spec/roles/0/scopes/resources/0/kind", "UnknownCollectionGroup")},
 			shouldFail: true,
 		},
 	}

@@ -206,7 +206,7 @@ def main():
     elif args.command == 'stop':
         stop(args)
     else:
-        print('invalid command {}'.format(args.command))
+        print(f'invalid command {args.command}')
         sys.exit(1)
 
 

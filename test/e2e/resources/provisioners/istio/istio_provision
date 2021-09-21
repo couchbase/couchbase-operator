@@ -97,7 +97,7 @@ def istioctl(*cmd):
     try:
         return subprocess.check_output(['istioctl'] + list(cmd)).decode().strip()
     except subprocess.CalledProcessError as err:
-        raise RuntimeError("command '{}' failed".format(err.cmd)) from err
+        raise RuntimeError(f"command '{err.cmd}' failed") from err
 
 def start(args):
     """
@@ -128,7 +128,7 @@ def main():
     if args.command == 'start':
         start(args)
     else:
-        print('invalid command {}'.format(args.command))
+        print(f'invalid command {args.command}')
         sys.exit(1)
 
 

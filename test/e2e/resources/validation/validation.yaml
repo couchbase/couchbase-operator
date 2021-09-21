@@ -239,14 +239,16 @@ metadata:
   name: scoped-group
 spec:
   roles:
-   - name: data_writer
-     bucket: default
-     scopes:
-       name: scope0
-       kind: CouchbaseScope
-     collections:
-       name: collection0
-       kind: CouchbaseCollection
+  - name: data_writer
+    bucket: default
+    scopes:
+      resources:
+      - name: scope0
+        kind: CouchbaseScope
+    collections:
+      resources:
+      - name: collection0
+        kind: CouchbaseCollection
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseRoleBinding

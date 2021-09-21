@@ -65,6 +65,9 @@ PATTERN_LABEL = 'Pattern (Regular Expression)'
 # Asciidoc directory layout.
 AUTOGEN_DIR = 'resource'
 
+# Used to denote a heading level.
+HEADING_CHAR = '='
+
 def escape_attributes(attribute):
     """
     Raw strings like "{blah}" need escaping, or asciidoc thinks the
@@ -89,7 +92,7 @@ def generate_heading(content, depth, heading):
     Helper for create Asciidoc headings.
     """
 
-    content.append('{} {}'.format('=' * depth, heading))
+    content.append(f'{HEADING_CHAR * depth} {heading}')
     content.append('')
 
 
@@ -100,7 +103,7 @@ def generate_flag(content, flag, value):
     if not value:
         return
 
-    content.append('*{}*'.format(flag))
+    content.append(f'*{flag}*')
     content.append('')
 
 
@@ -111,7 +114,7 @@ def generate_constraint(content, key, value):
     if value is None:
         return
 
-    content.append('*{}*: `{}`'.format(key, escape_attributes(value)))
+    content.append(f'*{key}*: `{escape_attributes(value)}`')
     content.append('')
 
 
@@ -193,7 +196,7 @@ def generate_metadata(content, names):
     and are generated so that xref linking works.
     """
 
-    content.append('include::partial$autogen-reference-metadata.adoc[tags=**;!*;{}]'.format(names['singular']))
+    content.append(f'include::partial$autogen-reference-metadata.adoc[tags=**;!*;{names["singular"]}]')
     content.append('')
 
 
@@ -238,12 +241,12 @@ def generate_schema(content, names, path, schema, required):
 
     if typ == 'array':
         array_type = schema['items']['type']
-        display_type = '[]{}'.format(array_type)
+        display_type = f'[]{array_type}'
 
     # Maps are special too...
     if typ == 'object' and 'additionalProperties' in schema:
         map_type = schema['additionalProperties']['type']
-        display_type = 'map[string]{}'.format(map_type)
+        display_type = f'map[string]{map_type}'
 
     # Every schema can have an optional default.
     default = None
@@ -253,11 +256,11 @@ def generate_schema(content, names, path, schema, required):
 
     # Every attribute gets a heading.  The main root element is special...
     if depth == ROOT_DEPTH:
-        content.append('= {} Resource'.format(names['kind']))
-        content.append('include::partial$autogen-reference-aliases.adoc[tags={}]'.format(names['singular']))
-        content.append(':resource-name-singular: {}'.format(names['singular']))
-        content.append(':resource-name-plural: {}'.format(names['plural']))
-        content.append(':resource-name-kind: {}'.format(names['kind']))
+        content.append(f'= {names["kind"]} Resource')
+        content.append(f'include::partial$autogen-reference-aliases.adoc[tags={names["singular"]}]')
+        content.append(f':resource-name-singular: {names["singular"]}')
+        content.append(f':resource-name-plural: {names["plural"]}')
+        content.append(f':resource-name-kind: {names["kind"]}')
         content.append('')
     else:
         generate_heading(content, depth, path)
@@ -288,10 +291,10 @@ def generate_schema(content, names, path, schema, required):
                 required = schema['required']
 
             for property_name, property_schema in properties.items():
-                generate_schema(content, names, '{}.{}'.format(path, property_name), property_schema, property_name in required)
+                generate_schema(content, names, f'{path}.{property_name}', property_schema, property_name in required)
         elif 'additionalProperties' in schema:
             if map_type in ['array', 'object']:
-                raise RuntimeError('map of {} detected, this is bad, sort your life out'.format(map_type))
+                raise RuntimeError(f'map of {map_type} detected, this is bad, sort your life out')
 
     # Arrays are--obviously--special... Arrays of scalars have already been handled
     # due to look-ahead, so we only need concern ourselves with arrays of objects.  Arrays
@@ -309,7 +312,7 @@ def generate_schema(content, names, path, schema, required):
             required = items['required']
 
         for property_name, property_schema in properties.items():
-            generate_schema(content, names, '{}.{}'.format(path, property_name), property_schema, property_name in required)
+            generate_schema(content, names, f'{path}.{property_name}', property_schema, property_name in required)
 
 
 def generate(args, crd, content):
@@ -374,7 +377,7 @@ def main():
 
     crds = yaml.load_all(crd_data, Loader=yaml.SafeLoader)
 
-    adoc_autogen_dir = 'docs/user/modules/ROOT/pages/{}'.format(AUTOGEN_DIR)
+    adoc_autogen_dir = f'docs/user/modules/ROOT/pages/{AUTOGEN_DIR}'
 
     # Remove the old autogen directory and start afresh, this handles files being
     # deleted.
@@ -391,21 +394,21 @@ def main():
         if args.dry_run:
             continue
 
-        adoc_file_name = '{}.adoc'.format(names['singular'])
-        adoc_file_path = '{}/{}'.format(adoc_autogen_dir, adoc_file_name)
+        adoc_file_name = f'{names["singular"]}.adoc'
+        adoc_file_path = f'{adoc_autogen_dir}/{adoc_file_name}'
 
         with open(adoc_file_path, 'w', encoding="utf-8") as adoc_file:
             adoc_file.write("\n".join(content))
 
         generated_docs.append({
             'names': names,
-            'xref': '{}/{}'.format(AUTOGEN_DIR, adoc_file_name),
+            'xref': f'{AUTOGEN_DIR}/{adoc_file_name}'
         })
 
     with open('docs/user/modules/ROOT/partials/autogen-reference.adoc', 'w', encoding="utf-8") as nav_file:
         nav_file.write("// THIS FILE IS AUTO-GENERATED - DO NOT EDIT\n")
         for generated_doc in generated_docs:
-            nav_file.write("** xref:{}[{} Resource]\n".format(generated_doc['xref'], generated_doc['names']['kind']))
+            nav_file.write(f"** xref:{generated_doc['xref']}[{generated_doc['names']['kind']} Resource]\n")
 
 
 if __name__ == '__main__':
