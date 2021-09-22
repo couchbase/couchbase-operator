@@ -456,12 +456,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		return nil, err
 	}
 
-	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
-	if err != nil {
-		return nil, err
-	}
-
-	durable, err := couchbaseutil.VersionAfter(tag, "6.6.0")
+	durable, err := c.IsAtLeastVersion("6.6.0")
 	if err != nil {
 		return nil, err
 	}

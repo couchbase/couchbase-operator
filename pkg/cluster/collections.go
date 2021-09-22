@@ -13,12 +13,7 @@ import (
 // for all buckets.  This is the entry point from the main reconcile loop.
 func (c *Cluster) reconcileScopesAndCollections() error {
 	// Handle legacy versions...
-	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
-	if err != nil {
-		return err
-	}
-
-	available, err := couchbaseutil.VersionAfter(tag, "7.0.0")
+	available, err := c.IsAtLeastVersion("7.0.0")
 	if err != nil {
 		return err
 	}

@@ -247,12 +247,7 @@ func getXDCRHostnameAndNetwork(cluster couchbasev2.RemoteCluster) (string, strin
 
 func (c *Cluster) isScopesAndCollectionsSupported() (bool, error) {
 	// Minimum supported version for scopes and collections is 7
-	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
-	if err != nil {
-		return false, err
-	}
-
-	return couchbaseutil.VersionAfter(tag, "7.0.0")
+	return c.IsAtLeastVersion("7.0.0")
 }
 
 // generateXDCRReplications uses the remote's label selector to pick all the replications
