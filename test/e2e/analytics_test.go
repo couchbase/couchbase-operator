@@ -344,3 +344,76 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
 }
+
+// Create cluster with Analytics service enabled
+// Deploy analytics bucket and verify for bucket creation and data replication.
+// Analytics Datasets cannot be created on Scope only on Collectiions.
+func TestAnalyticsCreateDataSetWithCollections(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipAnalytics(t)
+
+	// Static configuration.
+	clusterSize := 1
+	numOfDocs := f.DocsCount
+
+	scopeName := "pinky"
+	collectionName := "brain"
+
+	analyticsDataset := "testDataset1"
+	queries := []string{
+		"CREATE DATASET " + analyticsDataset + " ON `default`" + "." + scopeName + "." + collectionName,
+		"CONNECT LINK Local",
+	}
+
+	// Create a collection and collection group.
+	collection := e2eutil.NewCollection(collectionName).MustCreate(t, targetKube)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, targetKube)
+
+	// Link to a bucket and create that.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
+	bucket = e2eutil.MustNewBucket(t, targetKube, bucket)
+
+	// Create the cluster.
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
+	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollection(collectionName)
+	e2eutil.MustWaitForScopesAndCollections(t, targetKube, testCouchbase, bucket, expected, time.Minute)
+
+	// insert docs in the created scope.collection.
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, targetKube, testCouchbase)
+	e2eutil.MustVerifyDocCountInCollection(t, targetKube, testCouchbase, bucket.GetName(), scopeName, collectionName, numOfDocs, 10*time.Minute)
+
+	// insert docs in the default_scope.default_collection.
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, targetKube, testCouchbase)
+	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), 2*numOfDocs, 2*time.Minute)
+
+	for _, query := range queries {
+		e2eutil.MustExecuteAnalyticsQuery(t, targetKube, testCouchbase, query, time.Minute)
+	}
+
+	time.Sleep(time.Minute) // let analytics catch up
+	// Verify dataset itemCount.
+	e2eutil.MustVerifyDatasetItemCount(t, targetKube, testCouchbase, analyticsDataset, int64(numOfDocs), time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+	}
+
+	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+}

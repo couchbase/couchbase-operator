@@ -96,6 +96,27 @@ func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCl
 	return GetHostURL(k8s, cluster, couchbasev2.AdminService)
 }
 
+// GetCBInstance returns CouchbaseCluster Instance.
+func GetCBInstance(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*gocb.Cluster, error) {
+	opts := gocb.ClusterOptions{
+		Username: string(k8s.DefaultSecret.Data["username"]),
+		Password: string(k8s.DefaultSecret.Data["password"]),
+	}
+
+	host, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", cluster.Name, cluster.Namespace), opts)
+
+	return host, err
+}
+
+func MustGetCBInstance(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) *gocb.Cluster {
+	host, err := GetCBInstance(k8s, cluster)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return host
+}
+
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
 func PatchBucketInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucketName string, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
@@ -232,7 +253,7 @@ func addDocs(d *DocumentSet) error {
 		id := i
 
 		if _, err := collection.Upsert(fmt.Sprintf("%s%d", d.prefix, id), document, &gocb.UpsertOptions{
-			Timeout: time.Minute,
+			Timeout: 2 * time.Minute,
 		}); err != nil {
 			return err
 		}
@@ -925,6 +946,14 @@ func MustGetDatasetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbas
 	return count
 }
 
+func MustVerifyDatasetItemCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, dataset string, expectedItems int64, timeout time.Duration) {
+	count := MustGetDatasetItemCount(t, k8s, cluster, dataset, timeout)
+
+	if count != expectedItems {
+		Die(t, fmt.Errorf("dataset item mismatch %v/%v", count, expectedItems))
+	}
+}
+
 func GetDatasetCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) (int64, error) {
 	query := "Select Count(*) AS count from Metadata.`Dataset` where DataverseName <> `Metadata`"
 	return getAnalyticsData(k8s, cluster, query, timeout)
@@ -1380,4 +1409,172 @@ func GetCouchbaseMetric(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.C
 	}
 
 	return result, nil
+}
+
+// MustCreateSecondaryIndex creates Secondary Index against default collection.
+func MustCreateSecondaryIndex(t *testing.T, queryManager *gocb.QueryIndexManager, bucketName string) {
+	if err := queryManager.CreateIndex(bucketName, "cnd_gsi", []string{"key1"}, &gocb.CreateQueryIndexOptions{Timeout: 3 * time.Minute}); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustExecuteN1qlQuery runs the specified query against default collection.
+func MustExecuteN1qlQuery(t *testing.T, host *gocb.Cluster, query string) *gocb.QueryResult {
+	queryResult, err := host.Query(query, &gocb.QueryOptions{Timeout: 3 * time.Minute})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return queryResult
+}
+
+// MustGetAllIndexes gets all the indexes built against the specified bucket.
+func MustGetAllIndexes(t *testing.T, queryManager *gocb.QueryIndexManager, bucketName string) []gocb.QueryIndex {
+	indexes, err := queryManager.GetAllIndexes(bucketName, &gocb.GetAllQueryIndexesOptions{Timeout: 5 * time.Minute})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return indexes
+}
+
+func NewFTSIndex(bucketName string) gocb.SearchIndex {
+	// define basic params of the Index.
+	searchIndex := gocb.SearchIndex{Name: "cnd-test", Type: "fulltext-index", SourceName: bucketName, SourceType: "couchbase"}
+
+	searchIndex.Params = map[string]interface{}{
+		"mapping": map[string]interface{}{
+			"default_analyzer": "keyword",
+		},
+	}
+
+	searchIndex.PlanParams = map[string]interface{}{
+		"maxPartitionsPerPIndex": 1024,
+		"indexPartitions":        1,
+	}
+
+	return searchIndex
+}
+
+func NewFTSIndexWithCollections(bucketName, scopeName, collectionName string) gocb.SearchIndex {
+	ftsType := fmt.Sprintf("%s.%s", scopeName, collectionName)
+
+	// define basic params of the Index.
+	searchIndex := gocb.SearchIndex{Name: "cnd-test", Type: "fulltext-index", SourceName: bucketName, SourceType: "couchbase"}
+
+	searchIndex.Params = map[string]interface{}{
+		"doc_config": map[string]interface{}{
+			"mode": "scope.collection.type_field",
+		},
+		"mapping": map[string]interface{}{
+			"default_analyzer": "keyword",
+			// Disable Indexing of default scopes and collections.
+			"default_mapping": map[string]interface{}{
+				"enabled": false,
+			},
+			"types": map[string]interface{}{
+				// Enble Indexing against custom scopes and collections.
+				ftsType: map[string]interface{}{
+					"enabled":          true,
+					"default_analyzer": "keyword",
+				},
+			},
+		},
+	}
+
+	searchIndex.PlanParams = map[string]interface{}{
+		"maxPartitionsPerPIndex": 1024,
+		"indexPartitions":        1,
+	}
+
+	return searchIndex
+}
+
+// executeFTSOPs creates FTS Index and execute a n1ql against that index.
+func executeFTSOps(searchIndex gocb.SearchIndex, searchManager *gocb.SearchIndexManager, host *gocb.Cluster, query string) error {
+	// Create FTS Index.
+	if err := searchManager.UpsertIndex(searchIndex, &gocb.UpsertSearchIndexOptions{Timeout: 10 * time.Minute}); err != nil {
+		return err
+	}
+
+	// wait for FTS to process all docs.
+	time.Sleep(2 * time.Minute)
+
+	// Allow Query to be executed against FTS Index.
+	if err := searchManager.AllowQuerying("cnd-test", &gocb.AllowQueryingSearchIndexOptions{Timeout: 5 * time.Minute}); err != nil {
+		return err
+	}
+
+	// Run N1QL Query against FTS Index.
+	if _, err := host.Query(query, &gocb.QueryOptions{Timeout: 3 * time.Minute}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func MustExecuteFTSOps(t *testing.T, searchIndex gocb.SearchIndex, searchManager *gocb.SearchIndexManager, host *gocb.Cluster, query string) {
+	if err := executeFTSOps(searchIndex, searchManager, host, query); err != nil {
+		Die(t, err)
+	}
+}
+
+func NewViewsDesignDoc() gocb.DesignDocument {
+	// designDoc is Views Design Doc which return doc ID.
+	designDoc := gocb.DesignDocument{
+		Name: "landmarks",
+		Views: map[string]gocb.View{
+			"key1": {
+				Map: "function (doc, meta) {emit(doc.id, null);}",
+			},
+		},
+	}
+
+	return designDoc
+}
+
+// upsertViewsDesignDocs upserts defined Designed doc.
+func upsertViewsDesignDocs(designDoc gocb.DesignDocument, viewManager *gocb.ViewIndexManager) error {
+	if err := viewManager.UpsertDesignDocument(designDoc, gocb.DesignDocumentNamespaceDevelopment, &gocb.UpsertDesignDocumentOptions{Timeout: 3 * time.Minute}); err != nil {
+		return err
+	}
+
+	dDoc, err := viewManager.GetDesignDocument(designDoc.Name, gocb.DesignDocumentNamespaceDevelopment, &gocb.GetDesignDocumentOptions{Timeout: 3 * time.Minute})
+	if err != nil {
+		return err
+	}
+
+	if dDoc.Name != designDoc.Name {
+		return fmt.Errorf("upserted dDoc and Received dDoc don't match")
+	}
+
+	return nil
+}
+
+func MustUpsertViewsDesignDocs(t *testing.T, designDoc gocb.DesignDocument, viewManager *gocb.ViewIndexManager) {
+	if err := upsertViewsDesignDocs(designDoc, viewManager); err != nil {
+		Die(t, err)
+	}
+}
+
+// dropViewsDesignDocs drops defined Designed doc.
+func dropViewsDesignDocs(designDoc gocb.DesignDocument, viewManager *gocb.ViewIndexManager) error {
+	if err := viewManager.DropDesignDocument(designDoc.Name, gocb.DesignDocumentNamespaceDevelopment, &gocb.DropDesignDocumentOptions{Timeout: 3 * time.Minute}); err != nil {
+		return err
+	}
+
+	// wait for ddocs to disappear
+	time.Sleep(30 * time.Second)
+
+	if _, err := viewManager.GetDesignDocument(designDoc.Name, gocb.DesignDocumentNamespaceDevelopment, &gocb.GetDesignDocumentOptions{Timeout: 3 * time.Minute}); err == nil {
+		return fmt.Errorf("design Documents still present")
+	}
+
+	return nil
+}
+
+func MustDropViewsDesignDocs(t *testing.T, designDoc gocb.DesignDocument, viewManager *gocb.ViewIndexManager) {
+	if err := dropViewsDesignDocs(designDoc, viewManager); err != nil {
+		Die(t, err)
+	}
 }

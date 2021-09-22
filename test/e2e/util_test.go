@@ -119,6 +119,8 @@ func registerTests() {
 		framework.NewTestDef(TestRotateAdminPassword).WithTags(TagSuiteSanity),
 		framework.NewTestDef(TestNoLogOrAuditConfig).WithTags(TagSuiteSanity, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingAndAuditingDefaults).WithTags(TagSuiteSanity, TagFeatureLogging, TagSuitePlatform),
+		framework.NewTestDef(TestViewsCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
+		framework.NewTestDef(TestFTSCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 
 		// High priority tests.
 		framework.NewTestDef(TestResizeClusterWithBucket).WithTags(TagSuiteP0, TagSuitePlatform),
@@ -345,6 +347,12 @@ func registerTests() {
 		framework.NewTestDef(TestScopesAndCollectionsCascadingScopeDeletion).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestScopeOverflow).WithTags(TagSuiteP1, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionOverflow).WithTags(TagSuiteP1, TagFeatureCollections),
+		framework.NewTestDef(TestViewsResizeCluster).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestViewsWithScopesAndCollections).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestFTSResizeCluster).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestFTSWithScopesAndCollections).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestAnalyticsCreateDataSetWithCollections).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestGSIWithCollections).WithTags(TagSuiteP0, TagFeatureCollections),
 
 		// Low priority tests.
 		framework.NewTestDef(TestInvalidBaseImage).WithTags(TagSuiteP1, TagSuitePlatform),

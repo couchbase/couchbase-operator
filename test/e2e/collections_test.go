@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -756,4 +757,64 @@ func TestCollectionOverflow(t *testing.T) {
 	e2eutil.MustUpdateCollectionGroup(t, kubernetes, collectionGroup)
 
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionError, v1.ConditionTrue, cluster, time.Minute)
+}
+
+func TestGSIWithCollections(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+
+	clusterSize := 1
+	numOfDocs := f.DocsCount
+
+	// Create a bucket.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+
+	// insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Couchbase Cluster Instance.
+	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
+
+	// Instance to manage Indexes.
+	queryManager := host.QueryIndexes()
+
+	// Create Secondary Index against default collection.
+	e2eutil.MustCreateSecondaryIndex(t, queryManager, bucket.GetName())
+
+	// Drop default collection.
+	query := "DROP COLLECTION `default`._default._default;"
+
+	// Run N1QL Query against Collection.
+	e2eutil.MustExecuteN1qlQuery(t, host, query)
+
+	// wait for Index to disappear.
+	time.Sleep(30 * time.Second)
+
+	indexes := e2eutil.MustGetAllIndexes(t, queryManager, bucket.GetName())
+
+	// Check dropping collection dropped all Indexes as well.
+	if len(indexes) != 0 {
+		e2eutil.Die(t, fmt.Errorf("GSI %s against Collection was not dropped after dropping collection", indexes[0].Name))
+	}
+
+	// Expect there to be a scopes & collections updated event for creation and deletion.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
