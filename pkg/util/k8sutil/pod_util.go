@@ -1423,7 +1423,12 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig) v1.Container {
 	initContainer := couchbaseContainer(cluster, &config)
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
-	initContainer.Args = []string{"bash", "-c", "if [[ ! -e /mnt/etc ]]; then cp -a /opt/couchbase/etc /mnt/; fi"}
+	// NOTE: we originally did a [[ ! -e /mnt/etc ]] but alas some people insist on
+	// using NFS, which will return false on an EIO, say, and just end up resetting
+	// the configuration.  By doing an unconditional non-clobbering copy, we will
+	// never overwrite if the file exists, and also probably hit an error condition
+	// that will cause the init process to fail if NFS is playing silly buggers.
+	initContainer.Args = []string{"bash", "-c", "cp -na /opt/couchbase/etc /mnt/"}
 	initContainer.VolumeMounts = []v1.VolumeMount{
 		{
 			Name:      claimName,

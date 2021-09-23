@@ -438,7 +438,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, targetKube)
 
 	// Static configuration.
-	clusterSize := e2eutil.MustNumNodes(t, targetKube) / len(availableServerGroups) * len(availableServerGroups)
+	clusterSize := len(availableServerGroups) * 2
 	pvcName := "couchbase"
 
 	// Create the cluster.
@@ -580,7 +580,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	// Create cluster spec for RZA feature
 	availableServerGroups := getAvailabilityZones(t, targetKube)
-	clusterSize := e2eutil.MustNumNodes(t, targetKube) / len(availableServerGroups) * len(availableServerGroups)
+	clusterSize := len(availableServerGroups) * 2
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, targetKube, bucket)

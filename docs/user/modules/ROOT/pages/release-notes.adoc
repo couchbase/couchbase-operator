@@ -115,6 +115,12 @@ Some defaults were not able to be migrated so have been removed entirely:
 |===
 | Issue | Description
 
+a| https://issues.couchbase.com/browse/K8S-2432[K8S-2432^]
+a| *Summary:* When recovering a pod and using persistent volume storage, there is the possibly of a race condition when running the Couchbase Server pod's initialization container.
+This occurs when the underlying storage provider returns an error, rather than a definitive answer a to whether a file exists.
+The error appears as if the file doesn't exist, and so the container erroneously reinitializes its persistent storage and resets configuration, particularly storage path locations.
+This fix removes the condition check, and replaces with a non-destructive copy instead.
+
 |===
 
 [#known-issues-v230-beta1]
