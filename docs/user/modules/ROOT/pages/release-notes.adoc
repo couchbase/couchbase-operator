@@ -88,6 +88,26 @@ Ensure that any backup jobs are upgraded to use the new image when moving to Ope
 Backup 1.2.0 fully supports operation with Couchbase scopes and collections.
 Additional improvements include support for filtering of backup source data -- thus minimizing backup size and improving performance, and the addition of new options for filtering restore data -- such as with document key and value regular expressions.
 
+==== Removal of Admission Controller Mutation
+
+Prior to this release, the dynamic admission controller was utilized to provide some defaults to Couchbase custom resources.
+The vast majority of these defaults have already been migrated to native CRD defaulting.
+Mutation has now been fully removed to provide out-of-the-box compatibility with platforms like GKE Autopilot where mutation is prohibited.
+
+Some defaults were not able to be migrated so have been removed entirely:
+
+* Default file system groups for persistent volumes.
+  When using Couchbase with PVCs, the operator tries to reuse data where possible.
+  In order for an old volume to be used by a new pod, the data needs to be read and written by the same group across all pods.
+  Previously the DAC provided dynamic defaults depending on the platform (Kubernetes/Red Hat OCP).
+  While OCP should work without specifying the file system group, Kubernetes users will need to explicitly specify the group when using persistent volumes.
+  Follow the existing xref:concept-persistent-volumes.adoc#using-storage-classes[persistent volume concepts] documentation for guidance on configuration.
+* Backup and Prometheus images.
+  These were dynamically populated by the DAC for ease of use, depending on platform.
+  These fields are now marked as required to be provided by the end user.
+  Up to date images can be found on Docker hub and the Red Hat container catalog.
+  See the xref:prerequisite-and-setup.adoc[prerequisites] documentation for compatible image versions.
+
 [#fixed-issues-v230-beta1]
 === Fixed Issues
 

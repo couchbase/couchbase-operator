@@ -2100,8 +2100,7 @@ type Backup struct {
 	Managed bool `json:"managed,omitempty"`
 
 	// The Backup Image to run on backup pods.
-	// +kubebuilder:default="couchbase/operator-backup:1.2.0"
-	Image string `json:"image,omitempty"`
+	Image string `json:"image"`
 
 	// The Service Account to run backup (and restore) pods under.
 	// Without this backup pods will not be able to update status.
@@ -3313,7 +3312,7 @@ type CouchbaseClusterMonitoringPrometheusSpec struct {
 
 	// Image is the metrics image to be used to collect metrics.
 	// No validation is carried out as this can be any arbitrary repo and tag.
-	Image string `json:"image,omitempty"`
+	Image string `json:"image"`
 
 	// Resources is the resource requirements for the metrics container.
 	// Will be populated by Kubernetes defaults if not specified.

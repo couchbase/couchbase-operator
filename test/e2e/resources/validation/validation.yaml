@@ -496,6 +496,7 @@ spec:
   monitoring:
     prometheus:
       enabled: true
+      image: couchbase/exporter:6.6.6
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBackup

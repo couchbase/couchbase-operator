@@ -160,9 +160,9 @@ Backup defines whether the Operator should manage automated backups, and how to 
 
 ==== Constraints
 
-*Type*: `string`
+*Required*
 
-*Default*: `couchbase/operator-backup:1.2.0`
+*Type*: `string`
 
 ==== Description
 
@@ -1393,6 +1393,8 @@ Enabled is a boolean that enables/disables the metrics sidecar container.
 === couchbaseclusters.spec.monitoring.prometheus.image
 
 ==== Constraints
+
+*Required*
 
 *Type*: `string`
 
