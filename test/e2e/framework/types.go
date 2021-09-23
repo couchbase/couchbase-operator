@@ -8,6 +8,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 )
 
@@ -31,8 +32,8 @@ type Framework struct {
 	CouchbaseBackupImage          string
 	CouchbaseLoggingImage         string
 	CouchbaseLoggingImageUpgrade  string
-	BucketType                    string
-	CompressionMode               string
+	BucketType                    e2eutil.BucketType
+	CompressionMode               couchbasev2.CouchbaseBucketCompressionMode
 	EnableIstio                   bool
 	S3Region                      string
 	S3AccessKey                   string

@@ -2040,8 +2040,8 @@ func TestBackupBucketInclusion(t *testing.T) {
 
 	// Create two buckets.
 	// TODO: The typing in types.Cluster need to change.
-	bucket1 := e2eutil.NewBucket(e2eutil.BucketType(f.BucketType)).WithCompressionMode(v2.CouchbaseBucketCompressionMode(f.CompressionMode)).WithFlush().MustCreate(t, kubernetes)
-	bucket2 := e2eutil.NewBucket(e2eutil.BucketType(f.BucketType)).WithCompressionMode(v2.CouchbaseBucketCompressionMode(f.CompressionMode)).WithFlush().MustCreate(t, kubernetes)
+	bucket1 := e2eutil.NewBucket(f.BucketType).WithCompressionMode(f.CompressionMode).WithFlush().MustCreate(t, kubernetes)
+	bucket2 := e2eutil.NewBucket(f.BucketType).WithCompressionMode(f.CompressionMode).WithFlush().MustCreate(t, kubernetes)
 
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -2079,8 +2079,8 @@ func TestBackupBucketExclusion(t *testing.T) {
 	clusterSize := 1
 
 	// Create two buckets.
-	bucket1 := e2eutil.NewBucket(e2eutil.BucketType(f.BucketType)).WithCompressionMode(v2.CouchbaseBucketCompressionMode(f.CompressionMode)).WithFlush().MustCreate(t, kubernetes)
-	bucket2 := e2eutil.NewBucket(e2eutil.BucketType(f.BucketType)).WithCompressionMode(v2.CouchbaseBucketCompressionMode(f.CompressionMode)).WithFlush().MustCreate(t, kubernetes)
+	bucket1 := e2eutil.NewBucket(f.BucketType).WithCompressionMode(f.CompressionMode).WithFlush().MustCreate(t, kubernetes)
+	bucket2 := e2eutil.NewBucket(f.BucketType).WithCompressionMode(f.CompressionMode).WithFlush().MustCreate(t, kubernetes)
 
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)

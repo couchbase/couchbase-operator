@@ -158,86 +158,6 @@ func preflight() error {
 	return nil
 }
 
-// RegistryConfigValue allows multiple container image registries to be passed on the command
-// line e.g:
-// --registry https://index.docker.io/v1/,organization,password.
-type RegistryConfigValue struct {
-	values []RegistryConfig
-}
-
-func (v *RegistryConfigValue) Set(value string) error {
-	fields := strings.Split(value, ",")
-	if len(fields) != 3 {
-		return fmt.Errorf("invalid cluster config value, expected SERVER,USERNAME,PASSWORD")
-	}
-
-	config := RegistryConfig{
-		Server:   fields[0],
-		Username: fields[1],
-		Password: fields[2],
-	}
-
-	v.values = append(v.values, config)
-
-	return nil
-}
-
-func (v *RegistryConfigValue) String() string {
-	return ""
-}
-
-// TestConfigValue represents an explicit set of tests to run, so you can choose to
-// not run a 12h suite and only a single 5m test.
-type TestConfigValue struct {
-	values []string
-}
-
-func (v *TestConfigValue) Set(value string) error {
-	v.values = append(v.values, value)
-	return nil
-}
-
-func (v *TestConfigValue) String() string {
-	return ""
-}
-
-// SuiteConfigValue represents an explcit set of suites to run.
-type SuiteConfigValue struct {
-	values []string
-}
-
-func (v *SuiteConfigValue) Set(value string) error {
-	v.values = append(v.values, value)
-	return nil
-}
-
-func (v *SuiteConfigValue) String() string {
-	return ""
-}
-
-type durationVar struct {
-	value time.Duration
-}
-
-func (v *durationVar) Set(s string) error {
-	value, err := time.ParseDuration(s)
-	if err != nil {
-		return fmt.Errorf("duration invalid: %w", err)
-	}
-
-	v.value = value
-
-	return nil
-}
-
-func (v *durationVar) Type() string {
-	return "string"
-}
-
-func (v *durationVar) String() string {
-	return v.value.String()
-}
-
 func configure() (err error) {
 	// Provide some sane defaults.
 	params := &Framework{
@@ -256,6 +176,14 @@ func configure() (err error) {
 
 	podCreateTimeout := durationVar{
 		value: 5 * time.Minute,
+	}
+
+	compression := bucketCompression{
+		value: couchbasev2.CouchbaseBucketCompressionModePassive,
+	}
+
+	bucket := bucketType{
+		value: e2eutil.BucketTypeCouchbase,
 	}
 
 	// CLI based configuration (CI/computer friendly)
@@ -298,11 +226,9 @@ func configure() (err error) {
 	flag.StringVar(&params.StorageClassName, "storage-class",
 		"",
 		"Storage class to use, platform default if not specified.")
-	flag.StringVar(&params.BucketType, "bucket-type",
-		"couchbase",
+	flag.Var(&bucket, "bucket-type",
 		"Bucket type to use.  Either 'couchbase', 'ephemeral' or 'memcached'.")
-	flag.StringVar(&params.CompressionMode, "compression-mode",
-		"passive",
+	flag.Var(&compression, "compression-mode",
 		"Compression mode to use.  Either 'off', 'passive' or 'active'.")
 	flag.StringVar(&params.S3Region, "s3-region",
 		"us-west-2",
@@ -341,7 +267,7 @@ func configure() (err error) {
 		"Time before giving up on pod creation.  Platforms with cluster autoscaling may require a larger value e.g. 15m.")
 	flag.BoolVar(&params.EnableIstio, "istio",
 		false,
-		"Enable istio injection.  This annotates per-test namespaces with Istio injecttion, and enables any Operator specific workarounds.")
+		"Enable istio injection.  This annotates per-test namespaces with Istio injection, and enables any Operator specific workarounds.")
 	flag.BoolVar(&params.DynamicPlatform, "dynamic-platform",
 		false,
 		"Enable dynamic platform support e.g. GKE Autopilot, AWS Fargate or anything with cluster autoscaling enabled.")
@@ -358,6 +284,8 @@ func configure() (err error) {
 	params.RegistryConfigs = registries.values
 	params.PodCreateTimeout = podCreateTimeout.value
 	params.Platform = couchbasev2.PlatformType(platform)
+	params.CompressionMode = compression.value
+	params.BucketType = bucket.value
 
 	// Hack... if nothing is specified then it's likely the user will
 	// want platform certification.

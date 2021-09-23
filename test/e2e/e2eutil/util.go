@@ -469,13 +469,11 @@ func MustNewBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object) metav
 	return object
 }
 
-func generateBucket(bucketType, compressionMode string, durability couchbasev2.CouchbaseBucketMinimumDurability) metav1.Object {
-	compressionmode := GetCompressionMode(compressionMode)
-
+func generateBucket(bucketType BucketType, compressionMode couchbasev2.CouchbaseBucketCompressionMode, durability couchbasev2.CouchbaseBucketMinimumDurability) metav1.Object {
 	switch bucketType {
 	case "couchbase":
 		bucket := e2espec.DefaultBucket()
-		bucket.Spec.CompressionMode = compressionmode
+		bucket.Spec.CompressionMode = compressionMode
 
 		if durability != "" {
 			bucket.Spec.MinimumDurability = durability
@@ -484,7 +482,7 @@ func generateBucket(bucketType, compressionMode string, durability couchbasev2.C
 		return bucket
 	case "ephemeral":
 		bucket := e2espec.DefaultEphemeralBucket()
-		bucket.Spec.CompressionMode = compressionmode
+		bucket.Spec.CompressionMode = compressionMode
 
 		if durability != "" {
 			bucket.Spec.MinimumDurability = couchbasev2.CouchbaseEphemeralBucketMinimumDurability(durability)
@@ -498,28 +496,15 @@ func generateBucket(bucketType, compressionMode string, durability couchbasev2.C
 	}
 }
 
-func GetBucket(bucketType, compressionMode string) metav1.Object {
+func GetBucket(bucketType BucketType, compressionMode couchbasev2.CouchbaseBucketCompressionMode) metav1.Object {
 	return generateBucket(bucketType, compressionMode, "")
 }
 
-func GetDurableBucket(bucketType, compressionMode string, durability couchbasev2.CouchbaseBucketMinimumDurability) metav1.Object {
+func GetDurableBucket(bucketType BucketType, compressionMode couchbasev2.CouchbaseBucketCompressionMode, durability couchbasev2.CouchbaseBucketMinimumDurability) metav1.Object {
 	return generateBucket(bucketType, compressionMode, durability)
 }
 
-func GetCompressionMode(compressionMode string) couchbasev2.CouchbaseBucketCompressionMode {
-	switch compressionMode {
-	case "off":
-		return couchbasev2.CouchbaseBucketCompressionModeOff
-	case "passive":
-		return couchbasev2.CouchbaseBucketCompressionModePassive
-	case "active":
-		return couchbasev2.CouchbaseBucketCompressionModeActive
-	default:
-		return couchbasev2.CouchbaseBucketCompressionModePassive
-	}
-}
-
-func MustGetBucket(t *testing.T, bucketType, compressionMode string) metav1.Object {
+func MustGetBucket(t *testing.T, bucketType BucketType, compressionMode couchbasev2.CouchbaseBucketCompressionMode) metav1.Object {
 	bucket := GetBucket(bucketType, compressionMode)
 
 	return bucket
