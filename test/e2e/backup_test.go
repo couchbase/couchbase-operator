@@ -22,7 +22,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -1083,7 +1082,6 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 
 	// Static configuration.
 	clusterSize := 3
-	newBackupSize := resource.MustParse("5Gi")
 
 	// Create cluster.
 	numOfDocs := 100
@@ -1106,6 +1104,9 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// edit CouchbaseBackup to trigger another backup which then triggers the PVC resize
+	newBackupSize := backup.Spec.Size.DeepCopy()
+	newBackupSize.Add(newBackupSize)
+
 	patchset := jsonpatch.NewPatchSet().
 		Replace("/spec/full/schedule", e2eutil.ScheduleIn(4*time.Minute)).
 		Replace("/spec/size", newBackupSize)
