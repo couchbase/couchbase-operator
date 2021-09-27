@@ -1,0 +1,147 @@
+= Operator Self-Certification
+:stem:
+
+[abstract]
+Certifying your platform for use with Couchbase Autonomous Operator.
+
+== Why Self-Certify?
+
+Couchbase Engineering periodically tests the Operator against a number of major platform throughout development e.g. Amazon EKS, Google GKE, Microsoft AKS and Red Hat OCP.
+This is a representative set of different platforms, and aims to cover the majority of those in use by end users.
+Official certification is often a time consuming business, so this has to be constrained.
+
+We appreciate that end users may not want to use one of the officially certified platforms for some of the reasons listed below:
+
+* Data locality -- one of the major vendors may not operate in your country or region
+* On premise deployments -- you may be using your own version of Kubernetes
+* Vendor lock-in -- you may be tied to existing infrastructure providers
+
+Take a third-party storage appliance as an example.
+The cost of procuring the hardware, hosting it, and providing it to a Kubernetes cluster are prohibitively expensive.
+We need another way of supporting these users, and providing confidence the Operator will function as designed in your environment.
+
+== What is Self-Certification?
+
+Self-certification began life as an internal test framework used for Operator acceptance and integration testing.
+It fulfills the following test criteria:
+
+* Kubernetes API conformance
+** Couchbase custom resources are accepted when they should
+** Couchbase custom resources are rejected when they should, either via API schema validation or the admission controller
+* Platform behavior conformance
+** Simulation of platform scheduling, upgrade, error conditions etc.
+** Validation the Operator recovers database instances in a safe and predictable manner
+* Couchbase Server feature conformance
+** Ensures that Couchbase server behaves in a safe and predictable manner
+
+Thus the test framework can be used to:
+
+* Identify where Kubernetes API rules change in an incompatible way
+* Identify where Kubernetes platform behaviors lead to unexpected and unsupportable results
+* Identify where Couchbase Server changes lead to incompatibilities with the Operator
+
+The logical next step was to take this framework and package it up as an Operator self certification container image.
+End users can run it wherever, and on whatever they wish.
+
+=== High Level Overview
+
+Self-certification is deployed onto the platform under test.
+The self certification pod runs a default set of tests that are required for platform certification.
+Results are stored on a persistent volume.
+When the self-certification image completes, an ephemeral pod is created and the results archived and copied locally.
+
+Individual test cases are run in separate namespaces so the whole process can be run in parallel.
+
+=== Security Overview
+
+Platform certification needs full administrative access to the platform under test.
+Installation of cluster roles, cluster role bindings and custom resource definitions will always be an administrative task, so this is a hard requirement.
+Additionally, to test platform behavior, the self-certification image will need to install admission controllers in order to test compatibility, and have access to global resources such as nodes and storage classes in order to correctly simulate error conditions.
+
+[IMPORTANT]
+====
+*Do not run self-certification on a production cluster* as it reserves the right to perform necessary cleanup operations of any resource it requires, and may interfere with other deployments on the platform.
+*It is highly recommended that any platform under test is ephemeral* -- created on demand, tested, then deprovisioned.
+====
+
+== Running Self-Certification
+
+In its most basic form self-certification is started with the following command:
+
+[source,console]
+----
+$ cao certify
+----
+
+This will run the platform certification suite for the Operator version the tool came bundled with.
+It will run with 8-way parallelism, taking approximately 2 hours to run.
+For more information see <<platform requirements>> below.
+
+=== Interpreting Results
+
+When installed and running, the self-certification process will stream output to the console.
+There are two phases:
+
+* Preflight checks
+* Acceptance and integration tests
+
+Preflight checks occur before the tests are started, they performs static checks on the Kubernetes environment to ensure it supports the Operator and Couchbase Server.
+Examples include ensuring the underlying hypervisor supports the required number of processes etc.
+Any preflight failures will need to be addressed before the tests will run, and will typically involve consulting with your platform vendor.
+
+When the acceptance tests commence, progress will be streamed out, and eventually a summary.
+If all tests pass +++<span style="color: green">&#10003;</span>+++ then you are certified and ready to go!
+
+If any tests fail +++<span style="color: red">&#10007;</span>+++ then you will need to submit your results to Couchbase in order to approve the use of Operator or help diagnose any issues that need fixing.
+
+==== Submitting Results to Couchbase
+
+The only thing that is required for review by Couchbase is the downloaded archive that will be in the directory where the `cao certify` command was run.
+The archive will be named something like `couchbase-operator-certification-20060102T150405-0700.tar.bz2`.
+Failure to submit this archive, or simply returning a screen capture, will result in delays until it is provided.
+
+== Platform Requirements
+
+Kubernetes cluster size and node size directly impact how many test can be run in parallel, and inversely, how long a self-certification test takes to run:
+
+* Kubernetes nodes must have at least 4 GiB *available* memory and 2 vCPUs in order to run self-certification
+** The certification image itself needs approximately 3 GiB of memory and 2 vCPUs to run
+** Couchbase server instances require at least 2.5 GiB of memory and 2 vCPUs
+* Each test typically uses a 3 pod -- the minimum supported -- Couchbase cluster to execute.
+* Couchbase server is very CPU intensive, and the tests are time constrained, so we recommend using only the latest generation of CPU available on the platform
+* You need at least 2 availability zones for server group testing, although 3 are recommended for full test coverage and functionality.
+
+Given these constraints, and the default parallelism of 8, we can calculate:
+
+[source]
+----
+memory = certification + (parallelism * couchbase_cluster_size * couchbase_memory)
+memory = 3 + (8 * 3 * 3)
+memory = 75 GiB
+
+CPU = certification + (parallelism * couchbase_cluster_size * couchbase_cpu)
+CPU = 2 + (8 * 3 * 2)
+CPU = 50 vCPU
+----
+
+Given a typical node of a Kubernetes cluster:
+
+* 16GiB memory (13GiB available)
+* 4 vCPUs (3.9 vCPUs available)
+
+We would arrive at:
+
+[source]
+----
+nodes = total_memory / node_memory
+nodes = 75 / 13
+nodes = ~6 nodes
+
+nodes = total_cpu / node_cpu
+nodes = 50 / 3.9
+nodes = ~13 nodes
+----
+
+The largest of these values is 13, so you would need at least 13 nodes.
+However as certification needs at least 2 availability zones, having a 14 node cluster, with 7 nodes in each.
+For the recommended 3 availability zones, this would entail a 15 node cluster, with 5 nodes in each.
