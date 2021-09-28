@@ -302,60 +302,6 @@ func (c *Cluster) initializeClusterState() error {
 	return nil
 }
 
-// createInitialMember picks a server class containing the data service and
-// creates a member/pod for it.
-func (c *Cluster) createInitialMember() (couchbaseutil.Member, *couchbasev2.ServerConfig, error) {
-	if len(c.cluster.Spec.Servers) == 0 {
-		return nil, nil, fmt.Errorf("cluster create: no server specification defined: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
-	}
-
-	index := c.indexOfServerConfigWithService(couchbasev2.DataService)
-	if index == -1 {
-		return nil, nil, fmt.Errorf("%w: cluster create: at least one server specification must contain the data service", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
-	}
-
-	c.members = couchbaseutil.NewMemberSet()
-
-	class := c.cluster.Spec.Servers[index]
-
-	member, err := c.createMember(class)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Notify that we have added a new member, this makes it callable.
-	c.clusterAddMember(member)
-
-	return member, &class, nil
-}
-
-// configureInitialMember sets up passwords, defaults, that kind of stuff.  It's unlikely
-// that this can go wrong, you've probably bypassed the admission controller (naughty)...
-func (c *Cluster) configureInitialMember(member couchbaseutil.Member, class *couchbasev2.ServerConfig) error {
-	if err := c.initMember(member, class); err != nil {
-		// ... if we fail to initialize the cluster, then chances are we won't be
-		// able to contact it and get stuck.  Like all pod creation/recreation code
-		// we should clean up and let retries potentially work, either as transient
-		// errors clear up, or the user unbreaks their bad configuration.
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(member.Name(), c.cluster))
-
-		// Remove the volumes too, we want to recreate them in case they are the
-		// problem.  They contain no data at this point.
-		if err := c.removePod(member.Name(), true); err != nil {
-			// Unlikely, print the error in scope, propagate the outer error.
-			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", err)
-		}
-
-		return err
-	}
-
-	if err := k8sutil.SetPodInitialized(c.k8s, member.Name()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // create is the main cluster creation routine.  It is called on initial cluster creation
 // and any time it is recreated (e.g. all ephemeral pods have been killed).
 func (c *Cluster) create() error {
@@ -633,129 +579,6 @@ func (c *Cluster) updateCRStatus() error {
 	return nil
 }
 
-// createPod is used to create EVERY Couchbase server pod, either provisioning or
-// reprovisioning them.
-func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig, deleteVolumes bool) (err error) {
-	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name(), "image", c.cluster.Spec.CouchbaseImage())
-
-	// In the event of an error, dump out all information we know about
-	// and raise an event.  Delete all resources
-	defer func() {
-		if err == nil {
-			return
-		}
-
-		c.logFailedMember("Member creation failed", m.Name())
-		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(m.Name(), c.cluster))
-
-		if rerr := c.removePod(m.Name(), deleteVolumes); rerr != nil {
-			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", rerr)
-		}
-	}()
-
-	if _, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec); err != nil {
-		return err
-	}
-
-	if err := c.waitForCreatePod(ctx, m); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Remove Pod and any volumes associated with pod if requested
-// ore volumes are associated with default claim.
-func (c *Cluster) removePod(name string, removeVolumes bool) error {
-	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-
-	err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, *opts, removeVolumes)
-	if err != nil {
-		log.Error(err, "Pod deletion failed", "cluster", c.namespacedName())
-		return err
-	}
-
-	log.Info("Pod deleted", "cluster", c.namespacedName(), "name", name)
-
-	return nil
-}
-
-// Delete pod and create with same name.
-// Persisted members will reuse volume mounts.
-func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
-	config := c.cluster.Spec.GetServerConfigByName(m.Config())
-	if config == nil {
-		return fmt.Errorf("%w: config %s for pod does not exist", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), m.Config())
-	}
-
-	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-
-	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name(), *opts); err != nil {
-		return err
-	}
-
-	if err := c.waitForDeletePod(m.Name(), 120); err != nil {
-		return err
-	}
-
-	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
-	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
-	if err != nil {
-		return fmt.Errorf("PodCreateTimeout improperly formatted: %w", errors.NewStackTracedError(err))
-	}
-
-	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
-	defer cancel()
-
-	// Don't delete the volumes here, we need them to recover from, and they
-	// contain precious customer data.
-	if err := c.createPod(ctx, m, *config, false); err != nil {
-		return err
-	}
-
-	// To get here the pod would need to be initialized and clustered, so this is
-	// safe.
-	if err := k8sutil.SetPodInitialized(c.k8s, m.Name()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// wait with context.
-func (c *Cluster) waitForCreatePod(ctx context.Context, member couchbaseutil.Member) error {
-	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name(), member.GetHostPort()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
-	ctx, cancel := context.WithTimeout(c.ctx, time.Duration(timeout)*time.Second)
-	defer cancel()
-
-	if err := k8sutil.WaitForDeletePod(ctx, c.k8s.KubeClient, c.cluster.Namespace, podName); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
-	config := c.cluster.Spec.GetServerConfigByName(m.Config())
-	if config == nil {
-		return false
-	}
-
-	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m); err != nil {
-		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
-		return false
-	}
-
-	return true
-}
-
 // Selects any member that can be recovered and attempts to restart it.
 func (c *Cluster) recoverClusterDown() (bool, error) {
 	// Use Names() as that returns a deterministic/sorted list for testing.
@@ -838,55 +661,6 @@ func (c *Cluster) getClusterPodsByPhase() (running, pending []*v1.Pod) {
 	}
 
 	return
-}
-
-func (c *Cluster) updateMemberStatus(firstMember bool) error {
-	// Hack, NS server doesn't start to work properly until the full initialization
-	// sequence is performed, so a call to /pools/default will not work :sadpanda:
-	// We need to avoid this code path in order to avoid this hack.
-	if firstMember {
-		c.updateMemberStatusWithClusterInfo(c.members, nil)
-		return nil
-	}
-
-	status, err := c.GetStatus()
-	if err != nil {
-		return err
-	}
-
-	ready := couchbaseutil.MemberSet{}
-
-	for name, member := range c.members {
-		state, ok := status.NodeStates[name]
-		if !ok {
-			continue
-		}
-
-		if state == NodeStateActive {
-			ready.Add(member)
-		}
-	}
-
-	unready := c.members.Diff(ready)
-
-	c.updateMemberStatusWithClusterInfo(ready, unready)
-
-	return nil
-}
-
-// use cluster info to set ready members from active nodes
-// and all remaining nodes as unready.
-func (c *Cluster) updateMemberStatusWithClusterInfo(ready, unready couchbaseutil.MemberSet) {
-	if c.cluster.Status.Members == nil {
-		c.cluster.Status.Members = &couchbasev2.MembersStatus{}
-	}
-
-	c.cluster.Status.Members.SetReady(ready.Names())
-	c.cluster.Status.Members.SetUnready(unready.Names())
-
-	if err := c.updateCRStatus(); err != nil {
-		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
-	}
 }
 
 // initClients sets up communication with the Couchbase cluster.
@@ -1139,19 +913,6 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 	}
 }
 
-// clients should use ready members that are available to service requests
-// according to status readiness.  Otherwise, fallback to cluster members.
-func (c *Cluster) readyMembers() couchbaseutil.MemberSet {
-	// This used to cross reference with pod liveness.  Why?
-	// Performance improvment?  UX?
-	return c.callableMembers
-}
-
-// Check if volume only has log volumes mounted.
-func (c *Cluster) memberHasLogVolumes(name string) bool {
-	return k8sutil.MemberHasLogVolumes(c.k8s, name)
-}
-
 // getPodIndex returns the current pod naming index.
 func (c *Cluster) getPodIndex() (int, error) {
 	podIndexStr, err := c.state.Get(persistence.PodIndex)
@@ -1218,4 +979,27 @@ func (c *Cluster) checkVolumeExpansionState() bool {
 func (c *Cluster) logStatus(status *MemberState) {
 	status.LogStatus(c.namespacedName())
 	c.scheduler.LogStatus(c.namespacedName())
+}
+
+// hibernate puts the cluster to sleep, zzzz.
+func (c *Cluster) hibernate() error {
+	for _, pod := range c.getClusterPods() {
+		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", pod.Name)
+
+		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
+	}
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionAvailable)
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBalanced)
+	c.cluster.Status.SetHibernatingCondition("Cluster hibernating")
+
+	if err := c.updateCRStatus(); err != nil {
+		return err
+	}
+
+	log.Info("Cluster is hibernating", "cluster", c.namespacedName())
+
+	return nil
 }

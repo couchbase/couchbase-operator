@@ -1,0 +1,199 @@
+package cluster
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"reflect"
+	"strings"
+	"time"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
+	v1 "k8s.io/api/core/v1"
+)
+
+// createAlternateAddressesExternal calculates what the current state of the node's alternate
+// addresses should be. For public addresses we maintain the default ports, however set the
+// alternate address to the DDNS name.  For private addresses these will be an IP based on the
+// node address and node ports in the 30000 range.
+func (c *Cluster) createAlternateAddressesExternal(member couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
+	var hostname string
+
+	if c.cluster.Spec.Networking.DNS != nil {
+		// Use the user provided DNS name.
+		hostname = k8sutil.GetDNSName(c.cluster, member.Name())
+	} else {
+		// Lookup the node IP the pod is running on.
+		var err error
+		hostname, err = k8sutil.GetHostIP(c.k8s, member.Name())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.k8s, c.cluster.Namespace, member.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	addresses := &couchbaseutil.AlternateAddressesExternal{
+		Hostname: hostname,
+		Ports:    ports,
+	}
+
+	return addresses, nil
+}
+
+// waitAlternateAddressReachable waits for advertised addresses to become reachable.
+// This takes into account the time taken to create an external load balancer and
+// DDNS updates.  Obviously this is a best effort as different DNS servers may behave
+// differently, and what we see is not necessarily what the client sees.
+func waitAlternateAddressReachable(addresses *couchbaseutil.AlternateAddressesExternal) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// All exposed features contain the admin port, only TLS enabled ports
+	// are always guaranteed to exist.
+	port := 18091
+
+	if addresses.Ports != nil {
+		port = int(addresses.Ports.AdminServicePortTLS)
+	}
+
+	// If the address is IPv6, wrap it in brackets as per https://golang.org/pkg/net/#Dial.
+	hostname := addresses.Hostname
+
+	ip := net.ParseIP(hostname)
+	if ip != nil {
+		if strings.Contains(ip.String(), ":") {
+			hostname = fmt.Sprintf("[%s]", ip.String())
+		}
+	}
+
+	return netutil.WaitForHostPort(ctx, fmt.Sprintf("%s:%d", hostname, port))
+}
+
+// Get alternate addresses from server, when server is
+// exposed over LoadBalancer then Ports can be ignored.
+func (c *Cluster) getAlternateAddressesExternal(member couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
+	existingAddresses := &couchbaseutil.AlternateAddressesExternal{}
+	if err := c.getAlternateAddressesExternalInto(member, existingAddresses); err != nil {
+		return nil, err
+	}
+
+	if existingAddresses.Hostname == "" {
+		return nil, nil
+	}
+
+	// Remove Ports if member features are exposed with a loadbalancer
+	if svc, found := c.k8s.Services.Get(member.Name()); found {
+		if svc.Spec.Type == v1.ServiceTypeLoadBalancer {
+			existingAddresses.Ports = nil
+		}
+	}
+
+	return existingAddresses, nil
+}
+
+// getAlternateAddressesExternal gets the alternate addresses for this node.
+// It is *NOT* an error condition for this not to exist, which is an indication
+// that the client code is not clever enough to handle the snafu.
+func (c *Cluster) getAlternateAddressesExternalInto(m couchbaseutil.Member, alternateAddresses *couchbaseutil.AlternateAddressesExternal) error {
+	nodeServices := &couchbaseutil.NodeServices{}
+	if err := couchbaseutil.GetNodeServices(nodeServices).On(c.api, m); err != nil {
+		return err
+	}
+
+	for _, node := range nodeServices.NodesExt {
+		if !node.ThisNode {
+			continue
+		}
+
+		if node.AlternateAddresses != nil {
+			*alternateAddresses = *node.AlternateAddresses.External
+		}
+
+		return nil
+	}
+
+	// The absence of this node is probably due to it not being balanced in yet.
+	// /pools/default/nodeServices apparently only shows nodes when the rebalance
+	// starts.  Don't raise an error.
+	return nil
+}
+
+// getNodeNetworkConfiguration gets the network configuration settings for a node.
+func (c *Cluster) getNodeNetworkConfiguration(m couchbaseutil.Member, s *couchbaseutil.NodeNetworkConfiguration) error {
+	node := &couchbaseutil.NodeInfo{}
+	if err := couchbaseutil.GetNodesSelf(node).On(c.api, m); err != nil {
+		return err
+	}
+
+	onOrOff := couchbaseutil.Off
+
+	if node.NodeEncryption {
+		onOrOff = couchbaseutil.On
+	}
+
+	*s = couchbaseutil.NodeNetworkConfiguration{
+		NodeEncryption: onOrOff,
+	}
+
+	return nil
+}
+
+// initMemberAlternateAddresses injects the K8S node's L3 address and alternate
+// ports into the requested member.  Clients may use these addresses/ports to
+// connect to the cluster if there is no direct L3 connectivity into the pod
+// network.
+func (c *Cluster) reconcileMemberAlternateAddresses() error {
+	// Examine each member in turn as they will have different node
+	// addresses (i.e. you must be using anti affinity or kubernetes
+	// has no way of addressing individual cluster nodes).
+	for _, member := range c.members {
+		// Grab the current configuration
+		existingAddresses, err := c.getAlternateAddressesExternal(member)
+		if err != nil {
+			// If we cannot make contact then just continue, it may have been deleted
+			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
+			return nil
+		}
+
+		// If we don't have any exposed ports, but the node reports it is configured so
+		// then remove the configuration.
+		if !c.cluster.Spec.HasExposedFeatures() {
+			if existingAddresses != nil {
+				if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
+					return err
+				}
+			}
+
+			continue
+		}
+
+		// Get the requested alternate address specification.
+		addresses, err := c.createAlternateAddressesExternal(member)
+		if err != nil {
+			return err
+		}
+
+		// Don't allow addresses to be advertised unless they can be used.
+		if err := waitAlternateAddressReachable(addresses); err != nil {
+			return err
+		}
+
+		// Check to see if we need to perform any updates, ignoring if not
+		if reflect.DeepEqual(addresses, existingAddresses) {
+			continue
+		}
+
+		// Perform the update
+		if err := couchbaseutil.SetAlternateAddressesExternal(addresses).On(c.api, member); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

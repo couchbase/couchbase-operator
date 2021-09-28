@@ -1146,3 +1146,23 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 
 	return nil
 }
+
+// supportsNodeToNode tells us whether the current version supports N2N encryption.
+func (c *Cluster) supportsNodeToNode() bool {
+	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return false
+	}
+
+	version, err := couchbaseutil.NewVersion(tag)
+	if err != nil {
+		return false
+	}
+
+	return version.GreaterEqualString("6.5.1")
+}
+
+// nodeToNodeEnabled tells us whether N2N encyption is enabled.
+func (c *Cluster) nodeToNodeEnabled() bool {
+	return c.cluster.Spec.Networking.TLS != nil && c.cluster.Spec.Networking.TLS.NodeToNodeEncryption != nil
+}

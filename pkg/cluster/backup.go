@@ -18,6 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type CBBackupmgrAction string
@@ -948,4 +949,154 @@ func (c *Cluster) generateBackupPVC(backup *couchbasev2.CouchbaseBackup) *corev1
 			StorageClassName: backup.Spec.StorageClassName,
 		},
 	}
+}
+
+// gatherBackups returns CouchbaseBackups based on the cluster Spec selector.
+func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
+	selector := labels.Everything()
+
+	if c.cluster.Spec.Backup.Selector != nil {
+		var err error
+		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Backup.Selector); err != nil {
+			return nil, err
+		}
+	}
+
+	couchbaseBackups := c.k8s.CouchbaseBackups.List()
+
+	backups := []couchbasev2.CouchbaseBackup{}
+
+	for _, backup := range couchbaseBackups {
+		if !selector.Matches(labels.Set(backup.Labels)) {
+			continue
+		}
+
+		backups = append(backups, *backup)
+	}
+
+	return backups, nil
+}
+
+// gatherBackupRestores returns CouchbaseBackupRestores based on the cluster Spec selector.
+func (c *Cluster) gatherBackupRestores() ([]couchbasev2.CouchbaseBackupRestore, error) {
+	selector := labels.Everything()
+
+	if c.cluster.Spec.Backup.Selector != nil {
+		var err error
+		if selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Backup.Selector); err != nil {
+			return nil, err
+		}
+	}
+
+	couchbaseBackupRestores := c.k8s.CouchbaseBackupRestores.List()
+
+	restores := []couchbasev2.CouchbaseBackupRestore{}
+
+	for _, restore := range couchbaseBackupRestores {
+		if !selector.Matches(labels.Set(restore.Labels)) {
+			continue
+		}
+
+		restores = append(restores, *restore)
+	}
+
+	return restores, nil
+}
+
+func (c *Cluster) reconcileBackup() error {
+	if !c.cluster.Spec.Backup.Managed {
+		return nil
+	}
+
+	requested, err := c.generateBackupResources()
+	if err != nil {
+		return err
+	}
+
+	current, err := c.listBackupResources()
+	if err != nil {
+		return err
+	}
+
+	for _, req := range requested {
+		// Requested resource doesn't exist (as best we know...), so create it.
+		if !current.contains(req) {
+			if err := c.createBackupResource(req); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		// Check for any of the resources needing an update.
+		if err := c.updateBackupResource(req, current.find(req.backup.Name)); err != nil {
+			return err
+		}
+	}
+
+	for _, cur := range current {
+		if cur.backup != nil {
+			continue
+		}
+
+		// Current resource is no longer valid, so delete them.
+		if err := c.deleteBackupResource(cur); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) reconcileBackupRestore() error {
+	if !c.cluster.Spec.Backup.Managed {
+		return nil
+	}
+
+	// poll for an existing CouchbaseBackupRestore resource
+	currentRestores, err := c.gatherBackupRestores()
+	if err != nil {
+		return err
+	}
+
+	// for the current CouchbaseBackupRestores, loop through and see if they have a Job created
+	for i := range currentRestores {
+		currentRestore := &currentRestores[i]
+
+		requested, err := c.generateRestoreJob(currentRestore)
+		if err != nil {
+			return err
+		}
+
+		k8sutil.ApplyBaseAnnotations(requested)
+
+		// Check if restore job already exists.  If it doesn't, then it's never been created, or
+		// less likely, been deleted and needs recreating.
+		currentjob, ok := c.k8s.Jobs.Get(requested.Name)
+		if !ok {
+			log.Info("Restore created", "cbrestore", currentRestore.Name)
+
+			c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
+
+			createdJob, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+
+			log.Info("restore job created", "cbrestore", currentRestore.Name, "created job", createdJob.Name)
+
+			continue
+		}
+
+		// Cleanup completed restores so that aren't rerun.
+		if currentjob.Status.Succeeded == 1 {
+			log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", currentRestore.Name)
+
+			if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), currentRestore.Name, *metav1.NewDeleteOptions(0)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
