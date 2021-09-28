@@ -316,7 +316,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().StringVar(&o.archiveName, "archive-name", archiveName, "Set the default test archive name")
 	cmd.Flags().IntVar(&o.parallel, "parallel", 8, "Test concurrency")
 	cmd.Flags().BoolVar(&o.clean, "clean", false, "Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run")
-	cmd.Flags().BoolVar(&o.useFSGroup, "use-fsgroup", true, "Use a file system group for persistent volumes.")
+	cmd.Flags().BoolVar(&o.useFSGroup, "use-fsgroup", useFSGroup, "Use a file system group for persistent volumes.")
 	cmd.Flags().IntVar(&o.fsGroup, "fsgroup", 1000, "Set the file system group for persistent volumes.")
 	cmd.Flags().Var(&o.registries, "registry", "Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.")
 

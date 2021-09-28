@@ -6,7 +6,11 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
+const (
+	imageRepo  = "registry.connect.redhat.com"
+	useFSGroup = false
+)
+
 var (
-	imageRepo    = "registry.connect.redhat.com"
 	imageDefault = imageRepo + "/couchbase/operator-certification:" + version.WithRevision()
 )
