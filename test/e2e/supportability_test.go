@@ -179,6 +179,7 @@ func mustVerifyArchiveMetadata(t *testing.T, archive string, withOperator bool, 
 			}
 		}
 
+		// nolint:staticcheck
 		if clusterMetadata == nil {
 			e2eutil.Die(t, fmt.Errorf("unable to locate cluster metadata for %s", cluster.Name))
 		}

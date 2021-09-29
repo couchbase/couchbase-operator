@@ -61,7 +61,7 @@ func (c *Client) makeClient() {
 		// If the TLS configuration is explicitly set use that, otherwise
 		// use a basic configuration (which won't ever work unless your cluster
 		// is signed by a CA defined in the ca-certificates package)
-		var tlsClientConfig *tls.Config = nil
+		var tlsClientConfig *tls.Config
 
 		if c.tls != nil {
 			tlsClientConfig = &tls.Config{

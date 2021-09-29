@@ -1,10 +1,10 @@
 pipeline {
   agent {
-    label 'ubuntu-18.04 && master'
+    label 'docker'
   }
 
   environment {
-    GOVERSION = '1.16.3'
+    GOVERSION = '1.17.1'
     NODEVERSION = '14.15.4'
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
   }
@@ -42,9 +42,21 @@ pipeline {
         sh 'make'
       }
     }
-    stage('Build Test') {
-      steps {
-        sh 'make build-test'
+    stage('Build Containers') {
+      matrix {
+        axes {
+          axis {
+            name 'dockerfile'
+            values 'Dockerfile', 'Dockerfile.rhel', 'Dockerfile.admission', 'Dockerfile.admission-rhel', 'Dockerfile.qa', 'Dockerfile.qa-rhel'
+          }
+        }
+        stages {
+          stage('Build Container') {
+            steps {
+              sh 'DOCKER_BUILDKIT=1 docker build -f ${dockerfile} .'
+            }
+          }
+        }
       }
     }
     stage('Unit Test') {

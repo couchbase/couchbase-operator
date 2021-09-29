@@ -258,7 +258,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 	defer cleanup()
 
 	// MonitoringAuthSecret is the name used for all Monitoring Authorisation secret.
-	var monitoringAuthSecret string = "cb-metrics-token"
+	monitoringAuthSecret := "cb-metrics-token"
 
 	// Static configuration.
 	clusterSize := 3

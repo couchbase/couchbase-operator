@@ -2,6 +2,13 @@
 # to tolerate the Mac users.
 FROM registry.access.redhat.com/ubi8/go-toolset:1.15.14-3 as build
 
+# Literally Red Hat is two releases behind the times, with all those lovely
+# unpatched CVEs, so give it a helping hand and override go.  You have to
+# install this in a wierd location as this runs as non-root so normal unix
+# places are out of bounds.
+RUN curl -s https://dl.google.com/go/go1.17.1.linux-amd64.tar.gz | tar xz
+ENV PATH="/opt/app-root/src/go/bin:${PATH}"
+
 ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
 
 # Create the working directory to build in.
@@ -13,12 +20,17 @@ COPY go.* .
 RUN go mod download
 
 # Copy in the rest of the source and compile, caching any build objects.
-COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build make crd binaries certification-binary -e BUILDFLAGS='-tags redhat -trimpath'
+COPY --chown=default:default . .
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated crd binaries certification-binary -e BUILDFLAGS='-tags redhat -trimpath'
 
 # This builds the actual container, copying the binaries over from
 # the build container, and installing any other static dependencies.
 FROM registry.access.redhat.com/ubi8/go-toolset:1.15.14-3
+
+# Literally Red Hat is two releases behind the times, with all those lovely
+# unpatched CVEs, so give it a helping hand and override go.
+RUN curl -s https://dl.google.com/go/go1.17.1.linux-amd64.tar.gz | tar xz
+ENV PATH="/opt/app-root/src/go/bin:${PATH}"
 
 ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
 

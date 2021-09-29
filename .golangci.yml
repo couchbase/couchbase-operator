@@ -37,6 +37,20 @@ linters:
   - nlreturn # seems at odds with cuddling
   - noctx # do want to fix this
   - wrapcheck # we do want this, but I want https://github.com/tomarrell/wrapcheck/issues/2 fixing first
+  - forbidigo # allow println
+  - promlinter # don't check that our metrics are all broken...
+  - cyclop # we just did this...??
+  - ifshort # turn me on
+  - nilerr # turn me on
+  - forcetypeassert # turn me on (maybe, some times we know it's the correct type)
+  - tagliatelle # don't complain about Kubernetes json tag formats, they are standard
+  - predeclared # turn me on
+  - thelper # turn me on
+  - gci # turn me on (perhaps new conding standards?)
+  - durationcheck # turn me on (perhaps)
+  - scopelint # deprecated replaced by exportloopref
+  - interfacer # deprecated
+  - golint # deprecated replaced by revive
 
 linters-settings:
   # Code duplication filter catches a lot of duplication in test
@@ -56,6 +70,10 @@ issues:
   - text: always receives
     linters:
     - unparam
+  # turn me on
+  - text: appendAssign
+    linters:
+    - gocritic
   # Test is exempt from proper error handling.
   # Validation and tools are exempt for now...
   - path: test/.*

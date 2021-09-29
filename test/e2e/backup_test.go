@@ -102,7 +102,7 @@ func getS3Bucket(svc *s3.S3, bucket string) (bool, error) {
 		return false, err
 	}
 
-	var bucketPresent bool = false
+	var bucketPresent bool
 
 	for _, s3bucket := range result.Buckets {
 		if bucket == *s3bucket.Name {

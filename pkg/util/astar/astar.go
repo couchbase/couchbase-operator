@@ -13,7 +13,7 @@ import (
 )
 
 // ErrUnsolvable is raised when the problem submitted was unsolvable for some reason.
-var ErrUnsolvable error = errors.New("problem is unsolvable")
+var ErrUnsolvable = errors.New("problem is unsolvable")
 
 // AStarable is an interface a problem must implment to perform an A* algorthm.
 type AStarable interface {

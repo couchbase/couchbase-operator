@@ -1,4 +1,4 @@
-// +build redhat
+//go:build redhat
 
 package config
 

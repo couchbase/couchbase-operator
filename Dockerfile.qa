@@ -1,6 +1,6 @@
 # This bit is very much linux only, so we do the build in a container
 # to tolerate the Mac users.
-FROM golang:1.16.3 as build
+FROM golang:1.17.1 as build
 
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
 
@@ -14,11 +14,11 @@ RUN go mod download
 
 # Copy in the rest of the source and compile, caching any build objects.
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build make crd binaries certification-binary
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated crd binaries certification-binary
 
 # This builds the actual container, copying the binaries over from
 # the build container, and installing any other static dependencies.
-FROM golang:1.16.3
+FROM golang:1.17.1
 
 # Install whatever compression and archival stuff we need to stream off
 # the test archive (logs).

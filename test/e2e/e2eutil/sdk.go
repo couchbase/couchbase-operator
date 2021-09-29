@@ -18,7 +18,7 @@ import (
 )
 
 // backoffLimit allows the container to only run once.
-var backoffLimit int32 = 0
+var backoffLimit int32
 
 // jobTemplate is the static part of every SDK job.
 var jobTemplate = &batchv1.Job{
