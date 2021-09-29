@@ -252,12 +252,12 @@ func checkConstraintAdminSecret(v *types.Validator, cluster *couchbasev2.Couchba
 		return nil
 	}
 
-	secret, err := v.Abstraction.GetSecret(cluster.Namespace, cluster.Spec.Security.AdminSecret)
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, cluster.Spec.Security.AdminSecret)
 	if err != nil {
 		return err
 	}
 
-	if secret == nil {
+	if !found {
 		return fmt.Errorf("secret %s referenced by spec.security.adminSecret must exist", cluster.Spec.Security.AdminSecret)
 	}
 
@@ -302,12 +302,12 @@ func checkConstraintPrometheusAuthorizationSecret(v *types.Validator, cluster *c
 
 	secretName := *cluster.Spec.Monitoring.Prometheus.AuthorizationSecret
 
-	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {
 		return err
 	}
 
-	if secret == nil {
+	if !found {
 		return fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", secretName)
 	}
 
@@ -360,12 +360,12 @@ func checkConstraintXDCRRemoteAuthentication(v *types.Validator, cluster *couchb
 		if v.Options.ValidateSecrets && remoteCluster.AuthenticationSecret != nil {
 			secretName := *remoteCluster.AuthenticationSecret
 
-			secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+			_, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 			if err != nil {
 				errs = append(errs, err)
 			}
 
-			if secret == nil {
+			if !found {
 				errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", secretName, i))
 			}
 		}
@@ -867,13 +867,13 @@ func checkConstraintVolumeTemplateStorageClass(v *types.Validator, cluster *couc
 
 		storageClassName := *template.Spec.StorageClassName
 
-		storageClass, err := v.Abstraction.GetStorageClass(storageClassName)
+		storageClass, found, err := v.Abstraction.GetStorageClass(storageClassName)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
 
-		if storageClass == nil {
+		if !found {
 			errs = append(errs, fmt.Errorf("storage class %s must exist", storageClassName))
 			continue
 		}
@@ -1062,12 +1062,12 @@ func checkConstraintLDAPConnectionTLS(v *types.Validator, cluster *couchbasev2.C
 	}
 
 	if v.Options.ValidateSecrets {
-		tlsSecret, err := v.Abstraction.GetSecret(cluster.Namespace, tlsSecretName)
+		tlsSecret, found, err := v.Abstraction.GetSecret(cluster.Namespace, tlsSecretName)
 		if err != nil {
 			return err
 		}
 
-		if tlsSecret == nil {
+		if !found {
 			return fmt.Errorf("secret %s referenced by security.ldap.tlsSecret must exist", tlsSecretName)
 		}
 
@@ -1225,10 +1225,10 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 			errs = append(errs, errors.Required(emsg, user.Name, nil))
 		} else if v.Options.ValidateSecrets {
 			// Check the ldap auth secret exists and has the correct keys
-			authSecret, err := v.Abstraction.GetSecret(user.Namespace, authSecretName)
+			authSecret, found, err := v.Abstraction.GetSecret(user.Namespace, authSecretName)
 			if err != nil {
 				errs = append(errs, err)
-			} else if authSecret == nil {
+			} else if !found {
 				errs = append(errs, fmt.Errorf("secret %s referenced by user.spec.authSecret for `%s` must exist", authSecretName, user.Name))
 			} else if _, ok := authSecret.Data["password"]; !ok {
 				errs = append(errs, fmt.Errorf("ldap auth secret %s must contain password", authSecretName))
@@ -1525,12 +1525,12 @@ func getCA(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, b
 		secretName = cluster.Spec.Networking.TLS.Static.OperatorSecret
 	}
 
-	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {
 		return nil, false, err
 	}
 
-	if secret == nil {
+	if !found {
 		return nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
 	}
 
@@ -1564,12 +1564,12 @@ func getServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 		chainKey = "chain.pem"
 	}
 
-	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {
 		return nil, nil, false, err
 	}
 
-	if secret == nil {
+	if !found {
 		return nil, nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
 	}
 
@@ -1608,12 +1608,12 @@ func getClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 		chainKey = "couchbase-operator.crt"
 	}
 
-	secret, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {
 		return nil, nil, false, err
 	}
 
-	if secret == nil {
+	if !found {
 		return nil, nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
 	}
 
@@ -1704,14 +1704,14 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 		}
 
 		if remoteCluster.TLS.Secret != nil {
-			secret, err := v.Abstraction.GetSecret(cluster.Namespace, *remoteCluster.TLS.Secret)
+			secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, *remoteCluster.TLS.Secret)
 			if err != nil {
 				errs = append(errs, err)
 
 				continue
 			}
 
-			if secret == nil {
+			if !found {
 				errs = append(errs, fmt.Errorf("xdcr tls secret %s for remote cluster %s must exist", *remoteCluster.TLS.Secret, remoteCluster.Name))
 				continue
 			}
@@ -2116,12 +2116,12 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 	for _, resource := range selector.Resources {
 		switch resource.Kind {
 		case couchbasev2.CollectionCRDResourceKind:
-			collection, err := v.Abstraction.GetCouchbaseCollection(namespace, resource.StrName())
+			collection, found, err := v.Abstraction.GetCouchbaseCollection(namespace, resource.StrName())
 			if err != nil {
 				return err
 			}
 
-			if collection == nil {
+			if !found {
 				break
 			}
 
@@ -2134,12 +2134,12 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 				name: collection.Name,
 			}
 		case couchbasev2.CollectionGroupCRDResourceKind:
-			collectionGroup, err := v.Abstraction.GetCouchbaseCollectionGroup(namespace, resource.StrName())
+			collectionGroup, found, err := v.Abstraction.GetCouchbaseCollectionGroup(namespace, resource.StrName())
 			if err != nil {
 				return err
 			}
 
-			if collectionGroup == nil {
+			if !found {
 				break
 			}
 
@@ -2258,12 +2258,12 @@ func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resour
 	for _, resource := range selector.Resources {
 		switch resource.Kind {
 		case couchbasev2.ScopeCRDResourceKind:
-			scope, err := v.Abstraction.GetCouchbaseScope(namespace, resource.StrName())
+			scope, found, err := v.Abstraction.GetCouchbaseScope(namespace, resource.StrName())
 			if err != nil {
 				return err
 			}
 
-			if scope == nil {
+			if !found {
 				break
 			}
 
@@ -2276,12 +2276,12 @@ func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resour
 				name: scope.Name,
 			}
 		case couchbasev2.ScopeGroupCRDResourceKind:
-			scopeGroup, err := v.Abstraction.GetCouchbaseScopeGroup(namespace, resource.StrName())
+			scopeGroup, found, err := v.Abstraction.GetCouchbaseScopeGroup(namespace, resource.StrName())
 			if err != nil {
 				return err
 			}
 
-			if scopeGroup == nil {
+			if !found {
 				break
 			}
 

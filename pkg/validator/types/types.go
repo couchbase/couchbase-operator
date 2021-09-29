@@ -19,11 +19,9 @@ import (
 // that may or may not exist before being accepted by K8s itself.
 type KubeAbstraction interface {
 	// GetSecret checks whether the named secret exists in the specified namespace.
-	GetSecret(string, string) (*corev1.Secret, error)
+	GetSecret(string, string) (*corev1.Secret, bool, error)
 	// GetStorageClass checks whether the named stoage class exists.
-	GetStorageClass(string) (*storagev1.StorageClass, error)
-	// GetNamespace returns the requested namespace.
-	GetNamespace(string) (*corev1.Namespace, error)
+	GetStorageClass(string) (*storagev1.StorageClass, bool, error)
 	// GetCouchbaseClusters returns all clusters in the specified namespace.
 	GetCouchbaseClusters(string) (*couchbasev2.CouchbaseClusterList, error)
 	// GetCouchbaseBuckets returns all couchbase buckets for a specified selector.
@@ -47,17 +45,17 @@ type KubeAbstraction interface {
 	// GetCouchbaseBackups returns all backups for a specified selector.
 	GetCouchbaseBackupRestores(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupRestoreList, error)
 	// GetCouchbaseCollection returns the named collection.
-	GetCouchbaseCollection(string, string) (*couchbasev2.CouchbaseCollection, error)
+	GetCouchbaseCollection(string, string) (*couchbasev2.CouchbaseCollection, bool, error)
 	// GetCouchbaseCollectionGroup returns the named collection group.
-	GetCouchbaseCollectionGroup(string, string) (*couchbasev2.CouchbaseCollectionGroup, error)
+	GetCouchbaseCollectionGroup(string, string) (*couchbasev2.CouchbaseCollectionGroup, bool, error)
 	// GetCouchbaseCollections returns the selected collections.
 	GetCouchbaseCollections(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionList, error)
 	// GetCouchbaseCollectionGroups returns the selected collection groups.
 	GetCouchbaseCollectionGroups(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionGroupList, error)
 	// GetCouchbaseScope returns the named scope.
-	GetCouchbaseScope(string, string) (*couchbasev2.CouchbaseScope, error)
+	GetCouchbaseScope(string, string) (*couchbasev2.CouchbaseScope, bool, error)
 	// GetCouchbaseScopeGroup returns the named scope group.
-	GetCouchbaseScopeGroup(string, string) (*couchbasev2.CouchbaseScopeGroup, error)
+	GetCouchbaseScopeGroup(string, string) (*couchbasev2.CouchbaseScopeGroup, bool, error)
 	// GetCouchbaseScopes returns the selected scopes.
 	GetCouchbaseScopes(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeList, error)
 	// GetCouchbaseScopeGroups returns the selected scope groups.
@@ -73,38 +71,33 @@ type kubeAbstractionImpl struct {
 }
 
 // secretExists checks whether the named secret exists in the specified namespace.
-func (ab *kubeAbstractionImpl) GetSecret(namespace, name string) (*corev1.Secret, error) {
+func (ab *kubeAbstractionImpl) GetSecret(namespace, name string) (*corev1.Secret, bool, error) {
 	// Warning, this returns a valid pointer on error
 	secret, err := ab.client.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil
+			return nil, false, nil
 		}
 
-		return nil, err
+		return nil, false, err
 	}
 
-	return secret, nil
+	return secret, true, nil
 }
 
 // storageClassExists checks whether the named stoage class exists.
-func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageClass, error) {
+func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageClass, bool, error) {
 	// Warning, this returns a valid pointer on error
 	storageClass, err := ab.client.StorageV1().StorageClasses().Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil
+			return nil, false, nil
 		}
 
-		return nil, err
+		return nil, false, err
 	}
 
-	return storageClass, nil
-}
-
-// GetNamespace returns the requested namespace.
-func (ab *kubeAbstractionImpl) GetNamespace(name string) (*corev1.Namespace, error) {
-	return ab.client.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{})
+	return storageClass, true, nil
 }
 
 // GetCouchbaseClusters returns all clusters in the specified namespace.
@@ -253,31 +246,31 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBackupRestores(namespace string, sele
 }
 
 // GetCouchbaseCollection returns the named collection.
-func (ab *kubeAbstractionImpl) GetCouchbaseCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, error) {
+func (ab *kubeAbstractionImpl) GetCouchbaseCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, bool, error) {
 	collection, err := ab.couchbaseClient.CouchbaseV2().CouchbaseCollections(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil
+			return nil, false, nil
 		}
 
-		return nil, err
+		return nil, false, err
 	}
 
-	return collection, nil
+	return collection, true, nil
 }
 
 // GetCouchbaseCollectionGroup returns the named collection group.
-func (ab *kubeAbstractionImpl) GetCouchbaseCollectionGroup(namespace, name string) (*couchbasev2.CouchbaseCollectionGroup, error) {
+func (ab *kubeAbstractionImpl) GetCouchbaseCollectionGroup(namespace, name string) (*couchbasev2.CouchbaseCollectionGroup, bool, error) {
 	collectionGroup, err := ab.couchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil
+			return nil, false, nil
 		}
 
-		return nil, err
+		return nil, false, err
 	}
 
-	return collectionGroup, nil
+	return collectionGroup, true, nil
 }
 
 // GetCouchbaseCollections returns the selected collections.
@@ -303,31 +296,31 @@ func (ab *kubeAbstractionImpl) GetCouchbaseCollectionGroups(namespace string, se
 }
 
 // GetCouchbaseScope returns the named scope.
-func (ab *kubeAbstractionImpl) GetCouchbaseScope(namespace, name string) (*couchbasev2.CouchbaseScope, error) {
+func (ab *kubeAbstractionImpl) GetCouchbaseScope(namespace, name string) (*couchbasev2.CouchbaseScope, bool, error) {
 	scope, err := ab.couchbaseClient.CouchbaseV2().CouchbaseScopes(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil
+			return nil, false, nil
 		}
 
-		return nil, err
+		return nil, false, err
 	}
 
-	return scope, nil
+	return scope, true, nil
 }
 
 // GetCouchbaseScopeGroup returns the named scopegroup.
-func (ab *kubeAbstractionImpl) GetCouchbaseScopeGroup(namespace, name string) (*couchbasev2.CouchbaseScopeGroup, error) {
+func (ab *kubeAbstractionImpl) GetCouchbaseScopeGroup(namespace, name string) (*couchbasev2.CouchbaseScopeGroup, bool, error) {
 	collectionGroup, err := ab.couchbaseClient.CouchbaseV2().CouchbaseScopeGroups(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil
+			return nil, false, nil
 		}
 
-		return nil, err
+		return nil, false, err
 	}
 
-	return collectionGroup, nil
+	return collectionGroup, true, nil
 }
 
 // GetCouchbaseScopes returns the selected scopes.
