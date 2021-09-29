@@ -2121,6 +2121,10 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 				return err
 			}
 
+			if collection == nil {
+				break
+			}
+
 			if first, ok := names[collection.CouchbaseName()]; ok {
 				return fmt.Errorf("couchbase collection name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", collection.CouchbaseName(), kind, resourceName, couchbasev2.CollectionCRDResourceKind, collection.Name, first.kind, first.name)
 			}
@@ -2133,6 +2137,10 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 			collectionGroup, err := v.Abstraction.GetCouchbaseCollectionGroup(namespace, resource.StrName())
 			if err != nil {
 				return err
+			}
+
+			if collectionGroup == nil {
+				break
 			}
 
 			for _, name := range collectionGroup.Spec.Names {
@@ -2255,6 +2263,10 @@ func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resour
 				return err
 			}
 
+			if scope == nil {
+				break
+			}
+
 			if first, ok := names[scope.CouchbaseName()]; ok {
 				return fmt.Errorf("couchbase scope name `%v` in %s/%s redefined by %s/%s, first seen in %s/%s", scope.CouchbaseName(), kind, resourceName, couchbasev2.ScopeCRDResourceKind, scope.Name, first.kind, first.name)
 			}
@@ -2267,6 +2279,10 @@ func checkBucketScopesUniqueExplicit(v *types.Validator, namespace, kind, resour
 			scopeGroup, err := v.Abstraction.GetCouchbaseScopeGroup(namespace, resource.StrName())
 			if err != nil {
 				return err
+			}
+
+			if scopeGroup == nil {
+				break
 			}
 
 			for _, name := range scopeGroup.Spec.Names {
