@@ -2107,3 +2107,381 @@ func TestBackupBucketExclusion(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket1.GetName(), f.DocsCount, time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket2.GetName(), 0, time.Minute)
 }
+
+// testBackupAndRestoreScopesAndCollection tests data backup taken of a bucket
+// with managed scopes and collections,
+// is restored successfully in a managed bucket with unmanaged scopes and collections.
+func testBackupAndRestoreScopesAndCollections(t *testing.T, s3 bool) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	scopeName := "pinky"
+	collectionName := "brain"
+	numOfDocs := f.DocsCount
+
+	// Create a collection and collection group.
+	collection := e2eutil.NewCollection(collectionName).MustCreate(t, kubernetes)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
+
+	// Link to a bucket and create that.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollection(collectionName)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+
+	// insert docs in the created scope.collection.
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, cluster)
+
+	// Create and wait for a backup
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// create new restore
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// restore job is too fast, just validate that all items were restored in collection.
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, numOfDocs, 10*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created with Scopes and Collections.
+	// * Backup created
+	// * Remove Bucket
+	// * Bucket created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestBackupAndRestoreScopesAndCollections(t *testing.T) {
+	testBackupAndRestoreScopesAndCollections(t, false)
+}
+
+func TestBackupAndRestoreScopesAndCollectionsS3(t *testing.T) {
+	testBackupAndRestoreScopesAndCollections(t, true)
+}
+
+// testBackupAndRestoreCollection tests data backup taken of a bucket
+// with managed scopes and collections,
+// is restored successfully in a managed bucket with managed scopes
+// and unmanaged collection.
+func testBackupAndRestoreCollections(t *testing.T, s3 bool) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	scopeName := "pinky"
+	collectionName := "brain"
+	numOfDocs := f.DocsCount
+
+	// Create a collection and collection group.
+	collection := e2eutil.NewCollection(collectionName).MustCreate(t, kubernetes)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
+
+	// Link to a bucket and create that.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollection(collectionName)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+
+	// insert docs in the created scope.collection.
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, cluster)
+
+	// Create and wait for a backup
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	// deleting bucket will not delete the underlying k8s couchbasescope resource
+	// delete it explicitly.
+	e2eutil.MustDeleteScope(t, kubernetes, scopeName)
+
+	// Create the scope with no collection.
+	scopeNew := e2eutil.NewScope(scopeName).MustCreate(t, kubernetes)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.LinkBucketToScopesExplicit(bucket, scopeNew)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// create new restore
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// restore job is too fast, just validate that all items were restored in collection.
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, numOfDocs, 10*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created with Scopes and Collections.
+	// * Backup created
+	// * Remove Bucket
+	// * Bucket created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestBackupAndRestoreCollections(t *testing.T) {
+	testBackupAndRestoreCollections(t, false)
+}
+
+func TestBackupAndRestoreCollectionsS3(t *testing.T) {
+	testBackupAndRestoreCollections(t, true)
+}
+
+// testBackupAndRestoreScope tests data backup taken of a managed scope
+// is restored successfully in an unmanaged scope with the same name.
+func testBackupAndRestoreScope(t *testing.T, s3 bool) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	scopeName := "pinky"
+	collectionName := "brain"
+	numOfDocs := f.DocsCount
+
+	// Create a collection and collection group.
+	collection := e2eutil.NewCollection(collectionName).MustCreate(t, kubernetes)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
+
+	// Link to a bucket and create that.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollection(collectionName)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+
+	// insert docs.
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, cluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+
+	// take backup of a single scope.
+	backupInclude := fmt.Sprintf("%s.%s", bucket.GetName(), scopeName)
+
+	// Create and wait for a backup
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).Include(backupInclude).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// create new restore
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// restore job is too fast, just validate that all items were restored in collection.
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, numOfDocs, 10*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created with Scopes and Collections.
+	// * Backup created
+	// * Remove Bucket
+	// * Bucket created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestBackupAndRestoreScope(t *testing.T) {
+	testBackupAndRestoreScope(t, false)
+}
+
+func TestBackupAndRestoreScopeS3(t *testing.T) {
+	testBackupAndRestoreScope(t, true)
+}
+
+// testBackupAndRestoreCollection tests data backup taken of a managed collection
+// is restored successfully in an unmanaged collection with the same name.
+func testBackupAndRestoreCollection(t *testing.T, s3 bool) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	scopeName := "pinky"
+	collectionName1 := "brain"
+	collectionName2 := "heart"
+
+	numOfDocs := f.DocsCount
+
+	// Create a collection.
+	collection1 := e2eutil.NewCollection(collectionName1).MustCreate(t, kubernetes)
+	collection2 := e2eutil.NewCollection(collectionName2).MustCreate(t, kubernetes)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection1, collection2).MustCreate(t, kubernetes)
+
+	// Link to a bucket and create that.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollections(collectionName1, collectionName2)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+
+	// insert docs in the created scope.collection.
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName1).MustCreate(t, kubernetes, cluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName2).MustCreate(t, kubernetes, cluster)
+
+	// take backup of a single scope.
+	backupInclude := fmt.Sprintf("%s.%s.%s", bucket.GetName(), scopeName, collectionName1)
+
+	// Create and wait for a backup
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).Include(backupInclude).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// create new restore
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// restore job is too fast, just validate that all items were restored in included collection only.
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName1, numOfDocs, 10*time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName2, 0, 10*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created with Scopes and Collections.
+	// * Backup created
+	// * Remove Bucket
+	// * Bucket created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestBackupAndRestoreCollection(t *testing.T) {
+	testBackupAndRestoreCollection(t, false)
+}
+
+func TestBackupAndRestoreCollectionS3(t *testing.T) {
+	testBackupAndRestoreCollection(t, true)
+}
