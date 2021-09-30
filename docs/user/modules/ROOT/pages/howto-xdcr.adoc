@@ -315,3 +315,128 @@ The hostname is calculated as per the xref:howto-client-sdks.adoc#ip-based-addre
 <.> As we are not using client certificate authentication we specify a secret containing a username and password on the remote system.
 
 <.> Finally we select replications that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
+
+== Scopes and collections support
+
+With Couchbase Server version 7 and greater, scope and collections support is now present for XDCR.
+The Couchbase Autonomous Operator fully supports the various options available to the Couchbase Server version it is running with, full details can be found in the xref:server:manage:manage-xdcr/replicate-using-scopes-and-collections.html[official documentation].
+
+[NOTE]
+====
+If scopes and collections are not used then XDCR maintains the previous approach of replicating the full bucket by default.
+====
+
+[IMPORTANT]
+====
+These options are all only valid if the version of Couchbase Server deployed in the Couchbase Cluster is 7+.
+The target bucket must be set up with the correct scopes and collections to support XDCR.
+====
+
+=== Replication
+
+XDCR differs slightly from RBAC and other usage of scopes and collections in that it has the concept of mappings and keyspaces as defined in the xref:server:learn:clusters-and-availability/xdcr-with-scopes-and-collections.html[official documentation].
+These follow a set of allow and deny rules as indicated which are reflected as a list within the CRD.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replicationscopesandcollections
+spec:
+  bucket: bucket0 # <.>
+  remoteBucket: anotherbucket
+explicitMapping: # <.>
+  allowRules: # <.>
+    - sourceKeyspace: # <.>
+        scope: "scope0"
+      targetKeyspace: # <.>
+        scope: "scope0"
+    - sourceKeyspace:
+        scope: scope1
+        collection: collection1 # <.>
+      targetKeyspace:
+        scope: targetscope1
+        collection: targetcollection1 # <.>
+    - sourceKeyspace:
+        scope: scope1
+        collection: collection2
+      targetKeyspace:
+        scope: targetscope1
+        collection: targetcollection2
+    - sourceKeyspace:
+        scope: scope2
+        collection: collection2
+      targetKeyspace:
+        scope: targetscope2
+        collection: targetcollection2
+  denyRules: # <.>
+    # More specific denial rule of the scope0 implicit mappings
+    - sourceKeyspace:
+        scope: scope0
+        collection: bugs
+----
+
+<.> The source bucket, this must be defined as a CRD at least in the source cluster.
+Eventual consistency rules apply so if the bucket is still being created then we will keep retrying until it reconciles.
+
+<.> The `explicitMapping` is the new Couchbase Server 7 set of explicit mapping rules.
+
+<.> A set of allow rules, i.e. please replicate these.
+
+<.> The source keyspace to replicate from, in this case it will replicate all of the `scope0` scope including all its collections subject to any deny rules.
+
+<.> The target keyspace to replicate to, this must be a matching size to the source so if you specify a collection in the source you must specify a collection in the target.
+
+<.> Here we have an example of replicating only a specific collection.
+
+<.> The target keyspace must be of identical size so as we are replicating from a collection we must also specify a target collection.
+
+<.> Deny rules can be used to prevent replication of specific keyspaces.
+This is useful if for example you have a scope with a large number of collections and you want to replicate all but a small number.
+You can indicate an allow rule for the scope and then filter out the collections you do not want via deny rules rather than have to specify every collection you want explicitly.
+
+As you can see this is an extension of the previously defined CRD to cater for scopes and collections.
+If the `explicitMapping` structure is not set then it will behave as it did previously with full bucket replication including any scopes and collections.
+
+=== Migration
+
+One particular area of note is the ability to xref:server:learn:clusters-and-availability/xdcr-with-scopes-and-collections.html#migration[migrate] data from the default scope and collection of the source bucket into named scopes and collections of the target bucket.
+As this is intended as a one-off task and mutually exclusive from standard replication a new separate CRD is provided to configure it.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseMigrationReplication
+metadata:
+  name: migrationscopesandcollections
+spec:
+  bucket: explicit-name # <.>
+  remoteBucket: explicit-name
+migrationMapping: # <.>
+  mappings:
+    - targetKeyspace: # <.>
+        scope: donald
+        collection: antique
+      filter: "type=duck && age=old" # <.>
+    - filter: "Iamnotaduck"
+      targetKeyspace:
+        scope: migrationscope
+        collection: migrationcollection
+----
+
+<.> The source bucket to use, this must exist at least as a CRD definition.
+
+<.> The set of mappings to use for migration.
+This can either be the entire default scope and collection into a single named target scope and collection or you can filter it via a regex into separate target scopes and collections.
+The options are mutually exclusive so you either replicate the entirety into a single scope and collection or you filter it into different ones, not both.
+
+<.> An example of replicating to a named scope and collection.
+
+<.> An example of a regex to apply to the data.
+This is obviously data dependent and not something that can be validated by the operator.
+
+== Further Reading
+
+* xref:resource/couchbasereplication.adoc[`CouchbaseReplication` resource reference]
+* xref:resource/couchbasemigrationreplication.adoc[`CouchbaseMigrationReplication` resource reference]
