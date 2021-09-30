@@ -65,8 +65,17 @@ spec:
   roles: <.>
   - name: replication_admin
   - name: data_reader
+    bucket: default <.>
   - name: data_writer
-    bucket: default
+    buckets: <.>
+      kind: CouchbaseBucket
+      name: default
+    scopes: <.>
+      kind: CouchbaseScope
+      name: seasia
+    collections: <.>
+      kind: CouchbaseCollection
+      name: templates
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseRoleBinding
@@ -86,6 +95,10 @@ EOF
 <.> The Secret from the previous step.
 <.> The new group, with name `my-group`.
 <.> The xref:server:learn:security/roles.adoc[Couchbase roles] that we want to assign to the new user.
+<.> You can optionally specify a bucket name to apply the role against.  This bucket need not be managed by the operator.
+<.> You can also optionally specify bucket resources to apply the role against for managed buckets.
+<.> In Couchbase server 7.0+, you can optionally specify scope resources to apply the role against.
+<.> In Couchbase server 7.0+, you can optionally specify collection resources to apply the role against.
 <.> The new role binding, with name `my-group-binding`, that binds the new user (`developer`) with the new group (`my-group`).
 
 To test that the new user was created and assigned the desired roles, xref:howto-ui.adoc[connect to the Couchbase Web Console] and log in as user `developer` with password `mypass`.
