@@ -43,6 +43,11 @@ const (
 
 	// operatorDefaultMemoryLimit is the burst amount of memory to kill the pod if exceeded.
 	operatorDefaultMemoryLimit = "400Mi"
+
+	// Debug flag.
+	debug = "debug"
+	// dlv requires a specific port be specified otherwise a random one is used.
+	debugPort = "30123"
 )
 
 // generateOperatorOptions defines the options for creating the operator.
@@ -76,6 +81,9 @@ type generateOperatorOptions struct {
 
 	// memoryLimit is the burst amount of memory to kill the pod if exceeded.
 	memoryLimit quantityVar
+
+	// debug sets the image to run debug config
+	debug bool
 }
 
 // newGenerateOperatorOptions returns a set of options with defaults applied.
@@ -103,6 +111,8 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 	cmd.Flags().Var(&o.cpuLimit, "cpu-limit", "CPU limit for constraining")
 	cmd.Flags().Var(&o.memoryRequest, "memory-request", "Memory requested for scheduling")
 	cmd.Flags().Var(&o.memoryLimit, "memory-limit", "Memory limit for constraining")
+	cmd.Flags().BoolVar(&o.debug, debug, false, "Runs debug configuration. Not intended for external use")
+	_ = cmd.Flags().MarkHidden(debug)
 }
 
 // getGenerateOperatorCommand creates YAML capable of creating the Operator.
@@ -537,6 +547,17 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 		}
 	}
 
+	operatorCommand := OperatorResourceName
+	operatorCommandArgs := []string{
+		"--pod-create-timeout=" + o.podCreationTimeout.value.String(),
+		"--zap-log-level=" + o.logLevel.value,
+	}
+
+	if o.debug {
+		operatorCommand = "/go/bin/dlv"
+		operatorCommandArgs = []string{"debug", "./cmd/operator", "--listen=:" + debugPort, "--accept-multiclient", "--headless=true", "--api-version=2"}
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: OperatorResourceName,
@@ -569,12 +590,9 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 							Name:  OperatorResourceName,
 							Image: o.image,
 							Command: []string{
-								OperatorResourceName,
+								operatorCommand,
 							},
-							Args: []string{
-								"--pod-create-timeout=" + o.podCreationTimeout.value.String(),
-								"--zap-log-level=" + o.logLevel.value,
-							},
+							Args: operatorCommandArgs,
 							Env: []corev1.EnvVar{
 								namespaceEnv,
 								{

@@ -61,6 +61,9 @@ func generateDocumentation(file io.StringWriter, command *cobra.Command) {
 	if command.Runnable() {
 		flagVisitor := func(flag *pflag.Flag) {
 			options := []string{}
+			if flag.Hidden {
+				return
+			}
 
 			if flag.Name != "" {
 				options = append(options, fmt.Sprintf("--%s", flag.Name))
