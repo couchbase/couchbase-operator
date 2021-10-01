@@ -124,6 +124,72 @@ var discard = pathMatcher{
 		kind:  "CouchbaseCluster",
 		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.required",
 	},
+	// Stuff we always override.
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.networking.properties.adminConsoleServiceTemplate.properties.spec.properties.publishNotReadyAddresses",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.networking.properties.adminConsoleServiceTemplate.properties.spec.properties.selector",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.networking.properties.exposedFeatureServiceTemplate.properties.spec.properties.publishNotReadyAddresses",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.networking.properties.exposedFeatureServiceTemplate.properties.spec.properties.selector",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.restartPolicy",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.hostname",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.subdomain",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.securityContext",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.readinessGates",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.affinity",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.hostAliases",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.volumes",
+	},
+	{
+		group: "couchbase.com",
+		kind:  "CouchbaseCluster",
+		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.ephemeralContainers",
+	},
 }
 
 // mutators allow the modification of attributes.  The only reason this is necessary is
