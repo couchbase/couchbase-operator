@@ -37,11 +37,11 @@ pipeline {
     string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-rhcc/operator-backup:1.2.0-105')
     string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-rhcc/exporter:latest')
     string(name: 'exporter_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.5-1')
-    string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-rhcc/fluent-bit:1.1.0')
-    string(name: 'logging_image_upgrade', defaultValue: 'registry.gitlab.com/ch-rhcc/fluent-bit:1.0.4')
+    string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-rhcc/fluent-bit:latest')
+    string(name: 'logging_image_upgrade', defaultValue: 'registry.gitlab.com/ch-rhcc/fluent-bit:1.1.0')
     string(name: 'mobile_image', defaultValue: 'registry.connect.redhat.com/couchbase/sync-gateway:2.8.2-1')
     string(name: 'platform', defaultValue: 'openshift')
-    string(name: 'openshift_version', defaultValue: '4.7')
+    string(name: 'openshift_version', defaultValue: '4.8')
     string(name: 'storage_class', defaultValue: 'gp2')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
@@ -151,7 +151,6 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
-            -istio=${params.enable_istio} \
             -collect-logs \
             -color=false"
           }
@@ -208,7 +207,6 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
-            -istio=${params.enable_istio} \
             -collect-logs \
             -color=false"
           }
@@ -265,7 +263,6 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
-            -istio=${params.enable_istio} \
             -collect-logs \
             -color=false"
           }
@@ -322,7 +319,6 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
-            -istio=${params.enable_istio} \
             -collect-logs \
             -color=false"
           }
@@ -379,7 +375,6 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
-            -istio=${params.enable_istio} \
             -collect-logs \
             -color=false"
           }
@@ -436,7 +431,6 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
-            -istio=${params.enable_istio} \
             -collect-logs \
             -color=false"
           }
