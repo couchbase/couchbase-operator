@@ -111,6 +111,8 @@ func TestViewsWithScopesAndCollections(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+
 	// Static configuration.
 	clusterSize := 1
 	numOfDocs := f.DocsCount

@@ -2120,7 +2120,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, s3 bool) {
 	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
 	defer s3cleanup()
 
-	framework.Requires(t, kubernetes).StaticCluster()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -2210,7 +2210,7 @@ func testBackupAndRestoreCollections(t *testing.T, s3 bool) {
 	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
 	defer s3cleanup()
 
-	framework.Requires(t, kubernetes).StaticCluster()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -2308,7 +2308,7 @@ func testBackupAndRestoreScope(t *testing.T, s3 bool) {
 	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
 	defer s3cleanup()
 
-	framework.Requires(t, kubernetes).StaticCluster()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -2401,7 +2401,7 @@ func testBackupAndRestoreCollection(t *testing.T, s3 bool) {
 	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
 	defer s3cleanup()
 
-	framework.Requires(t, kubernetes).StaticCluster()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	// Static configuration.
 	clusterSize := constants.Size1

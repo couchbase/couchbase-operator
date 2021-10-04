@@ -355,6 +355,8 @@ func TestAnalyticsCreateDataSetWithCollections(t *testing.T) {
 	targetKube, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, targetKube).AtLeastVersion("7.0.0").CouchbaseBucket()
+
 	skipAnalytics(t)
 
 	// Static configuration.
