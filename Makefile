@@ -270,7 +270,6 @@ image-artifacts: binaries
 	# Create a subdirectory for self certification
 	mkdir -p $(CERTIFICATION_ARTIFACTS)/docs
 	cp -a Makefile .git go.mod go.sum cmd pkg scripts test $(CERTIFICATION_ARTIFACTS)
-	rm -rf $(CERTIFICATION_ARTIFACTS)/pkg/generated
 	cp -a docs/License.txt docs/README.txt $(CERTIFICATION_ARTIFACTS)/docs
 	cp Dockerfile.qa $(CERTIFICATION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.qa-rhel $(CERTIFICATION_ARTIFACTS)/Dockerfile.rhel
