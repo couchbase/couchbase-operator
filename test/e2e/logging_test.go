@@ -439,6 +439,7 @@ func TestLoggingUpgrade(t *testing.T) {
 
 	// Check that the image is the new version. This won't work if using the 'latest' tag.
 	targetVersion := strings.Split(f.CouchbaseLoggingImage, ":")[1]
+	targetVersion = strings.Split(targetVersion, "-")[0]
 	searchString := fmt.Sprintf(`"version":"%s (build `, targetVersion)
 	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, searchString)
 
