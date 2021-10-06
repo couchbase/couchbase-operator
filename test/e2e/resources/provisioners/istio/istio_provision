@@ -55,9 +55,23 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: couchbase-admission-controller
+      app: couchbase-operator-admission
   mtls:
     mode: PERMISSIVE
+"""
+
+CERTIFICATIONPEERAUTHENTICATION = """
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: peer-authentication-certification
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: certification
+  mtls:
+    mode: STRICT
 """
 
 def kubectl(*cmd):
@@ -92,6 +106,15 @@ def apply_dac_peer_authentication(args):
         kubectl('apply', '-f', manifest.name,
                 '--kubeconfig', args.kubeconfig)
 
+def apply_certification_peer_authentication(args):
+    """Runs a kubectl command raising an exception on error"""
+    with tempfile.NamedTemporaryFile() as manifest:
+        manifest.write(CERTIFICATIONPEERAUTHENTICATION.encode())
+        manifest.flush()
+
+        kubectl('apply', '-f', manifest.name,
+                '--kubeconfig', args.kubeconfig)
+
 def istioctl(*cmd):
     """Runs a istioctl command raising an exception on error"""
     try:
@@ -104,9 +127,12 @@ def start(args):
     Run istioctl command with required parameters
     """
     istioctl('install', '-y', '--kubeconfig' , args.kubeconfig)
+    # Mark default namespace with istio-injection.
+    kubectl('label', 'namespace', 'default', 'istio-injection=enabled', '--overwrite')
     istioctl('verify-install', '--kubeconfig' , args.kubeconfig)
     if args.mode == 'strict':
         apply_dac_peer_authentication(args)
+        apply_certification_peer_authentication(args)
         apply_operator_peer_authentication(args)
         apply_exporter_peer_authentication(args)
 
