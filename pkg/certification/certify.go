@@ -625,7 +625,7 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 // waitCertificationPodReady waits for the certification pod to report as ready,
 // thus running, and thus ready for log streaming.
 func (o *certifyOptions) waitCertificationPodReady() error {
-	fmt.Println("Wating for certification pod to become ready ...")
+	fmt.Println("Waiting for certification pod to become ready ...")
 
 	callback := func() error {
 		return util.PodReady(o.client, o.namespace, certificationName)
@@ -702,7 +702,7 @@ func (o *certifyOptions) retryStreamLogs() {
 // implying the container has also finished.  As an extra safetly measure this ensures
 // it actually has completed before continuing.
 func (o *certifyOptions) waitCertificationPodCompletion() (int32, error) {
-	fmt.Println("Wating for certification pod to complete ...")
+	fmt.Println("Waiting for certification pod to complete ...")
 
 	var exitCode int32
 
@@ -794,7 +794,7 @@ func (o *certifyOptions) createArtifactsPod(secrets []string) (func(), error) {
 // waitArtifactsPodReady waits for the artifacts pod to be running before we attempt to
 // shell into it to extract the artifacts archive.
 func (o *certifyOptions) waitArtifactsPodReady() error {
-	fmt.Println("Wating for artifact pod to become ready ...")
+	fmt.Println("Waiting for artifact pod to become ready ...")
 
 	callback := func() error {
 		return util.PodReady(o.client, o.namespace, artifactsName)
