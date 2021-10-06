@@ -75,49 +75,6 @@ In order to allow Couchbase Server to write to the persistent storage you must s
 This mounts the persistent volume so the Couchbase Server user is able to write to the persistent volume.
 
 The xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-securitycontext[`couchbaseclusters.spec.securityContext.fsGroup`] parameter allows this to be explicitly set.
-By default, the Operator dynamic admission controller will populate this parameter for you based on whether you are deploying on Kubernetes or Red Hat OCP.
-You can disable this behavior with xref:tools/cao.adoc#cao-generate-admission[`installer configuration parameters`].
 
-[TIP]
-====
-On Kubernetes the file system group can be any non-zero value.
-
-On Red Hat OCP the Couchbase Server user is random and so is the set of groups they are members of.
-This is defined in the project/namespace:
-
-[source,console]
-----
-$ oc get project operator-example-namespace -o json
-{
-    "apiVersion": "project.openshift.io/v1",
-    "kind": "Project",
-    "metadata": {
-        "annotations": {
-            "openshift.io/description": "",
-            "openshift.io/display-name": "",
-            "openshift.io/requester": "developer",
-            "openshift.io/sa.scc.mcs": "s0:c12,c9",
-            "openshift.io/sa.scc.supplemental-groups": "1000150000/10000",
-            "openshift.io/sa.scc.uid-range": "1000150000/10000"
-        },
-        "creationTimestamp": "2018-09-04T20:39:38Z",
-        "name": "operator-example-namespace",
-        "resourceVersion": "312376",
-        "selfLink": "/apis/project.openshift.io/v1/projects/operator-example-namespace",
-        "uid": "a42f48b0-b082-11e8-9a10-020859cce73e"
-    },
-    "spec": {
-        "finalizers": [
-            "openshift.io/origin",
-            "kubernetes"
-        ]
-    },
-    "status": {
-        "phase": "Active"
-    }
-}
-----
-
-A valid file system group is determined by the `openshift.io/sa.scc.supplemental-groups` annotation.
-In this example `1000150000` would allow the Couchbase Server pod to write to attached storage.
-====
+On Kubernetes the file system group can be any non-zero value (we use `1000` internally for testing).
+On Red Hat OpenShift you do not need to populate this field.

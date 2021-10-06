@@ -6,7 +6,7 @@ Configure and manage persistent volumes for a Couchbase cluster.
 
 == Configuring Persistent Volumes
 
-Ensure you have read the xref:concept-persistent-volumes.adoc#supported-storage-classes[storage classes] documentation and created any necessary storage classes for your platform.
+Ensure you have read the xref:concept-persistent-volumes.adoc#supported-storage-classes[storage classes] documentation, created any necessary storage classes for your platform, and setup file system groups for your platform.
 
 Once storage classes are provisioned correctly, you can start provisioning persistent volume claims by modifying the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] configuration:
 
