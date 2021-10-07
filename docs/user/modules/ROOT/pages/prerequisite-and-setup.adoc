@@ -60,7 +60,10 @@ This release supports the following versions of the Couchbase Fluent Bit image f
 | 1.0.0 - 1.0.4
 
 | 2.2.1
-| 1.0.0 - 1.0.4, 1.1.0
+| 1.0.0 - 1.0.4, 1.1.0 - 1.1.1
+
+| 2.3.0
+| 1.0.4, 1.1.0 - 1.1.1
 |===
 
 .Operator Fluent Bit Compatibility
@@ -79,7 +82,7 @@ This release supports the following Kubernetes platforms:
 | 1.18, 1.19, 1.20, 1.21, 1.22
 
 | Red Hat OpenShift Container Platform
-| 4.5, 4.6, 4.7
+| 4.5, 4.6, 4.7, 4.8
 |===
 
 The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:
