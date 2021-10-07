@@ -660,9 +660,13 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 	var deletions []couchbasev2.ServerConfig
 
+	var scheduledScaling couchbasev2.ScalingMessageList
+
 	for _, serverSpec := range c.cluster.Spec.Servers {
 		// Check to see if we need to remove anything
-		nodesToRemove := r.clusteredMembers.GroupByServerConfig(serverSpec.Name).Size() - serverSpec.Size
+		existingNodes := r.clusteredMembers.GroupByServerConfig(serverSpec.Name).Size()
+		nodesToRemove := existingNodes - serverSpec.Size
+
 		if nodesToRemove <= 0 {
 			continue
 		}
@@ -670,6 +674,8 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 		for i := 0; i < nodesToRemove; i++ {
 			deletions = append(deletions, serverSpec)
 		}
+
+		scheduledScaling = append(scheduledScaling, couchbasev2.ScalingMessage{Server: serverSpec.Name, From: existingNodes, To: serverSpec.Size})
 	}
 
 	if len(deletions) == 0 {
@@ -678,7 +684,7 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 
 	r.log()
 
-	// TODO: scaling down condition (K8S-2290)
+	c.cluster.Status.SetScalingDownCondition(scheduledScaling.BuildMessage())
 
 	for _, serverSpec := range deletions {
 		server, err := c.scheduler.Delete(serverSpec.Name)
@@ -696,8 +702,12 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 	// Accumulate the server classes that need scaling up...
 	var additions []couchbasev2.ServerConfig
 
+	var scheduledScaling couchbasev2.ScalingMessageList
+
 	for _, serverSpec := range c.cluster.Spec.Servers {
-		nodesToCreate := serverSpec.Size - r.clusteredMembers.GroupByServerConfig(serverSpec.Name).Size()
+		existingNodes := r.clusteredMembers.GroupByServerConfig(serverSpec.Name).Size()
+
+		nodesToCreate := serverSpec.Size - existingNodes
 		if nodesToCreate <= 0 {
 			continue
 		}
@@ -705,6 +715,8 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 		for i := 0; i < nodesToCreate; i++ {
 			additions = append(additions, serverSpec)
 		}
+
+		scheduledScaling = append(scheduledScaling, couchbasev2.ScalingMessage{Server: serverSpec.Name, From: existingNodes, To: serverSpec.Size})
 	}
 
 	if len(additions) == 0 {
@@ -716,8 +728,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 	// Set the scaling status *before* we start adding any nodes.
 	// This means an external observer can wait for a node addition and the
 	// cluster will already report as scaling (aka not fully healthy)
-	originalSize := r.couchbase.ActiveNodes.Size() + r.couchbase.PendingAddNodes.Size()
-	c.cluster.Status.SetScalingUpCondition(originalSize, originalSize+len(additions))
+	c.cluster.Status.SetScalingUpCondition(scheduledScaling.BuildMessage())
 
 	if err := c.updateCRStatus(); err != nil {
 		log.Error(err, "Cluster status update failed", "cluster", c.namespacedName())

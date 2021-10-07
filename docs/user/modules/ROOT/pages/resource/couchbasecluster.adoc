@@ -2982,7 +2982,7 @@ Can be one of True, False, Unknown.
 
 *Type*: `string`
 
-*Enumerations*: `Available, Balanced, ManageConfig, Scaling, Upgrading, Hibernating, Error, AutoscaleReady`
+*Enumerations*: `Available, Balanced, ManageConfig, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady`
 
 ==== Description
 

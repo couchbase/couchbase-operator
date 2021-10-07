@@ -3122,7 +3122,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;Upgrading;Hibernating;Error;AutoscaleReady
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;
 type ClusterConditionType string
 
 const (
@@ -3130,6 +3130,8 @@ const (
 	ClusterConditionBalanced       ClusterConditionType = "Balanced"
 	ClusterConditionManageConfig   ClusterConditionType = "ManageConfig"
 	ClusterConditionScaling        ClusterConditionType = "Scaling"
+	ClusterConditionScalingUp      ClusterConditionType = "ScalingUp"
+	ClusterConditionScalingDown    ClusterConditionType = "ScalingDown"
 	ClusterConditionUpgrading      ClusterConditionType = "Upgrading"
 	ClusterConditionHibernating    ClusterConditionType = "Hibernating"
 	ClusterConditionError          ClusterConditionType = "Error"

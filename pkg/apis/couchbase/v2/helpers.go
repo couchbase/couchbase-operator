@@ -538,13 +538,41 @@ func (cs *ClusterStatus) Control() {
 	cs.ControlPaused = false
 }
 
-func (cs *ClusterStatus) SetScalingUpCondition(from, to int) {
-	c := newClusterCondition(ClusterConditionScaling, v1.ConditionTrue, "ScalingUp", scalingMsg(from, to))
+type ScalingMessage struct {
+	Server string
+	From   int
+	To     int
+}
+
+type ScalingMessageList []ScalingMessage
+
+func (sml *ScalingMessageList) BuildMessage() string {
+	var builtMessages []string
+
+	for _, message := range *sml {
+		builtMessage := fmt.Sprintf("Scaling Server Class %s from %d to %d", message.Server, message.From, message.To)
+		builtMessages = append(builtMessages, builtMessage)
+	}
+
+	return strings.Join(builtMessages, ", ")
+}
+
+func (cs *ClusterStatus) SetScalingCondition() {
+	c := newClusterCondition(ClusterConditionScaling, v1.ConditionTrue, "ClusterScaling", "The operator is attempting to scale the cluster")
 	cs.setClusterCondition(c)
 }
 
-func (cs *ClusterStatus) SetScalingDownCondition(from, to int) {
-	c := newClusterCondition(ClusterConditionScaling, v1.ConditionTrue, "ScalingDown", scalingMsg(from, to))
+func (cs *ClusterStatus) SetScalingUpCondition(msg string) {
+	cs.SetScalingCondition()
+
+	c := newClusterCondition(ClusterConditionScalingUp, v1.ConditionTrue, "ScalingUp", msg)
+	cs.setClusterCondition(c)
+}
+
+func (cs *ClusterStatus) SetScalingDownCondition(msg string) {
+	cs.SetScalingCondition()
+
+	c := newClusterCondition(ClusterConditionScalingDown, v1.ConditionTrue, "ScalingDown", msg)
 	cs.setClusterCondition(c)
 }
 
@@ -671,10 +699,6 @@ func newClusterCondition(t ClusterConditionType, status v1.ConditionStatus, reas
 		Reason:             reason,
 		Message:            message,
 	}
-}
-
-func scalingMsg(from, to int) string {
-	return fmt.Sprintf("Current cluster size: %d, desired cluster size: %d", from, to)
 }
 
 // Format creates an upgrade condition message.
