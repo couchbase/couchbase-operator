@@ -1,108 +1,40 @@
 = What's New?
 include::partial$constants.adoc[]
 
-Couchbase Autonomous Operator {operator-version-minor} is a significant release that adds new features to the Autonomous Operator 2.0 series.
-The changes in this release enable several advancements in how you can manage, monitor, and deploy Couchbase clusters.
+Couchbase Autonomous Operator {operator-version-minor} release is focused on adding some key features introduced in Couchbase Server 7.0 to CAO such as Scopes and Collections, TLS 1.3 support, RBAC changes to Analytics, and a special feature - a Self-Certification tool - designed to certify CAO on any platform of your choice. 
 
-Take a look at the xref:release-notes.adoc[release notes] for a more detailed and complete list of changes in this release, including known and fixed issues.
+== Manage Scopes and Collections with CAO
+Couchbase Server 7.0 has introduced Scopes and Collections that are new data organization layers between Couchbase Buckets and JSON documents which enables a Dynamic Data Containment Model. Together, Scopes and Collections change the game by making Couchbase one of the few flexible NoSQL systems to support multi-layered structures that map to the RDBMS schema. At the same time, they provide data isolation which is very useful for high-density applications.
 
-== Couchbase Cluster Auto-scaling
+With CAO 2.3_Beta, we are introducing Scopes and Collections for Kubernetes deployments where Data Isolation and Dynamic Data Containment are very important use-cases, especially for modern application developments based on microservices architecture. With the 2.3_Beta release, CAO has the ability to fully manage scopes and collections within a bucket. With Scopes and collections, CAO provides fine-grained access control and cross-datacenter-replication, and improved scalability.  Migration from Couchbase Server 6.x to 7.x happens seamlessly with no additional steps required at your end. 
+Learn more<link> about how Scopes and Collections work in CAO.
 
-The Autonomous Operator now supports Couchbase cluster auto-scaling for _all_ Couchbase services.
-This means that Couchbase cluster server class configurations containing stateful services like Data and Index can now be configured to automatically scale in response to observed metrics.
-(Previously, only stateless deployments of the Query Service were supported.)
+== Self-Certify CAO for any platform of your choice
+With CAO 2.3_Beta we are introducing a Self-Certification tool that allows you to certify your platform for use with Couchbase Autonomous Operator.
+Today CAO is tested and certified against a number of major platforms such as Amazon EKS, Google GKE, Microsoft AKS, and Red Hat OCP. Official certification is often a time-consuming process, so this has to be constrained. However, we understand that end users may not want to use one of the officially certified platforms for some of the reasons listed below:
+* Data locality - vendors may not operate in your country or region
+* On-premise deployments - you may be using your own version of Kubernetes
+* Vendor lock-in - you may be tied to existing infrastructure providers
 
-The Autonomous Operator provides the necessary facilities for Couchbase clusters to be automatically scaled based on usage metrics.
-This capability is provided through an integration with the Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/[Horizontal Pod Autoscaler (HPA)^].
-Thresholds can be set for native Kubernetes metrics (such as pod CPU utilization) as well as Couchbase metrics (such as bucket memory utilization) that, once exceeded, trigger _horizontal scaling_ of individual server classes.
-Auto-scaling doesn't incur any cluster downtime, and allows for each Couchbase Service to be scaled independently based on different metrics.
+So, there has to be another way of supporting these users and providing confidence that the CAO will function as designed in your environment. This is why we are introducing a Self-Certification tool with CAO. It fulfills the following test criteria:
 
-To help users get started in production, an xref:concept-couchbase-autoscaling-best-practices.adoc[auto-scaling best practices guide] has been provided.
-This guide discusses relevant metrics for scaling individual Couchbase Services, and includes recommended settings based on internal benchmark testing performed by Couchbase.
+* Kubernetes API conformance
+** Couchbase custom resources are accepted when they should
+** Couchbase custom resources are rejected when they should, either via API schema validation or the admission controller
+* Platform behavior conformance
+** Simulation of platform scheduling, upgrade error conditions, etc.
+** Validation the Operator recovers database instances in a safe and predictable manner
+* Couchbase Server feature conformance
+** Ensures that Couchbase server behaves in a safe and predictable manner
 
-For more information, refer to xref:concept-couchbase-autoscaling.adoc[].
+Thus the test framework can be used to identify where Kubernetes API rules change in an incompatible way, where Kubernetes platform behaviors lead to unexpected and unsupportable results, and where Couchbase Server changes lead to incompatibilities with the Operator.
+Learn more about the Self-Certification tool here<Link>.
 
-== Log Forwarding and Audit Log Management
+== TLS 1.3 Support
+With Couchbase server 7.0.2, TLS 1.3 support is added, and thus to reconcile with that, CAO is also improved to support TLS 1.3. 
+ 
+== RBAC to Analytics 
+In Couchbase Server 7.0 some new roles and RBAC settings have been added specifically to the Couchabse Analytics service, which is now also added to CAO in 2.3-Beta.
 
-The Autonomous Operator now supports xref:concept-couchbase-logging.adoc#log-forwarding[_log forwarding_] through the optional deployment of a third party log processor that can read Couchbase log files and forward them to standard console output and other configurable destinations.
-This feature is powered by a https://github.com/couchbase/couchbase-fluent-bit[Couchbase-supplied log processor image^] (based on https://fluentbit.io/[Fluent Bit^]) which has also been made available as an open source project on https://github.com/couchbase/couchbase-fluent-bit[Github^].
-
-In addition, audit logging can now be configured via the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification, thus allowing for xref:howto-manage-couchbase-logging.adoc#configuring-audit-logging[automated audit logging] via the Autonomous Operator.
-
-== Online Expansion of Persistent Volumes
-
-The Autonomous Operator now optionally allows for the expansion of persistent volumes that are already in use by Couchbase clusters, thus removing the need for a rolling upgrade of cluster pods.
-
-For additional information and requirements, refer to xref:howto-persistent-volumes.adoc#online-volume-expansion[Online Volume Expansion].
-
-== Enhanced Backup and Restore
-
-With the release of Autonomous Operator 2.2, the https://hub.docker.com/r/couchbase/operator-backup[`operator-backup`^] container image has been enhanced to support a wider range of Couchbase Server and Autonomous Operator versions.
-As part of this update, the https://hub.docker.com/r/couchbase/operator-backup[`operator-backup`^] image has switched to semantic versioning which is no longer based on Couchbase Server version.
-
-At the time of this writing, the new image -- https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.1.0`^] -- is compatible with all versions of the Autonomous Operator that support xref:concept-backup.adoc[managed backup and restore] (version 2.0 and later).
-
-=== Online Backup Volume Resizing
-
-While not a replacement for a properly implemented monitoring solution, it may be beneficial to have your backup storage grow with your requirements.
-To this end, the Autonomous Operator now supports xref:howto-backup.adoc#online-backup-volume-resizing[online resizing of backup volumes].
-
-In addition to supporting xref:howto-backup.adoc#manual-backup-volume-resizing[manual resizing], the Autonomous Operator can also xref:howto-backup.adoc#automated-backup-volume-resizing[automatically resize] backup volumes while also keeping backups to the minimum size necessary to operate, thus reducing cost while also supporting future expansion.
-Note that in order to use these resize capabilities, the underlying StorageClass associated with the backup volume must be configured to https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims[allow volume expansion^].
-
-=== General Backup and Restore Enhancements
-
-By default, backup and restore operations execute with only a single thread of execution, which can sometimes lead to poor performance.
-To mitigate thread-related performance issues, xref:resource/couchbasebackup.adoc#couchbasebackups-spec-threads[`couchbasebackups.spec.threads`] and xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-threads[`couchbasebackuprestores.spec.threads`] can now be specified to configure the number of concurrent xref:server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr`] clients to use when backing up or restoring data.
-
-This release also introduces filters that allow you to control exactly what is restored from a backup.
-In previous releases, restore operations were fairly inflexible in that the only option was to restore all data from a backup.
-Now you can choose to include or exclude specific buckets, restore data for a particular service, and even restore to a different bucket name when restoring documents.
-
-Refer to xref:howto-backup.adoc#additional-restore-options[Additional Restore Options] for more information.
-
-== Customizable Prometheus Metrics
-
-The latest version of the Couchbase Prometheus Exporter allows for certain customizations to exported metrics.
-The following customizations are currently supported:
-
-* Change the namespace, subsystem, name, and help text for each metric.
-* Enable and disable whether a metric is exported to Prometheus.
-
-For more information, refer to xref:howto-prometheus.adoc#customizing-metrics[Customizing Metrics].
-
-== Enhanced Couchbase Upgrade Behavior
-
-Prior to version 2.2, the Autonomous Operator allowed two types of upgrade -- a one pod at a time rolling upgrade, and a whole cluster upgrade.
-This release adds the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] parameter, which allows rolling upgrades to be extended to upgrade either a fixed number of pods, or a percentage of the cluster size.
-
-Refer to xref:concept-upgrade.adoc[] for more information.
-
-== Automatic Resource Allocation
-
-The Autonomous Operator now provides the ability to automatically manage pod CPU and memory resource requests with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoresourceallocation[`couchbaseclusters.spec.autoResourceAllocation`] field.
-When in use, pods will have their resource requests automatically populated depending on the services enabled on that pod, and the individual Couchbase service quotas.
-
-== Improved Security Defaults
-
-The Couchbase Server default minimum TLS version is 1.0.
-This is insecure and easily compromised if a client downgrades to a version less than 1.2.
-Autonomous Operator 2.2 makes TLS 1.2 the minimum by default, and will automatically update the TLS minimum version unless it is explicitly specified with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-tlsminimumversion[`couchbaseclusters.spec.networking.tls.tlsMinimumVersion`] parameter.
-
-You can prevent this change from occurring when xref:howto-operator-upgrade.adoc[upgrading the Operator] on existing clusters by setting xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-tlsminimumversion[`couchbaseclusters.spec.networking.tls.tlsMinimumVersion`] to `TLS1.0` after upgrading the CRDs, and before restarting the Operator.
-
-== Improved TLS Certificate and Key Handling
-
-Couchbase Server requires that the TLS resources be called `pkey.key` and `chain.pem`, however the majority of 3rd-party certificate managers generate `tls.key` and `tls.crt`.
-This format is governed by the Kubernetes `kubernetes.io/tls` secret type.
-To provide integration with 3rd-party providers, and to maintain backward compatibility with existing clusters, the Operator now provides secret shadowing.
-
-A new TLS source -- xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource[`couchbaseclusters.spec.networking.tls.secretSource`] -- allows you to use `kubernetes.io/tls` type secrets to configure Couchbase Server.
-When using this new TLS source, a shadow copy of the TLS secret is created, with the key names changed to those hard coded in Couchbase Server.
-The shadow secret can then be mounted and used inside Couchbase Server pods.
-As the secret is shadowed, the Operator can reformat private keys, and therefore now supports PKCS#8 formatted private keys.
-
-3rd-party certificate managers can be used with clusters that are configured with this new TLS source.
-Refer to the tutorial xref:tutorial-cert-manager.adoc[] for an example.
-
-For existing clusters using the legacy xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-static[`couchbaseclusters.spec.networking.tls.static`] source, the Autonomous Operator works as before -- directly mounting and consuming the TLS secret without a shadow secret.
+== Couchbase Helm Chart 
+Couchbase Helm Chart provides an alternate way to deploy CAO and Couchbase Clusters on Kubernetes platforms. Hence, with every release, we plan to reconcile Couchbase Helm Chart with enhancements made to CAO to maintain a consistent user experience.
