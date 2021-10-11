@@ -102,6 +102,8 @@ This release supports the following managed Kubernetes services and utilities:
 * Microsoft AKS
 * Rancher
 
+Note: With Couchbase Autonomous Operator 2.2.0, we added support for Bottlerocket OS. Bottlerocket is a Linux-based open-source operating system that is purpose-built by Amazon Web Services for running containers. To create an EKS cluster with BottleRocket OS, follow the steps https://github.com/bottlerocket-os/bottlerocket/blob/develop/QUICKSTART-EKS.md[here^].
+
 [#compatibility-pv]
 == Persistent Volume Compatibility
 
