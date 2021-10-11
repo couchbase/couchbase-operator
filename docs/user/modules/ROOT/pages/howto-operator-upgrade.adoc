@@ -11,7 +11,7 @@ Upgrading the Couchbase Autonomous Operator is a four-step process:
 
 == Before Upgrading
 
-Make sure to consult the xref:release-notes.adoc[Release Notes] and the xref:whats-new.adoc[What's New?] pages before upgrading, as there may be additional considerations or steps required on a per-release basis.
+Make sure to consult the xref:release-notes.adoc[Release Notes] and the xref:whats-new.adoc[What's New?] pages before upgrading, as there may be additional considerations or steps required on a per-release basis. Clusters with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-antiaffinity[`couchbaseclusters.spec.antiAffinity`] attribute enabled will require the addition of a temporary node for the upgrade — see xref:concept-sizing.adoc#rolling-upgrade[here] for further details.
 
 .About Upgrading From Version 1.x.x
 [IMPORTANT]
