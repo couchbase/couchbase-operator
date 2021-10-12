@@ -190,6 +190,9 @@ func applyGenericNetworking(cluster *couchbasev2.CouchbaseCluster, genericNetwor
 		return
 	}
 
+	// Set this to zero for generic networking, as node ports are pretty much
+	// instantaneous, and will cause test timeouts.
+	cluster.Spec.Networking.WaitForAddressReachableDelay = &metav1.Duration{}
 	cluster.Spec.Networking.ExposeAdminConsole = true
 	cluster.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
 		couchbasev2.FeatureXDCR,

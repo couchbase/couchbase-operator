@@ -94,11 +94,11 @@ func (r *CouchbaseClusterReconciler) Reconcile(ctx context.Context, request reco
 
 // AddToManager registers a controller reconciler with the manager and triggers updates
 // when CouchbaseCluster objects are modified.
-func AddToManager(mgr manager.Manager, timeout string, concurrency int) error {
+func AddToManager(mgr manager.Manager, createTimeout string, concurrency int) error {
 	r := &CouchbaseClusterReconciler{
 		client:           mgr.GetClient(),
 		clusters:         CreateManagedClusters(),
-		podCreateTimeout: timeout,
+		podCreateTimeout: createTimeout,
 	}
 
 	options := controller.Options{

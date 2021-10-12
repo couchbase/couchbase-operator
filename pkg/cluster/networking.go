@@ -50,8 +50,8 @@ func (c *Cluster) createAlternateAddressesExternal(member couchbaseutil.Member) 
 // This takes into account the time taken to create an external load balancer and
 // DDNS updates.  Obviously this is a best effort as different DNS servers may behave
 // differently, and what we see is not necessarily what the client sees.
-func waitAlternateAddressReachable(addresses *couchbaseutil.AlternateAddressesExternal) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+func waitAlternateAddressReachable(timeout time.Duration, addresses *couchbaseutil.AlternateAddressesExternal) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	// All exposed features contain the admin port, only TLS enabled ports
@@ -149,6 +149,12 @@ func (c *Cluster) getNodeNetworkConfiguration(m couchbaseutil.Member, s *couchba
 // connect to the cluster if there is no direct L3 connectivity into the pod
 // network.
 func (c *Cluster) reconcileMemberAlternateAddresses() error {
+	// Start a global timout counter, this caters for any/all alternate addresses
+	// in the system as we are waiting for external-DNS to do its thing, and all
+	// services will be processed in bulk.
+	ctx, cancel := context.WithTimeout(context.Background(), c.cluster.Spec.Networking.WaitForAddressReachableDelay.Duration)
+	defer cancel()
+
 	// Examine each member in turn as they will have different node
 	// addresses (i.e. you must be using anti affinity or kubernetes
 	// has no way of addressing individual cluster nodes).
@@ -180,7 +186,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		}
 
 		// Don't allow addresses to be advertised unless they can be used.
-		if err := waitAlternateAddressReachable(addresses); err != nil {
+		if err := waitAlternateAddressReachable(10*time.Minute, addresses); err != nil {
 			return err
 		}
 
@@ -188,6 +194,23 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		if reflect.DeepEqual(addresses, existingAddresses) {
 			continue
 		}
+
+		// Wait for a period of time before allowing polling to happen in order to
+		// avoid negative caching of DNS values.
+		log.Info("Waiting for DNS propagation", "cluster", c.namespacedName())
+
+		<-ctx.Done()
+
+		// Next check to see if the DNS entry is actually live (and visible by the Operator),
+		// before installing it into Couchbase server, which will then propagate to clients
+		// and potentially break them.
+		log.Info("Polling for DNS availability", "cluster", c.namespacedName(), "service", member.Name())
+
+		if err := waitAlternateAddressReachable(c.cluster.Spec.Networking.WaitForAddressReachable.Duration, addresses); err != nil {
+			return err
+		}
+
+		log.Info("DNS available", "cluster", c.namespacedName(), "service", member.Name())
 
 		// Perform the update
 		if err := couchbaseutil.SetAlternateAddressesExternal(addresses).On(c.api, member); err != nil {

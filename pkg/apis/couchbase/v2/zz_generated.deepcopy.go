@@ -1679,6 +1679,16 @@ func (in *CouchbaseClusterNetworkingSpec) DeepCopyInto(out *CouchbaseClusterNetw
 		*out = new(NetworkPlatform)
 		**out = **in
 	}
+	if in.WaitForAddressReachableDelay != nil {
+		in, out := &in.WaitForAddressReachableDelay, &out.WaitForAddressReachableDelay
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.WaitForAddressReachable != nil {
+		in, out := &in.WaitForAddressReachable, &out.WaitForAddressReachable
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 

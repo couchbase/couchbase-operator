@@ -2405,6 +2405,20 @@ type CouchbaseClusterNetworkingSpec struct {
 	// DisableUIOverHTTPS is used to explicitly enable and disable UI access over
 	// the HTTPS protocol.  If not specified, this field defaults to false.
 	DisableUIOverHTTPS bool `json:"disableUIOverHTTPS,omitempty"`
+
+	// WaitForAddressReachableDelay is used to defer operator checks that
+	// ensure external addresses are reachable before new nodes are balanced
+	// in to the cluster.  This prevents negative DNS caching while waiting
+	// for external-DDNS controllers to propagate addresses.
+	// +kubebuilder:default="2m"
+	WaitForAddressReachableDelay *metav1.Duration `json:"waitForAddressReachableDelay,omitempty"`
+
+	// WaitForAddressReachable is used to set the timeout between when polling of
+	// external addresses is started, and when it is deemed a failure.  Polling of
+	// DNS name availability inherently dangerous due to negative caching, so prefer
+	// the use of an initial `waitForAddressReachableDelay` to allow propagation.
+	// +kubebuilder:default="10m"
+	WaitForAddressReachable *metav1.Duration `json:"waitForAddressReachable,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
