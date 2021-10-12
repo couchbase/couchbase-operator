@@ -63,7 +63,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // CouchbaseV2 retrieves the CouchbaseV2Client
 func (c *Clientset) CouchbaseV2() couchbasev2.CouchbaseV2Interface {

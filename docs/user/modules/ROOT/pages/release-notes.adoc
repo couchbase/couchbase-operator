@@ -68,6 +68,14 @@ Couchbase Autonomous Operator 2.3.0-beta1 was released in October 2021.
 [#changes-in-behavior-v230-beta1]
 === New Features and Behavioral Changes
 
+=== Logging Defaults
+The new default image for logging is `couchbase/fluent-bit:1.1.1`.
+This image features functional and security updates.
+
+Existing clusters will continue to use the logging version they were provisioned with.
+Should you wish to update existing Couchbase clusters to make use of this new image, then they will undergo a rolling upgrade to facilitate the update.
+You should plan a maintenance window accordingly.
+
 ==== Scopes and Collections Management
 
 The Operator now has the ability to fully manage scopes and collections within a bucket.

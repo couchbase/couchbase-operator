@@ -3355,7 +3355,7 @@ type LogShipperSidecarSpec struct {
 	// Image is the image to be used to deal with logging as a sidecar.
 	// No validation is carried out as this can be any arbitrary repo and tag.
 	// It will default to the latest supported version of Fluent Bit.
-	// +kubebuilder:default="couchbase/fluent-bit:1.0.4"
+	// +kubebuilder:default="couchbase/fluent-bit:1.1.1"
 	Image string `json:"image,omitempty"`
 
 	// ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
