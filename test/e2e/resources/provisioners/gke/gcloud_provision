@@ -44,7 +44,7 @@ PREFIX = '10.0.0.0/8'
 # Each region defines the region name and other region specific configuration.
 # A Kubernetes cluster will be spawned in each region.
 REGIONS = {
-    'us-west1': {
+    'us-central1': {
         'prefix': '10.16.0.0/12',
     }
 }

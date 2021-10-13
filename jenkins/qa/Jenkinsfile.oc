@@ -32,7 +32,7 @@ pipeline {
     string(name: 'operator_image', defaultValue: 'registry.gitlab.com/cb-rhcc/operator:latest')
     string(name: 'admission_image', defaultValue: 'registry.gitlab.com/cb-rhcc/admission-controller:latest')
     string(name: 'certification_image', defaultValue: 'registry.gitlab.com/cb-rhcc/certification:latest')
-    string(name: 'server_image', defaultValue: 'registry.connect.redhat.com/couchbase/server:7.0.1-1')
+    string(name: 'server_image', defaultValue: 'registry.connect.redhat.com/couchbase/server:7.0.2-1')
     string(name: 'server_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/server:6.6.3-1')
     string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-rhcc/operator-backup:1.2.0-105')
     string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-rhcc/exporter:latest')

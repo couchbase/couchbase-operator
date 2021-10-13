@@ -23,11 +23,11 @@ provider "kubernetes" {
 }
 
 provider "aws" {
-  region = "us-west-2"
+  region = "us-east-1"
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = "us-east-2"
   alias = "east"
 }
 
@@ -35,7 +35,7 @@ module "vpc1" {
   source          = "terraform-aws-modules/vpc/aws"
   name            = "${var.name}-vpc1"
   cidr            = "10.0.0.0/16"
-  azs             = ["us-west-2a", "us-west-2b", "us-west-2c"]
+  azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
   public_subnets  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
 
   default_security_group_egress = [
@@ -89,7 +89,7 @@ module "vpc2" {
   source          = "terraform-aws-modules/vpc/aws"
   name            = "${var.name}-vpc2"
   cidr            = "192.168.0.0/16"
-  azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  azs             = ["us-east-2a", "us-east-2b", "us-east-2c"]
   public_subnets  = ["192.168.1.0/24", "192.168.2.0/24", "192.168.3.0/24"]
 
   default_security_group_egress = [
@@ -146,6 +146,7 @@ resource "aws_security_group" "securitygroup2" {
 
 module "cluster1" {
   source          = "terraform-aws-modules/eks/aws"
+  version         = "~>17.20.0"
   cluster_name    = "${var.name}-1"
   cluster_version = var.kubernetes-version
   subnets         = module.vpc1.public_subnets
@@ -181,6 +182,7 @@ module "cluster2" {
   count = var.remote ? 1 : 0
 
   source          = "terraform-aws-modules/eks/aws"
+  version         = "~>17.20.0"
   cluster_name    = "${var.name}-2"
   cluster_version = var.kubernetes-version
   subnets         = module.vpc2[0].public_subnets
