@@ -177,7 +177,7 @@ lint-python:
 # well, but it is quite possible in future that the canonical Dockerfile will
 # need to be moved to a separate repo in which case the "docker build" command
 # can't be here anyway.
-container: $(OPERATOR_BINARY) $(ADMISSION_BINARY) crd
+container:
 	DOCKER_BUILDKIT=1 docker build -f Dockerfile -t ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG} .
 	DOCKER_BUILDKIT=1 docker build -f Dockerfile.admission -t ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG} .
 
@@ -207,9 +207,9 @@ certification-container-public: certification-container
 # well, but it is quite possible in future that the canonical Dockerfile will
 # need to be moved to a separate repo in which case the "docker build" command
 # can't be here anyway.
-container-rhel: binaries crd
-	docker build -f Dockerfile.rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-rhel:v1 .
-	docker build -f Dockerfile.admission-rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-admission-rhel:v1 .
+container-rhel: 
+	DOCKER_BUILDKIT=1 docker build -f Dockerfile.rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-rhel:v1 .
+	DOCKER_BUILDKIT=1 docker build -f Dockerfile.admission-rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-admission-rhel:v1 .
 
 tools-kubernetes: PLATFORM=kubernetes
 tools-kubernetes: tools-platform-specific
@@ -307,3 +307,4 @@ docs: $(CRD_FILE)
 
 docs-lint:
 	scripts/asciidoc-lint
+

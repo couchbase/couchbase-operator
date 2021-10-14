@@ -1,6 +1,10 @@
 # Ignore everything, with the exception of the admission binary
 * 
-!build/bin/couchbase-operator-admission
 !docs/License.txt
 !docs/README.txt
-!scripts/passwd
+!scripts/*
+!cmd/*
+!pkg/*
+!go.*
+!Makefile
+!.git

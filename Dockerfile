@@ -1,9 +1,26 @@
+FROM golang:1.17.1 as build
+
+ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
+
+# Create the working directory to build in.
+WORKDIR ${WORKDIR}
+
+# Copy the go module files and download, this effectively caches the modules.
+COPY go.* ./
+RUN go mod download
+
+# Copy in the rest of the source and compile, caching any build objects.
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated binaries
+
 FROM scratch
 
-ADD scripts/passwd /etc/passwd
+ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
 
-ADD docs/License.txt /License.txt
-ADD docs/README.txt /README.txt
-ADD build/bin/couchbase-operator /usr/local/bin/couchbase-operator
+COPY --from=build ${WORKDIR}/scripts/passwd /etc/passwd
+
+COPY --from=build ${WORKDIR}/docs/License.txt /License.txt
+COPY --from=build ${WORKDIR}/docs/README.txt /README.txt
+COPY --from=build ${WORKDIR}/build/bin/couchbase-operator /usr/local/bin/couchbase-operator
 
 USER 8453
