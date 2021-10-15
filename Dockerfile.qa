@@ -18,13 +18,11 @@ RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated crd bin
 
 # This builds the actual container, copying the binaries over from
 # the build container, and installing any other static dependencies.
-FROM golang:1.17.1
+FROM golang:1.17.1-alpine
 
 # Install whatever compression and archival stuff we need to stream off
 # the test archive (logs).
-RUN --mount=type=cache,target=/var/cache/apt apt-get update \
- && apt-get install -y tar bzip2 \
- && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apk apk add tar bzip2 libc6-compat
 
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
 
@@ -37,7 +35,10 @@ COPY docs/License.txt /
 COPY test/e2e/resources/validation /resources/validation/
 
 # Create a non-root user to run as.
-RUN useradd -u 8453 -s /bin/false couchbase
+RUN adduser -u 8453 -s /bin/false -D couchbase
+RUN mkdir /artifacts
+RUN chown couchbase /artifacts
+
 USER 8453
 
 ENTRYPOINT ["/certification"]
