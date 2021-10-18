@@ -17,8 +17,16 @@ This release supports the deployment of the following Couchbase software:
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| 6.5.1+, 6.6
+| 6.5.1+, 6.6, 7.0
 |===
+
+[NOTE]
+====
+Couchbase Server 7.0 Enterprise Edition, released in July 2021, is certified and supported with Couchbase Operator 2.2.0+.
+Couchbase Server 7.0 introduces scopes and collections that provide new database organization structures within Couchbase.
+Since scopes and collections were newly introduced in Couchbase Server 7.0, Operator management these new data structures will happen in future releases.
+Couchbase Operator 2.2.x will continue to perform the operations at the Couchbase bucket level.
+====
 
 The following diagram depicts Couchbase Server compatibility with the Operator for this, and previous releases, and can be used to calculate upgrade paths:
 
