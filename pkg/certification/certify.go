@@ -324,6 +324,12 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 
 			Resource access is scoped so that only couchbase.com CRDs are managed
 			and namespace with the name 'test-*'.
+
+			When running on a platform with Istio network service mesh, the
+			dynamic admission controller will be installed into the default
+			namespace, and MUST NOT have Istio injection enabled.  The
+			certification image MUST be installed in a non-default namespace
+			with Istio injecton enabled.
 		`),
 		Example: normalize(`
 			# Run platform certification with defaults
@@ -334,6 +340,9 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 
 			# Run platform certification with private image repository
 			cao certify --registry=https://index.docker.io/v1/,username,password
+
+			# Run certification on an Istio enabled platform.
+			cao certify --namespace istio-enabled-namespace -- -istio
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.certify(flags, args); err != nil {
