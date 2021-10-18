@@ -26,7 +26,7 @@ DOCKER_TAG = v1
 # Set this to, for example beta1, for a beta release.
 # This will affect the "-v" version strings and docker images.
 # This is analogous to revisions in DEB and RPM archives.
-revision = $(if $(REVISION),$(REVISION),beta1)
+revision = $(if $(REVISION),$(REVISION),)
 
 # Revisioned version is used for package creation.
 ifeq ($(revision),)
