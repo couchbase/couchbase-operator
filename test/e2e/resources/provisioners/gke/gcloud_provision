@@ -132,8 +132,8 @@ def start(args):
         # Define any arguments that aren't static.
         dynamic_args = []
         dynamic_args.extend(('container', 'clusters', 'create', args.name,
-                            '--release-channel', args.release_channel, '--cluster-version',
-                            get_cluster_version(args, region)))
+                             '--release-channel', args.release_channel, '--cluster-version',
+                             get_cluster_version(args, region)))
 
         # Create this regions's Kubernetes cluster.
         gcloud(*dynamic_args,

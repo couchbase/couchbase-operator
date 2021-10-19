@@ -31,7 +31,7 @@ spec:
     mode: STRICT
 """
 
-EXPORTERPEERAUTHENTICATION="""
+EXPORTERPEERAUTHENTICATION = """
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
@@ -46,7 +46,7 @@ spec:
       mode: PERMISSIVE
 """
 
-DACPEERAUTHENTICATION="""
+DACPEERAUTHENTICATION = """
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
@@ -103,8 +103,8 @@ def start(args):
     """
     Run istioctl command with required parameters
     """
-    istioctl('install', '-y', '--kubeconfig' , args.kubeconfig)
-    istioctl('verify-install', '--kubeconfig' , args.kubeconfig)
+    istioctl('install', '-y', '--kubeconfig', args.kubeconfig)
+    istioctl('verify-install', '--kubeconfig', args.kubeconfig)
     if args.mode == 'strict':
         apply_dac_peer_authentication(args)
         apply_operator_peer_authentication(args)
