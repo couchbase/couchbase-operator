@@ -246,31 +246,20 @@ artifacts: tools crd
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os linux --arch x86_64 --version $(revisionedVersion) --bld_num $(bldNum)
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform openshift --os windows --arch amd64 --version $(revisionedVersion) --bld_num $(bldNum)
 
-image-artifacts: binaries
+image-artifacts:
 	# Create a subdirectory for the operator docker build
-	mkdir -p $(OPERATOR_ARTIFACTS)/docs
-	mkdir -p $(OPERATOR_ARTIFACTS)/scripts
-	mkdir -p $(OPERATOR_ARTIFACTS)/build/bin
-	cp scripts/passwd $(OPERATOR_ARTIFACTS)/scripts/passwd
-	cp docs/License.txt $(OPERATOR_ARTIFACTS)/docs/License.txt
-	cp docs/README.txt $(OPERATOR_ARTIFACTS)/docs/README.txt
-	cp $(OPERATOR_BINARY) $(OPERATOR_ARTIFACTS)/$(OPERATOR_BINARY)
+	mkdir -p $(OPERATOR_ARTIFACTS)
+	./scripts/image_artifact_copy.sh -i Dockerfile.dockerignore -o $(OPERATOR_ARTIFACTS)
 	cp Dockerfile $(OPERATOR_ARTIFACTS)/Dockerfile
 	cp Dockerfile.rhel $(OPERATOR_ARTIFACTS)/Dockerfile.rhel
 	# Create a subdirectory for the admission controller docker build
-	mkdir -p $(ADMISSION_ARTIFACTS)/docs
-	mkdir -p $(ADMISSION_ARTIFACTS)/scripts
-	mkdir -p $(ADMISSION_ARTIFACTS)/build/bin
-	cp scripts/passwd $(ADMISSION_ARTIFACTS)/scripts/passwd
-	cp docs/License.txt $(ADMISSION_ARTIFACTS)/docs/License.txt
-	cp docs/README.txt $(ADMISSION_ARTIFACTS)/docs/README.txt
-	cp $(ADMISSION_BINARY) $(ADMISSION_ARTIFACTS)/$(ADMISSION_BINARY)
+	mkdir -p $(ADMISSION_ARTIFACTS)
+	./scripts/image_artifact_copy.sh -i Dockerfile.admission.dockerignore -o $(ADMISSION_ARTIFACTS)
 	cp Dockerfile.admission $(ADMISSION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.admission-rhel $(ADMISSION_ARTIFACTS)/Dockerfile.rhel
 	# Create a subdirectory for self certification
-	mkdir -p $(CERTIFICATION_ARTIFACTS)/docs
-	cp -a Makefile .git go.mod go.sum cmd pkg scripts test $(CERTIFICATION_ARTIFACTS)
-	cp -a docs/License.txt docs/README.txt $(CERTIFICATION_ARTIFACTS)/docs
+	mkdir -p $(CERTIFICATION_ARTIFACTS)
+	./scripts/image_artifact_copy.sh -i Dockerfile.qa.dockerignore -o $(CERTIFICATION_ARTIFACTS)
 	cp Dockerfile.qa $(CERTIFICATION_ARTIFACTS)/Dockerfile
 	cp Dockerfile.qa-rhel $(CERTIFICATION_ARTIFACTS)/Dockerfile.rhel
 	# Create the archive
