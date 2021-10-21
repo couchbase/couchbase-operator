@@ -7,9 +7,13 @@ CBOPINFO_BINARY = build/bin/cbopinfo
 CERTIFICATION_BINARY = build/bin/certification
 CAO_BINARY = build/bin/cao
 ARTIFACTS = build/artifacts
+
+# These names are very important.  The directory name `couchbase-badger`
+# is used to determine the image name IRL `couchbase/badger` by the build
+# process.
 OPERATOR_ARTIFACTS = $(ARTIFACTS)/couchbase-operator
 ADMISSION_ARTIFACTS = $(ARTIFACTS)/couchbase-admission-controller
-CERTIFICATION_ARTIFACTS = $(ARTIFACTS)/couchbase-certification
+CERTIFICATION_ARTIFACTS = $(ARTIFACTS)/couchbase-operator-certification
 
 kubeconfig = $(if $(KUBECONFIG),$(KUBECONFIG),$(HOME)/.kube/config)
 operatorImage = $(if $(OPERATOR_IMAGE),$(OPERATOR_IMAGE),couchbase/couchbase-operator:v1)
