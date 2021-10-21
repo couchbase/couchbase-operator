@@ -231,10 +231,10 @@ tools-platform-specific:
 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/darwin/arm64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/linux/x86_64/bin/cbopcfg -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/windows/amd64/bin/cbopcfg.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cbopcfg/
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/x86_64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/darwin/arm64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/linux/x86_64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/windows/amd64/bin/cao.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/darwin/x86_64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/darwin/arm64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/linux/x86_64/bin/cao -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build $(BUILDFLAGS) -o build/${PLATFORM}/windows/amd64/bin/cao.exe -ldflags $(LDFLAGS) ${GO_BUILD_FLAGS} ./cmd/cao/
 
 artifacts: tools crd
 	WORKSPACE_DIR=$(PREFIX) ./scripts/artifact_gen.sh --platform kubernetes --os darwin --arch x86_64 --version $(revisionedVersion) --bld_num $(bldNum)
