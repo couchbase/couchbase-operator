@@ -64,7 +64,7 @@ The following example demonstrates how to restrict data writing to the default b
 apiVersion: couchbase.com/v2
 kind: CouchbaseGroup
 metadata:
-  name: data_role
+  name: datarole
 spec:
   roles:
   - name: data_reader
@@ -82,7 +82,7 @@ The following example demonstrates how to restrict data writing to the default b
 apiVersion: couchbase.com/v2
 kind: CouchbaseGroup
 metadata:
-  name: data_role
+  name: datarole
 spec:
   roles:
   - name: data_reader
@@ -113,7 +113,7 @@ The Autonomous Operator can be used to enable this functionality when an `ldapGr
 apiVersion: couchbase.com/v2
 kind: CouchbaseGroup
 metadata:
-  name: data_role
+  name: datarole
 spec:
   ldapGroupRef: cn=mygroup,ou=Groups,dc=example,dc=com
   roles:

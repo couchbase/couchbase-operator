@@ -10,15 +10,15 @@ Couchbase Server 7.0 has introduced Scopes and Collections that are new data org
 Together, Scopes and Collections change the game by making Couchbase one of the few flexible NoSQL systems to support multi-layered structures that map to the relational database schema.
 At the same time, they provide data isolation which is very useful for high-density applications.
 
-With Autonomous Operator 2.3-beta, we are introducing Scopes and Collections for Kubernetes deployments where Data Isolation and Dynamic Data Containment are very important use-cases, especially for modern application developments based on microservices architecture.
-With the 2.3-beta release, Autonomous Operator has the ability to fully manage scopes and collections within a bucket. With Scopes and Collections, Autonomous Operator provides fine-grained access control and cross-datacenter-replication, and improved scalability.
+We are introducing Scopes and Collections for Kubernetes deployments where Data Isolation and Dynamic Data Containment are very important use-cases, especially for modern application developments based on microservices architecture.
+With this release, Autonomous Operator has the ability to fully manage scopes and collections within a bucket. With Scopes and Collections, Autonomous Operator provides fine-grained access control and cross-datacenter-replication, and improved scalability.
 Migration from Couchbase Server 6.x to 7.x happens seamlessly with no additional steps required at your end.
 
 xref:concept-scopes-and-collections.adoc[Learn more] about how Scopes and Collections work in Autonomous Operator.
 
 == Self-Certify Autonomous Operator for any certified Kubernetes platform
 
-With Autonomous Operator 2.3-beta we are introducing a self-certification tool that allows you to certify your platform and other platform specific components such as storage, networking for use with Autonomous Operator.
+We are introducing a self-certification tool that allows you to certify your platform and other platform specific components such as storage, networking for use with Autonomous Operator.
 
 Today Autonomous Operator is tested and certified against a number of major platforms such as Amazon EKS, Google GKE, Microsoft AKS, and Red Hat OCP.
 Official certification is often a time-consuming process, so this has to be constrained. However, we understand that end users may not want to use one of the officially certified platforms for some of the reasons listed below:
@@ -36,21 +36,21 @@ It fulfills the following test criteria:
 ** Couchbase custom resources are rejected when they should, either via API schema validation or the admission controller
 * Platform behavior conformance
 ** Simulation of platform scheduling, upgrade error conditions, etc.
-** Validation of the Operator that it can recover database instances in a safe and predictable manner
+** Validation of the Autonomous Operator that it can recover database instances in a safe and predictable manner
 * Couchbase Server feature conformance
 ** Ensures that Couchbase server behaves in a safe and predictable manner
 
-Thus the test framework can be used to identify where Kubernetes API rules change in an incompatible way, where Kubernetes platform behaviors lead to unexpected and unsupportable results, and where Couchbase Server changes lead to incompatibilities with the Operator.
+Thus the test framework can be used to identify where Kubernetes API rules change in an incompatible way, where Kubernetes platform behaviors lead to unexpected and unsupportable results, and where Couchbase Server changes lead to incompatibilities with the Autonomous Operator.
 
 NOTE: Currently, the Self Certification tool is not supported on the Red Hat OpenShift platform because it requires a new format for the binary or package validation in order to publish the Self Certification tool. Work is underway to fix these issues.
 
 xref:concept-platform-certification.adoc[Learn more] about self-certification.
 
-== RBAC for Analytics 
+== RBAC for Analytics
 
-In Couchbase Server 7.0 some new roles and RBAC settings have been added specifically to the Couchbase Analytics service, which is now also added to Operator in 2.3-beta.
+In Couchbase Server 7.0 some new roles and RBAC settings have been added specifically to the Couchbase Analytics service, which is now also added to Autonomous Operator in 2.3-beta.
 
-== Couchbase Helm Chart 
+== Couchbase Helm Chart
 
-Couchbase Helm Chart provides an alternate way to deploy Operator and Couchbase Clusters on Kubernetes platforms. Hence, with every release.
-We plan to reconcile Couchbase Helm Chart with enhancements made to Operator to maintain a consistent user experience.
+Couchbase Helm Chart provides an alternate way to deploy Autonomous Operator and Couchbase Clusters on Kubernetes platforms. Hence, with every release.
+We plan to reconcile Couchbase Helm Chart with enhancements made to Autonomous Operator to maintain a consistent user experience.
