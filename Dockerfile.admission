@@ -1,6 +1,7 @@
 FROM golang:1.17.1 as build
 
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
+ARG PROD_VERSION=2.3.0
 
 # Create the working directory to build in.
 WORKDIR ${WORKDIR}
@@ -11,7 +12,7 @@ RUN go mod download
 
 # Copy in the rest of the source and compile, caching any build objects.
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated binaries
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated binaries -e VERSION=${PROD_VERSION}
 
 FROM scratch
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator

@@ -2,6 +2,8 @@
 # to tolerate the Mac users.
 FROM registry.access.redhat.com/ubi8/go-toolset:1.15.14-3 as build
 
+ARG PROD_VERSION=2.3.0
+
 # Literally Red Hat is two releases behind the times, with all those lovely
 # unpatched CVEs, so give it a helping hand and override go.  You have to
 # install this in a wierd location as this runs as non-root so normal unix
@@ -21,7 +23,7 @@ RUN go mod download
 
 # Copy in the rest of the source and compile, caching any build objects.
 COPY --chown=default:default . .
-RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated binaries -e BUILDFLAGS='-tags redhat -trimpath'
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated binaries -e BUILDFLAGS='-tags redhat -trimpath' VERSION=${PROD_VERSION}
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-200
 
