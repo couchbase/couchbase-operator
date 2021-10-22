@@ -152,7 +152,12 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	// Start a global timout counter, this caters for any/all alternate addresses
 	// in the system as we are waiting for external-DNS to do its thing, and all
 	// services will be processed in bulk.
-	ctx, cancel := context.WithTimeout(context.Background(), c.cluster.Spec.Networking.WaitForAddressReachableDelay.Duration)
+	delay := time.Duration(0)
+	if c.cluster.Spec.Networking.WaitForAddressReachableDelay != nil {
+		delay = c.cluster.Spec.Networking.WaitForAddressReachableDelay.Duration
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), delay)
 	defer cancel()
 
 	// Examine each member in turn as they will have different node
