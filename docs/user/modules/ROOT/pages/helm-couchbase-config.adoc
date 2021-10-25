@@ -593,7 +593,7 @@ When using the Helm CLI to override pull secrets, the list should be denoted as 
 
 [source,console]
 ----
-helm install --set admissionController.imagePullSecrets={pullsecret1,pullsecret2} couchbase/couchbase-operator
+helm install --set admissionController.imagePullSecrets={pullsecret1,pullsecret2} {helm-repo}
 ----
 |===
 
@@ -678,7 +678,7 @@ Use `--set-file` to import the files from your current directory:
 ----
 helm install  --set-file admissionCA.cert=myCA.pem \
               --set-file admissionCA.key=myCA.key \
-              couchbase/couchbase-operator
+              {helm-repo}
 ----
 
 Refer to the xref:tls.adoc[TLS documentation] for manually creating certificates and keys that can be used to override the auto-generated secret.
@@ -753,7 +753,7 @@ helm install  --namespace ci-testcluster \
               --set-file admissionCA.key=/home/ubuntu/easy-rsa/easyrsa3/pki/private/ca.key \
               --set-file admissionSecret.cert=/home/ubuntu/easy-rsa/easyrsa3/pki/issued/admission-controller.crt \
               --set-file admissionSecret.key=/home/ubuntu/easy-rsa/easyrsa3/pki/private/admission-controller.key \
-              couchbase/couchbase-operator
+              {helm-repo}
 ----
 
 
