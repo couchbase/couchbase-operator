@@ -14,7 +14,7 @@ var (
 	admissionImageDefault           = imageRepo + "/couchbase/admission-controller:" + version.WithRevision()
 	operatorImageDefault            = imageRepo + "/couchbase/operator:" + version.WithRevision()
 	mobileImageDefault              = imageRepo + "/couchbase/sync-gateway:2.8.2-1"
-	serverImageDefault              = imageRepo + "/couchbase/server:7.0.0-1"
+	serverImageDefault              = imageRepo + "/couchbase/server:7.0.2-1"
 	serverImageUpgradeFromDefault   = imageRepo + "/couchbase/server:6.6.3-1"
 	exporterImageDefault            = imageRepo + "/couchbase/exporter:1.0.5-1"
 	exporterImageUpgradeFromDefault = imageRepo + "/couchbase/exporter:1.0.4-2"
