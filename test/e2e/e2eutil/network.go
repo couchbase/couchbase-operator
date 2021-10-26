@@ -237,6 +237,42 @@ func MustCheckServicePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbas
 	}
 }
 
+// MustCheckConsolePorts requires successful check of expected ports on the Console service.
+func MustCheckConsolePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedPorts *[]int32, rejectedPorts *[]int32) {
+	if err := checkConsolePorts(k8s, couchbase, expectedPorts, rejectedPorts); err != nil {
+		Die(t, err)
+	}
+}
+
+// checkConsolePorts ensures that Console service advertises the expected data port, but not the rejected ports.
+func checkConsolePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedPorts *[]int32, rejectedPorts *[]int32) error {
+	// Get Console Service.
+	service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+"-ui", metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	// Check service for expected ports.
+	if expectedPorts != nil {
+		err := checkForExpectedPorts(*service, *expectedPorts)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Expect failure when looking up each rejected port
+	if rejectedPorts != nil {
+		for _, port := range *rejectedPorts {
+			err = checkForExpectedPorts(*service, []int32{port})
+			if err == nil {
+				return fmt.Errorf("port %d was not expected to be exposed on service %s", port, service.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
 // CheckForIPAlternateAddresses gets external addressability configuration from the Couchbase API
 // and checks that alternate addresses are defined and IPv4 addresses.
 func CheckForIPAlternateAddresses(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {

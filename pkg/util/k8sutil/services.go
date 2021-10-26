@@ -118,6 +118,20 @@ var (
 		},
 	}
 
+	// clientBootstrapPorts are the data ports used for sdk bootstrapping.
+	clientBootstrapPorts = []v1.ServicePort{
+		{
+			Name:     dataServicePortName,
+			Port:     dataServicePort,
+			Protocol: v1.ProtocolTCP,
+		},
+		{
+			Name:     dataServicePortNameTLS,
+			Port:     dataServicePortTLS,
+			Protocol: v1.ProtocolTCP,
+		},
+	}
+
 	// srvServicePorts is the list of ports used to create the Couchbase cluster SRV record
 	// for service discovery.  The port names must be couchbase(s) and point at the data
 	// service ports.
@@ -363,9 +377,11 @@ func adminConsoleSelector(cluster *couchbasev2.CouchbaseCluster) map[string]stri
 
 // generateConsoleService creates a new Service resource based on the cluster specification.
 func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
-	// The console service only exposes 8091/18091, insecure ports
-	// are filtered out when using public networking.
-	ports := filterInsecurePorts(uiServicePorts, cluster.Spec.IsAdminConsoleServiceTypePublic())
+	// Gather admin console ports.
+	ports := listConsolePorts(cluster)
+
+	// Insecure ports are filtered out when using public networking.
+	ports = filterInsecurePorts(ports, cluster.Spec.IsAdminConsoleServiceTypePublic())
 
 	// Use either a blank service or the user specified template.
 	service := &v1.Service{}
@@ -730,6 +746,20 @@ func listRequestedPorts(serviceNames couchbasev2.ServiceList) []v1.ServicePort {
 
 	for _, serviceName := range serviceNames {
 		ports = append(ports, servicePorts[serviceName]...)
+	}
+
+	return ports
+}
+
+// listConsolePorts returns the set of ports to expose on the Admin console service.
+func listConsolePorts(cluster *couchbasev2.CouchbaseCluster) []v1.ServicePort {
+	// The console service always exposes 8091/18091,
+	ports := uiServicePorts
+
+	// The console service exposes data ports for bootstrapping
+	// when 'client' feature set is exposed
+	if cluster.Spec.IsClientFeatureExposed() {
+		ports = append(ports, clientBootstrapPorts...)
 	}
 
 	return ports

@@ -24,6 +24,12 @@ const (
 	newDomain = "ajax.com"
 )
 
+// Data service ports.
+const (
+	dataServicePort    = 11210
+	dataServicePortTLS = 11207
+)
+
 // TestExposedFeatureIP tests alternate addresses are populated with IP addresses with
 // a basic cluster.
 func TestExposedFeatureIP(t *testing.T) {
@@ -105,12 +111,20 @@ func TestExposedFeatureDNS(t *testing.T) {
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
+	testCouchbase.Spec.Networking.ExposedFeatures = []couchbasev2.ExposedFeature{
+		couchbasev2.FeatureClient,
+	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Verify that all nodes advertise a DNS based alternate address.
 	e2eutil.MustCheckForDNSAlternateAddresses(t, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, targetKube, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
+
+	// Verify console service exposes data ports.
+	expectedPorts := &[]int32{dataServicePortTLS}
+	rejectedPorts := &[]int32{dataServicePort}
+	e2eutil.MustCheckConsolePorts(t, targetKube, testCouchbase, expectedPorts, rejectedPorts)
 }
 
 // TestExposedFeatureDNSModify tests modifications to the DNS configuration are mirrored by
@@ -271,6 +285,10 @@ func TestConsoleServiceDNS(t *testing.T) {
 	// Verify console service advertises a DNS based address.
 	e2eutil.MustCheckForDNSAdminAnnotation(t, targetKube, testCouchbase, domain, time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, targetKube, testCouchbase, corev1.ServiceTypeLoadBalancer, time.Minute)
+
+	// Verify data ports are not exposed for bootstrapping since exposed features is not set
+	rejectedPorts := &[]int32{dataServicePort, dataServicePortTLS}
+	e2eutil.MustCheckConsolePorts(t, targetKube, testCouchbase, nil, rejectedPorts)
 }
 
 // TestConsoleServiceDNSModify tests modifications to the DNS configuration are mirrored by
@@ -467,4 +485,64 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 	e2eutil.MustCheckConsoleServiceLoadBalancerSourceRanges(t, targetKube, testCouchbase, nil, time.Minute)
 	_ = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/networking/adminConsoleServiceTemplate/spec/loadBalancerSourceRanges", sourceRanges), time.Minute)
 	e2eutil.MustCheckConsoleServiceLoadBalancerSourceRanges(t, targetKube, testCouchbase, sourceRanges, time.Minute)
+}
+
+// TestConsoleServiceBootstrapingClient verifies that data service ports are exposed
+// on Console service when expose features includes the 'client' parameter.
+func TestConsoleServiceBootstrapingClient(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size1
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
+	// create cluster
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
+	testCouchbase.Name = clusterName
+	testCouchbase.Spec.Networking.ExposeAdminConsole = true
+	testCouchbase.Spec.Networking.ExposedFeatures = []couchbasev2.ExposedFeature{
+		couchbasev2.FeatureClient,
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	// Verify console service exposes data ports.
+	expectedPorts := &[]int32{dataServicePort, dataServicePortTLS}
+	e2eutil.MustCheckConsolePorts(t, targetKube, testCouchbase, expectedPorts, nil)
+}
+
+// TestConsoleServiceBootstrapingXDCR verifies that data service ports is not exposed
+// on Console service when expose features only specifies 'xdcr' parameter.
+func TestConsoleServiceBootstrapingXDCR(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	targetKube, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size1
+
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, targetKube, bucket)
+
+	// create cluster
+	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
+	testCouchbase.Name = clusterName
+	testCouchbase.Spec.Networking.ExposeAdminConsole = true
+	testCouchbase.Spec.Networking.ExposedFeatures = []couchbasev2.ExposedFeature{
+		couchbasev2.FeatureXDCR,
+	}
+	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+
+	// Verify console service exposes data ports.
+	rejectedPorts := &[]int32{dataServicePort, dataServicePortTLS}
+	e2eutil.MustCheckConsolePorts(t, targetKube, testCouchbase, nil, rejectedPorts)
 }

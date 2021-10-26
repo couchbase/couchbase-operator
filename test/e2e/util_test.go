@@ -230,6 +230,8 @@ func registerTests() {
 		framework.NewTestDef(TestConsoleServiceDNS).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestConsoleServiceDNSModify).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestConsoleServiceTypeModify).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestConsoleServiceBootstrapingClient).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestConsoleServiceBootstrapingXDCR).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestExposedFeatureTrafficPolicyCluster).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestRBACDeleteUser).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACUpdateRole).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureRBAC),

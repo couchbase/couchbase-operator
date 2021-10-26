@@ -391,6 +391,17 @@ func (cs *ClusterSpec) IsAdminConsoleServiceTypePublic() bool {
 	return false
 }
 
+// IsClientFeatureExposed returns whether client service ports are exposed by the cluster.
+func (cs *ClusterSpec) IsClientFeatureExposed() bool {
+	for _, feature := range cs.Networking.ExposedFeatures {
+		if feature == FeatureClient {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (c *CouchbaseCluster) IsTLSEnabled() bool {
 	return c.Spec.Networking.TLS != nil && (c.Spec.Networking.TLS.Static != nil || c.Spec.Networking.TLS.SecretSource != nil)
 }
