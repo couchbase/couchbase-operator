@@ -2,6 +2,7 @@
 # to tolerate the Mac users.
 FROM golang:1.17.1 as build
 
+ARG PROD_VERSION=2.3.0-beta1
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
 
 # Create the working directory to build in.
@@ -14,7 +15,7 @@ RUN go mod download
 
 # Copy in the rest of the source and compile, caching any build objects.
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated crd binaries certification-binary
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated crd binaries certification-binary -e VERSION=${PROD_VERSION}
 
 # This builds the actual container, copying the binaries over from
 # the build container, and installing any other static dependencies.

@@ -56,7 +56,7 @@ Kubernetes::
 --
 [source,console]
 ----
-helm install <my-release> couchbase/couchbase-operator
+helm install <my-release> {helm-repo}
 ----
 --
 
@@ -98,7 +98,8 @@ cluster:
 +
 [source,console]
 ----
-helm install <my-release> -f openshift_values.yaml couchbase/couchbase-operator
+helm install <my-release> -f openshift_values.yaml {helm-repo}
+
 ----
 --
 ====
@@ -142,7 +143,7 @@ couchbaseOperator:
 +
 [source,console]
 ----
-helm install my-release --values myvalues.yaml couchbase/couchbase-operator
+helm install my-release --values myvalues.yaml {helm-repo}
 ----
 +
 The values in your overrides file (`myvalues.yaml`) will override their counterparts in the chart's `values.yaml` file.
@@ -157,7 +158,7 @@ For example:
 
 [source,console]
 ----
-helm install my-release --set cluster.servers.default.size=5 couchbase/couchbase-operator
+helm install my-release --set cluster.servers.default.size=5 {helm-repo}
 ----
 
 This would translate to the following in the `values.yaml` of the chart:
@@ -217,7 +218,7 @@ To install the chart with Sync Gateway _enabled_, you will need to <<custom-inst
 
 [source,console]
 ----
-helm install mobile --set install.syncGateway=true couchbase/couchbase-operator
+helm install mobile --set install.syncGateway=true {helm-repo}
 ----
 
 By default, Sync Gateway is only exposed to the internal Kubernetes network with a `ClusterIP` service.
@@ -225,7 +226,7 @@ To change the type of service that is used to expose Sync Gateway, you can speci
 
 [source,console]
 ----
-helm install mobile --set install.syncGateway=true --set syncGateway.exposeServiceType=LoadBalancer couchbase/couchbase-operator
+helm install mobile --set install.syncGateway=true --set syncGateway.exposeServiceType=LoadBalancer {helm-repo}
 ----
 
 For more information about using Sync Gateway with the Autonomous Operator, you can refer to the xref:tutorial-sync-gateway.adoc[Sync Gateway Tutorial].
@@ -244,7 +245,7 @@ Install the chart with `tls` enabled:
 
 [source,console]
 ----
-helm install my-release --set tls.generate=true couchbase/couchbase-operator
+helm install my-release --set tls.generate=true {helm-repo}
 ----
 
 The Autonomous Operator will create the certificates and then configure them as Kubernetes Secrets for the cluster.
@@ -296,7 +297,7 @@ Install the chart using the custom override values.
 
 [source,console]
 ----
-helm install my-release -f tls_values.yaml couchbase/couchbase-operator
+helm install my-release -f tls_values.yaml {helm-repo}
 ----
 
 === Deploying Multiple Chart Instances (Releases)
@@ -309,7 +310,7 @@ To prevent deployment of the Admission Controller by the Couchbase Helm Chart, y
 
 [source,console]
 ----
-helm install my-release couchbase/couchbase-operator --set install.admissionController=false
+helm install my-release --set install.admissionController=false {helm-repo}
 ----
 
 If you install the default Couchbase Helm Chart multiple times in the same namespace, then you'll end up with multiple instances of the Autonomous Operator and the Admission Controller, which will cause errors in your deployments.
@@ -321,7 +322,7 @@ If you want Helm to generate a name for you, you can run any of the example inst
 
 [source,console]
 ----
-helm install -g couchbase/couchbase-operator
+helm install -g {helm-repo}
 ----
 
 === Chart Versions

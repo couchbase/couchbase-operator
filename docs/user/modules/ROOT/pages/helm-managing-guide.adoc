@@ -23,7 +23,7 @@ For example:
 
 [source,console]
 ----
-helm upgrade --values myvalues.yaml <release-name> couchbase/couchbase-operator
+helm upgrade --values myvalues.yaml <release-name> {helm-repo}
 ----
 
 It's important that you make your updates using the `helm upgrade` command instead of using `kubectl` or simply editing chart resources.
@@ -57,7 +57,7 @@ The point is to ensure any old ones are updated or removed plus new ones are add
 Once those are complete then upgrade the chart version:
 [source,console]
 ----
-helm upgrade --version <chart-version> <release-name> couchbase/couchbase-operator
+helm upgrade --version <chart-version> <release-name> {helm-repo}
 ----
 
 Where `<chart-version>` is the version of the Couchbase Helm Chart that you want to upgrade to, and `<release-name>` is the name of the release that is managing the instance of the Autonomous Operator that you wish to upgrade.
@@ -84,7 +84,7 @@ IMPORTANT: When upgrading a Couchbase cluster, you should first upgrade the Auto
 +
 [source,console]
 ----
-helm inspect  --version <chart-version> values couchbase/couchbase-cluster | grep  "version:"
+helm inspect  --version <chart-version> values {helm-repo} | grep  "couchbase/server"
 ----
 +
 Where `<chart-version>` is the version number of a newer chart.
@@ -93,7 +93,7 @@ Where `<chart-version>` is the version number of a newer chart.
 +
 [source,console]
 ----
-helm upgrade --version <chart-version> <release-name> couchbase/couchbase-cluster
+helm upgrade --version <chart-version> <release-name> {helm-repo}
 ----
 +
 Where `<chart-version>` is the version of the Couchbase Helm Chart that you want to upgrade to, and  `<release-name>` is the name of the release that is managing the Couchbase cluster that you wish to upgrade.
@@ -101,7 +101,7 @@ Where `<chart-version>` is the version of the Couchbase Helm Chart that you want
 .To upgrade a Couchbase cluster without upgrading the chart
 [source,console]
 ----
-helm upgrade --set cluster.image=<image> <release-name> couchbase/couchbase-cluster
+helm upgrade --set cluster.image=<image> <release-name> {helm-repo}
 ----
 
 Where `<image>` is the name of the container image.
@@ -109,7 +109,7 @@ For example, to upgrade a cluster to Couchbase Server {couchbase-version}:
 
 [source,console,subs="attributes,verbatim"]
 ----
-helm upgrade --set cluster.image=couchbase/server:{couchbase-version} <release-name> couchbase/couchbase-cluster
+helm upgrade --set cluster.image=couchbase/server:{couchbase-version} <release-name> {helm-repo}
 ----
 
 [#delete-deployment]
