@@ -21,7 +21,7 @@ To modify a release, you'll specify overrides via the xref:helm-setup-guide.adoc
 However, when modifying a release, you use the `helm upgrade` command instead of `helm install`.
 For example:
 
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm upgrade --values myvalues.yaml <release-name> {helm-repo}
 ----
@@ -55,7 +55,7 @@ If the original CRDs were added using `kubectl create` then errors may be report
 The point is to ensure any old ones are updated or removed plus new ones are added.
 
 Once those are complete then upgrade the chart version:
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm upgrade --version <chart-version> <release-name> {helm-repo}
 ----
@@ -82,7 +82,7 @@ IMPORTANT: When upgrading a Couchbase cluster, you should first upgrade the Auto
 .To upgrade a Couchbase cluster by using a newer chart
 . Check the default Couchbase Server version of a chart to make sure that it uses the version that you want to upgrade your cluster to.
 +
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm inspect  --version <chart-version> values {helm-repo} | grep  "couchbase/server"
 ----
@@ -91,7 +91,7 @@ Where `<chart-version>` is the version number of a newer chart.
 
 . Upgrade to the newer chart.
 +
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm upgrade --version <chart-version> <release-name> {helm-repo}
 ----
@@ -99,7 +99,7 @@ helm upgrade --version <chart-version> <release-name> {helm-repo}
 Where `<chart-version>` is the version of the Couchbase Helm Chart that you want to upgrade to, and  `<release-name>` is the name of the release that is managing the Couchbase cluster that you wish to upgrade.
 
 .To upgrade a Couchbase cluster without upgrading the chart
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm upgrade --set cluster.image=<image> <release-name> {helm-repo}
 ----
