@@ -313,8 +313,9 @@ func TestInflightLogRedaction(t *testing.T) {
 	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Specific checks for redacted information being replaced (and not output)
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, "Cats are <ud>00b335216f27c1e7d35149b5bbfe19d4eb2d6af1</ud> than dogs, and <ud>888f807d45ff6ce47240c7ed4e884a6f9dc7b4fb</ud>")
-	e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, unredactedInputString)
+	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, "{\"message\"=>\"Cats are <ud>00b335216f27c1e7d35149b5bbfe19d4eb2d6af1</ud> than dogs, and <ud>888f807d45ff6ce47240c7ed4e884a6f9dc7b4fb</ud>")
+	// We need to make sure we look for the specific log output string rather than the string in the configuration to generate it
+	e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, "{\"message\"=>\""+unredactedInputString)
 }
 
 func TestRebalanceLogProcessing(t *testing.T) {
