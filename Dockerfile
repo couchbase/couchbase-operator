@@ -1,4 +1,5 @@
-FROM golang:1.17.1 as build
+ARG GO_VERSION=1.17.2
+FROM golang:${GO_VERSION} as build
 
 ARG PROD_VERSION=2.3.0
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator

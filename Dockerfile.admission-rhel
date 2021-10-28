@@ -8,7 +8,8 @@ ARG PROD_VERSION=2.3.0
 # unpatched CVEs, so give it a helping hand and override go.  You have to
 # install this in a wierd location as this runs as non-root so normal unix
 # places are out of bounds.
-RUN curl -s https://dl.google.com/go/go1.17.1.linux-amd64.tar.gz | tar xz
+ARG GO_VERSION=1.17.2
+RUN curl -s https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz | tar xz
 ENV PATH="/opt/app-root/src/go/bin:${PATH}"
 
 ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
@@ -54,6 +55,7 @@ USER 8453
 LABEL name="couchbase/admission-controller" \
       vendor="Couchbase" \
       version="${PROD_VERSION}" \
+      go-version="${GO_VERSION}" \
       openshift_build="${OS_BUILD}" \
       operator_build="${OPERATOR_BUILD}" \
       release="Latest" \

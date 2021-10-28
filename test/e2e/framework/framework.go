@@ -18,6 +18,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
+	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -51,7 +52,7 @@ import (
 // Init performs one time only initialization of the framework.  Dynamic calls to these
 // functions will result in race conditions and spurious failures.
 func Init() error {
-	fmt.Println("couchbase-operator-certification", version.WithBuildNumber())
+	fmt.Println("couchbase-operator-certification", version.WithBuildNumber(), "revision:", revision.Revision())
 
 	// Register CouchbaseCluster and CustomResourceDefinition types with the main library.
 	if err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
