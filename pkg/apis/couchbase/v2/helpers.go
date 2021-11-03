@@ -308,6 +308,19 @@ func (cs *ClusterSpec) BackupImage() string {
 	return image
 }
 
+// ConfigHasDataService returns whether server config specifies data service.
+func (cs *ClusterSpec) ConfigHasDataService(name string) bool {
+	if config := cs.GetServerConfigByName(name); config != nil {
+		for _, service := range config.Services {
+			if service == DataService {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // Monitoring Image represents the image to use for metrics exporter for monitoring.
 // defaults to Spec.Image when provided then falls back to relatedImage env variable.
 func (m *CouchbaseClusterMonitoringPrometheusSpec) MetricsImage() string {

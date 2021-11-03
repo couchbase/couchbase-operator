@@ -190,9 +190,14 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 			return err
 		}
 
-		// Don't allow addresses to be advertised unless they can be used.
-		if err := waitAlternateAddressReachable(10*time.Minute, addresses); err != nil {
-			return err
+		// BUG: MB-49376
+		// Kubernetes service always exposes data ports but Couchbase doesn't
+		// include these ports in alternative address configs if node service
+		// does not explicitly include "data".
+		// Therefore for functional correctness, the Kubernetes data ports
+		// will be same as existing ports (if specified).
+		if c.alternatePortsNeedUpdating(member.Config(), addresses, existingAddresses) {
+			c.addDataServiceExternalPorts(addresses.Ports, existingAddresses.Ports)
 		}
 
 		// Check to see if we need to perform any updates, ignoring if not
@@ -224,4 +229,22 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	}
 
 	return nil
+}
+
+// alternatePortsNeedUpdating checks if existing alternate ports need to be updated.
+// The result is 'true' if the config uses alternate ports associated with a non-kv member.
+func (c *Cluster) alternatePortsNeedUpdating(config string, requested *couchbaseutil.AlternateAddressesExternal, existing *couchbaseutil.AlternateAddressesExternal) bool {
+	if c.cluster.Spec.ConfigHasDataService(config) || c.cluster.Spec.Networking.ExposedFeatureServiceTemplate == nil || requested == nil || existing == nil {
+		return false
+	}
+
+	return c.cluster.Spec.Networking.ExposedFeatureServiceTemplate.Spec.Type == v1.ServiceTypeNodePort
+}
+
+// addDataServiceExternalPorts adds data service ports to existing alternative address ports.
+func (c *Cluster) addDataServiceExternalPorts(k8sAddressPorts *couchbaseutil.AlternateAddressesExternalPorts, existingAddressPorts *couchbaseutil.AlternateAddressesExternalPorts) {
+	existingAddressPorts.DataServicePort = k8sAddressPorts.DataServicePort
+	existingAddressPorts.DataServicePortTLS = k8sAddressPorts.DataServicePortTLS
+	existingAddressPorts.ViewAndXDCRServicePort = k8sAddressPorts.ViewAndXDCRServicePort
+	existingAddressPorts.ViewAndXDCRServicePortTLS = k8sAddressPorts.ViewAndXDCRServicePortTLS
 }
