@@ -94,6 +94,11 @@ The client uses Kubernetes node ports to connect to individual Couchbase nodes.
 Stable service discovery is not possible.
 TLS cannot be used to secure communications.
 
+[IMPORTANT]
+====
+When using Istio or another service mesh, remember that strict mode mTLS cannot be used with Kubernetes node ports.
+====
+
 .Learn More
 * xref:howto-nodeport-networking.adoc[How-to configure node port networking]
 * xref:howto-ui.adoc#port-forwarding[How-to connect to the UI]

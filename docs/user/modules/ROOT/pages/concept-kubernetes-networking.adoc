@@ -92,6 +92,7 @@ Use of service meshes should, for the most part, be transparent to the Autonomou
    This is especially true of migration to strict mTLS as Couchbase cluster nodes will not be able to communicate with one another during the upgrade.
    While an upgrade to permissive mTLS may work, it has not been tested, therefore is unsupported.
 ** You should not configure the Autonomous Operator to use TLS if the service mesh is already providing an mTLS transport.
+** IP-based networking should not be used with strict mTLS.
 ** In order to establish connections between a client and server when strict mTLS is enabled, both the client and server need to be running with an Envoy proxy, and be part of the same Istio control plane.
   For this reason, clients and XDCR connections originating from outside of the Kubernetes cluster must connect to a Couchbase cluster with either no or permissive mTLS.
 

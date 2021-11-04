@@ -230,6 +230,12 @@ In this discouraged scenario, there is no shared DNS between two Kubernetes clus
 Pods are exposed by using Kubernetes `NodePort` type services.
 As there is no DNS, TLS is not supported, so security must be maintained between the two clusters using a VPN.
 
+[IMPORTANT]
+====
+When using Istio or another service mesh, remember that strict mode mTLS cannot be used with Kubernetes node ports.
+This means XDCR will be unable to replicate when using IP based addressing with strict mode mTLS.
+====
+
 === Remote Cluster
 
 The remote cluster needs to set some networking options:
