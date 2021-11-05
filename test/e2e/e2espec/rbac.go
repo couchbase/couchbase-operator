@@ -150,7 +150,7 @@ func (g *GroupDefinition) Create() *couchbasev2.CouchbaseGroup {
 
 		for _, scope := range g.Scopes {
 			ref := couchbasev2.ScopeLocalObjectReference{
-				Kind: couchbasev2.CouchbaseScopeKind,
+				Kind: couchbasev2.CouchbaseScopeKindScope,
 				Name: couchbasev2.ScopeOrCollectionName(scope.GetName()),
 			}
 			scopeSpec.Resources = append(scopeSpec.Resources, ref)
@@ -158,7 +158,7 @@ func (g *GroupDefinition) Create() *couchbasev2.CouchbaseGroup {
 
 		for _, group := range g.ScopeGroups {
 			ref := couchbasev2.ScopeLocalObjectReference{
-				Kind: couchbasev2.CouchbaseScopeGroupKind,
+				Kind: couchbasev2.CouchbaseScopeKindScopeGroup,
 				Name: couchbasev2.ScopeOrCollectionName(group.GetName()),
 			}
 			scopeSpec.Resources = append(scopeSpec.Resources, ref)
@@ -176,7 +176,7 @@ func (g *GroupDefinition) Create() *couchbasev2.CouchbaseGroup {
 
 		for _, collection := range g.Collections {
 			ref := couchbasev2.CollectionLocalObjectReference{
-				Kind: couchbasev2.CouchbaseCollectionKind,
+				Kind: couchbasev2.CouchbaseCollectionKindCollection,
 				Name: couchbasev2.ScopeOrCollectionName(collection.GetName()),
 			}
 			collectionSpec.Resources = append(collectionSpec.Resources, ref)
@@ -184,7 +184,7 @@ func (g *GroupDefinition) Create() *couchbasev2.CouchbaseGroup {
 
 		for _, group := range g.CollectionGroups {
 			ref := couchbasev2.CollectionLocalObjectReference{
-				Kind: couchbasev2.CouchbaseCollectionGroupKind,
+				Kind: couchbasev2.CouchbaseCollectionKindCollectionGroup,
 				Name: couchbasev2.ScopeOrCollectionName(group.GetName()),
 			}
 			collectionSpec.Resources = append(collectionSpec.Resources, ref)
@@ -243,7 +243,7 @@ func NewBucketScopeCollectionGroup(role couchbasev2.RoleName, bucket string, sco
 	collectionSpec := couchbasev2.CollectionRoleSpec{
 		Resources: []couchbasev2.CollectionLocalObjectReference{
 			{
-				Kind: couchbasev2.CouchbaseCollectionKind,
+				Kind: couchbasev2.CouchbaseCollectionKindCollection,
 				Name: couchbasev2.ScopeOrCollectionName(collection.Name),
 			},
 		},
@@ -295,7 +295,7 @@ func NewBucketScopeCollectionsGroup(role couchbasev2.RoleName, bucket string, sc
 	collectionSpec := couchbasev2.CollectionRoleSpec{
 		Resources: []couchbasev2.CollectionLocalObjectReference{
 			{
-				Kind: couchbasev2.CouchbaseCollectionGroupKind,
+				Kind: couchbasev2.CouchbaseCollectionKindCollectionGroup,
 				Name: couchbasev2.ScopeOrCollectionName(collections.Name),
 			},
 		},
@@ -309,7 +309,7 @@ func NewBucketScopesCollectionsGroup(role couchbasev2.RoleName, bucket string, s
 	scopeSpec := couchbasev2.ScopeRoleSpec{
 		Resources: []couchbasev2.ScopeLocalObjectReference{
 			{
-				Kind: couchbasev2.CouchbaseScopeGroupKind,
+				Kind: couchbasev2.CouchbaseScopeKindScopeGroup,
 				Name: couchbasev2.ScopeOrCollectionName(scopes.Name),
 			},
 		},
@@ -318,7 +318,7 @@ func NewBucketScopesCollectionsGroup(role couchbasev2.RoleName, bucket string, s
 	collectionSpec := couchbasev2.CollectionRoleSpec{
 		Resources: []couchbasev2.CollectionLocalObjectReference{
 			{
-				Kind: couchbasev2.CouchbaseCollectionGroupKind,
+				Kind: couchbasev2.CouchbaseCollectionKindCollectionGroup,
 				Name: couchbasev2.ScopeOrCollectionName(collections.Name),
 			},
 		},
@@ -348,7 +348,7 @@ func NewBucketScopesGroup(role couchbasev2.RoleName, bucket string, scopes *couc
 	scopeSpec := couchbasev2.ScopeRoleSpec{
 		Resources: []couchbasev2.ScopeLocalObjectReference{
 			{
-				Kind: couchbasev2.CouchbaseScopeGroupKind,
+				Kind: couchbasev2.CouchbaseScopeKindScopeGroup,
 				Name: couchbasev2.ScopeOrCollectionName(scopes.Name),
 			},
 		},
@@ -377,7 +377,7 @@ func NewBucketScopeGroup(role couchbasev2.RoleName, bucket string, scope *couchb
 	scopeSpec := couchbasev2.ScopeRoleSpec{
 		Resources: []couchbasev2.ScopeLocalObjectReference{
 			{
-				Kind: couchbasev2.CouchbaseScopeKind,
+				Kind: couchbasev2.CouchbaseScopeKindScope,
 				Name: couchbasev2.ScopeOrCollectionName(scope.Name),
 			},
 		},

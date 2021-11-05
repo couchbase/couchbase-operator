@@ -86,6 +86,12 @@ var (
 	ErrConfigurationInvalid = errors.New("user configuration error")
 )
 
+// CLI errors.
+var (
+	// ErrUserInput is when an expected input has not been provided.
+	ErrUserInput = errors.New("user input error")
+)
+
 // StackTracedError allows an error to be wrapped up at the source and store the stack
 // trace of where it occurred, useful for determining the context in which the error
 // occurred when errors are propagated up the stack without being wrapped further.

@@ -707,6 +707,10 @@ type CouchbaseBackupRestoreList struct {
 // +kubebuilder:validation:Pattern="^[a-zA-Z0-9\\-][a-zA-Z0-9\\-%_]{0,250}$"
 type ScopeOrCollectionName string
 
+// ScopeOrCollectionNameList is the type for a list of scope or collection names
+// to provide helper functions.
+type ScopeOrCollectionNameList []ScopeOrCollectionName
+
 // DefaultScopeOrCollection is the name of the default scope and collection.
 const DefaultScopeOrCollection = "_default"
 
@@ -857,14 +861,22 @@ type CouchbaseScopeSpec struct {
 	DefaultScope bool `json:"defaultScope,omitempty"`
 }
 
+// CouchbaseCollectionKind is the type of collection we are referring to.
+// +kubebuilder:validation:Enum=CouchbaseCollection;CouchbaseCollectionGroup
+type CouchbaseCollectionKind string
+
+const (
+	CouchbaseCollectionKindCollection      CouchbaseCollectionKind = "CouchbaseCollection"
+	CouchbaseCollectionKindCollectionGroup CouchbaseCollectionKind = "CouchbaseCollectionGroup"
+)
+
 type CollectionLocalObjectReference struct {
 	// Kind indicates the kind of resource that is being referenced.  A scope
 	// can only reference `CouchbaseCollection` and `CouchbaseCollectionGroup`
 	// resource kinds.  This field defaults to `CouchbaseCollection` if not
 	// specified.
-	// +kubebuilder:validation:Enum=CouchbaseCollection;CouchbaseCollectionGroup
 	// +kubebuilder:default=CouchbaseCollection
-	Kind CouchbaseRoleAccessKind `json:"kind,omitempty"`
+	Kind CouchbaseCollectionKind `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
 	// Legal collection names have a maximum length of 251
@@ -950,14 +962,22 @@ type CouchbaseScopeGroupList struct {
 	Items           []CouchbaseScopeGroup `json:"items"`
 }
 
+// CouchbaseScopeKind is the kind of scope we are referring to.
+// +kubebuilder:validation:Enum=CouchbaseScope;CouchbaseScopeGroup
+type CouchbaseScopeKind string
+
+const (
+	CouchbaseScopeKindScope      CouchbaseScopeKind = "CouchbaseScope"
+	CouchbaseScopeKindScopeGroup CouchbaseScopeKind = "CouchbaseScopeGroup"
+)
+
 type ScopeLocalObjectReference struct {
 	// Kind indicates the kind of resource that is being referenced.  A scope
 	// can only reference `CouchbaseScope` and `CouchbaseScopeGroup`
 	// resource kinds.  This field defaults to `CouchbaseScope` if not
 	// specified.
-	// +kubebuilder:validation:Enum=CouchbaseScope;CouchbaseScopeGroup
 	// +kubebuilder:default=CouchbaseScope
-	Kind CouchbaseRoleAccessKind `json:"kind,omitempty"`
+	Kind CouchbaseScopeKind `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
 	// Legal scope names have a maximum length of 251
@@ -1608,13 +1628,20 @@ type BucketRoleSpec struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
+// CouchbaseBucketKind represents the kind of bucket being referred to.
+// +kubebuilder:validation:Enum=CouchbaseBucket
+type CouchbaseBucketKind string
+
+const (
+	CouchbaseBucketKindBucket CouchbaseBucketKind = "CouchbaseBucket"
+)
+
 type BucketLocalObjectReference struct {
 	// Kind indicates the kind of resource that is being referenced.  A Role
 	// can only reference `CouchbaseBucket` kind.  This field defaults
 	// to `CouchbaseBucket` if not specified.
-	// +kubebuilder:validation:Enum=CouchbaseBucket
 	// +kubebuilder:default=CouchbaseBucket
-	Kind CouchbaseRoleAccessKind `json:"kind,omitempty"`
+	Kind CouchbaseBucketKind `json:"kind,omitempty"`
 
 	// Name is the name of the Kubernetes resource name that is being referenced.
 	Name string `json:"name"`
@@ -1633,15 +1660,6 @@ type ScopeRoleSpec struct {
 	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
-
-type CouchbaseRoleAccessKind string
-
-const (
-	CouchbaseScopeKind           CouchbaseRoleAccessKind = "CouchbaseScope"
-	CouchbaseScopeGroupKind      CouchbaseRoleAccessKind = "CouchbaseScopeGroup"
-	CouchbaseCollectionKind      CouchbaseRoleAccessKind = "CouchbaseCollection"
-	CouchbaseCollectionGroupKind CouchbaseRoleAccessKind = "CouchbaseCollectionGroup"
-)
 
 type CollectionRoleSpec struct {
 
@@ -2241,6 +2259,14 @@ type LDAPUserDNMapping struct {
 	// Query is the LDAP query to run to map from Couchbase user to LDAP distinguished name.
 	Query string `json:"query,omitempty"`
 }
+
+const (
+	// AdminSecretUsernameKey is the secret key to save an admin username under.
+	AdminSecretUsernameKey = "username"
+
+	// AdminSecretPasswordKey is the secret key to save an admin password under.
+	AdminSecretPasswordKey = "password"
+)
 
 type CouchbaseClusterSecuritySpec struct {
 	// AdminSecret is the name of a Kubernetes secret to use for administrator authentication.

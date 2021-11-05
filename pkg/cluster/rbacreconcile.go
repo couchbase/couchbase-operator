@@ -98,11 +98,11 @@ func (c *Cluster) getRoleScopes(role couchbasev2.Role) []*couchbasev2.CouchbaseS
 
 	for _, scope := range role.Scopes.Resources {
 		switch scope.Kind {
-		case couchbasev2.CouchbaseScopeKind:
+		case couchbasev2.CouchbaseScopeKindScope:
 			if scope, noErr := c.k8s.CouchbaseScopes.Get(string(scope.Name)); noErr {
 				scopes = append(scopes, scope)
 			}
-		case couchbasev2.CouchbaseScopeGroupKind:
+		case couchbasev2.CouchbaseScopeKindScopeGroup:
 			if group, noErr := c.k8s.CouchbaseScopeGroups.Get(string(scope.Name)); noErr {
 				scopes = append(scopes, c.getScopesFromGroup(group)...)
 			}
@@ -171,11 +171,11 @@ func (c *Cluster) getRoleCollections(role couchbasev2.Role) []*couchbasev2.Couch
 
 	for _, collection := range role.Collections.Resources {
 		switch collection.Kind {
-		case couchbasev2.CouchbaseCollectionKind:
+		case couchbasev2.CouchbaseCollectionKindCollection:
 			if collection, noErr := c.k8s.CouchbaseCollections.Get(string(collection.Name)); noErr {
 				collections = append(collections, collection)
 			}
-		case couchbasev2.CouchbaseCollectionGroupKind:
+		case couchbasev2.CouchbaseCollectionKindCollectionGroup:
 			if group, noErr := c.k8s.CouchbaseCollectionGroups.Get(string(collection.Name)); noErr {
 				collections = append(collections, c.getCollectionsFromGroup(group)...)
 			}

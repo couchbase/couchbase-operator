@@ -87,7 +87,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 	// Get the current state of the system.
 	current := &couchbaseutil.ScopeList{}
 
-	if err := couchbaseutil.ListScopes(bucket.GetName(), current).On(c.api, c.readyMembers()); err != nil {
+	if err := couchbaseutil.ListScopes(bucket.GetCouchbaseName(), current).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
@@ -113,9 +113,9 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 			continue
 		}
 
-		log.Info("Deleting scope", "cluster", c.namespacedName(), "bucket", bucket.GetName(), "scope", scope.Name)
+		log.Info("Deleting scope", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName(), "scope", scope.Name)
 
-		if err := couchbaseutil.DeleteScope(bucket.GetName(), scope.Name).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.DeleteScope(bucket.GetCouchbaseName(), scope.Name).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -128,9 +128,9 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 			continue
 		}
 
-		log.Info("Creating scope", "cluster", c.namespacedName(), "bucket", bucket.GetName(), "scope", scope)
+		log.Info("Creating scope", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName(), "scope", scope)
 
-		if err := couchbaseutil.CreateScope(bucket.GetName(), scope).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.CreateScope(bucket.GetCouchbaseName(), scope).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -139,7 +139,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 
 	// Refresh the current scopes/collections to include new scopes as
 	// the collections reconciliation will expect them to be populated.
-	if err := couchbaseutil.ListScopes(bucket.GetName(), current).On(c.api, c.readyMembers()); err != nil {
+	if err := couchbaseutil.ListScopes(bucket.GetCouchbaseName(), current).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
@@ -156,7 +156,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 
 	// Notify any watchers that something has happened.
 	if raiseEvent {
-		c.raiseEvent(k8sutil.ScopesAndCollectionsUpdated(c.cluster, bucket.GetName()))
+		c.raiseEvent(k8sutil.ScopesAndCollectionsUpdated(c.cluster, bucket.GetCouchbaseName()))
 	}
 
 	return nil
@@ -308,9 +308,9 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			continue
 		}
 
-		log.Info("Deleting collection", "bucket", bucket.GetName(), "scope", scope.CouchbaseName(), "collection", collection.Name)
+		log.Info("Deleting collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.Name)
 
-		if err := couchbaseutil.DeleteCollection(bucket.GetName(), scope.CouchbaseName(), collection.Name).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.DeleteCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), collection.Name).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -323,7 +323,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			continue
 		}
 
-		log.Info("Creating collection", "bucket", bucket.GetName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
+		log.Info("Creating collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
 
 		apiCollection := couchbaseutil.Collection{
 			Name: collection.CouchbaseName(),
@@ -333,7 +333,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			apiCollection.MaxTTL = int(collection.Spec.MaxTTL.Duration.Seconds())
 		}
 
-		if err := couchbaseutil.CreateCollection(bucket.GetName(), scope.CouchbaseName(), apiCollection).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.CreateCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), apiCollection).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 

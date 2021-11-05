@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
+	"github.com/couchbase/couchbase-operator/pkg/util/cli"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/prettytable"
 
@@ -199,30 +200,6 @@ func parseIndices(input string, max int) (indexSet, error) {
 	}
 
 	return indices, nil
-}
-
-// parseYesNo accepts a 'y' or 'n' and returns a boolean.
-func parseYesNo(input string, defaultValue bool) (bool, error) {
-	// Sanitise the input, it will probably have a trailling new line.
-	input = strings.TrimSpace(input)
-
-	// No input, this is fine
-	if input == "" {
-		return defaultValue, nil
-	}
-
-	if len(input) != 1 {
-		return false, fmt.Errorf("invalid input")
-	}
-
-	switch input[0] {
-	case 'y', 'Y':
-		return true, nil
-	case 'n', 'N':
-		return false, nil
-	}
-
-	return false, fmt.Errorf("invalid input")
 }
 
 // createEphemeralPod takes whatever information it can from the PVC and creates
@@ -449,7 +426,7 @@ func configureInteractive(context *context.Context, logEntries LogEntryList) (in
 				continue
 			}
 
-			if context.Config.CollectInfoRedact, err = parseYesNo(text, true); err != nil {
+			if context.Config.CollectInfoRedact, err = cli.ParseYesNo(text, true); err != nil {
 				fmt.Println(err)
 				continue
 			}

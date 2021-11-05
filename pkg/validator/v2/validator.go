@@ -1836,7 +1836,7 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object) er
 		names := map[string]interface{}{}
 
 		for _, bucket := range buckets {
-			name := bucket.GetName()
+			name := bucket.GetCouchbaseName()
 
 			if _, ok := names[name]; ok {
 				return fmt.Errorf("bucket name %s defined multiple times for cluster %s", name, cluster.Name)
@@ -1927,7 +1927,7 @@ func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseClus
 	}
 
 	for _, bucket := range buckets {
-		if bucket.GetName() != name {
+		if bucket.GetCouchbaseName() != name {
 			continue
 		}
 

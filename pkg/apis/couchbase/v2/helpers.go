@@ -917,10 +917,12 @@ const (
 
 // AbstractBucket give a bit of commonality to buckets!!
 type AbstractBucket interface {
-	// GetName returns the Couchbase bucket name, either from the metadata
+	// GetCouchbaseName returns the Couchbase bucket name, either from the metadata
 	// or overridden by the spec name (which is more flexible and not tied
 	// to DNS names).
-	GetName() string
+	// ACHTUNG! You cannot add a GetName() receiver to a raw type as it will override
+	// that provided by Kubernetes and break cache indexes and numerous other subtle things.
+	GetCouchbaseName() string
 
 	// GetLabels returns any metadata labels.
 	GetLabels() map[string]string
@@ -933,9 +935,12 @@ type AbstractBucket interface {
 
 	// GetScopes gets the scopes and collections specification.
 	GetScopes() *ScopeSelector
+
+	// AddScopeResource appends a reference to a scope resource.
+	AddScopeResource(ScopeLocalObjectReference)
 }
 
-func (b *CouchbaseBucket) GetName() string {
+func (b *CouchbaseBucket) GetCouchbaseName() string {
 	name := b.Name
 
 	if b.Spec.Name != "" {
@@ -961,7 +966,11 @@ func (b *CouchbaseBucket) GetScopes() *ScopeSelector {
 	return b.Spec.Scopes
 }
 
-func (b *CouchbaseEphemeralBucket) GetName() string {
+func (b *CouchbaseBucket) AddScopeResource(resource ScopeLocalObjectReference) {
+	b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, resource)
+}
+
+func (b *CouchbaseEphemeralBucket) GetCouchbaseName() string {
 	name := b.Name
 
 	if b.Spec.Name != "" {
@@ -987,7 +996,11 @@ func (b *CouchbaseEphemeralBucket) GetScopes() *ScopeSelector {
 	return b.Spec.Scopes
 }
 
-func (b *CouchbaseMemcachedBucket) GetName() string {
+func (b *CouchbaseEphemeralBucket) AddScopeResource(resource ScopeLocalObjectReference) {
+	b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, resource)
+}
+
+func (b *CouchbaseMemcachedBucket) GetCouchbaseName() string {
 	name := b.Name
 
 	if b.Spec.Name != "" {
@@ -1013,6 +1026,9 @@ func (b *CouchbaseMemcachedBucket) GetScopes() *ScopeSelector {
 	return nil
 }
 
+func (b *CouchbaseMemcachedBucket) AddScopeResource(_ ScopeLocalObjectReference) {
+}
+
 // Abstractions for scopes and collections.
 // ACHTUNG! You cannot add a GetName() receiver to a raw type as it will override
 // that provided by Kubernetes and break cache indexes and numerous other subtle things.
@@ -1034,6 +1050,34 @@ func (s *CouchbaseScope) CouchbaseName() string {
 	}
 
 	return s.Name
+}
+
+// CanBeImplied means the resource will be implictly filled in by the operator
+// if not explcitly defined.  The operator will inject a default scope, without
+// a set of collections, thus they are implicitly unmanaged, and a default
+// collection will be preserved.
+func (s *CouchbaseScope) CanBeImplied() bool {
+	if !s.Spec.DefaultScope {
+		return false
+	}
+
+	if s.Spec.Collections == nil {
+		return true
+	}
+
+	if !s.Spec.Collections.Managed {
+		return true
+	}
+
+	if s.Spec.Collections.Selector != nil || len(s.Spec.Collections.Resources) != 0 {
+		return false
+	}
+
+	if !s.Spec.Collections.PreserveDefaultCollection {
+		return false
+	}
+
+	return true
 }
 
 // BucketScopeOrCollectionNameWithDefaultsList provides some helpers to convert betwixt types.
@@ -1058,4 +1102,15 @@ func (s ScopeLocalObjectReference) StrName() string {
 // Collection object name as string.
 func (c CollectionLocalObjectReference) StrName() string {
 	return string(c.Name)
+}
+
+// StringSlice returns a list of names as a string slice.
+func (l ScopeOrCollectionNameList) StringSlice() []string {
+	var out []string
+
+	for _, name := range l {
+		out = append(out, string(name))
+	}
+
+	return out
 }

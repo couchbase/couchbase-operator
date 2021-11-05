@@ -49,6 +49,8 @@ func GenerateCommand() *cobra.Command {
 
 	root.AddCommand(version)
 	root.AddCommand(getCertifyCommand(flags))
+	root.AddCommand(getSaveDataTopologyCommand(flags))
+	root.AddCommand(getRestoreDataTopologyCommand(flags))
 
 	config.ApplySubCommands(root, flags)
 	command.ApplySubCommands(root, flags)
