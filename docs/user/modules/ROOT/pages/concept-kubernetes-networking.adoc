@@ -124,3 +124,35 @@ The client's address in the packet is 10.32.0.7.
 
 When the pod tries to respond to the client, there is a problem in that the Kubernetes cluster's VIP range aliases with that of the client.
 Instead of routing the reply back to the client, a service that aliases with the client's IP address intercepts the reply, and the reply is most likely dropped entirely.
+
+== Network Policies
+
+Kubernetes provides https://kubernetes.io/docs/concepts/services-networking/network-policies/[native support^] for controlling traffic flow across the network.
+Whilst this is not officially supported by Couchbase, there is nothing that should prevent the use of network policies when correctly configured.
+
+Network policies require the underlying infrastructure to https://kubernetes.io/docs/concepts/services-networking/network-policies/#prerequisites[implement them^], so refer to the guidance for your infrastructure on how to deploy them.
+They may be disabled by default on various cloud providers as well as require a network plugin (e.g. Calico or Cilium) to be deployed before they can be used.
+Each network plugin may have its own way of configuring the network policy or use the Kubernetes default CRD to do so.
+For the purposes of this documentation we only reference the default Kubernetes configuration to allow it to be reused or translated to the specific implementation required.
+
+For more secure deployments, the typical approach is to have a https://kubernetes.io/docs/concepts/services-networking/network-policies/#default-deny-all-ingress-and-all-egress-traffic[deny-all traffic that is not approved^] within a namespace.
+If this is the case then the following rules need to be implemented to allow Couchbase Server and Couchbase Autonomous Operator to correctly function.
+
+.Network Policy Rules
+* DNS resolution must be possible, typically by enabling port 53 traffic although this can be constrained to the DNS deployment namespace and/or pods as required.
+* If the xref:concept-operator.adoc#dynamic-admission-controller[dynamic admission controller] (DAC) is used, then traffic between this and the Kubernetes API plus for port 8443 needs to be allowed.
+** The DAC is typically deployed once per cluster and may be deployed in a different namespace to the operator so ensure to correctly specify the namespace to use.
+** Port 8443 is the default port for traffic to the DAC so if this is modified for your cluster be sure to update appropriately.
+* The operator requires traffic to be allowed to the Kubernetes API to monitor and update Couchbase custom resource types correctly.
+* The operator requires traffic to be allowed to the Couchbase Server pods it is managing on the administration port 8091.
+* Couchbase Server pods require traffic to be allowed between each other on https://docs.couchbase.com/server/current/install/install-ports.html[various ports] depending on their configuration and the version of Couchbase Server used.
+** The recommendation would be to allow all internal traffic between these pods or within the namespace rather than constrain it by port.
+* Access to the Couchbase Server UI is via the 8091 (or secure 18091) administration ports.
+* SDKs require traffic to be allowed from their location to the Couchbase Server pods, primarily they use ports 8091/18091 and 11210/11207 for bootstrapping.
+** This will be specific to the SDK used but each SDK has a https://docs.couchbase.com/go-sdk/current/howtos/managing-connections.html[managing connections] page.
+
+The recommendation would be deploy Couchbase Server and Couchbase Autonomous Operator within a dedicated namespace and allow internal traffic within it.
+The limited external ingress and egress required can then be added as well.
+It may be good to start with this approach and then lock it down as required or to aid with debugging any issues found.
+
+An xref:tutorial-kubernetes-network-policy.adoc[example] is provided to demonstrate the rules in action.

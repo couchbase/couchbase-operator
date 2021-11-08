@@ -131,6 +131,7 @@ include::partial$autogen-reference.adoc[]
 * Networking
  ** xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS]
  ** xref:tutorial-public-addressability.adoc[Public Networking with External DNS]
+ ** xref:tutorial-kubernetes-network-policy.adoc[Kubernetes Network Policies Using Deny-All Default]
 * Persistent Volumes
  ** xref:tutorial-volume-expansion.adoc[Persistent Volume Expansion]
 * Sync Gateway
