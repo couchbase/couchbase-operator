@@ -331,6 +331,7 @@ func (c *Cluster) generateRestoreJob(restore couchbasev2.CouchbaseBackupRestore)
 					NodeSelector:       c.cluster.Spec.Backup.NodeSelector,
 					ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
 					ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
+					SecurityContext:    c.cluster.Spec.SecurityContext,
 					InitContainers:     nil,
 					Containers: []corev1.Container{
 						c.generateRestoreContainer(restore.Spec, start, end),
