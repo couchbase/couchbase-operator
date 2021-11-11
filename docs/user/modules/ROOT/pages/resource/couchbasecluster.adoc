@@ -1831,6 +1831,32 @@ See the Operator TLS documentation for more information.
 TLSMinimumVersion specifies the minimum TLS version the Couchbase server can negotiate with a client.
 Must be one of TLS1.0, TLS1.1 or TLS1.2, defaulting to TLS1.2.
 
+=== couchbaseclusters.spec.networking.waitForAddressReachable
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `10m`
+
+==== Description
+
+WaitForAddressReachable is used to set the timeout between when polling of external addresses is started, and when it is deemed a failure.
+Polling of DNS name availability is inherently dangerous due to negative caching, so prefer the use of an initial `waitForAddressReachableDelay` to allow propagation.
+
+=== couchbaseclusters.spec.networking.waitForAddressReachableDelay
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `2m`
+
+==== Description
+
+WaitForAddressReachableDelay is used to defer operator checks that ensure external addresses are reachable before new nodes are balanced in to the cluster.
+This prevents negative DNS caching while waiting for external-DDNS controllers to propagate addresses.
+
 === couchbaseclusters.spec.paused
 
 ==== Constraints
