@@ -1,75 +1,94 @@
 = Development Quick Start Guide
 
-In order to start working with the Couchbase Operator you first need to install Kubernetes. The easiest way to do so if you do not already have a Kubernetes cluster is with MiniKube. MiniKube handles deploying a single node Kubernetes cluster by using VirtualBox.  To install minikube follow https://kubernetes.io/docs/tasks/tools/install-minikube/[the official instructions] for various operating systems.
-
-NOTE: The default version of Kubernetes installed is hard coded in Minikube.  You can always use the `--kubernetes-version` flag to set the version you require.  At the time of writing we support 1.9.0+ onwards, but the latest version is recommended given the fast paced nature of things.
-
-Once MiniKube is installed you can run the command below to start MiniKube.
-
-[source,bash]
-----
-minikube start --cpus 4 --memory 8192
-----
-
-NOTE: Although not needed, we recommend 4 VCPUs and 8 GiB of RAM.  When running acceptance tests it's not uncommon to see up to 8 containers running and Server does use a lot of processing power to rebalance.
-
-== Running on MiniKube
-
-To run this operator on minikube you first need to build a container image which can be deployed into the Kubernetes environment. Normally you would need to push your container image to a container registry (e.g. DockerHub) and then pull it into Kubernetes, but since you are using MiniKube you can build the image using the same container host as the Minikube VM. That way the images are automatically present. To do this, make sure you are using the Minikube Docker daemon:
-
-[source,bash]
-----
-eval $(minikube docker-env)
-----
-
-Later when you no longer want to use the Docker host in the MiniKube VM you can undo this change by running the command below.
-
-[source,bash]
-----
-eval $(minikube docker-env -u)
-----
+In order to start working with the Couchbase Operator you first need to install Kubernetes.
+Kubernetes-IN-Docker (KIND) is used for all CI and generally recommended during development.
+To install KIND follow https://kind.sigs.k8s.io/docs/user/quick-start/#installation[the official instructions^].
+It has the benefit of allowing running multiple clusters and each can be configured independently with different versions of K8S or other settings.
 
 == Build Prerequsites
 
 You will need the following from your favorite package manager:
 
-* go (1.10.0+)
-* dep (0.5.0+)
+* go (1.17.0+)
 * git
 * git-review
 * make
 * docker
 
+Ensure docker is allocated a decent amount of RAM as it defaults to 2GB for some reason, suggest 8GB+: https://kind.sigs.k8s.io/docs/user/quick-start#settings-for-docker-desktop
+
+[NOTE]
+====
+Although not needed, we recommend 4 VCPUs and 8 GiB of RAM.
+When running acceptance tests it's not uncommon to see up to 8 containers running and Couchbase Server does use a lot of processing power to rebalance.
+====
+
 === Preparing the Environment
 
-First you will need to configure your environment to allow Go to compile the code.  This involves creating the correct directory lay out and environment variables.
+Here is an example of using the Brew package manager for macOS.
+This also sets up an IDE (Visual Studio Code in this case) along with supporting tooling for linting and using Helm charts.
+Each line is intended to cover a particular aspect (e.g. code then test) to make it clearer in case you want to use other tools.
 
-[source,bash]
+[source,console]
 ----
-mkdir -p ${HOME}/go/src/github.com/couchbase
-cd ~/go/src/github.com/couchbase
-git clone https://github.com/couchbase/couchbase-operator
-cd couchbase-operator
-export GOPATH=${HOME}/go
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+$ brew doctor
+$ brew install git python repo cmake ccache git-review go@1.17 make
+$ brew install --cask docker
+$ brew install kind kubectl helm
+$ brew install --cask visual-studio-code
+$ brew install asciidoc aspell node
+$ python3 -m pip install pyyaml
 ----
+
+Make sure to explicitly start the graphical elements above (docker particularly) to cover all credentials and permissions.
+
+Ensure docker is allocated a decent amount of RAM as it defaults to 2GiB for some reason currently which will not be enough, suggest 8GiB+: https://kind.sigs.k8s.io/docs/user/quick-start#settings-for-docker-desktop
 
 === Preparing to Submit Code
 
-To initialize Gerrit integration (necessary evil) run the following once per new repository:
+Ensure you have set up your SSH keys, the GitHub https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent[documentation^] covers it reasonably well.
 
-[source,bash]
+To work with the code, you will need to do the following:
+* Create ssh keys (used for Gerrit authentication) and add to http://review.couchbase.org/settings/#SSHKeys[Gerrit^].
+* Ensure Gerrit is http://review.couchbase.org/settings#EmailAddresses[set up with your email address^] used by git configuration.
+* Get an account on Gerrit for the `couchbase-operator` repository (raise a CBIT or contact Couchbase) - this requires addition of the user to the `NorthScale` group.
+* Have `git` and `git-review` installed.
+
+Once complete you can clone the repository and ready it for code review.
+
+[IMPORTANT]
+====
+Your `<gerrit username>` in following steps can be found by looking at http://review.couchbase.org/settings/#HTTPCredentials[your profile on Gerrit under the HTTP credentials^].
+
+Depending on your username vs your Couchbase/machine login/git id the git review step may need some additional input.
+For example if your local username is `firstnamelastname` but your Gerrit username is `firstname-lastname` then you need to provide this otherwise it will fail to login initially.
+This can also be provided by the `git config` command:
+
+[source,console]
 ----
-git review -s
+$ git config --global user.name "<firstname> <lastname>"
+$ git config --global user.email "<email address>"
+$ git config --global --add gitreview.username "<gerrit username>"
+----
+====
+Be aware that to build the code you need a certain path structure for the code generator `make` rules to function.
+
+[source,console]
+----
+$ mkdir -p github.com/couchbase
+$ git clone ssh://<gerrit username>@review.couchbase.org:29418/couchbase-operator.git github.com/couchbase/couchbase-operator
+$ cd github.com/couchbase/couchbase-operator
+$ git review -s
 ----
 
-Your work flow is entirely up to you however we recommend:
+Your work flow is entirely up to you however we recommend the following process.
 
-* Before doing anything create an issue in Jira so we have an ID for simple tracking e.g. K8S-836
-* Create a feature branch `git checkout -b k8s_836_my_change master`
-* Do your work and test it
-* Commit the code with a message in the form
+* Before doing anything create an issue in Jira so we have an ID for simple tracking e.g. K8S-836.
+* Create a feature branch `git checkout -b k8s_836_my_change master`.
+* Do your work and test it.
+* Commit the code with a message in the form:
 +
---
 [source]
 ----
 K8S-836: What My Change Does
@@ -79,73 +98,315 @@ lines should be kept to below 80 characters as Gerrit won't display it
 very nicely otherwise.  Some clever editors will automatically do word
 wrap for you e.g. vim.
 ----
---
-* Submit your change to Gerrit `git review`
+* Submit your change to Gerrit `git review` (use `-R` to prevent automatic rebase).
 * To update your patch set do your changes and amend `git commit --amend` then review with `git review` preserving the `Change-ID` which was automatically added by the prior commit.
 
 == Building the Operator
 
 Run make command to build the container image.
 
-[source,bash]
+[source,console]
 ----
-make container
-----
-
-You should see something similar to the following with the `docker images` command.  The make file will automatically tag the image with something sane.
-
-[source,bash]
-----
-REPOSITORY                                            TAG                 IMAGE ID            CREATED             SIZE
-couchbase/couchbase-operator                          v1                  859ad4bb3d38        2 weeks ago         45.7MB
-alpine                                                3.6                 da579b235e92        2 months ago        4.03MB
-k8s.gcr.io/kube-proxy-amd64                           v1.10.0             bfc21aadc7d3        5 months ago        97MB
-k8s.gcr.io/kube-controller-manager-amd64              v1.10.0             ad86dbed1555        5 months ago        148MB
-k8s.gcr.io/kube-apiserver-amd64                       v1.10.0             af20925d51a3        5 months ago        225MB
-k8s.gcr.io/kube-scheduler-amd64                       v1.10.0             704ba848e69a        5 months ago        50.4MB
-k8s.gcr.io/etcd-amd64                                 3.1.12              52920ad46f5b        6 months ago        193MB
-k8s.gcr.io/kube-addon-manager                         v8.6                9c16409588eb        6 months ago        78.4MB
-k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64                1.14.8              c2ce1ffb51ed        8 months ago        41MB
-k8s.gcr.io/k8s-dns-sidecar-amd64                      1.14.8              6f7f2dc7fab5        8 months ago        42.2MB
-k8s.gcr.io/k8s-dns-kube-dns-amd64                     1.14.8              80cc5ea4b547        8 months ago        50.5MB
-k8s.gcr.io/pause-amd64                                3.1                 da86e6ba6ca1        9 months ago        742kB
-k8s.gcr.io/kubernetes-dashboard-amd64                 v1.8.1              e94d2f21bc0c        9 months ago        121MB
-gcr.io/k8s-minikube/storage-provisioner               v1.8.1              4689081edb10        10 months ago       80.8MB
-busybox                                               1.27                6ad733544a63        10 months ago       1.13MB
+$ make container
 ----
 
-NOTE: Make sure you tag your container image with something other than '`latest`' and use that tag while you pull the image. Otherwise, if you do not specify version of your image, it will be assumed as :latest, with pull image policy of Always correspondingly, which may eventually result in ErrImagePull as you may not have any versions of your container image out there in the default container registry (usually DockerHub) yet.
+The various `make` targets are documented below.
 
-== Adding Dependencies
+.Make targets
+|===
+|Command|Description
 
-Add a source specifying the lower bound of supported version.  Go mandates backwards compatibility for later versions within the same major.
+|`make`
+|Build all binaries (required to run tests, must pass).
 
-[source,bash]
+|`make container`
+|Build docker images (`couchbase/couchbase-operator:v1` and `couchbase/couchbase-operator-admission:v1`).
+
+|`make test-unit`
+|Runs unit tests (must pass).
+
+|`make lint`
+|Checks for code standards, style and bugs (must pass).
+
+|`make docs`
+|Detects doc changes and auto-generates Asciidoc from code.
+
+|`make docs-lint`
+|Command used by CI to ensure you've auto-generated, checked in, spellchecked and the links aren't broken (must pass).
+
+|`make lint-python`
+|Checks all python scripts are standard, not broken and not dubious (must pass).
+
+|`make certification-container`
+|Builds all the test framework and packages it.
+|===
+
+You should see something similar to the following with the `docker images` command.
+The make file will automatically tag the image with something sane.
+
+[source,console]
 ----
-dep ensure -add gihub.com/organization/repo@v1.0.0
+REPOSITORY                                     TAG                                        IMAGE ID       CREATED        SIZE
+couchbase/couchbase-operator-certification     v1                                         c825c3d17788   13 days ago    479MB
+couchbase/couchbase-operator-admission         v1                                         375316d73a6e   13 days ago    45.8MB
+couchbase/couchbase-operator                   v1                                         90a8c4e7a26a   13 days ago    50.4MB
 ----
 
-See the `dep` documentation for full instructions.
+[NOTE]
+====
+Make sure you tag your container image with something other than '`latest`' and use that tag while you pull the image.
+Otherwise, if you do not specify version of your image, it will be assumed as `:latest`, with pull image policy of `Always` correspondingly.
+This may eventually result in `ErrImagePull` as you may not have any versions of your container image out there in the default container registry (usually DockerHub) yet.
+====
 
-== Updating Dependencies
+== Running Tests
 
-Update a source specifying the new lower bound of supported version.
+Install the following:
 
-[source,bash]
+* `kind`
+* `kubectl`
+
+Create a cluster: `kind create cluster`
+
+=== Install some images
+
+You need to poke local docker images into kind, if the images are already in the public internet (e.g. DockerHub) you can skip this although it will speed things up and prevent hitting rate limits for pulling from those remote registries.
+
+[source,console]
 ----
-dep ensure -update gihub.com/organization/repo@v1.1.0
+$ make # create the tools
+$ make container # create the container images
+$ kind load docker-image couchbase/couchbase-operator:v1
+$ kind load docker-image couchbase/couchbase-operator-admission:v1
+$ kind load docker-image couchbase/couchbase-operator-certification:v1
 ----
 
-This command will create a new `Gopkg.lock` and then checkout code into the `vendor` directory.
+Not strictly required but improves caching performance - replace with the server version you want to test.
+[source,console]
+----
+$ docker pull couchbase/server:7.0.2
+$ kind load docker-image couchbase/server:7.0.2
+----
 
-See the `dep` documentation for full instructions.
+=== Running a test
+
+It may be helpful to make an alias in your `bashrc` (or similar profile script - default shell on macOS seems to be ZSH so in the `.zshrc`) file:
+
+[source,console]
+----
+$ alias test-couchbase='./build/bin/cao certify --image couchbase/couchbase-operator-certification:v1 --clean --parallel=1 -- -operator-image couchbase/couchbase-operator:v1 -admission-image couchbase/couchbase-operator-admission:v1'
+----
+
+Then you can run some common commands to get you started:
+
+[source,console]
+----
+$ test-couchbase -test TestCreateCluster
+$ test-couchbase -suite sanity
+----
+
+Note that arguments can be passed to the certification binary (`cao`) before the `--`, and arguments following it are passed to the underlying test framework.
+
+All available arguments for the `cao` binary can be found in `pkg/certification/certify.go`.
+All available arguments for the test framework can be found in `test/e2e/framework/framework.go`.
+
+=== Test requirements
+
+1. When you submit code, it must be tested sufficiently, either with a unit test or a full-on integration test.
+2. When you write a test it must always pass, if it doesn't and you think it's a bug, talk to development and submit a fix with the test!
+3. Tests should be stable, tests should pass, if they don't then it just wastes time across the team analyzing the same issues over and over again.
+
+=== Analyzing logs
+
+To gather logs from tests, add the `--collect-logs` flag to your test command.
+
+[source,console]
+----
+$ test-couchbase -suite p0 --collect-logs
+----
+
+Test runs will place the results of the test run in the base directory, in an archive called `couchbase-operator-certification-<TIMESTAMP>.tar.bz2`.
+Inside there is an artifacts folder, containing the test `results.xml` and `logs` folder with logs for every test, plus a xref:tools/cbopinfo.adoc[`cbopinfo`] archive for any failed test.
+You can unzip this with `tar -xf <FILE>`, and view an individual instances logs via `./namespace/pod/<PODNAME>/`
+
+https://github.com/spjmurray/logify/[Logify^] can be used to pull apart the logs collected via `cbopinfo`.
+
+=== Targeting other branches
+
+The assumption is that you have branched from the right upstream branch.
+Note if you branch from `master` then this is unlikely to be correct for the specific version you are targeting.
+You may need to re-base from the version you want and also trigger Gerrit to do it:
+
+[source,console]
+----
+$ git rebase --onto origin/2.1.x HEAD~ <your branch name>
+$ git review 2.1.x
+----
+
+This will target the 2.1.x release.
+
+Similarly to cherry pick changes already submitted from another change set:
+
+[source,console]
+----
+$ git checkout -b test origin/2.1.x
+$ git cherry-pick <hash>
+$ git review 2.1.x
+----
+
+=== Verify documentation
+
+To verify documentation updates a https://github.com/spjmurray/couchbase-antora-preview[special container^] can be used which will process it all and serve it locally for you to verify.
+
+[source,console]
+----
+$ docker run --rm -ti \
+  --publish 8080:80 \
+  --mount type=bind,source=${PWD},target=/src,readonly \
+  spjmurray/couchbase-antora-preview:latest
+2021-11-11 13:50:01.513 INFO Using default repo path /src
+2021-11-11 13:50:01.768 INFO Using branch k8s_2520_add_contribution_documentation
+2021-11-11 13:50:03.522 INFO Using path ./docs/user
+2021-11-11 13:50:03.526 INFO Cloning latest document repository ...
+2021-11-11 13:50:07.495 INFO Creating site playbook ...
+2021-11-11 13:50:07.552 INFO Generating static content ...
+2021-11-11 13:50:16.679 INFO Serving content on http://localhost:8080
+2021-11-11 13:50:16.686 INFO Serving repo content on http://localhost:8080/operator/2.3/overview.html
+2021-11-11 13:50:16.686 INFO Starting webserver ...
+2021-11-11 13:50:17.094 INFO Press Ctl+C to exit ...
+----
+
+As you can see it shows you where to go to view the generated documentation.
+Make sure to change port 8080 if it is already in use locally.
+
+== Relation chains
+
+You can set up a set of related changes in Gerrit all under the same topic like so.
+
+* Create a new branch from where you want the next changeset in the relation chain to start from
+* Make your changes
+* Commit but when triggering a review specify the same topic to use, otherwise it will use the branch name.
+
+== Code reviews
+
+When it hits Gerrit, your change will be automatically reviewed by a robot.
+
+IMPORTANT: **ITS OPINION IS FINAL, DO NOT REMOVE -1 VOTES.**
+
+Using Gerrit is not always intuitive so some useful links are here:
+
+* https://gerrit-review.googlesource.com/Documentation/intro-gerrit-walkthrough.html
+* https://hyperledger-fabric.readthedocs.io/en/release-1.3/Gerrit/best-practices.html
+
+As of 2.1 EVERY commit must go through validation/sanity to ensure you haven't broken the code for anyone else.
+
+For documentation changes, there is no need to run the tests but for everything else you must.
+
+If you are adding tests to P0 or P1, then run them too.
+You may choose to run an explicit set of targeted individual tests, this is described in the UI.
+Note that running tests is a good thing but target the effort at the areas changed - consuming the cluster for the whole test suite unnecessarily will slow down other builds and therefore productivity.
+
+To run tests:
+
+. In Gerrit click `Download` and copy the git reference that looks like `refs/changes/88/136688/2`.
+. Navigate to https://jenkins.spjmurray.co.uk/job/couchbase-operator-continuous-integration/[Jenkins CICD job^]
+. Select `build with parameters` and replace the `refspec` with the one you have just copied from Gerrit.
+. Add any other parameters (especially suites), and click `build`.
+
+At the end you should navigate to the test results page, see if you have broken anything (and then fix it repeating the above), if not post the link to Gerrit.
+
+Finally reviewers should:
+
+* Check the code is decent!
+* Ensure that validation hasn't been overridden
+* Ensure that the code has decent test coverage where applicable
+* Ensure the test has been run and passes
+* Only then may you bless with a +2 and submit the change.
+* Once reviewed, the author then submits.
+
+== Debugging
+
+. Create a kind cluster
+. `kubectl create -f example/crd.yaml`
+. `make debug`
+   * build all containers
+   * load them into kind
+   * select the debug image as the operator image and set the command to run dlv
+. Port forward 30123 from the operator pod i.e `kubectl port-forward couchbase-operator-8bbc65c4f-q5l8d 30123:30123`
+. Attach a delve client, e.g. Visual Studio Code configuration is `launch.json`:
++
+[source,json]
+----
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+       {
+                    "name": "Remote debug in Kubernetes",
+                    "type": "go",
+                    "request": "attach",
+                    "mode":"remote",
+                    "remotePath": "/go/src/github.com/couchbase/couchbase-operator",
+                    "port": 30123,
+                    "host": "127.0.0.1",
+                    "showLog": true
+                }
+    ]
+}
+----
+
+If you pause on a breakpoint for longer than 15 seconds, the operator lease will time expire.
+This can be extended by `kubectl edit lease` and changing `leaseDurationSeconds` to something more appropriate.
 
 == Next Steps
 
 Please consult the user documentation for instructions on how to deploy the Operator and a Couchbase cluster in Kubernetes, view cluster status and logs etc.
 
-IMPORTANT: The main documentation refers to .yaml paths which are distributed in the main package.  Typically in development we will use the examples in the `examples` directory of the Operator source tree.
+[IMPORTANT]
+====
+The main documentation refers to .yaml paths which are distributed in the main package.
+Typically in development we will use the examples in the `examples` directory of the Operator source tree.
+====
 
 === Selecting Couchbase Server Version
 
-The containers used by couchbase-operator are hosted on Docker Hub.  You can modify the version to install by editing `example/couchbase-cluster.yaml` and altering the `/spec/version` value.  Valid container version tags are available on the https://hub.docker.com/r/couchbase/server/tags/[Couchbase Server Docker Hub].
+The containers used by couchbase-operator are hosted on Docker Hub.
+You can modify the version to install by editing `example/couchbase-cluster.yaml` and altering the `/spec/version` value.
+Valid container version tags are available on the https://hub.docker.com/r/couchbase/server/tags/[Couchbase Server Docker Hub].
+
+== MiniKube
+
+This guide assumes the usage of KIND but there are other options available, most notably MiniKube which we will cover here.
+MiniKube handles deploying a single node Kubernetes cluster by using VirtualBox.
+To install minikube follow https://kubernetes.io/docs/tasks/tools/install-minikube/[the official instructions^] for various operating systems.
+
+[NOTE]
+====
+The default version of Kubernetes installed is hard coded in Minikube.  You can always use the `--kubernetes-version` flag to set the version you require.
+At the time of writing we support 1.17.0+ onwards, but the latest version is recommended given the fast paced nature of things.
+====
+
+Once MiniKube is installed you can run the command below to start MiniKube.
+
+[source,bash]
+----
+$ minikube start --cpus 4 --memory 8192
+----
+
+=== Running on MiniKube
+
+To run this operator on minikube you first need to build a container image which can be deployed into the Kubernetes environment. Normally you would need to push your container image to a container registry (e.g. DockerHub) and then pull it into Kubernetes, but since you are using MiniKube you can build the image using the same container host as the Minikube VM. That way the images are automatically present. To do this, make sure you are using the Minikube Docker daemon:
+
+[source,bash]
+----
+$ eval $(minikube docker-env)
+----
+
+Later when you no longer want to use the Docker host in the MiniKube VM you can undo this change by running the command below.
+
+[source,bash]
+----
+$ eval $(minikube docker-env -u)
+----
