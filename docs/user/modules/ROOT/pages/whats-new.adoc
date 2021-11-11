@@ -42,6 +42,8 @@ It fulfills the following test criteria:
 
 Thus the test framework can be used to identify where Kubernetes API rules change in an incompatible way, where Kubernetes platform behaviors lead to unexpected and unsupportable results, and where Couchbase Server changes lead to incompatibilities with the Operator.
 
+NOTE: Currently, the Self Certification tool is not supported on the Red Hat OpenShift platform because it requires a new format for the binary or package validation in order to publish the Self Certification tool. Work is underway to fix these issues.
+
 xref:concept-platform-certification.adoc[Learn more] about self-certification.
 
 == RBAC for Analytics 
