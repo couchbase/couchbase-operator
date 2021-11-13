@@ -880,11 +880,12 @@ func generateExposedService(member couchbaseutil.Member, cluster *couchbasev2.Co
 	service := &v1.Service{}
 
 	if cluster.Spec.Networking.ExposedFeatureServiceTemplate != nil {
-		service.Labels = cluster.Spec.Networking.ExposedFeatureServiceTemplate.Labels
-		service.Annotations = cluster.Spec.Networking.ExposedFeatureServiceTemplate.Annotations
+		serviceTemplate := cluster.Spec.Networking.ExposedFeatureServiceTemplate.DeepCopy()
+		service.Labels = serviceTemplate.Labels
+		service.Annotations = serviceTemplate.Annotations
 
-		if cluster.Spec.Networking.ExposedFeatureServiceTemplate.Spec != nil {
-			service.Spec = *cluster.Spec.Networking.ExposedFeatureServiceTemplate.Spec
+		if serviceTemplate.Spec != nil {
+			service.Spec = *serviceTemplate.Spec
 		}
 	} else {
 		service.Spec.Type = cluster.Spec.Networking.ExposedFeatureServiceType
