@@ -2988,7 +2988,7 @@ type VolumeMounts struct {
 }
 
 // NodeToNodeEncryptionType is used to define the level of node-to-node encryption.
-// +kubebuilder:validation:Enum=ControlPlaneOnly;All
+// +kubebuilder:validation:Enum=ControlPlaneOnly;All;Strict
 type NodeToNodeEncryptionType string
 
 const (
@@ -2997,6 +2997,9 @@ const (
 
 	// NodeToNodeAll all traffic should be over TLS.
 	NodeToNodeAll NodeToNodeEncryptionType = "All"
+
+	// NodeToNodeStrict all traffic is over TLS and non-TLS ports are shut down.
+	NodeToNodeStrict NodeToNodeEncryptionType = "Strict"
 )
 
 // TLSVersion defines the minimum TLS version to use.
@@ -3041,7 +3044,9 @@ type TLSPolicy struct {
 	// within the same cluster.  This may come at the expense of performance.  When
 	// control plane only encryption is used, only cluster management traffic is encrypted
 	// between nodes.  When all, all traffic is encrypted, including database documents.
-	// This field must be either "ControlPlaneOnly" or "All".
+	// When strict mode is used, it is the same as all, but also disables all plaintext
+	// ports.  Strict mode is only available on Couchbase Server versions 7.1 and greater.
+	// This field must be either "ControlPlaneOnly", "All", or "Strict".
 	NodeToNodeEncryption *NodeToNodeEncryptionType `json:"nodeToNodeEncryption,omitempty"`
 
 	// TLSMinimumVersion specifies the minimum TLS version the Couchbase server can

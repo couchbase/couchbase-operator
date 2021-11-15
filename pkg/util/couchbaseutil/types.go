@@ -1130,6 +1130,9 @@ const (
 	// Encrypt only the control plane, allowing all your data to be evesdropped.
 	// The implication here is performance sucks, so use with caution!
 	ClusterEncryptionControl ClusterEncryptionLevel = "control"
+
+	// Same as above, just disables plaintext ports too.
+	ClusterEncryptionStrict ClusterEncryptionLevel = "strict"
 )
 
 // Security settings for the cluster.

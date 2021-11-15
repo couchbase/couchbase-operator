@@ -1172,6 +1172,8 @@ func (c *Cluster) reconcileNodeToNode(requestedEncryption bool) error {
 		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionControl
 	case couchbasev2.NodeToNodeAll:
 		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionAll
+	case couchbasev2.NodeToNodeStrict:
+		requestedSecuritySettings.ClusterEncryptionLevel = couchbaseutil.ClusterEncryptionStrict
 	default:
 		return fmt.Errorf("%w: illegal cluster encryption level '%s'", errors.NewStackTracedError(errors.ErrConfigurationInvalid), *c.cluster.Spec.Networking.TLS.NodeToNodeEncryption)
 	}
