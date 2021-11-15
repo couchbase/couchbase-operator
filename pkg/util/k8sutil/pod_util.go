@@ -924,8 +924,6 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		// Add a suggested parser to help with Fluent Bit usage as a daemonset
 		// https://docs.fluentbit.io/manual/pipeline/filters/kubernetes#kubernetes-annotations
 		annotations["fluentbit.io/parser_stdout-"+CouchbaseLogSidecarContainerName] = "couchbase_sidecar"
-		// Add default logging annotation: https://github.com/kubernetes/kubernetes/pull/87809
-		annotations["kubectl.kubernetes.io/default-logs-container"] = CouchbaseLogSidecarContainerName
 	}
 
 	pod.Annotations = mergeLabels(pod.Annotations, annotations)
