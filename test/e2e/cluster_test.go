@@ -855,7 +855,7 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	clusterSize := mdsGroupSize1 + mdsGroupSize2
 
 	// Create the cluster with two server classes, and exposed features.
-	testCouchbase := clusterOptions().Generate(targetKube)
+	testCouchbase := clusterOptions().WithGenericNetworking().Generate(targetKube)
 	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "data",
@@ -873,9 +873,6 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 			},
 		},
 	}
-	testCouchbase.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
-		couchbasev2.FeatureXDCR,
-	}
 	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
 
 	// Remove a service and ensure things still work.
@@ -884,10 +881,12 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Check the events match what we expect:
+	// * Service added
 	// * Cluster created
 	// * XDCR service created (admin, data, index)
 	// * Server class successfully removed.
 	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
