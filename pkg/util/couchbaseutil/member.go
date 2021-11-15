@@ -151,7 +151,7 @@ func (m *memberImpl) GetHostURLPlaintext() string {
 
 // GetHostName returns what Couchbase calls a host name; a combination of DNS and port.
 func (m *memberImpl) GetHostName() HostName {
-	return HostName(m.GetHostPort())
+	return HostName(fmt.Sprintf("%s:8091", m.GetDNSName()))
 }
 
 // GetOTPNode is an anachronism and is used to operator the Couchbase cluster even though

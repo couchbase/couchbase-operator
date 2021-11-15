@@ -8,21 +8,11 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  image: couchbase/server:6.6.2
+  image: couchbase/server:7.0.2
   security:
     adminSecret: cb-example-auth
     rbac:
       managed: true
-  networking:
-    exposeAdminConsole: true
-    adminConsoleServiceTemplate:
-      spec:
-        type: NodePort
-    exposedFeatures:
-      - xdcr
-    exposedFeatureServiceTemplate:
-      spec:
-        type: NodePort
   buckets:
     managed: true
   servers:

@@ -1079,12 +1079,17 @@ func (c *Cluster) reconcileNodeToNodeUpdateMembers(requestedEncryption bool, upd
 		encryptionDisabledString = couchbaseutil.Off
 	}
 
+	listenerSettings := &couchbaseutil.ListenerConfiguration{
+		AddressFamily:  couchbaseutil.AddressFamilyIPV4,
+		NodeEncryption: encryptionEnabledString,
+	}
+
 	networkSettings := &couchbaseutil.NodeNetworkConfiguration{
 		AddressFamily:  couchbaseutil.AddressFamilyIPV4,
 		NodeEncryption: encryptionEnabledString,
 	}
 
-	antiNetworkSettings := &couchbaseutil.NodeNetworkConfiguration{
+	antiListenerSettings := &couchbaseutil.ListenerConfiguration{
 		AddressFamily:  couchbaseutil.AddressFamilyIPV4,
 		NodeEncryption: encryptionDisabledString,
 	}
@@ -1093,11 +1098,10 @@ func (c *Cluster) reconcileNodeToNodeUpdateMembers(requestedEncryption bool, upd
 	for _, m := range updatableMembers {
 		// The auto-failover settings may take a while to take effect, so retry
 		// this call a few times.
-		if err := couchbaseutil.EnableExternalListener(networkSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
+		if err := couchbaseutil.EnableExternalListener(listenerSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
 			return err
 		}
 	}
-
 	// Update another API per node, with exactly the same configuration...
 	for _, m := range updatableMembers {
 		if err := couchbaseutil.SetNodeNetworkConfiguration(networkSettings).On(c.api, m); err != nil {
@@ -1111,7 +1115,7 @@ func (c *Cluster) reconcileNodeToNodeUpdateMembers(requestedEncryption bool, upd
 	for i := range updatableMembers {
 		m := updatableMembers[i]
 
-		if err := couchbaseutil.DisableExternalListener(antiNetworkSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
+		if err := couchbaseutil.DisableExternalListener(antiListenerSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
 			return err
 		}
 	}

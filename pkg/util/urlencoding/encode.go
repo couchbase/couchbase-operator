@@ -27,6 +27,8 @@ func isEmptyValue(v reflect.Value) bool {
 		return !v.Bool()
 	case reflect.Slice:
 		return v.Len() == 0
+	case reflect.Ptr:
+		return v.IsNil()
 	}
 
 	return false
@@ -58,6 +60,12 @@ func encode(v reflect.Value) (string, error) {
 		}
 
 		return "[" + strings.Join(items, ",") + "]", nil
+	case reflect.Ptr:
+		nv := v.Elem()
+
+		if nv.Kind() == reflect.Bool {
+			return strconv.FormatBool(nv.Bool()), nil
+		}
 	}
 
 	return "", fmt.Errorf("unsupported type %v %v: %w", v, v.Type(), errors.NewStackTracedError(ErrTypeUnsupported))

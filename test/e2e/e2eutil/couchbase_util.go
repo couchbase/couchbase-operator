@@ -578,7 +578,7 @@ func MustWaitForUnhealthyNodes(t *testing.T, k8s *types.Cluster, couchbase *couc
 }
 
 // PatchCouchbaseInfo tries patching the cluster information returned directly from Couchbase server.
-func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchCouchbaseInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
@@ -599,7 +599,7 @@ func PatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 }
 
 func MustPatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
-	if err := PatchCouchbaseInfo(t, k8s, couchbase, patches, timeout); err != nil {
+	if err := PatchCouchbaseInfo(k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }

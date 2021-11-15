@@ -4,7 +4,6 @@ import (
 	"crypto/x509"
 	goerrors "errors"
 	"fmt"
-	"reflect"
 	"regexp"
 	"strings"
 
@@ -2352,7 +2351,6 @@ func checkBucketScopesUniqueImplicit(v *types.Validator, namespace, kind, resour
 // it won't work and they will complain at you.
 func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error {
 	checks := []func(*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster) error{
-		checkImmutableAddressFamily,
 		checkImmutableServerClass,
 		checkImmutableIndexStorage,
 		checkImmutableImage,
@@ -2376,17 +2374,6 @@ func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error 
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
-	}
-
-	return nil
-}
-
-// checkImmutableAddressFamily checks that you aren't doing something silly like trying
-// to migrate from IPv4 to IPv6.  Couchbase doesn't do dual stack, it's one or the other
-// and set at pod creation time.
-func checkImmutableAddressFamily(current, updated *couchbasev2.CouchbaseCluster) error {
-	if !reflect.DeepEqual(current.Spec.Networking.AddressFamily, updated.Spec.Networking.AddressFamily) {
-		return util.NewUpdateError(`spec.networking.addressFamily`, `body`)
 	}
 
 	return nil

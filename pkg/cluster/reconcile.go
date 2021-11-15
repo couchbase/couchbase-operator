@@ -191,6 +191,7 @@ func (c *Cluster) reconcile() error {
 	// and happy state (most of the time, races can still occur).
 	postTopologyReconcilers := reconcileFuncList{
 		(*Cluster).reconcilePersistentStatus,
+		(*Cluster).reconcileClusterNetworking,
 		(*Cluster).reconcileTLSPostTopologyChange,
 		(*Cluster).reconcilePods,
 		(*Cluster).reconcileClusterSettings,

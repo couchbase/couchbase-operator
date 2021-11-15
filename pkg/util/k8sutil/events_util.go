@@ -92,6 +92,9 @@ const (
 	EventAutoscaleUp       = "EventAutoscaleUp"
 	EventAutoscaleDown     = "EventAutoscaleDown"
 
+	// Network lifecycle.
+	EventNetworkSettingsModified = "NetworkSettingsModified"
+
 	EventReasonTLSInvalidMessage = "Failed to validate TLS certificate chain"
 
 	// Scopes and collections.
@@ -596,6 +599,15 @@ func SecuritySettingsUpdatedEvent(cl *couchbasev2.CouchbaseCluster, message stri
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonSecuritySettingsUpdated
 	event.Message = message
+
+	return event
+}
+
+func NetworkSettingsModifiedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventNetworkSettingsModified
+	event.Message = "Network settings were updated"
 
 	return event
 }

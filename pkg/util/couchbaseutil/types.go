@@ -223,6 +223,25 @@ type NodeServices struct {
 	NodesExt []NodeService `json:"nodesExt"`
 }
 
+// AddressFamilyOut in keeping Couchbase APIs returns "inet" and "inet6"
+// but accepts "ipv4" and "ipv6".
+type AddressFamilyOut string
+
+const (
+	AddressFamilyOutInet  AddressFamilyOut = "inet"
+	AddressFamilyOutInet6 AddressFamilyOut = "inet6"
+)
+
+// ExternalListener is something that has nothing to do with network
+// configuration, and changing it makes no difference to the cluster,
+// but you need to set it in order to change the network configuration.
+// I'd like to comment more, but there is literally no documentation
+// about this secret hidden API.
+type ExternalListener struct {
+	AddressFamily  AddressFamilyOut `json:"afamily"`
+	NodeEncryption bool             `json:"nodeEncryption"`
+}
+
 type NodeInfo struct {
 	ThisNode           bool                 `json:"thisNode"`
 	Uptime             string               `json:"uptime"`
@@ -234,8 +253,24 @@ type NodeInfo struct {
 	Services           []string             `json:"services"`
 	AvailableStorage   AvailableStorageInfo `json:"storage"`
 	AlternateAddresses *AlternateAddresses  `json:"alternateAddresses,omitempty"`
-	NodeEncryption     bool                 `json:"nodeEncryption"`
 	Version            string               `json:"version"`
+
+	// AddressFamily is the actual network configuration of the node, and controls
+	// the protocol Couchbase talks to itself over (A vs AAAA lookups most likely).
+	// Must have a corresponding protocol listener defined.
+	AddressFamily AddressFamilyOut `json:"addressFamily"`
+
+	// AddressFamilyOnly only exposes the specified address family, if this
+	// is not set, then it may be running dual stack and exposing on IPv4 and IPv6.
+	AddressFamilyOnly bool `json:"addressFamilyOnly"`
+
+	// NodeEncryption enables/disables node-to-node encryption.  Must have a corresponding
+	// listener, for the address family, with encryption enabled.
+	NodeEncryption bool `json:"nodeEncryption"`
+
+	// ExternalListeners are... something, but you need to have a corresponding one
+	// in order to set the address family, or node encryption.
+	ExternalListeners []ExternalListener `json:"externalListeners"`
 }
 
 type AvailableStorageInfo map[AvailableStorageType][]StorageInfo
@@ -1176,11 +1211,34 @@ const (
 	AddressFamilyIPV6 AddressFamily = "ipv6"
 )
 
+// ConvertAddressFamilyOutToAddressFamily addresses the fact Server doesn't have
+// any consistency when reading and writing the same value.
+func (f AddressFamilyOut) ConvertAddressFamilyOutToAddressFamily() AddressFamily {
+	switch f {
+	case AddressFamilyOutInet:
+		return AddressFamilyIPV4
+	case AddressFamilyOutInet6:
+		return AddressFamilyIPV6
+	}
+
+	return ""
+}
+
 // NodeNetworkConfiguration allows configuration of node networking for a specific address family.
 // I can only guess this default to IPv4, which is fine.
 type NodeNetworkConfiguration struct {
 	// AddressFamily is the family of addresses to affect (IPv4 or IPv6 presumably).
-	AddressFamily AddressFamily `json:"afamiliy" url:"afamily,omitempty"`
+	AddressFamily AddressFamily `json:"afamily" url:"afamily,omitempty"`
+
+	AddressFamilyOnly *bool `url:"afamilyOnly,omitempty"`
+
+	// NodeEncryption is whether encyryption is enabled for a node.
+	NodeEncryption OnOrOff `json:"nodeEncryption" url:"nodeEncryption,omitempty"`
+}
+
+type ListenerConfiguration struct {
+	// AddressFamily is the family of addresses to affect (IPv4 or IPv6 presumably).
+	AddressFamily AddressFamily `json:"afamily" url:"afamily,omitempty"`
 
 	// NodeEncryption is whether encyryption is enabled for a node.
 	NodeEncryption OnOrOff `json:"nodeEncryption" url:"nodeEncryption,omitempty"`

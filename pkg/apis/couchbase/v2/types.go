@@ -2305,11 +2305,14 @@ const (
 )
 
 type CouchbaseClusterNetworkingSpec struct {
-	// DEVELOPER PREVIEW - this feature is not for production use.
 	// AddressFamily allows the manual selection of the address family to use.
-	// Couchbase server will default to "IPv4" regardless of underlying network
-	// configuration, so this must be manually set to enable use on an "IPv6"
-	// only network.  This field is immutable and cannot be changed once set.
+	// When this field is not set, Couchbase server will default to using IPv4
+	// for internal communication and also support IPv6 on dual stack systems.
+	// Setting this field to either IPv4 or IPv6 will force Couchbase to use the
+	// selected protocol for internal communication, and also disable all other
+	// protocols to provide added security and simplicty when defining firewall
+	// rules.  Disabling of address families is only supported in Couchbase
+	// Server 7.0.2+.
 	AddressFamily *AddressFamily `json:"addressFamily,omitempty"`
 
 	// ExposeAdminConsole creates a service referencing the admin console.

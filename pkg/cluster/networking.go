@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
@@ -247,4 +248,138 @@ func (c *Cluster) addDataServiceExternalPorts(k8sAddressPorts *couchbaseutil.Alt
 	existingAddressPorts.DataServicePortTLS = k8sAddressPorts.DataServicePortTLS
 	existingAddressPorts.ViewAndXDCRServicePort = k8sAddressPorts.ViewAndXDCRServicePort
 	existingAddressPorts.ViewAndXDCRServicePortTLS = k8sAddressPorts.ViewAndXDCRServicePortTLS
+}
+
+// supportsAFFiltering tells us whether we can support address familiy filtering
+// or not e.g. only the requested familiy shows up, rather than the normal
+// dual-stack stuff.
+func (c *Cluster) supportsAFFiltering() bool {
+	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return false
+	}
+
+	version, err := couchbaseutil.NewVersion(tag)
+	if err != nil {
+		return false
+	}
+
+	return version.GreaterEqualString("7.0.2")
+}
+
+// generateNetworkConfiguration generates the required network configuration for
+// the requested cluster configuration.
+func (c *Cluster) generateNetworkConfiguration() *couchbaseutil.NodeNetworkConfiguration {
+	networkConfiguration := &couchbaseutil.NodeNetworkConfiguration{}
+
+	t := true
+	f := false
+
+	// If nothing is specified, or we explcitly ask for IPv4 set the current protocol.
+	// If IPv4 is explcitly asked for, and it's supported, turn off dual stack support.
+	if c.cluster.Spec.Networking.AddressFamily == nil || *c.cluster.Spec.Networking.AddressFamily == couchbasev2.AFInet {
+		networkConfiguration.AddressFamily = couchbaseutil.AddressFamilyIPV4
+
+		if c.supportsAFFiltering() {
+			networkConfiguration.AddressFamilyOnly = &f
+
+			if c.cluster.Spec.Networking.AddressFamily != nil {
+				networkConfiguration.AddressFamilyOnly = &t
+			}
+		}
+	}
+
+	// If IPv6 was asked for, set that as the communication protocol and disable IPv4.
+	if c.cluster.Spec.Networking.AddressFamily != nil && *c.cluster.Spec.Networking.AddressFamily == couchbasev2.AFInet6 {
+		networkConfiguration.AddressFamily = couchbaseutil.AddressFamilyIPV6
+
+		if c.supportsAFFiltering() {
+			networkConfiguration.AddressFamilyOnly = &t
+		}
+	}
+
+	return networkConfiguration
+}
+
+// initMemberNetworking sets up IP address families on pod start up.  Sadly you cannot also
+// setup node-to-node networking because Server will collapse in a heap.  Apply all configuration
+// blindly because we cannot see what Couchbase's configuration is at this time...
+func (c *Cluster) initMemberNetworking(member couchbaseutil.Member) error {
+	if err := couchbaseutil.SetNodeNetworkConfiguration(c.generateNetworkConfiguration()).InPlaintext().RetryFor(10*time.Second).On(c.api, member); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reconcileClusterNetworking allows a read/modify/write version of the above.
+func (c *Cluster) reconcileClusterNetworking() error {
+	// Work out what ne need the networking to look like.
+	requestedNetworkConfiguration := c.generateNetworkConfiguration()
+
+	// Poll Couchbase for the current network configuration, keeping record
+	// of any members whose configuration does not match what is expected.
+	var info couchbaseutil.ClusterInfo
+
+	if err := couchbaseutil.GetPoolsDefault(&info).On(c.api, c.members); err != nil {
+		return err
+	}
+
+	var updateMembers []couchbaseutil.Member
+
+	for _, member := range c.members {
+		node, err := info.GetNode(member.GetHostName())
+		if err != nil {
+			return err
+		}
+
+		currentNetworkConfiguration := &couchbaseutil.NodeNetworkConfiguration{
+			AddressFamily:     node.AddressFamily.ConvertAddressFamilyOutToAddressFamily(),
+			AddressFamilyOnly: &node.AddressFamilyOnly,
+		}
+
+		if reflect.DeepEqual(currentNetworkConfiguration, requestedNetworkConfiguration) {
+			continue
+		}
+
+		updateMembers = append(updateMembers, member)
+	}
+
+	// Nothing to do, move along...
+	if len(updateMembers) == 0 {
+		return nil
+	}
+
+	// For some reason you need to disable failover because server is
+	// incapable of doing this itself.  Perhaps it's because updating settings causes
+	// a failover because it's slow or broken in some repect?
+	failoverSettings := &couchbaseutil.AutoFailoverSettings{}
+	if err := couchbaseutil.GetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	if failoverSettings.Enabled {
+		newFailoverSettings := *failoverSettings
+		newFailoverSettings.Enabled = false
+
+		if err := couchbaseutil.SetAutoFailoverSettings(&newFailoverSettings).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		defer func() {
+			_ = couchbaseutil.SetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers())
+		}()
+	}
+
+	for _, member := range updateMembers {
+		// Retry this because server doesn't attempt to actually perform the failover
+		// update operation, it simply says "200 okay!", which is a lie.
+		if err := couchbaseutil.SetNodeNetworkConfiguration(requestedNetworkConfiguration).RetryFor(time.Minute).On(c.api, member); err != nil {
+			return err
+		}
+	}
+
+	c.raiseEvent(k8sutil.NetworkSettingsModifiedEvent(c.cluster))
+
+	return nil
 }

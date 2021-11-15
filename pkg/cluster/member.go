@@ -184,32 +184,9 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 		}
 	}()
 
-	// The new node will not be part of the cluster yet  so the API calls will fail
-	// when checking the UUID, temporarily disable these checks while installing
-	// TLS configuration
-	// c.api.SetUUID("")
-	// defer c.api.SetUUID(c.cluster.Status.ClusterID)
-
-	// Explicitly change the network mode before doing anything else.
-	if c.cluster.Spec.Networking.AddressFamily != nil {
-		var family couchbaseutil.AddressFamily
-
-		switch *c.cluster.Spec.Networking.AddressFamily {
-		case couchbasev2.AFInet:
-			family = couchbaseutil.AddressFamilyIPV4
-		case couchbasev2.AFInet6:
-			family = couchbaseutil.AddressFamilyIPV6
-		default:
-			return nil, fmt.Errorf("%w: unexpected address family %v", errors.NewStackTracedError(errors.ErrInternalError), family)
-		}
-
-		config := &couchbaseutil.NodeNetworkConfiguration{
-			AddressFamily: family,
-		}
-
-		if err := couchbaseutil.SetNodeNetworkConfiguration(config).InPlaintext().RetryFor(time.Minute).On(c.api, newMember); err != nil {
-			return nil, err
-		}
+	// Setup networking.
+	if err := c.initMemberNetworking(newMember); err != nil {
+		return nil, err
 	}
 
 	// Check the pod is EE.  DNS should be working (as checked by the wait above), but
@@ -223,7 +200,7 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 		return nil, fmt.Errorf("%w: couchbase server reports community edition", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 	}
 
-	// Enable TLS if requested
+	// Enable TLS if requested.
 	if err := c.initMemberTLS(ctx, newMember); err != nil {
 		return nil, err
 	}

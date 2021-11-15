@@ -14,6 +14,9 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -480,7 +483,7 @@ func MustCheckConsoleServiceStatus(t *testing.T, k8s *types.Cluster, couchbase *
 	}
 }
 
-// CheckConsoleServiceLoadBalancerSourceRanges checks that loda balancer source ranges
+// CheckConsoleServiceLoadBalancerSourceRanges checks that load balancer source ranges
 // are as we expect.
 func CheckConsoleServiceLoadBalancerSourceRanges(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, sourceRanges []string, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
@@ -499,6 +502,49 @@ func CheckConsoleServiceLoadBalancerSourceRanges(k8s *types.Cluster, couchbase *
 
 func MustCheckConsoleServiceLoadBalancerSourceRanges(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, sourceRanges []string, timeout time.Duration) {
 	if err := CheckConsoleServiceLoadBalancerSourceRanges(k8s, couchbase, sourceRanges, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// exposePorts checks if the server ports are exposed only on the requested protocols.
+// Works with 7.0.2+ only.  Don't be tempted to actually probe the ports themselves,
+// you'll find it practically impossible to actually test this on 99% of platforms.
+func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, unique bool, timeout time.Duration) error {
+	// Get the expected number of pods (with kubernetes as the source of truth, we expect Couchbase to match).
+	options := metav1.ListOptions{
+		LabelSelector: labels.Set(k8sutil.SelectorForClusterResource(couchbase)).String(),
+	}
+
+	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), options)
+	if err != nil {
+		return fmt.Errorf("unable to get couchbase pods: %w", err)
+	}
+
+	// Translate between the API idea of an address family and that Couchbase returns.
+	family := couchbaseutil.AddressFamilyOutInet
+
+	if protocol == couchbasev2.AFInet6 {
+		family = couchbaseutil.AddressFamilyOutInet6
+	}
+
+	// Accumulate tests to run against the /pools/default endpoint.
+	// All nodes in the cluster should be the same.
+	patchset := jsonpatch.NewPatchSet()
+
+	for i := range pods.Items {
+		patchset.Test(fmt.Sprintf("/Nodes/%d/AddressFamily", i), family)
+		patchset.Test(fmt.Sprintf("/Nodes/%d/AddressFamilyOnly", i), unique)
+	}
+
+	callback := func() error {
+		return PatchCouchbaseInfo(k8s, couchbase, patchset, timeout)
+	}
+
+	return retryutil.RetryFor(timeout, callback)
+}
+
+func MustExposePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, unique bool, timeout time.Duration) {
+	if err := exposePorts(k8s, couchbase, protocol, unique, timeout); err != nil {
 		Die(t, err)
 	}
 }

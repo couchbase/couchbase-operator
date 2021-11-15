@@ -546,3 +546,40 @@ func TestConsoleServiceBootstrapingXDCR(t *testing.T) {
 	rejectedPorts := &[]int32{dataServicePort, dataServicePortTLS}
 	e2eutil.MustCheckConsolePorts(t, targetKube, testCouchbase, nil, rejectedPorts)
 }
+
+// TestNetworkAddressFamily ensures address family enforcement can be turned on and
+// off.
+func TestNetworkAddressFamily(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	// The enforcement stuff only appreared in 7.0.2... in true "add a new feature
+	// to a bug fix release" form.
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.2")
+
+	// Create any old cluster and ensure all pods have dual stack enabled.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.AFInet, false, time.Minute)
+
+	// Set the mode explicitly to IPv4, expect the IPv6 ports to disappear.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", couchbasev2.AFInet), time.Minute)
+	e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.AFInet, true, time.Minute)
+
+	// Revert the mode back to unset and esnure dial stack is restored.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/networking/addressFamily"), time.Minute)
+	e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.AFInet, false, time.Minute)
+
+	// Ensure the expected events were raised.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

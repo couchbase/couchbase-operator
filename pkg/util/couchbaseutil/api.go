@@ -748,7 +748,7 @@ func SetNodeNetworkConfiguration(s *NodeNetworkConfiguration) *Request {
 }
 
 // EnableExternalListener enables a listener (probably an API port, for a specific protocol for a node).
-func EnableExternalListener(s *NodeNetworkConfiguration) *Request {
+func EnableExternalListener(s *ListenerConfiguration) *Request {
 	data, err := urlencoding.Marshal(s)
 	if err != nil {
 		return NewRequestError(err)
@@ -758,7 +758,7 @@ func EnableExternalListener(s *NodeNetworkConfiguration) *Request {
 }
 
 // EnableExternalListener disables a listener (probably an API port, for a specific protocol for a node).
-func DisableExternalListener(s *NodeNetworkConfiguration) *Request {
+func DisableExternalListener(s *ListenerConfiguration) *Request {
 	data, err := urlencoding.Marshal(s)
 	if err != nil {
 		return NewRequestError(err)
