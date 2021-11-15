@@ -20,6 +20,8 @@ NOTE: The Couchbase-supplied log processor container image is only supported on 
 NOTE: Log forwarding requires that logs be written to a persistent volume (i.e. the Couchbase deployment's `default` or `logs` volumes are backed by xref:best-practices.adoc#storage[persistent storage]).
 Fully-ephemeral clusters are not supported by this feature.
 
+NOTE: Log forwarding requires that xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-securitycontext[`couchbaseclusters.spec.securityContext`] is set as appropriate for your Kubernetes distribution, as the sidecar requires read access to the shared volume.
+
 [[enabling-log-forwarding]]
 == Enabling Log Forwarding
 
