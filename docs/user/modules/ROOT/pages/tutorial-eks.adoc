@@ -13,6 +13,13 @@ This guide is meant to supplement the regular Amazon EKS https://docs.aws.amazon
 Create the EKS cluster(s) according to the Amazon https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html#eks-create-cluster[documentation^], with either `eksctl` or via the AWS Management Console.
 Actual cluster creation in EKS can take some time (around 10-15 minutes per cluster).
 
+[NOTE]
+====
+With Couchbase Autonomous Operator 2.2.0, we added support for Bottlerocket OS.
+Bottlerocket is a Linux-based open-source operating system that is purpose-built by Amazon Web Services for running containers.
+To create an EKS cluster with Bottlerocket OS, follow https://kubernetes.io/docs/concepts/storage/storage-classes/#aws-ebs[the steps^].
+====
+
 === Configure `kubectl`
 
 [NOTE]
