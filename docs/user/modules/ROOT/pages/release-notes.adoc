@@ -100,9 +100,10 @@ Couchbase Autonomous Operator 2.2.1 was released in August 2021.
 [#changes-in-behavior-v221]
 === New Features and Behavioral Changes
 
-==== New Prometheus and Logging Defaults
+==== New Prometheus, Logging and Backup Defaults
 
-The new default images are `couchbase/exporter:1.0.5` and `couchbase/fluent-bit:1.0.4` respectively.
+The new default images are `couchbase/exporter:1.0.5` and `couchbase/fluent-bit:1.0.4`.
+The latest backup image is `couchbase/operator-backup:1.1.1`.
 These images feature functional and security updates.
 
 Existing clusters will continue to use the component versions they were provisioned with.
@@ -150,6 +151,10 @@ As a result, this would not equal the Couchbase Server provided default of 30000
 The `CouchbaseCluster` CRD has now been amended to provide this default and avoid the problem.
 
 Additionally defaults have been provided for the LDAP port and LDAP group search depth, and better range checking.
+
+a| https://issues.couchbase.com/browse/K8S-2537[K8S-2537^]
+a| *Summary:* New Operator Backup image is published which is tested against Couchbase Autonomous Operator 2.2.1 and later with no changes in the Couchbase Autonomous Operator.
+We recommend updating to `couchbase/operator-backup:1.1.1`.
 |===
 
 [#release-v220]
