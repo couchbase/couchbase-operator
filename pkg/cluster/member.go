@@ -261,14 +261,6 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.
 		return nil, err
 	}
 
-	// TODO: 6.5.0+ probably allows HTTPS bootstrap all the time, not just
-	// when N2N is enabled...
-	url := newMember.GetHostURLPlaintext()
-
-	if c.supportsNodeToNode() && c.nodeToNodeEnabled() {
-		url = newMember.GetHostURL()
-	}
-
 	// Add to the cluster. Note we have to use the plain text url as
 	// /controller/addNode will not work with a https reference
 	services, err := couchbaseutil.ServiceListFromStringArray(couchbasev2.ServiceList(serverSpec.Services).StringSlice())
@@ -276,7 +268,7 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.
 		return newMember, err
 	}
 
-	if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
+	if err := couchbaseutil.AddNode(newMember.GetDNSName(), c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
 		return newMember, err
 	}
 
@@ -469,6 +461,38 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m couchbaseutil.Member) err
 		return err
 	}
 
+	ok, err := c.IsAtLeastVersion("7.1.0")
+	if err != nil {
+		return err
+	}
+
+	if ok {
+		return c.initMemberTLSNew(ctx, m, ca)
+	}
+
+	return c.initMemberTLSLegacy(ctx, m, ca)
+}
+
+// initMemberTLSNew handles TLS initialization on CBS versions 7.1+.
+func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member, ca []byte) error {
+	if err := couchbaseutil.LoadCAs().InPlaintext().On(c.api, m); err != nil {
+		return err
+	}
+
+	if err := couchbaseutil.ReloadNodeCert().InPlaintext().On(c.api, m); err != nil {
+		return err
+	}
+
+	// Wait for the port to come backup with the correct certificate chain
+	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), ca); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// initMemberTLSLegacy handles TLS initialization on CBS versions >=7.0.
+func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Member, ca []byte) error {
 	// Update Couchbase's TLS configuration
 	if err := couchbaseutil.SetClusterCACert(ca).InPlaintext().On(c.api, m); err != nil {
 		return err

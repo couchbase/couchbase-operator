@@ -471,13 +471,21 @@ func GetNodesSelf(node *NodeInfo) *Request {
 }
 
 // GetClusterCACert gets the cluster CA certificate.
-func GetClusterCACert(certificate []byte) *Request {
-	return NewRequest((*Client).Get, "/pools/default/certificate", nil, &certificate)
+func GetClusterCACert(certificate *[]byte) *Request {
+	return NewRequest((*Client).Get, "/pools/default/certificate", nil, certificate)
 }
 
 // SetClusterCACert sets the cluster CA certificate.
 func SetClusterCACert(certificate []byte) *Request {
 	return NewRequest((*Client).PostNoContentType, "/controller/uploadClusterCA", certificate, nil)
+}
+
+func LoadCAs() *Request {
+	return NewRequest((*Client).PostNoContentType, "/node/controller/loadTrustedCAs", []byte{}, nil)
+}
+
+func ListCAs(ca *TrustedCAList) *Request {
+	return NewRequest((*Client).Get, "/pools/default/trustedCAs", nil, ca)
 }
 
 // ReloadNodeCert causes server to reload the server certificate chain and key from disk.

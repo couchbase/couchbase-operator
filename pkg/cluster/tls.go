@@ -25,6 +25,73 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// refreshTLSShadowCASecret creates/updates a shadow secret that contains one
+// or more CAs used by CBS for TLS verification.  This is a 7.1+ only feature
+// as those versions require the CAs to reside on disk, rather than be posted
+// over HTTP with legacy versions.
+func (c *Cluster) refreshTLSShadowCASecret() error {
+	if !c.cluster.IsTLSEnabled() {
+		return nil
+	}
+
+	ok, err := c.IsAtLeastVersion("7.1.0")
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return nil
+	}
+
+	ca, _, _, err := c.getTLSData()
+	if err != nil {
+		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
+		return err
+	}
+
+	name := k8sutil.ShadowTLSCASecretName(c.cluster)
+
+	requestedShadowSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: k8sutil.LabelsForCluster(c.cluster),
+			OwnerReferences: []metav1.OwnerReference{
+				c.cluster.AsOwner(),
+			},
+		},
+		Data: map[string][]byte{
+			"ca.crt": ca,
+		},
+	}
+
+	// Look for the shadow secret, if it exists update it, otherwise create it.
+	currentShadowSecret, ok := c.k8s.Secrets.Get(name)
+	if !ok {
+		log.Info("Creating shadow TLS CA secret", "cluster", c.namespacedName())
+
+		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedShadowSecret, metav1.CreateOptions{}); err != nil {
+			return errors.NewStackTracedError(err)
+		}
+
+		return nil
+	}
+
+	if reflect.DeepEqual(requestedShadowSecret.Data, currentShadowSecret.Data) {
+		return nil
+	}
+
+	log.Info("Updating shadow TLS CA secret", "cluster", c.namespacedName())
+
+	updatedShadowSecret := currentShadowSecret.DeepCopy()
+	updatedShadowSecret.Data = requestedShadowSecret.Data
+
+	if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), updatedShadowSecret, metav1.UpdateOptions{}); err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	return nil
+}
+
 // refreshTLSShadowSecret does what it says, it keeps a shadow version of the TLS
 // secret up to date.  Why you ask?  Well CBS is crap and requires the files be
 // called chain.pem and pkey.key, whereas our users require it to be whatever they
@@ -96,6 +163,8 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 	// Look for the shadow secret, if it exists update it, otherwise create it.
 	currentShadowSecret, ok := c.k8s.Secrets.Get(name)
 	if !ok {
+		log.Info("Creating shadow TLS secret", "cluster", c.namespacedName())
+
 		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedShadowSecret, metav1.CreateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
@@ -106,6 +175,8 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 	if reflect.DeepEqual(requestedShadowSecret.Data, currentShadowSecret.Data) {
 		return nil
 	}
+
+	log.Info("Updating shadow TLS secret", "cluster", c.namespacedName())
 
 	updatedShadowSecret := currentShadowSecret.DeepCopy()
 	updatedShadowSecret.Data = requestedShadowSecret.Data
@@ -129,12 +200,120 @@ func tlsValid(member couchbaseutil.Member, ca, clientCert, clientKey []byte, cer
 
 // reloadCA insecurely reloads the cluster CA certificate.
 func (c *Cluster) reloadCA(member couchbaseutil.Member, cacert []byte) error {
-	oldcacert := []byte{}
-	if err := couchbaseutil.GetClusterCACert(oldcacert).On(c.api, member); err != nil {
+	ok, err := c.IsAtLeastVersion("7.1.0")
+	if err != nil {
 		return err
 	}
 
-	if !reflect.DeepEqual(cacert, oldcacert) {
+	if ok {
+		return c.reloadCANew(member, cacert)
+	}
+
+	return c.reloadCALegacy(member, cacert)
+}
+
+// certiifcatesEqual accepts two PEM encoded certificates and compare them.
+func certiifcatesEqual(a, b []byte) (bool, error) {
+	cert1, err := util_x509.ParseCertificate(a)
+	if err != nil {
+		return false, err
+	}
+
+	cert2, err := util_x509.ParseCertificate(b)
+	if err != nil {
+		return false, err
+	}
+
+	return cert1.Equal(cert2), nil
+}
+
+// hasCA tells us whether the CA is installed on the member.
+func (c *Cluster) hasCA(member couchbaseutil.Member, cacert []byte) (bool, error) {
+	var cas couchbaseutil.TrustedCAList
+
+	if err := couchbaseutil.ListCAs(&cas).On(c.api, member); err != nil {
+		return false, err
+	}
+
+	// Check to see if the CA is already present, the problem here is server
+	// has done all kinds of things with the certificate, thus tainting our
+	// original input, so we cannot do a stright match, and we need to decode
+	// it.
+	for _, ca := range cas {
+		ok, err := certiifcatesEqual(cacert, []byte(ca.PEM))
+		if err != nil {
+			return false, err
+		}
+
+		if ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// reloadCANew reloads the clusters CA certificate(s) for post 7.1 versions.
+func (c *Cluster) reloadCANew(member couchbaseutil.Member, cacert []byte) error {
+	// Check to see if the CA is already present.
+	ok, err := c.hasCA(member, cacert)
+	if err != nil {
+		return err
+	}
+
+	if ok {
+		return nil
+	}
+
+	log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name())
+
+	// If node to node is enabled, then server will refuse to rotate TLS, for good reason,
+	// so force disable it when performing TLS updates.
+	if err := c.disableNodeToNode(); err != nil {
+		return err
+	}
+
+	// Next annoyance is that while we can see the CA by reading the secret,
+	// there is no guarantee server can yet, because of the delay kubelet
+	// imposes when synchronizing secrets with tmpfs, so we have to wang this
+	// in a retry loop until we can see it's installed.
+	callback := func() error {
+		if err := couchbaseutil.LoadCAs().On(c.api, member); err != nil {
+			return err
+		}
+
+		ok, err := c.hasCA(member, cacert)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			return fmt.Errorf("%w: expected CA not present", errors.NewStackTracedError(errors.ErrTLSInvalid))
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(secretSyncTimePeriod, callback); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reloadCALegacy reloads the cluster CA certificate for pre-7.1 versions.
+func (c *Cluster) reloadCALegacy(member couchbaseutil.Member, cacert []byte) error {
+	var oldcacert []byte
+	if err := couchbaseutil.GetClusterCACert(&oldcacert).On(c.api, member); err != nil {
+		return err
+	}
+
+	ok, err := certiifcatesEqual(cacert, oldcacert)
+	if err != nil {
+		return err
+	}
+
+	if !ok {
 		log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name())
 
 		// If node to node is enabled, then server will refuse to rotate TLS, for good reason,
@@ -181,7 +360,7 @@ func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cacert, clie
 		return nil
 	}
 
-	if err := retryutil.RetryFor(extendedRetryPeriod, callback); err != nil {
+	if err := retryutil.RetryFor(secretSyncTimePeriod, callback); err != nil {
 		return err
 	}
 

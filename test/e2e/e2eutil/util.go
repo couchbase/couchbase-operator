@@ -1214,7 +1214,7 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.C
 		pod := pods.Items[i]
 
 		callback := func() error {
-			if err := tlsCheckForPod(cluster, pod.GetName(), tls); err != nil {
+			if err := tlsCheckForPod(k8s, cluster, pod.GetName(), tls); err != nil {
 				return fmt.Errorf("TLS verification failed: %w", err)
 			}
 

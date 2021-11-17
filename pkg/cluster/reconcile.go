@@ -28,6 +28,15 @@ const (
 	// extendedRetryPeriod is an extended amount of time to wait for slow
 	// API operations to report success.
 	extendedRetryPeriod = 3 * time.Minute
+
+	// secretSyncTimePeriod is approximately how long it takes for secret
+	// updates to take effect in pod file systems.  Note, there is a race
+	// because TLS updates aren't atomic.  It's possible for the shadow
+	// secret to skip being updated, but the certs to be spotted as changed
+	// and a futile reload cycle entered.  Setting this too high will cause
+	// test failures.  I guess we need to check TLS at the start of the
+	// loop and cache the certs/keys.  Better but not perfect.
+	secretSyncTimePeriod = 2 * time.Minute
 )
 
 // reconcileFunc is a stable and consistent interface to a reconcile function.
@@ -97,6 +106,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileCompletedPods,
 		(*Cluster).reconcilePeerServices,
 		(*Cluster).reconcileAdminService,
+		(*Cluster).refreshTLSShadowCASecret,
 		(*Cluster).refreshTLSShadowSecret,
 		(*Cluster).reconcileLogConfig,
 	}

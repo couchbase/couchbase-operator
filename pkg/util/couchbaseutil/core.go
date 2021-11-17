@@ -205,7 +205,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 			return fmt.Errorf("%w: unexpected type decode for text/plain", errors.NewStackTracedError(ErrTypeError))
 		}
 
-		copy(*s, body)
+		*s = body
 	default:
 		return fmt.Errorf("%w: unexpected content type %s", errors.NewStackTracedError(ErrTypeError), contentType)
 	}

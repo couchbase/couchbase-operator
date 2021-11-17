@@ -30,6 +30,7 @@ import (
 
 const (
 	couchbaseTLSVolumeMountDir                = "/opt/couchbase/var/lib/couchbase/inbox"
+	couchbaseTLSCAVolumeMountDir              = "/opt/couchbase/var/lib/couchbase/inbox/CA"
 	couchbaseVolumeDefaultConfigDir           = "/opt/couchbase/var/lib/couchbase"
 	CouchbaseVolumeMountLogsDir               = "/opt/couchbase/var/lib/couchbase/logs"
 	couchbaseVolumeDefaultEtcDir              = "/opt/couchbase/etc"
@@ -1514,6 +1515,11 @@ func ShadowTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
 	return cluster.Name + "-tls-shadow"
 }
 
+// ShadowTLSCASecretName generates a TLS secret name for CA certificates on CBS 7.1+.
+func ShadowTLSCASecretName(cluster *couchbasev2.CouchbaseCluster) string {
+	return cluster.Name + "-tls-ca-shadow"
+}
+
 // Adds any necessary pod prerequisites before enabling TLS.
 func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
 	// Static configuration:
@@ -1559,6 +1565,38 @@ func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod
 
 		// Annotate the pod as having TLS enabled
 		pod.Annotations[constants.PodTLSAnnotation] = constants.EnabledValue
+
+		// In 7.1 the CA must be installed in the pod, and not injected over
+		// HTTP... which is a pain.
+		tag, err := CouchbaseVersion(cluster.Spec.Image)
+		if err != nil {
+			return err
+		}
+
+		is71, err := couchbaseutil.VersionAfter(tag, "7.1.0")
+		if err != nil {
+			return err
+		}
+
+		if is71 {
+			caVolume := v1.Volume{
+				Name: constants.CouchbaseTLSCAVolumeName,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName: ShadowTLSCASecretName(cluster),
+					},
+				},
+			}
+			pod.Spec.Volumes = append(pod.Spec.Volumes, caVolume)
+
+			caVolumeMount := v1.VolumeMount{
+				Name:      constants.CouchbaseTLSCAVolumeName,
+				ReadOnly:  true,
+				MountPath: couchbaseTLSCAVolumeMountDir,
+			}
+
+			container.VolumeMounts = append(container.VolumeMounts, caVolumeMount)
+		}
 	}
 
 	return nil

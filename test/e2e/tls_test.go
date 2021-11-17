@@ -1644,12 +1644,10 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 	// * N2N enabled
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
-		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
 		eventschema.Repeat{
 			Times:     clusterSize,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
 		},
-		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
 	}
 
 	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)

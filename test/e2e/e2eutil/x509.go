@@ -23,6 +23,8 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -1113,9 +1115,24 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	}
 }
 
+// newTLSAPI determines whether to use new TLS verification or legacy.
+func newTLSAPI(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return false, err
+	}
+
+	version, err := couchbaseutil.NewVersion(tag)
+	if err != nil {
+		return false, err
+	}
+
+	return version.GreaterEqualString("7.1.0"), nil
+}
+
 // tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
 // using TlsCheckForCluster which is safer.
-func tlsCheckForPod(cluster *couchbasev2.CouchbaseCluster, podName string, ctx *TLSContext) error {
+func tlsCheckForPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, podName string, ctx *TLSContext) error {
 	clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
 	if err != nil {
 		return err
@@ -1153,12 +1170,46 @@ func tlsCheckForPod(cluster *couchbasev2.CouchbaseCluster, podName string, ctx *
 		},
 	}
 
-	request, err := http.NewRequest("GET", "https://"+host+"/pools/default/certificate", nil)
+	ok, err := newTLSAPI(cluster)
 	if err != nil {
 		return err
 	}
 
-	response, err := client.Do(request)
+	if ok {
+		// Handle 7.1+
+		adminClient, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		var trustedCAs couchbaseutil.TrustedCAList
+
+		if err := couchbaseutil.ListCAs(&trustedCAs).On(adminClient.client, adminClient.host); err != nil {
+			return err
+		}
+
+		// TODO: check the error type for 404
+		for _, ca := range trustedCAs {
+			cacert, err := ParseCertificate([]byte(ca.PEM))
+			if err != nil {
+				return err
+			}
+
+			if cacert.Equal(ctx.CA.certificate) {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("no matching CA found in Couchbase Server")
+	}
+
+	// Fall back to legacy 6.5/6.6/7.0
+	requestLegacy, err := http.NewRequest("GET", "https://"+host+"/pools/default/certificate", nil)
+	if err != nil {
+		return err
+	}
+
+	response, err := client.Do(requestLegacy)
 	if err != nil {
 		return err
 	}
