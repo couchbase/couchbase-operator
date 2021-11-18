@@ -1,0 +1,136 @@
+= Documentation Guide
+
+[abstract]
+How to document and review documentation changes.
+
+== Introduction
+
+Documentation is done using https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/[Asciidoc^] for all Couchbase products.
+The specific flavour we use is https://antora.org/[Antora^].
+
+== Useful Tools
+
+You can preview AsciiDoc code in a number of different ways.
+
+=== Asciidoctor.js Preview
+
+This is a browser plugin that detects and renders AsciiDoc, and is available for https://chrome.google.com/webstore/detail/asciidoctorjs-live-previe/iaalpfgpbocpdfblpnhhgllgbdbchmia?hl=en[Chrome^], and https://addons.mozilla.org/en-GB/firefox/addon/asciidoctorjs-live-preview/[Firefox^].
+I'm writing this document using it.
+Simply specify a URI e.g. `file:///home/simon/src/github.com/couchbase/couchbase-operator/docs/dev/documentation.adoc`, and it will update every time you save.
+
+[#couchbase-antora-preview]
+=== Couchbase Antora Preview
+
+This is a standalone container managed by Simon.
+The https://github.com/spjmurray/couchbase-antora-preview[source^] is on GitHub if you run into any problems, but for most people you can just run the following the the Operator source root directory:
+
+[source,console]
+----
+$ docker run --rm -ti \
+  --publish 8080:80 \
+  --mount type=bind,source=${PWD},target=/src,readonly \
+  spjmurray/couchbase-antora-preview:latest
+----
+
+This actually renders all pages in the repository using the official Couchbase styles.
+
+== Site Layout
+
+Important things about this repository:
+
+docs/user/antora.yml::
+This file defines the short `name` of the repository, used in URLs, so don't change this as it will break SEO.
+The product `title` should not be changed, unless PM ask for it as a branding exercise.
+The `version` is specific to the branch.
+Each released minor version of the Operator, and the still-in-development (SID) master, has its own branch.
+Every branch *must* have a unique version, or you will break Antora for the whole company.
+The `prerelease` flag set to true on beta and SID releases, this affects how the documentation is presented i.e. it will default to the latest non-prerelease version.
+The `start_page` is the landing/default page for the repository.
+Finally the `nav` defines the navigation menu for the repository.
+
+docs/user/modules/ROOT/nav.adoc::
+Defines the navigation menu for the repository.
+The formatting is defined <<navigation-layout,below>>.
+
+docs/user/modules/ROOT/pages/*::
+These are the main pages for the documentation.
+The formatting is defined <<documentation-layout,below>>.
+
+docs/user/modules/ROOT/partials/*::
+These define partial documentation, or snippets.
+The formatting is the same as for <<documentation-layout,documentation>>.
+
+docs/user/modules/ROOT/assets/images/*::
+These define any images included in documentation.
+The formatting is defined <<image-layout,below>>.
+
+[#navigation-layout]
+== Navigation Layout
+
+When writing nav entries keep a few things in mind:
+
+* The title of the entry, must match the title of the document it refers to
+* Any level in the nav should aim to have about 10 entries at most, beyond this people cannot find things as they are overwhelmed
+* The top level nav entries (learn, manage, etc.) are consistent across call Couchbase products, don't touch these (even if they are nonsense, and should be concepts, tasks, etc.)
+
+[#documentation-layout]
+== Documentation Layout
+
+Before writing any technical documentation, first thoroughly read https://www.writethedocs.org/[Write the Docs^].
+
+Every document *must*:
+
+* Have a title that corresponds to a nav entry with the same name
+* Have an abstract
+* Use white space to separate elements e.g. don't butt titles and paragraphs together
+* Use one source line per line, this aids in diffing and code review
+* Accompany tables and images with a title
+* Use block syntax for admonitions
+* Use attributes for versions where appropriate, so they update automatically over time
+* Use xref, not link
+
+Every document should:
+
+* Not repeat anything else, use links to avoid duplication -- don't repeat yourself (DRY)
+* Have links at the bottom of the content to flow from one topic to the next
+* Use diagrams where appropriate -- a picture paints a thousand words
+
+=== Documentation Linting
+
+You can run `make docs-lint` to perform automated testing on your code this will:
+
+* Spell check your work
+* Ensure your AsciiDoc is will formed
+* Ensure cross-references point to something
+
+On the topic of spell checking, we filter out a lot of AsciiDoc commands and verbatim blocks.
+By convention references to Kubernetes resources e.g. `CouchbaseBucket` are surrounded by backticks (inline verbatim), and are filtered out.
+Do not add these to the dictionary, we use their absence to enforce the use of backticks and consistent presentation.
+When you think you need to add a word to the dictionary, please check to see if it already exists in a different form.
+This is because some brand names e.g. Red Hat, should be a certain way for correctness and consistency.
+
+[#image-layout]
+== Image Layout
+
+Images are all created with https://diagrams.net[diagrams.net^].
+There's no real style defined for these, but try to keep things consistent with existing images e.g. default font size, Arial face.
+Existing images are on Google Drive, ask Simon if you need access.
+
+== Reviewing Documentation
+
+It is your job as reviewer to do the following, and failure to do so will result in a sudden terminal incident:
+
+* Check `buildbot` has given a `+1` review
+** The author may not have spell checked
+** May not have working syntax
+** May have broken links
+** *NEVER EVER remove a `-1`*, if you do you just _fuck it up_ for all the engineers afterwards
+* Checkout the code and <<couchbase-antora-preview,preview it>>
+** Does it look broken or inconsistent anywhere?
+* Do a technical review
+** Have *all* the <<navigation-layout,navigation>>, <<documentation-layout,documentation>>, and <<image-layout,image>> layout conventions been followed.
+* Then, and only then, can you give it a +2 and merge.
+
+Remember, when committing changes to a branch e.g. `2.2.x`, you will be committing changes to a live production website.
+For that reason you can only push fixes on a day-to-day basis.
+New content for a patch release *must* be queued up and merged on the day of release and no sooner.
