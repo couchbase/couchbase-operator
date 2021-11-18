@@ -46,7 +46,11 @@ This release supports the following container images for xref:concept-backup.ado
 
 a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.1.0`^]
 a| xref:6.6@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 6.6.2`]
-| Couchbase Server 6.6--5.5
+| Couchbase Server 6.5--6.6
+
+a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.1.1`^]
+a| xref:7.0@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 7.0.2`]
+| Couchbase Server 6.5--7.0
 |===
 
 The following diagram depicts Operator Backup image compatibility with all supported Couchbase Server versions, you should consider this when upgrading Couchbase Server:
