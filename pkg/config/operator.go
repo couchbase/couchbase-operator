@@ -44,6 +44,10 @@ const (
 	// operatorDefaultMemoryLimit is the burst amount of memory to kill the pod if exceeded.
 	operatorDefaultMemoryLimit = "400Mi"
 
+	// operatorDefaultPullPolicy is the pull policy to use when downloading the image.
+	// By default images are only pulled if not already present.
+	operatorDefaultPullPolicy = string(corev1.PullIfNotPresent)
+
 	// Debug flag.
 	debug = "debug"
 	// dlv requires a specific port be specified otherwise a random one is used.
@@ -60,6 +64,9 @@ type generateOperatorOptions struct {
 
 	// imagePullSecret is the name of an image pull secret for authenticating image pulls.
 	imagePullSecret imagePullSecretVar
+
+	// imagePullPolicy is the pull policy to use when downloading the image.
+	imagePullPolicy string
 
 	// logLevel is the level to emit docs at.
 	logLevel zapLogLevelVar
@@ -104,6 +111,7 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", operatorImageDefault, "Operator image to use.")
 	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image.")
+	cmd.Flags().StringVar(&o.imagePullPolicy, "image-pull-policy", operatorDefaultPullPolicy, "Image pull policy to affect when the image is downloaded.")
 	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
 	cmd.Flags().Var(&o.podCreationTimeout, "pod-creation-timeout", "How long to wait before declaring an error when provisioning a pod.")
 	cmd.Flags().BoolVar(&o.withResources, "with-resources", false, "Populates pod resource requests and limits")
@@ -587,8 +595,9 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 					},
 					Containers: []corev1.Container{
 						{
-							Name:  OperatorResourceName,
-							Image: o.image,
+							Name:            OperatorResourceName,
+							Image:           o.image,
+							ImagePullPolicy: corev1.PullPolicy(o.imagePullPolicy),
 							Command: []string{
 								operatorCommand,
 							},

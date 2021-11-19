@@ -173,6 +173,9 @@ type certifyOptions struct {
 	// image is the certification image name.
 	image string
 
+	// image pull policy to use when downloading the certification container.
+	imagePullPolicy string
+
 	// parallel is the default parallelism (really concurrency) to use when running
 	// test cases.
 	parallel int
@@ -361,6 +364,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&o.useFSGroup, "use-fsgroup", useFSGroup, "Use a file system group for persistent volumes.")
 	cmd.Flags().IntVar(&o.fsGroup, "fsgroup", 1000, "Set the file system group for persistent volumes.")
 	cmd.Flags().Var(&o.registries, "registry", "Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.")
+	cmd.Flags().StringVar(&o.imagePullPolicy, "image-pull-policy", imagePullPolicyDefault, "Pull Policy to use when downloading the Certification container")
 
 	return cmd
 }
@@ -595,6 +599,7 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 
 	certificationPod.Spec.ServiceAccountName = serviceAccount
 	certificationPod.Spec.Containers[0].Image = o.image
+	certificationPod.Spec.Containers[0].ImagePullPolicy = corev1.PullPolicy(o.imagePullPolicy)
 	certificationPod.Spec.Containers[0].Args = certificationArgs
 
 	for _, secret := range secrets {

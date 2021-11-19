@@ -5,10 +5,13 @@ package certification
 
 import (
 	"github.com/couchbase/couchbase-operator/pkg/version"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
-	useFSGroup = true
+	useFSGroup             = true
+	imagePullPolicyDefault = string(corev1.PullIfNotPresent)
 )
 
 var (

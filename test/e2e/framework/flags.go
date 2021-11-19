@@ -7,6 +7,8 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // RegistryConfigValue allows multiple container image registries to be passed on the command
@@ -177,4 +179,23 @@ func (i *istioMTLSModeFlag) Type() string {
 
 func (i *istioMTLSModeFlag) String() string {
 	return string(i.value)
+}
+
+// PullPolicyFlag implements flag.Value for passing pull policy command arguments.
+type PullPolicyFlag struct {
+	policy corev1.PullPolicy
+}
+
+func (p *PullPolicyFlag) Set(s string) error {
+	switch corev1.PullPolicy(s) {
+	case corev1.PullAlways, corev1.PullNever, corev1.PullIfNotPresent:
+		p.policy = corev1.PullPolicy(s)
+		return nil
+	}
+
+	return fmt.Errorf("failed to set unknown pull policy: %s", s)
+}
+
+func (p *PullPolicyFlag) String() string {
+	return string(p.policy)
 }

@@ -45,6 +45,10 @@ const (
 
 	// admissionDefaultReplicas is the number of replicas in the deployment.
 	admissionDefaultReplicas = 1
+
+	// admissionDefaultPullPolicy is the pull policy to use when downloading the image.
+	// By default images are only pulled if not already present.
+	admissionDefaultPullPolicy = string(corev1.PullIfNotPresent)
 )
 
 // generateAdmissionOptions defines options for creating the admission controller.
@@ -57,6 +61,9 @@ type generateAdmissionOptions struct {
 
 	// imagePullSecret is the name of an image pull secret for authenticating image pulls.
 	imagePullSecret imagePullSecretVar
+
+	// imagePullPolicy is the pull policy to use when downloading the image.
+	imagePullPolicy string
 
 	// namespaceSelector defines the namespace selector to apply API webhooks to when
 	// using the admission controller in namespace scope.
@@ -110,6 +117,7 @@ func (o *generateAdmissionOptions) registerAdmissionGenerateFlags(cmd *cobra.Com
 	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
 	cmd.Flags().StringVar(&o.image, "image", admissionImageDefault, "Operator image to use")
 	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image")
+	cmd.Flags().StringVar(&o.imagePullPolicy, "image-pull-policy", admissionDefaultPullPolicy, "Image pull policy to affect when the image is downloaded.")
 	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information.")
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
@@ -528,8 +536,9 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 					},
 					Containers: []corev1.Container{
 						{
-							Name:  AdmissionResourceName,
-							Image: o.image,
+							Name:            AdmissionResourceName,
+							Image:           o.image,
+							ImagePullPolicy: corev1.PullPolicy(o.imagePullPolicy),
 							Command: []string{
 								"couchbase-operator-admission",
 							},

@@ -87,6 +87,13 @@ Set the file system group for persistent volumes.
 +
 Certification image to use
 
+--image-pull-policy::
+*Type*: string
++
+*Default*: IfNotPresent
++
+Pull Policy to use when downloading the Certification container
+
 --parallel::
 *Type*: int
 +
@@ -481,6 +488,13 @@ Fills in default file system group information on Couchbase volumes
 +
 Operator image to use
 
+--image-pull-policy::
+*Type*: string
++
+*Default*: IfNotPresent
++
+Image pull policy to affect when the image is downloaded.
+
 --image-pull-secret::
 *Type*: string
 +
@@ -782,6 +796,13 @@ CPU requested for scheduling
 *Default*: couchbase/operator:
 +
 Operator image to use.
+
+--image-pull-policy::
+*Type*: string
++
+*Default*: IfNotPresent
++
+Image pull policy to affect when the image is downloaded.
 
 --image-pull-secret::
 *Type*: string
@@ -1315,6 +1336,13 @@ Fills in default file system group information on Couchbase volumes
 +
 Operator image to use
 
+--image-pull-policy::
+*Type*: string
++
+*Default*: IfNotPresent
++
+Image pull policy to affect when the image is downloaded.
+
 --image-pull-secret::
 *Type*: string
 +
@@ -1616,6 +1644,13 @@ CPU requested for scheduling
 *Default*: couchbase/operator:
 +
 Operator image to use.
+
+--image-pull-policy::
+*Type*: string
++
+*Default*: IfNotPresent
++
+Image pull policy to affect when the image is downloaded.
 
 --image-pull-secret::
 *Type*: string

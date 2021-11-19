@@ -281,6 +281,8 @@ func configure() (err error) {
 	flag.BoolVar(&params.IPv6, "ipv6",
 		false,
 		"Force the use use of IPv6 with Couchbase Server.")
+	flag.Var(&params.PodImagePullPolicy, "image-pull-policy",
+		"Image pull policy to use for Operator and Admission Pods.")
 
 	flag.Parse()
 
@@ -857,6 +859,10 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 
 		for _, secret := range secrets {
 			args = append(args, "--image-pull-secret="+secret)
+		}
+
+		if f.PodImagePullPolicy.String() != "" {
+			args = append(args, "--image-pull-policy="+f.PodImagePullPolicy.String())
 		}
 
 		if _, err := exec.Command("/cao", args...).CombinedOutput(); err != nil {

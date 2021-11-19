@@ -52,6 +52,10 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		args = append(args, "--image-pull-secret="+secret)
 	}
 
+	if Global.PodImagePullPolicy.String() != "" {
+		args = append(args, "--image-pull-policy="+Global.PodImagePullPolicy.String())
+	}
+
 	output, err := exec.Command("/cao", args...).CombinedOutput()
 	if err != nil {
 		logrus.Info(string(output))
