@@ -1014,10 +1014,9 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 
 	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewVolumeExpandStartedEvent(k8sutil.NameForPersistentVolumeClaim(memberName, 1, "data"), "2Gi", "3Gi", testCouchbase), 2*time.Minute)
-
+	e2eutil.MustObserveClusterEvent(t, targetKube, testCouchbase, e2eutil.NewVolumeExpandStartedEvent(k8sutil.NameForPersistentVolumeClaim(memberName, 0, "data"), "2Gi", "3Gi", testCouchbase), 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
 
 	// Verify resize state
 	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcName, requestedQuantity, 10*time.Minute)
