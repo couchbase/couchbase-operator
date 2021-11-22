@@ -188,6 +188,7 @@ type DocumentSet struct {
 	scope      string
 	collection string
 	prefix     string
+	values     map[string]interface{}
 }
 
 // NewDocumentSet creates a basic DocumentSet, specifying the bucket to insert to and the number of
@@ -197,6 +198,7 @@ func NewDocumentSet(bucket string, count int) *DocumentSet {
 		count:  count,
 		bucket: bucket,
 		prefix: RandomSuffix(),
+		values: map[string]interface{}{},
 	}
 }
 
@@ -213,6 +215,12 @@ func (d *DocumentSet) IntoScopeAndCollection(scope string, collection string) *D
 // with a number to create the key. If not specified, the prefix will be 5 random characters.
 func (d *DocumentSet) WithPrefix(prefix string) *DocumentSet {
 	d.prefix = prefix
+
+	return d
+}
+
+func (d *DocumentSet) WithValue(key, value string) *DocumentSet {
+	d.values[key] = value
 
 	return d
 }
@@ -257,6 +265,9 @@ func addDocs(d *DocumentSet) error {
 		"key2": "dummyVal2",
 		"key3": "dummyVal3",
 		"key4": "dummyVal4",
+	}
+	if len(d.values) > 0 {
+		document = d.values
 	}
 
 	for i := 0; i < d.count; i++ {

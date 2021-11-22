@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -1092,6 +1093,7 @@ func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
 	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
 }
 
+// TestXDCRReplicateLocalScopesAndCollectionsWithDeny tests that replication deny rules are correctly applied.
 func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
@@ -1300,6 +1302,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {
 	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
 }
 
+// TestXDCRReplicateLocalScopesAndCollectionsMultipleRules tests that multiple rules can be combined and applied.
 func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
@@ -1394,7 +1397,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
-	// Add docs to both collections on the source bucket.
+	// Add docs to various scopes and collections collections on the source bucket.
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName1, collectionName1).MustCreate(t, kubernetes, xdcrCluster1)
 	e2eutil.NewDocumentSet(bucket.GetName(), 2*numOfDocs).IntoScopeAndCollection(scopeName1, collectionName2).MustCreate(t, kubernetes, xdcrCluster1)
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName1, deniedCollectionName).MustCreate(t, kubernetes, xdcrCluster1)
@@ -1431,6 +1434,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
 }
 
+// TestXDCRReplicateLocalScopesAndCollectionsImplicit tests replication using implicit rules.
 func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 	f := framework.Global
 
@@ -1501,6 +1505,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
 }
 
+// TestXDCRMigrationLocalScopesAndCollections tests the migration functionality fo XDCR.
 func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
@@ -1605,6 +1610,216 @@ func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
+	}
+
+	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
+	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+}
+
+// TestXDCRMigrationLocalScopesAndCollectionsMultipleRules tests migration with multiple rules, and checks docs are appropriately not migrated.
+func TestXDCRMigrationLocalScopesAndCollectionsMultipleRules(t *testing.T) {
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+
+	// Static configuration.
+	numOfDocs := framework.Global.DocsCount
+	clusterSize := 1
+	scope1Name := "pinky"
+	scope2Name := "snowball"
+	collection1Name := "brain"
+	collection2Name := "billie"
+	key := "test"
+	value1 := "qwerty"
+	value2 := "asdf"
+
+	// Create a collection and collection group.
+	collection1 := e2eutil.NewCollection(collection1Name).MustCreate(t, kubernetes)
+	collection2 := e2eutil.NewCollection(collection2Name).MustCreate(t, kubernetes)
+
+	// Create a scope.
+	scope1 := e2eutil.NewScope(scope1Name).WithCollections(collection1, collection2).MustCreate(t, kubernetes)
+	scope2 := e2eutil.NewScope(scope2Name).WithCollections(collection2).MustCreate(t, kubernetes)
+
+	// Create the clusters each selecting a different bucket using labels.
+	sourceLabels := map[string]string{
+		"source": "true",
+	}
+	targetLabels := map[string]string{
+		"target": "true",
+	}
+
+	// Our source bucket has no scope and collection.
+	sourceBucket := e2espec.DefaultBucket()
+	sourceBucket.Name = "source"
+	sourceBucket.Labels = sourceLabels
+	sourceBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+	e2eutil.MustNewBucket(t, kubernetes, sourceBucket)
+
+	// Create a target bucket with the scope and collection we want.
+	targetBucket := e2espec.DefaultBucket()
+	targetBucket.Name = "target"
+	targetBucket.Labels = targetLabels
+	targetBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+	e2eutil.LinkBucketToScopesExplicit(targetBucket, scope1, scope2)
+	e2eutil.MustNewBucket(t, kubernetes, targetBucket)
+
+	// Now create our clusters which should select their appropriate buckets
+	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
+	xdcrCluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
+		MatchLabels: sourceLabels,
+	}
+	xdcrCluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, xdcrCluster1)
+
+	// And the target cluster
+	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
+	xdcrCluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
+		MatchLabels: targetLabels,
+	}
+	xdcrCluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, xdcrCluster2)
+
+	// Confirm we have both
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, sourceBucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, targetBucket, time.Minute)
+
+	// When ready, establish the XDCR connection, add some documents and
+	// verify they have been replicated.
+	replication := e2espec.GetMigrationReplication(sourceBucket.GetName(), targetBucket.GetName())
+
+	replication.MigrationMapping = couchbasev2.CouchbaseMigrationMappingSpec{
+		Mappings: []couchbasev2.CouchbaseMigrationMapping{
+			{
+				Filter: fmt.Sprintf("%s=\"%s\"", key, value2),
+				TargetKeyspace: couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault(scope2Name),
+					Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault(collection2Name),
+				},
+			},
+			{
+				Filter: fmt.Sprintf("%s=\"%s\"", key, value1),
+				TargetKeyspace: couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault(scope1Name),
+					Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault(collection2Name),
+				},
+			},
+		},
+	}
+
+	// Wait for the scope and collection to be created on both clusters
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected.WithScope(scope1Name).WithCollections(collection1Name, collection2Name)
+	expected.WithScope(scope2Name).WithCollections(collection2Name)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, targetBucket, expected, time.Minute)
+
+	// Set up replication
+	e2eutil.MustEstablishXDCRMigrationReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
+
+	// Add docs and ensure they get replicated
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).WithValue(key, value1).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).WithValue(key, value2).MustCreate(t, kubernetes, xdcrCluster1)
+	// Add docs that shouldn't be migrated.
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, kubernetes, xdcrCluster1)
+	// Ensure we have the source docs first
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster1, sourceBucket.GetName(), 3*numOfDocs, time.Minute)
+	// Now wait until all the target ones appear
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, targetBucket.GetName(), scope1Name, collection2Name, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, targetBucket.GetName(), scope2Name, collection2Name, numOfDocs, time.Minute)
+
+	// Check the events match what we expect:
+	// * Both clusters created
+	// * Source cluster establishes XDCR
+	expectedEvents1 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
+	}
+
+	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
+	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+}
+
+// TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged replicates from a managed collection into an unmanaged one
+// (created directly through the UI).
+func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+
+	// Static configuration.
+	numOfDocs := f.DocsCount
+	clusterSize := 1
+	scopeName := "pinky"
+	collectionName := "brain"
+
+	// Create a collection and collection group.
+	collection := e2eutil.NewCollection(collectionName).MustCreate(t, kubernetes)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
+
+	// Create the clusters.
+	bucket := e2eutil.NewBucket(f.BucketType).WithScopes(scope).MustCreate(t, kubernetes)
+	bucketNoScopes := e2eutil.NewBucket(f.BucketType).MustCreate(t, kubernetes)
+	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, bucketNoScopes, time.Minute)
+
+	// Manually create unmanaged scope & collection in target bucket.
+	e2eutil.MustCreateScopeManually(t, kubernetes, xdcrCluster2, bucketNoScopes.GetName(), scopeName)
+	e2eutil.MustCreateCollectionManually(t, kubernetes, xdcrCluster2, bucketNoScopes.GetName(), scopeName, collectionName)
+
+	// When ready, establish the XDCR connection, add some documents and
+	// verify they have been replicated.
+	replication := e2espec.GetReplication(bucket.GetName(), bucketNoScopes.GetName())
+
+	// Wait for the scope and collection to be created on both clusters
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollections(collectionName)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster1, bucket, expected, time.Minute)
+
+	// Set up replication
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
+
+	// Add docs and ensure they get replicated
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, xdcrCluster1)
+	// Ensure we have the source docs first
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster1, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	// Now wait until all the target ones appear
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucketNoScopes.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+
+	// Check the events match what we expect:
+	// * Both clusters created
+	// * Source cluster establishes XDCR
+	expectedEvents1 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}

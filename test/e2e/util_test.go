@@ -424,6 +424,8 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRReplicateLocalScopesAndCollectionsWithDeny).WithTags(TagSuiteP1, TagFeatureXDCR, TagFeatureCollections),
 		framework.NewTestDef(TestXDCRReplicateLocalScopesAndCollectionsMultipleRules).WithTags(TagSuiteP1, TagFeatureXDCR, TagFeatureCollections),
 		framework.NewTestDef(TestXDCRReplicateLocalScopesAndCollectionsReuseSpec).WithTags(TagSuiteP1, TagFeatureXDCR, TagFeatureCollections),
+		framework.NewTestDef(TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged).WithTags(TagSuiteP1, TagFeatureXDCR, TagFeatureCollections),
+		framework.NewTestDef(TestXDCRMigrationLocalScopesAndCollectionsMultipleRules).WithTags(TagSuiteP1, TagFeatureXDCR, TagFeatureCollections),
 		framework.NewTestDef(TestXDCRRotateCAMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR, TagSuitePlatform),
 		framework.NewTestDef(TestRzaAntiAffinityOn).WithTags(TagSuiteP1, TagFeatureServerGroups, TagFeatureScheduling),
 		framework.NewTestDef(TestRzaAntiAffinityOff).WithTags(TagSuiteP1, TagFeatureServerGroups, TagFeatureScheduling),
