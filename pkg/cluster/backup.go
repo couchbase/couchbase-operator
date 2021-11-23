@@ -404,8 +404,10 @@ func (c *Cluster) updateBackupPVC(notifier *backupUpdateNotifier, backup *couchb
 // would do this for us, we'd lose the ability to generate an event... but then we could
 // use the shared informer to raise it for us (if we are online at the time).
 func (c *Cluster) deleteBackupResource(resource backupResources) error {
-	if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.fullCronJob.Name, metav1.DeleteOptions{}); err != nil {
-		return err
+	if resource.fullCronJob != nil {
+		if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.fullCronJob.Name, metav1.DeleteOptions{}); err != nil {
+			return err
+		}
 	}
 
 	if resource.incrementalCronJob != nil {

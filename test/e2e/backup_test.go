@@ -614,10 +614,8 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
 
 	// wait for backups completion and confirm they ran without error
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 2*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 7*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 7*time.Minute)
 
 	// wait for backup to be deleted
 	e2eutil.MustDeleteBackup(t, kubernetes, backup1)
@@ -628,8 +626,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackup(t, kubernetes, backup2, 2*time.Minute)
 
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -2240,7 +2237,7 @@ func testBackupAndRestoreCollections(t *testing.T, s3 bool) {
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, cluster)
 
 	// Create and wait for a backup
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
@@ -2342,7 +2339,7 @@ func testBackupAndRestoreScope(t *testing.T, s3 bool) {
 	backupInclude := fmt.Sprintf("%s.%s", bucket.GetName(), scopeName)
 
 	// Create and wait for a backup
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).Include(backupInclude).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).Include(backupInclude).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
@@ -2356,6 +2353,7 @@ func testBackupAndRestoreScope(t *testing.T, s3 bool) {
 
 	// create new restore
 	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that all items were restored in collection.
@@ -2438,7 +2436,7 @@ func testBackupAndRestoreCollection(t *testing.T, s3 bool) {
 	backupInclude := fmt.Sprintf("%s.%s.%s", bucket.GetName(), scopeName, collectionName1)
 
 	// Create and wait for a backup
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).Include(backupInclude).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).Include(backupInclude).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
@@ -2484,4 +2482,53 @@ func TestBackupAndRestoreCollection(t *testing.T) {
 
 func TestBackupAndRestoreCollectionS3(t *testing.T) {
 	testBackupAndRestoreCollection(t, true)
+}
+
+// TestBackupThenDelete tests that a backup resource can be created
+// and prematurely deleted before the cronjob runs.
+func TestBackupThenDelete(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+	numOfDocs := f.DocsCount
+
+	// Create a normal cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+
+	// Delete the backup object.
+	err := e2eutil.DeleteBackup(kubernetes, backup)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// // Check the events match what we expect:
+	// // * Cluster created
+	// // * Bucket created
+	// // * Backup created
+	// // * Backup deleted
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

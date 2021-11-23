@@ -123,7 +123,7 @@ func (b *Backup) Exclude(things ...interface{}) *Backup {
 	return b
 }
 
-// ToS3, if not emptry, sends the backup to S3.
+// ToS3, if not empty, sends the backup to S3.
 func (b *Backup) ToS3(bucket string) *Backup {
 	b.s3Bucket = bucket
 	return b

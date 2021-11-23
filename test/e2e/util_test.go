@@ -525,6 +525,7 @@ func registerTests() {
 		framework.NewTestDef(TestCustomAnnotationsAndLabelsStayAfterReconcile).WithTags(TagSuiteP1, TagFeatureReconcile),
 		framework.NewTestDef(TestBackupBucketInclusion).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupBucketExclusion).WithTags(TagSuiteP1, TagFeatureBackup),
+		framework.NewTestDef(TestBackupThenDelete).WithTags(TagSuiteP1, TagFeatureBackup),
 
 		// System tests.
 		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem),
