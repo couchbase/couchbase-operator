@@ -42,8 +42,6 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasecollection]
 
 === Constraints
 
-*Required*
-
 *Type*: `object`
 
 *Default*: `{}`

@@ -723,6 +723,7 @@ type CouchbaseCollection struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Spec defines the desired state of the resource.
+	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	Spec CouchbaseCollectionSpec `json:"spec"`
 }
@@ -819,6 +820,7 @@ type CouchbaseScope struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Spec defines the desired state of the resource.
+	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	Spec CouchbaseScopeSpec `json:"spec"`
 }
