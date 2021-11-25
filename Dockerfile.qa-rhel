@@ -26,7 +26,7 @@ RUN go mod download
 
 # Copy in the rest of the source and compile, caching any build objects.
 COPY --chown=default:default . .
-RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated crd binaries certification-binary -e BUILDFLAGS='-tags redhat -trimpath' VERSION=${PROD_VERSION}
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated crd cao certification-binary -e BUILDFLAGS='-tags redhat -trimpath' VERSION=${PROD_VERSION}
 
 # This builds the actual container, copying the binaries over from
 # the build container, and installing any other static dependencies.

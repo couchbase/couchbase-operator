@@ -55,7 +55,7 @@ LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(vers
 # Common flags to apply during build (and test build)
 BUILDFLAGS = "-trimpath"
 
-.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs docs-lint certification-container certification-container-public
+.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs docs-lint certification-container certification-container-public operator admission cao
 
 all: binaries crd
 
@@ -124,8 +124,17 @@ pkg/generated/informers: pkg/generated/clientset pkg/generated/listers
 	@rm -rf $@
 	go run k8s.io/code-generator/cmd/informer-gen --input-dirs $(API_PACKAGE_V2) --versioned-clientset-package $(CLIENTSET_PACKAGE)/$(CLIENTSET_NAME) --listers-package $(LISTERS_PACKAGE) --output-package $(INFORMERS_PACKAGE) $(CODEGEN_ARGS)
 
-# Make the main binaries
+# Make all binaries
 binaries: $(OPERATOR_BINARY) $(ADMISSION_BINARY) $(CBOPCFG_BINARY) $(CBOPINFO_BINARY) $(CAO_BINARY)
+
+# Make the operator binary only.
+operator: $(OPERATOR_BINARY)
+
+# Make the admission controller binary only.
+admission: $(ADMISSION_BINARY)
+
+# Make the "one tool to rule them all" binary only.
+cao: $(CAO_BINARY)
 
 # Make the certification binary separately, it's not cross platform.
 certification-binary: ${CERTIFICATION_BINARY}

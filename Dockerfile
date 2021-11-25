@@ -13,7 +13,7 @@ RUN go mod download
 
 # Copy in the rest of the source and compile, caching any build objects.
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated binaries -e VERSION=${PROD_VERSION}
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated operator -e VERSION=${PROD_VERSION}
 
 FROM scratch
 

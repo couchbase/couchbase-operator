@@ -24,7 +24,7 @@ RUN go mod download
 
 # Copy in the rest of the source and compile, caching any build objects.
 COPY --chown=default:default . .
-RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated binaries -e BUILDFLAGS='-tags redhat -trimpath' VERSION=${PROD_VERSION}
+RUN --mount=type=cache,target=/root/.cache/go-build make touch-generated admission -e BUILDFLAGS='-tags redhat -trimpath' VERSION=${PROD_VERSION}
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-200
 
