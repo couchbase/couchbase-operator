@@ -31,10 +31,7 @@ func checkAuditConfig(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluste
 
 		info := couchbaseutil.AuditSettings{}
 
-		request := &couchbaseutil.Request{
-			Path:   "/settings/audit",
-			Result: &info,
-		}
+		request := newRequest("/settings/audit", nil, &info)
 
 		if err := client.client.Get(request, client.host); err != nil {
 			return err
@@ -97,10 +94,7 @@ func enableAuditLogging(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 		data.Add("rotateSize", "1024")
 		data.Add("disabled", "")
 
-		request := &couchbaseutil.Request{
-			Path: "/settings/audit",
-			Body: []byte(data.Encode()),
-		}
+		request := newRequest("/settings/audit", []byte(data.Encode()), nil)
 
 		return client.client.Post(request, client.host)
 	})

@@ -96,6 +96,16 @@ func GetAdminConsoleHostURL(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCl
 	return GetHostURL(k8s, cluster, couchbasev2.AdminService)
 }
 
+// newRequest is what you must use when doing stuff directly to the API.
+func newRequest(path string, body []byte, result interface{}) *couchbaseutil.Request {
+	return &couchbaseutil.Request{
+		Path:         path,
+		Body:         body,
+		Result:       result,
+		Authenticate: true,
+	}
+}
+
 // GetCBInstance returns CouchbaseCluster Instance.
 func GetCBInstance(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*gocb.Cluster, error) {
 	opts := gocb.ClusterOptions{
@@ -479,10 +489,7 @@ func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 			data.Add("otpNode", string(member.GetOTPNode()))
 		}
 
-		request := &couchbaseutil.Request{
-			Path: "/controller/failOver",
-			Body: []byte(data.Encode()),
-		}
+		request := newRequest("/controller/failOver", []byte(data.Encode()), nil)
 
 		if err := client.client.Post(request, client.host); err != nil {
 			return err
@@ -1024,10 +1031,7 @@ func GetItemCount(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, buc
 
 		info := &couchbaseutil.BucketStatus{}
 
-		request := &couchbaseutil.Request{
-			Path:   "/pools/default/buckets/" + bucket,
-			Result: info,
-		}
+		request := newRequest("/pools/default/buckets/"+bucket, nil, info)
 
 		if err := client.client.Get(request, client.host); err != nil {
 			return err
@@ -1399,10 +1403,7 @@ func GetCouchbaseMetric(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.C
 		path = fmt.Sprintf("%s%s=%s&", path, k, v)
 	}
 
-	request := &couchbaseutil.Request{
-		Path:   path,
-		Result: result,
-	}
+	request := newRequest(path, nil, result)
 
 	if err := client.client.Get(request, client.host); err != nil {
 		return result, err

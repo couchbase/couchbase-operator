@@ -7,7 +7,6 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
@@ -195,9 +194,7 @@ func MustFlushBucket(t *testing.T, kubernetes *types.Cluster, cluster *couchbase
 			return err
 		}
 
-		request := &couchbaseutil.Request{
-			Path: fmt.Sprintf("/pools/default/buckets/%s/controller/doFlush", bucket.GetName()),
-		}
+		request := newRequest(fmt.Sprintf("/pools/default/buckets/%s/controller/doFlush", bucket.GetName()), nil, nil)
 
 		return client.client.Post(request, client.host)
 	}

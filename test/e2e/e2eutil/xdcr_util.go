@@ -28,10 +28,7 @@ func getBucketInfo(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couchb
 
 	info := &couchbaseutil.BucketStatus{}
 
-	request := &couchbaseutil.Request{
-		Path:   "/pools/default/buckets/" + bucket,
-		Result: info,
-	}
+	request := newRequest("/pools/default/buckets/"+bucket, nil, info)
 
 	if err := client.client.Get(request, client.host); err != nil {
 		return info, err

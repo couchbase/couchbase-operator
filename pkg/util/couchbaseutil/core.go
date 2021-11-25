@@ -121,9 +121,6 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	// Do the request recording the time taken.
 	start := time.Now()
 
-	// All requests send the username and password.
-	request.SetBasicAuth(c.username, c.password)
-
 	// Request logging.  Careful here, higher levels of verbosity generate a huge
 	// amount more log traffic. All requests have the following common attributes.
 	logLabels := []interface{}{
@@ -222,7 +219,7 @@ func (c *Client) Get(r *Request, host string) error {
 		return errors.NewStackTracedError(err)
 	}
 
-	req.Header = defaultHeaders()
+	c.setDefaultHeaders(r, req)
 
 	return c.doRequest(req, nil, r.Result)
 }
@@ -233,7 +230,8 @@ func (c *Client) Post(r *Request, host string) error {
 		return errors.NewStackTracedError(err)
 	}
 
-	req.Header = defaultHeaders()
+	c.setDefaultHeaders(r, req)
+
 	req.Header.Set(HeaderContentType, ContentTypeURLEncoded)
 
 	return c.doRequest(req, r.Body, r.Result)
@@ -245,7 +243,8 @@ func (c *Client) PostJSON(r *Request, host string) error {
 		return errors.NewStackTracedError(err)
 	}
 
-	req.Header = defaultHeaders()
+	c.setDefaultHeaders(r, req)
+
 	req.Header.Set(HeaderContentType, ContentTypeJSON)
 
 	return c.doRequest(req, r.Body, r.Result)
@@ -257,7 +256,7 @@ func (c *Client) PostNoContentType(r *Request, host string) error {
 		return errors.NewStackTracedError(err)
 	}
 
-	req.Header = defaultHeaders()
+	c.setDefaultHeaders(r, req)
 
 	return c.doRequest(req, r.Body, r.Result)
 }
@@ -268,7 +267,8 @@ func (c *Client) Put(r *Request, host string) error {
 		return errors.NewStackTracedError(err)
 	}
 
-	req.Header = defaultHeaders()
+	c.setDefaultHeaders(r, req)
+
 	req.Header.Set(HeaderContentType, ContentTypeURLEncoded)
 
 	return c.doRequest(req, r.Body, nil)
@@ -280,7 +280,8 @@ func (c *Client) PutJSON(r *Request, host string) error {
 		return errors.NewStackTracedError(err)
 	}
 
-	req.Header = defaultHeaders()
+	c.setDefaultHeaders(r, req)
+
 	req.Header.Set(HeaderContentType, ContentTypeJSON)
 
 	return c.doRequest(req, r.Body, nil)
@@ -292,15 +293,19 @@ func (c *Client) Delete(r *Request, host string) error {
 		return errors.NewStackTracedError(err)
 	}
 
-	req.Header = defaultHeaders()
+	c.setDefaultHeaders(r, req)
 
 	return c.doRequest(req, nil, nil)
 }
 
-func defaultHeaders() http.Header {
+func (c *Client) setDefaultHeaders(request *Request, r *http.Request) {
 	headers := http.Header{}
 	headers.Set(HeaderUserAgent, version.UserAgent())
 	headers.Set("Accept-Encoding", "application/json, text/plain, */*")
 
-	return headers
+	r.Header = headers
+
+	if request.Authenticate {
+		r.SetBasicAuth(c.username, c.password)
+	}
 }

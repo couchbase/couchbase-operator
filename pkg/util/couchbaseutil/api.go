@@ -48,11 +48,6 @@ type Client struct {
 	// password is used in basic HTTP authorization
 	password string
 
-	// uuid, when set, is used to verify that endpoints we are connecting
-	// to are part of the specified cluster and will return reliable
-	// responses
-	uuid string
-
 	// tls, if set, specifies the client certificate chain and private keys
 	// for mutual verification.  It also contains at least a CA certificate
 	// to authenticate the server is trustworthy
@@ -90,13 +85,6 @@ func New(ctx context.Context, cluster, username, password string) *Client {
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 	CloseIdleConnections()
-}
-
-// SetUUID updates the cluster UUID to check new connections against.  Creates
-// a new client object to flush existing persistent connections.
-func (c *Client) SetUUID(uuid string) {
-	c.uuid = uuid
-	c.makeClient()
 }
 
 func (c *Client) SetPassword(password string) {
@@ -148,15 +136,19 @@ type Request struct {
 
 	// err records any errors during the request build process.
 	err error
+
+	// Authenticate sends the admin username/password.
+	Authenticate bool
 }
 
 // NewRequest is a terse way of creating an API request.
 func NewRequest(method RequestMethod, path string, body []byte, result interface{}) *Request {
 	return &Request{
-		method: method,
-		Path:   path,
-		Body:   body,
-		Result: result,
+		method:       method,
+		Path:         path,
+		Body:         body,
+		Result:       result,
+		Authenticate: true,
 	}
 }
 
@@ -168,9 +160,14 @@ func NewRequestError(err error) *Request {
 	}
 }
 
-// InPlaintext forces the API requests to be in plaintext.
+// InPlaintext forces the API requests to be in plaintext.  This is used
+// for initial calls to server before TLS is configured, and therefore
+// we inhibit the passing of admin credentials to avoid a leak.  If you ever
+// need to change this, think long and hard about your life.
 func (r *Request) InPlaintext() *Request {
 	r.Host = Member.GetHostURLPlaintext
+	r.Authenticate = false
+
 	return r
 }
 
