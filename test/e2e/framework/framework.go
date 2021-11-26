@@ -39,6 +39,8 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -187,6 +189,8 @@ func configure() (err error) {
 		value: e2eutil.BucketTypeCouchbase,
 	}
 
+	istioMode := newIstioMTLSModeFlag()
+
 	// CLI based configuration (CI/computer friendly)
 	flag.StringVar(&params.KubeType, "platform-type",
 		"kubernetes",
@@ -269,6 +273,8 @@ func configure() (err error) {
 	flag.BoolVar(&params.EnableIstio, "istio",
 		false,
 		"Enable istio injection.  This annotates per-test namespaces with Istio injection, and enables any Operator specific workarounds.")
+	flag.Var(&istioMode, "istio-mtls-mode",
+		"Select the istio mTLS policy.  Can be 'PERMISSIVE' or 'STRICT'.")
 	flag.BoolVar(&params.DynamicPlatform, "dynamic-platform",
 		false,
 		"Enable dynamic platform support e.g. GKE Autopilot, AWS Fargate or anything with cluster autoscaling enabled.")
@@ -287,6 +293,7 @@ func configure() (err error) {
 	params.Platform = couchbasev2.PlatformType(platform)
 	params.CompressionMode = compression.value
 	params.BucketType = bucket.value
+	params.IstioTLSMode = istioMode.String()
 
 	// Hack... if nothing is specified then it's likely the user will
 	// want platform certification.
@@ -796,6 +803,33 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 	}
 
 	cluster.Namespace = namespace.Name
+
+	if f.EnableIstio && f.IstioTLSMode != "" {
+		policy := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "security.istio.io/v1beta1",
+				"kind":       "PeerAuthentication",
+				"metadata": map[string]interface{}{
+					"name": "default",
+				},
+				"spec": map[string]interface{}{
+					"mtls": map[string]interface{}{
+						"mode": f.IstioTLSMode,
+					},
+				},
+			},
+		}
+
+		gvr := schema.GroupVersionResource{
+			Group:    "security.istio.io",
+			Version:  "v1beta1",
+			Resource: "peerauthentications",
+		}
+
+		if _, err := cluster.DynamicClient.Resource(gvr).Namespace(namespace.Name).Create(context.Background(), policy, metav1.CreateOptions{}); err != nil {
+			e2eutil.Die(t, err)
+		}
+	}
 
 	// Setup any pull secrets in the new namespace.
 	secrets, err := recreateDockerAuthSecret(cluster, cluster.Namespace)

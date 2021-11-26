@@ -112,7 +112,7 @@ func (c *bucketCompression) Set(s string) error {
 }
 
 func (c *bucketCompression) String() string {
-	return fmt.Sprint(c.value)
+	return string(c.value)
 }
 
 // bucketType represents the type of bucket created for tests.
@@ -138,5 +138,43 @@ func (b *bucketType) Set(s string) error {
 }
 
 func (b *bucketType) String() string {
-	return fmt.Sprint(b.value)
+	return string(b.value)
+}
+
+// istioMTLSMode is an Istio MTLS mode, either permissive or strict.
+// We default to STRICT because that will catch more bugs, no one
+// should be using permissive, and thus we shouldn't really be bothered
+// with testing it unless in very specific circumstances.
+type istioMTLSMode string
+
+const (
+	istioMTLSModePermissive istioMTLSMode = "PERMISSIVE"
+	istioMTLSModeStrict     istioMTLSMode = "STRICT"
+)
+
+// istioMTLSModeFlag is an ISTIO TLS policy.
+type istioMTLSModeFlag struct {
+	value istioMTLSMode
+}
+
+func newIstioMTLSModeFlag() istioMTLSModeFlag {
+	return istioMTLSModeFlag{value: istioMTLSModeStrict}
+}
+
+func (i *istioMTLSModeFlag) Set(s string) error {
+	switch istioMTLSMode(s) {
+	case istioMTLSModePermissive, istioMTLSModeStrict:
+		i.value = istioMTLSMode(s)
+		return nil
+	}
+
+	return fmt.Errorf("istio mTLS mode must be one of %v or %v", istioMTLSModePermissive, istioMTLSModeStrict)
+}
+
+func (i *istioMTLSModeFlag) Type() string {
+	return "string"
+}
+
+func (i *istioMTLSModeFlag) String() string {
+	return string(i.value)
 }

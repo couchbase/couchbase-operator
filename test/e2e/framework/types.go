@@ -35,6 +35,7 @@ type Framework struct {
 	BucketType                    e2eutil.BucketType
 	CompressionMode               couchbasev2.CouchbaseBucketCompressionMode
 	EnableIstio                   bool
+	IstioTLSMode                  string
 	S3Region                      string
 	S3AccessKey                   string
 	S3SecretID                    string
