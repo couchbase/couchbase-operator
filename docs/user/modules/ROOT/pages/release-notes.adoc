@@ -55,6 +55,43 @@ You can use the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rolli
 To enable this feature while upgrading the Autonomous Operator, stop the old Operator, replace the CRDs, edit the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] field to enable bulk upgrades, then start the new Operator.
 Refer to xref:howto-operator-upgrade.adoc[] for further details.
 
+[#release-v222]
+== Release 2.2.2
+
+Couchbase Autonomous Operator 2.2.2 was released in December 2021.
+
+[#changes-in-behavior-v222]
+=== New Features and Behavioral Changes
+
+==== Configurable Addressability Timeouts
+
+When using xref:concept-couchbase-networking.adoc#public-networking-with-external-dns[public networking with external-DNS] or xref:concept-couchbase-networking.adoc#generic-networking[generic networking], the Operator polls new cluster members to ensure addressability and connectivity before allowing the member to be added to the cluster.
+Failure to do so would result in client errors and partial availability.
+
+This has a downside in that polling DNS immediately would poison caching DNS servers with negative lookup results (https://datatracker.ietf.org/doc/html/rfc2308[negative caching^]).
+
+In order to mitigate this problem, a new field xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-waitforaddressreachabledelay[`couchbaseclusters.spec.networking.waitForAddressReachableDelay`], is introduced.
+This allows a time period to be configured between pod creation and polling, allowing time for load balancers to be provisioned and DNS entries to be propagated.
+This defaults to `2m`, changing the old behavior of immediate polling.
+
+[#fixed-issues-v222]
+=== Fixed Issues
+
+[#table-fixed-issues-v222,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2521[K8S-2521^]
+a| *Summary:* When backup and restore jobs are run, they may do so with a security context.
+Previously, backup jobs would have run with a security context (typically UID 1000 as advised by the documentation).
+A restore job did not have the security context associated with it, but worked as the container image's default UID was 1000.
+With newer backup images (1.1.1 and greater), the default UID of the container image has changed, so this will no longer work, as the restore user does not match the backup user.
+
+To remedy this, the security context is now attached to the restore job also.
+This issue affects users running with a UID other than 1000, and users for backup 1.1.1 and greater.
+
+|===
+
 [#release-v221]
 == Release 2.2.1
 
