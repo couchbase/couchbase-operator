@@ -1522,6 +1522,11 @@ func ShadowTLSCASecretName(cluster *couchbasev2.CouchbaseCluster) string {
 
 // Adds any necessary pod prerequisites before enabling TLS.
 func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
+	container, err := getCouchbaseContainer(pod)
+	if err != nil {
+		return err
+	}
+
 	// Static configuration:
 	// * Defines a volume which contains the secrets necessary
 	//   to explicitly define TLS certificates and keys
@@ -1556,47 +1561,43 @@ func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod
 			MountPath: couchbaseTLSVolumeMountDir,
 		}
 
-		container, err := getCouchbaseContainer(pod)
-		if err != nil {
-			return err
-		}
-
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 		// Annotate the pod as having TLS enabled
 		pod.Annotations[constants.PodTLSAnnotation] = constants.EnabledValue
+	}
 
-		// In 7.1 the CA must be installed in the pod, and not injected over
-		// HTTP... which is a pain.
-		tag, err := CouchbaseVersion(cluster.Spec.Image)
-		if err != nil {
-			return err
-		}
+	// In 7.1 the CA must be installed in the pod, and not injected over
+	// HTTP... which is a pain.  It must also *always* exist, as we need
+	// to install the CA before upgading to TLS.
+	tag, err := CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
 
-		is71, err := couchbaseutil.VersionAfter(tag, "7.1.0")
-		if err != nil {
-			return err
-		}
+	is71, err := couchbaseutil.VersionAfter(tag, "7.1.0")
+	if err != nil {
+		return err
+	}
 
-		if is71 {
-			caVolume := v1.Volume{
-				Name: constants.CouchbaseTLSCAVolumeName,
-				VolumeSource: v1.VolumeSource{
-					Secret: &v1.SecretVolumeSource{
-						SecretName: ShadowTLSCASecretName(cluster),
-					},
+	if is71 {
+		caVolume := v1.Volume{
+			Name: constants.CouchbaseTLSCAVolumeName,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: ShadowTLSCASecretName(cluster),
 				},
-			}
-			pod.Spec.Volumes = append(pod.Spec.Volumes, caVolume)
-
-			caVolumeMount := v1.VolumeMount{
-				Name:      constants.CouchbaseTLSCAVolumeName,
-				ReadOnly:  true,
-				MountPath: couchbaseTLSCAVolumeMountDir,
-			}
-
-			container.VolumeMounts = append(container.VolumeMounts, caVolumeMount)
+			},
 		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, caVolume)
+
+		caVolumeMount := v1.VolumeMount{
+			Name:      constants.CouchbaseTLSCAVolumeName,
+			ReadOnly:  true,
+			MountPath: couchbaseTLSCAVolumeMountDir,
+		}
+
+		container.VolumeMounts = append(container.VolumeMounts, caVolumeMount)
 	}
 
 	return nil

@@ -433,25 +433,20 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m couchbaseutil.Member) err
 		return nil
 	}
 
-	ca, _, _, err := c.getTLSData()
-	if err != nil {
-		return err
-	}
-
 	ok, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
 		return err
 	}
 
 	if ok {
-		return c.initMemberTLSNew(ctx, m, ca)
+		return c.initMemberTLSNew(ctx, m)
 	}
 
-	return c.initMemberTLSLegacy(ctx, m, ca)
+	return c.initMemberTLSLegacy(ctx, m)
 }
 
 // initMemberTLSNew handles TLS initialization on CBS versions 7.1+.
-func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member, ca []byte) error {
+func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member) error {
 	if err := couchbaseutil.LoadCAs().InPlaintext().On(c.api, m); err != nil {
 		return err
 	}
@@ -461,17 +456,17 @@ func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member, 
 	}
 
 	// Wait for the port to come backup with the correct certificate chain
-	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), ca); err != nil {
+	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.ca); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// initMemberTLSLegacy handles TLS initialization on CBS versions >=7.0.
-func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Member, ca []byte) error {
+// initMemberTLSLegacy handles TLS initialization on CBS versions <=7.0.
+func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Member) error {
 	// Update Couchbase's TLS configuration
-	if err := couchbaseutil.SetClusterCACert(ca).InPlaintext().On(c.api, m); err != nil {
+	if err := couchbaseutil.SetClusterCACert(c.tlsCache.ca).InPlaintext().On(c.api, m); err != nil {
 		return err
 	}
 
@@ -480,7 +475,7 @@ func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Membe
 	}
 
 	// Wait for the port to come backup with the correct certificate chain
-	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), ca); err != nil {
+	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.ca); err != nil {
 		return err
 	}
 

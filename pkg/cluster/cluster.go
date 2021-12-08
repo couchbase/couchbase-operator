@@ -127,6 +127,10 @@ type Cluster struct {
 	// some reason a read after write can go back in time, I'm not certain it's
 	// caching we are doing, but the API itself.
 	generation int64
+
+	// tlsCache allows us to load up and verify TLS data at the beginning of
+	// a reconcile so it appears atomic throughout the process.
+	tlsCache *tlsCache
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.

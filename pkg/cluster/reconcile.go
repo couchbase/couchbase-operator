@@ -106,6 +106,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileCompletedPods,
 		(*Cluster).reconcilePeerServices,
 		(*Cluster).reconcileAdminService,
+		(*Cluster).initTLSCache,
 		(*Cluster).refreshTLSShadowCASecret,
 		(*Cluster).refreshTLSShadowSecret,
 		(*Cluster).reconcileLogConfig,

@@ -25,15 +25,69 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// refreshTLSShadowCASecret creates/updates a shadow secret that contains one
-// or more CAs used by CBS for TLS verification.  This is a 7.1+ only feature
-// as those versions require the CAs to reside on disk, rather than be posted
-// over HTTP with legacy versions.
-func (c *Cluster) refreshTLSShadowCASecret() error {
+// tlsCache allows semi-atomic views of TLS updates.  Essentially weird things
+// happen if we read from the main caches and things change as we go through
+// the reconcile process.  By having an atomic cache that exists for the duration
+// or a reconcile cycle, this reduces race conditions and provides a better UX.
+type tlsCache struct {
+	// ca is the cluster CA.
+	ca []byte
+
+	// cert is the server certificate/chain.
+	cert []byte
+
+	// key is the server key.
+	key []byte
+
+	// clientCert is the operator client certificate (optional).
+	clientCert []byte
+
+	// clientKey is thte operator client key (optional).
+	clientKey []byte
+}
+
+// initTLSCache populates the TLS cache if TLS is enabled, and attaches it to
+// the cluster object.
+func (c *Cluster) initTLSCache() error {
 	if !c.cluster.IsTLSEnabled() {
 		return nil
 	}
 
+	ca, cert, key, err := c.getVerifiedTLSData()
+	if err != nil {
+		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
+		return err
+	}
+
+	cache := &tlsCache{
+		ca:   ca,
+		cert: cert,
+		key:  key,
+	}
+
+	if c.cluster.IsMutualTLSEnabled() {
+		clientCert, clientKey, err := c.getVerifiedTLSClientData(ca)
+		if err != nil {
+			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
+			return err
+		}
+
+		cache.clientCert = clientCert
+		cache.clientKey = clientKey
+	}
+
+	c.tlsCache = cache
+
+	return nil
+}
+
+// refreshTLSShadowCASecret creates/updates a shadow secret that contains one
+// or more CAs used by CBS for TLS verification.  This is a 7.1+ only feature
+// as those versions require the CAs to reside on disk, rather than be posted
+// over HTTP with legacy versions.  The shadow secret must always exist on
+// a 7.1+ cluster as we may need to install the CA on a non-TLS pod in order
+// to upgrade.
+func (c *Cluster) refreshTLSShadowCASecret() error {
 	ok, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
 		return err
@@ -41,12 +95,6 @@ func (c *Cluster) refreshTLSShadowCASecret() error {
 
 	if !ok {
 		return nil
-	}
-
-	ca, _, _, err := c.getTLSData()
-	if err != nil {
-		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
-		return err
 	}
 
 	name := k8sutil.ShadowTLSCASecretName(c.cluster)
@@ -59,9 +107,12 @@ func (c *Cluster) refreshTLSShadowCASecret() error {
 				c.cluster.AsOwner(),
 			},
 		},
-		Data: map[string][]byte{
-			"ca.crt": ca,
-		},
+	}
+
+	if c.cluster.IsTLSEnabled() {
+		requestedShadowSecret.Data = map[string][]byte{
+			"ca.crt": c.tlsCache.ca,
+		}
 	}
 
 	// Look for the shadow secret, if it exists update it, otherwise create it.
@@ -101,12 +152,6 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 		return nil
 	}
 
-	// Grab the user provided secret.
-	_, cert, key, err := c.getTLSDataStandard()
-	if err != nil {
-		return err
-	}
-
 	name := k8sutil.ShadowTLSSecretName(c.cluster)
 
 	requestedShadowSecret := &corev1.Secret{
@@ -118,13 +163,13 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 			},
 		},
 		Data: map[string][]byte{
-			"chain.pem": cert,
-			"pkey.key":  key,
+			"chain.pem": c.tlsCache.cert,
+			"pkey.key":  c.tlsCache.key,
 		},
 	}
 
 	// Pa's special sauce!  Support PKCS#8 keys, because we can.
-	block, _ := pem.Decode(key)
+	block, _ := pem.Decode(c.tlsCache.key)
 	if block == nil {
 		return fmt.Errorf("%w: private key not in PEM format", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid))
 	}
@@ -189,8 +234,8 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 }
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
-func tlsValid(member couchbaseutil.Member, ca, clientCert, clientKey []byte, cert *x509.Certificate) bool {
-	serverChain, err := netutil.GetTLSState(member.GetHostPortTLS(), ca, clientCert, clientKey)
+func tlsValid(member couchbaseutil.Member, cache *tlsCache, cert *x509.Certificate) bool {
+	serverChain, err := netutil.GetTLSState(member.GetHostPortTLS(), cache.ca, cache.clientCert, cache.clientKey)
 	if err == nil && serverChain[0].Equal(cert) {
 		return true
 	}
@@ -199,17 +244,17 @@ func tlsValid(member couchbaseutil.Member, ca, clientCert, clientKey []byte, cer
 }
 
 // reloadCA insecurely reloads the cluster CA certificate.
-func (c *Cluster) reloadCA(member couchbaseutil.Member, cacert []byte) error {
+func (c *Cluster) reloadCA(member couchbaseutil.Member) error {
 	ok, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
 		return err
 	}
 
 	if ok {
-		return c.reloadCANew(member, cacert)
+		return c.reloadCANew(member)
 	}
 
-	return c.reloadCALegacy(member, cacert)
+	return c.reloadCALegacy(member)
 }
 
 // certiifcatesEqual accepts two PEM encoded certificates and compare them.
@@ -228,7 +273,7 @@ func certiifcatesEqual(a, b []byte) (bool, error) {
 }
 
 // hasCA tells us whether the CA is installed on the member.
-func (c *Cluster) hasCA(member couchbaseutil.Member, cacert []byte) (bool, error) {
+func (c *Cluster) hasCA(member couchbaseutil.Member) (bool, error) {
 	var cas couchbaseutil.TrustedCAList
 
 	if err := couchbaseutil.ListCAs(&cas).On(c.api, member); err != nil {
@@ -240,7 +285,7 @@ func (c *Cluster) hasCA(member couchbaseutil.Member, cacert []byte) (bool, error
 	// original input, so we cannot do a stright match, and we need to decode
 	// it.
 	for _, ca := range cas {
-		ok, err := certiifcatesEqual(cacert, []byte(ca.PEM))
+		ok, err := certiifcatesEqual(c.tlsCache.ca, []byte(ca.PEM))
 		if err != nil {
 			return false, err
 		}
@@ -254,9 +299,9 @@ func (c *Cluster) hasCA(member couchbaseutil.Member, cacert []byte) (bool, error
 }
 
 // reloadCANew reloads the clusters CA certificate(s) for post 7.1 versions.
-func (c *Cluster) reloadCANew(member couchbaseutil.Member, cacert []byte) error {
+func (c *Cluster) reloadCANew(member couchbaseutil.Member) error {
 	// Check to see if the CA is already present.
-	ok, err := c.hasCA(member, cacert)
+	ok, err := c.hasCA(member)
 	if err != nil {
 		return err
 	}
@@ -282,7 +327,7 @@ func (c *Cluster) reloadCANew(member couchbaseutil.Member, cacert []byte) error 
 			return err
 		}
 
-		ok, err := c.hasCA(member, cacert)
+		ok, err := c.hasCA(member)
 		if err != nil {
 			return err
 		}
@@ -302,13 +347,13 @@ func (c *Cluster) reloadCANew(member couchbaseutil.Member, cacert []byte) error 
 }
 
 // reloadCALegacy reloads the cluster CA certificate for pre-7.1 versions.
-func (c *Cluster) reloadCALegacy(member couchbaseutil.Member, cacert []byte) error {
+func (c *Cluster) reloadCALegacy(member couchbaseutil.Member) error {
 	var oldcacert []byte
 	if err := couchbaseutil.GetClusterCACert(&oldcacert).On(c.api, member); err != nil {
 		return err
 	}
 
-	ok, err := certiifcatesEqual(cacert, oldcacert)
+	ok, err := certiifcatesEqual(c.tlsCache.ca, oldcacert)
 	if err != nil {
 		return err
 	}
@@ -322,7 +367,7 @@ func (c *Cluster) reloadCALegacy(member couchbaseutil.Member, cacert []byte) err
 			return err
 		}
 
-		if err := couchbaseutil.SetClusterCACert(cacert).On(c.api, member); err != nil {
+		if err := couchbaseutil.SetClusterCACert(c.tlsCache.ca).On(c.api, member); err != nil {
 			return err
 		}
 	}
@@ -337,7 +382,7 @@ func (c *Cluster) reloadChain(member couchbaseutil.Member) error {
 
 // reloadChainAndVerify reloads the certificate chain for a member when necessary,
 // waiting until the certificate is presented by the server.
-func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cacert, clientCert, clientKey []byte, cert *x509.Certificate) error {
+func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cert *x509.Certificate) error {
 	log.Info("Reloading certificate chain", "cluster", c.namespacedName(), "name", member.Name())
 
 	// Wait for the certificate data to be updated. NS server has a few quirks (as per usual... sigh).
@@ -345,7 +390,7 @@ func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cacert, clie
 	// due to a dirty shutdown of TLS.  So prioritize the end result over the retry or we will
 	// get stuck.
 	callback := func() error {
-		if tlsValid(member, cacert, clientCert, clientKey, cert) {
+		if tlsValid(member, c.tlsCache, cert) {
 			return nil
 		}
 
@@ -353,7 +398,7 @@ func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cacert, clie
 			return err
 		}
 
-		if !tlsValid(member, cacert, clientCert, clientKey, cert) {
+		if !tlsValid(member, c.tlsCache, cert) {
 			return fmt.Errorf("%w: certificate chain not served", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 		}
 
@@ -451,11 +496,11 @@ func (c *Cluster) getTLSData() ([]byte, []byte, []byte, error) {
 
 // getVerifiedTLSData is an extended version of getTLSData that performs certificate
 // verification of tainted input.
-func (c *Cluster) getVerifiedTLSData() (ca, chain []byte, err error) {
+func (c *Cluster) getVerifiedTLSData() (ca, chain, key []byte, err error) {
 	// Load server TLS data from kubernetes and verify.
 	cacert, chain, key, err := c.getTLSData()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	subjectAltNames := util_x509.MandatorySANs(c.cluster.Name, c.cluster.Namespace)
@@ -473,10 +518,10 @@ func (c *Cluster) getVerifiedTLSData() (ca, chain []byte, err error) {
 
 		errString := strings.Join(errStrings, ", ")
 
-		return nil, nil, fmt.Errorf("%w: %s", errors.NewStackTracedError(errors.ErrTLSInvalid), errString)
+		return nil, nil, nil, fmt.Errorf("%w: %s", errors.NewStackTracedError(errors.ErrTLSInvalid), errString)
 	}
 
-	return cacert, chain, nil
+	return cacert, chain, key, nil
 }
 
 // getTLSClientDataStandard get TLS client configuration using standard data layout.
@@ -568,7 +613,7 @@ func (c *Cluster) getVerifiedTLSClientData(cacert []byte) (chain []byte, key []b
 
 // reconcileMemberTLS reconciles both the CA and certificate chain on Couchbase server.
 // This is done in plain text due to races involving required mTLS.
-func (c *Cluster) reconcileMemberTLS(member couchbaseutil.Member, ca, cert, key []byte, leaf *x509.Certificate) error {
+func (c *Cluster) reconcileMemberTLS(member couchbaseutil.Member, leaf *x509.Certificate) error {
 	// Try connect to the target node, if it doesn't respond we assume it's
 	// deleted or the admin service has gone down and needs a reconcile to fix it.
 	ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
@@ -578,12 +623,12 @@ func (c *Cluster) reconcileMemberTLS(member couchbaseutil.Member, ca, cert, key 
 		return nil
 	}
 
-	if tlsValid(member, ca, cert, key, leaf) {
+	if tlsValid(member, c.tlsCache, leaf) {
 		return nil
 	}
 
 	// Reload the CA certificate if necessary.
-	if err := c.reloadCA(member, ca); err != nil {
+	if err := c.reloadCA(member); err != nil {
 		return err
 	}
 
@@ -598,7 +643,7 @@ func (c *Cluster) reconcileMemberTLS(member couchbaseutil.Member, ca, cert, key 
 	}
 
 	// Reload the server certificate chain.
-	if err := c.reloadChainAndVerify(member, ca, cert, key, leaf); err != nil {
+	if err := c.reloadChainAndVerify(member, leaf); err != nil {
 		return err
 	}
 
@@ -665,29 +710,23 @@ func (c *Cluster) enableTLS() error {
 
 	log.Info("Enabling TLS", "cluster", c.namespacedName())
 
-	ca, _, err := c.getVerifiedTLSData()
-	if err != nil {
-		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
-		return err
-	}
-
 	// Reload the CA certificate if necessary.  This must happen before new
 	// nodes are added as server does what the hell it wants to and just copies
 	// over what is the current CA to the new node, irrespective of what we
 	// pre-populate it with.
 	for _, member := range c.members {
-		if err := c.reloadCA(member, ca); err != nil {
+		if err := c.reloadCA(member); err != nil {
 			return err
 		}
 	}
 
 	clientTLS = &couchbaseutil.TLSAuth{
-		CACert: ca,
+		CACert: c.tlsCache.ca,
 	}
 
 	c.api.SetTLS(clientTLS)
 
-	if err := c.state.Insert(persistence.CACertificate, string(ca)); err != nil {
+	if err := c.state.Insert(persistence.CACertificate, string(c.tlsCache.ca)); err != nil {
 		return err
 	}
 
@@ -703,30 +742,8 @@ func (c *Cluster) updateTLS() error {
 		return nil
 	}
 
-	// Load server TLS data from kubernetes and verify.
-	cacert, chain, err := c.getVerifiedTLSData()
-	if err != nil {
-		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
-
-		return err
-	}
-
-	// If client authentication is specified load and verify those certificates.
-	var clientCert []byte
-
-	var clientKey []byte
-
-	if c.cluster.IsMutualTLSEnabled() {
-		clientCert, clientKey, err = c.getVerifiedTLSClientData(cacert)
-		if err != nil {
-			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
-
-			return err
-		}
-	}
-
 	// Parse the certificate chain.
-	chainPem := util_x509.DecodePEM(chain)
+	chainPem := util_x509.DecodePEM(c.tlsCache.cert)
 
 	cert, err := x509.ParseCertificate(chainPem[0].Bytes)
 	if err != nil {
@@ -739,7 +756,7 @@ func (c *Cluster) updateTLS() error {
 
 	// Update the CA and any server certificate chains that require it.
 	for _, member := range c.members {
-		if err := c.reconcileMemberTLS(member, cacert, clientCert, clientKey, cert); err != nil {
+		if err := c.reconcileMemberTLS(member, cert); err != nil {
 			return err
 		}
 	}
@@ -747,14 +764,14 @@ func (c *Cluster) updateTLS() error {
 	clientTLS := c.api.GetTLS()
 
 	newClientTLS := *clientTLS
-	newClientTLS.CACert = cacert
+	newClientTLS.CACert = c.tlsCache.ca
 
 	if !reflect.DeepEqual(clientTLS, &newClientTLS) {
 		log.Info("Reloading client CA certificate", "cluster", c.namespacedName())
 
 		c.api.SetTLS(&newClientTLS)
 
-		if err := c.state.Update(persistence.CACertificate, string(cacert)); err != nil {
+		if err := c.state.Update(persistence.CACertificate, string(c.tlsCache.ca)); err != nil {
 			return err
 		}
 
@@ -807,23 +824,18 @@ func (c *Cluster) enableMutualTLS() error {
 	if clientTLS.ClientAuth == nil {
 		log.Info("Loading client certificate", "cluster", c.namespacedName())
 
-		cert, key, err := c.getTLSClientData()
-		if err != nil {
-			return err
-		}
-
 		clientTLS.ClientAuth = &couchbaseutil.TLSClientAuth{
-			Cert: cert,
-			Key:  key,
+			Cert: c.tlsCache.clientCert,
+			Key:  c.tlsCache.clientKey,
 		}
 
 		c.api.SetTLS(clientTLS)
 
-		if err := c.state.Insert(persistence.ClientCertificate, string(cert)); err != nil {
+		if err := c.state.Insert(persistence.ClientCertificate, string(c.tlsCache.clientCert)); err != nil {
 			return err
 		}
 
-		if err := c.state.Insert(persistence.ClientKey, string(key)); err != nil {
+		if err := c.state.Insert(persistence.ClientKey, string(c.tlsCache.clientKey)); err != nil {
 			return err
 		}
 
@@ -882,18 +894,10 @@ func (c *Cluster) updateMutualTLS() error {
 
 	// Verified already by cert updates, so we don't need to mess with getting the CA.
 	// Note of caution, if you've changed the secret data in the mean time...
-	cert, key, err := c.getTLSClientData()
-	if err != nil {
-		c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
-
-		return err
-	}
-
-	// Pass by reference, caution!
 	newClientTLS := *clientTLS
 	newClientTLS.ClientAuth = &couchbaseutil.TLSClientAuth{
-		Cert: cert,
-		Key:  key,
+		Cert: c.tlsCache.clientCert,
+		Key:  c.tlsCache.clientKey,
 	}
 
 	if !reflect.DeepEqual(clientTLS, &newClientTLS) {
@@ -901,11 +905,11 @@ func (c *Cluster) updateMutualTLS() error {
 
 		c.api.SetTLS(&newClientTLS)
 
-		if err := c.state.Update(persistence.ClientCertificate, string(cert)); err != nil {
+		if err := c.state.Update(persistence.ClientCertificate, string(c.tlsCache.clientCert)); err != nil {
 			return err
 		}
 
-		if err := c.state.Update(persistence.ClientKey, string(key)); err != nil {
+		if err := c.state.Update(persistence.ClientKey, string(c.tlsCache.clientKey)); err != nil {
 			return err
 		}
 
