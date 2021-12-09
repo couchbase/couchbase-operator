@@ -306,7 +306,7 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 	// Note: these should be updated every release.
 	technicalLowerBound := &version.Info{Major: "1", Minor: "18", GitVersion: "v1.18.0"}
 	supportedLowerBound := &version.Info{Major: "1", Minor: "18", GitVersion: "v1.18.0"}
-	supportedUpperBound := &version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.0"}
+	supportedUpperBound := &version.Info{Major: "1", Minor: "23", GitVersion: "v1.23.0"}
 
 	// You shall not pass!!  AKA don't waste our time.
 	ok, err := versionLessThan(technicalLowerBound, v)
