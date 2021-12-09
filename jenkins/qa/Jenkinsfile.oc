@@ -48,6 +48,7 @@ pipeline {
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 's3_region', defaultValue: 'us-west-2')
+    string(name: 'tls_version', defaultValue: '1.2')
     string(name: 'docs', defaultValue: '100')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
@@ -164,6 +165,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -collect-logs \
             -color=false"
           }
@@ -223,6 +225,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -collect-logs \
             -color=false"
           }
@@ -282,6 +285,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -collect-logs \
             -color=false"
           }
@@ -341,6 +345,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -collect-logs \
             -color=false"
           }
@@ -461,6 +466,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -collect-logs \
             -color=false"
           }
@@ -520,6 +526,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -collect-logs \
             -color=false"
           }

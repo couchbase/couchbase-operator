@@ -6,6 +6,8 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -66,6 +68,8 @@ type Cluster struct {
 	DynamicPlatform bool
 	// IPv6 is whether or not we are using IPv6.
 	IPv6 bool
+	// TLSVersion is the Version of TLS we are testing with.
+	TLSVersion *couchbasev2.TLSVersion
 
 	// Dynamic configuration.
 

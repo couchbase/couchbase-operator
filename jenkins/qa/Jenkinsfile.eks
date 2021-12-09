@@ -48,6 +48,7 @@ pipeline {
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 'kubectl_version', defaultValue: '1.26.7')
     string(name: 's3_region', defaultValue: 'us-west-2')
+    string(name: 'tls_version', defaultValue: '1.2')
     string(name: 'docs', defaultValue: '100')
     string(name: 'terraform_version', defaultValue: '1.4.6')
     booleanParam(name: 'enable_istio', defaultValue: false)
@@ -196,6 +197,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
@@ -257,6 +259,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
@@ -318,6 +321,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
@@ -379,6 +383,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
@@ -501,6 +506,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
@@ -562,6 +568,7 @@ pipeline {
             -s3-region ${params.s3_region} \
             -s3-access-key ${env.S3_ACCESS_KEY} \
             -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \

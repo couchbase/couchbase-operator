@@ -29,6 +29,10 @@ func CreateCluster(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couch
 		cl.Spec.Networking.AddressFamily = &ipv6
 	}
 
+	if cl.Spec.Networking.TLS != nil && k8s.TLSVersion != nil {
+		cl.Spec.Networking.TLS.TLSMinimumVersion = *k8s.TLSVersion
+	}
+
 	e2espec.ApplySecurityContext(cl, k8s.PlatformType)
 
 	// If we left the CPU requests as default, that would have some nasty side effects

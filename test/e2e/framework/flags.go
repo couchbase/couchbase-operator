@@ -199,3 +199,28 @@ func (p *PullPolicyFlag) Set(s string) error {
 func (p *PullPolicyFlag) String() string {
 	return string(p.policy)
 }
+
+type TLSVer struct {
+	version couchbasev2.TLSVersion
+}
+
+func (v *TLSVer) Set(s string) error {
+	switch s {
+	case "1.0":
+		v.version = couchbasev2.TLS10
+	case "1.1":
+		v.version = couchbasev2.TLS11
+	case "1.2":
+		v.version = couchbasev2.TLS12
+	case "1.3":
+		v.version = couchbasev2.TLS13
+	default:
+		return fmt.Errorf("invalid TLS version: %s", s)
+	}
+
+	return nil
+}
+
+func (v *TLSVer) String() string {
+	return string(v.version)
+}

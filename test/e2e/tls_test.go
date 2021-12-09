@@ -1669,6 +1669,8 @@ func TestTLSEditSettings(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
+	kubernetes.TLSVersion = nil
+
 	defer cleanup()
 
 	// Static configuration.
