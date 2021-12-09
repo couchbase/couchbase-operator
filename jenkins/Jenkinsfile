@@ -37,11 +37,16 @@ pipeline {
         sh '. venv/bin/activate && make lint-python'
       }
     }
-    stage('Build All') {
+    // This should build only the stand alone binaries that are required by 
+    // packaged downloads, and for all target platforms (don't bother with
+    // architectures... yet)
+    stage('Build Binaries') {
       steps {
-        sh 'make'
+        sh 'make cao clean'
+        sh "make cao clean -e BUILDFLAGS='-trimpath -tags redhat'"
       }
     }
+    // Build all containers that will be pushed to docker hub or RHCC.
     stage('Build Containers') {
       matrix {
         axes {

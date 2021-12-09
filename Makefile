@@ -55,7 +55,7 @@ LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(vers
 # Common flags to apply during build (and test build)
 BUILDFLAGS = "-trimpath"
 
-.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs docs-lint certification-container certification-container-public operator admission cao
+.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs docs-lint certification-container certification-container-public operator admission cao clean
 
 all: binaries crd
 
@@ -139,6 +139,10 @@ cao: $(CAO_BINARY)
 # Make the certification binary separately, it's not cross platform.
 certification-binary: ${CERTIFICATION_BINARY}
 
+# Clean target to remove any generated files.
+clean:
+	rm -rf build dist $(CRD_FILE)
+
 # Operator binary build target.
 $(OPERATOR_BINARY): $(GENERATED_FILES) $(SOURCE)
 	$(CONTAINER_GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/operator
@@ -156,7 +160,7 @@ $(CBOPINFO_BINARY): $(GENERATED_FILES) $(SOURCE)
 	$(GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/cbopinfo
 
 $(CAO_BINARY): $(SOURCE)
-	$(GOENV) go build -o $@ -ldflags $(LDFLAGS) ./cmd/cao
+	$(GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/cao
 
 # test binary framework build target.
 # This is a linux only build, use the certification-container target instead.
