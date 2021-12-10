@@ -12,11 +12,15 @@ import (
 
 const (
 	// BackupResource is the name used for all resources involving automated backup.
-	BackupResourceName = "couchbase-backup"
+	BackupResourceName  = "couchbase-backup"
+	BackupIAMAnnotation = "eks.amazonaws.com/role-arn"
 )
 
 // generateBackupOptions defines options for generating backup resources.
 type generateBackupOptions struct {
+	// backupIAMRoleARN is the ARN of the IAM role to be associated with the backup
+	// service account.
+	backupIAMRoleARN string
 }
 
 // getGenerateBackupCommand creates YAML capable of creating backup job prerequisites.
@@ -40,6 +44,8 @@ func getGenerateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Comma
 			return nil
 		},
 	}
+
+	o.registerBackupGenerateFlags(cmd)
 
 	return cmd
 }
@@ -67,6 +73,8 @@ func getCreateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Command
 			return nil
 		},
 	}
+
+	o.registerBackupGenerateFlags(cmd)
 
 	return cmd
 }
@@ -106,16 +114,16 @@ func (o *generateBackupOptions) generate(flags *genericclioptions.ConfigFlags) (
 	}
 
 	resources := []runtime.Object{
-		GetBackupServiceAccount(),
-		GetBackupRole(),
-		GetBackupRoleBinding(namespace),
+		o.GetBackupServiceAccount(),
+		o.GetBackupRole(),
+		o.GetBackupRoleBinding(namespace),
 	}
 
 	return resources, nil
 }
 
 // GetBackupRole returns the role required for the backup script to function correctly.
-func GetBackupRole() *rbacv1.Role {
+func (o *generateBackupOptions) GetBackupRole() *rbacv1.Role {
 	return &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: BackupResourceName,
@@ -178,16 +186,22 @@ func GetBackupRole() *rbacv1.Role {
 }
 
 // GetBackupServiceAccount returns a service account for the backup script to run as.
-func GetBackupServiceAccount() *v1.ServiceAccount {
-	return &v1.ServiceAccount{
+func (o *generateBackupOptions) GetBackupServiceAccount() *v1.ServiceAccount {
+	serviceAccount := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: BackupResourceName,
 		},
 	}
+
+	if o.backupIAMRoleARN != "" {
+		serviceAccount.Annotations[BackupIAMAnnotation] = o.backupIAMRoleARN
+	}
+
+	return serviceAccount
 }
 
 // GetBackupRoleBinding returns a role binding linking the backup service account to its role.
-func GetBackupRoleBinding(namespace string) *rbacv1.RoleBinding {
+func (o *generateBackupOptions) GetBackupRoleBinding(namespace string) *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: BackupResourceName,
@@ -205,4 +219,9 @@ func GetBackupRoleBinding(namespace string) *rbacv1.RoleBinding {
 			Name:     BackupResourceName,
 		},
 	}
+}
+
+// registerBackupGenerateFlags adds generic generation flags to the provided command.
+func (o *generateBackupOptions) registerBackupGenerateFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&o.backupIAMRoleARN, "iam-role-arn", "", "Adds the IAM Role ARN to the backup service account's annotation. e.g arn:aws:iam::<ACCOUNT_ID>:role/<IAM_ROLE_NAME>")
 }

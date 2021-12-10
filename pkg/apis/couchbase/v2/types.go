@@ -2134,6 +2134,11 @@ type Backup struct {
 
 	// ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
 	ObjectEndpoint *ObjectEndpoint `json:"objectEndpoint,omitempty"`
+
+	// UseIAMRole enables backup to fetch EC2 instance metadata.
+	// This allows the AWS SDK to use the EC2's IAM Role for S3 access.
+	// UseIAMRole will ignore credentials in s3Secret.
+	UseIAMRole bool `json:"useIAMRole,omitempty"`
 }
 
 type ObjectEndpoint struct {

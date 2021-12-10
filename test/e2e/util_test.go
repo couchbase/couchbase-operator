@@ -530,6 +530,7 @@ func registerTests() {
 		framework.NewTestDef(TestBackupBucketInclusion).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupBucketExclusion).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupThenDelete).WithTags(TagSuiteP1, TagFeatureBackup),
+		framework.NewTestDef(TestBackupAndRestoreS3WithIAMRole).WithTags(TagSuiteP1, TagFeatureBackup, TagSuitePlatform),
 
 		// System tests.
 		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem),

@@ -30,10 +30,11 @@ const (
 
 func createS3Bucket(t *testing.T, bucket, accessKey, secretID, region, endpoint string, cert []byte) error {
 	// create S3 bucket
-	sess := e2eutil.CreateAWSSession(accessKey, secretID, region, endpoint, cert)
+	helper := e2eutil.AwsHelper(accessKey, secretID, region).WithEndpoint(endpoint).WithEndpointCert(cert).Create()
 
 	// Create S3 service client
-	svc := s3.New(sess)
+	svc := s3.New(helper.Sess)
+
 	if MustGetS3Bucket(t, svc, bucket) {
 		return nil
 	}
@@ -115,9 +116,10 @@ func MustGetS3Bucket(t *testing.T, svc *s3.S3, bucket string) bool {
 
 func deleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string, endpoint string, cert []byte) error {
 	// create S3 bucket
-	sess := e2eutil.CreateAWSSession(accessKey, secretID, region, endpoint, cert)
+	helper := e2eutil.AwsHelper(accessKey, secretID, region).WithEndpoint(endpoint).WithEndpointCert(cert).Create()
+
 	// Create S3 service client
-	svc := s3.New(sess)
+	svc := s3.New(helper.Sess)
 
 	// Check if the bucket is present
 	if bucketPresent := MustGetS3Bucket(t, svc, bucket); bucketPresent == false {
@@ -164,6 +166,9 @@ func MustDeleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string
 // exact same as createS3Secret but with custom endpoint and cert.
 func createObjEndpointS3Secret(t *testing.T, kubernetes *types.Cluster, endpoint string, cert []byte) (*corev1.Secret, string, func()) {
 	f := framework.Global
+
+	framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").PlatformIs(v2.PlatformTypeAWS).HasS3Parameters()
+
 	s3secret := "s3-secret"
 	s3BucketName := "s3bucket-" + kubernetes.Namespace
 
@@ -178,15 +183,42 @@ func createObjEndpointS3Secret(t *testing.T, kubernetes *types.Cluster, endpoint
 		},
 	}
 
-	if _, err := kubernetes.KubeClient.CoreV1().Secrets(kubernetes.Namespace).Create(context.Background(), secret, v1.CreateOptions{}); err != nil {
-		e2eutil.Die(t, err)
-	}
-
 	MustCreateS3Bucket(t, s3BucketName, f.MinioAccessKey, f.MinioSecretID, f.MinioRegion, endpoint, cert)
 
 	// Note: deferred functions must not call Die.
 	cleanup := func() {
-		_ = deleteS3Bucket(t, s3BucketName, f.MinioAccessKey, f.MinioSecretID, f.S3Region, endpoint, cert)
+		_ = deleteS3Bucket(t, s3BucketName, f.MinioAccessKey, f.MinioSecretID, f.MinioRegion, endpoint, cert)
+	}
+
+	return secret, s3BucketName, cleanup
+}
+
+func createS3RegionSecret(t *testing.T, kubernetes *types.Cluster) (*corev1.Secret, string, func()) {
+	f := framework.Global
+
+	framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").PlatformIs(v2.PlatformTypeAWS).HasS3Parameters()
+
+	s3secret := "s3-secret"
+	s3BucketName := "s3bucket-" + kubernetes.Namespace
+
+	secret := &corev1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name: s3secret,
+		},
+		Data: map[string][]byte{
+			"region": []byte(f.S3Region),
+		},
+	}
+
+	if _, err := kubernetes.KubeClient.CoreV1().Secrets(kubernetes.Namespace).Create(context.Background(), secret, v1.CreateOptions{}); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	MustCreateS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region, "", nil)
+
+	// Note: deferred functions must not call Die.
+	cleanup := func() {
+		_ = deleteS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region, "", nil)
 	}
 
 	return secret, s3BucketName, cleanup
@@ -673,6 +705,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	defer cleanup()
 
 	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+
 	defer s3cleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
@@ -681,7 +714,6 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 
 	numOfDocs := f.DocsCount
-
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -697,10 +729,8 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
 
-	// wait for backup to start
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	// wait for backup to complete
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
 
 	// delete bucket
 	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
@@ -2316,7 +2346,7 @@ func testBackupAndRestoreScope(t *testing.T, s3 bool) {
 	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
 	defer s3cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().PlatformIs(v2.PlatformTypeAWS)
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -2546,6 +2576,11 @@ func TestBackupThenDelete(t *testing.T) {
 func TestBackupCustomObjEndpoint(t *testing.T) {
 	testBackupCustomObjectEndpoint(t, false)
 }
+
+func TestBackupCustomObjEndpointWithCert(t *testing.T) {
+	testBackupCustomObjectEndpoint(t, true)
+}
+
 func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 	f := framework.Global
 	kubernetes, cleanup := f.SetupTest(t)
@@ -2579,12 +2614,78 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 
 	defer s3cleanup()
 
+	numOfDocs := f.DocsCount
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).WithObjEndpoint(minio.Endpoint).WithObjEndpointCert(minio.CASecret).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+
+	// wait for backup
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// wait for backup to complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 12*time.Minute)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
+
+	// create new restore
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+
+	// restore job is too fast, just validate bucket item count
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * Remove Bucket
+	// * Bucket created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	s3secret, s3BucketName, s3cleanup := createS3RegionSecret(t, kubernetes)
+
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().HasIAMParameters()
+
 	// Create a normal cluster.
 	clusterSize := constants.Size3
 
 	numOfDocs := f.DocsCount
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).WithS3IAMRole(true).MustCreate(t, kubernetes)
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).WithObjEndpoint(minio.Endpoint).WithObjEndpointCert(minio.CASecret).MustCreate(t, kubernetes)
+	aws := e2eutil.AwsHelper(f.IAMAccessKey, f.IAMSecretID, f.S3Region).Create()
+	e2eutil.MustSetupBackupIAM(t, kubernetes, aws, f.AWSAccountID, f.AWSOIDCProvider, s3BucketName)
+
+	defer aws.Cleanup()
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -2593,6 +2694,7 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 	// insert docs to backup
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
 	// Create a Backup object.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
 
@@ -2634,7 +2736,4 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
-}
-func TestBackupCustomObjEndpointWithCert(t *testing.T) {
-	testBackupCustomObjectEndpoint(t, true)
 }

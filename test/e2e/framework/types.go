@@ -42,6 +42,10 @@ type Framework struct {
 	MinioRegion                   string
 	MinioAccessKey                string
 	MinioSecretID                 string
+	AWSAccountID                  string
+	AWSOIDCProvider               string
+	IAMAccessKey                  string
+	IAMSecretID                   string
 	DocsCount                     int
 	LogLevel                      string
 	IPv6                          bool

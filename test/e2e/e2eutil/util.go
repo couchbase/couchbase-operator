@@ -195,6 +195,11 @@ func applyObjEndpoint(cluster *couchbasev2.CouchbaseCluster, objEndpoint string,
 	}
 }
 
+// applyIAMRole optionally sets backup to use host EC2 IAM Role.
+func applyS3IAMRole(cluster *couchbasev2.CouchbaseCluster, useIAMRole bool) {
+	cluster.Spec.Backup.UseIAMRole = useIAMRole
+}
+
 // applyGenericNetworking optionally applies generic networking to the cluster, this
 // exposes the admin console to provide a HTTP load-balanced endpoint, giving HA
 // service discovery, albeit with unstable IP based addressing, and exposed features,
@@ -254,6 +259,8 @@ type ClusterOptions struct {
 	AuditConfiguration *couchbasev2.CouchbaseClusterAuditLoggingSpec
 
 	MonitoringConfiguration *couchbasev2.CouchbaseClusterMonitoringSpec
+
+	S3UseIAM bool
 }
 
 // WithEphemeralTopology defines a cluster as being ephemeral (no volumes).
@@ -425,6 +432,14 @@ func (o *ClusterOptions) WithObjEndpoint(objEndpoint string) *ClusterOptions {
 
 func (o *ClusterOptions) WithObjEndpointCert(certSecret *v1.Secret) *ClusterOptions {
 	o.ObjEndpointCertSecret = certSecret
+
+	return o
+}
+
+// WithS3IAMRole set the cluster to use host EC2 IAM Role.
+func (o *ClusterOptions) WithS3IAMRole(useIAM bool) *ClusterOptions {
+	o.S3UseIAM = useIAM
+
 	return o
 }
 
@@ -459,6 +474,7 @@ func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseClus
 	applyDNS(k8s, cluster, o.DNS)
 	applyS3(cluster, o.S3Credentials)
 	applyObjEndpoint(cluster, o.ObjEndpoint, o.ObjEndpointCertSecret)
+	applyS3IAMRole(cluster, o.S3UseIAM)
 	applyGenericNetworking(cluster, o.GenericNetworking)
 	applyLogStreaming(cluster, o.LogStreaming)
 	applyAuditing(cluster, o.AuditConfiguration)

@@ -962,7 +962,6 @@ func (c *Cluster) applyObjEndpointToContainer(container *corev1.Container) {
 
 func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName couchbasev2.S3BucketURI) {
 	container.Args = append(container.Args, "--s3-bucket", string(s3BucketName))
-
 	container.Env = []corev1.EnvVar{
 		{
 			Name: "AWS_REGION",
@@ -975,28 +974,38 @@ func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName
 				},
 			},
 		},
-		{
-			Name: "AWS_ACCESS_KEY_ID",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: c.cluster.Spec.Backup.S3Secret,
+	}
+
+	if c.cluster.Spec.Backup.UseIAMRole {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "CB_AWS_ENABLE_EC2_METADATA",
+			Value: "true",
+		})
+	} else {
+		container.Env = append(container.Env, []corev1.EnvVar{
+			{
+				Name: "AWS_ACCESS_KEY_ID",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: c.cluster.Spec.Backup.S3Secret,
+						},
+						Key: "access-key-id",
 					},
-					Key: "access-key-id",
 				},
 			},
-		},
-		{
-			Name: "AWS_SECRET_ACCESS_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: c.cluster.Spec.Backup.S3Secret,
+			{
+				Name: "AWS_SECRET_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: c.cluster.Spec.Backup.S3Secret,
+						},
+						Key: "secret-access-key",
 					},
-					Key: "secret-access-key",
 				},
 			},
-		},
+		}...)
 	}
 }
 

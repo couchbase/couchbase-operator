@@ -247,7 +247,18 @@ func configure() (err error) {
 	flag.StringVar(&params.S3SecretID, "s3-secret-id",
 		"",
 		"S3 secret ID to use for backup.")
-
+	flag.StringVar(&params.AWSAccountID, "aws-account-id",
+		"",
+		"AWS Account ID of the running cluster.")
+	flag.StringVar(&params.AWSOIDCProvider, "aws-oidc-provider",
+		"",
+		"AWS OIDC provider of the running cluster.")
+	flag.StringVar(&params.IAMAccessKey, "iam-access-key",
+		"",
+		"AWS OIDC provider of the running cluster.")
+	flag.StringVar(&params.IAMSecretID, "iam-secret-id",
+		"",
+		"AWS OIDC provider of the running cluster.")
 	flag.StringVar(&suiteSuffix, "suite-suffix",
 		"",
 		"Suffix to apply to suite name in JUnit results, useful when running multiple versions of the same suite in parallel.")
@@ -1003,6 +1014,24 @@ func (r *TestRequirement) HasS3Parameters() *TestRequirement {
 	return r
 }
 
+// HasIAMParameters skips the IAM test if the IAM related parameters
+// are not provided.
+func (r *TestRequirement) HasIAMParameters() *TestRequirement {
+	if Global.IAMAccessKey == "" || Global.IAMSecretID == "" {
+		r.t.Skip("IAM Config parameters are not provided")
+	}
+
+	if Global.AWSAccountID == "" {
+		r.t.Skip("Missing Account ID")
+	}
+
+	if Global.AWSOIDCProvider == "" {
+		r.t.Skip("Missing AWS OIDC Provider")
+	}
+
+	return r
+}
+
 // AtLeastVersion skips the test for Couchbase versions before this threshold.
 func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseServerImage, ":")
@@ -1241,6 +1270,15 @@ func (r *TestRequirement) ExpandableStorage() *TestRequirement {
 // simulate a rolling cluster upgrade, the test container would get killed!
 func (r *TestRequirement) Rethink() *TestRequirement {
 	r.t.Skip("test unstable")
+
+	return r
+}
+
+// PlatformIs skips the test if the vendor platform is incorrect.
+func (r *TestRequirement) PlatformIs(platform couchbasev2.PlatformType) *TestRequirement {
+	if Global.Platform != platform {
+		r.t.Skip(fmt.Sprintf("Platform requires %s", platform))
+	}
 
 	return r
 }

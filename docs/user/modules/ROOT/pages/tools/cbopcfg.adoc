@@ -252,9 +252,16 @@ Bearer token for authentication to the API server
 +
 The name of the kubeconfig user to use
 
-== cbopcfg create backup
+== cbopcfg create backup [flags]
 
 Creates backup roles.
+
+=== Flags
+
+--iam-role-arn::
+*Type*: string
++
+Adds the IAM Role ARN to the backup service account's annotation. e.g arn:aws:iam::<ACCOUNT_ID>:role/<IAM_ROLE_NAME>
 
 === Inherited Flags
 
@@ -1100,9 +1107,16 @@ Bearer token for authentication to the API server
 +
 The name of the kubeconfig user to use
 
-== cbopcfg generate backup
+== cbopcfg generate backup [flags]
 
 Generates YAML for backup jobs.
+
+=== Flags
+
+--iam-role-arn::
+*Type*: string
++
+Adds the IAM Role ARN to the backup service account's annotation. e.g arn:aws:iam::<ACCOUNT_ID>:role/<IAM_ROLE_NAME>
 
 === Inherited Flags
 
