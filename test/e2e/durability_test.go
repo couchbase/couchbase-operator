@@ -25,7 +25,7 @@ func TestCreateDurableBucket(t *testing.T) {
 	framework.Requires(t, kubernetes).CouchbaseBucket().AtLeastVersion("6.6.0")
 
 	// Static configuration.
-	clusterSize := 1
+	clusterSize := 3
 
 	// Create the cluster.
 	bucket := e2eutil.GetDurableBucket(f.BucketType, f.CompressionMode, couchbasev2.CouchbaseBucketMinimumDurabilityMajority)
@@ -54,7 +54,7 @@ func TestEditDurableBucket(t *testing.T) {
 	framework.Requires(t, kubernetes).CouchbaseBucket().AtLeastVersion("6.6.0")
 
 	// Static configuration.
-	clusterSize := 1
+	clusterSize := 3
 
 	// Create the cluster.
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
