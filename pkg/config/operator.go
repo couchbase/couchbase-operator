@@ -205,6 +205,8 @@ func getCreateOperatorCommand(command string, flags *genericclioptions.ConfigFla
                         %[1]s create operator --pod-creation-timeout 1h
                 `, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-create-operator-flags")
+
 			resources, err := o.generate(flags)
 			if err != nil {
 				return err
@@ -239,6 +241,8 @@ func getDeleteOperatorCommand(command string, flags *genericclioptions.ConfigFla
 			%[1]s delete operator --scope cluster
 		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-operator-flags")
+
 			resources, err := o.generate(flags)
 			if err != nil {
 				return err

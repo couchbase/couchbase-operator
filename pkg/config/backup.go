@@ -53,6 +53,8 @@ func getCreateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Command
 		Short: "Creates backup roles.",
 		Long:  "Creates backup roles.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-create-backup")
+
 			resources, err := o.generate(flags)
 			if err != nil {
 				return err
@@ -78,6 +80,8 @@ func getDeleteBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Command
 		Short: "Deletes backup roles.",
 		Long:  "Deletes backup roles.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-backup")
+
 			resources, err := o.generate(flags)
 			if err != nil {
 				return err

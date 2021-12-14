@@ -349,3 +349,8 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 
 	return nil
 }
+
+// Generic warning message to encourage the use of cao instead of cbopcfg and cbopinfo.
+func genDeprecatedWarning(docURL string) {
+	fmt.Printf("\nWARNING: This tool is deprecated and will be removed in a later release. Please use cao binary that features the same functionality: %s\n\n", docURL)
+}
