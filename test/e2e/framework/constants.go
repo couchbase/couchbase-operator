@@ -11,8 +11,8 @@ var (
 	admissionImageDefault           = "couchbase/admission-controller:" + version.WithRevision()
 	operatorImageDefault            = "couchbase/operator:" + version.WithRevision()
 	mobileImageDefault              = "couchbase/sync-gateway:2.8.2-enterprise"
-	serverImageDefault              = "couchbase/server:7.0.2"
-	serverImageUpgradeFromDefault   = "couchbase/server:6.6.3"
+	serverImageDefault              = "couchbase/server:7.0.3"
+	serverImageUpgradeFromDefault   = "couchbase/server:6.6.4"
 	exporterImageDefault            = "couchbase/exporter:1.0.5"
 	exporterImageUpgradeFromDefault = "couchbase/exporter:1.0.4"
 	backupImageDefault              = "couchbase/operator-backup:1.2.0"

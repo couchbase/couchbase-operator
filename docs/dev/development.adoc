@@ -184,8 +184,8 @@ $ kind load docker-image couchbase/couchbase-operator-certification:v1
 Not strictly required but improves caching performance - replace with the server version you want to test.
 [source,console]
 ----
-$ docker pull couchbase/server:7.0.2
-$ kind load docker-image couchbase/server:7.0.2
+$ docker pull couchbase/server:7.0.3
+$ kind load docker-image couchbase/server:7.0.3
 ----
 
 === Running a test
