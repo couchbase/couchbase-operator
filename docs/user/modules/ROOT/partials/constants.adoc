@@ -11,4 +11,4 @@
 :tutorial-gke-version: 1.14.10-gke.27
 :backup-version: 1.2.0
 :sgw-version: 2.8.2-enterprise
-:helm-repo: https://github.com/couchbase-partners/helm-charts/releases/download/couchbase-operator-2.3.0-beta/couchbase-operator-2.3.001.tgz
+:helm-repo: couchbase/couchbase-operator
