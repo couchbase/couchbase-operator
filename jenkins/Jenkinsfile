@@ -25,6 +25,7 @@ pipeline {
         sh 'make lint'
       }
     }
+/*
     stage('Python Lint') {
       steps {
         sh 'python3 -m venv venv'
@@ -32,6 +33,7 @@ pipeline {
         sh '. venv/bin/activate && make lint-python'
       }
     }
+*/
     stage('Build All') {
       steps {
         sh 'make'
