@@ -18,6 +18,14 @@ Developer Preview:: Couchbase is still developing functionality for the specifie
 
 === Couchbase Server Compatibility
 
+[IMPORTANT]
+====
+Couchbase Server versions 6.0-7.0 are susceptible to the 'log4shell' CVE, though this version of the Couchbase Autonomous Operator does not support 7.0 and forward releases.
+Read https://blog.couchbase.com/what-to-know-about-the-log4j-vulnerability-cve-2021-44228/[our blog on this vulnerability^] for more details.
+
+It is _strongly recommended_ that users upgrade to at least server version 6.6.4, when using the analytics service.
+====
+
 [#table-operator-compatibility-couchbase,cols="1,1",options="header"]
 |===
 | Software | Version
