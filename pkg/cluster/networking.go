@@ -334,8 +334,11 @@ func (c *Cluster) reconcileClusterNetworking() error {
 		}
 
 		currentNetworkConfiguration := &couchbaseutil.NodeNetworkConfiguration{
-			AddressFamily:     node.AddressFamily.ConvertAddressFamilyOutToAddressFamily(),
-			AddressFamilyOnly: &node.AddressFamilyOnly,
+			AddressFamily: node.AddressFamily.ConvertAddressFamilyOutToAddressFamily(),
+		}
+
+		if c.supportsAFFiltering() {
+			currentNetworkConfiguration.AddressFamilyOnly = &node.AddressFamilyOnly
 		}
 
 		if reflect.DeepEqual(currentNetworkConfiguration, requestedNetworkConfiguration) {
