@@ -33,7 +33,7 @@ pipeline {
     stage('Python Lint') {
       steps {
         sh 'python3 -m venv venv'
-        sh '. venv/bin/activate && pip3 install pylint pyyaml'
+        sh '. venv/bin/activate && pip3 install -r scripts/requirements.txt'
         sh '. venv/bin/activate && make lint-python'
       }
     }

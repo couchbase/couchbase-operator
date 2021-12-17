@@ -38,7 +38,7 @@ $ brew install --cask docker
 $ brew install kind kubectl helm
 $ brew install --cask visual-studio-code
 $ brew install asciidoc aspell node
-$ python3 -m pip install pyyaml
+$ python3 -m pip install  -r scripts/requirements.txt
 ----
 
 Make sure to explicitly start the graphical elements above (docker particularly) to cover all credentials and permissions.
