@@ -36,11 +36,27 @@ This is to ensure that Helm can continue to update and manage all resources appr
 Upgrading the Autonomous Operator and Admission Controller to a newer version requires that you upgrade the _release_ to a newer version of its _chart_.
 This allows Helm to ensure that all dependencies specified by the chart get updated appropriately.
 
+[IMPORTANT]
 ====
-IMPORTANT: An upgrade also requires the CRDs to be updated, this is something that Helm is https://github.com/helm/community/blob/f9e06c16d89ccea1bea77c01a6a96ae3b309f823/architecture/crds.md#upgrading-crds[unable to do^].
+An upgrade also requires the CRDs to be updated, this is something that Helm is https://github.com/helm/community/blob/f9e06c16d89ccea1bea77c01a6a96ae3b309f823/architecture/crds.md#upgrading-crds[unable to do^].
 The CRDs must be replaced (not deleted as this will remove any existing clusters) with the version for the release you want to upgrade to.
 Refer to the xref:howto-operator-upgrade.adoc#update-crd[Operator upgrade documentation] for detailed information on this stage.
 ====
+
+.To replace the CRDs:
+
+To replace the CRDs pull the current helm chart:
+[source,console]
+----
+helm pull couchbase/couchbase-operator
+tar -xf couchbase-operator-<version>.tgz
+----
+
+Then replace the CRDs with the lastest version:
+[source,console]
+----
+kubectl replace -f  couchbase-operator/crds/couchbase.crds.yaml
+----
 
 .To upgrade the Autonomous Operator using Helm:
 
