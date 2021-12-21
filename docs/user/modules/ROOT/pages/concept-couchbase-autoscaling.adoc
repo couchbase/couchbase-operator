@@ -570,10 +570,11 @@ If you receive a `NotFound` error, then you'll need to https://github.com/kubern
 Couchbase metrics need to be exposed through the Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-custom-metrics[custom metrics API^] in order to use them for auto-scaling.
 This is a requirement if you wish to use metrics like memory quota and query latency as targets to determine when auto-scaling should occur.
 
-Couchbase metrics are collected by the xref:howto-prometheus.adoc[Couchbase Prometheus Exporter].
-The cluster must have xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-monitoring-prometheus-enabled[`couchbaseclusters.spec.monitoring.prometheus.enabled`] set to `true` in order for Couchbase metrics to be collected by the custom metrics API service.
+Couchbase metrics may be collected by the xref:howto-prometheus.adoc[Couchbase Prometheus Exporter] or the native Prometheus Endpoint that is exposed in Couchbase Server versions 7.0+.
 
-You can run the following command to verify that your cluster is capable of performing auto-scaling based on custom metrics:
+When using the Prometheus Exporter, the `CouchbaseCluster` resource must have xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-monitoring-prometheus-enabled[`couchbaseclusters.spec.monitoring.prometheus.enabled`] set to `true` in order for Couchbase metrics to be collected by the custom metrics API service.
+
+You can run the following command to verify that your cluster is capable of performing auto-scaling based on metrics exposed by the Prometheus Endpoint:
 
 [source,console]
 ----
@@ -585,6 +586,48 @@ The recommended custom metrics service to use with the Autonomous Operator is th
 
 When performing auto-scaling based on Couchbase Server metrics, the discovery of available metrics can be performed through Prometheus queries that are beyond the scope of this document.
 However, the Couchbase Exporter repository contains a https://github.com/couchbase/couchbase-exporter/blob/master/example/config.json[list of the Couchbase metrics being exported^].
+
+=== Couchbase Native Metrics
+
+Couchbase Server version 7.0+ expose a Prometheus endpoint which can be used in conjunction with https://prometheus-operator.dev[Prometheus Operator^].
+
+To configure your cluster for use with the Prometheus Operator, you must first install the https://prometheus-operator.dev/docs/prologue/quick-start/#get-the-kube-prometheus-project[`kube-prometheus` Project^].
+This project provides the `ServiceMonitor` custom resource that allows Prometheus to monitor the Couchbase metric service.
+The following is an example `ServiceMonitor` that monitors metrics from a Couchbase cluster named `cb-example`:
+
+[source,console]
+----
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: couchbase-prometheus
+spec:
+  endpoints:
+  - interval: 5s
+    port: couchbase-ui <.>
+    basicAuth: <.>
+      password:
+        name: cb-example-auth
+        key: password
+      username:
+        name: cb-example-auth
+        key: username
+  namespaceSelector:
+    matchNames:
+    - default <.>
+  selector:
+    matchLabels:
+      app: couchbase <.>
+----
+
+<.> Name of the Couchbase console service which exposes cluster metrics.
+Requires xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposeadminconsole[`couchbaseclusters.spec.networking.exposeAdminConsole`] is enabled to allow the creation of a service pointing to the Couchbase admin port.
+<.> Provides authentication to Prometheus for metric collection.
+This secret must be created in the same namespace as the Prometheus Operator, that defaults to `monitoring`.
+<.> Namespace in which the Couchbase console service is running.
+<.> Match labels of the Couchbase console service.
+
+When the `ServiceMonitor` is created, a new Prometheus target is created which can be used for querying metrics.
 
 == About the Kubernetes Cluster Autoscaler
 
