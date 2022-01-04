@@ -28,7 +28,7 @@ This protects against a potential service outage.
 
 The scheduling algorithm attempts to keep the number of pods from each server class evenly distributed across all server groups.
 
-Server groups are scheduled with pod node selectors and use the well known `failure-domain.beta.kubernetes.io/zone` label defined by default on managed clouds.
+Server groups are scheduled with pod node selectors and use the well known `topology.kubernetes.io/zone` label defined by default on managed clouds.
 
 [TIP]
 ====

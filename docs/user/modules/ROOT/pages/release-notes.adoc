@@ -60,6 +60,18 @@ You can use the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rolli
 To enable this feature while upgrading the Autonomous Operator, stop the old Operator, replace the CRDs, edit the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] field to enable bulk upgrades, then start the new Operator.
 Refer to xref:howto-operator-upgrade.adoc[] for further details.
 
+=== Upgrading from 2.0, 2.1, and 2.2
+
+==== Mandatory Couchbase Upgrade Cycle
+
+When upgrading from all prior versions in the 2.x series, users of the server groups feature will undergo a mandatory upgrade cycle.
+
+When the Operator was first released, the only available Node label that was available across all platforms to allow explicit pod scheduling was `failure-domain.beta.kubernetes.io/zone`.
+This label has been deprecated since Kubernetes 1.17, in favor of `topology.kubernetes.io/zone`.
+
+To ensure correct operation of the Operator in the future, the decision has been taken to start using the new label as of Operator 2.3.
+This ensures that the Operator is compatible with all future Kubernetes releases in the event of the deprecated label being removed.
+
 [#release-v230-beta1]
 == Release 2.3.0-beta1
 

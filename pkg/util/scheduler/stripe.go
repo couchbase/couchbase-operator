@@ -66,6 +66,28 @@ func (sched *stripeSchedulerImpl) initServerClasses(cluster *couchbasev2.Couchba
 	return nil
 }
 
+// getPodServerGroup extracts the pod's server group from the specification.
+// With hindsight, this should have been metadata e.g. an annotation.
+func getPodServerGroup(pod *v1.Pod) (string, error) {
+	if pod.Spec.NodeSelector == nil {
+		return "", fmt.Errorf("%w: node selector not set", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+	}
+
+	group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+	if ok {
+		return group, nil
+	}
+
+	// During an upgrade to 2.3 or higher, we need to fall back to
+	// the old beta label.
+	group, ok = pod.Spec.NodeSelector[v1.LabelFailureDomainBetaZone]
+	if ok {
+		return group, nil
+	}
+
+	return "", fmt.Errorf("%w: node selector not as expected", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+}
+
 // populateServerClasses populates the server group lists with pods.
 func (sched *stripeSchedulerImpl) populateServerClasses(pods []*v1.Pod) error {
 	for _, pod := range pods {
@@ -86,8 +108,8 @@ func (sched *stripeSchedulerImpl) populateServerClasses(pods []*v1.Pod) error {
 
 		// Pod has no scheduling information... we're upgrading from a non-scheduled
 		// to a scheduled cluster.
-		group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
-		if !ok {
+		group, err := getPodServerGroup(pod)
+		if err != nil {
 			if _, ok := sched.unschedulableServerClasses[class]; !ok {
 				sched.unschedulableServerClasses[class] = serverGroups{}
 			}

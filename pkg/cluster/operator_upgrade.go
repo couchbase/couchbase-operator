@@ -63,6 +63,7 @@ type upgradableResource interface {
 func (c *Cluster) operatorUpgrade() error {
 	resources := []upgradableResource{
 		newPodUpgradableResource(c),
+		newPVCUpgradableResource(c),
 	}
 
 	for _, resource := range resources {

@@ -1998,10 +1998,10 @@ type ClusterSpec struct {
 
 	// ServerGroups define the set of availability zones you want to distribute
 	// pods over, and construct Couchbase server groups for.  By default, most
-	// cloud providers will label nodes with the key "failure-domain.beta.kubernetes.io/zone",
+	// cloud providers will label nodes with the key "topology.kubernetes.io/zone",
 	// the values associated with that key are used here to provide explicit
 	// scheduling by the Operator.  You may manually label nodes using the
-	// "failure-domain.beta.kubernetes.io/zone" key, to provide failure-domain
+	// "topology.kubernetes.io/zone" key, to provide failure-domain
 	// aware scheduling when none is provided for you.  Global server groups are
 	// applied to all server classes, and may be overridden on a per-server class
 	// basis to give more control over scheduling and server groups.
@@ -2894,10 +2894,10 @@ type ServerConfig struct {
 
 	// ServerGroups define the set of availability zones you want to distribute
 	// pods over, and construct Couchbase server groups for.  By default, most
-	// cloud providers will label nodes with the key "failure-domain.beta.kubernetes.io/zone",
+	// cloud providers will label nodes with the key "topology.kubernetes.io/zone",
 	// the values associated with that key are used here to provide explicit
 	// scheduling by the Operator.  You may manually label nodes using the
-	// "failure-domain.beta.kubernetes.io/zone" key, to provide failure-domain
+	// "topology.kubernetes.io/zone" key, to provide failure-domain
 	// aware scheduling when none is provided for you.  Global server groups are
 	// applied to all server classes, and may be overridden on a per-server class
 	// basis to give more control over scheduling and server groups.

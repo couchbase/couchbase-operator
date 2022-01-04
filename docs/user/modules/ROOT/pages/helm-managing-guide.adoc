@@ -52,7 +52,7 @@ helm pull couchbase/couchbase-operator
 tar -xf couchbase-operator-<version>.tgz
 ----
 
-Then replace the CRDs with the lastest version:
+Then replace the CRDs with the latest version:
 [source,console]
 ----
 kubectl replace -f  couchbase-operator/crds/couchbase.crds.yaml

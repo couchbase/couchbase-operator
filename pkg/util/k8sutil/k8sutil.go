@@ -141,7 +141,15 @@ func GetServerGroup(client *client.Client, name string) (string, error) {
 		return "", fmt.Errorf("%w: pod %s has no node selector", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), name)
 	}
 
-	serverGroup := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+	serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+	if !ok {
+		// During an upgrade to 2.3 or higher, we need to fall back to the
+		// old beta label.
+		serverGroup, ok = pod.Spec.NodeSelector[v1.LabelFailureDomainBetaZone]
+		if !ok {
+			return "", nil
+		}
+	}
 
 	return serverGroup, nil
 }

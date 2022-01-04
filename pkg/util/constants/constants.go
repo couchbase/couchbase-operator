@@ -1,5 +1,9 @@
 package constants
 
+import (
+	corev1 "k8s.io/api/core/v1"
+)
+
 const (
 	EnvOperatorPodName      = "MY_POD_NAME"
 	EnvOperatorPodNamespace = "MY_POD_NAMESPACE"
@@ -66,7 +70,7 @@ const (
 	AnnotationPrometheusPath   = "prometheus.io/path"
 	AnnotationPrometheusPort   = "prometheus.io/port"
 
-	ServerGroupLabel = "failure-domain.beta.kubernetes.io/zone"
+	ServerGroupLabel = corev1.LabelTopologyZone
 
 	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
 	DNSAnnotation = "external-dns.alpha.kubernetes.io/hostname"

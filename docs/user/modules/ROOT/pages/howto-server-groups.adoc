@@ -20,17 +20,17 @@ This can be done with the following command:
 
 [source,console]
 ----
-$ kubectl label nodes ip-172-16-0-10 failure-domain.beta.kubernetes.io/zone=us-east-1a
+$ kubectl label nodes ip-172-16-0-10 topology.kubernetes.io/zone=us-east-1a
 ----
 
 `ip-172-16-0-10` is the Kubernetes node name to apply the label to.
-The label key must be `failure-domain.beta.kubernetes.io/zone`.
+The label key must be `topology.kubernetes.io/zone`.
 The label value (`us-east-1a`) can be anything you want.
 
 == Configuring Couchbase Cluster
 
 When configuring the cluster, you must specify the set of server groups that the Operator is allowed to schedule Couchbase Server pods across.
-Server group members correspond to Kubernetes `failure-domain.beta.kubernetes.io/zone` labels.
+Server group members correspond to Kubernetes `topology.kubernetes.io/zone` labels.
 For example:
 
 [source,yaml]

@@ -23,7 +23,7 @@ type podUpgradeAction struct {
 // pod resource.
 type podUpgradeActionList []podUpgradeAction
 
-// podUpgradableResource implments the upgradableResource interface for pods.
+// podUpgradableResource implements the upgradableResource interface for pods.
 type podUpgradableResource struct {
 	// cluster is a reference to the cluster for client and namespace access.
 	cluster *Cluster
