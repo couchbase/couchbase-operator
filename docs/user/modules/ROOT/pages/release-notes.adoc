@@ -93,9 +93,10 @@ This ensures that the Operator is compatible with all future Kubernetes releases
 
 ===== Logging Users
 
-Users of audit log rotation -- in particular log clean up -- will encounter a cluster upgrade.
+To control memory usage, memory buffer limits have been implemented for the logging sidecar.
+This change will affect all users of logging, and will require a cluster upgrade.
 
-A bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
+Additionally a bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
 This has been fixed so that logs older than or equal to the time period are cleaned.
 
 [#release-v230]

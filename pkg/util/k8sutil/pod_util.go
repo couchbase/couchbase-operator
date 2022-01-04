@@ -1057,6 +1057,20 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 					},
 				},
 			},
+			{
+				Name: "CONTAINER_LIMITS_MEMORY",
+				ValueFrom: &v1.EnvVarSource{
+					ResourceFieldRef: &v1.ResourceFieldSelector{
+						ContainerName: CouchbaseLogSidecarContainerName,
+						Resource:      "limits.memory",
+						Divisor:       resource.MustParse("1M"),
+					},
+				},
+			},
+			{
+				Name:  "AUDIT_ENABLED",
+				Value: strconv.FormatBool(cluster.IsAuditLoggingEnabled()),
+			},
 		},
 		Resources: loggingResources,
 		Ports: []v1.ContainerPort{
