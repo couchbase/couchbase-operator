@@ -89,10 +89,11 @@ Preflight checks occur before the tests are started, they performs static checks
 Examples include ensuring the underlying hypervisor supports the required number of processes etc.
 Any preflight failures will need to be addressed before the tests will run, and will typically involve consulting with your platform vendor.
 
-When the acceptance tests commence, progress will be streamed out, and eventually a summary.
-If all tests pass +++<span style="color: green">&#10003;</span>+++ then you are certified and ready to go!
+When the acceptance tests commence, progress will be streamed out, and eventually a summary. If all tests pass +++<span style="color: green">&#10003;</span>+++ that means self-certification was successfull. 
 
-If any tests fail +++<span style="color: red">&#10007;</span>+++ then you will need to submit your results to Couchbase in order to approve the use of Operator or help diagnose any issues that need fixing.
+If any tests fail +++<span style="color: red">&#10007;</span>+++ that means self-certification failed and needs to be diagnosed. 
+
+In both cases, you will need to submit your results to Couchbase to approve successful self-certification and help diagnose any issues that need fixing. 
 
 ==== Submitting Results to Couchbase
 
