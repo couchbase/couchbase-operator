@@ -24,8 +24,9 @@ import (
 type CBBackupmgrAction string
 
 const (
-	Incremental CBBackupmgrAction = "incremental"
-	Full        CBBackupmgrAction = "full"
+	Incremental       CBBackupmgrAction = "incremental"
+	Full              CBBackupmgrAction = "full"
+	ObjEndpointCrtDir string            = "/var/run/secrets/objectendpoint"
 )
 
 // backupResources contains all the resources required to create and manage a backup.
@@ -579,6 +580,9 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 		},
 	}
 
+	// Mount objectendpoint cert if set.
+	c.applyObjEndpointCertToCronJob(cronjob)
+
 	k8sutil.ApplyBaseAnnotations(cronjob)
 
 	// if TLS enabled apply TLS config to cronjobs
@@ -681,6 +685,9 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 		c.applyS3Configuration(&container, backup.Spec.S3Bucket)
 	}
 
+	// Set container volume mount and update args if custom endpoint is set.
+	c.applyObjEndpointToContainer(&container)
+
 	return container
 }
 
@@ -770,6 +777,8 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 	if err := applyTLSConfiguration(c.cluster, &restorejob.Spec); err != nil {
 		return nil, err
 	}
+	// Mount objectendpoint cert if set
+	c.applyObjEndpointCertToJob(restorejob)
 
 	return restorejob, nil
 }
@@ -885,7 +894,70 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		c.applyS3Configuration(&container, spec.S3Bucket)
 	}
 
+	// Set container volume mount and update args if custom endpoint is set.
+	c.applyObjEndpointToContainer(&container)
+
 	return container
+}
+
+func (c *Cluster) applyObjEndpointCertToJob(job *batchv1.Job) {
+	if c.cluster.Spec.Backup.ObjectEndpoint == nil {
+		return
+	}
+
+	if len(c.cluster.Spec.Backup.ObjectEndpoint.CertSecret) != 0 {
+		volume := corev1.Volume{
+			Name: c.cluster.Spec.Backup.ObjectEndpoint.CertSecret,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: c.cluster.Spec.Backup.ObjectEndpoint.CertSecret,
+				},
+			},
+		}
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volume)
+	}
+}
+
+func (c *Cluster) applyObjEndpointCertToCronJob(cronjob *batchv1beta1.CronJob) {
+	if c.cluster.Spec.Backup.ObjectEndpoint == nil {
+		return
+	}
+
+	if len(c.cluster.Spec.Backup.ObjectEndpoint.CertSecret) != 0 {
+		volume := corev1.Volume{
+			Name: c.cluster.Spec.Backup.ObjectEndpoint.CertSecret,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: c.cluster.Spec.Backup.ObjectEndpoint.CertSecret,
+				},
+			},
+		}
+		cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes = append(cronjob.Spec.JobTemplate.Spec.Template.Spec.Volumes, volume)
+	}
+}
+
+func (c *Cluster) applyObjEndpointToContainer(container *corev1.Container) {
+	if c.cluster.Spec.Backup.ObjectEndpoint == nil {
+		return
+	}
+
+	if len(c.cluster.Spec.Backup.ObjectEndpoint.URL) != 0 {
+		container.Args = append(container.Args, "--obj-endpoint", c.cluster.Spec.Backup.ObjectEndpoint.URL)
+
+		if len(c.cluster.Spec.Backup.ObjectEndpoint.CertSecret) != 0 {
+			volumeMount := corev1.VolumeMount{
+				Name:      c.cluster.Spec.Backup.ObjectEndpoint.CertSecret,
+				ReadOnly:  true,
+				MountPath: ObjEndpointCrtDir,
+			}
+			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+			container.Args = append(container.Args, "--obj-cacert", fmt.Sprintf("%s/tls.crt", ObjEndpointCrtDir))
+		}
+
+		if c.cluster.Spec.Backup.ObjectEndpoint.UseVirtualPath {
+			container.Args = append(container.Args, "--s3-force-path-style", fmt.Sprintf("%t", c.cluster.Spec.Backup.ObjectEndpoint.UseVirtualPath))
+		}
+	}
 }
 
 func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName couchbasev2.S3BucketURI) {

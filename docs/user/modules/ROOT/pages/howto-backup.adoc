@@ -795,3 +795,44 @@ Please note that cleanup schedules will also apply to the local PVC as well as t
 
 The `staging` folder does not need to be created manually by the user.
 ====
+
+== Backup and Restore to Compatible Object Stores
+
+If you are using Couchbase Operator version 2.3.0 or higher, and Couchbase Operator Backup 1.2.1 version or higher, the ability to backup/restore using a S3 compatible stores is available.
+Please see xref:server:backup-restore:cbbackupmgr-cloud.adoc#compatible-object-stores[Compatible Object Stores] for limitations.
+
+Users wishing to use a compatible store should set xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-objectendpoint-url[`couchbaseclusters.spec.backup.objectEndpoint.url`] to the host/address of the object store.
+
+Optionally, xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-objectendpoint-secret[`couchbaseclusters.spec.backup.objectEndpoint.secret`] can be set to the name of the secret containing the CA certificate the compatible object endpoint is using.
+
+[source,yaml,subs="attributes,verbatim"]
+----
+apiVersion: couchbase/v2
+kind: CouchbaseCluster
+spec:
+  backup:
+    managed: true
+    image: couchbase/operator-backup:{backup-version}
+    serviceAccountName: couchbase-backup
+    s3Secret: s3-secret
+    objectEndpoint:
+      url: https://minio.minio # <.>
+      secret: my-tls-secret # <.>
+      useVirtualPath: false # <.>
+----
+
+<.> The only required parameter for using a custom object endpoint.
+<.> Only required if the custom object store is using a custom CA certificate for communication
+<.> Only required if the custom object store uses virtual-hosted style addressing instead of path-style addressing. e.g `https://bucket.s3.amazonaws.com/file` vs `https://s3.amazonaws.com/bucket/file`
+
+Where `my-tls-secret` contains the certificate of the endpoint, similarly to below.
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-tls-secret
+type: kubernetes.io/tls	
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J...
+----

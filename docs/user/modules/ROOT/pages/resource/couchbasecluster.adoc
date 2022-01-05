@@ -210,6 +210,49 @@ Managed defines whether backups are managed by us or the clients.
 
 NodeSelector defines which nodes to constrain the pods that run any backup and restore operations to.
 
+=== couchbaseclusters.spec.backup.objectEndpoint
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
+
+=== couchbaseclusters.spec.backup.objectEndpoint.secret
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint (when required, e.g.
+not signed by a public CA).
+The secret must have the key with the name "tls.crt".
+
+=== couchbaseclusters.spec.backup.objectEndpoint.url
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The host/address of the custom object endpoint.
+
+=== couchbaseclusters.spec.backup.objectEndpoint.useVirtualPath
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+UseVirtualPath will force the AWS SDK to use the new virtual style paths.
+by default alternative path style URLs which are often required by S3 compatible object stores.
+
 === couchbaseclusters.spec.backup.resources
 
 ==== Constraints

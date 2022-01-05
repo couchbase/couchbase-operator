@@ -2131,6 +2131,22 @@ type Backup struct {
 	// This field must be popluated when the `spec.s3bucket` field is specified
 	// for a backup or restore resource.
 	S3Secret string `json:"s3Secret,omitempty"`
+
+	// ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
+	ObjectEndpoint *ObjectEndpoint `json:"objectEndpoint,omitempty"`
+}
+
+type ObjectEndpoint struct {
+	// The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint
+	// (when required, e.g. not signed by a public CA). The secret must have the key with the name "tls.crt"
+	CertSecret string `json:"secret,omitempty"`
+
+	// The host/address of the custom object endpoint.
+	URL string `json:"url,omitempty"`
+
+	// UseVirtualPath will force the AWS SDK to use the new virtual style paths.
+	// by default alternative path style URLs which are often required by S3 compatible object stores.
+	UseVirtualPath bool `json:"useVirtualPath,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=None;StartTLSExtension;TLS

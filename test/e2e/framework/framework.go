@@ -165,6 +165,9 @@ func configure() (err error) {
 	// Provide some sane defaults.
 	params := &Framework{
 		ServiceAccountName: "couchbase-operator",
+		MinioAccessKey:     e2eutil.RandomString(8),
+		MinioSecretID:      e2eutil.RandomString(8),
+		MinioRegion:        "us-west-1",
 	}
 
 	var platform string
@@ -244,6 +247,7 @@ func configure() (err error) {
 	flag.StringVar(&params.S3SecretID, "s3-secret-id",
 		"",
 		"S3 secret ID to use for backup.")
+
 	flag.StringVar(&suiteSuffix, "suite-suffix",
 		"",
 		"Suffix to apply to suite name in JUnit results, useful when running multiple versions of the same suite in parallel.")

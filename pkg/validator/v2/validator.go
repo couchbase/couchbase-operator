@@ -74,6 +74,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintLDAPConnectionTLS,
 		checkConstraintLDAPAuthorization,
 		checkConstraintAutoscalingStabilizationPeriod,
+		checkConstraintBackupObjectEndpointSecret,
 	}
 
 	var errs []error
@@ -1393,6 +1394,33 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintBackupObjectEndpointSecret(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	if cluster.Spec.Backup.ObjectEndpoint == nil || len(cluster.Spec.Backup.ObjectEndpoint.CertSecret) == 0 {
+		return nil
+	}
+
+	secretName := cluster.Spec.Backup.ObjectEndpoint.CertSecret
+
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("secret %s referenced by spec.backup.objectEndpoint.secret must exist", secretName)
+	}
+
+	if _, ok := secret.Data["tls.crt"]; !ok {
+		return fmt.Errorf("custom object endpoint secret %s must contain key 'tls.crt'", secretName)
 	}
 
 	return nil

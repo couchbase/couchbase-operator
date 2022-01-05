@@ -180,6 +180,21 @@ func applyS3(cluster *couchbasev2.CouchbaseCluster, secret *v1.Secret) {
 	cluster.Spec.Backup.S3Secret = secret.Name
 }
 
+// applyObjEndpoint optionally applies a custom obj endpoint to the backup config.
+func applyObjEndpoint(cluster *couchbasev2.CouchbaseCluster, objEndpoint string, secret *v1.Secret) {
+	if objEndpoint == "" {
+		return
+	}
+
+	cluster.Spec.Backup.ObjectEndpoint = &couchbasev2.ObjectEndpoint{
+		URL: objEndpoint,
+	}
+
+	if secret != nil {
+		cluster.Spec.Backup.ObjectEndpoint.CertSecret = secret.Name
+	}
+}
+
 // applyGenericNetworking optionally applies generic networking to the cluster, this
 // exposes the admin console to provide a HTTP load-balanced endpoint, giving HA
 // service discovery, albeit with unstable IP based addressing, and exposed features,
@@ -227,6 +242,10 @@ type ClusterOptions struct {
 	DNS *v1.Service
 
 	S3Credentials *v1.Secret
+
+	ObjEndpoint string
+
+	ObjEndpointCertSecret *v1.Secret
 
 	GenericNetworking bool
 
@@ -397,6 +416,18 @@ func (o *ClusterOptions) WithS3(s3 *v1.Secret) *ClusterOptions {
 	return o
 }
 
+// WithObjEndpoint set the cluster to use a custom obj endpoint for backups.
+func (o *ClusterOptions) WithObjEndpoint(objEndpoint string) *ClusterOptions {
+	o.ObjEndpoint = objEndpoint
+
+	return o
+}
+
+func (o *ClusterOptions) WithObjEndpointCert(certSecret *v1.Secret) *ClusterOptions {
+	o.ObjEndpointCertSecret = certSecret
+	return o
+}
+
 // WithGenericNetworking enables Satan's insecure, unstable, shit show of a network mode.
 func (o *ClusterOptions) WithGenericNetworking() *ClusterOptions {
 	o.GenericNetworking = true
@@ -427,6 +458,7 @@ func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseClus
 	applyMTLS(cluster, o.TLSPolicy)
 	applyDNS(k8s, cluster, o.DNS)
 	applyS3(cluster, o.S3Credentials)
+	applyObjEndpoint(cluster, o.ObjEndpoint, o.ObjEndpointCertSecret)
 	applyGenericNetworking(cluster, o.GenericNetworking)
 	applyLogStreaming(cluster, o.LogStreaming)
 	applyAuditing(cluster, o.AuditConfiguration)

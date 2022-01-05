@@ -39,6 +39,9 @@ type Framework struct {
 	S3Region                      string
 	S3AccessKey                   string
 	S3SecretID                    string
+	MinioRegion                   string
+	MinioAccessKey                string
+	MinioSecretID                 string
 	DocsCount                     int
 	LogLevel                      string
 	IPv6                          bool
