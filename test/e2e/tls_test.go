@@ -381,47 +381,6 @@ func TestTLSNegRSACertificateDnsName(t *testing.T) {
 	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, targetKube)
 }
 
-// Deploy cluster using a TLS certificates which will expire after few minutes.
-// Cluster creation will be successful.
-// Wait for certificate to expire and try to scale up the cluster.
-// Cluster scaling will fail due to new pod creation failure.
-func TestTLSCertificateExpiry(t *testing.T) {
-	// Platform configuration.
-	f := framework.Global
-
-	targetKube, cleanup := f.SetupTest(t)
-	defer cleanup()
-
-	// Static configuration.
-	clusterSize := constants.Size3
-	exipiry := 5 * time.Minute
-
-	// Create the cluster
-	validTo := time.Now().In(time.UTC).Add(exipiry)
-	opts := &e2eutil.TLSOpts{
-		ValidTo: &validTo,
-	}
-
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, opts)
-
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
-
-	// When the cluster is ready, check that TLS is valid, after the expiry period
-	// expect the TLS to become invalid.
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), exipiry+30*time.Second)
-
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Invalid TLS event
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
-	}
-
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
-}
-
 // Deploy a couchbase cluster using a expired TLS certificate.
 // Cluster creation should fail.
 func TestTLSNegCertificateExpiredBeforeDeployment(t *testing.T) {

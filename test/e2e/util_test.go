@@ -397,7 +397,6 @@ func registerTests() {
 		framework.NewTestDef(TestTLSRemoveOperatorCertificateAndResizeCluster).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestTLSRemoveClusterCertificateAndResizeCluster).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestTLSNegRSACertificateDnsName).WithTags(TagSuiteP1, TagFeatureTLS),
-		framework.NewTestDef(TestTLSCertificateExpiry).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestTLSNegCertificateExpiredBeforeDeployment).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestTLSCertificateDeployedBeforeValidity).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestTLSGenerateWrongCACertType).WithTags(TagSuiteP1, TagFeatureTLS),
