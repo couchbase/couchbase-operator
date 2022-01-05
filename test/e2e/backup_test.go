@@ -1033,7 +1033,7 @@ func TestBackupFullOnlyOverTLS(t *testing.T) {
 
 func TestBackupFullOnlyOverTLSStandard(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
-	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding}
+	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding}
 
 	testFullOnlyOverTLS(t, false, opts, nil)
 }
@@ -1056,7 +1056,7 @@ func TestBackupFullOnlyOverTLSS3(t *testing.T) {
 
 func TestBackupFullOnlyOverTLSS3Standard(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
-	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding}
+	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding}
 
 	testFullOnlyOverTLS(t, true, opts, nil)
 }

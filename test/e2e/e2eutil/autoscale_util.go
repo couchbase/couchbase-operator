@@ -78,7 +78,7 @@ func MustNewAutoscaleCluster(t *testing.T, k8s *types.Cluster, options *e2espec.
 func MustNewAutoscaleClusterMDS(t *testing.T, k8s *types.Cluster, options *e2espec.ClusterOptions, tls *TLSContext, policy *couchbasev2.ClientCertificatePolicy) *couchbasev2.CouchbaseCluster {
 	// select only query config for autoscaling
 	cluster := e2espec.NewBasicCluster(options)
-	applyTLS(cluster, tls)
+	applyTLS(cluster, tls, nil, nil)
 	applyMTLS(cluster, policy)
 
 	// add query only config with autoscale enabled

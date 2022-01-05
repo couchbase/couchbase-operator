@@ -447,6 +447,7 @@ func CreateKeyPairReqData(keyType KeyType, keyEncodingType KeyEncodingType, cert
 }
 
 const (
+	certManagerCAKey       = "ca.crt"
 	operatorTLSSecretCA    = "ca.crt"
 	operatorTLSSecretChain = "couchbase-operator.crt"
 	operatorTLSSecretKey   = "couchbase-operator.key"
@@ -477,8 +478,8 @@ func CreateOperatorSecretData(namespace string, ctx *TLSContext) *corev1.Secret 
 			Name:      ctx.OperatorSecretName,
 		},
 		Data: map[string][]byte{
-			"tls.crt": ctx.ClientCert,
-			"tls.key": ctx.ClientKey,
+			corev1.TLSCertKey:       ctx.ClientCert,
+			corev1.TLSPrivateKeyKey: ctx.ClientKey,
 		},
 	}
 }
@@ -498,16 +499,60 @@ func CreateClusterSecretData(namespace string, ctx *TLSContext) *corev1.Secret {
 		}
 	}
 
-	return &corev1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      ctx.ClusterSecretName,
 		},
 		Data: map[string][]byte{
-			"ca.crt":  ctx.CA.Certificate,
-			"tls.crt": ctx.ServerCert,
-			"tls.key": ctx.ServerKey,
+			corev1.TLSCertKey:       ctx.ServerCert,
+			corev1.TLSPrivateKeyKey: ctx.ServerKey,
 		},
+	}
+
+	// In cert-manager mode, the cluster secret contains the CA certificate.
+	if ctx.Source == TLSSourceCertManagerSecret {
+		secret.Data[certManagerCAKey] = ctx.CA.Certificate
+	}
+
+	return secret
+}
+
+// rotateOperatorSecretData abstracts away secret updates for the various TLS
+// configuration modes.
+func rotateOperatorSecretData(ctx *TLSContext, secret *corev1.Secret, ca, cert, key []byte) {
+	if ctx.LegacyTLS() {
+		secret.Data[operatorTLSSecretChain] = cert
+		secret.Data[operatorTLSSecretKey] = key
+
+		// In legacy mode, the operator secret contains the CA unconditionally.
+		if ca != nil {
+			secret.Data[operatorTLSSecretCA] = ca
+		}
+
+		return
+	}
+
+	secret.Data[corev1.TLSCertKey] = cert
+	secret.Data[corev1.TLSPrivateKeyKey] = key
+}
+
+// rotateClusterSecretData abstracts away secret updates for the various TLS
+// configuration modes.
+func rotateClusterSecretData(ctx *TLSContext, secret *corev1.Secret, ca, cert, key []byte) {
+	if ctx.LegacyTLS() {
+		secret.Data[clusterTLSSecretChain] = cert
+		secret.Data[clusterTLSSecretKey] = key
+
+		return
+	}
+
+	secret.Data[corev1.TLSCertKey] = cert
+	secret.Data[corev1.TLSPrivateKeyKey] = key
+
+	// In cert-manager mode, the cluster secret contains the CA unconditionally.
+	if ctx.Source == TLSSourceCertManagerSecret && ca != nil {
+		secret.Data[operatorTLSSecretCA] = ca
 	}
 }
 
@@ -526,9 +571,12 @@ const (
 	// too heavily tied to Couchbase's requirements.
 	TLSSourceLegacy TLSSource = "legacy"
 
-	// TLS secret sources use Kubernetes standards, and allow us to slip an
-	// abstraction layer in to hide all the badness.
-	TLSSourceTLSSecret TLSSource = "tlsSecret"
+	// TLS kubernets secret source use Kubernetes standards.
+	TLSSourceKubernetesSecret TLSSource = "kubernetesSecret"
+
+	// TLS cert-manager secret sources use Kubernetes standards with cert-manager add ons,
+	// and allow us to slip an abstraction layer in to hide all the badness.
+	TLSSourceCertManagerSecret TLSSource = "certManagerSecret"
 )
 
 // tlsContext is generated per test, it contains certificates to be injected into
@@ -556,6 +604,8 @@ type TLSContext struct {
 	OperatorSecretName string
 	// ClusterSecretName is the name of the secret created for cluster certificates.
 	ClusterSecretName string
+	// CASecretName is the name of the CA secret create when using kubernetes secret mode.
+	CASecretName string
 	// Source is the type of TLS to use for the Operator.
 	Source TLSSource
 }
@@ -715,6 +765,25 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 		return
 	}
 
+	// In kubernetes mode, the CA certificate is injected as a separate secret
+	// from the operator and cluster secrets.
+	if opts.Source == TLSSourceKubernetesSecret {
+		ctx.CASecretName = "ca-secret-tls-" + RandomSuffix()
+
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ctx.CASecretName,
+			},
+			Data: map[string][]byte{
+				corev1.TLSCertKey: ctx.CA.Certificate,
+			},
+		}
+
+		if _, err = CreateSecret(k8s, secret); err != nil {
+			return
+		}
+	}
+
 	return
 }
 
@@ -756,13 +825,7 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, subjectAltNames 
 		Die(t, err)
 	}
 
-	if ctx.LegacyTLS() {
-		secret.Data[clusterTLSSecretKey] = clusterKey
-		secret.Data[clusterTLSSecretChain] = clusterCert
-	} else {
-		secret.Data["tls.key"] = clusterKey
-		secret.Data["tls.crt"] = clusterCert
-	}
+	rotateClusterSecretData(ctx, secret, nil, clusterCert, clusterKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -792,13 +855,7 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 		Die(t, err)
 	}
 
-	if ctx.LegacyTLS() {
-		secret.Data[operatorTLSSecretKey] = operatorKey
-		secret.Data[operatorTLSSecretChain] = operatorCert
-	} else {
-		secret.Data["tls.key"] = operatorKey
-		secret.Data["tls.crt"] = operatorCert
-	}
+	rotateOperatorSecretData(ctx, secret, nil, operatorCert, operatorKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -837,13 +894,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 
 	chain := append(clusterCert, intermediate.Certificate...)
 
-	if ctx.LegacyTLS() {
-		secret.Data[clusterTLSSecretKey] = clusterKey
-		secret.Data[clusterTLSSecretChain] = chain
-	} else {
-		secret.Data["tls.key"] = clusterKey
-		secret.Data["tls.crt"] = chain
-	}
+	rotateClusterSecretData(ctx, secret, nil, chain, clusterKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -883,13 +934,7 @@ func MustRotateClientCertificateChain(t *testing.T, ctx *TLSContext) {
 		Die(t, err)
 	}
 
-	if ctx.LegacyTLS() {
-		secret.Data[operatorTLSSecretKey] = operatorKey
-		secret.Data[operatorTLSSecretChain] = chain
-	} else {
-		secret.Data["tls.key"] = operatorKey
-		secret.Data["tls.crt"] = chain
-	}
+	rotateOperatorSecretData(ctx, secret, nil, chain, operatorKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -941,14 +986,7 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 		Die(t, err)
 	}
 
-	if ctx.LegacyTLS() {
-		secret.Data[clusterTLSSecretKey] = clusterKey
-		secret.Data[clusterTLSSecretChain] = clusterCert
-	} else {
-		secret.Data["tls.key"] = clusterKey
-		secret.Data["tls.crt"] = clusterCert
-		secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
-	}
+	rotateClusterSecretData(ctx, secret, ctx.CA.Certificate, clusterCert, clusterKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -998,14 +1036,7 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 		Die(t, err)
 	}
 
-	if ctx.LegacyTLS() {
-		secret.Data[operatorTLSSecretKey] = operatorKey
-		secret.Data[operatorTLSSecretChain] = operatorCert
-		secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
-	} else {
-		secret.Data["tls.key"] = operatorKey
-		secret.Data["tls.crt"] = operatorCert
-	}
+	rotateOperatorSecretData(ctx, secret, ctx.CA.Certificate, operatorCert, operatorKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -1016,14 +1047,7 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 		Die(t, err)
 	}
 
-	if ctx.LegacyTLS() {
-		secret.Data[clusterTLSSecretKey] = clusterKey
-		secret.Data[clusterTLSSecretChain] = clusterCert
-	} else {
-		secret.Data["tls.key"] = clusterKey
-		secret.Data["tls.crt"] = clusterCert
-		secret.Data[operatorTLSSecretCA] = ctx.CA.Certificate
-	}
+	rotateClusterSecretData(ctx, secret, ctx.CA.Certificate, clusterCert, clusterKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -1060,13 +1084,7 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 		Die(t, err)
 	}
 
-	if ctx.LegacyTLS() {
-		secret.Data[clusterTLSSecretKey] = clusterKey
-		secret.Data[clusterTLSSecretChain] = clusterCert
-	} else {
-		secret.Data["tls.key"] = clusterKey
-		secret.Data["tls.crt"] = clusterCert
-	}
+	rotateClusterSecretData(ctx, secret, nil, clusterCert, clusterKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -1102,13 +1120,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 		Die(t, err)
 	}
 
-	if ctx.LegacyTLS() {
-		secret.Data[operatorTLSSecretKey] = operatorKey
-		secret.Data[operatorTLSSecretChain] = operatorCert
-	} else {
-		secret.Data["tls.key"] = operatorKey
-		secret.Data["tls.crt"] = operatorCert
-	}
+	rotateOperatorSecretData(ctx, secret, nil, operatorCert, operatorKey)
 
 	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
 		Die(t, err)
@@ -1298,7 +1310,7 @@ func InitLDAPTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err error)
 	ctx.ClusterSecretName = "ldap-secret-tls-" + RandomSuffix()
 	ctx.ServerKey = ldapKey
 	ctx.ServerCert = ldapCert
-	ctx.Source = TLSSourceTLSSecret
+	ctx.Source = TLSSourceCertManagerSecret
 
 	ldapSecretData := CreateClusterSecretData(k8s.Namespace, ctx)
 	ldapSecretData.Labels = map[string]string{

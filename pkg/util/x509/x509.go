@@ -105,30 +105,32 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 }
 
 // Verify checks the given chain and CA are valid to be installed.
-func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string, legacy bool) (errs []error) {
-	// Decode CA certificate
-	caPem := DecodePEM(caData)
+func Verify(rootCAs [][]byte, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string, legacy bool) ([][]*x509.Certificate, error) {
+	roots := x509.NewCertPool()
 
-	switch {
-	case len(caPem) < 1:
-		errs = append(errs, fmt.Errorf("%w: CA contains no PEM blocks", errors.NewStackTracedError(errors.ErrCertificateInvalid)))
-		return
-	case len(caPem) > 1:
-		errs = append(errs, fmt.Errorf("%w: CA contains %d PEM blocks, expected 1", errors.NewStackTracedError(errors.ErrCertificateInvalid), len(caPem)))
-		return
-	}
+	for _, caData := range rootCAs {
+		// Decode CA certificate
+		caPem := DecodePEM(caData)
 
-	ca, err := x509.ParseCertificate(caPem[0].Bytes)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("CA failed to decode: %w", errors.NewStackTracedError(err)))
-		return
+		switch {
+		case len(caPem) < 1:
+			return nil, fmt.Errorf("%w: CA contains no PEM blocks", errors.NewStackTracedError(errors.ErrCertificateInvalid))
+		case len(caPem) > 1:
+			return nil, fmt.Errorf("%w: CA contains %d PEM blocks, expected 1", errors.NewStackTracedError(errors.ErrCertificateInvalid), len(caPem))
+		}
+
+		ca, err := x509.ParseCertificate(caPem[0].Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("CA failed to decode: %w", errors.NewStackTracedError(err))
+		}
+
+		roots.AddCert(ca)
 	}
 
 	// Decode chain
 	chainPem := DecodePEM(chainData)
 	if len(chainPem) == 0 {
-		errs = append(errs, fmt.Errorf("%w: chain contains no PEM blocks", errors.NewStackTracedError(errors.ErrCertificateInvalid)))
-		return
+		return nil, fmt.Errorf("%w: chain contains no PEM blocks", errors.NewStackTracedError(errors.ErrCertificateInvalid))
 	}
 
 	var chain []*x509.Certificate
@@ -136,8 +138,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 	for _, block := range chainPem {
 		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("chain failed to decode: %w", errors.NewStackTracedError(err)))
-			return
+			return nil, fmt.Errorf("chain failed to decode: %w", errors.NewStackTracedError(err))
 		}
 
 		chain = append(chain, cert)
@@ -147,21 +148,20 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 	intermediates := chain[1:]
 	verifyOptions := x509.VerifyOptions{
 		Intermediates: x509.NewCertPool(),
-		Roots:         x509.NewCertPool(),
+		Roots:         roots,
 		KeyUsages: []x509.ExtKeyUsage{
 			extKeyUsage,
 		},
 	}
-
-	verifyOptions.Roots.AddCert(ca)
 
 	for _, cert := range intermediates {
 		verifyOptions.Intermediates.AddCert(cert)
 	}
 
 	// Verify the certificate validates on its own (valid for both server and client)
-	if _, err := cert.Verify(verifyOptions); err != nil {
-		errs = append(errs, fmt.Errorf("certificate cannot be verified: %w", errors.NewStackTracedError(err)))
+	chains, err := cert.Verify(verifyOptions)
+	if err != nil {
+		return nil, fmt.Errorf("certificate cannot be verified: %w", errors.NewStackTracedError(err))
 	}
 
 	// Verify the certificate validates for each supplied zone (valid for server only)
@@ -173,7 +173,7 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 		verifyOptions.DNSName = hostname
 		if _, err := cert.Verify(verifyOptions); err != nil {
-			errs = append(errs, fmt.Errorf("certificate cannot be verified for zone: %w", errors.NewStackTracedError(err)))
+			return nil, fmt.Errorf("certificate cannot be verified for zone: %w", errors.NewStackTracedError(err))
 		}
 	}
 
@@ -182,21 +182,19 @@ func Verify(caData, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, sub
 
 	switch {
 	case len(keyPem) < 1:
-		errs = append(errs, fmt.Errorf("%w: private key contains no PEM blocks", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid)))
-		return
+		return nil, fmt.Errorf("%w: private key contains no PEM blocks", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid))
 	case len(keyPem) > 1:
-		errs = append(errs, fmt.Errorf("%w: private key contains %d PEM blocks, expected 1", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid), len(keyPem)))
-		return
+		return nil, fmt.Errorf("%w: private key contains %d PEM blocks, expected 1", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid), len(keyPem))
 	}
 
 	if extKeyUsage == x509.ExtKeyUsageServerAuth {
 		if legacy {
 			if _, err := x509.ParsePKCS1PrivateKey(keyPem[0].Bytes); err != nil {
 				// This is an annoying bug with NS server not supporting PKCS8 *sigh*
-				errs = append(errs, fmt.Errorf("%w: private key not formatted as PKCS1", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid)))
+				return nil, fmt.Errorf("%w: private key not formatted as PKCS1", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid))
 			}
 		}
 	}
 
-	return
+	return chains, nil
 }

@@ -3072,14 +3072,29 @@ const (
 
 // TLSPolicy defines the TLS policy of an Couchbase cluster
 type TLSPolicy struct {
+	// DEPRECATED - by couchbaseclusters.spec.networking.tls.secretSource.
 	// Static enables user to generate static x509 certificates and keys,
 	// put them into Kubernetes secrets, and specify them here.  Static secrets
-	// are very Couchbase specific.
+	// are Couchbase specific, and follow no well-known standards.
 	Static *StaticTLS `json:"static,omitempty"`
 
 	// SecretSource enables the user to specify a secret conforming to the Kubernetes TLS
-	// secret specification.
+	// secret specification that is used for the Couchbase server certificate, and optionally
+	// the Operator's client certificate, providing cert-manager compatibility without having
+	// to specify a separate root CA.  A server CA certificate must be supplied by one of the
+	// provided methods. Certificates referred to must be of well-known type
+	// "kubernetes.io/tls".
 	SecretSource *TLSSecretSource `json:"secretSource,omitempty"`
+
+	// RootCAs defines a set of secrets that reside in this namespace that contain
+	// additional CA certificates that should be installed in Couchbase.  The CA
+	// certificates that are defined here are in addition to those defined for the
+	// cluster, optionally by couchbaseclusters.spec.networking.tls.secretSource, and
+	// thus should not be duplicated.  Secrets referred to must be of well-know type
+	// "kubernetes.io/tls" and must contain the CA certificate under the key "tls.crt".
+	// Multiple root CA certificates are only supported on Couchbase Server 7.1 and greater,
+	// and not with legacy couchbaseclusters.spec.networking.tls.static configuration.
+	RootCAs []string `json:"rootCAs,omitempty"`
 
 	// ClientCertificatePolicy defines the client authentication policy to use.
 	// If set, the Operator expects TLS configuration to contain a valid certificate/key pair
@@ -3134,8 +3149,7 @@ type StaticTLS struct {
 type TLSSecretSource struct {
 	// ServerSecretName specifies the secret name, in the same namespace as the cluster,
 	// that contains server TLS data.  The secret is expected to contain "tls.crt" and
-	// "tls.key" as per the kubernetes.io/tls secret type.  It also additionally
-	// must contain "ca.crt".
+	// "tls.key" as per the kubernetes.io/tls secret type.  It may also contain "ca.crt".
 	ServerSecretName string `json:"serverSecretName"`
 
 	// ClientSecretName specifies the secret name, in the same namespace as the cluster,

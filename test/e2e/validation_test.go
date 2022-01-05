@@ -384,7 +384,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 					tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
 
 					if validation.tls == tlsStandard {
-						tlsOpts.Source = e2eutil.TLSSourceTLSSecret
+						tlsOpts.Source = e2eutil.TLSSourceCertManagerSecret
 					}
 
 					ctx = e2eutil.MustInitClusterTLS(t, targetKube, tlsOpts)

@@ -107,15 +107,15 @@ func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *
 }
 
 // applyTLS optionally layers on server side TLS support to a cluster.
-func applyTLS(cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext) {
-	if ctx == nil {
+func applyTLS(cluster *couchbasev2.CouchbaseCluster, tls, clientTLS *TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
+	if tls == nil {
 		return
 	}
 
 	// Add the explicit name generated for the cluster, and encoded in the TLS
 	// certificates.  Also clear out the generate name that will most likely
 	// have been implicitly filled in.
-	cluster.Name = ctx.ClusterName
+	cluster.Name = tls.ClusterName
 	cluster.GenerateName = ""
 
 	// All TLS is handled at this level, purely as an artifact of x509.go living
@@ -123,15 +123,54 @@ func applyTLS(cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext) {
 	// generators.
 	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{}
 
-	if ctx.LegacyTLS() {
+	switch {
+	case tls.LegacyTLS():
+		// Legacy mode just associates the bespoke secrets with the API
+		// fields, the operator secret contains the cluster CA.  There can
+		// only be one PKI used with legacy, so ignore the client TLS
+		// entirely.
 		cluster.Spec.Networking.TLS.Static = &couchbasev2.StaticTLS{
-			ServerSecret:   ctx.ClusterSecretName,
-			OperatorSecret: ctx.OperatorSecretName,
+			ServerSecret:   tls.ClusterSecretName,
+			OperatorSecret: tls.OperatorSecretName,
 		}
-	} else {
+	case tls.Source == TLSSourceKubernetesSecret:
+		// In Kubernetes mode, the operator and cluster secrets contain
+		// only the cert/key pairs, the CA needs to be applied to the
+		// root certificates field.
 		cluster.Spec.Networking.TLS.SecretSource = &couchbasev2.TLSSecretSource{
-			ServerSecretName: ctx.ClusterSecretName,
-			ClientSecretName: ctx.OperatorSecretName,
+			ServerSecretName: tls.ClusterSecretName,
+		}
+
+		cluster.Spec.Networking.TLS.RootCAs = []string{
+			tls.CASecretName,
+		}
+
+		// When client certification is in play, if we are using a separate CA
+		// then that needs adding to the list of root CAs.
+		if policy != nil {
+			if clientTLS != nil {
+				cluster.Spec.Networking.TLS.SecretSource.ClientSecretName = clientTLS.OperatorSecretName
+				cluster.Spec.Networking.TLS.RootCAs = append(cluster.Spec.Networking.TLS.RootCAs, clientTLS.CASecretName)
+			} else {
+				cluster.Spec.Networking.TLS.SecretSource.ClientSecretName = tls.OperatorSecretName
+			}
+		}
+	case tls.Source == TLSSourceCertManagerSecret:
+		// Cert-manager mode just associates the bespoke secrets with the API
+		// fields, the cluster secret contains the cluster CA.
+		cluster.Spec.Networking.TLS.SecretSource = &couchbasev2.TLSSecretSource{
+			ServerSecretName: tls.ClusterSecretName,
+		}
+
+		// When client certification is in play, if we are using a separate CA
+		// then that needs adding to the list of root CAs.
+		if policy != nil {
+			if clientTLS != nil {
+				cluster.Spec.Networking.TLS.SecretSource.ClientSecretName = clientTLS.OperatorSecretName
+				cluster.Spec.Networking.TLS.RootCAs = append(cluster.Spec.Networking.TLS.RootCAs, clientTLS.CASecretName)
+			} else {
+				cluster.Spec.Networking.TLS.SecretSource.ClientSecretName = tls.OperatorSecretName
+			}
 		}
 	}
 }
@@ -240,7 +279,12 @@ func applyMonitoring(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.
 type ClusterOptions struct {
 	Options *e2espec.ClusterOptions
 
+	// TLS is a full PKI for server and client certificates...
 	TLS *TLSContext
+
+	// ClientTLS, if set, allows the client certificate configuration to be
+	// overridden and taken from a different PKI than the server certificates.
+	ClientTLS *TLSContext
 
 	TLSPolicy *couchbasev2.ClientCertificatePolicy
 
@@ -409,6 +453,14 @@ func (o *ClusterOptions) WithMutualTLS(tls *TLSContext, policy *couchbasev2.Clie
 	return o
 }
 
+// WithClientTLS overrides the client TLS configuration so it comes from a different
+// PKI to that of the server.
+func (o *ClusterOptions) WithClientTLS(clientTLS *TLSContext) *ClusterOptions {
+	o.ClientTLS = clientTLS
+
+	return o
+}
+
 // WithDNS sets the cluster as having a custom DNS server.
 func (o *ClusterOptions) WithDNS(dns *v1.Service) *ClusterOptions {
 	o.DNS = dns
@@ -469,7 +521,7 @@ func (o *ClusterOptions) WithAutoscaleStabilizationPeriod(seconds int) *ClusterO
 func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseCluster {
 	cluster := e2espec.NewBasicCluster(o.Options)
 
-	applyTLS(cluster, o.TLS)
+	applyTLS(cluster, o.TLS, o.ClientTLS, o.TLSPolicy)
 	applyMTLS(cluster, o.TLSPolicy)
 	applyDNS(k8s, cluster, o.DNS)
 	applyS3(cluster, o.S3Credentials)

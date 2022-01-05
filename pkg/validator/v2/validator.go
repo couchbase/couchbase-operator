@@ -1536,37 +1536,68 @@ func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.Couch
 	return nil
 }
 
-// getCA returns the CA, whether there was a soft error, or whether there was a hard error.
-func getCA(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, bool, error) {
-	var secretPath string
+// getRootCAs returns the CAs.  When no CAs are returned e.g. nil, and no error, it's assumed
+// that this is a race condition to do with resource creation order.
+func getRootCAs(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([][]byte, error) {
+	var rootCAs [][]byte
 
-	var secretName string
-
-	caKey := "ca.crt"
-
+	// When in shadowed mode, the root CA may be specified by the the user or cert-manager.
+	// When not, then the CA is required.
 	if cluster.IsTLSShadowed() {
-		secretPath = "spec.networking.tls.secretSource.serverSecretName"
-		secretName = cluster.Spec.Networking.TLS.SecretSource.ServerSecretName
+		secretName := cluster.Spec.Networking.TLS.SecretSource.ServerSecretName
+
+		secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+		if err != nil {
+			return nil, err
+		}
+
+		if !found {
+			return nil, fmt.Errorf("secret %s referenced by spec.networking.tls.secretSource.serverSecretName must exist", secretName)
+		}
+
+		if ca, ok := secret.Data["ca.crt"]; ok {
+			rootCAs = append(rootCAs, ca)
+		}
 	} else {
-		secretPath = "spec.networking.tls.static.operatorSecret"
-		secretName = cluster.Spec.Networking.TLS.Static.OperatorSecret
+		secretName := cluster.Spec.Networking.TLS.Static.OperatorSecret
+
+		secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+		if err != nil {
+			return nil, err
+		}
+
+		if !found {
+			return nil, fmt.Errorf("secret %s referenced by spec.networking.tls.static.operatorSecret must exist", secretName)
+		}
+
+		ca, ok := secret.Data["ca.crt"]
+		if !ok {
+			return nil, fmt.Errorf("tls secret %s must contain ca.crt", secretName)
+		}
+
+		rootCAs = append(rootCAs, ca)
 	}
 
-	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
-	if err != nil {
-		return nil, false, err
+	// When using certificate pools, then the CA can come from any of these sources.
+	for _, secretName := range cluster.Spec.Networking.TLS.RootCAs {
+		secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+		if err != nil {
+			return nil, err
+		}
+
+		if !found {
+			return nil, fmt.Errorf("secret %s referenced by spec.networking.tls.rootCAs must exist", secretName)
+		}
+
+		ca, ok := secret.Data[v1.TLSCertKey]
+		if !ok {
+			return nil, fmt.Errorf("tls secret %s must contain ca.crt", secretName)
+		}
+
+		rootCAs = append(rootCAs, ca)
 	}
 
-	if !found {
-		return nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
-	}
-
-	ca, ok := secret.Data[caKey]
-	if !ok {
-		return nil, false, fmt.Errorf("tls secret %s must contain %s", secretName, caKey)
-	}
-
-	return ca, true, nil
+	return rootCAs, nil
 }
 
 // getServerTLS returns the server key and chain, whether there was a soft error, or whether there was a hard error.
@@ -1671,12 +1702,13 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 	}
 
 	// Get the CA for verification.
-	ca, ok, err := getCA(v, cluster)
+	rootCAs, err := getRootCAs(v, cluster)
 	if err != nil {
 		return []error{err}
 	}
 
-	if !ok {
+	// Nothing found, assume this is a recource creation race condition e.g. eventual consistency.
+	if rootCAs == nil {
 		return nil
 	}
 
@@ -1690,9 +1722,8 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		return nil
 	}
 
-	errs := util_x509.Verify(ca, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !cluster.IsTLSShadowed())
-	if errs != nil {
-		return errs
+	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !cluster.IsTLSShadowed()); err != nil {
+		return []error{err}
 	}
 
 	// Check the client certificates.
@@ -1709,9 +1740,8 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		return nil
 	}
 
-	errs = util_x509.Verify(ca, chain, key, x509.ExtKeyUsageClientAuth, nil, false)
-	if errs != nil {
-		return errs
+	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageClientAuth, nil, false); err != nil {
+		return []error{err}
 	}
 
 	return nil

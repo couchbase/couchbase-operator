@@ -5,7 +5,7 @@ FROM registry.access.redhat.com/ubi8/go-toolset:1.15.14-3 as build
 # This sentinel will be overwritten by the build system, but the Makefile
 # should have a sane default... unless that ^^^ container has the VERSION
 # environment variable set :eyeroll:
-ARG PROD_VERSION=2.3.0-beta1
+ARG PROD_VERSION=2.3.0
 
 # Literally Red Hat is two releases behind the times, with all those lovely
 # unpatched CVEs, so give it a helping hand and override go.  You have to

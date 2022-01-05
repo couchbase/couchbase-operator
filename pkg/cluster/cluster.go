@@ -778,12 +778,17 @@ func (c *Cluster) initCouchbaseClient() error {
 	if ca == nil && c.cluster.IsTLSEnabled() {
 		log.V(1).Info("No TLS configuration cached")
 
-		caTemp, _, _, err := c.getTLSData()
+		rootCAs, err := c.getCAs()
 		if err != nil {
 			return err
 		}
 
-		ca = caTemp
+		serverCA, _, _, err := c.getVerifiedServerTLSData(rootCAs)
+		if err != nil {
+			return err
+		}
+
+		ca = serverCA
 
 		// Optionally enable client authentication
 		if c.cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {

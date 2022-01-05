@@ -4,7 +4,7 @@ ARG GO_VERSION=1.17.2
 # to tolerate the Mac users.
 FROM golang:$GO_VERSION as build
 
-ARG PROD_VERSION=2.3.0-beta1
+ARG PROD_VERSION=2.3.0
 ARG WORKDIR=/src/github.com/couchbase/couchbase-operator
 
 # Create the working directory to build in.

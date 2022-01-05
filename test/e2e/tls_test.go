@@ -60,7 +60,7 @@ func TestTLSCreateClusterWithShadowing(t *testing.T) {
 
 	// Create the cluster.  Use the same names as are standard on Kubernetes.
 	keyEncoding := e2eutil.KeyEncodingPKCS8
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
+	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
 	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
 
 	// When the cluster is healthy, check the TLS is correctly configured.
@@ -500,7 +500,7 @@ func TestTLSRotate(t *testing.T) {
 func TestTLSRotateWithShadowing(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 
-	testTLSRotate(t, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
+	testTLSRotate(t, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
 }
 
 // TestTLSRotateChain tests a certificate can be reissued by a CA with a new sub-CA.
@@ -586,7 +586,7 @@ func TestTLSRotateCA(t *testing.T) {
 func TestTLSRotateCAWithShadowing(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 
-	testTLSRotateCA(t, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
+	testTLSRotateCA(t, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
 }
 
 // TestTLSRotateCAAndScale tests the operator can talk to a cluster after
@@ -811,7 +811,7 @@ func TestMandatoryMutualTLSCreateCluster(t *testing.T) {
 func TestMutualTLSCreateClusterWithShadowing(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 
-	testMutualTLSCreateCluster(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
+	testMutualTLSCreateCluster(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
 }
 
 // testMutualTLSEnable tests mTLS can be enabled on a TLS cluster.
@@ -957,7 +957,7 @@ func TestMandatoryMutualTLSRotateClient(t *testing.T) {
 func TestMutualTLSRotateClientWithShadowing(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 
-	testMutualTLSRotateClient(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
+	testMutualTLSRotateClient(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
 }
 
 // testMutualTLSRotateClientChain ensure we can rotate operator client certificate and
@@ -1058,7 +1058,7 @@ func TestMandatoryMutualTLSRotateCA(t *testing.T) {
 func TestMutualTLSRotateCAWithShadowing(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 
-	testMutualTLSRotateCA(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceTLSSecret, KeyEncoding: &keyEncoding})
+	testMutualTLSRotateCA(t, couchbasev2.ClientCertificatePolicyEnable, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
 }
 
 // testMutualTLSRotateClientChain ensure we can rotate operator client certificate and
@@ -1665,4 +1665,47 @@ func TestTLSEditSettings(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// testMandatoryMutualTLSWithMultipleCAs tests that a cluster using server secrets from
+// various different sources, works with client certs from a different PKI.
+func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2eutil.TLSSource) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: serverTLSSourceType})
+	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).Generate(kubernetes)
+
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestMandatoryMutualTLSWithMultipleCAsAndKubernetesSecrets tests that a cluster using Kubernetes
+// server secrets (CA supplied separately), works with client certs from a different PKI.
+func TestMandatoryMutualTLSWithMultipleCAsAndKubernetesSecrets(t *testing.T) {
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceKubernetesSecret)
+}
+
+// TestMandatoryMutualTLSWithMultipleCAsAndCertManagerSecrets tests that a cluster using cert-manager
+// server secrets (CA integrated), works with client certs from a different PKI.
+func TestMandatoryMutualTLSWithMultipleCAsAndCertManagerSecrets(t *testing.T) {
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret)
 }

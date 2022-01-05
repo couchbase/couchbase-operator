@@ -3541,6 +3541,11 @@ func (in *TLSPolicy) DeepCopyInto(out *TLSPolicy) {
 		*out = new(TLSSecretSource)
 		**out = **in
 	}
+	if in.RootCAs != nil {
+		in, out := &in.RootCAs, &out.RootCAs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ClientCertificatePolicy != nil {
 		in, out := &in.ClientCertificatePolicy, &out.ClientCertificatePolicy
 		*out = new(ClientCertificatePolicy)

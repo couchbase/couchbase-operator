@@ -456,7 +456,7 @@ func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member) 
 	}
 
 	// Wait for the port to come backup with the correct certificate chain
-	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.ca); err != nil {
+	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.serverCA); err != nil {
 		return err
 	}
 
@@ -466,7 +466,7 @@ func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member) 
 // initMemberTLSLegacy handles TLS initialization on CBS versions <=7.0.
 func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Member) error {
 	// Update Couchbase's TLS configuration
-	if err := couchbaseutil.SetClusterCACert(c.tlsCache.ca).InPlaintext().On(c.api, m); err != nil {
+	if err := couchbaseutil.SetClusterCACert(c.tlsCache.serverCA).InPlaintext().On(c.api, m); err != nil {
 		return err
 	}
 
@@ -475,7 +475,7 @@ func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Membe
 	}
 
 	// Wait for the port to come backup with the correct certificate chain
-	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.ca); err != nil {
+	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.serverCA); err != nil {
 		return err
 	}
 
