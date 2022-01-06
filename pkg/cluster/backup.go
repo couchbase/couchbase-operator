@@ -128,11 +128,7 @@ func (c Cluster) listBackupResources() (backupResourcesList, error) {
 		var resource *backupResources
 
 		for i := range resources {
-			if resources[i].backup == nil {
-				continue
-			}
-
-			if resources[i].backup.Name == name {
+			if resources[i].name == name {
 				resource = &resources[i]
 				break
 			}
