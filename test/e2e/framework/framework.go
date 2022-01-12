@@ -167,7 +167,7 @@ func configure() (err error) {
 		ServiceAccountName: "couchbase-operator",
 		MinioAccessKey:     e2eutil.RandomString(8),
 		MinioSecretID:      e2eutil.RandomString(8),
-		MinioRegion:        "us-west-1",
+		MinioRegion:        "us-east-1",
 	}
 
 	var platform string
@@ -1196,6 +1196,30 @@ func (r *TestRequirement) ExporterUpgradable() *TestRequirement {
 
 	if upgrade.GreaterEqual(version) {
 		r.t.Skip(fmt.Sprintf("Exporter upgrade version %s greater than or equal to base version %s", parts2[1], parts1[1]))
+	}
+
+	return r
+}
+
+// AtLeastBackupVersion skips the test for backup versions before this threshold.
+func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
+	parts := strings.Split(Global.CouchbaseBackupImage, ":")
+	if len(parts) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseBackupImage))
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+	}
+
+	v2, err := couchbaseutil.NewVersion(v)
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+	}
+
+	if v1.Less(v2) {
+		r.t.Skip("Couchbase Backup Image version not supported (geriatric)")
 	}
 
 	return r

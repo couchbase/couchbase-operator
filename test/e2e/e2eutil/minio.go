@@ -81,7 +81,7 @@ func (minio *Minio) Create(t *testing.T) (*Minio, error) {
 	return minio, nil
 }
 
-func (minio *Minio) WaitTillReady(waitTime time.Duration) error {
+func (minio *Minio) WaitUntilReady(waitTime time.Duration) error {
 	var client = http.Client{}
 
 	if minio.tls {
@@ -117,6 +117,13 @@ func (minio *Minio) WaitTillReady(waitTime time.Duration) error {
 	}
 
 	return nil
+}
+
+func (minio *Minio) MustWaitUntilReady(t *testing.T, waitTime time.Duration) {
+	err := minio.WaitUntilReady(waitTime)
+	if err != nil {
+		Die(t, err)
+	}
 }
 
 func (minio *Minio) createService() error {
