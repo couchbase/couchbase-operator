@@ -587,6 +587,7 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 		strconv.Itoa(o.parallel),
 		"-color",
 		"-collect-logs",
+		"-collect-server-logs",
 	}
 
 	certificationArgs = append(certificationArgs, args...)

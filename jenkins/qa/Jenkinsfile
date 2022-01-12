@@ -172,6 +172,7 @@ pipeline {
             -compression-mode \${compression_mode} \
             -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} \
             -collect-logs \
+            -collect-server-logs=false \
             -s3-access-key \${AWS_CREDENTIALS_USR} \
             -s3-secret-id \${AWS_CREDENTIALS_PSW}"
         }
