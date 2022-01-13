@@ -128,6 +128,7 @@ include::partial$autogen-reference.adoc[]
  ** xref:tutorial-metering.adoc[Metering Couchbase Resources In OpenShift]
 * Monitoring
  ** xref:tutorial-prometheus.adoc[Quick Start with Prometheus Monitoring]
+ ** xref:tutorial-use-your-own-prometheus-server.adoc[Using your own Prometheus Server]
 * Networking
  ** xref:tutorial-remote-dns.adoc[Inter-Kubernetes Networking with Forwarded DNS]
  ** xref:tutorial-public-addressability.adoc[Public Networking with External DNS]

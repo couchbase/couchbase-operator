@@ -1,0 +1,59 @@
+= Using Your Own Prometheus Server to Consume Couchbase Statistics
+:description: With Couchbase 7.x, it's not necessary to write a custom Prometheus Exporter.This page will demonstrate how to enable a Prometheus server to read from Couchbase's Prometheus-ready endpoints.
+
+[abstract]
+{description}
+
+== Prerequisites
+
+In this tutorial, we're going to use a Docker instance of Prometheus to build our consumer. Make sure that you have Docker installed and running on your machine.
+
+:sectnums:
+
+== Prepare the target configuration file
+You need to create a file that contains a list of the cluster's node targets. This is done by issuing a request to the server from the command line:
+
+[source, console]
+----
+wget --content-disposition \
+    'http://10.112.211.101:8091/prometheus_sd_config.yaml' \
+    --http-user Administrator --http-password password
+----
+
+This will generate a configuration file containing the target addresses of the servers in your node. The name of your file will depend on the name of your cluster, but the file suffix will be `yml`.
+
+.couchbase_sd_config_my-cluster.yml
+[source, yaml]
+----
+- targets:
+    - '10.144.220.101:8091'
+    - '10.144.220.102:8091'
+----
+
+Now create a new directory on your system and copy the file to new directory:
+
+[source, console]
+----
+mkdir ~/prometheus
+cp couchbase_sd_config_my-cluster.yml ~/prometheus
+----
+
+== Install Prometheus
+
+Open a terminal window and run the following command to provision Prometheus:
+
+[source, console]
+----
+docker run \
+    -p 9090:9090 \    # <.>
+    -v ~/prometheus/config:/etc/prometheus \    # <.>
+    prom/prometheus
+----
+<.> The port through which the Prometheus server is accessed and takes the form: `-p{nbsp}host-port:container-port`.
++
+[horizontal]
+*host-port*:: the port of the host machineused to access the Prometheus service.
+*container-port*:: this is the port used internally by the container. The host port maps on to this.
+
+<.> This is the mapping of the Prometheus configuration directory. In this example, you will need to put the `prometheus.yml` file in the `~/prometheus/config/` directory for the container to access it.
+
