@@ -7,6 +7,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
@@ -200,6 +201,26 @@ func MustFlushBucket(t *testing.T, kubernetes *types.Cluster, cluster *couchbase
 	}
 
 	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustCreateBucketManually creates an unmanaged bucket.
+func MustCreateBucketManually(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string) {
+	client, err := CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		Die(t, err)
+	}
+
+	// TODO: better parameterization.
+	bucket := &couchbaseutil.Bucket{
+		BucketName:        name,
+		BucketType:        "couchbase",
+		BucketMemoryQuota: 100,
+		CompressionMode:   couchbaseutil.CompressionModePassive,
+	}
+
+	if err := couchbaseutil.CreateBucket(bucket).On(client.client, client.host); err != nil {
 		Die(t, err)
 	}
 }

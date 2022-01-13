@@ -32,6 +32,7 @@
   *** xref:concept-memory-allocation.adoc[Couchbase Memory Allocation]
  ** Data Management
   *** xref:concept-scopes-and-collections.adoc[Couchbase Scopes and Collections]
+  *** xref:concept-data-save-restore.adoc[Data Topology Save, Restore and Synchronization]
  ** Hibernation
   *** xref:concept-hibernation.adoc[Couchbase Cluster Hibernation]
  ** Logging

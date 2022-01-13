@@ -87,6 +87,27 @@ For large, production databases, ensure an adequate maintenance window is schedu
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
 ====
 
+[#release-v230]
+== Release 2.3.0
+
+Couchbase Autonomous Operator 2.3.0 was released in April 2022.
+
+[#changes-in-behavior-v230]
+=== New Features and Behavioral Changes
+
+==== Data Topology Synchronization
+
+This feature allows manually created buckets, scopes and collections to be synchronized as Kubernetes primitives and then managed.
+
+For more information, see the xref:concept-data-save-restore.adoc[] concepts page.
+
+==== Data Topology Save and Restore
+
+This feature allows manually created buckets, scopes and collections to be saved, then restored to any cluster.
+Unlike synchronization, this feature supports partial save and restore, different merge policies, resource compaction and garbage collection.
+
+For more information, see the xref:concept-data-save-restore.adoc[] concepts page.
+
 [#release-v230-beta1]
 == Release 2.3.0-beta1
 

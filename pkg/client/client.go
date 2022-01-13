@@ -4,10 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 )
 
 func MustNew(cfg *rest.Config) versioned.Interface {
@@ -30,6 +36,12 @@ type Client struct {
 
 	// Couchbase is a client for accessing Couchbase custom resources
 	CouchbaseClient versioned.Interface
+
+	// DynamicClient is a type agnostic client set.
+	DynamicClient dynamic.Interface
+
+	// RESTMapper allows us to go from a type to a REST API call.
+	RESTMapper meta.RESTMapper
 
 	// Pods is a read only cache of pods (Couchbase cluster scoped)
 	Pods *PodCache
@@ -118,6 +130,18 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 	if err != nil {
 		return nil, err
 	}
+
+	c.DynamicClient, err = dynamic.NewForConfig(c.KubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	groupResources, err := restmapper.GetAPIGroupResources(c.KubeClient.Discovery())
+	if err != nil {
+		return nil, err
+	}
+
+	c.RESTMapper = restmapper.NewDiscoveryRESTMapper(groupResources)
 
 	c.Pods, err = newPodCache(ctx, c.KubeClient, namespace, selector)
 	if err != nil {
@@ -256,4 +280,26 @@ func (c *Client) Shutdown() {
 	c.CouchbaseCollections.stop()
 	c.CouchbaseCollectionGroups.stop()
 	c.CouchbaseMigrationReplications.stop()
+}
+
+// Get is a type agnostic interface to retrieve a named object.
+func (c *Client) Get(gvk schema.GroupVersionKind, name string) (runtime.Object, bool) {
+	if gvk.GroupVersion() != couchbasev2.SchemeGroupVersion {
+		return nil, false
+	}
+
+	switch gvk.Kind {
+	case couchbasev2.BucketCRDResourceKind:
+		return c.CouchbaseBuckets.Get(name)
+	case couchbasev2.EphemeralBucketCRDResourceKind:
+		return c.CouchbaseEphemeralBuckets.Get(name)
+	case couchbasev2.MemcachedBucketCRDResourceKind:
+		return c.CouchbaseMemcachedBuckets.Get(name)
+	case couchbasev2.ScopeCRDResourceKind:
+		return c.CouchbaseScopes.Get(name)
+	case couchbasev2.CollectionCRDResourceKind:
+		return c.CouchbaseCollections.Get(name)
+	}
+
+	return nil, false
 }

@@ -198,6 +198,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileClusterSettings,
 		(*Cluster).reconcileBuckets,
 		(*Cluster).reconcileScopesAndCollections,
+		(*Cluster).reconcileSynchronizeBuckets,
 		(*Cluster).reconcileXDCR,
 		(*Cluster).reconcileReadiness,
 		(*Cluster).reconcileAdminService,

@@ -22,6 +22,10 @@ func (c *Cluster) reconcileScopesAndCollections() error {
 		return nil
 	}
 
+	if !c.cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
 	// Reconcile each bucket individually.
 	buckets, err := c.listScopedBuckets()
 	if err != nil {

@@ -11,13 +11,14 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/conversion"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/ansi"
 	"github.com/couchbase/couchbase-operator/pkg/util/cli"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
@@ -31,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -56,12 +56,6 @@ var (
 
 	// errInternalError is raised when we messed up, and shouldn't ever be seen.
 	errInternalError = errors.New("internal error")
-)
-
-const (
-	// defaultScopeOrCollectionName is the hard coded default for scope and collection
-	// backward compatibility.
-	defaultScopeOrCollectionName = "_default"
 )
 
 var (
@@ -505,7 +499,7 @@ func gatherResources(client *couchbaseutil.Client, host string, path pathVar) ([
 	var resources []runtime.Object
 
 	for _, bucket := range buckets {
-		bucketResource, err := convertCouchbaseBucketToAPIBucket(bucket)
+		bucketResource, err := conversion.ConvertAbstractBucketToAPIBucket(&bucket, defaultSaveRestoreNamer)
 		if err != nil {
 			return nil, err
 		}
@@ -527,7 +521,7 @@ func gatherResources(client *couchbaseutil.Client, host string, path pathVar) ([
 		}
 
 		for _, scope := range scopes.Scopes {
-			s := convertCouchbaseScopeToAPIScope(scope)
+			s := conversion.ConvertCouchbaseScopeToAPIScope(&bucket, &scope, defaultSaveRestoreNamer)
 
 			abstractBucket, ok := bucketResource.(couchbasev2.AbstractBucket)
 			if !ok {
@@ -548,10 +542,10 @@ func gatherResources(client *couchbaseutil.Client, host string, path pathVar) ([
 			}
 
 			for _, collection := range scope.Collections {
-				if collection.Name == defaultScopeOrCollectionName {
+				if collection.Name == constants.DefaultScopeOrCollectionName {
 					s.Spec.Collections.PreserveDefaultCollection = true
 				} else {
-					c := convertCouchbaseCollectionToAPICollection(collection)
+					c := conversion.ConvertCouchbaseCollectionToAPICollection(&bucket, &scope, &collection, defaultSaveRestoreNamer)
 
 					collectionReference := couchbasev2.CollectionLocalObjectReference{
 						Kind: couchbasev2.CouchbaseCollectionKindCollection,
@@ -649,179 +643,51 @@ func gatherClusterResources(clients *clients, cluster *couchbasev2.CouchbaseClus
 	return gatherResources(apiClient, host, path)
 }
 
+// saveRestoreResourceNamer handles name generation of resource names in the context
+// of save and restore.  It conforms to the conversion.BucketNameGenerator interface.
+type saveRestoreResourceNamer struct{}
+
+// defaultSaveRestoreNamer is a global naming abstraction.
+var defaultSaveRestoreNamer = &saveRestoreResourceNamer{}
+
 // generateName generates a unique name for a type.
-func generateName(t string) string {
+func (n *saveRestoreResourceNamer) generateName(t string) string {
 	return fmt.Sprintf("%s-%s", t, uuid.New().String())
 }
 
-// generateBucketName generates a unique bucket name.
-func generateBucketName() string {
-	return generateName("bucket")
+// GenerateBucketName generates a unique bucket name.
+func (n *saveRestoreResourceNamer) GenerateBucketName(_ *couchbaseutil.Bucket) string {
+	return n.generateName("bucket")
 }
 
-// generateEphemeralBucketName generates a unique ephemeral bucket name.
-func generateEphemeralBucketName() string {
-	return generateName("ephemeralbucket")
+// GenerateEphemeralBucketName generates a unique ephemeral bucket name.
+func (n *saveRestoreResourceNamer) GenerateEphemeralBucketName(_ *couchbaseutil.Bucket) string {
+	return n.generateName("ephemeralbucket")
 }
 
-// generateMemcachedBucketName generates a unique memcached bucket name.
-func generateMemcachedBucketName() string {
-	return generateName("memcachedbucket")
+// GenerateMemcachedBucketName generates a unique memcached bucket name.
+func (n *saveRestoreResourceNamer) GenerateMemcachedBucketName(_ *couchbaseutil.Bucket) string {
+	return n.generateName("memcachedbucket")
 }
 
-// generateScopeName generates a unique scope name.
-func generateScopeName() string {
-	return generateName("scope")
+// GenerateScopeName generates a unique scope name.
+func (n *saveRestoreResourceNamer) GenerateScopeName(_ *couchbaseutil.Bucket, _ *couchbaseutil.Scope) string {
+	return n.generateName("scope")
 }
 
 // generateScopeGroupName generates a unique scope group name.
-func generateScopeGroupName() string {
-	return generateName("scopegroup")
+func (n *saveRestoreResourceNamer) generateScopeGroupName() string {
+	return n.generateName("scopegroup")
 }
 
-// generateCollectionName generates a unique collection name.
-func generateCollectionName() string {
-	return generateName("collection")
+// GenerateCollectionName generates a unique collection name.
+func (n *saveRestoreResourceNamer) GenerateCollectionName(_ *couchbaseutil.Bucket, _ *couchbaseutil.Scope, _ *couchbaseutil.Collection) string {
+	return n.generateName("collection")
 }
 
 // generateCollectionGroupName generates a unique collection group name.
-func generateCollectionGroupName() string {
-	return generateName("collectiongroup")
-}
-
-// convertCouchbaseBucketToAPIBucket takes a raw bucket from the Couchbase API and converts
-// it into a Kubernetes API equivalent.
-func convertCouchbaseBucketToAPIBucket(bucket couchbaseutil.Bucket) (runtime.Object, error) {
-	switch bucket.BucketType {
-	case "couchbase":
-		b := &couchbasev2.CouchbaseBucket{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: couchbasev2.Group,
-				Kind:       couchbasev2.BucketCRDResourceKind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: generateBucketName(),
-			},
-			Spec: couchbasev2.CouchbaseBucketSpec{
-				Name:               couchbasev2.BucketName(bucket.BucketName),
-				MemoryQuota:        resource.NewQuantity(bucket.BucketMemoryQuota<<20, resource.BinarySI),
-				Replicas:           bucket.BucketReplicas,
-				IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
-				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicy(bucket.EvictionPolicy),
-				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolution(bucket.ConflictResolution),
-				EnableFlush:        bucket.EnableFlush,
-				EnableIndexReplica: bucket.EnableIndexReplica,
-				CompressionMode:    couchbasev2.CouchbaseBucketCompressionMode(bucket.CompressionMode),
-				MinimumDurability:  couchbasev2.CouchbaseBucketMinimumDurability(bucket.DurabilityMinLevel),
-				MaxTTL:             &metav1.Duration{Duration: time.Duration(bucket.MaxTTL) * time.Second},
-				Scopes: &couchbasev2.ScopeSelector{
-					Managed:   true,
-					Resources: []couchbasev2.ScopeLocalObjectReference{},
-				},
-			},
-		}
-
-		return b, nil
-	case "ephemeral":
-		b := &couchbasev2.CouchbaseEphemeralBucket{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: couchbasev2.Group,
-				Kind:       couchbasev2.EphemeralBucketCRDResourceKind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: generateEphemeralBucketName(),
-			},
-			Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
-				Name:               couchbasev2.BucketName(bucket.BucketName),
-				MemoryQuota:        resource.NewQuantity(bucket.BucketMemoryQuota<<20, resource.BinarySI),
-				Replicas:           bucket.BucketReplicas,
-				IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
-				EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicy(bucket.EvictionPolicy),
-				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolution(bucket.ConflictResolution),
-				EnableFlush:        bucket.EnableFlush,
-				CompressionMode:    couchbasev2.CouchbaseBucketCompressionMode(bucket.CompressionMode),
-				MinimumDurability:  couchbasev2.CouchbaseEphemeralBucketMinimumDurability(bucket.DurabilityMinLevel),
-				MaxTTL:             &metav1.Duration{Duration: time.Duration(bucket.MaxTTL) * time.Second},
-				Scopes: &couchbasev2.ScopeSelector{
-					Managed:   true,
-					Resources: []couchbasev2.ScopeLocalObjectReference{},
-				},
-			},
-		}
-
-		return b, nil
-	case "memcached":
-		b := &couchbasev2.CouchbaseMemcachedBucket{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: couchbasev2.Group,
-				Kind:       couchbasev2.MemcachedBucketCRDResourceKind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: generateMemcachedBucketName(),
-			},
-			Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
-				Name:        couchbasev2.BucketName(bucket.BucketName),
-				MemoryQuota: resource.NewQuantity(bucket.BucketMemoryQuota<<20, resource.BinarySI),
-				EnableFlush: bucket.EnableFlush,
-			},
-		}
-
-		return b, nil
-	}
-
-	return nil, fmt.Errorf("%w: unexpected bucket type %s", errInternalError, bucket.BucketType)
-}
-
-// convertCouchbaseScopeToAPIScope takes a raw scope from the Couchbase API and converts
-// it into a Kubernetes API equivalent.
-func convertCouchbaseScopeToAPIScope(scope couchbaseutil.Scope) *couchbasev2.CouchbaseScope {
-	s := &couchbasev2.CouchbaseScope{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: couchbasev2.Group,
-			Kind:       couchbasev2.ScopeCRDResourceKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: generateScopeName(),
-		},
-		Spec: couchbasev2.CouchbaseScopeSpec{
-			CouchbaseScopeSpecCommon: couchbasev2.CouchbaseScopeSpecCommon{
-				Collections: &couchbasev2.CollectionSelector{
-					Managed:   true,
-					Resources: []couchbasev2.CollectionLocalObjectReference{},
-				},
-			},
-		},
-	}
-
-	if scope.Name == defaultScopeOrCollectionName {
-		s.Spec.DefaultScope = true
-	} else {
-		s.Spec.Name = couchbasev2.ScopeOrCollectionName(scope.Name)
-	}
-
-	return s
-}
-
-// convertCouchbaseCollectionToAPICollection takes a raw collection from the Couchbase API and converts
-// it into a Kubernetes API equivalent.
-func convertCouchbaseCollectionToAPICollection(collection couchbaseutil.Collection) *couchbasev2.CouchbaseCollection {
-	c := &couchbasev2.CouchbaseCollection{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: couchbasev2.Group,
-			Kind:       couchbasev2.CollectionCRDResourceKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: generateCollectionName(),
-		},
-		Spec: couchbasev2.CouchbaseCollectionSpec{
-			Name: couchbasev2.ScopeOrCollectionName(collection.Name),
-			CouchbaseCollectionSpecCommon: couchbasev2.CouchbaseCollectionSpecCommon{
-				MaxTTL: &metav1.Duration{Duration: time.Duration(collection.MaxTTL) * time.Second},
-			},
-		},
-	}
-
-	return c
+func (n *saveRestoreResourceNamer) generateCollectionGroupName() string {
+	return n.generateName("collectiongroup")
 }
 
 // restoreStrategy defines how to handle conflicts between the current data topology
@@ -1711,7 +1577,7 @@ func (n *bucketNode) DeepEqual(other TreeNode) (bool, error) {
 // GenerateResourceName creates a unique resource name for
 // concrete resource types.
 func (n *bucketNode) GenerateResourceName() {
-	n.resource.Name = generateBucketName()
+	n.resource.Name = defaultSaveRestoreNamer.GenerateBucketName(nil)
 }
 
 // ResourceName returns the nodes's resource Kubernetes name.
@@ -1815,7 +1681,7 @@ func (n *ephemeralBucketNode) DeepEqual(other TreeNode) (bool, error) {
 // GenerateResourceName creates a unique resource name for
 // concrete resource types.
 func (n *ephemeralBucketNode) GenerateResourceName() {
-	n.resource.Name = generateEphemeralBucketName()
+	n.resource.Name = defaultSaveRestoreNamer.GenerateEphemeralBucketName(nil)
 }
 
 // ResourceName returns the nodes's resource Kubernetes name.
@@ -1919,7 +1785,7 @@ func (n *memcachedBucketNode) DeepEqual(other TreeNode) (bool, error) {
 // GenerateResourceName creates a unique resource name for
 // concrete resource types.
 func (n *memcachedBucketNode) GenerateResourceName() {
-	n.resource.Name = generateMemcachedBucketName()
+	n.resource.Name = defaultSaveRestoreNamer.GenerateMemcachedBucketName(nil)
 }
 
 // ResourceName returns the nodes's resource Kubernetes name.
@@ -1997,7 +1863,7 @@ func (n *scopeNode) DeepEqual(other TreeNode) (bool, error) {
 // GenerateResourceName creates a unique resource name for
 // concrete resource types.
 func (n *scopeNode) GenerateResourceName() {
-	n.resource.Name = generateScopeName()
+	n.resource.Name = defaultSaveRestoreNamer.GenerateScopeName(nil, nil)
 }
 
 // ResourceName returns the nodes's resource Kubernetes name.
@@ -2100,7 +1966,7 @@ func (n *scopeGroupNode) DeepEqual(other TreeNode) (bool, error) {
 // GenerateResourceName creates a unique resource name for
 // concrete resource types.
 func (n *scopeGroupNode) GenerateResourceName() {
-	n.resource.Name = generateScopeGroupName()
+	n.resource.Name = defaultSaveRestoreNamer.generateScopeGroupName()
 }
 
 // ResourceName returns the nodes's resource Kubernetes name.
@@ -2202,7 +2068,7 @@ func (n *collectionNode) DeepEqual(other TreeNode) (bool, error) {
 // GenerateResourceName creates a unique resource name for
 // concrete resource types.
 func (n *collectionNode) GenerateResourceName() {
-	n.resource.Name = generateCollectionName()
+	n.resource.Name = defaultSaveRestoreNamer.GenerateCollectionName(nil, nil, nil)
 }
 
 // ResourceName returns the nodes's resource Kubernetes name.
@@ -2279,7 +2145,7 @@ func (n *collectionGroupNode) DeepEqual(other TreeNode) (bool, error) {
 // GenerateResourceName creates a unique resource name for
 // concrete resource types.
 func (n *collectionGroupNode) GenerateResourceName() {
-	n.resource.Name = generateCollectionGroupName()
+	n.resource.Name = defaultSaveRestoreNamer.generateCollectionGroupName()
 }
 
 // ResourceName returns the nodes's resource Kubernetes name.

@@ -46,6 +46,7 @@ const (
 	TagFeatureReconcile         = "reconcile"
 	TagFeatureNetwork           = "network"
 	TagFeatureCollections       = "collections"
+	TagFeatureSynchronization   = "synchronization"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -533,6 +534,9 @@ func registerTests() {
 		framework.NewTestDef(TestBackupBucketExclusion).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupThenDelete).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestoreS3WithIAMRole).WithTags(TagSuiteP1, TagFeatureBackup, TagSuitePlatform),
+
+		// Synchronization tests.
+		framework.NewTestDef(TestDataSynchronizationBasic).WithTags(TagSuiteP1, TagFeatureSynchronization, TagFeatureCollections),
 
 		// System tests.
 		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem),

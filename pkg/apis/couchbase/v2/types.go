@@ -2902,6 +2902,25 @@ type Buckets struct {
 	// of buckets will be reverted by the Operator.  When user managed, the Operator
 	// will not interrogate buckets at all.  This field defaults to false.
 	Managed bool `json:"managed,omitempty"`
+
+	// Synchronize allows unmanaged buckets, scopes, and collections to be synchronized as
+	// Kubernetes resources by the Operator.  This feature is intended for development only
+	// and should not be used for production workloads.  The synchronization workflow starts
+	// with `spec.buckets.managed` being set to false, the user can manually create buckets,
+	// scopes, and collections using the Couchbase UI, or other tooling.  When you wish to
+	// commit to Kubernetes resources, you must specify a unique label selector in the
+	// `spec.buckets.selector` field, and this field is set to true.  The Operator will
+	// create Kubernetes resources for you, and upon completion set the cluster's
+	// `Synchronized` status condition.  You may then safely set `spec.buckets.managed` to
+	// true and the Operator will manage these resources as per usual.  To update an already
+	// managed data topology, you must first set it to unmanaged, make any changes, and delete
+	// any old resources, then follow the standard synchronization workflow.  The Operator
+	// can not, and will not, ever delete, or make modifications to resource specifications
+	// that are intended to be user managed, or managed by a life cycle management tool. These
+	// actions must be instigated by an end user.  For a more complete experience, refer to
+	// the documentation for the `cao save` and `cao restore` CLI commands.
+	Synchronize bool `json:"synchronize,omitempty"`
+
 	// Selector is a label selector used to list buckets in the namespace
 	// that are managed by the Operator.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
@@ -3210,7 +3229,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;
 type ClusterConditionType string
 
 const (
@@ -3224,6 +3243,7 @@ const (
 	ClusterConditionHibernating    ClusterConditionType = "Hibernating"
 	ClusterConditionError          ClusterConditionType = "Error"
 	ClusterConditionAutoscaleReady ClusterConditionType = "AutoscaleReady"
+	ClusterConditionSynchronized   ClusterConditionType = "Synchronized"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

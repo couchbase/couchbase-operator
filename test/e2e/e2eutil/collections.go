@@ -636,7 +636,18 @@ func MustWaitForScopesAndCollections(t *testing.T, kubernetes *types.Cluster, cl
 
 // MustAssertScopesAndCollectionsFor checks that the scopes and collections state is as expected
 // for a period of time (e.g. the Operator is not doing something it shouldn't).
-func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket metav1.Object, expected *ExpectedScopesAndCollections, timeout time.Duration) {
+func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket interface{}, expected *ExpectedScopesAndCollections, timeout time.Duration) {
+	var bucketName string
+
+	switch typ := bucket.(type) {
+	case metav1.Object:
+		bucketName = typ.GetName()
+	case string:
+		bucketName = typ
+	default:
+		Die(t, fmt.Errorf("unhandled type"))
+	}
+
 	callback := func() error {
 		client, err := CreateAdminConsoleClient(kubernetes, cluster)
 		if err != nil {
@@ -645,7 +656,7 @@ func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, 
 
 		var scopes couchbaseutil.ScopeList
 
-		if err := couchbaseutil.ListScopes(bucket.GetName(), &scopes).On(client.client, client.host); err != nil {
+		if err := couchbaseutil.ListScopes(bucketName, &scopes).On(client.client, client.host); err != nil {
 			return err
 		}
 
@@ -653,7 +664,7 @@ func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, 
 		// there.
 		for _, scope := range scopes.Scopes {
 			if _, ok := expected.expected[scope.Name]; !ok {
-				return fmt.Errorf("scope `%v` not expected in bucket `%v`", scope.Name, bucket.GetName())
+				return fmt.Errorf("scope `%v` not expected in bucket `%v`", scope.Name, bucketName)
 			}
 		}
 
@@ -661,7 +672,7 @@ func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, 
 		// but aren't.
 		for scope, collections := range expected.expected {
 			if !scopes.HasScope(scope) {
-				return fmt.Errorf("expected scope `%v` not in bucket `%v`", scope, bucket.GetName())
+				return fmt.Errorf("expected scope `%v` not in bucket `%v`", scope, bucketName)
 			}
 
 			actualScope := scopes.GetScope(scope)
@@ -670,7 +681,7 @@ func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, 
 			// expected to be there.
 			for _, collection := range actualScope.Collections {
 				if _, ok := collections[collection.Name]; !ok {
-					return fmt.Errorf("collection `%v` not expected in scope `%v` for bucket `%v`", collection.Name, scope, bucket.GetName())
+					return fmt.Errorf("collection `%v` not expected in scope `%v` for bucket `%v`", collection.Name, scope, bucketName)
 				}
 			}
 
@@ -678,7 +689,7 @@ func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, 
 			// meant to be there, but aren't.
 			for collection := range collections {
 				if !actualScope.HasCollection(collection) {
-					return fmt.Errorf("expected collection `%v` not in scope `%v` for bucket `%v`", collection, scope, bucket.GetName())
+					return fmt.Errorf("expected collection `%v` not in scope `%v` for bucket `%v`", collection, scope, bucketName)
 				}
 			}
 		}

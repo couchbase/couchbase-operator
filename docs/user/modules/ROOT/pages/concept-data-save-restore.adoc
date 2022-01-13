@@ -1,0 +1,180 @@
+= Data Topology Save, Restore and Synchronization
+
+[abstract]
+The Operator and tooling provides features to aid with development and management of clusters.
+This details what can be done, and when it should be used.
+
+The Operator provides a rich set of Kubernetes-native primitives for configuration and management of the Couchbase data topology.
+Typically you would use a configuration and life-cycle manager to handle these resource for you e.g. Helm, Red Hat Operator Lifecycle Manager.
+These provide enterprise features such as:
+
+* Change control
+* Peer review
+* Auditing
+* Disaster recovery
+
+On some occasions, such as development environments, introducing a complex workflow may prove counter-productive, and negatively impact time to market.
+
+This is where the save, restore and synchronization features come in to play.
+
+[WARNING]
+====
+Save, restore and synchronization are -- ostensibly -- manual operations outside of the scope of any life-cycle manager used to deploy and manage a Couchbase cluster.
+To a lifecycle manager, any modifications to managed resources will look like external interference that needs to be reconciled back into the requested state.
+A result of accidental reversion is deletion of buckets, scopes, collection, data and indexes.
+
+It is your responsibility to ensure either:
+
+* Life-cycle management is not used, or does not run periodically and update infrastructure.
+* Life-cycle management is updated with any necessary changes to prevent reversion.
+====
+
+== Data Topology Save and Restore
+
+K8S-2570
+
+== Data Topology Synchronization
+
+Unlike <<data-topology-save-and-restore>>, synchronization is a fully online process.
+
+Synchronization allows data topology to be manually created by the user, either via the Couchbase user interface, or other external management tools.
+This provides rapid and agile development of your database schema.
+
+Once completed, the Operator can be told to synchronize data topology.
+This will poll Couchbase for the full data-topology -- including buckets, scopes and collections -- then mirror this configuration as Kubernetes-native custom resources.
+The user can then poll for completion before finally setting the Couchbase cluster to manage buckets.
+After this point, any manual modifications to the data topology will be reverted by the Operator as per usual.
+
+[NOTE]
+====
+As this feature is completely controlled by the Operator, there are a number of things to be aware of:
+
+. The Operator will never modify user managed custom resources (e.g. `CouchbaseCluster`, `CouchbaseBucket`, etc).
+These resources are intended solely for management by users -- either manually, or through life-cycle managers.
+To modify a resource specification would be to alter the managing entity's original intent, and is not allowed in Kubernetes.
+Operator modifications would also be reverted by any automated life-cycle manager.
+. The Operator will never delete user managed custom resources.
+Like modification, deletion may go against the user's intent, or be reverted by a life-cycle manager.
+It also may result in accidental data loss.
+====
+
+=== Using Data Topology Synchronization
+
+Throughout this example, the Couchbase cluster being referred to is called `my-cluster`.
+You will need to change this to your specific cluster name.
+
+==== Preparation
+
+The first thing that needs to be done is to clear any old resources out of the way.
+If you do not have any existing `CouchbaseBucket`, `CouchbaseScope`, etc. resources, and buckets are not managed (xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-buckets-managed[`couchbaseclusters.spec.buckets.managed`] is `false`, or undefined), then skip to the next section.
+
+First, you need to disable bucket management, so existing configuration is not deleted once backing resources are removed.
+
+[source,console]
+----
+$ kubectl patch couchbasecluster my-cluster -p ‘{“spec”:{“buckets”:{“managed”:false}}}’
+----
+
+Next, remove any resources that may conflict with those the Operator will generate.
+An example of manually clearing out resources could look like:
+
+[source,console]
+----
+$ for i in couchbasebuckets \
+    couchbaseephemeralbuckets \
+    couchbasememcachedbuckets \
+    couchbasescopes \
+    couchbasescopegroups \
+    couchbasecollections \
+    couchbasecollectiongroups
+  do
+    kubectl delete $i --all
+  done
+----
+
+This command deletes all resources in the namespace that will be affected by a synchronization operation.
+You can replace `--all` with a label, or field, selector if you wish to be more selective, especially in the case where multiple Couchbase clusters are running in the same namespace.
+
+[WARNING]
+====
+Data topology resources can be xref:concept-label-selection.adoc[shared between clusters].
+If they are shared, then deletion may affect another -- unrelated -- cluster and result in data loss.
+For this reason we recommend only ever deploying one Couchbase cluster per namespace.
+====
+
+==== Synchronizing
+
+Once you have manually updated the data topology to how you want it, we can begin synchronizing it so it can be managed.
+
+[IMPORTANT]
+====
+Because multiple Couchbase clusters can run in the same namespace, there is a danger that any resource created by synchronization may be erroneously picked up by another cluster.
+For this reason, the Operator enforces the use of a label selector to generate and select buckets for inclusion on the cluster to be synchronized.
+It is your responsibility to ensure any other clusters in this namespace have a unique bucket label selector that will not be affected by this synchronization operation.
+====
+
+Synchronization is triggered by first setting a label selector, then triggering the operation:
+
+[source,console]
+----
+$ kubectl patch couchbasecluster my-cluster -p ‘{“spec”:{“buckets”:{“selector”:{"matchLabels":{"foo":"bar"}}}}}’
+$ kubectl patch couchbasecluster my-cluster -p ‘{“spec”:{“buckets”:{“synchronize”:true}}}’
+----
+
+The synchronization operation proceeds as follows:
+
+. Couchbase server is polled for all buckets, scopes and collections.
+. Kubernetes resources are generated for those Couchbase resources.
+.. Buckets are labeled as defined by the provided label selector, therefore they should be considered by this cluster only.
+. Kubernetes resources are created and persisted.
+. The Operator reports the status in the cluster conditions.
+
+To check for completion status, you can wait until the condition is reported:
+
+[source,console]
+----
+$ kubectl wait –for=condition=Synchronized couchbasecluster/my-cluster
+----
+
+Then check whether or not the synchronization succeeded:
+
+[source,console]
+----
+$ kubectl describe couchbasecluster/my-cluster | grep Synchronized -B 5
+    Last Transition Time: 2022-01-14T10:33:25Z
+    Last Update Time:     2022-01-14T10:33:25Z
+    Message:              Data topology synchronized and ready to be managed
+    Reason:               SynchronizationComplete
+    Status:               True
+    Type:                 Synchronized
+----
+
+[IMPORTANT]
+====
+You must ensure synchronization has completed successfully before switching to managed mode.
+Failure to do so may result in backing resources not being created, and data loss.
+====
+
+[IMPORTANT]
+====
+Once synchronization has been triggered, you should not make any more manual adjustments to the data topology.
+Doing so may result in a conflict between what is expected and what has already been generated and committed.
+If you do encounter a conflict, then restart the process from the <<preparation>> stage to remove the conflicting resource.
+====
+
+[NOTE]
+====
+Unlike save and restore, synchronization does not optimize the data topology Kubernetes resources.
+In a worst case scenario, where 1000's of scopes and collections are in use, then you can expect synchronization to take several minutes due to the throttling of requests to the Kubernetes API to ensure fair use.
+====
+
+==== Managing Synchronized Resources
+
+Once you have confirmed synchronization has completed successfully, you can switch the cluster's bucket management on:
+
+[source,console]
+----
+$ kubectl patch couchbasecluster my-cluster -p ‘{“spec”:{“buckets”:{“synchronize”:false,“managed”:true}}}’
+----
+
+From this point onward, any managed resources that are deleted or modified manually will be recovered, and any additional resources that are added will be deleted, as per the usual operation of the Operator.

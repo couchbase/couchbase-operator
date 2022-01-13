@@ -330,23 +330,35 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.GroupName,
 			},
 			Resources: []string{
-				couchbasev2.BucketCRDResourcePlural,
-				couchbasev2.EphemeralBucketCRDResourcePlural,
-				couchbasev2.MemcachedBucketCRDResourcePlural,
 				couchbasev2.ReplicationCRDResourcePlural,
 				couchbasev2.MigrationReplicationCRDResourcePlural,
 				couchbasev2.UserCRDResourcePlural,
 				couchbasev2.GroupCRDResourcePlural,
 				couchbasev2.RoleBindingCRDResourcePlural,
 				couchbasev2.BackupCRDResourcePlural,
+			},
+			Verbs: []string{
+				"list",  // used by the operator for caching
+				"watch", // used by the operator for caching
+			},
+		},
+		{
+			APIGroups: []string{
+				couchbasev2.GroupName,
+			},
+			Resources: []string{
+				couchbasev2.BucketCRDResourcePlural,
+				couchbasev2.EphemeralBucketCRDResourcePlural,
+				couchbasev2.MemcachedBucketCRDResourcePlural,
 				couchbasev2.ScopeCRDResourcePlural,
 				couchbasev2.ScopeGroupCRDResourcePlural,
 				couchbasev2.CollectionCRDResourcePlural,
 				couchbasev2.CollectionGroupCRDResourcePlural,
 			},
 			Verbs: []string{
-				"list",  // used by the operator for caching
-				"watch", // used by the operator for caching
+				"list",   // used by the operator for caching
+				"watch",  // used by the operator for caching
+				"create", // used by my "favourite" synchronization feature
 			},
 		},
 		{

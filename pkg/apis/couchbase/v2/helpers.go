@@ -669,6 +669,16 @@ func (cs *ClusterStatus) SetAutoscalerUnreadyCondition(message string) {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetSynchronizedCondition() {
+	c := newClusterCondition(ClusterConditionSynchronized, v1.ConditionTrue, "SynchronizationComplete", "Data topology synchronized and ready to be managed")
+	cs.setClusterCondition(c)
+}
+
+func (cs *ClusterStatus) SetSynchronizationFailedCondition() {
+	c := newClusterCondition(ClusterConditionSynchronized, v1.ConditionFalse, "SynchronizationFailed", "Data topology synchronization failed, enabling management unsafe and may delete data")
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	for index, condition := range cs.Conditions {
 		if condition.Type == t {
@@ -927,6 +937,9 @@ type AbstractBucket interface {
 	// GetLabels returns any metadata labels.
 	GetLabels() map[string]string
 
+	// SetLabels sets the metadata labels.
+	SetLabels(map[string]string)
+
 	// GetMemoryQuota simply returns the buckets resource allocation.
 	GetMemoryQuota() *resource.Quantity
 
@@ -952,6 +965,10 @@ func (b *CouchbaseBucket) GetCouchbaseName() string {
 
 func (b *CouchbaseBucket) GetLabels() map[string]string {
 	return b.Labels
+}
+
+func (b *CouchbaseBucket) SetLabels(l map[string]string) {
+	b.Labels = l
 }
 
 func (b *CouchbaseBucket) GetMemoryQuota() *resource.Quantity {
@@ -984,6 +1001,10 @@ func (b *CouchbaseEphemeralBucket) GetLabels() map[string]string {
 	return b.Labels
 }
 
+func (b *CouchbaseEphemeralBucket) SetLabels(l map[string]string) {
+	b.Labels = l
+}
+
 func (b *CouchbaseEphemeralBucket) GetMemoryQuota() *resource.Quantity {
 	return b.Spec.MemoryQuota
 }
@@ -1012,6 +1033,10 @@ func (b *CouchbaseMemcachedBucket) GetCouchbaseName() string {
 
 func (b *CouchbaseMemcachedBucket) GetLabels() map[string]string {
 	return b.Labels
+}
+
+func (b *CouchbaseMemcachedBucket) SetLabels(l map[string]string) {
+	b.Labels = l
 }
 
 func (b *CouchbaseMemcachedBucket) GetMemoryQuota() *resource.Quantity {

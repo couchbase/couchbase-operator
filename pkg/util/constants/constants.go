@@ -48,6 +48,10 @@ var (
 	// first appeared in, so we shouldn't do anything with resources created on earlier
 	// versions.
 	PodInitializedAnnotationMinVersion = "2.2.0"
+
+	// DefaultScopeOrCollectionName is the hard coded default for scope and collection
+	// backward compatibility.
+	DefaultScopeOrCollectionName = "_default"
 )
 
 // Label types added to pods.
