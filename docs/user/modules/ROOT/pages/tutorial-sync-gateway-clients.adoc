@@ -172,7 +172,7 @@ In this case, Sync Gateway will be configured at the TLS termination point and T
 image::sgw-e2e-tls.png[]
 
 NOTE: Load balancers only work on  Cloud Environments (e.g. AWS, GCP etc).
-So if you are deploying on premise or using something like https://github.com/kubernetes/minikube[minikube^] for your test deployment, this option will not work.
+So if you are deploying on premise or using something like https://github.com/kubernetes/minikube[Minikube^] for your test deployment, this option will not work.
 Please use a https://kubernetes.io/docs/concepts/services-networking/service/[service^] such as node port or ingress instead and follow steps outlined in the <<Option 1: Ingress as SSL Termination Point>> section of this tutorial.
 
 === Prerequisites

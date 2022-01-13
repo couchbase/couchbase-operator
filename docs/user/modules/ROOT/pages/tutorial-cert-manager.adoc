@@ -35,7 +35,7 @@ The one major difference is that, along with `tls.crt` and `tls.key` secret data
 Before continuing with this tutorial, please ensure the following:
 
 * You have installed cert-manager.
-Follow the official installation guides at https://cert-manager.io/docs/installation/[cert-manager.io^].
+Follow the official installation guides at https://cert-manager.io/docs/installation/[`cert-manager.io`^].
 
 * You have installed Autonomous Operator 2.2 or higher.
 This tutorial assumes that the installed resources are present, and also leverages the xref:tools/cao.adoc[`cao`] command line tool that comes with the Autonomous Operator binary package.

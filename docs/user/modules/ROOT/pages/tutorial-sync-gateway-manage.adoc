@@ -126,7 +126,7 @@ $ kubectl exec <pod_id> -- /opt/couchbase-sync-gateway/tools/sgcollect_info /tmp
 
 ==== Coping log output from pod
 
-To copy the `sgcollect_info` generated output from the pod, use the `kubectl` https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#cp[cp command^].
+To copy the `sgcollect_info` generated output from the pod, use the `kubectl` https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#cp[`cp` command^].
 [source,console]
 ----
 $ kubectl cp <pod_id>:/tmp/out.zip .

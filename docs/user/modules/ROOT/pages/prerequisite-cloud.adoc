@@ -53,7 +53,7 @@ By default, the GKE control plane is firewalled off from Kubernetes nodes.
 This behavior stops the Operator dynamic admission controller (DAC) from functioning.
 You must configure firewall rules to allow the GKE control plane to connect to port 8443 on the DAC pod.
 
-For further details see the https://github.com/kubernetes/kubernetes/issues/79739[reated issue^] and https://cloud.google.com/kubernetes-engine/docs/how-to/private-clusters#add_firewall_rules[how to add a firewall rule^].
+For further details see the https://github.com/kubernetes/kubernetes/issues/79739[related issue^] and https://cloud.google.com/kubernetes-engine/docs/how-to/private-clusters#add_firewall_rules[how to add a firewall rule^].
 
 == Microsoft Azure
 

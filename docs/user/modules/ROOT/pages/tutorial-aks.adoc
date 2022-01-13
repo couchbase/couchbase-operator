@@ -10,7 +10,7 @@ This guide walks through the recommended procedure for installing the Couchbase 
 
 == Prerequisites
 
-Install the https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest[azure-cli^] and login to the Azure Portal.
+Install the https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest[`azure-cli`^] and login to the Azure Portal.
 
 [source,console]
 ----

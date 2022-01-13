@@ -45,13 +45,13 @@ The same rules however apply; no DNAT between the client and Couchbase server in
 == Configuring the Platform
 
 Platform configuration is left up to the end user as there are numerous different ways of deploying and interconnecting your Kubernetes clusters.
-The following diagram is based on https://eksctl.io[eksctl^] for Amazon AWS, however the concepts will be generally the same for any platform:
+The following diagram is based on https://eksctl.io[`eksctl`^] for Amazon AWS, however the concepts will be generally the same for any platform:
 
 .AWS Platform Configuration
 image::remote-dns-aws.png[]
 
-The https://eksctl.io[eksctl^] tool creates clusters similar to those depicted.
-It uses the https://github.com/aws/amazon-vpc-cni-k8s[amazon-vpc-cni-k8s^] CNI plugin to provision pod network interfaces.
+The https://eksctl.io[`eksctl`^] tool creates clusters similar to those depicted.
+It uses the https://github.com/aws/amazon-vpc-cni-k8s[`amazon-vpc-cni-k8s`^] CNI plugin to provision pod network interfaces.
 Pod interfaces are provisioned using elastic network interfaces, so appear as part of the cluster VPC.
 No overlay networks are involved and the pod IP addresses can be reached from outside of the Kubernetes cluster without NAT.
 This fulfills the requirement for xref:concept-kubernetes-networking.adoc#routed-networking[flat, routed networking].
@@ -76,13 +76,13 @@ You will need to add in routing table entries to forward packets destined for th
 This, like all steps, should be done for both clusters to allow bi-directional communication.
 
 The final part of platform configuration concerns security groups.
-Kubernetes nodes are firewalled off from everything except each other and their EKS control plane within an https://eksctl.io[eksctl^] deployment.
+Kubernetes nodes are firewalled off from everything except each other and their EKS control plane within an https://eksctl.io[`eksctl`^] deployment.
 You need to allow ingress traffic from the remote cluster to all Kubernetes nodes in the local cluster.
 In cluster 1, for example, you would need a security group that allows all protocol from 10.1.0.0/0 to be applied to all Kubernetes EC2 instance.
 
 [NOTE]
 ====
-At present https://eksctl.io[eksctl^] creates the VPC for you, but cannot automatically add custom security groups to that VPC, the cluster scaling group launch template, and therefore the Kubernetes node EC2 instances.
+At present https://eksctl.io[`eksctl`^] creates the VPC for you, but cannot automatically add custom security groups to that VPC, the cluster scaling group launch template, and therefore the Kubernetes node EC2 instances.
 It does, however, allow the user to specify their own VPC subnets which may have a security group predefined that can then be used for provisioning.
 Other cluster provisioning tools may have better support for inter-connectivity and firewalling.
 ====

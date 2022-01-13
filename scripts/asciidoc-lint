@@ -12,8 +12,8 @@ FILTER="${FILTER} -e s/{[^}]*}//g"
 # Ignore definition lists (contain arbitrary non-English configuration).
 FILTER="${FILTER} -e s/^.*::$//g"
 # Ignore hyperlinks (not our problem).
-FILTER="${FILTER} -e s/http:[[^\[]//g"
-FILTER="${FILTER} -e s/https:[[^\[]//g"
+FILTER="${FILTER} -e s/http:[^\[]*//g"
+FILTER="${FILTER} -e s/https:[^\[]*//g"
 # Ignore cross-reference file names (not user-visisble, however this may affect SEO).
 FILTER="${FILTER} -e s/xref:[^\[]*//g"
 # Ignore image file names (not user-visisble, however this may affect SEO).

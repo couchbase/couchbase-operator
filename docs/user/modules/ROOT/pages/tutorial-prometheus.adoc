@@ -9,7 +9,7 @@ This guide walks through recommended procedures for enabling and configuring Pro
 
 == Prerequisites
 
-Clone the https://github.com/coreos/kube-prometheus[kube-prometheus^] repository from GitHub, but do not create any manifests just yet.
+Clone the https://github.com/coreos/kube-prometheus[`kube-prometheus`^] repository from GitHub, but do not create any manifests just yet.
 
 [source,console]
 ----

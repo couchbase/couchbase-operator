@@ -312,7 +312,7 @@ helm upgrade --install loki grafana/loki-stack \
 
 The above command was borrowed and modified from the https://grafana.com/docs/loki/latest/installation/helm/#deploy-loki-stack-loki-fluent-bit-grafana-prometheus[official Loki documentation^], where you can find further details on how to then use Grafana and configure the stack how you might want in your cluster.
 The main difference between the above command and the one found in the official documentation, is that we've set `promtail.enabled=true`.
-This is because we want to use PromTail over Fluent Bit for shipping logs from the Kubernetes nodes in order to mitigate an issue with the Couchbase-supplied https://hub.docker.com/r/couchbase/fluent-bit[log processor image^] triggering a fingerprint collision in Loki (https://github.com/fluent/fluent-bit/issues/1746[fluent-bit #1746^], https://github.com/grafana/loki/issues/898#issuecomment-552333246[loki #898^]).
+This is because we want to use PromTail over Fluent Bit for shipping logs from the Kubernetes nodes in order to mitigate an issue with the Couchbase-supplied https://hub.docker.com/r/couchbase/fluent-bit[log processor image^] triggering a fingerprint collision in Loki (https://github.com/fluent/fluent-bit/issues/1746[fluent-bit #1746^], https://github.com/grafana/loki/issues/898#issuecomment-552333246[`loki #898`^]).
 
 NOTE: It may be better/easier to ship direct from the Fluent Bit sidecar to Loki using the https://docs.fluentbit.io/manual/pipeline/outputs/loki[plugin^].
 This would allow you to forward individual logs separately without having to configure PromTail or Fluent Bit for multi-line parsing on the node.
@@ -505,7 +505,7 @@ stringData:
 <.> Make sure to specify your details for `account_name` and `shared_key`, along with things like the `container_name` and `path`.
 All the various options are described in the official Fluent Bit documentation for the https://docs.fluentbit.io/manual/pipeline/outputs/azure_blob[Azure Blob output plugin^].
 
-To simplify testing, the https://github.com/Azure/Azurite[Azurite^] emulator can be used.
+To simplify testing, the https://github.com/Azure/Azurite[`Azurite`^] emulator can be used.
 
 [source,yaml]
 ----

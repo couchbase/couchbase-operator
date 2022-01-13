@@ -132,4 +132,4 @@ You might find the following resources helpful when setting up your Prometheus e
 * Couchbase Blog -- https://blog.couchbase.com/step-by-step-guide-for-running-couchbase-autonomous-operator-2-0-with-prometheus-part-1/[Part 1^] & https://blog.couchbase.com/step-by-step-guide-for-running-couchbase-autonomous-operator-2-0-with-prometheus-part-2/[Part 2^]
 * https://github.com/couchbase/couchbase-exporter[Couchbase Prometheus Exporter GitHub^]
 * https://prometheus-operator.dev[Prometheus Operator^]
-* https://github.com/prometheus-operator/kube-prometheus[kube-prometheus^]
+* https://github.com/prometheus-operator/kube-prometheus[`kube-prometheus`^]
