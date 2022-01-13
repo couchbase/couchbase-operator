@@ -229,7 +229,9 @@ func getCreateAdmissionCommand(command string, flags *genericclioptions.ConfigFl
                         %[1]s create admission --log-level debug
                 `, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-create-admission-flags")
+			if command != caoBinaryName {
+				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-create-admission-flags")
+			}
 
 			if err := o.validate(); err != nil {
 				return err
@@ -269,7 +271,9 @@ func getDeleteAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 			%[1]s delete admission --scope namespace
 		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-admission-flags")
+			if command != caoBinaryName {
+				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-admission-flags")
+			}
 
 			if err := o.validate(); err != nil {
 				return err

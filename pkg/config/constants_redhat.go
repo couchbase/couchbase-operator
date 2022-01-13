@@ -13,4 +13,5 @@ const (
 var (
 	admissionImageDefault = imageRepo + "/couchbase/admission-controller:" + version.WithRevision()
 	operatorImageDefault  = imageRepo + "/couchbase/operator:" + version.WithRevision()
+	caoBinaryName         = "cao"
 )
