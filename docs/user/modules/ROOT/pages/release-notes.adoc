@@ -64,13 +64,28 @@ Refer to xref:howto-operator-upgrade.adoc[] for further details.
 
 ==== Mandatory Couchbase Upgrade Cycle
 
-When upgrading from all prior versions in the 2.x series, users of the server groups feature will undergo a mandatory upgrade cycle.
+Some users will encounter a mandatory upgrade cycle when upgrading to this release.
+
+In prior versions, Couchbase Server pod readiness checks were done over plain text port 8091.
+With the introduction of strict mode TLS in this release, port 8091 can be disabled to inhibit all non TLS ports.
+The Operator has been updated to use port 18091 -- Couchbase Server's TLS admin port -- when TLS management is enabled.
+
+A pod upgrade is also required for users of the server groups feature.
 
 When the Operator was first released, the only available Node label that was available across all platforms to allow explicit pod scheduling was `failure-domain.beta.kubernetes.io/zone`.
 This label has been deprecated since Kubernetes 1.17, in favor of `topology.kubernetes.io/zone`.
 
 To ensure correct operation of the Operator in the future, the decision has been taken to start using the new label as of Operator 2.3.
 This ensures that the Operator is compatible with all future Kubernetes releases in the event of the deprecated label being removed.
+
+[IMPORTANT]
+====
+An upgrade cycle is a relatively heavyweight operation that requires all pods in the cluster to be replaced, and data transferred between the old and new pods.
+The time taken to perform this operation is dependent on network bandwidth, disk IO and the amount of data resident in the database.
+For large, production databases, ensure an adequate maintenance window is scheduled as to minimize any disruption to clients and other business critical functions.
+
+For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
+====
 
 [#release-v230-beta1]
 == Release 2.3.0-beta1

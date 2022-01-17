@@ -709,10 +709,24 @@ func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
 func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
 	container := couchbaseContainer(cluster, &config)
+
+	// The readiness probe does a TCP check against Couchbase Server to determine
+	// whether NS server is running.  It may not be actually functional, but it's
+	// better than nothing, as people complain if there is no readiness.  Note that
+	// we try use the TLS port always, as that's the only common denominator -- the
+	// plaintext port can be deactivated by strict mode TLS.  We persist with 8091
+	// because it would require a rolling upgrade of all those server instances, so
+	// limiting the blast radius.
+	port := AdminServicePort
+
+	if cluster.IsTLSEnabled() {
+		port = AdminServicePortTLS
+	}
+
 	container.ReadinessProbe = &v1.Probe{
 		Handler: v1.Handler{
 			TCPSocket: &v1.TCPSocketAction{
-				Port: intstr.FromInt(8091),
+				Port: intstr.FromInt(port),
 			},
 		},
 		InitialDelaySeconds: 10,
