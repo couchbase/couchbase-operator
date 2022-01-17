@@ -53,6 +53,9 @@ const (
 
 	// pullSecretValue is the value given to the pullSecretLabel.
 	pullSecretValue = "true"
+
+	// namespaceLabel is the label to select certification namespaces.
+	namespaceLabel = "couchbase-test"
 )
 
 var (
@@ -493,6 +496,22 @@ func (o *certifyOptions) deleteVolume() {
 	}
 }
 
+// deleteNamespaces cleans up namespaces created by certification testing.
+func (o *certifyOptions) deleteNamespaces() {
+	selector, _ := labels.NewRequirement("app", selection.Equals, []string{namespaceLabel})
+	namespaces, err := o.client.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	for _, namespace := range namespaces.Items {
+		if err := o.client.CoreV1().Namespaces().Delete(context.Background(), namespace.Name, *metav1.NewDeleteOptions(0)); err != nil {
+			fmt.Println(err)
+		}
+	}
+}
+
 // createVolume creates a workspace volume to communicate results from the certification
 // container to the artifacts one.
 func (o *certifyOptions) createVolume() (func(), error) {
@@ -884,13 +903,12 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 		_ = o.deleteCertificationPod()
 		o.deleteArtifactsPod()
 		o.deleteVolume()
-	}
 
-	// TODO: Test resources may be left around, occupying the whole platform so we need
-	//       to delete namespaces to free space, otherwise the certification container
-	//       cannot be scheduled.  We should:
-	//
-	//       * Probably offer this functionality as a flag as above for parity.
+		// Test resources may be left around, occupying the whole platform so we need
+		// to delete namespaces to free space, otherwise the certification container
+		// cannot be scheduled.
+		o.deleteNamespaces()
+	}
 
 	cleanServiceAccount, err := o.createServiceAccount()
 	if err != nil {

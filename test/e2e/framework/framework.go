@@ -39,7 +39,9 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -546,6 +548,7 @@ func recreateCRDs(k8s *types.Cluster) error {
 const (
 	// namespacePrefix is used to denote namespaces owned by this application.
 	namespacePrefix = "test-"
+	namespaceLabel  = "couchbase-test"
 )
 
 // tells us if the underlying physical cluster on a host exists.
@@ -560,16 +563,14 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 
 	logrus.Info("Cleaning-Up Namespaces")
 
-	namespaces, err := k8s.KubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+	selector, _ := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{namespaceLabel})
+	namespaces, err := k8s.KubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+
 	if err != nil {
 		return err
 	}
 
 	for _, namespace := range namespaces.Items {
-		if !strings.HasPrefix(namespace.Name, namespacePrefix) {
-			continue
-		}
-
 		if namespace.DeletionTimestamp != nil {
 			continue
 		}
@@ -806,7 +807,8 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: namespacePrefix,
 			Labels: map[string]string{
-				"istio-injection": constants.EnabledValue,
+				"istio-injection":  constants.EnabledValue,
+				constants.LabelApp: namespaceLabel,
 			},
 		},
 	}
