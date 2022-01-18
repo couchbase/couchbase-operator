@@ -484,12 +484,19 @@ func SetClusterCACert(certificate []byte) *Request {
 	return NewRequest((*Client).PostNoContentType, "/controller/uploadClusterCA", certificate, nil)
 }
 
+// LoadCAs loads all CAs in the inbox (7.1+ only).
 func LoadCAs() *Request {
 	return NewRequest((*Client).PostNoContentType, "/node/controller/loadTrustedCAs", []byte{}, nil)
 }
 
+// ListCAs lists all installed CAs (7.1+ only).
 func ListCAs(ca *TrustedCAList) *Request {
 	return NewRequest((*Client).Get, "/pools/default/trustedCAs", nil, ca)
+}
+
+// DeleteCA removes the requested CA from the cluster (7.1+ only).
+func DeleteCA(id int) *Request {
+	return NewRequest((*Client).Delete, fmt.Sprintf("/pools/default/trustedCAs/%d", id), nil, nil)
 }
 
 // ReloadNodeCert causes server to reload the server certificate chain and key from disk.

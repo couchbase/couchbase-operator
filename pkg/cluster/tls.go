@@ -298,18 +298,18 @@ func tlsValid(member couchbaseutil.Member, cache *tlsCache, cert *x509.Certifica
 	return false
 }
 
-// reloadCA insecurely reloads the cluster CA certificate.
-func (c *Cluster) reloadCA(member couchbaseutil.Member) error {
+// reloadMemberCAs reloads the cluster CA certificates.
+func (c *Cluster) reloadMemberCAs(member couchbaseutil.Member) error {
 	ok, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
 		return err
 	}
 
 	if ok {
-		return c.reloadCANew(member)
+		return c.reloadMemberCAsNew(member)
 	}
 
-	return c.reloadCALegacy(member)
+	return c.reloadMemberCALegacy(member)
 }
 
 // certiifcatesEqual accepts two PEM encoded certificates and compare them.
@@ -327,20 +327,13 @@ func certiifcatesEqual(a, b []byte) (bool, error) {
 	return cert1.Equal(cert2), nil
 }
 
-// hasCA tells us whether the CA is installed on the member.
-func (c *Cluster) hasCA(member couchbaseutil.Member) (bool, error) {
-	var cas couchbaseutil.TrustedCAList
-
-	if err := couchbaseutil.ListCAs(&cas).On(c.api, member); err != nil {
-		return false, err
-	}
-
-	// Check to see if the CA is already present, the problem here is server
-	// has done all kinds of things with the certificate, thus tainting our
-	// original input, so we cannot do a stright match, and we need to decode
-	// it.
-	for _, ca := range cas {
-		ok, err := certiifcatesEqual(c.tlsCache.serverCA, []byte(ca.PEM))
+// serverHasCA Checks to see if the CA is already present, the problem here is server
+// may have done all kinds of things with the certificate, thus tainting our
+// original input, so we cannot do a stright match, and we need to decode
+// it.
+func serverHasCA(serverCAs couchbaseutil.TrustedCAList, requestedCA []byte) (bool, error) {
+	for _, serverCA := range serverCAs {
+		ok, err := certiifcatesEqual(requestedCA, []byte(serverCA.PEM))
 		if err != nil {
 			return false, err
 		}
@@ -353,10 +346,48 @@ func (c *Cluster) hasCA(member couchbaseutil.Member) (bool, error) {
 	return false, nil
 }
 
-// reloadCANew reloads the clusters CA certificate(s) for post 7.1 versions.
-func (c *Cluster) reloadCANew(member couchbaseutil.Member) error {
+// serverHasAllCAs tells us whether all requested CAs are installed on the member.
+func (c *Cluster) serverHasAllCAs(member couchbaseutil.Member) (bool, error) {
+	var serverCAs couchbaseutil.TrustedCAList
+
+	if err := couchbaseutil.ListCAs(&serverCAs).On(c.api, member); err != nil {
+		return false, err
+	}
+
+	for _, requestedCA := range c.tlsCache.rootCAs {
+		ok, err := serverHasCA(serverCAs, requestedCA)
+		if err != nil {
+			return false, err
+		}
+
+		if !ok {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// apiHasCA tells us whether the CA is requested by the API.
+func (c *Cluster) apiHasCA(serverCA []byte) (bool, error) {
+	for _, requestedCA := range c.tlsCache.rootCAs {
+		ok, err := certiifcatesEqual(requestedCA, serverCA)
+		if err != nil {
+			return false, err
+		}
+
+		if ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// reloadMemberCAsNew reloads the clusters CA certificate(s) for post 7.1 versions.
+func (c *Cluster) reloadMemberCAsNew(member couchbaseutil.Member) error {
 	// Check to see if the CA is already present.
-	ok, err := c.hasCA(member)
+	ok, err := c.serverHasAllCAs(member)
 	if err != nil {
 		return err
 	}
@@ -365,7 +396,7 @@ func (c *Cluster) reloadCANew(member couchbaseutil.Member) error {
 		return nil
 	}
 
-	log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name())
+	log.Info("Reloading CA certificates", "cluster", c.namespacedName(), "name", member.Name())
 
 	// If node to node is enabled, then server will refuse to rotate TLS, for good reason,
 	// so force disable it when performing TLS updates.
@@ -382,13 +413,13 @@ func (c *Cluster) reloadCANew(member couchbaseutil.Member) error {
 			return err
 		}
 
-		ok, err := c.hasCA(member)
+		ok, err := c.serverHasAllCAs(member)
 		if err != nil {
 			return err
 		}
 
 		if !ok {
-			return fmt.Errorf("%w: expected CA not present", errors.NewStackTracedError(errors.ErrTLSInvalid))
+			return fmt.Errorf("%w: expected CAs not present", errors.NewStackTracedError(errors.ErrTLSInvalid))
 		}
 
 		return nil
@@ -401,8 +432,8 @@ func (c *Cluster) reloadCANew(member couchbaseutil.Member) error {
 	return nil
 }
 
-// reloadCALegacy reloads the cluster CA certificate for pre-7.1 versions.
-func (c *Cluster) reloadCALegacy(member couchbaseutil.Member) error {
+// reloadMemberCALegacy reloads the cluster CA certificate for pre-7.1 versions.
+func (c *Cluster) reloadMemberCALegacy(member couchbaseutil.Member) error {
 	var oldcacert []byte
 	if err := couchbaseutil.GetClusterCACert(&oldcacert).On(c.api, member); err != nil {
 		return err
@@ -413,16 +444,80 @@ func (c *Cluster) reloadCALegacy(member couchbaseutil.Member) error {
 		return err
 	}
 
-	if !ok {
-		log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name())
+	if ok {
+		return nil
+	}
 
-		// If node to node is enabled, then server will refuse to rotate TLS, for good reason,
-		// so force disable it when performing TLS updates.
-		if err := c.disableNodeToNode(); err != nil {
+	log.Info("Reloading CA certificate", "cluster", c.namespacedName(), "name", member.Name())
+
+	// If node to node is enabled, then server will refuse to rotate TLS, for good reason,
+	// so force disable it when performing TLS updates.
+	if err := c.disableNodeToNode(); err != nil {
+		return err
+	}
+
+	if err := couchbaseutil.SetClusterCACert(c.tlsCache.serverCA).On(c.api, member); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// updateCAs adds CAs if they don't exist only.  This must be called before
+// any client or server certificate rotation so we don't get locked out or
+// do some other stupid thing.  Old CAs will be cleared out later.
+func (c *Cluster) updateCAs() error {
+	if !c.cluster.IsTLSEnabled() {
+		return nil
+	}
+
+	for _, member := range c.callableMembers {
+		if err := c.reloadMemberCAs(member); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// cleanCAs removes any CAs from the trust pool that aren't required any more.
+func (c *Cluster) cleanCAs() error {
+	if !c.cluster.IsTLSEnabled() {
+		return nil
+	}
+
+	// This is a 7.1+ feature only.
+	ok, err := c.IsAtLeastVersion("7.1.0")
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return nil
+	}
+
+	// Grab a list of all CAs installed in Couchbase...
+	var serverCAs couchbaseutil.TrustedCAList
+
+	if err := couchbaseutil.ListCAs(&serverCAs).On(c.api, c.members); err != nil {
+		return err
+	}
+
+	// For each CA, if it doesn't have a corresponding CA defined in the
+	// cache, then it needs deleting from Couchbase.
+	for _, serverCA := range serverCAs {
+		ok, err := c.apiHasCA([]byte(serverCA.PEM))
+		if err != nil {
 			return err
 		}
 
-		if err := couchbaseutil.SetClusterCACert(c.tlsCache.serverCA).On(c.api, member); err != nil {
+		if ok {
+			continue
+		}
+
+		log.Info("Removing CA", "cluster", c.namespacedName(), "id", serverCA.ID, "subject", serverCA.Subject)
+
+		if err := couchbaseutil.DeleteCA(serverCA.ID).On(c.api, c.members); err != nil {
 			return err
 		}
 	}
@@ -722,11 +817,6 @@ func (c *Cluster) reconcileMemberTLS(member couchbaseutil.Member, leaf *x509.Cer
 		return nil
 	}
 
-	// Reload the CA certificate if necessary.
-	if err := c.reloadCA(member); err != nil {
-		return err
-	}
-
 	// If the pods doesn't have TLS enabled then ignore it.
 	pod, found := c.k8s.Pods.Get(member.Name())
 	if !found {
@@ -804,16 +894,6 @@ func (c *Cluster) enableTLS() error {
 	}
 
 	log.Info("Enabling TLS", "cluster", c.namespacedName())
-
-	// Reload the CA certificate if necessary.  This must happen before new
-	// nodes are added as server does what the hell it wants to and just copies
-	// over what is the current CA to the new node, irrespective of what we
-	// pre-populate it with.
-	for _, member := range c.members {
-		if err := c.reloadCA(member); err != nil {
-			return err
-		}
-	}
 
 	clientTLS = &couchbaseutil.TLSAuth{
 		CACert: c.tlsCache.serverCA,
@@ -1364,6 +1444,13 @@ func (c *Cluster) reconcileTLSPreTopologyChange() error {
 		return err
 	}
 
+	// When enabling TLS for legacy (pre 7.1) clusters, we need to have updated the
+	// CA before adding in any new pods, otherwise the generated CA will get propagated
+	// during engagement, overriding what we set it to on startup.
+	if err := c.updateCAs(); err != nil {
+		return err
+	}
+
 	// When enabling TLS ensure the client is updated with the CA before adding in,
 	// and communicating with, any new nodes.
 	if err := c.enableTLS(); err != nil {
@@ -1423,6 +1510,12 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 	// Security settings are updated independently of node-to-node due to ordering
 	// constraints of the latter.
 	if err := c.updateSecuritySettings(); err != nil {
+		return err
+	}
+
+	// Remove any unused CAs after everything else is successful, we risk locking
+	// ourselves out otherwise.
+	if err := c.cleanCAs(); err != nil {
 		return err
 	}
 

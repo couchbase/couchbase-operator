@@ -25,6 +25,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -1333,4 +1334,81 @@ func MustInitLDAPTLS(t *testing.T, k8s *types.Cluster, opts *TLSOpts) (ctx *TLSC
 	}
 
 	return ctx
+}
+
+// certificatesEqual accepts two PEM encoded certificates and compare them.
+func certificatesEqual(a, b []byte) (bool, error) {
+	cert1, err := util_x509.ParseCertificate(a)
+	if err != nil {
+		return false, err
+	}
+
+	cert2, err := util_x509.ParseCertificate(b)
+	if err != nil {
+		return false, err
+	}
+
+	return cert1.Equal(cert2), nil
+}
+
+// serverHasCA Checks to see if the CA is already present, the problem here is server
+// may have done all kinds of things with the certificate, thus tainting our
+// original input, so we cannot do a straight match, and we need to decode
+// it.
+func serverHasCA(serverCAs couchbaseutil.TrustedCAList, requestedCA []byte) (bool, error) {
+	for _, serverCA := range serverCAs {
+		ok, err := certificatesEqual(requestedCA, []byte(serverCA.PEM))
+		if err != nil {
+			return false, err
+		}
+
+		if ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// validateCAPool checks the server CA pool matches the CAs provided.
+func validateCAPool(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, rootCAs []*TLSContext) error {
+	client, err := CreateAdminConsoleClient(k8s, cluster)
+	if err != nil {
+		return err
+	}
+
+	// Get all CAs that server knows about.
+	var serverCAs couchbaseutil.TrustedCAList
+
+	if err := couchbaseutil.ListCAs(&serverCAs).On(client.client, client.host); err != nil {
+		return err
+	}
+
+	if len(serverCAs) != len(rootCAs) {
+		return fmt.Errorf("CA certificate number mismatch expected %d, got %d", len(rootCAs), len(serverCAs))
+	}
+
+	for _, ca := range rootCAs {
+		ok, err := serverHasCA(serverCAs, ca.CA.Certificate)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			return fmt.Errorf("expected CA certificate not found in server")
+		}
+	}
+
+	return nil
+}
+
+// MustValidateCAPool checks the server CA pool matches the CAs provided.
+func MustValidateCAPool(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration, rootCAs ...*TLSContext) {
+	callback := func() error {
+		return validateCAPool(k8s, cluster, rootCAs)
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
 }

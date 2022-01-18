@@ -1709,3 +1709,35 @@ func TestMandatoryMutualTLSWithMultipleCAsAndKubernetesSecrets(t *testing.T) {
 func TestMandatoryMutualTLSWithMultipleCAsAndCertManagerSecrets(t *testing.T) {
 	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret)
 }
+
+// TestMultipleCAsAddAndRemove tests that addition and removal of CAs works, and is
+// independent of other operations.
+func TestMultipleCAsAddAndRemove(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create a cluster.
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(tls).MustCreate(t, kubernetes)
+
+	// Check only the expected use cert is present.
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, time.Minute, tls)
+
+	// Add a new CA to the cluster and expect it to appear,
+	// take it away and expect it to disappear
+	tls2 := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/rootCAs", []string{tls2.CASecretName}), time.Minute)
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, time.Minute, tls, tls2)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/networking/tls/rootCAs"), time.Minute)
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, time.Minute, tls)
+}

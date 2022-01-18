@@ -1406,6 +1406,9 @@ type TrustedCA struct {
 
 	// PEM is the raw PEM encoded CA certificate.
 	PEM string `json:"pem"`
+
+	// Subject is the certiifcate subject.
+	Subject string `json:"subject"`
 }
 
 // TrustedCAList is a list of CAs that CBS knows about.
