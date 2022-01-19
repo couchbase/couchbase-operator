@@ -484,7 +484,7 @@ func (c *Cluster) getExplcitCAStandard() ([]byte, error) {
 		return nil, fmt.Errorf("%w: unable to get TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.SecretSource.ServerSecretName)
 	}
 
-	ca, ok := secret.Data["ca.crt"]
+	ca, ok := secret.Data[constants.CertManagerCAKey]
 	if !ok {
 		return nil, nil
 	}
@@ -509,9 +509,9 @@ func (c *Cluster) getExplcitCALegacy() ([]byte, error) {
 	}
 
 	// Ensure that the secrets are correctly formatted.
-	ca, ok := operatorSecret.Data["ca.crt"]
+	ca, ok := operatorSecret.Data[constants.OperatorSecretCAKey]
 	if !ok {
-		return nil, fmt.Errorf("%w: operator secret missing ca.crt", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, fmt.Errorf("%w: operator secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.OperatorSecretCAKey)
 	}
 
 	return ca, nil
@@ -669,14 +669,14 @@ func (c *Cluster) getTLSClientDataLegacy() ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("%w: unable to get operator secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.Static.OperatorSecret)
 	}
 
-	chain, ok := operatorSecret.Data[tlsOperatorSecretCert]
+	chain, ok := operatorSecret.Data[constants.OperatorSecretClientCertKey]
 	if !ok {
-		return nil, nil, fmt.Errorf("%w: operator secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), tlsOperatorSecretCert)
+		return nil, nil, fmt.Errorf("%w: operator secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.OperatorSecretClientCertKey)
 	}
 
-	key, ok := operatorSecret.Data[tlsOperatorSecretKey]
+	key, ok := operatorSecret.Data[constants.OperatorSecretPrivateKeyKey]
 	if !ok {
-		return nil, nil, fmt.Errorf("%w: operator secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), tlsOperatorSecretKey)
+		return nil, nil, fmt.Errorf("%w: operator secret missing %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.OperatorSecretPrivateKeyKey)
 	}
 
 	return chain, key, nil

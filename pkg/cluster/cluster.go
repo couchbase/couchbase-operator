@@ -40,11 +40,6 @@ var (
 	podTerminationGracePeriod = int64(0)
 )
 
-const (
-	tlsOperatorSecretCert string = "couchbase-operator.crt"
-	tlsOperatorSecretKey  string = "couchbase-operator.key"
-)
-
 type Config struct {
 	PodCreateTimeout string
 }

@@ -1555,7 +1555,7 @@ func getRootCAs(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([][]
 			return nil, fmt.Errorf("secret %s referenced by spec.networking.tls.secretSource.serverSecretName must exist", secretName)
 		}
 
-		if ca, ok := secret.Data["ca.crt"]; ok {
+		if ca, ok := secret.Data[constants.CertManagerCAKey]; ok {
 			rootCAs = append(rootCAs, ca)
 		}
 	} else {
@@ -1570,9 +1570,9 @@ func getRootCAs(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([][]
 			return nil, fmt.Errorf("secret %s referenced by spec.networking.tls.static.operatorSecret must exist", secretName)
 		}
 
-		ca, ok := secret.Data["ca.crt"]
+		ca, ok := secret.Data[constants.OperatorSecretCAKey]
 		if !ok {
-			return nil, fmt.Errorf("tls secret %s must contain ca.crt", secretName)
+			return nil, fmt.Errorf("tls secret %s must contain %s", secretName, constants.OperatorSecretCAKey)
 		}
 
 		rootCAs = append(rootCAs, ca)
@@ -1591,7 +1591,7 @@ func getRootCAs(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([][]
 
 		ca, ok := secret.Data[v1.TLSCertKey]
 		if !ok {
-			return nil, fmt.Errorf("tls secret %s must contain ca.crt", secretName)
+			return nil, fmt.Errorf("tls secret %s must contain %s", secretName, v1.TLSCertKey)
 		}
 
 		rootCAs = append(rootCAs, ca)

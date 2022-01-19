@@ -35,6 +35,10 @@ type TLSAuth struct {
 	// PEM encoded CA certificate
 	CACert []byte
 
+	// RootCAs allows a pool of CAs to be used to verify when
+	// we have multiple specified, and have no idea which to use.
+	RootCAs [][]byte
+
 	// Optional client authentication
 	ClientAuth *TLSClientAuth
 }

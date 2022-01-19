@@ -31,6 +31,45 @@ var ErrCertificateError = fmt.Errorf("certificate error")
 var ErrStatusError = fmt.Errorf("unexpected status code")
 var ErrUUIDError = fmt.Errorf("cluster UUID error")
 
+func (c *Client) getTLSConfig() (*tls.Config, error) {
+	if c.tls == nil {
+		return nil, nil
+	}
+
+	// At the very least we need a CA certificate to attain trust in the remote end
+	if c.tls.CACert == nil && c.tls.RootCAs == nil {
+		return nil, fmt.Errorf("%w: no CAs supplied to client", errors.NewStackTracedError(ErrCertificateError))
+	}
+
+	tlsClientConfig := &tls.Config{
+		RootCAs: x509.NewCertPool(),
+	}
+
+	if c.tls.CACert != nil {
+		if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(c.tls.CACert); !ok {
+			return nil, fmt.Errorf("%w: failed to append CA certificate", errors.NewStackTracedError(ErrCertificateError))
+		}
+	}
+
+	for _, ca := range c.tls.RootCAs {
+		if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(ca); !ok {
+			return nil, fmt.Errorf("%w: failed to append CA certificate", errors.NewStackTracedError(ErrCertificateError))
+		}
+	}
+
+	// If the remote end needs to trust us too we add a client certificate and key pair
+	if c.tls.ClientAuth != nil {
+		cert, err := tls.X509KeyPair(c.tls.ClientAuth.Cert, c.tls.ClientAuth.Key)
+		if err != nil {
+			return nil, errors.NewStackTracedError(err)
+		}
+
+		tlsClientConfig.Certificates = append(tlsClientConfig.Certificates, cert)
+	}
+
+	return tlsClientConfig, nil
+}
+
 // newClient creates a new HTTP client which offers connection persistence and
 // also checks that the UUID of a host is what we expect when dialing before
 // allowing further HTTP requests.
@@ -61,27 +100,9 @@ func (c *Client) makeClient() {
 		// If the TLS configuration is explicitly set use that, otherwise
 		// use a basic configuration (which won't ever work unless your cluster
 		// is signed by a CA defined in the ca-certificates package)
-		var tlsClientConfig *tls.Config
-
-		if c.tls != nil {
-			tlsClientConfig = &tls.Config{
-				RootCAs: x509.NewCertPool(),
-			}
-
-			// At the very least we need a CA certificate to attain trust in the remote end
-			if ok := tlsClientConfig.RootCAs.AppendCertsFromPEM(c.tls.CACert); !ok {
-				return nil, fmt.Errorf("%w: failed to append CA certificate", ErrCertificateError)
-			}
-
-			// If the remote end needs to trust us too we add a client certificate and key pair
-			if c.tls.ClientAuth != nil {
-				cert, err := tls.X509KeyPair(c.tls.ClientAuth.Cert, c.tls.ClientAuth.Key)
-				if err != nil {
-					return nil, errors.NewStackTracedError(err)
-				}
-
-				tlsClientConfig.Certificates = append(tlsClientConfig.Certificates, cert)
-			}
+		tlsClientConfig, err := c.getTLSConfig()
+		if err != nil {
+			return nil, err
 		}
 
 		// Establish a TCP connection with TLS transport

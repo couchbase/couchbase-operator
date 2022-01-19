@@ -52,6 +52,15 @@ var (
 	// DefaultScopeOrCollectionName is the hard coded default for scope and collection
 	// backward compatibility.
 	DefaultScopeOrCollectionName = "_default"
+
+	// CertManagerCAKey is the CA certificate key in the server secret, if provided.
+	CertManagerCAKey = "ca.crt"
+
+	// OperatorSecret* are keys into the legacy Operator TLS secret.  These are deprecated
+	// and need deleting as soon as possible.
+	OperatorSecretClientCertKey = "couchbase-operator.crt"
+	OperatorSecretPrivateKeyKey = "couchbase-operator.key"
+	OperatorSecretCAKey         = "ca.crt"
 )
 
 // Label types added to pods.
