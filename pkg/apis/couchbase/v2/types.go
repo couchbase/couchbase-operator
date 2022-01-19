@@ -3130,7 +3130,8 @@ type TLSPolicy struct {
 	// between nodes.  When all, all traffic is encrypted, including database documents.
 	// When strict mode is used, it is the same as all, but also disables all plaintext
 	// ports.  Strict mode is only available on Couchbase Server versions 7.1 and greater.
-	// This field must be either "ControlPlaneOnly", "All", or "Strict".
+	// Node to node encryption can only be used when TLS certificates are managed by the
+	// Operator.  This field must be either "ControlPlaneOnly", "All", or "Strict".
 	NodeToNodeEncryption *NodeToNodeEncryptionType `json:"nodeToNodeEncryption,omitempty"`
 
 	// TLSMinimumVersion specifies the minimum TLS version the Couchbase server can
