@@ -11,13 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	// versionAnnotation is used to flag who created resources e.g. us, and
-	// for what version.  This gives use the ability in future to reason about
-	// what needs doing to upgrade the operator...
-	versionAnnotation = "config.couchbase.com/version"
-)
-
 // ApplySubCommands attaches the configuration (create/delete/generate) sub commands to
 // an arbitrary root command.
 func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags) {

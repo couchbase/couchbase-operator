@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	cbversion "github.com/couchbase/couchbase-operator/pkg/version"
 
 	"github.com/ghodss/yaml"
@@ -83,7 +84,7 @@ func convertToUnstructured(objects []runtime.Object) ([]*unstructured.Unstructur
 			annotations = map[string]string{}
 		}
 
-		annotations[versionAnnotation] = cbversion.Version
+		annotations[constants.ConfigurationVersionAnnotation] = cbversion.Version
 
 		u.SetAnnotations(annotations)
 

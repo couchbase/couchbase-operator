@@ -42,6 +42,12 @@ var (
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"
 
+	// ConfigurationVersionAnnotation is used to flag who created resources e.g.
+	// us, and for what version.  This gives us the ability in the future to reason
+	// about what needs doing to upgrade the operator, or can be used by support as a
+	// sanity check.
+	ConfigurationVersionAnnotation = "config.couchbase.com/version"
+
 	CronjobSpecAnnotation = "cronjob.couchbase.com/spec"
 
 	// PodInitializedAnnotationMinVersion is the version pod.couchbase.com/initialized

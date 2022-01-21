@@ -8,6 +8,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/version"
+
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 
@@ -320,7 +323,26 @@ func main() {
 			glog.Exit(err)
 		}
 
-		encoded, err := yaml.Marshal(pruned)
+		prunedObject, ok := pruned.(map[string]interface{})
+		if !ok {
+			glog.Exit("Pruned CRD in wrong format")
+		}
+
+		output := unstructured.Unstructured{
+			Object: prunedObject,
+		}
+
+		// Set the version information.
+		annotations := output.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+
+		annotations[constants.ConfigurationVersionAnnotation] = version.Version
+
+		output.SetAnnotations(annotations)
+
+		encoded, err := yaml.Marshal(output.Object)
 		if err != nil {
 			glog.Exit(err)
 		}
