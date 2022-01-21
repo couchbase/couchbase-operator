@@ -10,6 +10,13 @@ NOTE: For all supported software versions listed on this page, maintenance/patch
 
 == Couchbase Compatibility
 
+[IMPORTANT]
+====
+Couchbase Server versions 6.5-7.0 are susceptible to the 'log4shell' CVE, read https://blog.couchbase.com/what-to-know-about-the-log4j-vulnerability-cve-2021-44228/[our blog on this vulnerability^] for more details.
+
+It is _strongly recommended_ that users upgrade to at least server version 6.6.4, or 7.0.3, when using the analytics service.
+====
+
 This release supports the deployment of the following Couchbase software:
 
 [#table-operator-compatibility-couchbase,cols="1,1",options="header"]
@@ -79,19 +86,16 @@ This release supports the following Kubernetes platforms:
 | Platform | Version
 
 | Open Source Kubernetes
-| 1.18, 1.19, 1.20, 1.21, 1.22
+| 1.20, 1.21, 1.22
 
 | Red Hat OpenShift Container Platform
-| 4.5, 4.6, 4.7, 4.8
+| 4.7, 4.8, 4.9
 |===
 
 The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:
 
-.Kubernetes Compatibility
+.Kubernetes and Red Hat OpenShift Compatibility
 image:compatibility-kubernetes.png[]
-
-.Red Hat OpenShift Compatibility
-image:compatibility-openshift.png[]
 
 === Managed Kubernetes Compatibility
 

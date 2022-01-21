@@ -388,13 +388,13 @@ Eventual consistency rules apply so if the bucket is still being created then we
 
 <.> The `explicitMapping` is the new Couchbase Server 7 set of explicit mapping rules.
 
-<.> A set of allow rules, i.e. please replicate these.
+<.> A set of allow rules, i.e. request to replicate these.
 
-<.> The source keyspace to replicate from, in this case it will replicate all of the `scope0` scope including all its collections subject to any deny rules.
+<.> The source keyspace to replicate from, in this case it will replicate the entire `scope0` scope including all its collections subject to any deny rules.
 
 <.> The target keyspace to replicate to, this must be a matching size to the source so if you specify a collection in the source you must specify a collection in the target.
 
-<.> Here we have an example of replicating only a specific collection.
+<.> This is an example of replicating only a specific collection `collection1` in scope `scope1`.
 
 <.> The target keyspace must be of identical size so as we are replicating from a collection we must also specify a target collection.
 

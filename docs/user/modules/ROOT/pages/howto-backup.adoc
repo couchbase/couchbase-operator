@@ -338,7 +338,7 @@ Data items cannot alias, e.g. `bucket` contains `bucket.scope`, and therefore ca
 
 <.> xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-data-map[`couchbasebackuprestores.spec.data.map`]: Specified when you want to restore a backup to a destination bucket, scope or collection that has a different name than the bucket, scope or collection that was originally backed up.
 +
-This field requires a pair of fields named `source` and `destination`.
+This field requires a pair of fields named `source` and `target`.
 +
 --
 * `source` refers to the name of the bucket, scope or collection to restore from in the backup archive

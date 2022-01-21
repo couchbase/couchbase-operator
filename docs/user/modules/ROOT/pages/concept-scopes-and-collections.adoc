@@ -22,7 +22,7 @@ image::collections-overview.png[]
 The finest-grained entity in a Couchbase cluster is the collection.
 A collection is -- as it sounds -- a collection of documents.
 Collections should be logical groupings of similar document types e.g. users, products, etc.
-This makes logical organization of data far simpler than in versions of Couchbase Server prior to 7.
+This makes the logical organization of data far simpler than in versions of Couchbase Server prior to 7.
 Couchbase server currently supports up to 1000 collections per cluster.
 
 Collections also contain indexes that apply to the collection's documents.
@@ -38,7 +38,7 @@ To maintain the legacy behavior of Couchbase Server versions prior to 7, there i
 A default collection belongs to the default scope of a bucket.
 Couchbase clients such as cross-datacenter replication (XDCR) and SDKs will transparently make use of a default scope and collection without any client-side configuration changes.
 
-A default collection cannot be modified, inheriting configuration from the underlying bucket to maintain legacy behavior.
+A default collection cannot be modified, inheriting the configuration from the underlying bucket to maintain legacy behavior.
 
 A default collection can be deleted, but cannot be recreated.
 ====
@@ -120,7 +120,7 @@ The remainder of this page will use explicit resource references due to clarity,
 As previously discussed in the <<overview, scopes and collections overview>>, Couchbase Server can support up to 1000 collections.
 Using the basic data model as outlined above could potentially result in over 1000 resources to manage.
 
-Not only is managing such a large number of resources difficult and error prone, it also places a great strain on the Kubernetes control plane.
+Not only is managing such a large number of resources difficult and error prone, but it also places a great strain on the Kubernetes control plane.
 For these reasons, we support -- indeed recommend -- the use of resource groups:
 
 .Operator Resource Grouping

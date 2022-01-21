@@ -54,7 +54,7 @@ The default chart deploys the Autonomous Operator, the Admission Controller, and
 Kubernetes::
 +
 --
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install <my-release> {helm-repo}
 ----
@@ -96,7 +96,7 @@ cluster:
 
 . Install the chart using the custom override values:
 +
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install <my-release> -f openshift_values.yaml {helm-repo}
 
@@ -141,7 +141,7 @@ couchbaseOperator:
 ----
 . Specify your overrides file when you install the chart:
 +
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install my-release --values myvalues.yaml {helm-repo}
 ----
@@ -156,7 +156,7 @@ Any values in `values.yaml` that weren't overridden will keep their defaults.
 If you only need to make minor customization, you can specify them on the command line by using the `--set` option.
 For example:
 
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install my-release --set cluster.servers.default.size=5 {helm-repo}
 ----
@@ -216,7 +216,7 @@ Even though the Couchbase Helm Chart has full configuration parameters for each 
 Sync Gateway is disabled by default in the Couchbase Helm Chart.
 To install the chart with Sync Gateway _enabled_, you will need to <<custom-installation,customize the installation>> to include it:
 
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install mobile --set install.syncGateway=true {helm-repo}
 ----
@@ -224,7 +224,7 @@ helm install mobile --set install.syncGateway=true {helm-repo}
 By default, Sync Gateway is only exposed to the internal Kubernetes network with a `ClusterIP` service.
 To change the type of service that is used to expose Sync Gateway, you can specify an override for `syncGateway.exposeServiceType` during installation:
 
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install mobile --set install.syncGateway=true --set syncGateway.exposeServiceType=LoadBalancer {helm-repo}
 ----
@@ -243,7 +243,7 @@ TLS certificates can be auto-generated, or provided by the user.
 
 Install the chart with `tls` enabled:
 
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install my-release --set tls.generate=true {helm-repo}
 ----
@@ -295,7 +295,7 @@ cluster:
 
 Install the chart using the custom override values.
 
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install my-release -f tls_values.yaml {helm-repo}
 ----
@@ -308,7 +308,7 @@ This is important to note because the Couchbase Helm Chart deploys both the Auto
 _The Admission Controller should only be deployed once per Kubernetes cluster_ as indicated in <<selective-deployment,Selective Deployment>> and in the xref:concept-operator.adoc#dynamic-admission-controller[operator architecture].
 To prevent deployment of the Admission Controller by the Couchbase Helm Chart, you can set the `install.admissionController=false` parameter either in the values file or on the command line:
 
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install my-release --set install.admissionController=false {helm-repo}
 ----
@@ -320,7 +320,7 @@ If you plan to use Helm to install multiple instances (releases) of the Couchbas
 
 If you want Helm to generate a name for you, you can run any of the example installation commands on this page using the `-g` option instead of the name parameter:
 
-[source,console]
+[source,console,subs="attributes,verbatim"]
 ----
 helm install -g {helm-repo}
 ----
