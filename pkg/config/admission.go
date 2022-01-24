@@ -565,7 +565,7 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 								},
 							},
 							ReadinessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Path:   "/readyz",
 										Port:   intstr.FromString("https"),

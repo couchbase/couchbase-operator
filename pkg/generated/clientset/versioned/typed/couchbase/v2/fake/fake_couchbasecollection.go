@@ -94,7 +94,7 @@ func (c *FakeCouchbaseCollections) Update(ctx context.Context, couchbaseCollecti
 // Delete takes name of the couchbaseCollection and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseCollections) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbasecollectionsResource, c.ns, name), &v2.CouchbaseCollection{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbasecollectionsResource, c.ns, name, opts), &v2.CouchbaseCollection{})
 
 	return err
 }

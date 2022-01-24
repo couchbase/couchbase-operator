@@ -94,7 +94,7 @@ func (c *FakeCouchbaseMemcachedBuckets) Update(ctx context.Context, couchbaseMem
 // Delete takes name of the couchbaseMemcachedBucket and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseMemcachedBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbasememcachedbucketsResource, c.ns, name), &v2.CouchbaseMemcachedBucket{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbasememcachedbucketsResource, c.ns, name, opts), &v2.CouchbaseMemcachedBucket{})
 
 	return err
 }

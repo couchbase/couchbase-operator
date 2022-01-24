@@ -94,7 +94,7 @@ func (c *FakeCouchbaseReplications) Update(ctx context.Context, couchbaseReplica
 // Delete takes name of the couchbaseReplication and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseReplications) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbasereplicationsResource, c.ns, name), &v2.CouchbaseReplication{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbasereplicationsResource, c.ns, name, opts), &v2.CouchbaseReplication{})
 
 	return err
 }

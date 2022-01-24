@@ -94,7 +94,7 @@ func (c *FakeCouchbaseRoleBindings) Update(ctx context.Context, couchbaseRoleBin
 // Delete takes name of the couchbaseRoleBinding and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseRoleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbaserolebindingsResource, c.ns, name), &v2.CouchbaseRoleBinding{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbaserolebindingsResource, c.ns, name, opts), &v2.CouchbaseRoleBinding{})
 
 	return err
 }

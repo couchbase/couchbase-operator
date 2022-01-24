@@ -167,7 +167,7 @@ Populates pod resource requests and limits
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -175,6 +175,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -268,7 +273,7 @@ Adds the IAM Role ARN to the backup service account's annotation. e.g arn:aws:ia
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -276,6 +281,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -464,7 +474,7 @@ Populates pod resource requests and limits
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -472,6 +482,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -582,7 +597,7 @@ Whether to scope the Operator to a 'namespace' or to the 'cluster'.
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -590,6 +605,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -676,7 +696,7 @@ Deletes backup roles.
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -684,6 +704,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -790,7 +815,7 @@ Whether to scope the Operator to a 'namespace' or to the 'cluster'.
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -798,6 +823,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -1022,7 +1052,7 @@ Populates pod resource requests and limits
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -1030,6 +1060,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -1123,7 +1158,7 @@ Adds the IAM Role ARN to the backup service account's annotation. e.g arn:aws:ia
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -1131,6 +1166,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -1319,7 +1359,7 @@ Populates pod resource requests and limits
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -1327,6 +1367,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string
@@ -1413,7 +1458,7 @@ Prints the command version
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -1421,6 +1466,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string

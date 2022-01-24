@@ -94,7 +94,7 @@ func (c *FakeCouchbaseScopes) Update(ctx context.Context, couchbaseScope *v2.Cou
 // Delete takes name of the couchbaseScope and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseScopes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbasescopesResource, c.ns, name), &v2.CouchbaseScope{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbasescopesResource, c.ns, name, opts), &v2.CouchbaseScope{})
 
 	return err
 }

@@ -94,7 +94,7 @@ func (c *FakeCouchbaseEphemeralBuckets) Update(ctx context.Context, couchbaseEph
 // Delete takes name of the couchbaseEphemeralBucket and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseEphemeralBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbaseephemeralbucketsResource, c.ns, name), &v2.CouchbaseEphemeralBucket{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbaseephemeralbucketsResource, c.ns, name, opts), &v2.CouchbaseEphemeralBucket{})
 
 	return err
 }
