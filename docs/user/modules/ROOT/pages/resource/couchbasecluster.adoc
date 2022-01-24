@@ -291,6 +291,8 @@ Selector allows CouchbaseBackup and CouchbaseBackupRestore resources to be filte
 
 *Type*: `string`
 
+*Default*: `couchbase-backup`
+
 ==== Description
 
 The Service Account to run backup (and restore) pods under.

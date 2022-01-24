@@ -2124,6 +2124,7 @@ type Backup struct {
 
 	// The Service Account to run backup (and restore) pods under.
 	// Without this backup pods will not be able to update status.
+	// +kubebuilder:default="couchbase-backup"
 	ServiceAccount string `json:"serviceAccountName,omitempty"`
 
 	// NodeSelector defines which nodes to constrain the pods that
