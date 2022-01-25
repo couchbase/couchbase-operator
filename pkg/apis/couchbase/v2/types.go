@@ -2189,20 +2189,26 @@ const (
 
 // LDAP Spec
 type CouchbaseClusterLDAPSpec struct {
-	// BindSecret is the name of a Kubernetes secret to use containing password for LDAP user binding
+	// BindSecret is the name of a Kubernetes secret to use containing password for LDAP user binding.
+	// The bindSecret must have a key with the name "password" and a value which corresponds to the
+	// password of the binding LDAP user.
 	BindSecret string `json:"bindSecret"`
 
 	// TLSSecret is the name of a Kubernetes secret to use for LDAP ca cert.
+	// The secret must have the key with the name "ca.crt".
 	TLSSecret string `json:"tlsSecret,omitempty"`
 
-	// Enables using LDAP to authenticate users.
+	// AuthenticationEnabled allows users who attempt to access Couchbase Server without having been
+	// added as local users to be authenticated against the specified LDAP Host(s).
 	// +kubebuilder:default=true
 	AuthenticationEnabled bool `json:"authenticationEnabled,omitempty"`
 
-	// Enables use of LDAP groups for authorization.
+	// AuthorizationEnabled allows authenticated LDAP users to be authorized with RBAC roles granted to
+	// any Couchbase Server group associated with the user.
 	AuthorizationEnabled bool `json:"authorizationEnabled,omitempty"`
 
-	// List of LDAP hosts.
+	// List of LDAP hosts to provide authentication-support for Couchbase Server.
+	// Host name must be a valid IP address or DNS Name e.g openldap.default.svc, 10.0.92.147.
 	// +kubebuilder:validation:MinItems=1
 	Hosts []string `json:"hosts"`
 
@@ -2211,14 +2217,20 @@ type CouchbaseClusterLDAPSpec struct {
 	// +kubebuilder:default=389
 	Port int `json:"port"`
 
-	// Encryption method to communicate with LDAP servers.
-	// Can be StartTLSExtension, TLS, or false.
+	// Encryption determines how the connection with the LDAP server should be encrypted.
+	// Encryption may set as either StartTLSExtension, TLS, or false.
+	// When set to "false" then no verification of the LDAP hostname is performed.
+	// When Encryption is StartTLSExtension, or TLS is set then the default behavior is to
+	// use the certificate already loaded into the Couchbase Cluster for certificate validation,
+	// otherwise `ldap.tlsSecret` may be set to override The Couchbase certificate.
 	Encryption LDAPEncryption `json:"encryption,omitempty"`
 
-	// Whether server certificate validation be enabled
+	// Whether server certificate validation be enabled.
 	EnableCertValidation bool `json:"serverCertValidation,omitempty"`
 
-	// CA Certificate in PEM format to be used in LDAP server certificate validation
+	// DEPRECATED - Field is ignored, use tlsSecret.
+	// CA Certificate in PEM format to be used in LDAP server certificate validation.
+	// This cert is the string form of the secret provided to `spec.tls.tlsSecret`.
 	CACert string `json:"cacert,omitempty"`
 
 	// LDAP query, to get the users' groups by username in RFC4516 format.  More info:
@@ -2280,10 +2292,11 @@ type CouchbaseClusterSecuritySpec struct {
 	// `()<>,;:\"/[]?={}`.
 	AdminSecret string `json:"adminSecret"`
 
-	// Couchbase RBAC Users
+	// RBAC is the options provided for enabling and selecting RBAC User resources to manage.
 	RBAC RBAC `json:"rbac,omitempty"`
 
-	// LDAP Settings
+	// LDAP provides settings to authenticate and authorize LDAP users with Couchbase Server.
+	// `RBAC.managed` must also be set to `true` in order to apply LDAP settings to Cocuhbase Server.
 	LDAP *CouchbaseClusterLDAPSpec `json:"ldap,omitempty"`
 }
 
