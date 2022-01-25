@@ -2909,7 +2909,7 @@ func gatherDataTopologyResources(clients *clients, cluster *couchbasev2.Couchbas
 // recursively gathers descendants.
 // nolint:gocognit
 func gatherScopeResources(clients *clients, scopeSelector *couchbasev2.ScopeSelector) ([]runtime.Object, error) {
-	if !scopeSelector.Managed {
+	if scopeSelector == nil || !scopeSelector.Managed {
 		return nil, nil
 	}
 
@@ -3004,7 +3004,7 @@ func gatherScopeResources(clients *clients, scopeSelector *couchbasev2.ScopeSele
 
 // gatherCollectionResources gathers any collection resources under the control of a selector.
 func gatherCollectionResources(clients *clients, collectionSelector *couchbasev2.CollectionSelector) ([]runtime.Object, error) {
-	if !collectionSelector.Managed {
+	if collectionSelector == nil || !collectionSelector.Managed {
 		return nil, nil
 	}
 
