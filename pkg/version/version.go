@@ -35,6 +35,12 @@ func WithBuildNumber() string {
 	return fmt.Sprintf("%s (build %s)", WithRevision(), BuildNumber)
 }
 
+// WithBuildNumberAndRevision gives full debug information, used primarily for
+// CLI commands.
+func WithBuildNumberAndRevision() string {
+	return fmt.Sprintf("%s (build %s, revision %s)", WithRevision(), BuildNumber, revision.Revision())
+}
+
 // UserAgent is a valid user agent string as defined by the HTTP specification
 // https://tools.ietf.org/html/rfc1945#section-10.15, this is used to identify
 // what unique version of the Operator has been interacting with Couchbase

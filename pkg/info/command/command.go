@@ -89,7 +89,7 @@ func GenerateCommand() *cobra.Command {
 		Short: "Prints the command version",
 		Long:  "Prints the command version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("cbopinfo", version.WithBuildNumber())
+			fmt.Println("cbopinfo", version.WithBuildNumberAndRevision())
 		},
 	}
 
