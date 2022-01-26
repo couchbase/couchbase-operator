@@ -66,9 +66,22 @@ Refer to xref:howto-operator-upgrade.adoc[] for further details.
 
 Some users will encounter a mandatory upgrade cycle when upgrading to this release.
 
+[IMPORTANT]
+====
+An upgrade cycle is a relatively heavyweight operation that requires all pods in the cluster to be replaced, and data transferred between the old and new pods.
+The time taken to perform this operation is dependent on network bandwidth, disk IO and the amount of data resident in the database.
+For large, production databases, ensure an adequate maintenance window is scheduled as to minimize any disruption to clients and other business critical functions.
+
+For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
+====
+
+===== TLS Users
+
 In prior versions, Couchbase Server pod readiness checks were done over plain text port 8091.
 With the introduction of strict mode TLS in this release, port 8091 can be disabled to inhibit all non TLS ports.
 The Operator has been updated to use port 18091 -- Couchbase Server's TLS admin port -- when TLS management is enabled.
+
+===== Server Groups Users
 
 A pod upgrade is also required for users of the server groups feature.
 
@@ -78,14 +91,12 @@ This label has been deprecated since Kubernetes 1.17, in favor of `topology.kube
 To ensure correct operation of the Operator in the future, the decision has been taken to start using the new label as of Operator 2.3.
 This ensures that the Operator is compatible with all future Kubernetes releases in the event of the deprecated label being removed.
 
-[IMPORTANT]
-====
-An upgrade cycle is a relatively heavyweight operation that requires all pods in the cluster to be replaced, and data transferred between the old and new pods.
-The time taken to perform this operation is dependent on network bandwidth, disk IO and the amount of data resident in the database.
-For large, production databases, ensure an adequate maintenance window is scheduled as to minimize any disruption to clients and other business critical functions.
+===== Logging Users
 
-For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
-====
+Users of audit log rotation -- in particular log clean up -- will encounter a cluster upgrade.
+
+A bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
+This has been fixed so that logs older than or equal to the time period are cleaned.
 
 [#release-v230]
 == Release 2.3.0

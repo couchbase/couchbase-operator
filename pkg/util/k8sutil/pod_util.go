@@ -1174,7 +1174,7 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		},
 		Args: []string{
 			"-c",
-			"while true; do sleep ${AUDIT_CLEANUP_INTERVAL} ; echo \"Cleaning audit logs every ${AUDIT_CLEANUP_INTERVAL}s, files older than ${AUDIT_CLEANUP_AGE}\"; find ${AUDIT_LOG_DIR} -mmin ${AUDIT_CLEANUP_AGE} -type f -name \"*-audit.log\" -delete -print; done",
+			"while true; do sleep ${AUDIT_CLEANUP_INTERVAL} ; echo \"Cleaning audit logs every ${AUDIT_CLEANUP_INTERVAL}s, files older than ${AUDIT_CLEANUP_AGE}\"; find ${AUDIT_LOG_DIR} -mmin +${AUDIT_CLEANUP_AGE} -type f -name \"*-audit.log\" -delete -print; done",
 		},
 		Resources: auditResources,
 	}
