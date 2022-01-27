@@ -317,7 +317,7 @@ func getSaveDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 			cao save --filename save.yaml
 
 			# Save the full data topology for a specific cluster
-			cao save --cluster cluster-nane --filename save.yaml
+			cao save --cluster cluster-name --filename save.yaml
 
 			# Save all scope and collections in a bucket
 			cao save --path /bucket --filename save.yaml
