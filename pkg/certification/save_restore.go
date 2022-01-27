@@ -56,6 +56,9 @@ var (
 
 	// errInternalError is raised when we messed up, and shouldn't ever be seen.
 	errInternalError = errors.New("internal error")
+
+	// minVersion is the lowest version this will work with.
+	minVersion = "7.0.0"
 )
 
 var (
@@ -478,6 +481,26 @@ func selectClusterPod(clients *clients, cluster *couchbasev2.CouchbaseCluster) (
 	return &pods.Items[0], nil
 }
 
+// checkVersion stops you from using an incompatible Server version.
+func checkVersion(client *couchbaseutil.Client, host string) error {
+	var pools couchbaseutil.PoolsInfo
+
+	if err := couchbaseutil.GetPools(&pools).On(client, host); err != nil {
+		return err
+	}
+
+	version, err := couchbaseutil.NewVersion(pools.Version)
+	if err != nil {
+		return err
+	}
+
+	if !version.GreaterEqualString(minVersion) {
+		return fmt.Errorf("%w: unsupported version, minimum %s", errEnvironmentError, minVersion)
+	}
+
+	return nil
+}
+
 // gatherResources collects all buckets, scopes and collections, under the guidance
 // of a path filter.
 func gatherResources(client *couchbaseutil.Client, host string, path pathVar) ([]runtime.Object, error) {
@@ -674,6 +697,11 @@ func gatherClusterResources(clients *clients, cluster *couchbasev2.CouchbaseClus
 
 			apiClient.SetTLS(tls)
 		}
+	}
+
+	// Insert this here while we have the client tunnel open.
+	if err := checkVersion(apiClient, host); err != nil {
+		return nil, err
 	}
 
 	// Gather all resources.

@@ -287,6 +287,9 @@ type PoolsInfo struct {
 	// UUID, in true server style, is either a string, or initially
 	// an array.
 	UUID interface{} `json:"uuid"`
+
+	// Version is a semver with a bunch of other cruft on the end.
+	Version string `json:"implementationVersion"`
 }
 
 // GetUUID abstracts away the polymorphic nature of the UUID field,
