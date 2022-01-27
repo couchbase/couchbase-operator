@@ -179,6 +179,9 @@ Even when running a Couchbase Server Pod on a dedicated Kubernetes node, it's im
 When not explicitly specified in a server class's pod template, the Operator will automatically populate the Couchbase server memory requests for that container.
 This is as defined by <<overheads-and-resource-scheduling>>, namely the total of all resource allocations per service enabled for that server class, plus a 25% overhead.
 
+When using automatic memory allocation, be aware there is a xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-cluster-queryservicememoryquota[`couchbaseclusters.spec.cluster.queryServiceMemoryQuota`] field that can be set.
+This has no affect on Couchbase Server -- as it cannot constrain the query service -- however, it does get added to the per-pod memory reservation total allowing sufficient overhead for query to be factored into cluster sizing.
+
 Modification of memory allocation will cause an upgrade of the affected pods.
 
 == Interactive Memory Allocation kbd:[operator 2.1]
