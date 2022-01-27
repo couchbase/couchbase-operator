@@ -12,7 +12,7 @@ NOTE: For all supported software versions listed on this page, maintenance/patch
 
 [IMPORTANT]
 ====
-Couchbase Server versions 6.5-7.0 are susceptible to the 'log4shell' CVE, read https://blog.couchbase.com/what-to-know-about-the-log4j-vulnerability-cve-2021-44228/[our blog on this vulnerability^] for more details.
+Couchbase Server versions 6.6-7.0 are susceptible to the 'log4shell' CVE, read https://blog.couchbase.com/what-to-know-about-the-log4j-vulnerability-cve-2021-44228/[our blog on this vulnerability^] for more details.
 
 It is _strongly recommended_ that users upgrade to at least server version 6.6.4, or 7.0.3, when using the analytics service.
 ====
@@ -24,7 +24,7 @@ This release supports the deployment of the following Couchbase software:
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| 6.5.1+, 6.6, 7.0
+| 6.6, 7.0
 |===
 
 The following diagram depicts Couchbase Server compatibility with the Operator for this, and previous releases, and can be used to calculate upgrade paths:
@@ -44,8 +44,8 @@ This release supports the following container images for xref:concept-backup.ado
 | Backup From and Restore To
 
 a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.2.0`^]
-a| xref:6.6@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 7.0.0`]
-| Couchbase Server 6.5--7.0
+a| xref:7.0@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 7.0.0`]
+| Couchbase Server 6.6--7.0
 |===
 
 The following diagram depicts Operator Backup image compatibility with all supported Couchbase Server versions, you should consider this when upgrading Couchbase Server:
@@ -96,6 +96,18 @@ The following diagrams depict Couchbase Operator compatibility with Kubernetes a
 
 .Kubernetes and Red Hat OpenShift Compatibility
 image:compatibility-kubernetes.png[]
+
+[IMPORTANT]
+====
+Where an Operator release is marked as _supported_, this means it has been fully tested for functionality on that platform version.
+Couchbase Support will actively recreate and diagnose issues.
+Where relevant, fixes will be made to the affected product and patch releases made.
+
+Where an Operator release is marked as _compatible_ however, this means it has been assessed by the development team to be technically feasible, and may have had rudimentary compatibility testing.
+You may run the xref:concept-platform-certification.adoc[] tooling to verify the Operator will work on a compatible platform.
+Support will be provided on a best-effort basis, and any issues may not result in fixes and patch releases.
+We therefore highly encourage the use of a supported platform version.
+====
 
 === Managed Kubernetes Compatibility
 
