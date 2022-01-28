@@ -21,6 +21,13 @@ Make sure to `cd` into this directory before you run the commands in this guide.
 
 All commands in this guide are run as a system administrator account; they require the creation of cluster scoped resources or the granting of roles to service accounts (privilege escalation).
 
+[IMPORTANT]
+====
+It may be tempting to use the container images hosted on Docker Hub as they are dramatically smaller, and more secure, than those offered for use on the Red Hat Container Catalog.
+However, it is a Red Hat requirement for OpenShift users that Red Hat Container Catalog images be used.
+Use of Kubernetes images hosted on Docker Hub are not guaranteed to work, and are not supported, on the OpenShift platform.
+====
+
 == Install the CRD
 
 The first step in installing the Operator is to install the custom resource definitions (CRD) that describe the Couchbase resource types.
