@@ -72,7 +72,7 @@ First, you need to disable bucket management, so existing configuration is not d
 
 [source,console]
 ----
-$ kubectl patch couchbasecluster my-cluster -p ‘{“spec”:{“buckets”:{“managed”:false}}}’
+$ kubectl patch couchbasecluster my-cluster --type=merge -p '{"spec":{"buckets":{"managed":false}}}'
 ----
 
 Next, remove any resources that may conflict with those the Operator will generate.
@@ -117,8 +117,8 @@ Synchronization is triggered by first setting a label selector, then triggering 
 
 [source,console]
 ----
-$ kubectl patch couchbasecluster my-cluster -p ‘{“spec”:{“buckets”:{“selector”:{"matchLabels":{"foo":"bar"}}}}}’
-$ kubectl patch couchbasecluster my-cluster -p ‘{“spec”:{“buckets”:{“synchronize”:true}}}’
+$ kubectl patch couchbasecluster my-cluster --type merge -p '{"spec":{"buckets":{"selector":{"matchLabels":{"foo":"bar"}}}}}'
+$ kubectl patch couchbasecluster my-cluster --type merge -p '{"spec":{"buckets":{"synchronize":true}}}'
 ----
 
 The synchronization operation proceeds as follows:
@@ -133,7 +133,7 @@ To check for completion status, you can wait until the condition is reported:
 
 [source,console]
 ----
-$ kubectl wait –for=condition=Synchronized couchbasecluster/my-cluster
+$ kubectl wait --for=condition=Synchronized couchbasecluster/my-cluster
 ----
 
 Then check whether or not the synchronization succeeded:
@@ -174,7 +174,7 @@ Once you have confirmed synchronization has completed successfully, you can swit
 
 [source,console]
 ----
-$ kubectl patch couchbasecluster my-cluster -p ‘{“spec”:{“buckets”:{“synchronize”:false,“managed”:true}}}’
+$ kubectl patch couchbasecluster my-cluster --type=merge -p '{"spec":{"buckets":{"synchronize":false,"managed":true}}}'
 ----
 
 From this point onward, any managed resources that are deleted or modified manually will be recovered, and any additional resources that are added will be deleted, as per the usual operation of the Operator.
