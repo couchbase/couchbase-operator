@@ -67,6 +67,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintXDCRConnectionTLS,
 		checkConstraintPublicNetworking,
 		checkConstraintBucketNames,
+		checkConstraintBucketSynchronization,
 		checkConstraintMemoryAllocations,
 		checkConstraintMTLSPaths,
 		checkConstraintAutoCompactionTombstonePurgeInterval,
@@ -978,6 +979,24 @@ func checkConstraintPublicNetworking(v *types.Validator, cluster *couchbasev2.Co
 // unique names.
 func checkConstraintBucketNames(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	return validateBucketNameConstraints(v, cluster)
+}
+
+// checkConstraintBucketSynchronization checks that when synchronization is enabled,
+// that a label selector has been provided by the user.
+func checkConstraintBucketSynchronization(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	if !cluster.Spec.Buckets.Synchronize {
+		return nil
+	}
+
+	if cluster.Spec.Buckets.Selector != nil {
+		return nil
+	}
+
+	return errors.Required("spec.buckets.selector", "body", nil)
 }
 
 // checkConstraintMemoryAllocations checks that all buckets referenced by this cluster
