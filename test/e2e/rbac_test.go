@@ -985,7 +985,7 @@ func TestRBACWithMultipleBucketRole(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).BeforeVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	clusterSize := 1
 
@@ -1018,7 +1018,7 @@ func TestRBACWithMultipleBucketSingleScopeRole(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).BeforeVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	clusterSize := 1
 	scopeName := "pinky"
@@ -1058,7 +1058,7 @@ func TestRBACWithMultipleBucketMultiScopeRole(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).BeforeVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	clusterSize := 1
 	scopeName := "pinky"
@@ -1103,7 +1103,7 @@ func TestRBACWithMultipleBucketMultiScopeSingleCollectionRole(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).BeforeVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	clusterSize := 1
 	scopeName := "pinky"
@@ -1152,7 +1152,7 @@ func TestRBACWithMultipleBucketMultiScopeMultiCollectionRole(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).BeforeVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	clusterSize := 1
 	scopeName := "pinky"
@@ -1207,7 +1207,7 @@ func TestRBACWithBucketSelector(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).BeforeVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	clusterSize := 1
 	label := map[string]string{

@@ -226,10 +226,27 @@ func (c *Cluster) getRoleBuckets(role couchbasev2.Role) []*couchbasev2.Couchbase
 			Spec: couchbasev2.CouchbaseBucketSpec{
 				Name: couchbasev2.BucketName(role.Bucket),
 			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: role.Bucket,
+			},
 		})
 	}
 
 	return buckets
+}
+
+func getScopeList(bucket *couchbasev2.CouchbaseBucket, scopes []*couchbasev2.CouchbaseScope, c *Cluster) (*couchbaseutil.ScopeList, error) {
+	// If we have no scopes, no point in making this request for every bucket.  Also
+	// makes this method usable for non-7.0.0+ clusters
+	scopeList := &couchbaseutil.ScopeList{}
+	if len(scopes) > 0 {
+		err := couchbaseutil.ListScopes(bucket.GetName(), scopeList).On(c.api, c.readyMembers())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return scopeList, nil
 }
 
 func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbasev2.CouchbaseBucket, scopes []*couchbasev2.CouchbaseScope, collections []*couchbasev2.CouchbaseCollection) ([]couchbaseutil.UserRole, error) {
@@ -243,9 +260,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 			continue
 		}
 
-		scopeList := &couchbaseutil.ScopeList{}
-		err := couchbaseutil.ListScopes(bucket.GetName(), scopeList).On(c.api, c.readyMembers())
-
+		scopeList, err := getScopeList(bucket, scopes, c)
 		if err != nil {
 			return nil, err
 		}
@@ -295,6 +310,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 				roles = append(roles, r)
 			}
 		}
+
 		// If a selector is passed but returns no results, we should not create
 		// a more permissive permission set and therefore skip creating the more permissive permission set.
 		// However if no scopes are present AND we do not have a selector, that is communicated as an intent to create
@@ -321,14 +337,14 @@ func (c *Cluster) bucketExists(bucket string) bool {
 
 	err := couchbaseutil.ListBuckets(bucketList).On(c.api, c.readyMembers())
 	if err != nil {
-		log.Error(err, "error retrieving bucket list")
+		log.Info("error retrieving bucket list")
 		return false
 	}
 
 	b, err := bucketList.Get(bucket)
 
 	if err != nil {
-		log.Error(err, "error checking for bucket %s", bucket)
+		log.Info("Error retrieving bucket", "bucket", bucket)
 		return false
 	}
 
@@ -338,20 +354,20 @@ func (c *Cluster) bucketExists(bucket string) bool {
 func isVersionGreaterThan(image string, version string) (bool, error) {
 	tag, err := k8sutil.CouchbaseVersion(image)
 	if err != nil {
-		log.Error(err, "error retrieving couchbase version")
+		log.Info("error retrieving couchbase version", "tagged", tag, "version", version)
 		return false, err
 	}
 
 	available, err := couchbaseutil.VersionAfter(tag, version)
 	if err != nil {
-		log.Error(err, "error comparing versions")
+		log.Info("error comparing versions", "tagged", tag, "version", version)
 		return false, err
 	}
 
 	return available, nil
 }
 
-func (c *Cluster) handleRole(role couchbasev2.Role) []couchbaseutil.UserRole {
+func (c *Cluster) handleRole(role couchbasev2.Role) ([]couchbaseutil.UserRole, error) {
 	roles := []couchbaseutil.UserRole{}
 	// Roles that relate to buckets are scoped to either one, or
 	// all of them.  We used to have a special mutator that would fill
@@ -369,40 +385,34 @@ func (c *Cluster) handleRole(role couchbasev2.Role) []couchbaseutil.UserRole {
 			CollectionName: "",
 		})
 
-		return roles
+		return roles, nil
 	}
 
 	available, err := isVersionGreaterThan(c.cluster.Spec.Image, "7.0.0")
 	if err != nil {
 		log.Error(err, "error during rbac reconciliation due to version check")
-		return roles
+		return roles, err
 	}
+
+	buckets := c.getRoleBuckets(role)
+	scopes := make([]*couchbasev2.CouchbaseScope, 0)
+	collections := make([]*couchbasev2.CouchbaseCollection, 0)
 
 	if available {
-		buckets := c.getRoleBuckets(role)
-
-		collections := c.getRoleCollections(role)
-
-		scopes := c.getRoleScopes(role)
-
-		roleCombinations, err := c.getRoleCombinations(role, buckets, scopes, collections)
-
-		if err != nil {
-			// handle validation errors
-			return roles
-		}
-
-		roles = append(roles, roleCombinations...)
-	} else {
-		roles = append(roles, couchbaseutil.UserRole{
-			Role:           string(role.Name),
-			BucketName:     role.Bucket,
-			ScopeName:      "",
-			CollectionName: "",
-		})
+		collections = c.getRoleCollections(role)
+		scopes = c.getRoleScopes(role)
 	}
 
-	return roles
+	roleCombinations, err := c.getRoleCombinations(role, buckets, scopes, collections)
+
+	if err != nil {
+		// handle validation errors
+		return roles, err
+	}
+
+	roles = append(roles, roleCombinations...)
+
+	return roles, nil
 }
 
 // generateGroups generates the list of groups that should exist, under the control
@@ -433,7 +443,12 @@ func (c *Cluster) generateGroups() (map[string]couchbaseutil.Group, error) {
 		}
 
 		for _, role := range g.Spec.Roles {
-			group.Roles = append(group.Roles, c.handleRole(role)...)
+			newRoles, err := c.handleRole(role)
+			if err != nil {
+				return groups, err
+			}
+
+			group.Roles = append(group.Roles, newRoles...)
 		}
 
 		groups[g.Name] = group
