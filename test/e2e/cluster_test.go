@@ -28,7 +28,7 @@ import (
 // 4. Check the events to make sure the operator took the correct actions.
 func TestResizeCluster(t *testing.T) {
 	// Platform configuration.
-	targetKube, cleanup := framework.Global.SetupTest(t)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -36,14 +36,14 @@ func TestResizeCluster(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size3, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size1, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size3, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size1, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -56,7 +56,7 @@ func TestResizeCluster(t *testing.T) {
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Test scaling a cluster with no buckets up and down
@@ -68,7 +68,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -77,16 +77,16 @@ func TestResizeClusterWithBucket(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size3, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size1, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size3, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size1, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -100,7 +100,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests editing of cluster settings
@@ -111,14 +111,14 @@ func TestResizeClusterWithBucket(t *testing.T) {
 // 5. Change autofailover timeout from 30 to 31 ( verify via rest call to cluster).
 func TestEditClusterSettings(t *testing.T) {
 	// Platform configuration.
-	targetKube, cleanup := framework.Global.SetupTest(t)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.
@@ -126,19 +126,19 @@ func TestEditClusterSettings(t *testing.T) {
 		Replace("/spec/cluster/dataServiceMemoryQuota", e2espec.NewResourceQuantityMi(257)).
 		Replace("/spec/cluster/indexServiceMemoryQuota", e2espec.NewResourceQuantityMi(257)).
 		Replace("/spec/cluster/searchServiceMemoryQuota", e2espec.NewResourceQuantityMi(257))
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patches, time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patches, time.Minute)
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.UpgradeFinishedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 5*time.Minute)
 
 	validationPatches := jsonpatch.NewPatchSet().
 		Test("/DataMemoryQuotaMB", int64(257)).
 		Test("/IndexMemoryQuotaMB", int64(257)).
 		Test("/SearchMemoryQuotaMB", int64(257))
-	e2eutil.MustPatchCouchbaseInfo(t, targetKube, testCouchbase, validationPatches, 5*time.Minute)
+	e2eutil.MustPatchCouchbaseInfo(t, kubernetes, cluster, validationPatches, 5*time.Minute)
 
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", e2espec.NewDurationS(31)), time.Minute)
-	e2eutil.MustPatchAutoFailoverInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Timeout", int64(31)), time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", e2espec.NewDurationS(31)), time.Minute)
+	e2eutil.MustPatchAutoFailoverInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Timeout", int64(31)), time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -153,13 +153,13 @@ func TestEditClusterSettings(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestIndexerSettings changes the indexer settings and sees what happens.
 func TestIndexerSettings(t *testing.T) {
 	// Platform configuration.
-	targetKube, cleanup := framework.Global.SetupTest(t)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -168,26 +168,26 @@ func TestIndexerSettings(t *testing.T) {
 	// Create the cluster.  Use an empty inderer settings to get the DAC to fill in
 	// the defaults for us.  Also remove the index service, the storage mode cannot be
 	// modified if any nodes are running the index service (lol really?)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.Indexer = &couchbasev2.CouchbaseClusterIndexerSettings{}
-	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.Indexer = &couchbasev2.CouchbaseClusterIndexerSettings{}
+	cluster.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Edit the index settings so they aren't the defaults.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/threads", 8), time.Minute)
-	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/Threads", 8), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/logLevel", couchbasev2.IndexerLogLevelDebug), time.Minute)
-	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/LogLevel", couchbaseutil.IndexLogLevelDebug), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/maxRollbackPoints", 8), time.Minute)
-	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/MaxRollbackPoints", 8), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/memorySnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
-	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/MemSnapInterval", 1000), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/stableSnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
-	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/StableSnapInterval", 1000), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
-	e2eutil.MustPatchIndexSettingInfo(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/StorageMode", couchbaseutil.IndexStoragePlasma), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/threads", 8), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Threads", 8), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/logLevel", couchbasev2.IndexerLogLevelDebug), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/LogLevel", couchbaseutil.IndexLogLevelDebug), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/maxRollbackPoints", 8), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MaxRollbackPoints", 8), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/memorySnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MemSnapInterval", 1000), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/stableSnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/StableSnapInterval", 1000), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/StorageMode", couchbaseutil.IndexStoragePlasma), time.Minute)
 
 	// Check that the user can see the cluster being edited.
 	expectedEvents := []eventschema.Validatable{
@@ -195,35 +195,35 @@ func TestIndexerSettings(t *testing.T) {
 		eventschema.Repeat{Times: 6, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestQuerySettings tests that query setting updates are accepted by the Couchbase API
 // and the necessary events are raised.
 func TestQuerySettings(t *testing.T) {
 	// Platform configuration.
-	targetKube, cleanup := framework.Global.SetupTest(t)
+	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.Query = &couchbasev2.CouchbaseClusterQuerySettings{}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.Query = &couchbasev2.CouchbaseClusterQuerySettings{}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Play with the settings and ensure events are raised.
-	op := e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("query service", testCouchbase), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpace", "2Gi"), time.Minute)
+	op := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.ClusterSettingsEditedEvent("query service", cluster), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpace", "2Gi"), time.Minute)
 	e2eutil.MustReceiveErrorValue(t, op)
 
-	op = e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("query service", testCouchbase), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpaceUnlimited", true), time.Minute)
+	op = e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.ClusterSettingsEditedEvent("query service", cluster), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpaceUnlimited", true), time.Minute)
 	e2eutil.MustReceiveErrorValue(t, op)
 
-	op = e2eutil.WaitForPendingClusterEvent(targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("query service", testCouchbase), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/backfillEnabled", false), time.Minute)
+	op = e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.ClusterSettingsEditedEvent("query service", cluster), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/backfillEnabled", false), time.Minute)
 	e2eutil.MustReceiveErrorValue(t, op)
 
 	// Check that the user can see the cluster being edited.
@@ -232,24 +232,24 @@ func TestQuerySettings(t *testing.T) {
 		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestInvalidBaseImage tests cluster with invalid image repos fail.
 func TestInvalidBaseImage(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(1).Generate(targetKube)
-	testCouchbase.Spec.Image = pkgconstants.InvalidBaseImage
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(1).Generate(kubernetes)
+	cluster.Spec.Image = pkgconstants.InvalidBaseImage
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, 0), 15*time.Minute)
 
 	// Check the events match what we expect:
 	// * First member creation failed
@@ -257,24 +257,24 @@ func TestInvalidBaseImage(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestInvalidVersion tests cluster with invalid version repos fail.
 func TestInvalidVersion(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(1).Generate(targetKube)
-	testCouchbase.Spec.Image = "couchbase/server:enterprise-9.9.9"
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(1).Generate(kubernetes)
+	cluster.Spec.Image = "couchbase/server:enterprise-9.9.9"
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// When a pod has been created check it's event stream has an image pull error.  Also expect the
 	// cluster to enter the failed state.
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, 0), 15*time.Minute)
 
 	// Check the events match what we expect:
 	// * First member creation failed
@@ -282,7 +282,7 @@ func TestInvalidVersion(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestNodeUnschedulable tests running out of allocatable memory and then updates
@@ -295,37 +295,37 @@ func TestNodeUnschedulable(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// This is broken because the memory allocation stuff is inherently flawed.
 	// There could be a prior cluster undergoing cleanup, thus making the allocations
 	// at calculation time not tally with those at execution time.  Perhaps we need
 	// to synchronize on namespace deletion??
-	framework.Requires(t, targetKube).StaticCluster().Rethink()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
 	// Static configuration.
-	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
-	allocatableMemory := e2eutil.MustGetMinNodeMem(t, targetKube)
+	clusterSize := e2eutil.MustNumNodes(t, kubernetes) + 1
+	allocatableMemory := e2eutil.MustGetMinNodeMem(t, kubernetes)
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(1).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+	cluster := clusterOptions().WithEphemeralTopology(1).Generate(kubernetes)
+	cluster.Spec.Servers[0].Resources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse(strconv.Itoa(int(allocatableMemory*0.7)) + "Mi"),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Scales up the cluster exhausting memory, We expect the last node to not schedule. When the
 	// policy is removed the last node will be created successfully and the rest of the cluster
 	// upgraded to keep the spec synchronized.
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, clusterSize-2), 10*time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/spec/servers/0/resources"), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 2*f.PodCreateTimeout)
-	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, clusterSize-2), 10*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/servers/0/resources"), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, clusterSize-1), 2*f.PodCreateTimeout)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
 	// Check the events match what we expect:
 	// * All but one new nodes are created
@@ -343,7 +343,7 @@ func TestNodeUnschedulable(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Cluster recovers after node service goes down
@@ -355,7 +355,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -364,17 +364,17 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 
 	// Create the cluster
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration
-	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When ready kill the Couchbase Server process and await recovery
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustKillCouchbaseService(t, targetKube, victimName, f.KubeType)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustKillCouchbaseService(t, kubernetes, victimName, f.KubeType)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -391,7 +391,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestNodeServiceDownDuringRebalance tests killing a node during a scale down.
@@ -399,7 +399,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -408,20 +408,20 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When healthy scale down the cluster and terminate the victim during the rebalance,
 	// we expect the cluster to end up healthy.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize-1, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 30*time.Second)
-	e2eutil.MustWaitForRebalanceProgress(t, targetKube, testCouchbase, 25.0, 5*time.Minute)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize-1, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 30*time.Second)
+	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -440,7 +440,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Test that a node is added back when operator is resumed
@@ -455,7 +455,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -464,15 +464,15 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 
 	// create 2 node cluster with admin console
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// pause operator
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
-	e2eutil.MustEjectMember(t, targetKube, testCouchbase, removePodMemberID, 5*time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	e2eutil.MustEjectMember(t, kubernetes, cluster, removePodMemberID, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -486,7 +486,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests basic MDS Scaling
@@ -501,18 +501,18 @@ func TestBasicMDSScaling(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// adding query service
 	t.Log("adding query service")
@@ -522,8 +522,8 @@ func TestBasicMDSScaling(t *testing.T) {
 		Name:     "test_config_2",
 		Services: couchbasev2.ServiceList{couchbasev2.QueryService},
 	}
-	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustAddServices(t, kubernetes, cluster, newService, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -531,7 +531,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	e2eutil.MustVerifyServices(t, kubernetes, cluster, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// adding index service
 	t.Log("adding index service")
@@ -541,8 +541,8 @@ func TestBasicMDSScaling(t *testing.T) {
 		Name:     "test_config_3",
 		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
-	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustAddServices(t, kubernetes, cluster, newService, time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -550,7 +550,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	e2eutil.MustVerifyServices(t, kubernetes, cluster, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// adding search service
 	t.Log("adding search service")
@@ -560,8 +560,8 @@ func TestBasicMDSScaling(t *testing.T) {
 		Name:     "test_config_4",
 		Services: couchbasev2.ServiceList{couchbasev2.SearchService},
 	}
-	testCouchbase = e2eutil.MustAddServices(t, targetKube, testCouchbase, newService, time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustAddServices(t, kubernetes, cluster, newService, time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -569,15 +569,15 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	e2eutil.MustVerifyServices(t, kubernetes, cluster, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// removing search service
 	t.Log("removing search service")
 
 	removeServiceName := "test_config_4"
-	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
+	cluster = e2eutil.MustRemoveServices(t, kubernetes, cluster, removeServiceName, 2*time.Minute)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -585,14 +585,14 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	e2eutil.MustVerifyServices(t, kubernetes, cluster, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// removing index service
 	t.Log("removing index service")
 
 	removeServiceName = "test_config_3"
-	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustRemoveServices(t, kubernetes, cluster, removeServiceName, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -600,14 +600,14 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	e2eutil.MustVerifyServices(t, kubernetes, cluster, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
 	// removing query service
 	t.Log("removing query service")
 
 	removeServiceName = "test_config_2"
-	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, removeServiceName, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustRemoveServices(t, kubernetes, cluster, removeServiceName, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	serviceMap = map[string]int{
 		"Data":  1,
@@ -615,9 +615,9 @@ func TestBasicMDSScaling(t *testing.T) {
 		"Index": 0,
 		"FTS":   0,
 	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	e2eutil.MustVerifyServices(t, kubernetes, cluster, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -628,7 +628,7 @@ func TestBasicMDSScaling(t *testing.T) {
 		eventschema.Repeat{Times: 3, Validator: e2eutil.ClusterScaleUpSequence(1)},
 		eventschema.Repeat{Times: 3, Validator: e2eutil.ClusterScaleDownSequence(1)},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests swapping nodes between services
@@ -643,18 +643,18 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Services = couchbasev2.ServiceList{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Services = couchbasev2.ServiceList{
 		couchbasev2.DataService,
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// adding query service
 	newService := couchbasev2.ServerConfig{
@@ -662,9 +662,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_2",
 		Services: couchbasev2.ServiceList{couchbasev2.QueryService},
 	}
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// adding index service
 	newService = couchbasev2.ServerConfig{
@@ -672,9 +672,9 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_3",
 		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// adding search services
 	newService = couchbasev2.ServerConfig{
@@ -682,27 +682,27 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 		Name:     "test_config_4",
 		Services: couchbasev2.ServiceList{couchbasev2.SearchService},
 	}
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", newService), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// swapping nodes search - 1 and index + 1
 	patchset := jsonpatch.NewPatchSet().Replace("/spec/servers/2/size", constants.Size2).Replace("/spec/servers/3/size", constants.Size1)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// swapping nodes index - 1 and query + 1
 	patchset = jsonpatch.NewPatchSet().Replace("/spec/servers/1/size", constants.Size2).Replace("/spec/servers/2/size", constants.Size1)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// swapping nodes query - 1 and data + 1
 	patchset = jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", constants.Size2).Replace("/spec/servers/1/size", constants.Size1)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -724,7 +724,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 			},
 		},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests creating a cluster where the data service is the second service listed in the spec
@@ -734,7 +734,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -743,8 +743,8 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 	clusterSize := mdsGroup1Size + mdsGroup2Size
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().Generate(targetKube)
-	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
+	cluster := clusterOptions().Generate(kubernetes)
+	cluster.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
 			Size: mdsGroup1Size,
@@ -762,7 +762,7 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 			},
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -770,22 +770,22 @@ func TestCreateClusterDataServiceNotFirst(t *testing.T) {
 		"Index": 1,
 		"FTS":   1,
 	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustVerifyServices(t, kubernetes, cluster, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestRemoveLastDataService(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -794,8 +794,8 @@ func TestRemoveLastDataService(t *testing.T) {
 	clusterSize := mdsGroup1Size + mdsGroup2Size
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().Generate(targetKube)
-	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
+	cluster := clusterOptions().Generate(kubernetes)
+	cluster.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "service1",
 			Size: mdsGroup1Size,
@@ -813,11 +813,11 @@ func TestRemoveLastDataService(t *testing.T) {
 			},
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// create connection to couchbase nodes
-	testCouchbase = e2eutil.MustRemoveServices(t, targetKube, testCouchbase, "service2", 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustRemoveServices(t, kubernetes, cluster, "service2", 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	serviceMap := map[string]int{
 		"Data":  1,
@@ -825,9 +825,9 @@ func TestRemoveLastDataService(t *testing.T) {
 		"Index": 1,
 		"FTS":   0,
 	}
-	e2eutil.MustVerifyServices(t, targetKube, testCouchbase, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
+	e2eutil.MustVerifyServices(t, kubernetes, cluster, time.Minute, serviceMap, e2eutil.NodeServicesVerifier)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -836,7 +836,7 @@ func TestRemoveLastDataService(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		e2eutil.ClusterScaleDownSequence(1),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestRemoveServerClassWithNodeService tests removing a server class with external features
@@ -846,7 +846,7 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -855,8 +855,8 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 	clusterSize := mdsGroupSize1 + mdsGroupSize2
 
 	// Create the cluster with two server classes, and exposed features.
-	testCouchbase := clusterOptions().WithGenericNetworking().Generate(targetKube)
-	testCouchbase.Spec.Servers = []couchbasev2.ServerConfig{
+	cluster := clusterOptions().WithGenericNetworking().Generate(kubernetes)
+	cluster.Spec.Servers = []couchbasev2.ServerConfig{
 		{
 			Name: "data",
 			Size: mdsGroupSize1,
@@ -873,12 +873,12 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 			},
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Remove a service and ensure things still work.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/spec/servers/1"), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/servers/1"), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Service added
@@ -892,7 +892,7 @@ func TestRemoveServerClassWithNodeService(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		e2eutil.ClusterScaleDownSequence(mdsGroupSize2),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestManageMultipleClusters tests that multiple clusters can be managed independently
@@ -901,7 +901,7 @@ func TestManageMultipleClusters(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -911,17 +911,17 @@ func TestManageMultipleClusters(t *testing.T) {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 
 	for index := 0; index < 3; index++ {
-		clusters = append(clusters, clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube))
+		clusters = append(clusters, clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes))
 	}
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	for _, testCouchbase := range clusters {
+	for _, cluster := range clusters {
 		// When each cluster is ready create a bucket and verify it appears in the
 		// cluster status.
-		e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/status/buckets/0/name", "default"), time.Minute)
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/status/buckets/0/name", "default"), time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 		// Check the events match what we expect:
 		// * Cluster created
@@ -930,7 +930,7 @@ func TestManageMultipleClusters(t *testing.T) {
 			e2eutil.ClusterCreateSequence(clusterSize),
 			eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		}
-		ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+		ValidateEvents(t, kubernetes, cluster, expectedEvents)
 	}
 }
 

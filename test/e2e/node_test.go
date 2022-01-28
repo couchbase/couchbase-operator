@@ -22,7 +22,7 @@ func TestDenyCommunityEdition(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Don't run this on Openshift etc. as there is no community edition.
@@ -32,12 +32,12 @@ func TestDenyCommunityEdition(t *testing.T) {
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Image = pkgconstants.CommunityEditionImage
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Image = pkgconstants.CommunityEditionImage
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// Expect the cluster to enter a failed state
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, 0), 15*time.Minute)
 }
 
 // Tests editing service spec
@@ -47,19 +47,19 @@ func TestEditServiceConfig(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When ready update the server class size and wait for the cluster to be scaled.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", clusterSize+1), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", clusterSize+1), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -69,7 +69,7 @@ func TestEditServiceConfig(t *testing.T) {
 		e2eutil.ClusterScaleUpSequence(constants.Size1),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests manual failover and operator recovery of cluster
@@ -80,7 +80,7 @@ func TestNodeManualFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -88,18 +88,18 @@ func TestNodeManualFailover(t *testing.T) {
 
 	// create 2 node cluster with admin console
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// When ready failover a node, expect it to be added back in.
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, 0, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustFailoverNode(t, kubernetes, cluster, 0, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -111,7 +111,7 @@ func TestNodeManualFailover(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestNodeRecoveryAfterMemberAdd tests killing a node during a scale up.
@@ -119,7 +119,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -130,23 +130,23 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When the cluster is ready begin scaling up.  When the third new member is added
 	// kill the victim node.  Expect the cluster to become healthy again.
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaleSize, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, triggerIndex), 5*time.Minute)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, scaleSize, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, triggerIndex), 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -166,7 +166,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests scenario where the node being added to is killed before it can be
@@ -178,7 +178,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -188,24 +188,24 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When ready scale the cluster and kill the victim as it is added.  Expect
 	// the operator to replace it and balance it in.
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaleSize, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitForRebalanceProgress(t, targetKube, testCouchbase, 25.0, 5*time.Minute)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, scaleSize, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -226,7 +226,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestKillNodesAfterRebalanceAndFailover tests repeated pod termination at
@@ -235,7 +235,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -246,29 +246,29 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// Runtime configuration.
-	victim1Name := couchbaseutil.CreateMemberName(testCouchbase.Name, victim1Index)
-	victim2Name := couchbaseutil.CreateMemberName(testCouchbase.Name, victim2Index)
+	victim1Name := couchbaseutil.CreateMemberName(cluster.Name, victim1Index)
+	victim2Name := couchbaseutil.CreateMemberName(cluster.Name, victim2Index)
 
 	// When the cluster is healthy, resize to the target size.  When the first victim starts balancing in
 	// kill it.  When the second victim is created to replace the dead node, kill it too.  Cluster should
 	// end up healthy.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaledClusterSize, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitForRebalanceProgress(t, targetKube, testCouchbase, 25.0, 2*time.Minute)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim1Index, true)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, victim2Index), 5*time.Minute)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim2Index, true)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, scaledClusterSize, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 2*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim1Index, true)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victim2Index), 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim2Index, true)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -298,7 +298,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Test that a foreign node is removed from cluster
@@ -311,7 +311,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -319,24 +319,24 @@ func TestRemoveForeignNode(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// Runtime configuration.
-	foreignNodeName := testCouchbase.Name + "-hrisovalantis" // (this is Greek ;p)
-	member := couchbaseutil.NewMember(targetKube.Namespace, testCouchbase.Name, foreignNodeName, "", testCouchbase.Spec.Servers[0].Name, false)
+	foreignNodeName := cluster.Name + "-hrisovalantis" // (this is Greek ;p)
+	member := couchbaseutil.NewMember(kubernetes.Namespace, cluster.Name, foreignNodeName, "", cluster.Spec.Servers[0].Name, false)
 
 	// When ready create and add a new node, expect the operator to remove it
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
-	e2eutil.MustAddNode(t, targetKube, testCouchbase, testCouchbase.Spec.Servers[0].Services, member)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	e2eutil.MustAddNode(t, kubernetes, cluster, cluster.Spec.Servers[0].Services, member)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -348,7 +348,7 @@ func TestRemoveForeignNode(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests one node failing in a cluster with no buckets
@@ -359,7 +359,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -367,12 +367,12 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Kill a single pod and wait for the cluster to recover.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -388,7 +388,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests two nodes failing in a cluster with no buckets
@@ -400,7 +400,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -409,15 +409,15 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	victimIndex2 := 1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Kill a two pods and wait for the cluster to recover.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
-	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 2, time.Minute)
-	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, []int{victimIndex1, victimIndex2}, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
+	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
+	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -435,7 +435,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests one nodes failing in a cluster with one bucket with one replica
@@ -446,7 +446,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -455,18 +455,18 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// Kill a single pod and wait for the cluster to recover.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -483,7 +483,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests two nodes failing in a cluster with one bucket with one replica
@@ -495,7 +495,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -505,21 +505,21 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// Kill a two pods and wait for the cluster to recover.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
-	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 2, time.Minute)
-	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, []int{victimIndex1, victimIndex2}, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
+	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
+	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -538,7 +538,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests one node failing in a cluster with one bucket with two replicas
@@ -549,7 +549,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -557,14 +557,14 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, e2espec.DefaultBucketTwoReplicas(), time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 
 	// Kill a single pod and wait for the cluster to recover.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -581,7 +581,7 @@ func TestRecoveryAfterOnePodFailureBucketTwoReplica(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests two nodes failing in a cluster with one bucket with two replicas
@@ -593,7 +593,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -602,20 +602,20 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	victimIndex2 := 1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, e2espec.DefaultBucketTwoReplicas(), time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, e2espec.DefaultBucket().Name)()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, e2espec.DefaultBucket().Name)()
 
 	// Kill a two pods and wait for the cluster to recover.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
-	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 2, time.Minute)
-	e2eutil.MustFailoverNodes(t, targetKube, testCouchbase, []int{victimIndex1, victimIndex2}, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
+	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
+	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -634,14 +634,14 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -650,22 +650,22 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// Runtime configuration
-	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When ready kill the Couchbase Server process and await recovery
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustKillCouchbaseService(t, targetKube, victimName, f.KubeType)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustKillCouchbaseService(t, kubernetes, victimName, f.KubeType)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -682,7 +682,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
@@ -704,7 +704,7 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -715,23 +715,23 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.RecoveryPolicy = &recoveryPolicy
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.RecoveryPolicy = &recoveryPolicy
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Generate workload during the operation.
-	defer e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, bucket.GetName())()
+	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// Kill a two pods and wait for the cluster to recover.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex1, true)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex2, true)
-	e2eutil.MustWaitForUnhealthyNodes(t, targetKube, testCouchbase, 2, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
+	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster is created
@@ -743,5 +743,5 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 		e2eutil.PodDownEphemeralWithForcedFailover(t, 2, f.CouchbaseServerImage),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

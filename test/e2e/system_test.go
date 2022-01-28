@@ -204,29 +204,29 @@ func CheckJob(t *testing.T, jobStatus map[string]string) {
 }
 
 func DeleteJob(t *testing.T, f *framework.Framework, jobName string) {
-	targetKube := f.ClusterSpec[0]
+	kubernetes := f.ClusterSpec[0]
 
 	fmt.Printf("deleting %v\n", jobName)
 
-	err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Delete(context.Background(), jobName, *metav1.NewDeleteOptions(0))
+	err := kubernetes.KubeClient.BatchV1().Jobs(kubernetes.Namespace).Delete(context.Background(), jobName, *metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Fatalf("failed to delete job %v \n", err)
 	}
 
-	pods, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "job=" + jobName})
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "job=" + jobName})
 	if err != nil {
 		t.Fatalf("failed to list pods for cluster: " + err.Error())
 	}
 
 	for _, pod := range pods.Items {
-		_ = targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0))
+		_ = kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0))
 	}
 }
 
 func CreateJob(t *testing.T, f *framework.Framework, jobSpec *batchv1.Job) *batchv1.Job {
-	targetKube := f.ClusterSpec[0]
+	kubernetes := f.ClusterSpec[0]
 
-	job, err := targetKube.KubeClient.BatchV1().Jobs(targetKube.Namespace).Create(context.Background(), jobSpec, metav1.CreateOptions{})
+	job, err := kubernetes.KubeClient.BatchV1().Jobs(kubernetes.Namespace).Create(context.Background(), jobSpec, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create job %v", err)
 	}
@@ -241,7 +241,7 @@ func CreateJob(t *testing.T, f *framework.Framework, jobSpec *batchv1.Job) *batc
 func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	t.Logf("Creating New Couchbase Cluster...\n")
 
-	targetKube := f.ClusterSpec[0]
+	kubernetes := f.ClusterSpec[0]
 	clusterSize := 4
 	pvcName := "couchbase"
 	leaveJobsRunning := false
@@ -259,7 +259,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 				AutoFailoverTimeout:   e2espec.NewDurationS(120),
 			},
 			Security: couchbasev2.CouchbaseClusterSecuritySpec{
-				AdminSecret: targetKube.DefaultSecret.Name,
+				AdminSecret: kubernetes.DefaultSecret.Name,
 			},
 			Servers: []couchbasev2.ServerConfig{
 				{
@@ -329,48 +329,48 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	for _, name := range bucketNames {
 		bucket := bucketTemplate.DeepCopy()
 		bucket.Name = name
-		e2eutil.MustNewBucket(t, targetKube, bucket)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
 	}
 
 	// Create the first cluster.
-	ctx1, err := e2eutil.InitClusterTLS(targetKube, &e2eutil.TLSOpts{})
+	ctx1, err := e2eutil.InitClusterTLS(kubernetes, &e2eutil.TLSOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testCouchbase1 := clusterTemplate.DeepCopy()
-	testCouchbase1.Name = ctx1.ClusterName
-	testCouchbase1.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	cluster1 := clusterTemplate.DeepCopy()
+	cluster1.Name = ctx1.ClusterName
+	cluster1.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx1.ClusterSecretName,
 			OperatorSecret: ctx1.OperatorSecretName,
 		},
 	}
 
-	testCouchbase1 = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase1)
+	cluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster1)
 
 	// Create the second cluster.
-	ctx2, err := e2eutil.InitClusterTLS(targetKube, &e2eutil.TLSOpts{})
+	ctx2, err := e2eutil.InitClusterTLS(kubernetes, &e2eutil.TLSOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testCouchbase2 := clusterTemplate.DeepCopy()
-	testCouchbase2.Name = ctx2.ClusterName
-	testCouchbase2.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	cluster2 := clusterTemplate.DeepCopy()
+	cluster2.Name = ctx2.ClusterName
+	cluster2.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx2.ClusterSecretName,
 			OperatorSecret: ctx2.OperatorSecretName,
 		},
 	}
 
-	testCouchbase2 = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase2)
+	cluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster2)
 
-	if err := e2eutil.TLSCheckForCluster(t, targetKube, testCouchbase1, ctx1, time.Minute); err != nil {
+	if err := e2eutil.TLSCheckForCluster(t, kubernetes, cluster1, ctx1, time.Minute); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 
-	if err := e2eutil.TLSCheckForCluster(t, targetKube, testCouchbase2, ctx2, time.Minute); err != nil {
+	if err := e2eutil.TLSCheckForCluster(t, kubernetes, cluster2, ctx2, time.Minute); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 
@@ -380,12 +380,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	// pause the operator for the test duration
 	t.Logf("Pausing operator...")
 
-	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
-	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	cluster1 = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	cluster2 = e2eutil.MustPatchCluster(t, kubernetes, cluster2, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
 
 	// make sure cluster is healthy before proceeding
-	testCouchbase1 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase1, jsonpatch.NewPatchSet().Test("/spec/paused", true), time.Minute)
-	testCouchbase2 = e2eutil.MustPatchCluster(t, targetKube, testCouchbase2, jsonpatch.NewPatchSet().Test("/spec/paused", true), time.Minute)
+	cluster1 = e2eutil.MustPatchCluster(t, kubernetes, cluster1, jsonpatch.NewPatchSet().Test("/spec/paused", true), time.Minute)
+	cluster2 = e2eutil.MustPatchCluster(t, kubernetes, cluster2, jsonpatch.NewPatchSet().Test("/spec/paused", true), time.Minute)
 
 	t.Logf("grabbing bucket info")
 
@@ -397,12 +397,12 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 		buckets: []string{},
 	}
 
-	suffix1 := "." + testCouchbase1.Name + "." + targetKube.Namespace + ".svc"
-	suffix2 := "." + testCouchbase2.Name + "." + targetKube.Namespace + ".svc"
+	suffix1 := "." + cluster1.Name + "." + kubernetes.Namespace + ".svc"
+	suffix2 := "." + cluster2.Name + "." + kubernetes.Namespace + ".svc"
 
 	for i := 0; i < clusterSize; i++ {
-		testScope.nodes1 = append(testScope.nodes1, couchbaseutil.CreateMemberName(testCouchbase1.Name, i)+suffix1)
-		testScope.nodes2 = append(testScope.nodes2, couchbaseutil.CreateMemberName(testCouchbase2.Name, i)+suffix2)
+		testScope.nodes1 = append(testScope.nodes1, couchbaseutil.CreateMemberName(cluster1.Name, i)+suffix1)
+		testScope.nodes2 = append(testScope.nodes2, couchbaseutil.CreateMemberName(cluster2.Name, i)+suffix2)
 	}
 
 	testScope.buckets = bucketNames
@@ -433,7 +433,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	// wait for job to succeed
 	singleResults := make(chan map[string]string, 1)
 
-	go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
+	go MonitorJob(job.Name, kubernetes.Namespace, kubernetes.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
 
 	jobStatus := <-singleResults
 
@@ -454,7 +454,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 	// wait for job to succeed
 	singleResults = make(chan map[string]string, 1)
 
-	go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
+	go MonitorJob(job.Name, kubernetes.Namespace, kubernetes.KubeClient, rbacOp.duration, rbacOp.timeout, singleResults)
 
 	jobStatus = <-singleResults
 
@@ -507,7 +507,7 @@ outerLoop:
 					if op.wait {
 						singleResults := make(chan map[string]string, 1)
 
-						go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, op.duration, op.timeout, singleResults)
+						go MonitorJob(job.Name, kubernetes.Namespace, kubernetes.KubeClient, op.duration, op.timeout, singleResults)
 
 						jobStatus := <-singleResults
 						CheckJob(t, jobStatus)
@@ -516,7 +516,7 @@ outerLoop:
 							DeleteJob(t, f, jobStatus["jobName"])
 						}
 					} else {
-						go MonitorJob(job.Name, targetKube.Namespace, targetKube.KubeClient, op.duration, op.timeout, results)
+						go MonitorJob(job.Name, kubernetes.Namespace, kubernetes.KubeClient, op.duration, op.timeout, results)
 
 						jobList[job.Name] = job
 					}
@@ -529,8 +529,8 @@ outerLoop:
 		}
 
 		// make sure cluster is healthy before running next cycle
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase1, 2*time.Minute)
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase2, 2*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster1, 2*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster2, 2*time.Minute)
 
 		cycles++
 		time.Sleep(1 * time.Second)

@@ -24,36 +24,36 @@ func TestNoLogOrAuditConfig(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check no audit enabled
-	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
+	e2eutil.MustCheckAuditConfiguration(t, kubernetes, cluster)
 	// Check no extra sidecars
-	e2eutil.MustCheckLoggingSidecarsCount(t, targetKube, testCouchbase, 0)
+	e2eutil.MustCheckLoggingSidecarsCount(t, kubernetes, cluster, 0)
 
 	// Check we can manually enable, i.e. existing behaviour
-	e2eutil.MustEnableAuditLogging(t, targetKube, testCouchbase)
+	e2eutil.MustEnableAuditLogging(t, kubernetes, cluster)
 
 	// Apply the new configuration and set explicitly false
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", &v2.CouchbaseClusterAuditLoggingSpec{Enabled: false}), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", &v2.CouchbaseClusterAuditLoggingSpec{Enabled: false}), time.Minute)
 
 	// We only have one of these events so no need to mess with race conditions & async waits
-	e2eutil.MustObserveClusterEvent(t, targetKube, testCouchbase, k8sutil.ClusterSettingsEditedEvent("audit", testCouchbase), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClusterSettingsEditedEvent("audit", cluster), 5*time.Minute)
 
 	// Check we have seen the event before continuing to check the audit configuration has been applied correctly now
-	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
+	e2eutil.MustCheckAuditConfiguration(t, kubernetes, cluster)
 
 	// Check that the user can see the cluster being edited.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(1),
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Audit log appears on standard output when enabled.
@@ -62,41 +62,41 @@ func TestLoggingAndAuditingDefaults(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithAuditing(true).WithDefaultLogStreaming().Generate(targetKube)
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithAuditing(true).WithDefaultLogStreaming().Generate(kubernetes)
 
 	// Create a dodgy log config to prove it is reconciled correctly later
-	e2eutil.SetInvalidLogStreamingConfig(t, targetKube, testCouchbase.Spec.Logging.Server.ConfigurationName)
-	e2eutil.MustFailLoggingConfig(t, targetKube, testCouchbase)
+	e2eutil.SetInvalidLogStreamingConfig(t, kubernetes, cluster.Spec.Logging.Server.ConfigurationName)
+	e2eutil.MustFailLoggingConfig(t, kubernetes, cluster)
 
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Confirm that config is now correct
 	// Special case as we create the Secret first so the ownerRef should not be the cluster
-	e2eutil.MustCheckLoggingConfigNotOwned(t, targetKube, testCouchbase)
-	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
+	e2eutil.MustCheckLoggingConfigNotOwned(t, kubernetes, cluster)
+	e2eutil.MustCheckAuditConfiguration(t, kubernetes, cluster)
 
 	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
-	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
 	// Note that the sidecars start fast but have to wait for logs to appear from the slower server container
-	e2eutil.MustCheckLogging(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckLogging(t, kubernetes, cluster, 5*time.Minute)
 	// Checks for extra information we have started adding, e.g.:
 	// "pod"=>{"namespace"=>"test-qmf56", "name"=>"test-couchbase-rjbbr-0000", "uid"=>"66c769fd-74b1-47bf-90a9-364eb649dcb9"}, "couchbase"=>{"cluster"=>"test-couchbase-rjbbr", "operator.version"=>"2.2.0", "server.version"=>"6.6.2", "node"=>"test-couchbase-rjbbr-0000", "node-config"=>"default", "server"=>"true", "data"=>"enabled", "index"=>"enabled"}
 	// We do not check for specific values, only that they're being provided.
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 10*time.Second, "\"pod\"=>{")
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 10*time.Second, "\"couchbase\"=>{")
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 10*time.Second, "operator.version")
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 10*time.Second, "server.version")
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 10*time.Second, "\"pod\"=>{")
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 10*time.Second, "\"couchbase\"=>{")
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 10*time.Second, "operator.version")
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 10*time.Second, "server.version")
 
 	// Check that the user can see the cluster settings being edited but only once.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(1),
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // If no GC enabled then sidecar is not running.
@@ -106,15 +106,15 @@ func TestAuditingNoLogging(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// GC is not supported without logging - tested by validation - so disable here.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithAuditing(false).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithAuditing(false).MustCreate(t, kubernetes)
 
-	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
+	e2eutil.MustCheckAuditConfiguration(t, kubernetes, cluster)
 	// Check no extra sidecars
-	e2eutil.MustCheckLoggingSidecarsCount(t, targetKube, testCouchbase, 0)
+	e2eutil.MustCheckLoggingSidecarsCount(t, kubernetes, cluster, 0)
 
 	// Patch in some deltas to configuration and check it is in place now
 	// The REST API for audit is particularly difficult/non-standard so testing each of the fields as a sanity check
@@ -129,7 +129,7 @@ func TestAuditingNoLogging(t *testing.T) {
 	}
 
 	// Apply the new configuration
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", newConfig), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", newConfig), time.Minute)
 
 	// Check that the user can see the cluster settings being edited twice.
 	expectedEvents := []eventschema.Validatable{
@@ -139,7 +139,7 @@ func TestAuditingNoLogging(t *testing.T) {
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Additional logs can be streamed to standard output with a custom log configuration. Custom configuration is ignored for reconcile.
@@ -147,11 +147,11 @@ func TestCustomLogging(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Do not enable auditing so no logging will be enabled unless we have a custom configuration
-	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(targetKube)
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(kubernetes)
 
 	config := map[string]string{
 		"fluent-bit.conf": "[SERVICE]\n" +
@@ -205,55 +205,55 @@ func TestCustomLogging(t *testing.T) {
 			"    Time_Format    %Y-%m-%dT%H:%M:%S.%L%z\n",
 	}
 
-	e2eutil.SetLogStreamingConfig(t, targetKube, testCouchbase, config, false)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.SetLogStreamingConfig(t, kubernetes, cluster, config, false)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Confirm that config is correct
-	e2eutil.MustCheckLoggingConfigNotOwned(t, targetKube, testCouchbase)
-	e2eutil.MustCheckAuditConfiguration(t, targetKube, testCouchbase)
+	e2eutil.MustCheckLoggingConfigNotOwned(t, kubernetes, cluster)
+	e2eutil.MustCheckAuditConfiguration(t, kubernetes, cluster)
 
 	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
-	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
 	// General check for some logs
-	e2eutil.MustCheckLogging(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustCheckLogging(t, kubernetes, cluster, 5*time.Minute)
 	// Specific check for logs we have specified in the custom config that are not in the default one
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, "couchbase.log.lookforme")
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 5*time.Minute, "couchbase.log.lookforme")
 
 	// Ensure no audit cleanup
-	e2eutil.MustCheckLoggingSidecarsCount(t, targetKube, testCouchbase, 1)
+	e2eutil.MustCheckLoggingSidecarsCount(t, kubernetes, cluster, 1)
 
 	// Ensure we can mess up the custom config and it is not reconciled and pods are not restarted
-	e2eutil.SetInvalidLogStreamingConfig(t, targetKube, testCouchbase.Spec.Logging.Server.ConfigurationName)
-	e2eutil.MustFailLoggingConfig(t, targetKube, testCouchbase)
+	e2eutil.SetInvalidLogStreamingConfig(t, kubernetes, cluster.Spec.Logging.Server.ConfigurationName)
+	e2eutil.MustFailLoggingConfig(t, kubernetes, cluster)
 
 	// Check that the user can not see the cluster settings being edited as they're custom.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(1),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestChangeLogShipperImage(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	options := clusterOptions()
 	options.Options.LoggingImage = "fluent/fluent-bit:1.6.10"
 
-	testCouchbase := options.WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, targetKube)
+	cluster := options.WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, kubernetes)
 
 	// Confirm that config is now correct
-	e2eutil.MustCheckLoggingConfig(t, targetKube, testCouchbase)
+	e2eutil.MustCheckLoggingConfig(t, kubernetes, cluster)
 
 	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
-	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check for the specific version of Fluent-bit in the logs
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, time.Minute, "Fluent Bit v1.6.10")
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, time.Minute, "Fluent Bit v1.6.10")
 }
 
 func TestInflightLogRedaction(t *testing.T) {
@@ -263,10 +263,10 @@ func TestInflightLogRedaction(t *testing.T) {
 
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(targetKube)
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(kubernetes)
 
 	unredactedInputString := "Cats are <ud>sma#@&*+-.!!!!!rter</ud> than dogs, and <UD>sheeps</UD>"
 
@@ -305,17 +305,17 @@ func TestInflightLogRedaction(t *testing.T) {
 		"redaction.salt": "",
 	}
 
-	e2eutil.SetLogStreamingConfig(t, targetKube, testCouchbase, config, false)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.SetLogStreamingConfig(t, kubernetes, cluster, config, false)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
-	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
 
 	// Specific checks for redacted information being replaced (and not output)
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, "{\"message\"=>\"Cats are <ud>00b335216f27c1e7d35149b5bbfe19d4eb2d6af1</ud> than dogs, and <ud>888f807d45ff6ce47240c7ed4e884a6f9dc7b4fb</ud>")
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 5*time.Minute, "{\"message\"=>\"Cats are <ud>00b335216f27c1e7d35149b5bbfe19d4eb2d6af1</ud> than dogs, and <ud>888f807d45ff6ce47240c7ed4e884a6f9dc7b4fb</ud>")
 	// We need to make sure we look for the specific log output string rather than the string in the configuration to generate it
-	e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, "{\"message\"=>\""+unredactedInputString)
+	e2eutil.MustCheckLogsAreMissingString(t, kubernetes, cluster, time.Minute, "{\"message\"=>\""+unredactedInputString)
 }
 
 func TestRebalanceLogProcessing(t *testing.T) {
@@ -325,15 +325,15 @@ func TestRebalanceLogProcessing(t *testing.T) {
 
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, targetKube)
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, kubernetes)
 
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+2, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, "couchbase.log.rebalance")
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+2, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 5*time.Minute, "couchbase.log.rebalance")
 }
 
 func TestLoggingDynamicConfigReload(t *testing.T) {
@@ -343,10 +343,10 @@ func TestLoggingDynamicConfigReload(t *testing.T) {
 
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(targetKube)
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithCustomLogStreaming().Generate(kubernetes)
 
 	// Start with logging with one tag then change to another and confirm the change
 	tag1 := "couchbase.log.test.original"
@@ -387,23 +387,23 @@ func TestLoggingDynamicConfigReload(t *testing.T) {
 			"    match couchbase.log.*\n",
 	}
 
-	e2eutil.SetLogStreamingConfig(t, targetKube, testCouchbase, config1, false)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.SetLogStreamingConfig(t, kubernetes, cluster, config1, false)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
-	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
 
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, time.Minute, tag1)
-	e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, tag2)
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, time.Minute, tag1)
+	e2eutil.MustCheckLogsAreMissingString(t, kubernetes, cluster, time.Minute, tag2)
 
 	// Switch config - can take a while to be applied
-	e2eutil.SetLogStreamingConfig(t, targetKube, testCouchbase, config2, true)
+	e2eutil.SetLogStreamingConfig(t, kubernetes, cluster, config2, true)
 
 	// Invert the check to confirm the new stuff is present
 	// Note the old tag may still be in older parts of the log so do not search for it
-	// e2eutil.MustCheckLogsAreMissingString(t, targetKube, testCouchbase, time.Minute, tag1)
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, tag2)
+	// e2eutil.MustCheckLogsAreMissingString(t, kubernetes, cluster, time.Minute, tag1)
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 5*time.Minute, tag2)
 }
 
 // TestLoggingUpgrade starts the logging sidecar with the logging upgrade image,
@@ -413,36 +413,36 @@ func TestLoggingUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).LoggingUpgradable()
+	framework.Requires(t, kubernetes).LoggingUpgradable()
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := clusterOptionsUpgradeLogging().WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, targetKube)
+	cluster := clusterOptionsUpgradeLogging().WithPersistentTopology(clusterSize).WithDefaultLogStreaming().MustCreate(t, kubernetes)
 
 	// Wait for the cluster to be ready.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
-	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckLogging(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckLogging(t, kubernetes, cluster, 5*time.Minute)
 
 	// Upgrade the cluster with new logging image and check again if logging is enabled.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/logging/server/sidecar/image", f.CouchbaseLoggingImage), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, targetKube, v2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/logging/server/sidecar/image", f.CouchbaseLoggingImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, v2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Wait for Fluent Bit to be ready on each pod, then check that each pod is exporting the expected Couchbase logs.
-	e2eutil.MustWaitForLoggingSidecarReady(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckLogging(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckLogging(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check that the image is the new version. This won't work if using the 'latest' tag.
 	targetVersion := strings.Split(f.CouchbaseLoggingImage, ":")[1]
 	targetVersion = strings.Split(targetVersion, "-")[0]
 	searchString := fmt.Sprintf(`"version":"%s (build `, targetVersion)
-	e2eutil.MustCheckLogsForString(t, targetKube, testCouchbase, 5*time.Minute, searchString)
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 5*time.Minute, searchString)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
@@ -451,5 +451,5 @@ func TestLoggingUpgrade(t *testing.T) {
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

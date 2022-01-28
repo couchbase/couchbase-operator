@@ -22,18 +22,18 @@ func TestAutoscaleEnabled(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions().WithEphemeralTopology(clusterSize).Options)
+	cluster := e2eutil.MustNewAutoscaleCluster(t, kubernetes, clusterOptions().WithEphemeralTopology(clusterSize).Options)
 
 	// Check autoscaler was created
-	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, kubernetes, cluster, autoscalerName, 1*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -42,7 +42,7 @@ func TestAutoscaleEnabled(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestAutoscaleDisabled tests behavior of disabling autoscaling.
@@ -54,22 +54,22 @@ func TestAutoscaleDisabled(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions().WithEphemeralTopology(clusterSize).Options)
+	cluster := e2eutil.MustNewAutoscaleCluster(t, kubernetes, clusterOptions().WithEphemeralTopology(clusterSize).Options)
 
 	// Check autoscaler was created
-	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, kubernetes, cluster, autoscalerName, 1*time.Minute)
 
 	// Disable autoscaling
-	e2eutil.MustDisableCouchbaseAutoscaling(t, targetKube, testCouchbase)
-	e2eutil.MustWaitForCouchbaseAutoscalerDeletion(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	e2eutil.MustDisableCouchbaseAutoscaling(t, kubernetes, cluster)
+	e2eutil.MustWaitForCouchbaseAutoscalerDeletion(t, kubernetes, cluster, autoscalerName, 1*time.Minute)
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
@@ -77,7 +77,7 @@ func TestAutoscaleDisabled(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
 		eventschema.Event{Reason: k8sutil.EventAutoscalerDeleted},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestAutoscalerDeleted tests behavior of user deletion of autoscaler.
@@ -89,25 +89,25 @@ func TestAutoscalerDeleted(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the cluster.
-	testCouchbase := e2eutil.MustNewAutoscaleCluster(t, targetKube, clusterOptions().WithEphemeralTopology(clusterSize).Options)
+	cluster := e2eutil.MustNewAutoscaleCluster(t, kubernetes, clusterOptions().WithEphemeralTopology(clusterSize).Options)
 
 	// Check autoscaler was created
-	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, kubernetes, cluster, autoscalerName, 1*time.Minute)
 
 	// Must delete autoscaler
-	e2eutil.MustDeleteCouchbaseAutoscaler(t, targetKube, testCouchbase.Namespace, autoscalerName)
-	e2eutil.MustWaitForCouchbaseAutoscalerDeletion(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	e2eutil.MustDeleteCouchbaseAutoscaler(t, kubernetes, cluster.Namespace, autoscalerName)
+	e2eutil.MustWaitForCouchbaseAutoscalerDeletion(t, kubernetes, cluster, autoscalerName, 1*time.Minute)
 
 	// Operator must recreate autoscaler
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, kubernetes, cluster, autoscalerName, 1*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -116,7 +116,7 @@ func TestAutoscalerDeleted(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestAutoscaleSelectiveMDS tests autoscaling enabled only for specific config
@@ -126,7 +126,7 @@ func TestAutoscaleSelectiveMDS(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -134,11 +134,11 @@ func TestAutoscaleSelectiveMDS(t *testing.T) {
 	sizePerConfig := clusterSize / 2
 
 	// Create the cluster with autoscaling
-	testCouchbase := e2eutil.MustNewAutoscaleClusterMDS(t, targetKube, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, nil, nil)
+	cluster := e2eutil.MustNewAutoscaleClusterMDS(t, kubernetes, clusterOptions().WithEphemeralTopology(sizePerConfig).Options, nil, nil)
 
 	// Check autoscaler was created only for query config
-	autoscalerName := testCouchbase.Spec.Servers[1].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, targetKube, testCouchbase, autoscalerName, 1*time.Minute)
+	autoscalerName := cluster.Spec.Servers[1].AutoscalerName(cluster.Name)
+	e2eutil.MustWaitUntilCouchbaseAutoscalerExists(t, kubernetes, cluster, autoscalerName, 1*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -147,7 +147,7 @@ func TestAutoscaleSelectiveMDS(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestAutoscaleUp tests that operator reacts to upscale requests from HPA.
@@ -161,10 +161,10 @@ func TestAutoscaleUp(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	// Create 1 node cluster with referencing HPA
 	clusterSize := 1
@@ -172,18 +172,18 @@ func TestAutoscaleUp(t *testing.T) {
 	targetValue := e2espec.DefaultMetricTarget
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
-	testCouchbase := hpaManager.CouchbaseCluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	cluster := hpaManager.CouchbaseCluster
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleUpEvent(testCouchbase, configName, 1, 2), 2*time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionScalingUp, v1.ConditionTrue, testCouchbase, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 1, 2), 2*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingUp, v1.ConditionTrue, cluster, time.Minute)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{
@@ -192,7 +192,7 @@ func TestAutoscaleUp(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscaleUp},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
-	ValidateEvents(t, targetKube, hpaManager.CouchbaseCluster, expectedEvents)
+	ValidateEvents(t, kubernetes, hpaManager.CouchbaseCluster, expectedEvents)
 }
 
 // Scale up 3 node cluster with TLS.
@@ -200,31 +200,31 @@ func TestAutoscaleUpMandatoryMutualTLS(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	clusterSize := 3
 	targetValue := e2espec.DefaultMetricTarget
 
 	// Create 3 node cluster with referencing HPA
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 	options := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, &policy).Options
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
-	testCouchbase := hpaManager.CouchbaseCluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	cluster := hpaManager.CouchbaseCluster
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleUpEvent(testCouchbase, configName, 3, 4), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 3, 4), 2*time.Minute)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{
@@ -233,7 +233,7 @@ func TestAutoscaleUpMandatoryMutualTLS(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscaleUp},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
-	ValidateEvents(t, targetKube, hpaManager.CouchbaseCluster, expectedEvents)
+	ValidateEvents(t, kubernetes, hpaManager.CouchbaseCluster, expectedEvents)
 }
 
 // TestAutoscaleDown tests that operator reacts to downscale requests from HPA.
@@ -241,10 +241,10 @@ func TestAutoscaleDown(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	// Create 2 node cluster with referencing HPA
 	clusterSize := 2
@@ -253,18 +253,18 @@ func TestAutoscaleDown(t *testing.T) {
 	hpaStabilization := e2espec.LowHPAStabilizationPeriod
 	config := e2espec.NewDecrementingHPAConfig(targetValue).WithScaleDownStabilizationWindow(hpaStabilization)
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale down event
-	testCouchbase := hpaManager.CouchbaseCluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	cluster := hpaManager.CouchbaseCluster
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleDownEvent(testCouchbase, configName, 2, 1), 2*time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, testCouchbase, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 2, 1), 2*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, cluster, time.Minute)
 
 	// Wait for rebalance after scale down
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling down
 	expectedEvents := []eventschema.Validatable{
@@ -273,7 +273,7 @@ func TestAutoscaleDown(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscaleDown},
 		e2eutil.ClusterScaleDownSequence(1),
 	}
-	ValidateEvents(t, targetKube, hpaManager.CouchbaseCluster, expectedEvents)
+	ValidateEvents(t, kubernetes, hpaManager.CouchbaseCluster, expectedEvents)
 }
 
 // Scale down 4 node cluster with TLS.
@@ -281,32 +281,32 @@ func TestAutoscaleDownMandatoryMutualTLS(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	targetValue := e2espec.DefaultMetricTarget
 	hpaStabilization := e2espec.DefaultHPAStabilizationPeriod
 	config := e2espec.NewDecrementingHPAConfig(targetValue).WithScaleDownStabilizationWindow(hpaStabilization)
-	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
 	// Create 4 node cluster with referencing HPA
 	clusterSize := 4
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	options := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, &policy).Options
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale down event
-	testCouchbase := hpaManager.CouchbaseCluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	cluster := hpaManager.CouchbaseCluster
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleDownEvent(testCouchbase, configName, 4, 1), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 4, 1), 2*time.Minute)
 
 	// Wait for rebalance after scale down
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling down
 	expectedEvents := []eventschema.Validatable{
@@ -315,7 +315,7 @@ func TestAutoscaleDownMandatoryMutualTLS(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscaleDown},
 		e2eutil.ClusterScaleDownSequence(3),
 	}
-	ValidateEvents(t, targetKube, hpaManager.CouchbaseCluster, expectedEvents)
+	ValidateEvents(t, kubernetes, hpaManager.CouchbaseCluster, expectedEvents)
 }
 
 // TestAutoscaleMultiConfigs tests that different configs can be scaled in different directions.
@@ -325,16 +325,16 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	// Static configuration.
 	clusterSize := 4
 	sizePerConfig := clusterSize / 2
 
-	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	options := clusterOptions().WithMixedEphemeralTopology(sizePerConfig).WithMutualTLS(tls, &policy)
 
@@ -356,23 +356,23 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	targetValue = 100
 	scaleDownConfig := e2espec.NewDecrementingHPAConfig(targetValue).WithScaleDownStabilizationWindow(hpaStabilization)
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options.Options, scaleUpConfig, scaleDownConfig)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options.Options, scaleUpConfig, scaleDownConfig)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event from 2 -> 3 of data/index Pods
-	testCouchbase := hpaManager.CouchbaseCluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	cluster := hpaManager.CouchbaseCluster
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleUpEvent(testCouchbase, configName, 2, 3), 5*time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionScalingUp, v1.ConditionTrue, testCouchbase, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingUp, v1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// Wait for scale down event from 2 -> 1 of query Pods
-	configName = testCouchbase.Spec.Servers[1].Name
+	configName = cluster.Spec.Servers[1].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleDownEvent(testCouchbase, configName, 2, 1), 5*time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, testCouchbase, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 2, 1), 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// Verify events.
 	// HPA is working as expected if we scale up without
@@ -386,7 +386,7 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscaleDown},
 		e2eutil.ClusterScaleDownSequence(1),
 	}
-	ValidateEvents(t, targetKube, hpaManager.CouchbaseCluster, expectedEvents)
+	ValidateEvents(t, kubernetes, hpaManager.CouchbaseCluster, expectedEvents)
 }
 
 // TestAutoscaleConflict tests that operator doesn't accept scale requests
@@ -397,7 +397,7 @@ func TestAutoscaleConflict(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// Create 2 node cluster with referencing HPA
@@ -410,28 +410,28 @@ func TestAutoscaleConflict(t *testing.T) {
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 	config.Behavior.ScaleUp.Policies[0].PeriodSeconds = 120
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
-	testCouchbase := hpaManager.CouchbaseCluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	cluster := hpaManager.CouchbaseCluster
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleUpEvent(testCouchbase, configName, 2, 3), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 5*time.Minute)
 
 	// Change CouchbaseAutoscaler size to 6 (max Pods) before cluster finishes scaling.
 	// This imitates behavior of HPA wanting to scale while rebalance is occurring.
-	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustUpdateScale(t, targetKube, testCouchbase.Namespace, autoscalerName, 6)
+	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
+	e2eutil.MustUpdateScale(t, kubernetes, cluster.Namespace, autoscalerName, 6)
 
 	// Allow cluster to finish rebalancing
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
 
 	// Also Change CouchbaseCluster size to 2 before cluster finishes scaling.
 	// This would occur if user observes an autoscale happening but wanted to manually go
 	// back to original size.  When the operator finishes scaling it will have conflicting
 	// requests, but since the Autoscaler is in maintenance mode the change to CouchbaseCluster wins.
-	testCouchbase = e2eutil.MustResizeCluster(t, 0, 2, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, 0, 2, kubernetes, cluster, 5*time.Minute)
 
 	// Verify Cluster autoscales up and then rollsback to 2
 	expectedEvents := []eventschema.Validatable{
@@ -442,7 +442,7 @@ func TestAutoscaleConflict(t *testing.T) {
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestAutoscaleEnabledAllowsStatefulTLS tests that autoscaling is enabled
@@ -451,35 +451,35 @@ func TestAutoscaleEnabledAllowsStatefulTLS(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	// Create bucket resource
 	bucket := e2espec.DefaultBucket()
 	bucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(256)
 	bucket.Spec.EnableIndexReplica = true
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// Create 2 node cluster with referencing HPA
 	clusterSize := 2
-	tls := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 	options := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(tls).Options
 	targetValue := e2espec.DefaultMetricTarget
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
-	testCouchbase := hpaManager.CouchbaseCluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	cluster := hpaManager.CouchbaseCluster
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleUpEvent(testCouchbase, configName, 2, 3), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 2*time.Minute)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{
@@ -489,7 +489,7 @@ func TestAutoscaleEnabledAllowsStatefulTLS(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscaleUp},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
-	ValidateEvents(t, targetKube, hpaManager.CouchbaseCluster, expectedEvents)
+	ValidateEvents(t, kubernetes, hpaManager.CouchbaseCluster, expectedEvents)
 }
 
 // Test that autoscaler only enters maintenance mode when stabilization period is set.
@@ -497,10 +497,10 @@ func TestAutoscaleVerifyMaintenanceMode(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	// Create 1 node cluster with referencing HPA
 	clusterSize := 1
@@ -509,36 +509,36 @@ func TestAutoscaleVerifyMaintenanceMode(t *testing.T) {
 	targetValue := e2espec.DefaultMetricTarget
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
-	testCouchbase := hpaManager.CouchbaseCluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	cluster := hpaManager.CouchbaseCluster
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleUpEvent(testCouchbase, configName, 1, 2), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 1, 2), 2*time.Minute)
 
 	// Autoscaler must be in Maintenance Mode after event is posted
-	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustValidateAutoscalerSize(t, targetKube, testCouchbase.Namespace, autoscalerName, 0)
-	e2eutil.MustValidateAutoscaleReadyStatus(t, targetKube, testCouchbase.Namespace, testCouchbase.Name, v1.ConditionFalse)
+	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
+	e2eutil.MustValidateAutoscalerSize(t, kubernetes, cluster.Namespace, autoscalerName, 0)
+	e2eutil.MustValidateAutoscaleReadyStatus(t, kubernetes, cluster.Namespace, cluster.Name, v1.ConditionFalse)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// Remove Stabilization Period
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Remove("/spec/autoscaleStabilizationPeriod"), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/autoscaleStabilizationPeriod"), time.Minute)
 
 	// Wait for next scale up event
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleUpEvent(testCouchbase, configName, 2, 3), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 2*time.Minute)
 
 	// Autoscale condition must remain ready and not go into maintenance mode
-	e2eutil.MustValidateAutoscaleReadyStatus(t, targetKube, testCouchbase.Namespace, testCouchbase.Name, v1.ConditionTrue)
+	e2eutil.MustValidateAutoscaleReadyStatus(t, kubernetes, cluster.Namespace, cluster.Name, v1.ConditionTrue)
 	// The autoscaler size should sync with cluster size
-	e2eutil.MustValidateAutoscalerSize(t, targetKube, testCouchbase.Namespace, autoscalerName, 3)
+	e2eutil.MustValidateAutoscalerSize(t, kubernetes, cluster.Namespace, autoscalerName, 3)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{
@@ -549,7 +549,7 @@ func TestAutoscaleVerifyMaintenanceMode(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscaleUp},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
-	ValidateEvents(t, targetKube, hpaManager.CouchbaseCluster, expectedEvents)
+	ValidateEvents(t, kubernetes, hpaManager.CouchbaseCluster, expectedEvents)
 }
 
 // Test that autoscaler goes into maintenance mode when cluster is manually scaled.
@@ -560,10 +560,10 @@ func TestAutoscaleManualMaintenanceMode(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster() // Requires access to kube-system!!
+	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	// Use decrementing metric so that HPA thinks we are over provisioned after scale up occurs.
 	clusterSize := 1
@@ -572,31 +572,31 @@ func TestAutoscaleManualMaintenanceMode(t *testing.T) {
 	targetValue := e2espec.DefaultMetricTarget
 	config := e2espec.NewDecrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, targetKube, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
 	defer hpaManager.Cleanup()
 
 	// Manually scale up server config to from 1 -> 3
 	serverConfigIndex := 0
-	testCouchbase := hpaManager.CouchbaseCluster
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, serverConfigIndex, 3, targetKube, testCouchbase)
+	cluster := hpaManager.CouchbaseCluster
+	cluster = e2eutil.MustResizeClusterNoWait(t, serverConfigIndex, 3, kubernetes, cluster)
 
 	// Once rebalance has started, the autoscaler should be in maintenance mode
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	autoscalerName := testCouchbase.Spec.Servers[0].AutoscalerName(testCouchbase.Name)
-	e2eutil.MustValidateAutoscaleReadyStatus(t, targetKube, testCouchbase.Namespace, testCouchbase.Name, v1.ConditionFalse)
-	e2eutil.MustValidateAutoscalerSize(t, targetKube, testCouchbase.Namespace, autoscalerName, 0)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
+	e2eutil.MustValidateAutoscaleReadyStatus(t, kubernetes, cluster.Namespace, cluster.Name, v1.ConditionFalse)
+	e2eutil.MustValidateAutoscalerSize(t, kubernetes, cluster.Namespace, autoscalerName, 0)
 
 	// Wait for rebalance complete
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Expecting HPA to scale down cluster
-	configName := testCouchbase.Spec.Servers[0].Name
+	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.AutoscaleDownEvent(testCouchbase, configName, 3, 2), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 3, 2), 2*time.Minute)
 
 	// Wait for rebalance after scale down
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{
@@ -606,5 +606,5 @@ func TestAutoscaleManualMaintenanceMode(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventAutoscaleDown},
 		e2eutil.ClusterScaleDownSequence(1),
 	}
-	ValidateEvents(t, targetKube, hpaManager.CouchbaseCluster, expectedEvents)
+	ValidateEvents(t, kubernetes, hpaManager.CouchbaseCluster, expectedEvents)
 }

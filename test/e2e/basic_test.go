@@ -17,21 +17,21 @@ func TestCreateCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests creation of a 3 node cluster with 1 bucket
@@ -42,7 +42,7 @@ func TestCreateBucketCluster(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -50,8 +50,8 @@ func TestCreateBucketCluster(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -59,5 +59,5 @@ func TestCreateBucketCluster(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

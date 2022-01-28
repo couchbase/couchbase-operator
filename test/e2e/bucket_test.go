@@ -21,7 +21,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration
@@ -88,25 +88,25 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		},
 	}
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for _, bucket := range buckets {
-		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	}
 
 	for _, bucket := range buckets {
-		e2eutil.MustDeleteBucket(t, targetKube, bucket)
+		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
 	}
 
 	for _, name := range names {
-		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, name, 2*time.Minute)
+		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, name, 2*time.Minute)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -117,32 +117,32 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted}},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestBucketAddRemoveExtended(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
 
 	buckets := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucket := range buckets {
 		name := bucket.GetName()
-		e2eutil.MustNewBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, 2*time.Minute)
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-		e2eutil.MustDeleteBucket(t, targetKube, bucket)
-		e2eutil.MustWaitUntilBucketNotExists(t, targetKube, testCouchbase, name, 2*time.Minute)
-		e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, name, 2*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	}
 
 	// Check the events match what we expect:
@@ -160,7 +160,7 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 			},
 		},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestEditBucket tests modifying various bucket parameters and reverting them.
@@ -237,24 +237,24 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).CouchbaseBucket()
+	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(1).MustCreate(t, targetKube)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(1).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Test("/EnableFlush", true), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/BucketReplicas", 3), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/IoPriority", couchbaseutil.IoPriorityTypeLow), time.Minute)
-	e2eutil.MustPatchBucketInfo(t, targetKube, testCouchbase, bucket.GetName(), jsonpatch.NewPatchSet().Test("/IoPriority", couchbaseutil.IoPriorityTypeHigh), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/EnableFlush", true), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/BucketReplicas", 3), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/IoPriority", couchbaseutil.IoPriorityTypeLow), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/IoPriority", couchbaseutil.IoPriorityTypeHigh), time.Minute)
 	time.Sleep(10 * time.Second) // Wait for event to become visible
 
 	// Check the events match what we expect:
@@ -267,7 +267,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestBucketUnmanaged ensures the operator doesn't touch buckets when they are
@@ -276,7 +276,7 @@ func TestBucketUnmanaged(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -284,15 +284,15 @@ func TestBucketUnmanaged(t *testing.T) {
 
 	// Create a bucket.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// Create a cluster with buckets unmanaged.
-	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
+	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	couchbase.Spec.Buckets.Managed = false
-	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
+	couchbase = e2eutil.MustNewClusterFromSpec(t, kubernetes, couchbase)
 
 	// Ensure the bucket doesn't get created.
-	if err := e2eutil.WaitUntilBucketExists(targetKube, couchbase, bucket, time.Minute); err == nil {
+	if err := e2eutil.WaitUntilBucketExists(kubernetes, couchbase, bucket, time.Minute); err == nil {
 		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
 	}
 
@@ -302,7 +302,7 @@ func TestBucketUnmanaged(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 
-	ValidateEvents(t, targetKube, couchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, couchbase, expectedEvents)
 }
 
 // TestBucketSelection ensures the operator only touches buckets that match the
@@ -311,7 +311,7 @@ func TestBucketSelection(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -322,21 +322,21 @@ func TestBucketSelection(t *testing.T) {
 	}
 
 	// Create a default bucket and a labelled bucket.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucket())
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket())
 	bucket := e2espec.DefaultBucket()
 	bucket.Name = bucketName
 	bucket.Labels = labels
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// Create a cluster that selects only labelled buckets.
-	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
+	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	couchbase.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: labels,
 	}
-	couchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, couchbase)
+	couchbase = e2eutil.MustNewClusterFromSpec(t, kubernetes, couchbase)
 
 	// Ensure the unlabelled bucket doesn't get created.
-	if err := e2eutil.WaitUntilBucketExists(targetKube, couchbase, e2espec.DefaultBucket(), time.Minute); err == nil {
+	if err := e2eutil.WaitUntilBucketExists(kubernetes, couchbase, e2espec.DefaultBucket(), time.Minute); err == nil {
 		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
 	}
 
@@ -348,7 +348,7 @@ func TestBucketSelection(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucketName},
 	}
 
-	ValidateEvents(t, targetKube, couchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, couchbase, expectedEvents)
 }
 
 // TestDeltaRecoveryImpossible ensures that the operator handles the situation where
@@ -358,7 +358,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -368,27 +368,27 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 
 	// Create the cluster
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
-	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, kubernetes, cluster)
 
 	// Pause the operator, failover the victim, then create a new bucket and populate it.
 	// The operator - when restarted - should flag the node for delta recovery, but Server
 	// will not allow this due to not all buckets being delta recoverable ("default" contains
 	// partial data whereas "foreign" contains none).
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
-	e2eutil.MustFailoverNode(t, targetKube, testCouchbase, victim, 5*time.Minute)
-	e2eutil.MustCreateBucket(t, targetKube, testCouchbase, foreignBucketName, time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	e2eutil.MustFailoverNode(t, kubernetes, cluster, victim, 5*time.Minute)
+	e2eutil.MustCreateBucket(t, kubernetes, cluster, foreignBucketName, time.Minute)
 	// Wait for the active nodes to warm up. Operator behaves differently if this hasn't happened
 	time.Sleep(10 * time.Second)
-	e2eutil.NewDocumentSet(foreignBucketName, f.DocsCount).MustCreate(t, targetKube, testCouchbase)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.NewDocumentSet(foreignBucketName, f.DocsCount).MustCreate(t, kubernetes, cluster)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -404,7 +404,7 @@ func TestDeltaRecoveryImpossible(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestBucketWithExplicitName checks that overriding the resource name works.

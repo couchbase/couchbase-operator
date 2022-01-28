@@ -330,7 +330,7 @@ type validationContext struct {
 func runValidationTest(t *testing.T, testDefs []testDef, validation validationContext) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t, framework.NoOperator)
+	kubernetes, cleanup := f.SetupTest(t, framework.NoOperator)
 	defer cleanup()
 
 	// Clean up resources that may have been left behind by a job that was interrupted.
@@ -353,7 +353,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 
 			// Delete anything we created.
 			defer func() {
-				_ = deleteResources(targetKube, objects)
+				_ = deleteResources(kubernetes, objects)
 			}()
 
 			for i, resource := range objects {
@@ -367,10 +367,10 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 				}
 
 				// Do static environment configuration.
-				object.SetNamespace(targetKube.Namespace)
+				object.SetNamespace(kubernetes.Namespace)
 
 				// Do dynamic environment configuration.
-				if err := unstructured.SetNestedField(object.Object, targetKube.DefaultSecret.Name, "spec", "security", "adminSecret"); err != nil {
+				if err := unstructured.SetNestedField(object.Object, kubernetes.DefaultSecret.Name, "spec", "security", "adminSecret"); err != nil {
 					e2eutil.Die(t, err)
 				}
 
@@ -379,7 +379,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 				if !ok {
 					tlsOpts := &e2eutil.TLSOpts{
 						ClusterName: object.GetName(),
-						AltNames:    util_x509.MandatorySANs(object.GetName(), targetKube.Namespace),
+						AltNames:    util_x509.MandatorySANs(object.GetName(), kubernetes.Namespace),
 					}
 					tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
 
@@ -387,7 +387,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 						tlsOpts.Source = e2eutil.TLSSourceCertManagerSecret
 					}
 
-					ctx = e2eutil.MustInitClusterTLS(t, targetKube, tlsOpts)
+					ctx = e2eutil.MustInitClusterTLS(t, kubernetes, tlsOpts)
 
 					tlsCache[object.GetName()] = ctx
 				}
@@ -418,7 +418,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 					if !ok {
 						e2eutil.Die(t, fmt.Errorf("unexpected data type"))
 					}
-					rc["authenticationSecret"] = targetKube.DefaultSecret.Name
+					rc["authenticationSecret"] = kubernetes.DefaultSecret.Name
 				}
 				if err := unstructured.SetNestedField(object.Object, remoteClusters, "spec", "xdcr", "remoteClusters"); err != nil {
 					e2eutil.Die(t, err)
@@ -434,7 +434,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 					if !ok {
 						e2eutil.Die(t, fmt.Errorf("unexpected data type"))
 					}
-					if err := unstructured.SetNestedField(pvct, getStorageClass(t, targetKube), "spec", "storageClassName"); err != nil {
+					if err := unstructured.SetNestedField(pvct, getStorageClass(t, kubernetes), "spec", "storageClassName"); err != nil {
 						e2eutil.Die(t, err)
 					}
 				}
@@ -452,7 +452,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 
 			// If we are applying a change or deleting a cluster we first need to create it...
 			if validation.operation == operationApply {
-				if err := createResources(targetKube, objects); err != nil {
+				if err := createResources(kubernetes, objects); err != nil {
 					e2eutil.Die(t, err)
 				}
 			}
@@ -467,9 +467,9 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 			// Execute the main test, update the new resource for verification.
 			switch validation.operation {
 			case operationCreate:
-				err = createResources(targetKube, objects)
+				err = createResources(kubernetes, objects)
 			case operationApply:
-				err = updateResources(targetKube, objects)
+				err = updateResources(kubernetes, objects)
 			}
 
 			// Handle successes when it shoud have failed.

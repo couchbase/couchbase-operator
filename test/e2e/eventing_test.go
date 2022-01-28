@@ -89,7 +89,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -97,22 +97,22 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	numOfDocs := f.DocsCount
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, sourceBucket)
-	e2eutil.MustNewBucket(t, targetKube, destinationBucket)
-	e2eutil.MustNewBucket(t, targetKube, metadataBucket)
+	e2eutil.MustNewBucket(t, kubernetes, sourceBucket)
+	e2eutil.MustNewBucket(t, kubernetes, destinationBucket)
+	e2eutil.MustNewBucket(t, kubernetes, metadataBucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExist(t, targetKube, testCouchbase, bucketNames, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, couchbasev2.EventingService)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketsExist(t, kubernetes, cluster, bucketNames, time.Minute)
 
 	// When ready, deploy an eventing function to create documents in a destination
 	// bucket based on source bucket documents. Populate the source and ensure the
 	// documents appear in the destination.
-	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
-	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, targetKube, testCouchbase)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, numOfDocs, time.Minute)
+	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, destinationBucket.Name, numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -122,7 +122,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create eventing enabled couchbase cluster with eventing buckets.
@@ -131,40 +131,40 @@ func TestEventingResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, sourceBucket)
-	e2eutil.MustNewBucket(t, targetKube, destinationBucket)
-	e2eutil.MustNewBucket(t, targetKube, metadataBucket)
+	e2eutil.MustNewBucket(t, kubernetes, sourceBucket)
+	e2eutil.MustNewBucket(t, kubernetes, destinationBucket)
+	e2eutil.MustNewBucket(t, kubernetes, metadataBucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExist(t, targetKube, testCouchbase, bucketNames, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, couchbasev2.EventingService)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketsExist(t, kubernetes, cluster, bucketNames, time.Minute)
 
 	// When ready deploy the eventing function and generate workload.  Scale the cluster
 	// up and down then stop the workload.  Expect the number of documents in the destination
 	// bucket to equal those in the source.
-	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
+	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
 
-	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, sourceBucket.Name)
+	stop := e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, sourceBucket.Name)
 	defer stop()
 
 	for _, newClusterSize := range []int{2, 3, 2} {
-		testCouchbase = e2eutil.MustResizeCluster(t, 0, newClusterSize, targetKube, testCouchbase, 20*time.Minute)
+		cluster = e2eutil.MustResizeCluster(t, 0, newClusterSize, kubernetes, cluster, 20*time.Minute)
 	}
 
 	stop()
 	time.Sleep(time.Minute) // Wait for eventing to catch up
 
-	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, sourceBucket.Name, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, int(itemCount), time.Minute)
+	itemCount := e2eutil.MustGetItemCount(t, kubernetes, cluster, sourceBucket.Name, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, destinationBucket.Name, int(itemCount), time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -180,7 +180,7 @@ func TestEventingResizeCluster(t *testing.T) {
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create couchbase cluster with eventing service and required buckets.
@@ -189,42 +189,42 @@ func TestEventingKillEventingPods(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := 3
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, sourceBucket)
-	e2eutil.MustNewBucket(t, targetKube, destinationBucket)
-	e2eutil.MustNewBucket(t, targetKube, metadataBucket)
+	e2eutil.MustNewBucket(t, kubernetes, sourceBucket)
+	e2eutil.MustNewBucket(t, kubernetes, destinationBucket)
+	e2eutil.MustNewBucket(t, kubernetes, metadataBucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
-	testCouchbase.Spec.Servers[0].Services = append(testCouchbase.Spec.Servers[0].Services, couchbasev2.EventingService)
-	testCouchbase.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketsExist(t, targetKube, testCouchbase, bucketNames, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, couchbasev2.EventingService)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = dataServiceMemoryQuota
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketsExist(t, kubernetes, cluster, bucketNames, time.Minute)
 
 	// When ready deploy the eventing function and generate workload.  Kill pods in sequence
 	// then stop the workload.  Expect the number of documents in the destination bucket to
 	// equal those in the source.
-	e2eutil.MustDeployEventingFunction(t, targetKube, testCouchbase, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
+	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
 
-	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, sourceBucket.Name)
+	stop := e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, sourceBucket.Name)
 	defer stop()
 
 	for _, victim := range []int{0, 1, 2} {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, true)
-		e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 20*time.Minute)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, true)
+		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 20*time.Minute)
 	}
 
 	stop()
 	time.Sleep(time.Minute) // Wait for eventing to catch up
 
-	itemCount := e2eutil.MustGetItemCount(t, targetKube, testCouchbase, sourceBucket.Name, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, destinationBucket.Name, int(itemCount), time.Minute)
+	itemCount := e2eutil.MustGetItemCount(t, kubernetes, cluster, sourceBucket.Name, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, destinationBucket.Name, int(itemCount), time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -235,5 +235,5 @@ func TestEventingKillEventingPods(t *testing.T) {
 		eventschema.Repeat{Times: 3, Validator: e2eutil.PodDownFailoverRecoverySequence()},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

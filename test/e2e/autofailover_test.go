@@ -21,35 +21,35 @@ import (
 func TestServerGroupAutoFailover(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster().ServerGroups(3)
+	framework.Requires(t, kubernetes).StaticCluster().ServerGroups(3)
 
-	availableServerGroupList := getAvailabilityZones(t, targetKube)
+	availableServerGroupList := getAvailabilityZones(t, kubernetes)
 
 	// Create cluster spec for RZA feature.  Ensure that data is correctly
 	// balanced by rounding down the largest multiple of number of AZs that
 	// will fit.
-	clusterSize := e2eutil.MustNumNodes(t, targetKube) / len(availableServerGroupList) * len(availableServerGroupList)
+	clusterSize := e2eutil.MustNumNodes(t, kubernetes) / len(availableServerGroupList) * len(availableServerGroupList)
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
-	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
-	testCouchbase.Spec.ServerGroups = availableServerGroupList
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 2
+	cluster.Spec.ClusterSettings.AutoFailoverServerGroup = true
+	cluster.Spec.ServerGroups = availableServerGroupList
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	sort.Strings(availableServerGroupList)
 
 	// Create a expected RZA results map for verification
 	expected := getExpectedRzaResultMap(clusterSize, availableServerGroupList)
-	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
 	victimGroup := 0
 	victims := []int{}
@@ -62,12 +62,12 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range victims {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, true)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, podMemberToKill, true)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
-	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -80,7 +80,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestMultiNodeAutoFailover tests Couchbase's ability to handle multiple failover
@@ -89,7 +89,7 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -98,27 +98,27 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	victimCount := len(victims)
 	autoFailoverTimeout := 10 * time.Second
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketThreeReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = &metav1.Duration{Duration: autoFailoverTimeout}
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, e2espec.DefaultBucketThreeReplicas(), time.Minute)
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketThreeReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = &metav1.Duration{Duration: autoFailoverTimeout}
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketThreeReplicas(), time.Minute)
 
 	// When ready, kill the victim nodes, waiting long enough for server to perform
 	// auto failover, then expect recovery.  Yes to test this we have to be not running
 	// in order for the condition to manifest.
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
 
 	for _, victim := range victims {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, true)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, true)
 		time.Sleep(2 * autoFailoverTimeout)
 	}
 
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceCompletedEvent(testCouchbase), 10*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -134,5 +134,5 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

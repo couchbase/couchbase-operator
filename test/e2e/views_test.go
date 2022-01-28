@@ -14,7 +14,7 @@ func TestViewsCreateCluster(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -23,14 +23,14 @@ func TestViewsCreateCluster(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// insert docs in the bucket
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, targetKube, testCouchbase)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
-	host := e2eutil.MustGetCBInstance(t, targetKube, testCouchbase)
+	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
 	// Design Doc definition.
 	designDoc := e2eutil.NewViewsDesignDoc()
 
@@ -48,14 +48,14 @@ func TestViewsCreateCluster(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestViewsResizeCluster(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -64,14 +64,14 @@ func TestViewsResizeCluster(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// insert docs in the bucket
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, targetKube, testCouchbase)
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, 2*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
-	host := e2eutil.MustGetCBInstance(t, targetKube, testCouchbase)
+	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
 	// Design Doc definition.
 	designDoc := e2eutil.NewViewsDesignDoc()
 
@@ -81,11 +81,11 @@ func TestViewsResizeCluster(t *testing.T) {
 	// create design docs.
 	e2eutil.MustUpsertViewsDesignDocs(t, designDoc, viewManager)
 
-	stop := e2eutil.MustGenerateWorkload(t, targetKube, testCouchbase, f.CouchbaseServerImage, sourceBucket.Name)
+	stop := e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, sourceBucket.Name)
 	defer stop()
 
 	for _, newClusterSize := range []int{2, 3, 2} {
-		testCouchbase = e2eutil.MustResizeCluster(t, 0, newClusterSize, targetKube, testCouchbase, 20*time.Minute)
+		cluster = e2eutil.MustResizeCluster(t, 0, newClusterSize, kubernetes, cluster, 20*time.Minute)
 	}
 
 	// drop design docs.
@@ -101,7 +101,7 @@ func TestViewsResizeCluster(t *testing.T) {
 			Validator: e2eutil.ClusterScaleUpSequence(1)},
 		e2eutil.ClusterScaleDownSequence(1),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestViewsWithScopesAndCollections(t *testing.T) {

@@ -747,7 +747,7 @@ func NodeServicesVerifier(t *testing.T, ci *couchbaseutil.ClusterInfo, servicesM
 	return reflect.DeepEqual(clusterServices, servicesMap)
 }
 
-func getEventingData(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, requestType, eventingJSONFunc string, timeout time.Duration) ([]byte, error) {
+func getEventingData(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, requestType, eventingJSONFunc string, timeout time.Duration) ([]byte, error) {
 	hostUsername := "Administrator"
 	hostPassword := "password"
 
@@ -758,7 +758,7 @@ func getEventingData(t *testing.T, targetKube *types.Cluster, cluster *couchbase
 
 		var err error
 
-		if eventingURL, err = GetHostURL(targetKube, cluster, couchbasev2.EventingService); err != nil {
+		if eventingURL, err = GetHostURL(kubernetes, cluster, couchbasev2.EventingService); err != nil {
 			t.Log(err)
 			return err
 		}
@@ -797,7 +797,7 @@ func getEventingData(t *testing.T, targetKube *types.Cluster, cluster *couchbase
 	return responseData, nil
 }
 
-func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) ([]byte, error) {
+func DeployEventingFunction(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) ([]byte, error) {
 	eventingFuncName := "test"
 
 	eventingJSONFunc := `[{` +
@@ -810,39 +810,39 @@ func DeployEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *co
 		`"appcode": "` + jsFunc + `"` +
 		`}]`
 
-	responseData, err := getEventingData(t, targetKube, cluster, "POST", eventingJSONFunc, timeout)
+	responseData, err := getEventingData(t, kubernetes, cluster, "POST", eventingJSONFunc, timeout)
 
 	return responseData, err
 }
 
-func MustDeployEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) {
-	if responseData, err := DeployEventingFunction(t, targetKube, testCouchbase, srcBucketName, metaBucketName, dstBucketName, jsFunc, timeout); err != nil {
+func MustDeployEventingFunction(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, eventingFuncName, srcBucketName, metaBucketName, dstBucketName, jsFunc string, timeout time.Duration) {
+	if responseData, err := DeployEventingFunction(t, kubernetes, cluster, srcBucketName, metaBucketName, dstBucketName, jsFunc, timeout); err != nil {
 		t.Log(string(responseData))
 		Die(t, err)
 	}
 }
 
-func DeleteEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) ([]byte, error) {
-	responseData, err := getEventingData(t, targetKube, cluster, "DELETE", "", timeout)
+func DeleteEventingFunction(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) ([]byte, error) {
+	responseData, err := getEventingData(t, kubernetes, cluster, "DELETE", "", timeout)
 
 	return responseData, err
 }
 
-func MustDeleteEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	if responseData, err := DeleteEventingFunction(t, targetKube, testCouchbase, timeout); err != nil {
+func MustDeleteEventingFunction(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if responseData, err := DeleteEventingFunction(t, kubernetes, cluster, timeout); err != nil {
 		t.Log(string(responseData))
 		Die(t, err)
 	}
 }
 
-func GetEventingFunction(t *testing.T, targetKube *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) ([]byte, error) {
-	responseData, err := getEventingData(t, targetKube, cluster, "GET", "", timeout)
+func GetEventingFunction(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) ([]byte, error) {
+	responseData, err := getEventingData(t, kubernetes, cluster, "GET", "", timeout)
 
 	return responseData, err
 }
 
-func MustGetEventingFunction(t *testing.T, targetKube *types.Cluster, testCouchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	if responseData, err := GetEventingFunction(t, targetKube, testCouchbase, timeout); err != nil {
+func MustGetEventingFunction(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	if responseData, err := GetEventingFunction(t, kubernetes, cluster, timeout); err != nil {
 		t.Log(string(responseData))
 		return err
 	}

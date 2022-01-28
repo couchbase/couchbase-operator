@@ -23,19 +23,19 @@ func TestTLSCreateCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// When the cluster is healthy, check the TLS is correctly configured.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -43,7 +43,7 @@ func TestTLSCreateCluster(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSCreateClusterWithShadowing tests deploying a cluster with standard names
@@ -52,7 +52,7 @@ func TestTLSCreateClusterWithShadowing(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -60,12 +60,12 @@ func TestTLSCreateClusterWithShadowing(t *testing.T) {
 
 	// Create the cluster.  Use the same names as are standard on Kubernetes.
 	keyEncoding := e2eutil.KeyEncodingPKCS8
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// When the cluster is healthy, check the TLS is correctly configured.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -73,7 +73,7 @@ func TestTLSCreateClusterWithShadowing(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Tests scenario where a third node is being added to a cluster, and a separate
@@ -84,7 +84,7 @@ func TestTLSKillClusterNode(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -93,24 +93,24 @@ func TestTLSKillClusterNode(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(testCouchbase.Name, victimIndex)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, scaledClusterSize, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberAddEvent(testCouchbase, scaledClusterSize-1), 5*time.Minute)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, scaledClusterSize, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, scaledClusterSize-1), 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -126,7 +126,7 @@ func TestTLSKillClusterNode(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create Couchbase cluster using certificates.
@@ -136,7 +136,7 @@ func TestTLSResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -144,17 +144,17 @@ func TestTLSResizeCluster(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// When the cluster is ready scale up to 3 nodes then down to 1 again.
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size3, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, targetKube, testCouchbase, 5*time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, serviceID, constants.Size1, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size3, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size2, kubernetes, cluster, 5*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, serviceID, constants.Size1, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -167,7 +167,7 @@ func TestTLSResizeCluster(t *testing.T) {
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Remove Operator certificate after cluster deployment.
@@ -178,7 +178,7 @@ func TestTLSRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -186,25 +186,25 @@ func TestTLSRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
-	secret := e2eutil.MustGetSecret(t, targetKube, ctx.OperatorSecretName)
-	e2eutil.MustDeleteSecret(t, targetKube, ctx.OperatorSecretName)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustRecreateSecret(t, targetKube, secret)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	secret := e2eutil.MustGetSecret(t, kubernetes, ctx.OperatorSecretName)
+	e2eutil.MustDeleteSecret(t, kubernetes, ctx.OperatorSecretName)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSInvalidEvent(cluster), 30*time.Second)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustRecreateSecret(t, kubernetes, secret)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -217,7 +217,7 @@ func TestTLSRemoveOperatorCertificateAndAddBack(t *testing.T) {
 		e2eutil.PodDownFailoverRecoverySequence(),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRemoveOperatorCertificateAndResizeCluster removes the CA certificate
@@ -227,7 +227,7 @@ func TestTLSRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -235,23 +235,23 @@ func TestTLSRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 	scaledClusterSize := constants.Size5
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
-	secret := e2eutil.MustGetSecret(t, targetKube, ctx.OperatorSecretName)
-	e2eutil.MustDeleteSecret(t, targetKube, ctx.OperatorSecretName)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
-	e2eutil.MustRecreateSecret(t, targetKube, secret)
-	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaledClusterSize, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	secret := e2eutil.MustGetSecret(t, kubernetes, ctx.OperatorSecretName)
+	e2eutil.MustDeleteSecret(t, kubernetes, ctx.OperatorSecretName)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSInvalidEvent(cluster), 30*time.Second)
+	e2eutil.MustRecreateSecret(t, kubernetes, secret)
+	cluster = e2eutil.MustResizeCluster(t, 0, scaledClusterSize, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -264,7 +264,7 @@ func TestTLSRemoveOperatorCertificateAndResizeCluster(t *testing.T) {
 		e2eutil.ClusterScaleUpSequence(scaledClusterSize - clusterSize),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates.
@@ -274,7 +274,7 @@ func TestTLSRemoveClusterCertificateAndAddBack(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -282,24 +282,24 @@ func TestTLSRemoveClusterCertificateAndAddBack(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
-	secret := e2eutil.MustGetSecret(t, targetKube, ctx.ClusterSecretName)
-	e2eutil.MustDeleteSecret(t, targetKube, ctx.ClusterSecretName)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), 30*time.Second)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustRecreateSecret(t, targetKube, secret)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	secret := e2eutil.MustGetSecret(t, kubernetes, ctx.ClusterSecretName)
+	e2eutil.MustDeleteSecret(t, kubernetes, ctx.ClusterSecretName)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSInvalidEvent(cluster), 30*time.Second)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustRecreateSecret(t, kubernetes, secret)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -312,7 +312,7 @@ func TestTLSRemoveClusterCertificateAndAddBack(t *testing.T) {
 		e2eutil.PodDownFailoverRecoverySequence(),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Deploy cluster using valid TLS certificates.
@@ -321,7 +321,7 @@ func TestTLSRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -329,23 +329,23 @@ func TestTLSRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 	scaledClusterSize := constants.Size5
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// When the cluster is healthy, remove the TLS certificate, expect the operator to
 	// raise an event to the effect that the TLS is invalid then restore the secret.
 	// Scale the cluster to ensure the TLS is still working.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
-	secret := e2eutil.MustGetSecret(t, targetKube, ctx.ClusterSecretName)
-	e2eutil.MustDeleteSecret(t, targetKube, ctx.ClusterSecretName)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.TLSInvalidEvent(testCouchbase), time.Minute)
-	e2eutil.MustRecreateSecret(t, targetKube, secret)
-	testCouchbase = e2eutil.MustResizeCluster(t, 0, scaledClusterSize, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	secret := e2eutil.MustGetSecret(t, kubernetes, ctx.ClusterSecretName)
+	e2eutil.MustDeleteSecret(t, kubernetes, ctx.ClusterSecretName)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSInvalidEvent(cluster), time.Minute)
+	e2eutil.MustRecreateSecret(t, kubernetes, secret)
+	cluster = e2eutil.MustResizeCluster(t, 0, scaledClusterSize, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -358,7 +358,7 @@ func TestTLSRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 		e2eutil.ClusterScaleUpSequence(scaledClusterSize - clusterSize),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Deploy cluster using invalid DNS name value in the certificate.
@@ -366,19 +366,19 @@ func TestTLSRemoveClusterCertificateAndResizeCluster(t *testing.T) {
 func TestTLSNegRSACertificateDnsName(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	opts := &e2eutil.TLSOpts{
 		AltNames: []string{
-			"*.test-couchbase-invalid-name." + targetKube.Namespace + ".svc",
+			"*.test-couchbase-invalid-name." + kubernetes.Namespace + ".svc",
 		},
 	}
 
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, opts)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 
 	// Actual Test case function
-	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, targetKube)
+	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, kubernetes)
 }
 
 // Deploy a couchbase cluster using a expired TLS certificate.
@@ -386,7 +386,7 @@ func TestTLSNegRSACertificateDnsName(t *testing.T) {
 func TestTLSNegCertificateExpiredBeforeDeployment(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Set the cert creation date 10 years in the past
@@ -397,10 +397,10 @@ func TestTLSNegCertificateExpiredBeforeDeployment(t *testing.T) {
 		ValidTo:   &validTo,
 	}
 
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, opts)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 
 	// Actual Test case function
-	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, targetKube)
+	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, kubernetes)
 }
 
 // Deploy the cluster using the certificate which is not yet valid.
@@ -408,7 +408,7 @@ func TestTLSNegCertificateExpiredBeforeDeployment(t *testing.T) {
 func TestTLSCertificateDeployedBeforeValidity(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	validFrom := time.Now().In(time.UTC).Add(30 * time.Second)
@@ -416,9 +416,9 @@ func TestTLSCertificateDeployedBeforeValidity(t *testing.T) {
 		ValidFrom: &validFrom,
 	}
 
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, opts)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 
-	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, targetKube)
+	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, kubernetes)
 }
 
 // Create a couchbase cluster using the wrong CA certificate type.
@@ -426,7 +426,7 @@ func TestTLSCertificateDeployedBeforeValidity(t *testing.T) {
 func TestTLSGenerateWrongCACertType(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	caCertType := e2eutil.CertTypeServer
@@ -434,10 +434,10 @@ func TestTLSGenerateWrongCACertType(t *testing.T) {
 		CaCertType: &caCertType,
 	}
 
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, opts)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 
 	// Create cluster
-	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, targetKube)
+	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, kubernetes)
 }
 
 // Create a couchbase cluster using the wrong certificate type.
@@ -445,7 +445,7 @@ func TestTLSGenerateWrongCACertType(t *testing.T) {
 func TestTLSGenerateWrongCertType(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	clusterCertType := e2eutil.CertTypeClient
@@ -453,9 +453,9 @@ func TestTLSGenerateWrongCertType(t *testing.T) {
 		ClusterCertType: &clusterCertType,
 	}
 
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, opts)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
 
-	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, targetKube)
+	clusterOptions().WithEphemeralTopology(1).WithTLS(ctx).MustNotCreate(t, kubernetes)
 }
 
 // TestTLSRotate tests a certificate can be reissued by a CA.
@@ -1129,7 +1129,7 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1138,20 +1138,20 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		NodeToNodeEncryption: &encryptionType,
 	}
-	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1159,7 +1159,7 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterWithTLSAndControlPlaneNodeToNode(t *testing.T) {
@@ -1176,7 +1176,7 @@ func testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t *testing.T, encryptionTy
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1185,22 +1185,22 @@ func testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t *testing.T, encryptionTy
 	clusterSize := 3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		NodeToNodeEncryption: &encryptionType,
 	}
-	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1224,7 +1224,7 @@ func testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t *testing.T, encryptionTy
 		},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterWithTLSAndControlPlaneNodeToNodeAndRotateCA(t *testing.T) {
@@ -1241,7 +1241,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1251,22 +1251,22 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 	scaleUp := 1
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		NodeToNodeEncryption: &encryptionType,
 	}
-	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect, then scale, and repeat the check.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
-	testCouchbase = e2eutil.MustResizeCluster(t, 0, clusterSize+scaleUp, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+scaleUp, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1276,7 +1276,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 		e2eutil.ClusterScaleUpSequence(scaleUp),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenScale(t *testing.T) {
@@ -1293,7 +1293,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenKillPod(t *testing.T, encryptionTy
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1303,24 +1303,24 @@ func testCreateClusterWithTLSAndNodeToNodeThenKillPod(t *testing.T, encryptionTy
 	victimIndex := 1
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		NodeToNodeEncryption: &encryptionType,
 	}
-	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect, kill a pod, let it recover and recheck N2N.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victimIndex, true)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1330,7 +1330,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenKillPod(t *testing.T, encryptionTy
 		e2eutil.PodDownFailoverRecoverySequence(),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenKillPod(t *testing.T) {
@@ -1347,7 +1347,7 @@ func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType c
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1356,14 +1356,14 @@ func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType c
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// Enable N2N encryption and check the state is as we expect.
 	patchset := jsonpatch.NewPatchSet().Add("/spec/networking/tls/nodeToNodeEncryption", encryptionType)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1378,7 +1378,7 @@ func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType c
 		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified})
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterWithTLSThenEnableControlPlaneNodeToNode(t *testing.T) {
@@ -1395,7 +1395,7 @@ func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbas
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1404,11 +1404,11 @@ func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbas
 	clusterSize := constants.Size3
 
 	// Create the cluster without TLS.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// When ready create the required TLS secrets and patch them into the running
 	// cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{ClusterName: testCouchbase.Name})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{ClusterName: cluster.Name})
 	tls := &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
@@ -1419,10 +1419,10 @@ func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbas
 
 	// Enable N2N encryption and check the state is as we expect.
 	patchset := jsonpatch.NewPatchSet().Add("/spec/networking/tls", tls)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, targetKube, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, testCouchbase, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 20*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1443,7 +1443,7 @@ func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbas
 		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified})
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterThenEnableControlPlaneNodeToNode(t *testing.T) {
@@ -1460,7 +1460,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, en
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1469,26 +1469,26 @@ func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, en
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		NodeToNodeEncryption: &encryptionType,
 	}
-	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Disable N2N then check state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
 	patchset := jsonpatch.NewPatchSet().Remove("/spec/networking/tls/nodeToNodeEncryption")
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 
-	e2eutil.MustCheckN2NDisabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NDisabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1503,7 +1503,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, en
 
 	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified})
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterWithTLSAnControlPlanedNodeToNodeThenDisableNodeToNode(t *testing.T) {
@@ -1520,7 +1520,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1529,24 +1529,24 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		NodeToNodeEncryption: &encryptionType,
 	}
-	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
 	patchset := jsonpatch.NewPatchSet().Replace("/spec/networking/tls/nodeToNodeEncryption", &newEncryptionType)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, patchset, time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1555,7 +1555,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToFullNodeToNode(t *testing.T) {
@@ -1570,7 +1570,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	skipN2NCheck(t)
@@ -1579,22 +1579,22 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 	clusterSize := constants.Size3
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 		NodeToNodeEncryption: &encryptionType,
 	}
-	e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	e2eutil.MustCheckN2NEnabled(t, targetKube, testCouchbase, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 	e2eutil.MustRotateServerCertificate(t, ctx, []string{})
-	e2eutil.MustCheckClusterTLS(t, targetKube, testCouchbase, ctx, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1609,7 +1609,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 		},
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificate(t *testing.T) {

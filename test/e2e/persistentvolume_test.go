@@ -79,7 +79,7 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -88,26 +88,26 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, e2espec.DefaultBucketTwoReplicas(), time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
 
 	// When ready terminate a node, expect Server to auto failover and the operator
 	// to replace the node.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victim), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victim), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events are as expected:
 	// * Cluster created
@@ -117,7 +117,7 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownFailedWithPVCRecoverySequence(1),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestPersistentVolumeAutoFailover tests the operator can recover multiple
@@ -126,7 +126,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -136,24 +136,24 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When ready terminate the victims, expect the Operator auto recover the nodes.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim1, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim2, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victim1), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim1, false)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim2, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victim1), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events are as expected:
 	// * Cluster created
@@ -180,7 +180,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 			},
 		},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create multi-node couchbase cluster with volumeClaimTemplates.
@@ -227,7 +227,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -235,27 +235,27 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 		IndexClaim:   pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When ready kill all pods while the operator is down.  Upon restart expect
 	// the operator to recover a single node, then manually recover the others.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 2, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 1), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 1, false)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 2, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, 1), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the results are as expected:
 	// * Cluster created
@@ -266,7 +266,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestPersistentVolumeKillAllPodsTLS tests the operator can recover from a total failure
@@ -275,7 +275,7 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -283,35 +283,35 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	ctx := e2eutil.MustInitClusterTLS(t, targetKube, &e2eutil.TLSOpts{})
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Name = ctx.ClusterName
-	testCouchbase.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
 		Static: &couchbasev2.StaticTLS{
 			ServerSecret:   ctx.ClusterSecretName,
 			OperatorSecret: ctx.OperatorSecretName,
 		},
 	}
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 		IndexClaim:   pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When ready kill all pods while the operator is down.  Upon restart expect
 	// the operator to recover a single node, then manually recover the others.
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 2, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 1), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 1, false)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 2, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, 1), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the results are as expected:
 	// * Cluster created
@@ -322,7 +322,7 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestPersistentVolumeKillPodAndOperator tests the operator is able to handle a single
@@ -331,7 +331,7 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -340,28 +340,28 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 		IndexClaim:   pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
 
 	// When ready delete the victim node while the operator is down.  On restart
 	// Server should failover the node and the operator recovers the cluster.
-	e2eutil.MustDeleteCouchbaseOperator(t, targetKube)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, victim, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, k8sutil.RebalanceStartedEvent(testCouchbase), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the results are as expected:
 	// * Cluster created
@@ -371,7 +371,7 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownFailedWithPVCRecoverySequence(1),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestPersistentVolumeKillAllPodsAndOperator tests the operator can handle all nodes
@@ -380,7 +380,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -388,28 +388,28 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 		IndexClaim:   pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When ready kill all pods while the operator is down.  Upon restart expect
 	// the operator to recover a single node, then manually recover the others.
-	e2eutil.MustDeleteCouchbaseOperator(t, targetKube)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 1, false)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 2, false)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, 1), 10*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 1, false)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 2, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, 1), 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Check the results are as expected:
 	// * Cluster created
@@ -420,7 +420,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestPersistentVolumeRzaNodesKilled tests operator recovery of pods spanning
@@ -429,13 +429,13 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster().ServerGroups(2)
+	framework.Requires(t, kubernetes).StaticCluster().ServerGroups(2)
 
 	// Create cluster spec for RZA feature
-	availableServerGroups := getAvailabilityZones(t, targetKube)
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
 
 	// Static configuration.
 	clusterSize := len(availableServerGroups) * 2
@@ -443,25 +443,25 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
-	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
+	cluster.Spec.ServerGroups = availableServerGroups
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 		IndexClaim:   pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Create a expected RZA results map for verification
 	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
 	// kill the first N pods where N is the no of server groups
 	victims := []int{}
@@ -472,14 +472,14 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range victims {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, false)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, podMemberToKill, false)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victims[0]), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victims[0]), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
-	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
 	// Check the results are as expected:
 	// * Cluster created
@@ -490,7 +490,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, len(victims)),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestPersistentVolumeRzaNodesKilledUnbalanced tests operator recovery of pods spanning
@@ -502,13 +502,13 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).ServerGroups(2)
+	framework.Requires(t, kubernetes).ServerGroups(2)
 
 	// Create cluster spec for RZA feature
-	availableServerGroups := getAvailabilityZones(t, targetKube)
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
 
 	// Static configuration.
 	clusterSize := len(availableServerGroups) + 1
@@ -516,24 +516,24 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
-	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.ServerGroups = availableServerGroups
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 		IndexClaim:   pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Create a expected RZA results map for verification
 	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
 	// kill the first N pods where N is the no of server groups
 	victims := []int{}
@@ -544,14 +544,14 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range victims {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, false)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, podMemberToKill, false)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberDownEvent(testCouchbase, victims[0]), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victims[0]), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
-	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
 	// Check the results are as expected:
 	// * Cluster created
@@ -562,7 +562,7 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, len(victims)),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create couchbase cluster with Persistent volumes and server groups.
@@ -571,39 +571,39 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 func TestPersistentVolumeRzaFailover(t *testing.T) {
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster().ServerGroups(2)
+	framework.Requires(t, kubernetes).StaticCluster().ServerGroups(2)
 
 	pvcName := "couchbase"
 
 	// Create cluster spec for RZA feature
-	availableServerGroups := getAvailabilityZones(t, targetKube)
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
 	clusterSize := len(availableServerGroups) * 2
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, targetKube, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 2
-	testCouchbase.Spec.ClusterSettings.AutoFailoverServerGroup = true
-	testCouchbase.Spec.ServerGroups = availableServerGroups
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(60)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 2
+	cluster.Spec.ClusterSettings.AutoFailoverServerGroup = true
+	cluster.Spec.ServerGroups = availableServerGroups
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 		IndexClaim:   pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Create a expected RZA results map for verification
 	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
 	// Kill nodes in 1st server group
 	victimGroup := 0
@@ -617,14 +617,14 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	// Loop to kill the nodes
 	for _, podMemberToKill := range victims {
-		e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, podMemberToKill, false)
+		e2eutil.MustKillPodForMember(t, kubernetes, cluster, podMemberToKill, false)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.RebalanceStartedEvent(testCouchbase), 10*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
-	expected.mustValidateRzaMap(t, targetKube, testCouchbase)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -632,7 +632,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		e2eutil.PodDownFailedWithPVCRecoverySequence(len(victims)),
 	}
 
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create 3 node couchbase cluster initially.
@@ -642,7 +642,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Static configuration.
@@ -650,19 +650,19 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 
 	pvcName := "couchbase"
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
-	testCouchbase.Spec.ClusterSettings.AutoFailoverMaxCount = 3
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 		IndexClaim:   pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	expectedPvcMap := map[string]int{}
 
@@ -670,15 +670,15 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	for _, clusterSize = range resizeClusterSizes {
 		service := 0
 
-		testCouchbase = e2eutil.MustResizeCluster(t, service, clusterSize, targetKube, testCouchbase, 10*time.Minute)
+		cluster = e2eutil.MustResizeCluster(t, service, clusterSize, kubernetes, cluster, 10*time.Minute)
 
 		// Populate the expectedPvcMap for maximum available nodes everytime
 		for memberID := 0; memberID < 9; memberID++ {
-			memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, memberID)
+			memberName := couchbaseutil.CreateMemberName(cluster.Name, memberID)
 			expectedPvcMap[memberName] = 0
 		}
 
-		podList, err := targetKube.KubeClient.CoreV1().Pods(targetKube.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + testCouchbase.Name})
+		podList, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + cluster.Name})
 		if err != nil {
 			e2eutil.Die(t, fmt.Errorf("Failed to fetch pod list: %w", err))
 		}
@@ -688,10 +688,10 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		}
 
 		// To cross check number of persistent vol claims matches the defined spec
-		mustVerifyPvcMappingForPods(t, targetKube, expectedPvcMap)
+		mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
 	}
 
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -703,7 +703,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		e2eutil.ClusterScaleDownSequence(4),
 		e2eutil.ClusterScaleUpSequence(2),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create cluster with online volume resize enabled.
@@ -713,36 +713,36 @@ func TestOnlinePersistentVolumeResize(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).ExpandableStorage()
+	framework.Requires(t, kubernetes).ExpandableStorage()
 
 	// Static configuration.
 	clusterSize := 1
 	pvcName := "couchbase"
 
 	// Create cluster with Online Resizing Enabled
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = true
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Resize up to 3Gi
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 
 	// Verify resize state
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcName, requestedQuantity, 5*time.Minute)
+	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, 5*time.Minute)
 
 	// Events indirectly verify that upgrade did not occur
 	// since no scale up events should be present
@@ -751,7 +751,7 @@ func TestOnlinePersistentVolumeResize(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{Times: 2 * clusterSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create MDS cluster with online volume resize enabled for single server group.
@@ -760,10 +760,10 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).ExpandableStorage()
+	framework.Requires(t, kubernetes).ExpandableStorage()
 
 	// Static configuration.
 	groupSize := 1
@@ -772,14 +772,14 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 	secondConfigName := "test_config_2"
 
 	// Define cluster with separate data service config
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithPersistentTopology(groupSize).Generate(targetKube)
-	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithPersistentTopology(groupSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = true
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcDataName,
 		DataClaim:    pvcDataName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, 2),
 	}
 
@@ -789,32 +789,32 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 		Name:     secondConfigName,
 		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
 	}
-	testCouchbase.Spec.Servers = append(testCouchbase.Spec.Servers, newService)
-	testCouchbase.Spec.Servers[1].VolumeMounts = &couchbasev2.VolumeMounts{
+	cluster.Spec.Servers = append(cluster.Spec.Servers, newService)
+	cluster.Spec.Servers[1].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcIndexName,
 		IndexClaim:   pvcIndexName,
 	}
 	pvcIndexClaimTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, 2)
-	testCouchbase.Spec.VolumeClaimTemplates = append(testCouchbase.Spec.VolumeClaimTemplates, pvcIndexClaimTemplate)
+	cluster.Spec.VolumeClaimTemplates = append(cluster.Spec.VolumeClaimTemplates, pvcIndexClaimTemplate)
 
 	// Create cluster
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Resize and data services from 2Gi to 3Gi
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
 	// Verify index service volumes are still 2Gi
 	requestedQuantity = e2espec.NewResourceQuantityGi(2)
-	memberName = couchbaseutil.CreateMemberName(testCouchbase.Name, 1)
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcIndexName, requestedQuantity, 5*time.Minute)
+	memberName = couchbaseutil.CreateMemberName(cluster.Name, 1)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, 5*time.Minute)
 	// Scale index service volumes to 4Gi
 	requestedQuantity = e2espec.NewResourceQuantityGi(4)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/1/spec/resources/requests/storage", requestedQuantity), time.Minute)
-	memberName = couchbaseutil.CreateMemberName(testCouchbase.Name, 1)
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcIndexName, requestedQuantity, 6*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/1/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	memberName = couchbaseutil.CreateMemberName(cluster.Name, 1)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, 6*time.Minute)
 
 	// Verify events
 	expectedEvents := []eventschema.Validatable{
@@ -822,7 +822,7 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{Times: 4 * groupSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create cluster with different claim templates for different services.
@@ -830,43 +830,43 @@ func TestOnlinePersistentVolumeResizeMixedClaims(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).ExpandableStorage()
+	framework.Requires(t, kubernetes).ExpandableStorage()
 
 	// Static configuration.
 	groupSize := 1
 	pvcDataName := "couchbase_data"
 	pvcIndexName := "couchbase_index"
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithPersistentTopology(groupSize).Generate(targetKube)
-	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithPersistentTopology(groupSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = true
 	// Define different claims for data and index service
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcDataName,
 		DataClaim:    pvcDataName,
 		IndexClaim:   pvcIndexName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, 2),
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, 2),
 	}
 
 	// Create cluster
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Resize and data services from 2Gi to 3Gi
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
 	// Verify index service volumes are still 2Gi
 	requestedQuantity = e2espec.NewResourceQuantityGi(2)
-	memberName = couchbaseutil.CreateMemberName(testCouchbase.Name, 1)
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcIndexName, requestedQuantity, 5*time.Minute)
+	memberName = couchbaseutil.CreateMemberName(cluster.Name, 1)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, 5*time.Minute)
 
 	// Verify events
 	expectedEvents := []eventschema.Validatable{
@@ -874,7 +874,7 @@ func TestOnlinePersistentVolumeResizeMixedClaims(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{Times: 2 * groupSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create cluster with volume expansion enabled and verify that duplicate size
@@ -883,56 +883,56 @@ func TestOnlinePersistentVolumeResizeNop(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).ExpandableStorage()
+	framework.Requires(t, kubernetes).ExpandableStorage()
 
 	// Static configuration.
 	groupSize := 1
 	pvcDataName := "couchbase_data"
 	pvcIndexName := "couchbase_index"
 
-	e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithPersistentTopology(groupSize).Generate(targetKube)
-	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithPersistentTopology(groupSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = true
 	// Define different claims for data and index service
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcDataName,
 		DataClaim:    pvcDataName,
 		IndexClaim:   pvcIndexName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, 2),
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, 2),
 	}
 
 	// Create cluster
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Resize and data services from 2Gi to 2Gi
 	requestedQuantity := e2espec.NewResourceQuantityGi(2)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
 
 	// Verify events
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(groupSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).ExpandableStorage()
+	framework.Requires(t, kubernetes).ExpandableStorage()
 
 	// Static configuration.
 	clusterSize := 1
@@ -940,32 +940,32 @@ func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
 	numOfDocs := f.DocsCount
 
 	// Create cluster with Online Resizing Enabled
-	bucket := e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = true
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Resize up to 3Gi
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 
 	// Start Adding Docs
-	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, targetKube, testCouchbase)
+	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, kubernetes, cluster)
 
 	// Verify resize state
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcName, requestedQuantity, 5*time.Minute)
+	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, 5*time.Minute)
 
 	// Check all docs were added during resize
-	e2eutil.MustVerifyDocCountInBucket(t, targetKube, testCouchbase, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Events indirectly verify that upgrade did not occur
 	// since no scale up events should be present
@@ -974,7 +974,7 @@ func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{Times: 2 * clusterSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestOnlinePersistentVolumeResizeWhenPodKilled brings down a pod during a PV resize, and checks that the resize
@@ -983,43 +983,43 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).ExpandableStorage()
+	framework.Requires(t, kubernetes).ExpandableStorage()
 
 	// Static configuration.
 	clusterSize := 1
 	pvcName := "couchbase"
 
 	// Create cluster with Online Resizing Enabled
-	bucket := e2eutil.MustNewBucket(t, targetKube, e2espec.DefaultBucketTwoReplicas())
-	testCouchbase := clusterOptions().WithPersistentTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.EnableOnlineVolumeExpansion = true
-	testCouchbase.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = true
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
 	}
-	testCouchbase.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, targetKube, testCouchbase, bucket, time.Minute)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
 
 	// Resize up to 3Gi
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
-	testCouchbase = e2eutil.MustPatchCluster(t, targetKube, testCouchbase, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 
-	memberName := couchbaseutil.CreateMemberName(testCouchbase.Name, 0)
-	e2eutil.MustObserveClusterEvent(t, targetKube, testCouchbase, e2eutil.NewVolumeExpandStartedEvent(k8sutil.NameForPersistentVolumeClaim(memberName, 0, "data"), "2Gi", "3Gi", testCouchbase), 5*time.Minute)
-	e2eutil.MustKillPodForMember(t, targetKube, testCouchbase, 0, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 5*time.Minute)
+	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.NewVolumeExpandStartedEvent(k8sutil.NameForPersistentVolumeClaim(memberName, 0, "data"), "2Gi", "3Gi", cluster), 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Verify resize state
-	e2eutil.MustWaitForPodVolumeSize(t, targetKube, memberName, pvcName, requestedQuantity, 10*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, 10*time.Minute)
 
 	// Verify pod recovery during expansion events
 	expectedEvents := []eventschema.Validatable{
@@ -1031,5 +1031,5 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

@@ -153,16 +153,16 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	// ...choose the correct victim cluster...
-	var targetKubernetes *types.Cluster
+	var kubernetes *types.Cluster
 
 	var targetCouchbase *couchbasev2.CouchbaseCluster
 
 	switch cluster {
 	case xdcrClusterSource:
-		targetKubernetes = k8s1
+		kubernetes = k8s1
 		targetCouchbase = xdcrCluster1
 	case xdcrClusterTarget:
-		targetKubernetes = k8s2
+		kubernetes = k8s2
 		targetCouchbase = xdcrCluster2
 	}
 
@@ -171,11 +171,11 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 
 	switch operation {
 	case xdcrOperationEject:
-		schema = ejectAllXDCRNodes(t, targetKubernetes, targetCouchbase)
+		schema = ejectAllXDCRNodes(t, kubernetes, targetCouchbase)
 	case xdcrOperationDelete:
-		schema = killAllXDCRNodes(t, targetKubernetes, targetCouchbase)
+		schema = killAllXDCRNodes(t, kubernetes, targetCouchbase)
 	case xdcrOperationScaleDown:
-		schema = scaleDownXDCRCluster(t, targetKubernetes, targetCouchbase, scaleDownSize)
+		schema = scaleDownXDCRCluster(t, kubernetes, targetCouchbase, scaleDownSize)
 	}
 
 	// ...before finally creating more documents and verifying replication still works.

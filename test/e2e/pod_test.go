@@ -18,21 +18,21 @@ func TestPodResourcesBasic(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// This is broken because the memory allocation stuff cannot be trusted.
-	framework.Requires(t, targetKube).StaticCluster().Rethink()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := 1
-	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
+	maxMem := e2eutil.MustGetMaxNodeMem(t, kubernetes)
 	memReq := strconv.Itoa(int(0.7*maxMem)) + "Mi"
 	memLimit := strconv.Itoa(int(0.8*maxMem)) + "Mi"
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Resources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
@@ -40,35 +40,35 @@ func TestPodResourcesBasic(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse(memLimit),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestNegPodResourcesBasic(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// This is broken because the memory allocation stuff cannot be trusted.
-	framework.Requires(t, targetKube).StaticCluster().Rethink()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := 1
-	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
+	maxMem := e2eutil.MustGetMaxNodeMem(t, kubernetes)
 	memReq := strconv.Itoa(int(0.8*maxMem)) + "Mi"
 	memLimit := strconv.Itoa(int(0.7*maxMem)) + "Mi"
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Resources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
@@ -76,10 +76,10 @@ func TestNegPodResourcesBasic(t *testing.T) {
 			corev1.ResourceMemory: resource.MustParse(memLimit),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// Expect the cluster to enter a failed state
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, 0), 15*time.Minute)
 }
 
 // TestPodResourcesCannotBePlaced tests for additional pods failing creation due to
@@ -93,31 +93,31 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTestExclusive(t)
+	kubernetes, cleanup := f.SetupTestExclusive(t)
 	defer cleanup()
 
 	// Put this on a big cluster and it's going to literally take it over with
 	// hundreds of pods.  Poor test, we should constrain it with label selectors
 	// to limit the blast radius.  Also the memory calculations are just wrong.
-	framework.Requires(t, targetKube).StaticCluster().Rethink()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
-	minMem := e2eutil.MustGetMinNodeMem(t, targetKube)
+	minMem := e2eutil.MustGetMinNodeMem(t, kubernetes)
 	memoryRequest := 0.9 * minMem
 	memReq := strconv.Itoa(int(memoryRequest)) + "Mi"
-	clusterSize := e2eutil.MustGetMaxScale(t, targetKube, memoryRequest)
+	clusterSize := e2eutil.MustGetMaxScale(t, kubernetes, memoryRequest)
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Resources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When the cluster is ready, scale up, the node shouldn't be scheduled.
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 2*f.PodCreateTimeout)
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, clusterSize), 2*f.PodCreateTimeout)
 
 	// Check the events match what we expect:
 	// * N-1 members added
@@ -126,84 +126,84 @@ func TestPodResourcesCannotBePlaced(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestFirstNodePodResourcesCannotBePlaced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// This is broken because the memory allocation stuff cannot be trusted.
-	framework.Requires(t, targetKube).StaticCluster().Rethink()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
 	// Static configuration.
 	clusterSize := 1
-	maxMem := e2eutil.MustGetMaxNodeMem(t, targetKube)
+	maxMem := e2eutil.MustGetMaxNodeMem(t, kubernetes)
 	memReq := strconv.Itoa(int(2*maxMem)) + "Mi"
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.Servers[0].Resources = corev1.ResourceRequirements{
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Resources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceMemory: resource.MustParse(memReq),
 		},
 	}
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// Expect the cluster to enter a failed state
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, 0), 15*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, 0), 15*time.Minute)
 }
 
 func TestAntiAffinityOn(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// This test is broken because we cannot guarantee the N node cluster will
 	// fit when CPU and memory constraints are taken into account.
-	framework.Requires(t, targetKube).StaticCluster().Rethink()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
 	// Static configuration.
-	clusterSize := e2eutil.MustNumNodes(t, targetKube)
+	clusterSize := e2eutil.MustNumNodes(t, kubernetes)
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.AntiAffinity = true
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.AntiAffinity = true
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// This is broken because it doesn't consider memory allocation.
-	framework.Requires(t, targetKube).StaticCluster().Rethink()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
 	// Static configuration.
-	clusterSize := e2eutil.MustNumNodesAbsolute(t, targetKube) + 1
+	clusterSize := e2eutil.MustNumNodesAbsolute(t, kubernetes) + 1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.AntiAffinity = true
-	testCouchbase = e2eutil.MustNewClusterFromSpecAsync(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.AntiAffinity = true
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
 	// Wait for a healthy status.
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize-1), 2*f.PodCreateTimeout)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, clusterSize-1), 2*f.PodCreateTimeout)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -211,30 +211,30 @@ func TestAntiAffinityOnCannotBePlaced(t *testing.T) {
 		eventschema.RepeatAtMost{Times: clusterSize - 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// This is broken because it doesn't consider memory allocation.
-	framework.Requires(t, targetKube).StaticCluster().Rethink()
+	framework.Requires(t, kubernetes).StaticCluster().Rethink()
 
 	// Static configuration.
-	clusterSize := e2eutil.MustNumNodes(t, targetKube)
+	clusterSize := e2eutil.MustNumNodes(t, kubernetes)
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(targetKube)
-	testCouchbase.Spec.AntiAffinity = true
-	testCouchbase = e2eutil.MustNewClusterFromSpec(t, targetKube, testCouchbase)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.AntiAffinity = true
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When ready scale beyond the limits and wait for a failed creation.
-	testCouchbase = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, targetKube, testCouchbase)
-	e2eutil.MustWaitForClusterEvent(t, targetKube, testCouchbase, e2eutil.NewMemberCreationFailedEvent(testCouchbase, clusterSize), 2*f.PodCreateTimeout)
+	cluster = e2eutil.MustResizeClusterNoWait(t, 0, clusterSize+1, kubernetes, cluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, clusterSize), 2*f.PodCreateTimeout)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -242,49 +242,49 @@ func TestAntiAffinityOnCannotBeScaled(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestAntiAffinityOff(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, targetKube).StaticCluster()
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	// Static configuration.
-	clusterSize := e2eutil.MustNumNodes(t, targetKube) + 1
+	clusterSize := e2eutil.MustNumNodes(t, kubernetes) + 1
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for a healthy status.
-	e2eutil.MustWaitClusterStatusHealthy(t, targetKube, testCouchbase, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestCustomAnnotationsAndLabelsStayAfterReconcile(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	targetKube, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
 	// Create the cluster.
-	testCouchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, targetKube)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
-	ValidateEvents(t, targetKube, testCouchbase, expectedEvents)
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 
 	// Add a custom annotation and label to the pod, wait for reconcile and then confirm the annotations are still present
 	newAnnotations := make(map[string]string)
@@ -294,9 +294,9 @@ func TestCustomAnnotationsAndLabelsStayAfterReconcile(t *testing.T) {
 	newLabels["special.istio.label"] = "true"
 
 	// Add custom annotations and labels
-	e2eutil.MustAddCustomAnnotationAndLabels(t, targetKube, testCouchbase, newAnnotations, newLabels)
+	e2eutil.MustAddCustomAnnotationAndLabels(t, kubernetes, cluster, newAnnotations, newLabels)
 	// Wait for reconcile period to pass
 	time.Sleep(time.Minute)
 	// Ensure we still have them after waiting for a reconcile period to pass
-	e2eutil.MustCheckCustomAnnotationAndLabels(t, targetKube, testCouchbase, newAnnotations, newLabels)
+	e2eutil.MustCheckCustomAnnotationAndLabels(t, kubernetes, cluster, newAnnotations, newLabels)
 }
