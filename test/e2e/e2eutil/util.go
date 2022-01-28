@@ -1716,3 +1716,42 @@ func MustSetBucketTTL(t *testing.T, bucket metav1.Object, duration time.Duration
 		Die(t, fmt.Errorf("bucket of incorrect type"))
 	}
 }
+
+func MustRetrieveCouchbaseBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector *metav1.LabelSelector) *couchbasev2.CouchbaseBucket {
+	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "foo=bar"})
+	if err != nil {
+		Die(t, fmt.Errorf("cannot get bucket from kubernetes"))
+	}
+
+	if len(buckets.Items) != 1 {
+		Die(t, fmt.Errorf("unexpected number of buckets returned"))
+	}
+
+	return &buckets.Items[0]
+}
+
+func MustRetrieveEphemeralBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector *metav1.LabelSelector) *couchbasev2.CouchbaseEphemeralBucket {
+	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "foo=bar"})
+	if err != nil {
+		Die(t, fmt.Errorf("cannot get bucket from kubernetes"))
+	}
+
+	if len(buckets.Items) != 1 {
+		Die(t, fmt.Errorf("unexpected number of buckets returned"))
+	}
+
+	return &buckets.Items[0]
+}
+
+func MustRetrieveMemcachedBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector *metav1.LabelSelector) *couchbasev2.CouchbaseMemcachedBucket {
+	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "foo=bar"})
+	if err != nil {
+		Die(t, fmt.Errorf("cannot get bucket from kubernetes"))
+	}
+
+	if len(buckets.Items) != 1 {
+		Die(t, fmt.Errorf("unexpected number of buckets returned"))
+	}
+
+	return &buckets.Items[0]
+}

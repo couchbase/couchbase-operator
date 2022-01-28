@@ -732,3 +732,15 @@ func MustCreateCollectionManually(t *testing.T, kubernetes *types.Cluster, clust
 		Die(t, err)
 	}
 }
+
+// MustCreateCollectionManually allows manual creation of collections.
+func MustDeleteCollectionManually(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket, scope, collection string) {
+	client, err := CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		Die(t, err)
+	}
+
+	if err := couchbaseutil.DeleteCollection(bucket, scope, collection).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+}

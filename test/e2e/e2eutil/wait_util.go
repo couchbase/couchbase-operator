@@ -623,6 +623,12 @@ func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType
 	}
 }
 
+func AssertClusterConditionFor(t *testing.T, k8s *types.Cluster, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := retryutil.AssertFor(timeout, ResourceCondition(k8s, cl, string(conditionType), string(status))); err != nil {
+		Die(t, err)
+	}
+}
+
 func fieldEqualQuantity(size *resource.Quantity, fields ...string) resourceCheckFunc {
 	return func(u *unstructured.Unstructured, lookupError error) error {
 		raw, ok, _ := unstructured.NestedString(u.Object, fields...)

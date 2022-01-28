@@ -545,6 +545,13 @@ func registerTests() {
 
 		// Synchronization tests.
 		framework.NewTestDef(TestDataSynchronizationBasic).WithTags(TagSuiteP1, TagFeatureSynchronization, TagFeatureCollections),
+		framework.NewTestDef(TestDataSynchronizationUpdate).WithTags(TagSuiteP1, TagFeatureSynchronization, TagFeatureCollections),
+		framework.NewTestDef(TestDataSynchronizationCouchbaseBucketConfig).WithTags(TagSuiteP1, TagFeatureSynchronization),
+		framework.NewTestDef(TestDataSynchronizationEphemeralBucketConfig).WithTags(TagSuiteP1, TagFeatureSynchronization),
+		framework.NewTestDef(TestDataSynchronizationMemcachedBucketConfig).WithTags(TagSuiteP1, TagFeatureSynchronization),
+		framework.NewTestDef(TestDataSynchronizationDefaultCollectionDeleted).WithTags(TagSuiteP1, TagFeatureSynchronization, TagFeatureCollections),
+		framework.NewTestDef(TestDataSynchronizationErrorTopologyChange).WithTags(TagSuiteP1, TagFeatureSynchronization),
+		framework.NewTestDef(TestDataSynchronizationOperatorRestart).WithTags(TagSuiteP1, TagFeatureSynchronization),
 
 		// System tests.
 		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem),

@@ -1146,6 +1146,12 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.query.temporarySpace`},
 		},
+		{
+			name:           "TestValidateSynchronizationNoLabel",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/buckets/managed", false).Add("/spec/buckets/synchronize", true)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.buckets.selector`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
