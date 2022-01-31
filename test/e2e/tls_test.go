@@ -1685,9 +1685,7 @@ func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2e
 	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: serverTLSSourceType})
 	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).Generate(kubernetes)
-
-	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1740,4 +1738,170 @@ func TestMultipleCAsAddAndRemove(t *testing.T) {
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/networking/tls/rootCAs"), time.Minute)
 	e2eutil.MustValidateCAPool(t, kubernetes, cluster, time.Minute, tls)
+}
+
+// TestMandatoryMutualTLSWithMultipleCAsAndRotateServerPKI checks that the server PKI can be
+// rotated independently from the client PKI.
+func TestMandatoryMutualTLSWithMultipleCAsAndRotateServerPKI(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	// Create the cluster with multiple CAs for server and users.
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
+
+	// Rotate the server PKI and validate all is as expected.
+	e2eutil.MustRotateServerCertificateAndCA(t, serverTLS)
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, 2*time.Minute, serverTLS, clientTLS)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, serverTLS, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Server certs and client CA updated.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestMandatoryMutualTLSWithMultipleCAsAndRotateServerPKIWithOperatorDown checks that the server
+// PKI can be rotated independently from the client PKI, when the operator isn't running for
+// whatever reason.
+func TestMandatoryMutualTLSWithMultipleCAsAndRotateServerPKIWithOperatorDown(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	// Create the cluster with multiple CAs for server and users.
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
+
+	// Rotate the server PKI with the operator off and validate all is as expected.
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
+	e2eutil.MustRotateServerCertificateAndCA(t, serverTLS)
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, 2*time.Minute, serverTLS, clientTLS)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, serverTLS, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Server certs and client CA updated.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		},
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKI checks that the client PKI can be
+// rotated independently from the server PKI.
+func TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKI(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	// Create the cluster with multiple CAs for server and users.
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
+
+	// Rotate the client PKI and validate all is as expected.
+	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, clientTLS)
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, 2*time.Minute, serverTLS, clientTLS)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Client cert, key and CA updated.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKIWithOperatorDown checks that the
+// client PKI can be rotated independently from the server PKI, when the operator isn't running for
+// whatever reason.
+func TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKIWithOperatorDown(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	// Create the cluster with multiple CAs for server and users.
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
+
+	// Rotate the client PKI and validate all is as expected.
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
+	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, clientTLS)
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, 2*time.Minute, serverTLS, clientTLS)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Client cert, key and CA updated.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

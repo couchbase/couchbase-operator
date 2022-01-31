@@ -33,14 +33,14 @@ const (
 // createSyncGateway creates a sync gateway instance in the given cluster.
 // Communication, being external has to be with a port-forward so creating
 // a service is pointless.
-func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, image, bucket string, auth *corev1.Secret, dns *corev1.Service, tls *TLSContext, timeout time.Duration) error {
+func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, image, bucket string, auth *corev1.Secret, dns *corev1.Service, serverTLS, clientTLS *TLSContext, timeout time.Duration) error {
 	// Define and create the configuration secret.
 	// Dynamically select the scheme based on TLS mode, also optionally add in CA
 	// and client certificates as required.  As the config is going to be mounted
 	// we piggy back the certificates on this mount for simplicity.
 	scheme := "couchbase"
 
-	if tls != nil {
+	if serverTLS != nil {
 		scheme = "couchbases"
 	}
 
@@ -85,7 +85,7 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 		"enable_shared_bucket_access": true,
 	}
 
-	if tls != nil {
+	if serverTLS != nil {
 		databaseConfig["cacertpath"] = "/etc/sync_gateway/ca.pem"
 
 		if cluster.Spec.Networking.TLS.ClientCertificatePolicy != nil {
@@ -123,10 +123,10 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 		},
 	}
 
-	if tls != nil {
-		secret.Data["ca.pem"] = tls.CA.Certificate
-		secret.Data["client.pem"] = tls.ClientCert
-		secret.Data["client.key"] = tls.ClientKey
+	if serverTLS != nil {
+		secret.Data["ca.pem"] = serverTLS.CA.Certificate
+		secret.Data["client.pem"] = clientTLS.ClientCert
+		secret.Data["client.key"] = clientTLS.ClientKey
 	}
 
 	if _, err := k8s.KubeClient.CoreV1().Secrets(k8s.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
@@ -235,8 +235,14 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 	return nil
 }
 
-func MustCreateSyncGateway(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, image, bucket string, auth *corev1.Secret, dns *corev1.Service, tls *TLSContext, timeout time.Duration) {
-	if err := createSyncGateway(k8s, cluster, image, bucket, auth, dns, tls, timeout); err != nil {
+func MustCreateSyncGateway(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, image, bucket string, auth *corev1.Secret, dns *corev1.Service, serverTLS *TLSContext, timeout time.Duration) {
+	if err := createSyncGateway(k8s, cluster, image, bucket, auth, dns, serverTLS, serverTLS, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustCreateSyncGatewayWithMultipleCAs(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, image, bucket string, auth *corev1.Secret, dns *corev1.Service, serverTLS, clientTLS *TLSContext, timeout time.Duration) {
+	if err := createSyncGateway(k8s, cluster, image, bucket, auth, dns, serverTLS, clientTLS, timeout); err != nil {
 		Die(t, err)
 	}
 }

@@ -103,11 +103,11 @@ wrap for you e.g. vim.
 
 == Building the Operator
 
-Run make command to build the container image.
+Run make command to build the container images.
 
 [source,console]
 ----
-$ make container
+$ make images
 ----
 
 The various `make` targets are documented below.
@@ -119,8 +119,8 @@ The various `make` targets are documented below.
 |`make`
 |Build all binaries (required to run tests, must pass).
 
-|`make container`
-|Build docker images (`couchbase/couchbase-operator:v1` and `couchbase/couchbase-operator-admission:v1`).
+|`make images`
+|Build docker images (`couchbase/couchbase-operator:v1`, `couchbase/couchbase-operator-admission:v1`, and `couchbase/couchbase-operator-certification:v1`).
 
 |`make test-unit`
 |Runs unit tests (must pass).
@@ -136,9 +136,6 @@ The various `make` targets are documented below.
 
 |`make lint-python`
 |Checks all python scripts are standard, not broken and not dubious (must pass).
-
-|`make certification-container`
-|Builds all the test framework and packages it.
 |===
 
 You should see something similar to the following with the `docker images` command.
@@ -175,10 +172,7 @@ You need to poke local docker images into kind, if the images are already in the
 [source,console]
 ----
 $ make # create the tools
-$ make container # create the container images
-$ kind load docker-image couchbase/couchbase-operator:v1
-$ kind load docker-image couchbase/couchbase-operator-admission:v1
-$ kind load docker-image couchbase/couchbase-operator-certification:v1
+$ make kind-images # create and install the container images
 ----
 
 Not strictly required but improves caching performance - replace with the server version you want to test.

@@ -121,6 +121,37 @@ func TestSyncGatewayCreateRemoteMandatoryMutualTLS(t *testing.T) {
 	testSyncGatewayCreate(t, k8s1, k8s2, dns, tls, &policy)
 }
 
+// TestSyncGatewayCreateRemoteMandatoryMutualTLSWithMultipleCAs checks that SGW can authenticate
+// against server when a different PKI is used for authentication to that used by Server.
+func TestSyncGatewayCreateRemoteMandatoryMutualTLSWithMultipleCAs(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := 3
+	mtlsPolicy := couchbasev2.ClientCertificatePolicyMandatory
+
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+
+	// Create the cluster in the target cluster.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &mtlsPolicy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	// Create the sync gateway in the source cluster and insert a document.
+	e2eutil.MustCreateSyncGatewayWithMultipleCAs(t, kubernetes, cluster, f.SyncGatewayImage, bucket.GetName(), nil, nil, serverTLS, clientTLS, time.Minute)
+
+	// Ensure meta-data documents appear in the Couchbase cluster.
+	e2eutil.MustVerifyDocCountInBucketNonZero(t, kubernetes, cluster, bucket.GetName(), 5*time.Minute)
+}
+
 // TestSyncGatewayRBAC tests SGW works end-to-end with the bucket_full_access role.
 func TestSyncGatewayRBAC(t *testing.T) {
 	// Platform configuration.

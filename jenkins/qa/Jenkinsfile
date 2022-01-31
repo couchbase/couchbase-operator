@@ -46,6 +46,7 @@ pipeline {
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:${env.WORKSPACE}/google-cloud-sdk/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
+    GITLAB_CREDENTIALS = credentials('gitlab-couchbaseqe')
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
     AWS_CREDENTIALS = credentials('aws-simon')
     KIND_VERSION = "0.11.1"
@@ -92,15 +93,14 @@ pipeline {
     stage('Build Container Images') {
       steps {
         sh 'docker login -u ${DOCKER_CREDENTIALS_USR} -p ${DOCKER_CREDENTIALS_PSW}'
-        sh 'make container-public -e DOCKER_USER=${DOCKER_CREDENTIALS_USR} DOCKER_TAG=${GIT_COMMIT}'
-        sh 'make certification-container-public -e DOCKER_USER=${DOCKER_CREDENTIALS_USR} DOCKER_TAG=${GIT_COMMIT}'
+        sh 'make images-public -e DOCKER_USER=${DOCKER_CREDENTIALS_USR} DOCKER_TAG=${GIT_COMMIT}'
       }
 
       post {
         always {
           // Remove old docker images now, this stops disk from filling up and minimises risk
           // of this not being called due to a job cancellation.
-          sh 'make container-clean -e DOCKER_USER=${DOCKER_CREDENTIALS_USR} DOCKER_TAG=${GIT_COMMIT}'
+          sh 'make images-clean -e DOCKER_USER=${DOCKER_CREDENTIALS_USR} DOCKER_TAG=${GIT_COMMIT}'
         }
       }
     }
@@ -171,6 +171,7 @@ pipeline {
             -bucket-type \${bucket_type} \
             -compression-mode \${compression_mode} \
             -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} \
+            -registry registry.gitlab.com,\${GITLAB_CREDENTIALS_USR},\${GITLAB_CREDENTIALS_PSW} \
             -collect-logs \
             -collect-server-logs=false \
             -s3-access-key \${AWS_CREDENTIALS_USR} \

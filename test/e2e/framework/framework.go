@@ -1299,6 +1299,14 @@ func (r *TestRequirement) Rethink() *TestRequirement {
 	return r
 }
 
+// ServerFixing a tongue in cheek way of saying Server is broken/exhibiting some totally whack
+// behaviour that makes zero sense.
+func (r *TestRequirement) ServerFixing() *TestRequirement {
+	r.t.Skip("couchbase server needs fixing")
+
+	return r
+}
+
 // PlatformIs skips the test if the vendor platform is incorrect.
 func (r *TestRequirement) PlatformIs(platform couchbasev2.PlatformType) *TestRequirement {
 	if Global.Platform != platform {

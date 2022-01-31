@@ -519,9 +519,9 @@ func CreateClusterSecretData(namespace string, ctx *TLSContext) *corev1.Secret {
 	return secret
 }
 
-// rotateOperatorSecretData abstracts away secret updates for the various TLS
+// rotateClientSecretData abstracts away secret updates for the various TLS
 // configuration modes.
-func rotateOperatorSecretData(ctx *TLSContext, secret *corev1.Secret, ca, cert, key []byte) {
+func rotateClientSecretData(ctx *TLSContext, secret *corev1.Secret, ca, cert, key []byte) {
 	if ctx.LegacyTLS() {
 		secret.Data[operatorTLSSecretChain] = cert
 		secret.Data[operatorTLSSecretKey] = key
@@ -538,9 +538,37 @@ func rotateOperatorSecretData(ctx *TLSContext, secret *corev1.Secret, ca, cert, 
 	secret.Data[corev1.TLSPrivateKeyKey] = key
 }
 
-// rotateClusterSecretData abstracts away secret updates for the various TLS
+// mustRoateClientSecret rotates the client certificate and key, and optionally the CA,
+// regardless of the format.
+func mustRotateClientSecret(t *testing.T, ctx *TLSContext, ca, cert, key []byte) {
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
+	if err != nil {
+		Die(t, err)
+	}
+
+	rotateClientSecretData(ctx, secret, ca, cert, key)
+
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		Die(t, err)
+	}
+
+	if ctx.Source == TLSSourceKubernetesSecret && ca != nil {
+		secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.CASecretName)
+		if err != nil {
+			Die(t, err)
+		}
+
+		secret.Data[corev1.TLSCertKey] = ca
+
+		if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+			Die(t, err)
+		}
+	}
+}
+
+// rotateServerSecretData abstracts away secret updates for the various TLS
 // configuration modes.
-func rotateClusterSecretData(ctx *TLSContext, secret *corev1.Secret, ca, cert, key []byte) {
+func rotateServerSecretData(ctx *TLSContext, secret *corev1.Secret, ca, cert, key []byte) {
 	if ctx.LegacyTLS() {
 		secret.Data[clusterTLSSecretChain] = cert
 		secret.Data[clusterTLSSecretKey] = key
@@ -554,6 +582,34 @@ func rotateClusterSecretData(ctx *TLSContext, secret *corev1.Secret, ca, cert, k
 	// In cert-manager mode, the cluster secret contains the CA unconditionally.
 	if ctx.Source == TLSSourceCertManagerSecret && ca != nil {
 		secret.Data[operatorTLSSecretCA] = ca
+	}
+}
+
+// mustRotateServerSecret rotates the server certificate and key, and optionally the CA,
+// regardless of the format.
+func mustRotateServerSecret(t *testing.T, ctx *TLSContext, ca, cert, key []byte) {
+	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
+	if err != nil {
+		Die(t, err)
+	}
+
+	rotateServerSecretData(ctx, secret, ca, cert, key)
+
+	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+		Die(t, err)
+	}
+
+	if ctx.Source == TLSSourceKubernetesSecret && ca != nil {
+		secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.CASecretName)
+		if err != nil {
+			Die(t, err)
+		}
+
+		secret.Data[corev1.TLSCertKey] = ca
+
+		if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
+			Die(t, err)
+		}
 	}
 }
 
@@ -821,16 +877,7 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, subjectAltNames 
 	}
 
 	// Update the existing server secret
-	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
-	if err != nil {
-		Die(t, err)
-	}
-
-	rotateClusterSecretData(ctx, secret, nil, clusterCert, clusterKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateServerSecret(t, ctx, nil, clusterCert, clusterKey)
 }
 
 // MustRotateClientCertificate generates a new client certificate and updates the existing secret.
@@ -851,16 +898,7 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 	ctx.ClientCert = operatorCert
 
 	// Update the existing client secret
-	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
-	if err != nil {
-		Die(t, err)
-	}
-
-	rotateOperatorSecretData(ctx, secret, nil, operatorCert, operatorKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateClientSecret(t, ctx, nil, operatorCert, operatorKey)
 }
 
 // MustRotateServerCertificateChain generates a new intermediate CA and server certificate and updates the existing secret.
@@ -888,18 +926,9 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 	}
 
 	// Update the existing server secret
-	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
-	if err != nil {
-		Die(t, err)
-	}
-
 	chain := append(clusterCert, intermediate.Certificate...)
 
-	rotateClusterSecretData(ctx, secret, nil, chain, clusterKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateServerSecret(t, ctx, nil, chain, clusterKey)
 }
 
 // MustRotateClientCertificateChain generates a new intermediate CA and client certificate and updates the existing secret.
@@ -930,16 +959,7 @@ func MustRotateClientCertificateChain(t *testing.T, ctx *TLSContext) {
 	chain := append(operatorCert, intermediate.Certificate...)
 
 	// Update the existing client secret
-	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
-	if err != nil {
-		Die(t, err)
-	}
-
-	rotateOperatorSecretData(ctx, secret, nil, chain, operatorKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateClientSecret(t, ctx, nil, chain, operatorKey)
 }
 
 // MustRotateServerCertificateAndCA generates a new CA and server certificate and updates the existing secret.
@@ -982,16 +1002,7 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 	}
 
 	// Update the existing server secret
-	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
-	if err != nil {
-		Die(t, err)
-	}
-
-	rotateClusterSecretData(ctx, secret, ctx.CA.Certificate, clusterCert, clusterKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateServerSecret(t, ctx, ctx.CA.Certificate, clusterCert, clusterKey)
 }
 
 // MustRotateServerCertificateClientCertificateAndCA generates a new CA and client and server certificates and updates the existing secrets.
@@ -1032,27 +1043,10 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	ctx.ClientCert = operatorCert
 
 	// Update the existing operator secret
-	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
-	if err != nil {
-		Die(t, err)
-	}
-
-	rotateOperatorSecretData(ctx, secret, ctx.CA.Certificate, operatorCert, operatorKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateClientSecret(t, ctx, ctx.CA.Certificate, operatorCert, operatorKey)
 
 	// Update the existing server secret
-	if secret, err = GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName); err != nil {
-		Die(t, err)
-	}
-
-	rotateClusterSecretData(ctx, secret, ctx.CA.Certificate, clusterCert, clusterKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateServerSecret(t, ctx, ctx.CA.Certificate, clusterCert, clusterKey)
 }
 
 // MustRotateServerCertificateWrongCA generates a new CA and server certificate, but only updates the server cert.
@@ -1080,16 +1074,7 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	}
 
 	// Update the existing server secret
-	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.ClusterSecretName)
-	if err != nil {
-		Die(t, err)
-	}
-
-	rotateClusterSecretData(ctx, secret, nil, clusterCert, clusterKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateServerSecret(t, ctx, nil, clusterCert, clusterKey)
 }
 
 // MustRotateClientCertificateWrongCA generates a new CA and client certificate, but only updates the client cert.
@@ -1116,16 +1101,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	ctx.ClientCert = operatorCert
 
 	// Update the existing client secret
-	secret, err := GetSecret(ctx.Client, ctx.Namespace, ctx.OperatorSecretName)
-	if err != nil {
-		Die(t, err)
-	}
-
-	rotateOperatorSecretData(ctx, secret, nil, operatorCert, operatorKey)
-
-	if err := UpdateSecret(ctx.Client, ctx.Namespace, secret); err != nil {
-		Die(t, err)
-	}
+	mustRotateClientSecret(t, ctx, nil, operatorCert, operatorKey)
 }
 
 // newTLSAPI determines whether to use new TLS verification or legacy.

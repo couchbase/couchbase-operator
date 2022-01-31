@@ -21,24 +21,24 @@ import (
 
 // mustCreateXDCRBuckets creates default buckets in the source and target clusters, ensuring
 // we don't redefine if the same cluster is used for source and target couchbase instances.
-func mustCreateXDCRBucketsWithScopes(t *testing.T, k8s1, k8s2 *types.Cluster, scopes ...*couchbasev2.CouchbaseScope) metav1.Object {
+func mustCreateXDCRBucketsWithScopes(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, scopes ...*couchbasev2.CouchbaseScope) metav1.Object {
 	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
 
 	for _, scope := range scopes {
 		e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	}
 
-	e2eutil.MustNewBucket(t, k8s1, bucket)
+	e2eutil.MustNewBucket(t, kubernetes1, bucket)
 
-	if k8s1.Config.Host != k8s2.Config.Host || k8s1.Namespace != k8s2.Namespace {
-		e2eutil.MustNewBucket(t, k8s2, bucket)
+	if kubernetes1.Config.Host != kubernetes2.Config.Host || kubernetes1.Namespace != kubernetes2.Namespace {
+		e2eutil.MustNewBucket(t, kubernetes2, bucket)
 	}
 
 	return bucket
 }
 
-func mustCreateXDCRBuckets(t *testing.T, k8s1, k8s2 *types.Cluster) metav1.Object {
-	return mustCreateXDCRBucketsWithScopes(t, k8s1, k8s2)
+func mustCreateXDCRBuckets(t *testing.T, kubernetes1, kubernetes2 *types.Cluster) metav1.Object {
+	return mustCreateXDCRBucketsWithScopes(t, kubernetes1, kubernetes2)
 }
 
 // ejectAllXDCRNodes removes each node from the cluster sequentially.
@@ -111,46 +111,46 @@ const (
 	xdcrOperationScaleDown xdcrOperation = iota
 )
 
-func XDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, clusterSize int) (*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster, metav1.Object, *couchbasev2.CouchbaseReplication) {
+func XDCRCreateCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, clusterSize int) (*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster, metav1.Object, *couchbasev2.CouchbaseReplication) {
 	// Create the clusters.
-	// The k8s1 cluster optionally uses a custom DNS service to address the k8s2 cluster.
-	// The k8s2 cluster optionally has TLS set.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithDNS(dns).MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, policy).MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	// The kubernetes1 cluster optionally uses a custom DNS service to address the kubernetes2 cluster.
+	// The kubernetes2 cluster optionally has TLS set.
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithDNS(dns).MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, policy).MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	e2eutil.MustEstablishXDCRReplication(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication, tls)
+	e2eutil.MustEstablishXDCRReplication(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication, tls)
 
-	return xdcrCluster1, xdcrCluster2, bucket, replication
+	return sourceCluster, targetCluster, bucket, replication
 }
 
 // xdcrClusterRemoveNode removes nodes from the selected cluster in numerous
 // nefarious ways.
-func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcrCluster, operation xdcrOperation) {
+func xdcrClusterRemoveNode(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, cluster xdcrCluster, operation xdcrOperation) {
 	// Static configuration.
 	clusterSize := constants.Size3
 	scaleDownSize := constants.Size1
 	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection and verify correct replication...
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), framework.Global.DocsCount).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), framework.Global.DocsCount).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	// ...choose the correct victim cluster...
 	var kubernetes *types.Cluster
@@ -159,11 +159,11 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 
 	switch cluster {
 	case xdcrClusterSource:
-		kubernetes = k8s1
-		targetCouchbase = xdcrCluster1
+		kubernetes = kubernetes1
+		targetCouchbase = sourceCluster
 	case xdcrClusterTarget:
-		kubernetes = k8s2
-		targetCouchbase = xdcrCluster2
+		kubernetes = kubernetes2
+		targetCouchbase = targetCluster
 	}
 
 	// ...and perform the necessary operation on it...
@@ -179,8 +179,8 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 	}
 
 	// ...before finally creating more documents and verifying replication still works.
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -206,20 +206,20 @@ func xdcrClusterRemoveNode(t *testing.T, k8s1, k8s2 *types.Cluster, cluster xdcr
 		expectedEvents2 = append(expectedEvents2, schema)
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // testXDCRCreateCluster tests cluster creation using any combination of DNS/TLS.
-func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
+func testXDCRCreateCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := framework.Global.DocsCount
 
-	xdcrCluster1, xdcrCluster2, bucket, _ := XDCRCreateCluster(t, k8s1, k8s2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket, _ := XDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -238,141 +238,141 @@ func testXDCRCreateCluster(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRCreateClusterLocal tests establishing an XDCR connection within the same cluster.
 func TestXDCRCreateClusterLocal(t *testing.T) {
-	k8s1, cleanup := framework.Global.SetupTest(t)
+	kubernetes1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	testXDCRCreateCluster(t, k8s1, k8s1, nil, nil, nil)
+	testXDCRCreateCluster(t, kubernetes1, kubernetes1, nil, nil, nil)
 }
 
 // TestXDCRCreateClusterLocalTLS tests establishing a TLS XDCR connection within the same cluster.
 func TestXDCRCreateClusterLocalTLS(t *testing.T) {
-	k8s1, cleanup := framework.Global.SetupTest(t)
+	kubernetes1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes1, &e2eutil.TLSOpts{})
 
-	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, nil)
+	testXDCRCreateCluster(t, kubernetes1, kubernetes1, nil, tls, nil)
 }
 
 // TestXDCRCreateClusterLocalMutualTLS tests establishing an mTLS XDCR connection within the same cluster.
 func TestXDCRCreateClusterLocalMutualTLS(t *testing.T) {
-	k8s1, cleanup := framework.Global.SetupTest(t)
+	kubernetes1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
-	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, &policy)
+	testXDCRCreateCluster(t, kubernetes1, kubernetes1, nil, tls, &policy)
 }
 
 // TestXDCRCreateClusterLocalMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection within the same cluster.
 func TestXDCRCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
-	k8s1, cleanup := framework.Global.SetupTest(t)
+	kubernetes1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	testXDCRCreateCluster(t, k8s1, k8s1, nil, tls, &policy)
+	testXDCRCreateCluster(t, kubernetes1, kubernetes1, nil, tls, &policy)
 }
 
-// TestXDCRCreateClusterRemote tests establishing an XDCR connection to a k8s2 cluster.
+// TestXDCRCreateClusterRemote tests establishing an XDCR connection to a kubernetes2 cluster.
 func TestXDCRCreateClusterRemote(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	testXDCRCreateCluster(t, k8s1, k8s2, dns, nil, nil)
+	testXDCRCreateCluster(t, kubernetes1, kubernetes2, dns, nil, nil)
 }
 
-// TestXDCRCreateClusterRemoteTLS tests establishing a TLS XDCR connection to a k8s2 cluster.
+// TestXDCRCreateClusterRemoteTLS tests establishing a TLS XDCR connection to a kubernetes2 cluster.
 func TestXDCRCreateClusterRemoteTLS(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 
-	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, nil)
+	testXDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, nil)
 }
 
-// TestXDCRCreateClusterRemoteMutualTLS tests establishing an mTLS XDCR connection to a k8s2 cluster.
+// TestXDCRCreateClusterRemoteMutualTLS tests establishing an mTLS XDCR connection to a kubernetes2 cluster.
 func TestXDCRCreateClusterRemoteMutualTLS(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
-	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, &policy)
+	testXDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, &policy)
 }
 
-// TestXDCRCreateClusterRemoteMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection to a k8s2 cluster.
+// TestXDCRCreateClusterRemoteMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection to a kubernetes2 cluster.
 func TestXDCRCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	testXDCRCreateCluster(t, k8s1, k8s2, dns, tls, &policy)
+	testXDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, &policy)
 }
 
 // TestXDCRCreateCluster tests establishing an XDCR connection.
 func TestXDCRCreateCluster(t *testing.T) {
 	// Platform configuration.
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -390,28 +390,28 @@ func TestXDCRCreateCluster(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRPauseReplication tests a replication can be paused and restarted again.
 func TestXDCRPauseReplication(t *testing.T) {
 	// Platform configuration.
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
 	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.  Pause the replication and add in
@@ -419,18 +419,18 @@ func TestXDCRPauseReplication(t *testing.T) {
 	// pause.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	info := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	info := e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 	replication = info.Replication
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
-	replication = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, time.Minute)
+	replication = e2eutil.MustPatchReplication(t, kubernetes1, replication, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
 	time.Sleep(time.Minute)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
 	time.Sleep(time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
-	_ = e2eutil.MustPatchReplication(t, k8s1, replication, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, time.Minute)
+	_ = e2eutil.MustPatchReplication(t, kubernetes1, replication, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -451,18 +451,18 @@ func TestXDCRPauseReplication(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRSourceNodeDown tests killing a node in the source cluster of an
 // XDCR replication.
 func TestXDCRSourceNodeDown(t *testing.T) {
 	// Platform configuration.
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 3
@@ -470,26 +470,26 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and verify they
 	// have been replicated.  Kill a pod in the source cluster.  Add some more documents.
 	// When healthy verify the documents have been replicated.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
-	e2eutil.MustKillPodForMember(t, k8s1, xdcrCluster1, nodeToKill, true)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustWaitForClusterEvent(t, k8s1, xdcrCluster1, e2eutil.RebalanceStartedEvent(xdcrCluster1), 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, k8s1, xdcrCluster1, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes1, sourceCluster, nodeToKill, true)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes1, sourceCluster, e2eutil.RebalanceStartedEvent(sourceCluster), 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -509,18 +509,18 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRSourceNodeAdd tests adding a node into the source cluster of an XDCR
 // replication.
 func TestXDCRSourceNodeAdd(t *testing.T) {
 	// Platform configuration.
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -528,24 +528,24 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, link the source to the destination cluster.  Add some documents and
 	// ensure they are replicated.  Scale up the source cluster, add some more documents
 	// and ensure they are (eventually - after 5 whole minutes) replicated.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
-	xdcrCluster1 = e2eutil.MustResizeCluster(t, 0, constants.Size3, k8s1, xdcrCluster1, 5*time.Minute)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
+	sourceCluster = e2eutil.MustResizeCluster(t, 0, constants.Size3, kubernetes1, sourceCluster, 5*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -565,29 +565,29 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRTargetNodeServiceDelete tests deleting the node-port services of the
 // target cluster required by an XDCR replication.
 func TestXDCRTargetNodeServiceDelete(t *testing.T) {
 	// Platform configuration.
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := constants.Size1
 	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, link the source to the destination cluster.  Add some documents and
 	// ensure they are replicated.  Delete the pod services in the destination cluster
@@ -595,13 +595,13 @@ func TestXDCRTargetNodeServiceDelete(t *testing.T) {
 	// replicated when the connection is reestablished.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
-	e2eutil.MustDeletePodServices(t, k8s2, xdcrCluster2)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
+	e2eutil.MustDeletePodServices(t, kubernetes2, targetCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -620,119 +620,119 @@ func TestXDCRTargetNodeServiceDelete(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the source bucket cluster are rebalanced out.
 // one by one until there is only one node in cluster.
 func TestXDCRRebalanceOutSourceClusterNodes(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
-	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationEject)
+	xdcrClusterRemoveNode(t, kubernetes1, kubernetes2, xdcrClusterSource, xdcrOperationEject)
 }
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the destination bucket cluster are rebalanced out.
 // one by one until there is only one node in cluster.
 func TestXDCRRebalanceOutTargetClusterNodes(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
-	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationEject)
+	xdcrClusterRemoveNode(t, kubernetes1, kubernetes2, xdcrClusterTarget, xdcrOperationEject)
 }
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the source bucket cluster are killed one by one.
 // At the end all nodes are replaced by new nodes in the cluster.
 func TestXDCRRemoveSourceClusterNodes(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationDelete)
+	xdcrClusterRemoveNode(t, kubernetes1, kubernetes2, xdcrClusterSource, xdcrOperationDelete)
 }
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the destination bucket cluster are killed one by one.
 // At the end all nodes are replaced by new nodes in the cluster.
 func TestXDCRRemoveTargetClusterNodes(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationDelete)
+	xdcrClusterRemoveNode(t, kubernetes1, kubernetes2, xdcrClusterTarget, xdcrOperationDelete)
 }
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes of source bucket cluster is resized to single node cluster.
 func TestXDCRResizedOutSourceClusterNodes(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterSource, xdcrOperationScaleDown)
+	xdcrClusterRemoveNode(t, kubernetes1, kubernetes2, xdcrClusterSource, xdcrOperationScaleDown)
 }
 
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes of destination bucket cluster is resized to single node cluster.
 func TestXDCRResizedOutTargetClusterNodes(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	xdcrClusterRemoveNode(t, k8s1, k8s2, xdcrClusterTarget, xdcrOperationScaleDown)
+	xdcrClusterRemoveNode(t, kubernetes1, kubernetes2, xdcrClusterTarget, xdcrOperationScaleDown)
 }
 
 // TestXDCRDeleteReplication tests a replication can be deleted.
 func TestXDCRDeleteReplication(t *testing.T) {
 	// Platform configuration.
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
 	numOfDocs := framework.Global.DocsCount
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	info := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	info := e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 	replication = info.Replication
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Now we delete the replication, add some documents in the source bucket and
 	// verify that the doc count of destination bucket is same as its old value
-	e2eutil.MustDeleteXDCRReplication(t, k8s1, xdcrCluster1, replication, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, k8s1, xdcrCluster1, e2eutil.ReplicationRemovedEvent(xdcrCluster1, xdcrCluster2.Name, string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket)), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, k8s1, xdcrCluster1, 2*time.Minute)
+	e2eutil.MustDeleteXDCRReplication(t, kubernetes1, sourceCluster, replication, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes1, sourceCluster, e2eutil.ReplicationRemovedEvent(sourceCluster, targetCluster.Name, string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket)), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
 	time.Sleep(time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 2*numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes1, sourceCluster, bucket.GetName(), 2*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -752,8 +752,8 @@ func TestXDCRDeleteReplication(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRFilterExp checks that the filter expressions when applied to XDCR cluster
@@ -762,40 +762,40 @@ func TestXDCRFilterExp(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
 	numOfDocs := f.DocsCount
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection with the specified filter expression
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 	replication.Spec.FilterExpression = `REGEXP_CONTAINS(META().id, "^doc.*$")`
 
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
 	// Insert documents with DocId following the template: "random%d"
 	// which won't be matched by the filter and will not get replicated.
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 0, time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 0, time.Minute)
 
 	// Insert documents with DocId following the template: "`doc`%d"
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).WithPrefix("doc").MustCreate(t, k8s1, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).WithPrefix("doc").MustCreate(t, kubernetes1, sourceCluster)
 
 	// Now we check that the new documents inserted in the source bucket is replicated
 	// since the filter expression applied allows documents with document id starting with `doc` to get replicated.
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s1, xdcrCluster1, bucket.GetName(), 2*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes1, sourceCluster, bucket.GetName(), 2*numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -813,8 +813,8 @@ func TestXDCRFilterExp(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRRotatePassword tests that when the password is rotated on the XDCR target cluster
@@ -822,36 +822,36 @@ func TestXDCRFilterExp(t *testing.T) {
 // the connection.
 func TestXDCRRotatePassword(t *testing.T) {
 	// Platform configuration.
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
 
 	// Static configuration.
 	clusterSize := 1
 
 	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, k8s1, k8s2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s1)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, k8s2)
-	e2eutil.MustWaitUntilBucketExists(t, k8s1, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, k8s2, xdcrCluster2, bucket, time.Minute)
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	info := e2eutil.MustEstablishXDCRReplicationGeneric(t, k8s1, k8s2, xdcrCluster1, xdcrCluster2, replication)
+	info := e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
 	numOfDocs := framework.Global.DocsCount
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
 
-	e2eutil.MustRotateClusterPassword(t, k8s2)
-	e2eutil.MustRotateXDCRReplicationPassword(t, k8s1, k8s2, info.SecretName)
+	e2eutil.MustRotateClusterPassword(t, kubernetes2)
+	e2eutil.MustRotateXDCRReplicationPassword(t, kubernetes1, kubernetes2, info.SecretName)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
@@ -868,26 +868,26 @@ func TestXDCRRotatePassword(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonAdminPasswordChanged},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
-func testXDCRRotateClient(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
+func testXDCRRotateClient(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	clusterSize := 1
 
-	xdcrCluster1, xdcrCluster2, bucket, _ := XDCRCreateCluster(t, k8s1, k8s2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket, _ := XDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
 	numOfDocs := framework.Global.DocsCount
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	e2eutil.MustRotateClientCertificate(t, tls)
-	e2eutil.MustObserveClusterEvent(t, k8s2, xdcrCluster2, k8sutil.ClientTLSUpdatedEvent(xdcrCluster2, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 5*time.Minute)
-	e2eutil.MustRotateXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster2, tls)
+	e2eutil.MustObserveClusterEvent(t, kubernetes2, targetCluster, k8sutil.ClientTLSUpdatedEvent(targetCluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 5*time.Minute)
+	e2eutil.MustRotateXDCRReplicationTLS(t, kubernetes1, kubernetes2, targetCluster, tls)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	expectedEvents1 := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
@@ -903,56 +903,56 @@ func testXDCRRotateClient(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.S
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRRotateClientMutualTLS rotates the client certificate while using mutual TLS on the
 // XDCR target cluster, and ensures that the source cluster's cert is updated too (without recreating).
 func TestXDCRRotateClientMutualTLS(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyEnable
-	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	testXDCRRotateClient(t, k8s1, k8s2, dns, tls, &policy)
+	testXDCRRotateClient(t, kubernetes1, kubernetes2, dns, tls, &policy)
 }
 
 // TestXDCRRotateClientMandatoryMutualTLS rotates the client certificate while using mandatory mutual
 // TLS on the XDCR target cluster, and ensures that the source cluster's cert is updated too (without recreating).
 func TestXDCRRotateClientMandatoryMutualTLS(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	testXDCRRotateClient(t, k8s1, k8s2, dns, tls, &policy)
+	testXDCRRotateClient(t, kubernetes1, kubernetes2, dns, tls, &policy)
 }
 
-func testXDCRRotateCA(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
+func testXDCRRotateCA(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	clusterSize := 1
 
-	xdcrCluster1, xdcrCluster2, bucket, _ := XDCRCreateCluster(t, k8s1, k8s2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket, _ := XDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
 	numOfDocs := framework.Global.DocsCount
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, tls)
-	e2eutil.MustObserveClusterEvent(t, k8s2, xdcrCluster2, k8sutil.ClientTLSUpdatedEvent(xdcrCluster2, k8sutil.ClientTLSUpdateReasonUpdateCA), 5*time.Minute)
-	e2eutil.MustRotateXDCRReplicationTLS(t, k8s1, k8s2, xdcrCluster2, tls)
+	e2eutil.MustObserveClusterEvent(t, kubernetes2, targetCluster, k8sutil.ClientTLSUpdatedEvent(targetCluster, k8sutil.ClientTLSUpdateReasonUpdateCA), 5*time.Minute)
+	e2eutil.MustRotateXDCRReplicationTLS(t, kubernetes1, kubernetes2, targetCluster, tls)
 
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, k8s1, xdcrCluster1)
-	e2eutil.MustVerifyDocCountInBucket(t, k8s2, xdcrCluster2, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
 
 	expectedEvents1 := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
@@ -974,38 +974,38 @@ func testXDCRRotateCA(t *testing.T, k8s1, k8s2 *types.Cluster, dns *corev1.Servi
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 	}
 
-	ValidateEvents(t, k8s1, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, k8s2, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
 // TestXDCRRotateCAMandatoryMutualTLS rotates the CA while using mandatory mutual TLS on the
 // XDCR target cluster, and ensures that the source cluster's CA is updated too (without recreating).
 func TestXDCRRotateCAMandatoryMutualTLS(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	testXDCRRotateCA(t, k8s1, k8s2, dns, tls, &policy)
+	testXDCRRotateCA(t, kubernetes1, kubernetes2, dns, tls, &policy)
 }
 
 // TestXDCRRotateCAMutualTLS rotates the CA while using mutual TLS on the
 // XDCR target cluster, and ensures that the source cluster's CA is updated too (without recreating).
 func TestXDCRRotateCAMutualTLS(t *testing.T) {
-	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, k8s1).CouchbaseBucket()
+	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	tls := e2eutil.MustInitClusterTLS(t, k8s2, &e2eutil.TLSOpts{})
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 	policy := couchbasev2.ClientCertificatePolicyEnable
-	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	testXDCRRotateCA(t, k8s1, k8s2, dns, tls, &policy)
+	testXDCRRotateCA(t, kubernetes1, kubernetes2, dns, tls, &policy)
 }
 
 func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
@@ -1028,10 +1028,10 @@ func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBucketsWithScopes(t, kubernetes, kubernetes, scope)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, bucket, time.Minute)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
@@ -1057,19 +1057,19 @@ func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
 	// Wait for the scope and collection to be created on both clusters
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster1, bucket, expected, time.Minute)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
 
 	// Set up replication
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
 	// Add docs and ensure they get replicated
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, sourceCluster)
 	// Ensure we have the source docs first
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster1, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, sourceCluster, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
 	// Now wait until all the target ones appear
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucket.GetName(), scopeName, collectionName, numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName, collectionName, numOfDocs, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -1089,8 +1089,8 @@ func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
 }
 
 // TestXDCRReplicateLocalScopesAndCollectionsWithDeny tests that replication deny rules are correctly applied.
@@ -1116,10 +1116,10 @@ func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBucketsWithScopes(t, kubernetes, kubernetes, scope)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, bucket, time.Minute)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
@@ -1152,21 +1152,21 @@ func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 	// Wait for the scope and collection to be created on both clusters.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName, deniedCollectionName)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster1, bucket, expected, time.Minute)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
 
 	// Set up replication.
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
 	// Add docs to both collections on the source bucket.
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, xdcrCluster1)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, deniedCollectionName).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, deniedCollectionName).MustCreate(t, kubernetes, sourceCluster)
 	// Ensure we have the source docs first.
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster1, bucket.GetName(), 2*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, sourceCluster, bucket.GetName(), 2*numOfDocs, time.Minute)
 	// Now wait until only the allowed target ones appear.
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster2, bucket.GetName(), numOfDocs, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, targetCluster, bucket.GetName(), numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -1186,8 +1186,8 @@ func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
 }
 
 // TestXDCRReplicateLocalScopesAndCollectionsReuseSpec is much the same as ...WithDeny, but
@@ -1217,11 +1217,11 @@ func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {
 	// Create the buckets & clusters.
 	bucket := e2eutil.NewBucket(f.BucketType).WithScopes(scope).MustCreate(t, kubernetes)
 	bucket2 := e2eutil.NewBucket(f.BucketType).WithScopes(scope).MustCreate(t, kubernetes)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, bucket2, time.Minute)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucket2, time.Minute)
 
 	// Set up replication spec; allow one collection, deny the other.
 	mapping := couchbasev2.CouchbaseExplicitMappingSpec{
@@ -1255,25 +1255,25 @@ func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {
 	// Wait for the scope and collection to be created on both clusters.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName, deniedCollectionName)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster1, bucket, expected, time.Minute)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, bucket, expected, time.Minute)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, bucket2, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket2, expected, time.Minute)
 
 	// Set up replications.
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication1)
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication2)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication1)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication2)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
 	// Add docs to both collections in both source buckets.
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, xdcrCluster1)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, deniedCollectionName).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, deniedCollectionName).MustCreate(t, kubernetes, sourceCluster)
 	// Ensure we have the source docs first.
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster1, bucket.GetName(), 2*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, sourceCluster, bucket.GetName(), 2*numOfDocs, time.Minute)
 	// Now wait until only the allowed target ones appear.
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster2, bucket.GetName(), numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster2, bucket2.GetName(), numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucket2.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, targetCluster, bucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, targetCluster, bucket2.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket2.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -1298,8 +1298,8 @@ func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
 }
 
 // TestXDCRReplicateLocalScopesAndCollectionsMultipleRules tests that multiple rules can be combined and applied.
@@ -1329,10 +1329,10 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 
 	// Create the clusters.
 	bucket := mustCreateXDCRBucketsWithScopes(t, kubernetes, kubernetes, scope1, scope2)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, bucket, time.Minute)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
@@ -1390,27 +1390,27 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName1).WithCollections(collectionName1, collectionName2, deniedCollectionName)
 	expected.WithScope(scopeName2).WithCollections(collectionName1, collectionName2, deniedCollectionName)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster1, bucket, expected, time.Minute)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
 
 	// Set up replication.
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
 	// Add docs to various scopes and collections collections on the source bucket.
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName1, collectionName1).MustCreate(t, kubernetes, xdcrCluster1)
-	e2eutil.NewDocumentSet(bucket.GetName(), 2*numOfDocs).IntoScopeAndCollection(scopeName1, collectionName2).MustCreate(t, kubernetes, xdcrCluster1)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName1, deniedCollectionName).MustCreate(t, kubernetes, xdcrCluster1)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName2, collectionName1).MustCreate(t, kubernetes, xdcrCluster1)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName2, deniedCollectionName).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName1, collectionName1).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), 2*numOfDocs).IntoScopeAndCollection(scopeName1, collectionName2).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName1, deniedCollectionName).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName2, collectionName1).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName2, deniedCollectionName).MustCreate(t, kubernetes, sourceCluster)
 	// Ensure we have the source docs first.
-	e2eutil.MustVerifyDocCountInScope(t, kubernetes, xdcrCluster1, bucket.GetName(), scopeName1, 4*numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInScope(t, kubernetes, xdcrCluster1, bucket.GetName(), scopeName2, 2*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInScope(t, kubernetes, sourceCluster, bucket.GetName(), scopeName1, 4*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInScope(t, kubernetes, sourceCluster, bucket.GetName(), scopeName2, 2*numOfDocs, time.Minute)
 	// Now wait until only the allowed target ones appear.
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster2, bucket.GetName(), 4*numOfDocs, 5*time.Minute)
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucket.GetName(), scopeName1, collectionName1, 2*numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucket.GetName(), scopeName1, collectionName2, numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInScope(t, kubernetes, xdcrCluster2, bucket.GetName(), scopeName2, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, targetCluster, bucket.GetName(), 4*numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName1, collectionName1, 2*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName1, collectionName2, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInScope(t, kubernetes, targetCluster, bucket.GetName(), scopeName2, numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -1430,8 +1430,8 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
 }
 
 // TestXDCRReplicateLocalScopesAndCollectionsImplicit tests replication using implicit rules.
@@ -1457,10 +1457,10 @@ func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 
 	// Create the clusters.
 	bucket := e2eutil.NewBucket(f.BucketType).WithScopes(scope).MustCreate(t, kubernetes)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, bucket, time.Minute)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
@@ -1469,19 +1469,19 @@ func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 	// Wait for the scope and collection to be created on both clusters
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster1, bucket, expected, time.Minute)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
 
 	// Set up replication
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
 	// Add docs and ensure they get replicated
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, sourceCluster)
 	// Ensure we have the source docs first
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster1, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, sourceCluster, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
 	// Now wait until all the target ones appear
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucket.GetName(), scopeName, collectionName, numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName, collectionName, numOfDocs, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -1501,8 +1501,8 @@ func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
 }
 
 // TestXDCRMigrationLocalScopesAndCollections tests the migration functionality fo XDCR.
@@ -1548,22 +1548,22 @@ func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, targetBucket)
 
 	// Now create our clusters which should select their appropriate buckets
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
-	xdcrCluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
+	sourceCluster.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: sourceLabels,
 	}
-	xdcrCluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, xdcrCluster1)
+	sourceCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, sourceCluster)
 
 	// And the target cluster
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
-	xdcrCluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
+	targetCluster.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: targetLabels,
 	}
-	xdcrCluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, xdcrCluster2)
+	targetCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, targetCluster)
 
 	// Confirm we have both
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, sourceBucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, targetBucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, sourceBucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, targetBucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
@@ -1584,18 +1584,18 @@ func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 	// Wait for the scope and collection to be created on both clusters
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, targetBucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, targetBucket, expected, time.Minute)
 
 	// Set up replication
-	e2eutil.MustEstablishXDCRMigrationReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRMigrationReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
 	// Add docs and ensure they get replicated
-	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, kubernetes, sourceCluster)
 	// Ensure we have the source docs first
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster1, sourceBucket.GetName(), numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, sourceCluster, sourceBucket.GetName(), numOfDocs, time.Minute)
 	// Now wait until all the target ones appear
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, targetBucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, targetBucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -1614,8 +1614,8 @@ func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
 }
 
 // TestXDCRMigrationLocalScopesAndCollectionsMultipleRules tests migration with multiple rules, and checks docs are appropriately not migrated.
@@ -1668,22 +1668,22 @@ func TestXDCRMigrationLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, targetBucket)
 
 	// Now create our clusters which should select their appropriate buckets
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
-	xdcrCluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
+	sourceCluster.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: sourceLabels,
 	}
-	xdcrCluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, xdcrCluster1)
+	sourceCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, sourceCluster)
 
 	// And the target cluster
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
-	xdcrCluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
+	targetCluster.Spec.Buckets.Selector = &metav1.LabelSelector{
 		MatchLabels: targetLabels,
 	}
-	xdcrCluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, xdcrCluster2)
+	targetCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, targetCluster)
 
 	// Confirm we have both
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, sourceBucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, targetBucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, sourceBucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, targetBucket, time.Minute)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
@@ -1712,22 +1712,22 @@ func TestXDCRMigrationLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
 	expected.WithScope(scope1Name).WithCollections(collection1Name, collection2Name)
 	expected.WithScope(scope2Name).WithCollections(collection2Name)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster2, targetBucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, targetBucket, expected, time.Minute)
 
 	// Set up replication
-	e2eutil.MustEstablishXDCRMigrationReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRMigrationReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
 	// Add docs and ensure they get replicated
-	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).WithValue(key, value1).MustCreate(t, kubernetes, xdcrCluster1)
-	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).WithValue(key, value2).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).WithValue(key, value1).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).WithValue(key, value2).MustCreate(t, kubernetes, sourceCluster)
 	// Add docs that shouldn't be migrated.
-	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, kubernetes, sourceCluster)
 	// Ensure we have the source docs first
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, xdcrCluster1, sourceBucket.GetName(), 3*numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, sourceCluster, sourceBucket.GetName(), 3*numOfDocs, time.Minute)
 	// Now wait until all the target ones appear
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, targetBucket.GetName(), scope1Name, collection2Name, numOfDocs, time.Minute)
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, targetBucket.GetName(), scope2Name, collection2Name, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, targetBucket.GetName(), scope1Name, collection2Name, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, targetBucket.GetName(), scope2Name, collection2Name, numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -1746,8 +1746,8 @@ func TestXDCRMigrationLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
 }
 
 // TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged replicates from a managed collection into an unmanaged one
@@ -1775,14 +1775,14 @@ func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
 	// Create the clusters.
 	bucket := e2eutil.NewBucket(f.BucketType).WithScopes(scope).MustCreate(t, kubernetes)
 	bucketNoScopes := e2eutil.NewBucket(f.BucketType).MustCreate(t, kubernetes)
-	xdcrCluster1 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	xdcrCluster2 := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster1, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, xdcrCluster2, bucketNoScopes, time.Minute)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucketNoScopes, time.Minute)
 
 	// Manually create unmanaged scope & collection in target bucket.
-	e2eutil.MustCreateScopeManually(t, kubernetes, xdcrCluster2, bucketNoScopes.GetName(), scopeName)
-	e2eutil.MustCreateCollectionManually(t, kubernetes, xdcrCluster2, bucketNoScopes.GetName(), scopeName, collectionName)
+	e2eutil.MustCreateScopeManually(t, kubernetes, targetCluster, bucketNoScopes.GetName(), scopeName)
+	e2eutil.MustCreateCollectionManually(t, kubernetes, targetCluster, bucketNoScopes.GetName(), scopeName, collectionName)
 
 	// When ready, establish the XDCR connection, add some documents and
 	// verify they have been replicated.
@@ -1791,18 +1791,18 @@ func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
 	// Wait for the scope and collection to be created on both clusters
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
-	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, xdcrCluster1, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
 
 	// Set up replication
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, xdcrCluster1, xdcrCluster2, replication)
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication)
 	// TODO: verify the rules are correct (they are according to a check in the web UI on cluster 1)
 
 	// Add docs and ensure they get replicated
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, xdcrCluster1)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, sourceCluster)
 	// Ensure we have the source docs first
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster1, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, sourceCluster, bucket.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
 	// Now wait until all the target ones appear
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, xdcrCluster2, bucketNoScopes.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucketNoScopes.GetName(), scopeName, collectionName, numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Both clusters created
@@ -1824,6 +1824,53 @@ func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
-	ValidateEvents(t, kubernetes, xdcrCluster1, expectedEvents1)
-	ValidateEvents(t, kubernetes, xdcrCluster2, expectedEvents2)
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
+}
+
+// TestXDCRWithMandatoryTLSAndMultipleCAs tests that we can provision a working
+// XDCR stream when the remote end is using multiple CAs and the client PKI is
+// different from that of the server.
+//
+// BUG: MB-50697 - the local server REQUIRES the remote server's CA used for
+// client authentication xD  This is so it can validate the certificate is
+// valid against a CA that may or may not be installed in a remote service.
+// So besides being pointless, supporting this broken behaviour would result
+// in a total rearchitecting of the Operator's XDCR code, and result in
+// customer complaints, because, as I say, it's utterly pointless.
+func TestXDCRWithMandatoryTLSAndMultipleCAs(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0").ServerFixing()
+
+	// Static configuration.
+	clusterSize := 1
+	mtlsPolicy := couchbasev2.ClientCertificatePolicyMandatory
+
+	// Create a source and target bucket.
+	bucket := mustCreateXDCRBuckets(t, kubernetes, kubernetes)
+
+	// The XDCR remote will need server PKI and a client PKI.
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
+
+	// Create a basic source cluster, and an mTLS enabled target cluster, with multiple
+	// CAs for server and client certification.
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &mtlsPolicy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucket, time.Minute)
+
+	// Establish the XDCR connection.  Use the server PKI to validate against the endpoint,
+	// and the client PKI to provide authentication.
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+	e2eutil.MustEstblistXDCRReplicationWithMultipleCAs(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication, serverTLS, clientTLS)
+
+	// Inject some documents into the source, and expect them to appear in the target.
+	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, targetCluster, bucket.GetName(), f.DocsCount, 10*time.Minute)
 }

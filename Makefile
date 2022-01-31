@@ -23,7 +23,7 @@ bldNum = $(if $(BLD_NUM),$(BLD_NUM),999)
 version = $(if $(VERSION),$(VERSION),2.3.0)
 testname = $(E2E_TEST)
 
-# This allows the container tags to be explicitly set.
+# This allows the container image tags to be explicitly set.
 DOCKER_USER = couchbase
 DOCKER_TAG = v1
 
@@ -55,7 +55,7 @@ LDFLAGS = "-X github.com/couchbase/couchbase-operator/pkg/version.Version=$(vers
 # Common flags to apply during build (and test build)
 BUILDFLAGS = "-trimpath"
 
-.PHONY: all generated binaries crd build-test lint container container-clean container-public dist test test-indv docs docs-lint certification-container certification-container-public operator admission cao clean
+.PHONY: all generated binaries crd build-test lint images images-clean images-public kind-images dist test test-indv docs docs-lint operator-image admission-image certification-image operator admission cao clean
 
 all: binaries crd
 
@@ -163,7 +163,7 @@ $(CAO_BINARY): $(SOURCE)
 	$(GOENV) go build $(BUILDFLAGS) -o $@ -ldflags $(LDFLAGS) ./cmd/cao
 
 # test binary framework build target.
-# This is a linux only build, use the certification-container target instead.
+# This is a linux only build, use the certification-image target instead.
 ${CERTIFICATION_BINARY}: $(GENERATED_FILES) $(SOURCE)
 	GOOS=linux GOARCH=amd64 go test $(BUILDFLAGS) -race -c $(PACKAGE_BASE)/test/e2e -o $@ -ldflags $(LDFLAGS)
 
@@ -188,34 +188,39 @@ lint: $(GENERATED_FILES)
 lint-python:
 	scripts/pylinter
 
-# NOTE: This target is only for local development. While we use this Dockerfile
-# (for now), the actual "docker build" command is located in the Jenkins job
-# "couchbase-operator-docker". We could make use of this Makefile there as
-# well, but it is quite possible in future that the canonical Dockerfile will
-# need to be moved to a separate repo in which case the "docker build" command
-# can't be here anyway.
-container:
+# Create all images
+images: operator-image admission-image certification-image
+
+# Create the operator image.
+operator-image:
 	DOCKER_BUILDKIT=1 docker build -f Dockerfile -t ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG} .
+
+# Create the admission controller image.
+admission-image:
 	DOCKER_BUILDKIT=1 docker build -f Dockerfile.admission -t ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG} .
 
-# Clean up any images for this build, useful for CI jobs.
-container-clean:
-	docker rmi -f ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG}
-	docker rmi -f ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG}
-
-# This target pushes the containers to a public repository.
-# A typical one liner to deploy to the cloud would be:
-# 	make container-public -e DOCKER_USER=couchbase DOCKER_TAG=2.0.0
-container-public: container
-	docker push ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG}
-	docker push ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG}
-
-# Create certification test framework contianer.
-certification-container:
+# Create the certification image.
+certification-image:
 	DOCKER_BUILDKIT=1 docker build -f Dockerfile.qa -t ${DOCKER_USER}/couchbase-operator-certification:${DOCKER_TAG} .
 
-# Create and push certification test framework contianer.
-certification-container-public: certification-container
+# The go-to swiss army knife of targets, make all images and install in kind.
+kind-images: images
+	kind load docker-image ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG}
+	kind load docker-image ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG}
+	kind load docker-image ${DOCKER_USER}/couchbase-operator-certification:${DOCKER_TAG}
+
+# Clean up any images for this build, useful for CI jobs.
+images-clean:
+	docker rmi -f ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG}
+	docker rmi -f ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG}
+	docker rmi -f ${DOCKER_USER}/couchbase-operator-certification:${DOCKER_TAG}
+
+# This target pushes the images to a public repository.
+# A typical one liner to deploy to the cloud would be:
+# 	make images-public -e DOCKER_USER=couchbase DOCKER_TAG=2.0.0
+images-public: images
+	docker push ${DOCKER_USER}/couchbase-operator:${DOCKER_TAG}
+	docker push ${DOCKER_USER}/couchbase-operator-admission:${DOCKER_TAG}
 	docker push ${DOCKER_USER}/couchbase-operator-certification:${DOCKER_TAG}
 
 # NOTE: This target is only for local development. While we use this Dockerfile
@@ -224,7 +229,7 @@ certification-container-public: certification-container
 # well, but it is quite possible in future that the canonical Dockerfile will
 # need to be moved to a separate repo in which case the "docker build" command
 # can't be here anyway.
-container-rhel:
+images-rhel:
 	DOCKER_BUILDKIT=1 docker build -f Dockerfile.rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-rhel:v1 .
 	DOCKER_BUILDKIT=1 docker build -f Dockerfile.admission-rhel --build-arg OPERATOR_BUILD=$(OPERATOR_BUILD) --build-arg OS_BUILD=$(BUILD) --build-arg PROD_VERSION=$(VERSION) -t couchbase/couchbase-operator-admission-rhel:v1 .
 
@@ -292,9 +297,9 @@ dist: touch-generated artifacts image-artifacts
 	cp build/couchbase-autonomous-operator-*.tar.gz dist
 	cp build/couchbase-autonomous-operator-*.zip dist
 
-prod: container tools artifacts
+prod: image tools artifacts
 
-prod-rhel: container-rhel tools-rhel artifacts
+prod-rhel: image-rhel tools-rhel artifacts
 
 test-operator: $(GENERATED_FILES)
 	go test $(BUILDFLAGS) github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v --race -timeout 240m
