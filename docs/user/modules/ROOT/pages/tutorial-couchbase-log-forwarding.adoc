@@ -162,6 +162,10 @@ You'll notice that processed log events are structured messages with keys and va
 * `"level":"INFO"`
 * `"message":"Couchbase version 6.6.0-7909 starting."`
 
+The default configuration used has support for Elasticsearch, Loki, Splunk and standard console output as destinations for logs.
+However, everything aside from standard console output will not match any streams by default.
+See xref:howto-couchbase-log-forwarding.adoc[Configure Log Forwarding] for how to enable them.
+
 Now that we've successfully implemented the default configuration for processing and forwarding Couchbase logs to standard console output, we can move on to the <<customize-the-log-forwarding-configuration,next section>> where we'll explore how to customize the configuration to do things like apply different types of parsing and redaction to specific logs, as well as forward those logs to multiple different locations.
 
 [[customize-the-log-forwarding-configuration]]
@@ -307,18 +311,30 @@ The following command installs the chart in the default namespace:
 [source,console]
 ----
 helm upgrade --install loki grafana/loki-stack \
---set fluent-bit.enabled=false,promtail.enabled=true,grafana.enabled=true,prometheus.enabled=true,prometheus.alertmanager.persistentVolume.enabled=false,prometheus.server.persistentVolume.enabled=false
+--set fluent-bit.enabled=false,grafana.enabled=true,prometheus.enabled=true,prometheus.alertmanager.persistentVolume.enabled=false,prometheus.server.persistentVolume.enabled=false
 ----
 
-The above command was borrowed and modified from the https://grafana.com/docs/loki/latest/installation/helm/#deploy-loki-stack-loki-fluent-bit-grafana-prometheus[official Loki documentation^], where you can find further details on how to then use Grafana and configure the stack how you might want in your cluster.
-The main difference between the above command and the one found in the official documentation, is that we've set `promtail.enabled=true`.
-This is because we want to use PromTail over Fluent Bit for shipping logs from the Kubernetes nodes in order to mitigate an issue with the Couchbase-supplied https://hub.docker.com/r/couchbase/fluent-bit[log processor image^] triggering a fingerprint collision in Loki (https://github.com/fluent/fluent-bit/issues/1746[fluent-bit #1746^], https://github.com/grafana/loki/issues/898#issuecomment-552333246[`loki #898`^]).
+The above command was borrowed and modified from the https://grafana.com/docs/loki/latest/installation/helm/#deploy-loki-stack-loki-promtail-grafana-prometheus-with-persistent-volume-claim[official Loki documentation^], where you can find further details on how to then use Grafana and configure the stack how you might want in your cluster.
 
-NOTE: It may be better/easier to ship direct from the Fluent Bit sidecar to Loki using the https://docs.fluentbit.io/manual/pipeline/outputs/loki[plugin^].
-This would allow you to forward individual logs separately without having to configure PromTail or Fluent Bit for multi-line parsing on the node.
-The Helm deployment is the typical `daemonset` deployment of all logs on the node.
+Once the chart is deployed, you can update the Couchbase Cluster to forward logs to Loki by adding the correct annotation as per below.
 
-Once the chart is is deployed, you can retrieve the Grafana admin secret and do any port forwarding or similar required:
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  servers:
+  - size: 3
+    name: all_services
+    pod:
+      metadata:
+        annotations:
+          fluentbit.couchbase.com/loki_match: "*"
+----
+
+You can retrieve the Grafana admin secret and do any port forwarding or similar required:
 
 [source,console]
 ----
@@ -442,35 +458,24 @@ spec:
 
 This needs to be deployed in the same namespace as the Couchbase cluster, otherwise the service URL will need to be explicit (include the namespace) in the log configuration.
 
-Once the Elasticsearch deployment is in place, we can start configuring Fluent Bit.
-The main area to manage is the output configuration, so in the following example we've simply included the default configuration file and then appended an output to Elasticsearch:
-
+Once the Elasticsearch deployment is in place, we can update the stream match for the Elasticsearch output.
 [source,yaml]
 ----
-apiVersion: v1
-kind: Secret
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
 metadata:
-  name: fluent-bit-config
-stringData:
-  fluent-bit.conf: |
-    # Just include the normal file and append to it the Elasticsearch output
-    @include /fluent-bit/etc/fluent-bit.conf
-
-    # Output to Elasticsearch
-    [OUTPUT]
-        name  es
-        match couchbase.log.*# <.>
-        Logstash_Format On
-        Include_Tag_Key On
-        Tag_Key FluentBit-Key
-        Host elasticsearch# <.>
-        Port 9200
+  name: cb-example
+spec:
+...
+  servers:
+  - size: 3
+    name: all_services
+...
+    pod:
+      metadata:
+        annotations:
+          fluentbit.couchbase.com/es_match: "*"
 ----
-
-<.> In this case we send all logs to Elasticsearch via a regex match.
-
-<.> If the Elasticsearch instance is in another namespace, then the `Host` must be updated to include the namespace according to the usual Kubernetes syntax `<service>.<namespace>`.
-Similarly if it is external, then the correct URL needs to be provided and resolved correctly.
 
 == Example: Azure Blob Storage
 

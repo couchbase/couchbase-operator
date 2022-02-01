@@ -121,6 +121,21 @@ You may need to modify this field if your Kubernetes nodes can't pull from the D
 IMPORTANT: When xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`] is set to `true`, then the default log processor image supplied by Couchbase (or an image that is effectively equivalent) must also be used.
 This is because the default log forwarding configuration requires certain features that are a part of the default image.
 
+By default, this configuration will only output to the standard console output, however, there are other output plugins included that do not match any existing streams.
+It is possible to enable matching of streams to output plugins by setting the  `fluentbit.couchbase.com/<PLUGIN>_MATCH` annotation.
+The following is an example for Loki usage.
+
+----
+      pod:
+        metadata:
+          annotations:
+            fluentbit.couchbase.com/loki.match: "*"
+            fluentbit.couchbase.com/loki.host: loki.monitoring
+----
+
+Other supported output plugins include Elasticsearch and Splunk.
+See https://github.com/couchbase/couchbase-fluent-bit#configuration[Configuring Couchbase Fluent Bit^] for more detailed output configuration options.
+
 [[using-custom-log-forwarding]]
 === Using Custom Log Forwarding
 

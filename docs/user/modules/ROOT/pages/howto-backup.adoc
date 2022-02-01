@@ -760,7 +760,8 @@ spec:
 
 === Configure IAM Roles
 
-To allow backup to automatically use an attached IAM Role, enable the `useIAMRole` parameter. A secret with the region key set is still required.
+To allow backup to automatically use an attached IAM Role, enable the `useIAMRole` parameter.
+A secret with the region key set is still required.
 If you have attached the IAM Role to an EKS node directly then this is sufficient configuration.
 
 If you have link:https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html[setup IAM roles for service accounts], the role `ARN` annotation must be applied to the backup service account either manually or when running `cao` using `bin/cao create backup --iam-role-arn arn:aws:iam::<ACCOUNT_ID>:role/<IAM_ROLE_NAME>`
