@@ -812,6 +812,10 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		args = append(args, "--end", end)
 	}
 
+	if spec.ForceUpdates {
+		args = append(args, "--force-updates")
+	}
+
 	// Old resources won't have this set until written.
 	if spec.Threads != 0 {
 		args = append(args, "--threads", strconv.Itoa(spec.Threads))

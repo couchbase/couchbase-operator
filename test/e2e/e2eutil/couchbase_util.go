@@ -236,6 +236,77 @@ func (d *DocumentSet) MustCreate(t *testing.T, kubernetes *types.Cluster, cluste
 	}
 }
 
+// Validates the contents of the bucket from the doc set
+// against the expected contents.
+// This assumes that the data has been add via the addDocs function
+// i.e it's the same content added d.count times.
+func VerifyContents(timeout time.Duration, d *DocumentSet, expected map[string]interface{}) error {
+	return retryutil.RetryFor(timeout, func() error {
+		docs, err := getDocs(d)
+		if err != nil {
+			return err
+		}
+
+		for i := 0; i < len(docs); i++ {
+			for k := range docs[i] {
+				if docs[i][k] != expected[k] {
+					return fmt.Errorf("found: %s, expected: %s", docs[i][k], expected[k])
+				}
+			}
+		}
+		return nil
+	})
+}
+
+func getDocs(d *DocumentSet) ([]map[string]interface{}, error) {
+	opts := gocb.ClusterOptions{
+		Username: string(d.kubernetes.DefaultSecret.Data["username"]),
+		Password: string(d.kubernetes.DefaultSecret.Data["password"]),
+	}
+
+	c, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", d.cluster.Name, d.cluster.Namespace), opts)
+	if err != nil {
+		return nil, err
+	}
+
+	bucket := c.Bucket(d.bucket)
+
+	scope := bucket.DefaultScope()
+	if d.scope != "" {
+		scope = bucket.Scope(d.scope)
+	}
+
+	collection := bucket.DefaultCollection()
+	if d.collection != "" {
+		collection = scope.Collection(d.collection)
+	}
+
+	var items []map[string]interface{}
+
+	for i := 0; i < d.count; i++ {
+		id := i
+
+		itemResult, err := collection.Get(fmt.Sprintf("%s%d", d.prefix, id), &gocb.GetOptions{
+			Timeout: 2 * time.Minute,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
+		var item map[string]interface{}
+
+		err = itemResult.Content(&item)
+		if err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
 // addDocs uses the Couchbase Go SDK to add documents, with a DocumentSet used to specify options.
 func addDocs(d *DocumentSet) error {
 	opts := gocb.ClusterOptions{

@@ -232,6 +232,16 @@ Int references a relative backup by index.
 
 Str references an absolute backup by name.
 
+=== couchbasebackuprestores.spec.forceUpdates
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Forces data in the Couchbase cluster to be overwritten even if the data in the cluster is newer than the restore.
+
 === couchbasebackuprestores.spec.logRetention
 
 ==== Constraints

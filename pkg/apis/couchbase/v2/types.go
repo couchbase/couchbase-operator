@@ -518,6 +518,10 @@ type CouchbaseBackupRestoreSpec struct {
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	Threads int `json:"threads,omitempty"`
+
+	// Forces data in the Couchbase cluster to be overwritten
+	// even if the data in the cluster is newer than the restore
+	ForceUpdates bool `json:"forceUpdates,omitempty"`
 }
 
 // CouchbaseBackupRestoreDataFilter allows filtering of restore data by bucket, scope or collection.

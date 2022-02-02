@@ -2585,6 +2585,9 @@ func TestBackupCustomObjEndpointWithCert(t *testing.T) {
 	testBackupCustomObjectEndpoint(t, true)
 }
 
+// testbackupCustomObjectEndpoint tests backup compatibility with
+// AWS compliant object stores and with an optional custom CA
+// cert to verify the endpoint with.
 func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 	f := framework.Global
 
@@ -2666,6 +2669,10 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestBackupAndRestoreS3WithIAMRole tests backup functionality
+// when not using explicit credentials and instead applying an
+// IAMRole to backup. Only runs in AWS.
 func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 	f := framework.Global
 
@@ -2734,6 +2741,73 @@ func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestBackupAndForcedRestore tests forced restore functionality.
+// That when selected, a restore will overwrite the "newer" document.
+func TestBackupAndForcedRestore(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Create a normal cluster.
+	clusterSize := constants.Size3
+
+	numOfDocs := f.DocsCount
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	docSet := e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs)
+	docSet.WithValue("key1", "dummyVal1").MustCreate(t, kubernetes, cluster)
+
+	contents := map[string]interface{}{
+		"key1": "dummyVal1",
+	}
+
+	err := e2eutil.VerifyContents(600*time.Second, docSet, contents)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+
+	// wait for backup
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// wait for backup to complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
+
+	// update the data in the bucket
+	docSet.WithValue("key1", "thatsnew").MustCreate(t, kubernetes, cluster)
+
+	// create new restore
+	e2eutil.NewRestore(backup).WithForcedUpdates().MustCreate(t, kubernetes)
+
+	err = e2eutil.VerifyContents(600*time.Second, docSet, contents)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 

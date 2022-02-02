@@ -249,6 +249,9 @@ type Restore struct {
 
 	// mapping are any data mappings to perform.
 	mapping []couchbasev2.RestoreMapping
+
+	// forceUpdates overwrites data in the cluster with restore data
+	forceUpdates bool
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -258,7 +261,13 @@ func NewRestore(backup *couchbasev2.CouchbaseBackup) *Restore {
 	}
 }
 
-// FromS3, if not emptry, retrieves the backup to S3.
+// WithForcedUpdates, overwrites existing data in cluster regardless of what's "newer".
+func (r *Restore) WithForcedUpdates() *Restore {
+	r.forceUpdates = true
+	return r
+}
+
+// FromS3, if not empty, retrieves the backup to S3.
 func (r *Restore) FromS3(bucket string) *Restore {
 	r.s3Bucket = bucket
 	return r
@@ -358,6 +367,10 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 
 	if r.withoutAnalytics {
 		restore.Spec.Services.Analytics = &falseRef
+	}
+
+	if r.forceUpdates {
+		restore.Spec.ForceUpdates = true
 	}
 
 	if r.include != nil || r.exclude != nil || r.mapping != nil {
