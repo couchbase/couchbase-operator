@@ -1831,13 +1831,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
 // TestXDCRWithMandatoryTLSAndMultipleCAs tests that we can provision a working
 // XDCR stream when the remote end is using multiple CAs and the client PKI is
 // different from that of the server.
-//
-// BUG: MB-50697 - the local server REQUIRES the remote server's CA used for
-// client authentication xD  This is so it can validate the certificate is
-// valid against a CA that may or may not be installed in a remote service.
-// So besides being pointless, supporting this broken behaviour would result
-// in a total rearchitecting of the Operator's XDCR code, and result in
-// customer complaints, because, as I say, it's utterly pointless.
 func TestXDCRWithMandatoryTLSAndMultipleCAs(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -1845,7 +1838,7 @@ func TestXDCRWithMandatoryTLSAndMultipleCAs(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0").ServerFixing()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
 
 	// Static configuration.
 	clusterSize := 1
