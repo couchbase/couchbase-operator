@@ -8,6 +8,287 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasecluster]
 The CouchbaseCluster resource represents a Couchbase cluster.
 It allows configuration of cluster topology, networking, storage and security options.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbaseclusters-apiversion,apiVersion>>: v2
+<<couchbaseclusters-kind,kind>>: CouchbaseCluster
+<<couchbaseclusters-metadata,metadata>>:
+  <<couchbaseclusters-metadata-name,name>>: ""
+<<couchbaseclusters-spec,spec>>:
+  <<couchbaseclusters-spec-antiaffinity,antiAffinity>>: false
+  <<couchbaseclusters-spec-autoresourceallocation,autoResourceAllocation>>:
+    <<couchbaseclusters-spec-autoresourceallocation-cpulimits,cpuLimits>>: 4
+    <<couchbaseclusters-spec-autoresourceallocation-cpurequests,cpuRequests>>: 2
+    <<couchbaseclusters-spec-autoresourceallocation-enabled,enabled>>: false
+    <<couchbaseclusters-spec-autoresourceallocation-overheadpercent,overheadPercent>>: 25
+  <<couchbaseclusters-spec-autoscalestabilizationperiod,autoscaleStabilizationPeriod>>: ""
+  <<couchbaseclusters-spec-backup,backup>>:
+    <<couchbaseclusters-spec-backup-image,image>>: ""
+    <<couchbaseclusters-spec-backup-imagepullsecrets,imagePullSecrets>>:
+    - <<couchbaseclusters-spec-backup-imagepullsecrets-name,name>>: ""
+    <<couchbaseclusters-spec-backup-managed,managed>>: false
+    <<couchbaseclusters-spec-backup-nodeselector,nodeSelector>>: {}
+    <<couchbaseclusters-spec-backup-objectendpoint,objectEndpoint>>:
+      <<couchbaseclusters-spec-backup-objectendpoint-secret,secret>>: ""
+      <<couchbaseclusters-spec-backup-objectendpoint-url,url>>: ""
+      <<couchbaseclusters-spec-backup-objectendpoint-usevirtualpath,useVirtualPath>>: false
+    <<couchbaseclusters-spec-backup-resources,resources>>: {}
+    <<couchbaseclusters-spec-backup-s3secret,s3Secret>>: ""
+    <<couchbaseclusters-spec-backup-selector,selector>>: {}
+    <<couchbaseclusters-spec-backup-serviceaccountname,serviceAccountName>>: couchbase-backup
+    <<couchbaseclusters-spec-backup-tolerations,tolerations>>:
+    - <<couchbaseclusters-spec-backup-tolerations-effect,effect>>: ""
+      <<couchbaseclusters-spec-backup-tolerations-key,key>>: ""
+      <<couchbaseclusters-spec-backup-tolerations-operator,operator>>: ""
+      <<couchbaseclusters-spec-backup-tolerations-tolerationseconds,tolerationSeconds>>: 0
+      <<couchbaseclusters-spec-backup-tolerations-value,value>>: ""
+    <<couchbaseclusters-spec-backup-useiamrole,useIAMRole>>: false
+  <<couchbaseclusters-spec-buckets,buckets>>:
+    <<couchbaseclusters-spec-buckets-managed,managed>>: false
+    <<couchbaseclusters-spec-buckets-selector,selector>>:
+      <<couchbaseclusters-spec-buckets-selector-matchexpressions,matchExpressions>>:
+      - <<couchbaseclusters-spec-buckets-selector-matchexpressions-key,key>>: ""
+        <<couchbaseclusters-spec-buckets-selector-matchexpressions-operator,operator>>: ""
+        <<couchbaseclusters-spec-buckets-selector-matchexpressions-values,values>>:
+        - ""
+      <<couchbaseclusters-spec-buckets-selector-matchlabels,matchLabels>>:
+    <<couchbaseclusters-spec-buckets-synchronize,synchronize>>: false
+  <<couchbaseclusters-spec-cluster,cluster>>:
+    <<couchbaseclusters-spec-cluster-analyticsservicememoryquota,analyticsServiceMemoryQuota>>: 1Gi
+    <<couchbaseclusters-spec-cluster-autocompaction,autoCompaction>>:
+      <<couchbaseclusters-spec-cluster-autocompaction-databasefragmentationthreshold,databaseFragmentationThreshold>>:
+        <<couchbaseclusters-spec-cluster-autocompaction-databasefragmentationthreshold-percent,percent>>: 30
+        <<couchbaseclusters-spec-cluster-autocompaction-databasefragmentationthreshold-size,size>>: ""
+      <<couchbaseclusters-spec-cluster-autocompaction-parallelcompaction,parallelCompaction>>: false
+      <<couchbaseclusters-spec-cluster-autocompaction-timewindow,timeWindow>>:
+        <<couchbaseclusters-spec-cluster-autocompaction-timewindow-abortcompactionoutsidewindow,abortCompactionOutsideWindow>>: false
+        <<couchbaseclusters-spec-cluster-autocompaction-timewindow-end,end>>: ""
+        <<couchbaseclusters-spec-cluster-autocompaction-timewindow-start,start>>: ""
+      <<couchbaseclusters-spec-cluster-autocompaction-tombstonepurgeinterval,tombstonePurgeInterval>>: 72h
+      <<couchbaseclusters-spec-cluster-autocompaction-viewfragmentationthreshold,viewFragmentationThreshold>>:
+        <<couchbaseclusters-spec-cluster-autocompaction-viewfragmentationthreshold-percent,percent>>: 30
+        <<couchbaseclusters-spec-cluster-autocompaction-viewfragmentationthreshold-size,size>>: ""
+    <<couchbaseclusters-spec-cluster-autofailovermaxcount,autoFailoverMaxCount>>: 3
+    <<couchbaseclusters-spec-cluster-autofailoverondatadiskissues,autoFailoverOnDataDiskIssues>>: false
+    <<couchbaseclusters-spec-cluster-autofailoverondatadiskissuestimeperiod,autoFailoverOnDataDiskIssuesTimePeriod>>: 120s
+    <<couchbaseclusters-spec-cluster-autofailoverservergroup,autoFailoverServerGroup>>: false
+    <<couchbaseclusters-spec-cluster-autofailovertimeout,autoFailoverTimeout>>: 120s
+    <<couchbaseclusters-spec-cluster-clustername,clusterName>>: ""
+    <<couchbaseclusters-spec-cluster-data,data>>:
+      <<couchbaseclusters-spec-cluster-data-readerthreads,readerThreads>>: 0
+      <<couchbaseclusters-spec-cluster-data-writerthreads,writerThreads>>: 0
+    <<couchbaseclusters-spec-cluster-dataservicememoryquota,dataServiceMemoryQuota>>: 256Mi
+    <<couchbaseclusters-spec-cluster-eventingservicememoryquota,eventingServiceMemoryQuota>>: 256Mi
+    <<couchbaseclusters-spec-cluster-indexservicememoryquota,indexServiceMemoryQuota>>: 256Mi
+    <<couchbaseclusters-spec-cluster-indexstoragesetting,indexStorageSetting>>: memory_optimized
+    <<couchbaseclusters-spec-cluster-indexer,indexer>>:
+      <<couchbaseclusters-spec-cluster-indexer-loglevel,logLevel>>: info
+      <<couchbaseclusters-spec-cluster-indexer-maxrollbackpoints,maxRollbackPoints>>: 2
+      <<couchbaseclusters-spec-cluster-indexer-memorysnapshotinterval,memorySnapshotInterval>>: 200ms
+      <<couchbaseclusters-spec-cluster-indexer-stablesnapshotinterval,stableSnapshotInterval>>: 5s
+      <<couchbaseclusters-spec-cluster-indexer-storagemode,storageMode>>: memory_optimized
+      <<couchbaseclusters-spec-cluster-indexer-threads,threads>>: 0
+    <<couchbaseclusters-spec-cluster-query,query>>:
+      <<couchbaseclusters-spec-cluster-query-backfillenabled,backfillEnabled>>: True
+      <<couchbaseclusters-spec-cluster-query-temporaryspace,temporarySpace>>: 5Gi
+      <<couchbaseclusters-spec-cluster-query-temporaryspaceunlimited,temporarySpaceUnlimited>>: false
+    <<couchbaseclusters-spec-cluster-queryservicememoryquota,queryServiceMemoryQuota>>: ""
+    <<couchbaseclusters-spec-cluster-searchservicememoryquota,searchServiceMemoryQuota>>: 256Mi
+  <<couchbaseclusters-spec-enableonlinevolumeexpansion,enableOnlineVolumeExpansion>>: false
+  <<couchbaseclusters-spec-enablepreviewscaling,enablePreviewScaling>>: false
+  <<couchbaseclusters-spec-hibernate,hibernate>>: false
+  <<couchbaseclusters-spec-hibernationstrategy,hibernationStrategy>>: ""
+  <<couchbaseclusters-spec-image,image>>: ""
+  <<couchbaseclusters-spec-logging,logging>>:
+    <<couchbaseclusters-spec-logging-audit,audit>>:
+      <<couchbaseclusters-spec-logging-audit-disabledevents,disabledEvents>>:
+      - 0
+      <<couchbaseclusters-spec-logging-audit-disabledusers,disabledUsers>>:
+      - ""
+      <<couchbaseclusters-spec-logging-audit-enabled,enabled>>: false
+      <<couchbaseclusters-spec-logging-audit-garbagecollection,garbageCollection>>:
+        <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar,sidecar>>:
+          <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-age,age>>: 1h
+          <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-enabled,enabled>>: false
+          <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-image,image>>: busybox:1.33.1
+          <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-interval,interval>>: 20m
+          <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-resources,resources>>: {}
+      <<couchbaseclusters-spec-logging-audit-rotation,rotation>>:
+        <<couchbaseclusters-spec-logging-audit-rotation-interval,interval>>: 15m
+        <<couchbaseclusters-spec-logging-audit-rotation-size,size>>: 20Mi
+    <<couchbaseclusters-spec-logging-logretentioncount,logRetentionCount>>: 0
+    <<couchbaseclusters-spec-logging-logretentiontime,logRetentionTime>>: ""
+    <<couchbaseclusters-spec-logging-server,server>>:
+      <<couchbaseclusters-spec-logging-server-configurationname,configurationName>>: fluent-bit-config
+      <<couchbaseclusters-spec-logging-server-enabled,enabled>>: false
+      <<couchbaseclusters-spec-logging-server-manageconfiguration,manageConfiguration>>: True
+      <<couchbaseclusters-spec-logging-server-sidecar,sidecar>>:
+        <<couchbaseclusters-spec-logging-server-sidecar-configurationmountpath,configurationMountPath>>: /fluent-bit/config/
+        <<couchbaseclusters-spec-logging-server-sidecar-image,image>>: couchbase/fluent-bit:1.1.1
+        <<couchbaseclusters-spec-logging-server-sidecar-resources,resources>>: {}
+  <<couchbaseclusters-spec-monitoring,monitoring>>:
+    <<couchbaseclusters-spec-monitoring-prometheus,prometheus>>:
+      <<couchbaseclusters-spec-monitoring-prometheus-authorizationsecret,authorizationSecret>>: ""
+      <<couchbaseclusters-spec-monitoring-prometheus-enabled,enabled>>: false
+      <<couchbaseclusters-spec-monitoring-prometheus-image,image>>: ""
+      <<couchbaseclusters-spec-monitoring-prometheus-resources,resources>>: {}
+  <<couchbaseclusters-spec-networking,networking>>:
+    <<couchbaseclusters-spec-networking-addressfamily,addressFamily>>: ""
+    <<couchbaseclusters-spec-networking-adminconsoleservicetemplate,adminConsoleServiceTemplate>>: {}
+    <<couchbaseclusters-spec-networking-adminconsoleservicetype,adminConsoleServiceType>>: NodePort
+    <<couchbaseclusters-spec-networking-adminconsoleservices,adminConsoleServices>>:
+    - ""
+    <<couchbaseclusters-spec-networking-disableuioverhttp,disableUIOverHTTP>>: false
+    <<couchbaseclusters-spec-networking-disableuioverhttps,disableUIOverHTTPS>>: false
+    <<couchbaseclusters-spec-networking-dns,dns>>:
+      <<couchbaseclusters-spec-networking-dns-domain,domain>>: ""
+    <<couchbaseclusters-spec-networking-exposeadminconsole,exposeAdminConsole>>: false
+    <<couchbaseclusters-spec-networking-exposedfeatureservicetemplate,exposedFeatureServiceTemplate>>: {}
+    <<couchbaseclusters-spec-networking-exposedfeatureservicetype,exposedFeatureServiceType>>: NodePort
+    <<couchbaseclusters-spec-networking-exposedfeaturetrafficpolicy,exposedFeatureTrafficPolicy>>: ""
+    <<couchbaseclusters-spec-networking-exposedfeatures,exposedFeatures>>:
+    - ""
+    <<couchbaseclusters-spec-networking-loadbalancersourceranges,loadBalancerSourceRanges>>:
+    - ""
+    <<couchbaseclusters-spec-networking-networkplatform,networkPlatform>>: ""
+    <<couchbaseclusters-spec-networking-serviceannotations,serviceAnnotations>>:
+    <<couchbaseclusters-spec-networking-tls,tls>>:
+      <<couchbaseclusters-spec-networking-tls-ciphersuites,cipherSuites>>:
+      - ""
+      <<couchbaseclusters-spec-networking-tls-clientcertificatepaths,clientCertificatePaths>>:
+      - <<couchbaseclusters-spec-networking-tls-clientcertificatepaths-delimiter,delimiter>>: ""
+        <<couchbaseclusters-spec-networking-tls-clientcertificatepaths-path,path>>: ""
+        <<couchbaseclusters-spec-networking-tls-clientcertificatepaths-prefix,prefix>>: ""
+      <<couchbaseclusters-spec-networking-tls-clientcertificatepolicy,clientCertificatePolicy>>: ""
+      <<couchbaseclusters-spec-networking-tls-nodetonodeencryption,nodeToNodeEncryption>>: ""
+      <<couchbaseclusters-spec-networking-tls-rootcas,rootCAs>>:
+      - ""
+      <<couchbaseclusters-spec-networking-tls-secretsource,secretSource>>:
+        <<couchbaseclusters-spec-networking-tls-secretsource-clientsecretname,clientSecretName>>: ""
+        <<couchbaseclusters-spec-networking-tls-secretsource-serversecretname,serverSecretName>>: ""
+      <<couchbaseclusters-spec-networking-tls-static,static>>:
+        <<couchbaseclusters-spec-networking-tls-static-operatorsecret,operatorSecret>>: ""
+        <<couchbaseclusters-spec-networking-tls-static-serversecret,serverSecret>>: ""
+      <<couchbaseclusters-spec-networking-tls-tlsminimumversion,tlsMinimumVersion>>: TLS1.2
+    <<couchbaseclusters-spec-networking-waitforaddressreachable,waitForAddressReachable>>: 10m
+    <<couchbaseclusters-spec-networking-waitforaddressreachabledelay,waitForAddressReachableDelay>>: 2m
+  <<couchbaseclusters-spec-paused,paused>>: false
+  <<couchbaseclusters-spec-platform,platform>>: ""
+  <<couchbaseclusters-spec-recoverypolicy,recoveryPolicy>>: ""
+  <<couchbaseclusters-spec-rollingupgrade,rollingUpgrade>>:
+    <<couchbaseclusters-spec-rollingupgrade-maxupgradable,maxUpgradable>>: 0
+    <<couchbaseclusters-spec-rollingupgrade-maxupgradablepercent,maxUpgradablePercent>>: ""
+  <<couchbaseclusters-spec-security,security>>:
+    <<couchbaseclusters-spec-security-adminsecret,adminSecret>>: ""
+    <<couchbaseclusters-spec-security-ldap,ldap>>:
+      <<couchbaseclusters-spec-security-ldap-authenticationenabled,authenticationEnabled>>: True
+      <<couchbaseclusters-spec-security-ldap-authorizationenabled,authorizationEnabled>>: false
+      <<couchbaseclusters-spec-security-ldap-binddn,bindDN>>: ""
+      <<couchbaseclusters-spec-security-ldap-bindsecret,bindSecret>>: ""
+      <<couchbaseclusters-spec-security-ldap-cacert,cacert>>: ""
+      <<couchbaseclusters-spec-security-ldap-cachevaluelifetime,cacheValueLifetime>>: 30000
+      <<couchbaseclusters-spec-security-ldap-encryption,encryption>>: ""
+      <<couchbaseclusters-spec-security-ldap-groupsquery,groupsQuery>>: ""
+      <<couchbaseclusters-spec-security-ldap-hosts,hosts>>:
+      - ""
+      <<couchbaseclusters-spec-security-ldap-nestedgroupsenabled,nestedGroupsEnabled>>: false
+      <<couchbaseclusters-spec-security-ldap-nestedgroupsmaxdepth,nestedGroupsMaxDepth>>: 10
+      <<couchbaseclusters-spec-security-ldap-port,port>>: 389
+      <<couchbaseclusters-spec-security-ldap-servercertvalidation,serverCertValidation>>: false
+      <<couchbaseclusters-spec-security-ldap-tlssecret,tlsSecret>>: ""
+      <<couchbaseclusters-spec-security-ldap-userdnmapping,userDNMapping>>:
+        <<couchbaseclusters-spec-security-ldap-userdnmapping-query,query>>: ""
+        <<couchbaseclusters-spec-security-ldap-userdnmapping-template,template>>: ""
+    <<couchbaseclusters-spec-security-rbac,rbac>>:
+      <<couchbaseclusters-spec-security-rbac-managed,managed>>: false
+      <<couchbaseclusters-spec-security-rbac-selector,selector>>: {}
+  <<couchbaseclusters-spec-securitycontext,securityContext>>: {}
+  <<couchbaseclusters-spec-servergroups,serverGroups>>:
+  - ""
+  <<couchbaseclusters-spec-servers,servers>>:
+  - <<couchbaseclusters-spec-servers-autoscaleenabled,autoscaleEnabled>>: false
+    <<couchbaseclusters-spec-servers-env,env>>: []
+    <<couchbaseclusters-spec-servers-envfrom,envFrom>>: []
+    <<couchbaseclusters-spec-servers-name,name>>: ""
+    <<couchbaseclusters-spec-servers-pod,pod>>: {}
+    <<couchbaseclusters-spec-servers-resources,resources>>: {}
+    <<couchbaseclusters-spec-servers-servergroups,serverGroups>>:
+    - ""
+    <<couchbaseclusters-spec-servers-services,services>>:
+    - ""
+    <<couchbaseclusters-spec-servers-size,size>>: 0
+    <<couchbaseclusters-spec-servers-volumemounts,volumeMounts>>:
+      <<couchbaseclusters-spec-servers-volumemounts-analytics,analytics>>:
+      - ""
+      <<couchbaseclusters-spec-servers-volumemounts-data,data>>: ""
+      <<couchbaseclusters-spec-servers-volumemounts-default,default>>: ""
+      <<couchbaseclusters-spec-servers-volumemounts-index,index>>: ""
+      <<couchbaseclusters-spec-servers-volumemounts-logs,logs>>: ""
+  <<couchbaseclusters-spec-softwareupdatenotifications,softwareUpdateNotifications>>: false
+  <<couchbaseclusters-spec-upgradestrategy,upgradeStrategy>>: ""
+  <<couchbaseclusters-spec-volumeclaimtemplates,volumeClaimTemplates>>: []
+  <<couchbaseclusters-spec-xdcr,xdcr>>:
+    <<couchbaseclusters-spec-xdcr-managed,managed>>: false
+    <<couchbaseclusters-spec-xdcr-remoteclusters,remoteClusters>>:
+    - <<couchbaseclusters-spec-xdcr-remoteclusters-authenticationsecret,authenticationSecret>>: ""
+      <<couchbaseclusters-spec-xdcr-remoteclusters-hostname,hostname>>: ""
+      <<couchbaseclusters-spec-xdcr-remoteclusters-name,name>>: ""
+      <<couchbaseclusters-spec-xdcr-remoteclusters-replications,replications>>:
+        <<couchbaseclusters-spec-xdcr-remoteclusters-replications-selector,selector>>: {}
+      <<couchbaseclusters-spec-xdcr-remoteclusters-tls,tls>>:
+        <<couchbaseclusters-spec-xdcr-remoteclusters-tls-secret,secret>>: ""
+      <<couchbaseclusters-spec-xdcr-remoteclusters-uuid,uuid>>: ""
+<<couchbaseclusters-status,status>>:
+  <<couchbaseclusters-status-allocations,allocations>>:
+  - <<couchbaseclusters-status-allocations-allocatedmemory,allocatedMemory>>: ""
+    <<couchbaseclusters-status-allocations-allocatedmemorypercent,allocatedMemoryPercent>>: 0
+    <<couchbaseclusters-status-allocations-analyticsserviceallocation,analyticsServiceAllocation>>: ""
+    <<couchbaseclusters-status-allocations-dataserviceallocation,dataServiceAllocation>>: ""
+    <<couchbaseclusters-status-allocations-eventingserviceallocation,eventingServiceAllocation>>: ""
+    <<couchbaseclusters-status-allocations-indexserviceallocation,indexServiceAllocation>>: ""
+    <<couchbaseclusters-status-allocations-name,name>>: ""
+    <<couchbaseclusters-status-allocations-requestedmemory,requestedMemory>>: ""
+    <<couchbaseclusters-status-allocations-searchserviceallocation,searchServiceAllocation>>: ""
+    <<couchbaseclusters-status-allocations-unusedmemory,unusedMemory>>: ""
+    <<couchbaseclusters-status-allocations-unusedmemorypercent,unusedMemoryPercent>>: 0
+  <<couchbaseclusters-status-autoscalers,autoscalers>>:
+  - ""
+  <<couchbaseclusters-status-buckets,buckets>>:
+  - <<couchbaseclusters-status-buckets-compressionmode,compressionMode>>: ""
+    <<couchbaseclusters-status-buckets-conflictresolution,conflictResolution>>: ""
+    <<couchbaseclusters-status-buckets-enableflush,enableFlush>>: false
+    <<couchbaseclusters-status-buckets-enableindexreplica,enableIndexReplica>>: false
+    <<couchbaseclusters-status-buckets-evictionpolicy,evictionPolicy>>: ""
+    <<couchbaseclusters-status-buckets-iopriority,ioPriority>>: ""
+    <<couchbaseclusters-status-buckets-memoryquota,memoryQuota>>: 0
+    <<couchbaseclusters-status-buckets-name,name>>: ""
+    <<couchbaseclusters-status-buckets-password,password>>: ""
+    <<couchbaseclusters-status-buckets-replicas,replicas>>: 0
+    <<couchbaseclusters-status-buckets-type,type>>: ""
+  <<couchbaseclusters-status-clusterid,clusterId>>: ""
+  <<couchbaseclusters-status-conditions,conditions>>:
+  - <<couchbaseclusters-status-conditions-lasttransitiontime,lastTransitionTime>>: ""
+    <<couchbaseclusters-status-conditions-lastupdatetime,lastUpdateTime>>: ""
+    <<couchbaseclusters-status-conditions-message,message>>: ""
+    <<couchbaseclusters-status-conditions-reason,reason>>: ""
+    <<couchbaseclusters-status-conditions-status,status>>: ""
+    <<couchbaseclusters-status-conditions-type,type>>: ""
+  <<couchbaseclusters-status-controlpaused,controlPaused>>: false
+  <<couchbaseclusters-status-currentversion,currentVersion>>: ""
+  <<couchbaseclusters-status-groups,groups>>:
+  - ""
+  <<couchbaseclusters-status-members,members>>:
+    <<couchbaseclusters-status-members-ready,ready>>:
+    - ""
+    <<couchbaseclusters-status-members-unready,unready>>:
+    - ""
+  <<couchbaseclusters-status-size,size>>: 0
+  <<couchbaseclusters-status-users,users>>:
+  - ""
+----
+
 == couchbaseclusters.apiVersion
 
 === Constraints
@@ -2381,6 +2662,16 @@ The CouchbaseAutoscaler implements the Kubernetes scale API and can be controlle
 ==== Description
 
 Env allows the setting of environment variables in the Couchbase server container.
+
+=== couchbaseclusters.spec.servers.envFrom
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+EnvFrom allows the setting of environment variables in the Couchbase server container.
 
 === couchbaseclusters.spec.servers.name
 

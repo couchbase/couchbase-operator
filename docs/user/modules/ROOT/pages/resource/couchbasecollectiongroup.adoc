@@ -12,6 +12,20 @@ In order to be considered by the Operator, every collection group must be refere
 Unlike the CouchbaseCollection resource, a collection group represents multiple collections, with common configuration parameters, to be expressed as a single resource, minimizing required configuration and Kubernetes API traffic.
 It also forms the basis of Couchbase RBAC security boundaries.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasecollectiongroups-apiversion,apiVersion>>: v2
+<<couchbasecollectiongroups-kind,kind>>: CouchbaseCollectionGroup
+<<couchbasecollectiongroups-metadata,metadata>>:
+  <<couchbasecollectiongroups-metadata-name,name>>: ""
+<<couchbasecollectiongroups-spec,spec>>:
+  <<couchbasecollectiongroups-spec-maxttl,maxTTL>>: ""
+  <<couchbasecollectiongroups-spec-names,names>>:
+  - ""
+----
+
 == couchbasecollectiongroups.apiVersion
 
 === Constraints

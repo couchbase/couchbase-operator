@@ -7,6 +7,23 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbaserolebinding]
 
 CouchbaseRoleBinding allows association of Couchbase users with groups.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbaserolebindings-apiversion,apiVersion>>: v2
+<<couchbaserolebindings-kind,kind>>: CouchbaseRoleBinding
+<<couchbaserolebindings-metadata,metadata>>:
+  <<couchbaserolebindings-metadata-name,name>>: ""
+<<couchbaserolebindings-spec,spec>>:
+  <<couchbaserolebindings-spec-roleref,roleRef>>:
+    <<couchbaserolebindings-spec-roleref-kind,kind>>: ""
+    <<couchbaserolebindings-spec-roleref-name,name>>: ""
+  <<couchbaserolebindings-spec-subjects,subjects>>:
+  - <<couchbaserolebindings-spec-subjects-kind,kind>>: ""
+    <<couchbaserolebindings-spec-subjects-name,name>>: ""
+----
+
 == couchbaserolebindings.apiVersion
 
 === Constraints

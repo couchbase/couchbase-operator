@@ -7,6 +7,20 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbaseuser]
 
 CouchbaseUser allows the automation of Couchbase user management.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbaseusers-apiversion,apiVersion>>: v2
+<<couchbaseusers-kind,kind>>: CouchbaseUser
+<<couchbaseusers-metadata,metadata>>:
+  <<couchbaseusers-metadata-name,name>>: ""
+<<couchbaseusers-spec,spec>>:
+  <<couchbaseusers-spec-authdomain,authDomain>>: ""
+  <<couchbaseusers-spec-authsecret,authSecret>>: ""
+  <<couchbaseusers-spec-fullname,fullName>>: ""
+----
+
 == couchbaseusers.apiVersion
 
 === Constraints

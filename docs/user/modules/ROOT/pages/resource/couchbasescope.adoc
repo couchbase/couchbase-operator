@@ -11,6 +11,26 @@ At present, scopes are not nested, so provide only a single level of abstraction
 Scopes provide a coarser grained basis for role-based access control (RBAC) and cross-datacenter replication (XDCR) than collections, but finer that buckets.
 In order to be considered by the Operator, a scope must be referenced by either a `CouchbaseBucket` or `CouchbaseEphemeralBucket` resource.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasescopes-apiversion,apiVersion>>: v2
+<<couchbasescopes-kind,kind>>: CouchbaseScope
+<<couchbasescopes-metadata,metadata>>:
+  <<couchbasescopes-metadata-name,name>>: ""
+<<couchbasescopes-spec,spec>>:
+  <<couchbasescopes-spec-collections,collections>>:
+    <<couchbasescopes-spec-collections-managed,managed>>: false
+    <<couchbasescopes-spec-collections-preservedefaultcollection,preserveDefaultCollection>>: false
+    <<couchbasescopes-spec-collections-resources,resources>>:
+    - <<couchbasescopes-spec-collections-resources-kind,kind>>: CouchbaseCollection
+      <<couchbasescopes-spec-collections-resources-name,name>>: ""
+    <<couchbasescopes-spec-collections-selector,selector>>: {}
+  <<couchbasescopes-spec-defaultscope,defaultScope>>: false
+  <<couchbasescopes-spec-name,name>>: ""
+----
+
 == couchbasescopes.apiVersion
 
 === Constraints

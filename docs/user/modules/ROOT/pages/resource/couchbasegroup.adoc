@@ -7,6 +7,54 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasegroup]
 
 CouchbaseGroup allows the automation of Couchbase group management.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasegroups-apiversion,apiVersion>>: v2
+<<couchbasegroups-kind,kind>>: CouchbaseGroup
+<<couchbasegroups-metadata,metadata>>:
+  <<couchbasegroups-metadata-name,name>>: ""
+<<couchbasegroups-spec,spec>>:
+  <<couchbasegroups-spec-ldapgroupref,ldapGroupRef>>: ""
+  <<couchbasegroups-spec-roles,roles>>:
+  - <<couchbasegroups-spec-roles-bucket,bucket>>: ""
+    <<couchbasegroups-spec-roles-buckets,buckets>>:
+      <<couchbasegroups-spec-roles-buckets-resources,resources>>:
+      - <<couchbasegroups-spec-roles-buckets-resources-kind,kind>>: CouchbaseBucket
+        <<couchbasegroups-spec-roles-buckets-resources-name,name>>: ""
+      <<couchbasegroups-spec-roles-buckets-selector,selector>>:
+        <<couchbasegroups-spec-roles-buckets-selector-matchexpressions,matchExpressions>>:
+        - <<couchbasegroups-spec-roles-buckets-selector-matchexpressions-key,key>>: ""
+          <<couchbasegroups-spec-roles-buckets-selector-matchexpressions-operator,operator>>: ""
+          <<couchbasegroups-spec-roles-buckets-selector-matchexpressions-values,values>>:
+          - ""
+        <<couchbasegroups-spec-roles-buckets-selector-matchlabels,matchLabels>>:
+    <<couchbasegroups-spec-roles-collections,collections>>:
+      <<couchbasegroups-spec-roles-collections-resources,resources>>:
+      - <<couchbasegroups-spec-roles-collections-resources-kind,kind>>: CouchbaseCollection
+        <<couchbasegroups-spec-roles-collections-resources-name,name>>: ""
+      <<couchbasegroups-spec-roles-collections-selector,selector>>:
+        <<couchbasegroups-spec-roles-collections-selector-matchexpressions,matchExpressions>>:
+        - <<couchbasegroups-spec-roles-collections-selector-matchexpressions-key,key>>: ""
+          <<couchbasegroups-spec-roles-collections-selector-matchexpressions-operator,operator>>: ""
+          <<couchbasegroups-spec-roles-collections-selector-matchexpressions-values,values>>:
+          - ""
+        <<couchbasegroups-spec-roles-collections-selector-matchlabels,matchLabels>>:
+    <<couchbasegroups-spec-roles-name,name>>: ""
+    <<couchbasegroups-spec-roles-scopes,scopes>>:
+      <<couchbasegroups-spec-roles-scopes-resources,resources>>:
+      - <<couchbasegroups-spec-roles-scopes-resources-kind,kind>>: CouchbaseScope
+        <<couchbasegroups-spec-roles-scopes-resources-name,name>>: ""
+      <<couchbasegroups-spec-roles-scopes-selector,selector>>:
+        <<couchbasegroups-spec-roles-scopes-selector-matchexpressions,matchExpressions>>:
+        - <<couchbasegroups-spec-roles-scopes-selector-matchexpressions-key,key>>: ""
+          <<couchbasegroups-spec-roles-scopes-selector-matchexpressions-operator,operator>>: ""
+          <<couchbasegroups-spec-roles-scopes-selector-matchexpressions-values,values>>:
+          - ""
+        <<couchbasegroups-spec-roles-scopes-selector-matchlabels,matchLabels>>:
+----
+
 == couchbasegroups.apiVersion
 
 === Constraints

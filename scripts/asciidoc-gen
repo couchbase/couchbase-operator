@@ -39,12 +39,9 @@ NATIVE_TYPES = [
     'couchbaseclusters.spec.xdcr.remoteClusters.replications.selector',
     'couchbasescopes.spec.collections.selector',
     'couchbasescopegroups.spec.collections.selector',
-    'couchbasebuckets.spec.scopesAndCollections.scopes.selector',
-    'couchbaseephemeralbuckets.spec.scopesAndCollections.scopes.selector',
+    'couchbasebuckets.spec.scopes.selector',
+    'couchbaseephemeralbuckets.spec.scopes.selector',
 ]
-
-# Used to indicate this is the root element of a document.
-ROOT_DEPTH = 1
 
 # Output constants.
 CONSTRAINTS_HEADING = 'Constraints'
@@ -68,6 +65,11 @@ AUTOGEN_DIR = 'resource'
 # Used to denote a heading level.
 HEADING_CHAR = '='
 
+# Used for YAML generation when a default isn't provided in the schema.
+DEFAULT_STRING = '""'
+DEFAULT_BOOL = 'false'
+DEFAULT_INT = '0'
+
 def escape_attributes(attribute):
     """
     Raw strings like "{blah}" need escaping, or asciidoc thinks the
@@ -87,243 +89,638 @@ def escape_attributes(attribute):
     return attribute
 
 
-def generate_heading(content, depth, heading):
+class JSONPath:
     """
-    Helper for create Asciidoc headings.
-    """
-
-    content.append(f'{HEADING_CHAR * depth} {heading}')
-    content.append('')
-
-
-def generate_flag(content, flag, value):
-    """
-    Helper to create asciidoc flags.
-    """
-    if not value:
-        return
-
-    content.append(f'*{flag}*')
-    content.append('')
-
-
-def generate_constraint(content, key, value):
-    """
-    Helper to create asciidoc constaints.
-    """
-    if value is None:
-        return
-
-    content.append(f'*{key}*: `{escape_attributes(value)}`')
-    content.append('')
-
-
-def generate_scalar_constraints(content, typ, schema):
-    """
-    If the data type is a scalar, create any optional constraints
-    that are defined for it.
-    """
-    if typ == 'integer':
-        if 'minimum' in schema:
-            generate_constraint(content, MINIMUM_LABEL, schema['minimum'])
-        if 'maximum' in schema:
-            generate_constraint(content, MAXIMUM_LABEL, schema['maximum'])
-    elif typ == 'string':
-        if 'minLength' in schema:
-            generate_constraint(content, MINIMUM_LENGTH_LABEL, schema['minLength'])
-        if 'maxLength' in schema:
-            generate_constraint(content, MAXIMUM_LENGTH_LABEL, schema['maxLength'])
-        if 'pattern' in schema:
-            generate_constraint(content, PATTERN_LABEL, schema['pattern'])
-        if 'enum' in schema:
-            generate_constraint(content, ENUMERATIONS_LABEL, ', '.join(schema['enum']))
-
-
-def generate_array_constraints(content, typ, array_type, schema):
-    """
-    If the data type is an array, create any array specifc constraints.
-    If the array item type is a scalar, also create any constraints for that
-    too.
-    """
-    if typ != 'array':
-        return
-
-    if 'minItems' in schema:
-        generate_constraint(content, MINIMUM_ITEMS_LABEL, schema['minItems'])
-    if 'maxItems' in schema:
-        generate_constraint(content, MAXIMUM_ITEMS_LABEL, schema['maxItems'])
-
-    generate_scalar_constraints(content, array_type, schema['items'])
-
-
-def generate_description(content, description):
-    """
-    Process the description strings for any special markup, and also format to
-    more easily grok any changes to the documentation.
-    """
-    lines = re.split(r'\.\s+', description)
-
-    def periodify(line):
-        if line.endswith('.'):
-            return line
-
-        return line + '.'
-
-    lines = [periodify(line) for line in lines]
-
-    for line in lines:
-        # A simple filter to demonstrate how we can mutate the description field.
-        line_break = False
-        if 'DEPRECATED' in line:
-            line = re.sub('DEPRECATED', '*DEPRECATED*', line)
-            line_break = True
-
-        if 'DEVELOPER PREVIEW' in line:
-            line = re.sub('DEVELOPER PREVIEW', '*DEVELOPER PREVIEW*', line)
-            line_break = True
-
-        content.append(line)
-        if line_break:
-            content.append('')
-
-    content.append('')
-
-
-def generate_metadata(content, names):
-    """
-    Inject boilerplate documentation for resource type metadata.
-    The content is defined as a partial, the headings are type specific
-    and are generated so that xref linking works.
+    Abstraction for a JSON path style object.
     """
 
-    content.append(f'include::partial$autogen-reference-metadata.adoc[tags=**;!*;{names["singular"]}]')
-    content.append('')
+    # The path is represented as an array of labels.
+    # Any empty array is the root element.
+    path = None
+
+    def __init__(self, *args):
+        self.path = []
+
+        if args:
+            self.path = list(args)
+
+    def append(self, *args):
+        """
+        Tack an arbitrary number of labels on the end of the path.
+        """
+
+        self.path.extend(args)
+
+    @property
+    def root(self):
+        """
+        Is this the root node?
+        """
+
+        return len(self.path) == 0
+
+    @property
+    def base(self):
+        """
+        Return the base label e.g. the leaf, the least significant bit.
+        """
+
+        return self.path[-1]
+
+    def __len__(self):
+        """
+        Make compatible with len().
+        """
+
+        return len(self.path)
+
+    def __str__(self):
+        """
+        Make compatible with %s or str().
+        """
+
+        if self.root:
+            return '.'
+
+        return '.'.join(self.path)
 
 
-def generate_schema(content, names, path, schema, required):
+def asciidoc_printable(func):
     """
-    Generate ASCII documentation from a JSON schema object.
-    Valid keyword arguments are:
+    Decorator for handlers so that the root element is handled specially.
     """
 
-    depth = min(3, len(path.split('.')))
-
-    # Process the root of a native type, because we should document where
-    # to look for official documentation, but reject any children.
-    for ignored in NATIVE_TYPES:
-        if path == ignored:
-            break
-
-        if path.startswith(ignored):
+    def wrapper(self, context, *args, **kwargs):
+        # The root generates the page masthead, other elements are handled
+        # normally.
+        if context.path.root:
+            self.generate_masthead(context)
             return
 
-    # Metadata is not documented in the CRD by default, so catch that and
-    # treat it specially.
-    if re.match(r'[\w\d]+\.metadata', path):
-        generate_metadata(content, names)
+        func(self, context, *args, **kwargs)
+
+    return wrapper
+
+
+class AsciidocVisitor:
+    """
+    The Asciidoc visitor provides state and callbacks for rendering asciidoc
+    when walking the CRD trees.
+    """
+
+    # Content is a buffer to store text output into.
+    content = None
+
+    # Resource is the custom resource metadata.
+    resource = None
+
+    # This is the YAML example structure generated for the CRD.
+    yaml = None
+
+    def __init__(self, resource, yaml_content):
+        self.resource = resource
+        self.content = []
+        self.yaml = yaml_content
+
+    def generate_masthead(self, context):
+        """
+        Generate the page header content.
+        """
+
+        self.content.append(f'= {self.resource.kind} Resource')
+        self.content.append(f'include::partial$autogen-reference-aliases.adoc[tags={self.resource.singular}]')
+        self.content.append(f':resource-name-singular: {self.resource.singular}')
+        self.content.append(f':resource-name-plural: {self.resource.plural}')
+        self.content.append(f':resource-name-kind: {self.resource.kind}')
+        self.content.append('')
+
+        self._generate_description(context)
+
+        self.content.append('The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):')
+        self.content.append('')
+        self.content.append('[source,yaml,subs="+macros"]')
+        self.content.append('----')
+        self.content.extend(self.yaml)
+        self.content.append('----')
+        self.content.append('')
+
+    def _generate_metadata(self):
+        """
+        Inject boilerplate documentation for resource type metadata.
+        The content is defined as a partial, the headings are type specific
+        and are generated so that xref linking works.
+        """
+
+        self.content.append(f'include::partial$autogen-reference-metadata.adoc[tags=**;!*;{self.resource.singular}]')
+        self.content.append('')
+
+
+    def _generate_heading(self, depth, heading):
+        """
+        Helper for create Asciidoc headings.
+        """
+
+        self.content.append(f'{HEADING_CHAR * depth} {heading}')
+        self.content.append('')
+
+    def _generate_flag(self, flag, value):
+        """
+        Helper to create asciidoc flags.
+        """
+
+        if not value:
+            return
+
+        self.content.append(f'*{flag}*')
+        self.content.append('')
+
+    def _generate_required(self, context):
+        """
+        Helper to create the asciidoc required flag.
+        """
+
+        self._generate_flag(REQUIRED_LABEL, context.required)
+
+    def _generate_constraint(self, key, value):
+        """
+        Helper to create asciidoc constaints.
+        """
+
+        if value is None:
+            return
+
+        self.content.append(f'*{key}*: `{escape_attributes(value)}`')
+        self.content.append('')
+
+    def _generate_type(self, context):
+        """
+        Helper to create the asciidoc type.
+        """
+
+        display_type = context.type
+        if context.type == 'array':
+            display_type = f'[]{context.item_type}'
+        if context.type == 'object' and 'additionalProperties' in context.schema:
+            display_type = f'map[string]{context.additional_properties_type}'
+
+        self._generate_constraint(TYPE_LABEL, display_type)
+
+    def _generate_default(self, context):
+        """
+        Helper to generate the asciidoc default value.
+        """
+
+        self._generate_constraint(DEFAULT_LABEL, context.default)
+
+    def _generate_scalar_constraints(self, context):
+        """
+        If the data type is a scalar, create any optional constraints
+        that are defined for it.
+        """
+
+        if context.type == 'integer':
+            if 'minimum' in context.schema:
+                self._generate_constraint(MINIMUM_LABEL, context.schema['minimum'])
+            if 'maximum' in context.schema:
+                self._generate_constraint(MAXIMUM_LABEL, context.schema['maximum'])
+        elif context.type == 'string':
+            if 'minLength' in context.schema:
+                self._generate_constraint(MINIMUM_LENGTH_LABEL, context.schema['minLength'])
+            if 'maxLength' in context.schema:
+                self._generate_constraint(MAXIMUM_LENGTH_LABEL, context.schema['maxLength'])
+            if 'pattern' in context.schema:
+                self._generate_constraint(PATTERN_LABEL, context.schema['pattern'])
+            if 'enum' in context.schema:
+                self._generate_constraint(ENUMERATIONS_LABEL, ', '.join(context.schema['enum']))
+
+    def _generate_array_constraints(self, context):
+        """
+        If the data type is an array, create any array specifc constraints.
+        If the array item type is a scalar, also create any constraints for that
+        too.
+        """
+
+        if context.type != 'array':
+            return
+
+        if 'minItems' in context.schema:
+            self._generate_constraint(MINIMUM_ITEMS_LABEL, context.schema['minItems'])
+        if 'maxItems' in context.schema:
+            self._generate_constraint(MAXIMUM_ITEMS_LABEL, context.schema['maxItems'])
+
+        self._generate_scalar_constraints(WalkContext(None, None, context.schema["items"]))
+
+    def _generate_description(self, context):
+        """
+        Process the description strings for any special markup, and also format to
+        more easily grok any changes to the documentation.
+        """
+
+        lines = re.split(r'\.\s+', context.schema['description'])
+
+        def periodify(line):
+            if line.endswith('.'):
+                return line
+
+            return line + '.'
+
+        lines = [periodify(line) for line in lines]
+
+        for line in lines:
+            # A simple filter to demonstrate how we can mutate the description field.
+            line_break = False
+            if 'DEPRECATED' in line:
+                line = re.sub('DEPRECATED', '*DEPRECATED*', line)
+                line_break = True
+
+            if 'DEVELOPER PREVIEW' in line:
+                line = re.sub('DEVELOPER PREVIEW', '*DEVELOPER PREVIEW*', line)
+                line_break = True
+
+            self.content.append(line)
+            if line_break:
+                self.content.append('')
+
+        self.content.append('')
+
+    def _format_type(self, context):
+        """
+        Generic type formatter, called for all scalars, objects and arrays to
+        get consistent formatting.
+        """
+
+        depth = min(3, len(context.path) + 1)
+
+        self._generate_heading(depth, context.full_path)
+        self._generate_heading(depth+1, CONSTRAINTS_HEADING)
+        self._generate_required(context)
+        self._generate_type(context)
+        self._generate_default(context)
+        self._generate_scalar_constraints(context)
+        self._generate_array_constraints(context)
+
+        # Print out the description after the flags.
+        self._generate_heading(depth+1, DESCRIPTION_HEADING)
+        self._generate_description(context)
+
+    @asciidoc_printable
+    def metadata_handler(self, _):
+        """
+        Metadata handler.
+        """
+
+        self._generate_metadata()
+
+    @asciidoc_printable
+    def native_type_handler(self, context):
+        """
+        Native type handler, these are defined by NATIVE_TYPES and processing
+        descent stops after this node.
+        """
+
+        self._format_type(context)
+
+    @asciidoc_printable
+    def object_type_handler(self, context):
+        """
+        Object handler, may be an object or a map.
+        """
+
+        self._format_type(context)
+
+    @asciidoc_printable
+    def array_type_handler(self, context):
+        """
+        Array handler.
+        """
+
+        self._format_type(context)
+
+    @asciidoc_printable
+    def scalar_type_handler(self, context):
+        """
+        Scalar handler.
+        """
+
+        self._format_type(context)
+
+
+def yaml_printable(func):
+    """
+    Decorator for all the handler functions that omits the root element.
+    """
+
+    def wrapper(self, context, *args, **kwargs):
+        if context.path.root:
+            return
+
+        func(self, context, *args, **kwargs)
+
+    return wrapper
+
+
+class YAMLVisitor:
+    """
+    The YAML visitor allows the JSON schemas to be traversed, then converted
+    into YAML.
+    """
+
+    # We need to keep tabs on when we enter an array, as the "-" stuff commences
+    # on the next line.  This is an integer as you can have nested arrays, and
+    # using a bool is probably asking for trouble.
+    array = None
+
+    # Resource is the custom resource metadata.
+    resource = None
+
+    # Content is the generated YAML file.
+    content = None
+
+    def __init__(self, resource):
+        self.array = 0
+        self.resource = resource
+        self.content = []
+
+    def _prefix(self, context):
+        """
+        Helper to handle indentation based on path, and also
+        array handling.   As this updates the array counter it must
+        be called at most once per handler.
+        """
+
+        depth = len(context.path) - 1
+        if depth < 0:
+            return ''
+
+        if self.array == 0:
+            return '  ' * depth
+
+        self.array -= 1
+        return '  ' * (depth - 1) + '- '
+
+    def _label(self, context):
+        """
+        Helper to generate labels for YAML.  This adds in links to the specific
+        fields within the current document.
+        """
+        # pylint: disable=no-self-use
+
+        return '<<' + re.sub(r'\.', r'-', context.full_path.lower()) + f',{context.path.base}>>'
+
+    def _implicit_default(self, t):
+        """
+        Helper to populate sclar fields without a default.  While this is useless
+        without further context, it does communicate type information.
+        """
+        # pylint: disable=no-self-use
+
+        defaults = {
+            'string': DEFAULT_STRING,
+            'boolean': DEFAULT_BOOL,
+            'integer': DEFAULT_INT,
+        }
+
+        return defaults[t]
+
+    @yaml_printable
+    def metadata_handler(self, _context):
+        """
+        Metadata handler.
+        """
+        # pylint: disable=no-self-use
+
+        self.content.append(f'<<{self.resource.plural}-metadata,metadata>>:')
+        self.content.append(f'  <<{self.resource.plural}-metadata-name,name>>: {DEFAULT_STRING}')
+
+    @yaml_printable
+    def native_type_handler(self, context):
+        """
+        Native type handler, these are defined by NATIVE_TYPES and processing
+        descent stops after this node.
+        """
+
+        if context.type == "object":
+            value = '{}'
+        elif context.type == "array":
+            value = '[]'
+        else:
+            logging.error('native scalar type omitted unexpectedly at %s', context.path)
+
+        self.content.append(f'{self._prefix(context)}{self._label(context)}: {value}')
+
+    @yaml_printable
+    def object_type_handler(self, context):
+        """
+        Object handler, may be an object or a map.
+        """
+
+        self.content.append(f'{self._prefix(context)}{self._label(context)}:')
+
+    @yaml_printable
+    def array_type_handler(self, context):
+        """
+        Array handler.
+        """
+
+        if context.item_type == 'object':
+            self.content.append(f'{self._prefix(context)}{self._label(context)}:')
+            self.array += 1
+            return
+
+        self.content.append(f'{self._prefix(context)}{self._label(context)}:')
+        self.content.append(f'{self._prefix(context)}- {self._implicit_default(context.item_type)}')
+
+    @yaml_printable
+    def scalar_type_handler(self, context):
+        """
+        Scalar handler.
+        """
+
+        if context.full_path == f'{self.resource.plural}.apiVersion':
+            self.content.append(f'{self._prefix(context)}{self._label(context)}: {self.resource.version}')
+            return
+
+        if context.full_path == f'{self.resource.plural}.kind':
+            self.content.append(f'{self._prefix(context)}{self._label(context)}: {self.resource.kind}')
+            return
+
+        value = context.default
+        if not value:
+            value = self._implicit_default(context.type)
+
+        self.content.append(f'{self._prefix(context)}{self._label(context)}: {value}')
+
+
+class WalkContext:
+    """
+    Context passed to each handler as we walk the tree.
+    """
+
+    # Resource is the custom resource metadata.
+    resource = None
+
+    # Fully qualifed JSON path (with type).
+    path = None
+
+    # JSON schema for the node.
+    schema = None
+
+    # Whether this node is required in the parent.
+    required = None
+
+    def __init__(self, resource, path, schema, required=False):
+        self.resource = resource
+        self.path = path
+        self.schema = schema
+        self.required = required
+
+    @property
+    def type(self):
+        """
+        Helper to return the current JSON schema type.
+        """
+
+        return self.schema['type']
+
+    @property
+    def item_type(self):
+        """
+        Helper to return the current JSON schema array item type.
+        """
+
+        return self.schema['items']['type']
+
+    @property
+    def additional_properties_type(self):
+        """
+        Helper to return the current JSON additional properties type (e.g. for a map of scalars).
+        """
+
+        return self.schema['additionalProperties']['type']
+
+    @property
+    def default(self):
+        """
+        Helper to return the current JSON schema default.
+        """
+
+        if 'default' not in self.schema:
+            return None
+
+        return self.schema['default']
+
+    @property
+    def full_path(self):
+        """
+        Return the "fully qualified path", this essentially just preprends
+        the resource type to make it a globally uniqueu path across all
+        resource types.
+        """
+
+        if self.path.root:
+            return self.resource.plural
+
+        return f'{self.resource.plural}.{str(self.path)}'
+
+
+def walk(visitor, context):
+    """
+    Walk (recursively descend the schema), calling context specific handlers
+    in the provided visitor as we progress.
+    """
+
+    # Handle native types and stop processing down the tree.
+    if context.full_path in NATIVE_TYPES:
+        if hasattr(visitor, 'native_type_handler'):
+            visitor.native_type_handler(context)
         return
 
-    # If the schema doesn't have a description, then it must do.  The only
-    # exception is for Kubernetes native types, which should be ignored.
-    try:
-        description = schema['description']
-        typ = schema['type']
-    except KeyError:
-        logging.error('schema lacks documentation (description/type) at %s', path)
-        sys.exit(1)
+    if context.type == 'object':
+        if context.full_path.endswith(".metadata"):
+            if hasattr(visitor, 'metadata_handler'):
+                visitor.metadata_handler(context)
+            return
 
-    # Arrays a special in that array items only get interrogated if they are
-    # an object.  Therefore do a look-ahead and see if it's a scalar and handle
-    # it slightly differently.
-    display_type = typ
-    array_type = None
-    map_type = None
+        if hasattr(visitor, 'object_type_handler'):
+            visitor.object_type_handler(context)
 
-    if typ == 'array':
-        array_type = schema['items']['type']
-        display_type = f'[]{array_type}'
+        if 'properties' not in context.schema:
+            return
 
-    # Maps are special too...
-    if typ == 'object' and 'additionalProperties' in schema:
-        map_type = schema['additionalProperties']['type']
-        display_type = f'map[string]{map_type}'
+        for name, property_schema in context.schema['properties'].items():
+            property_required = False
+            if 'required' in context.schema and name in context.schema['required']:
+                property_required = True
 
-    # Every schema can have an optional default.
-    default = None
+            child_path = JSONPath(*context.path.path)
+            child_path.append(name)
 
-    if 'default' in schema:
-        default = schema['default']
+            walk(visitor, WalkContext(context.resource, child_path, property_schema, property_required))
 
-    # Every attribute gets a heading.  The main root element is special...
-    if depth == ROOT_DEPTH:
-        content.append(f'= {names["kind"]} Resource')
-        content.append(f'include::partial$autogen-reference-aliases.adoc[tags={names["singular"]}]')
-        content.append(f':resource-name-singular: {names["singular"]}')
-        content.append(f':resource-name-plural: {names["plural"]}')
-        content.append(f':resource-name-kind: {names["kind"]}')
-        content.append('')
-    else:
-        generate_heading(content, depth, path)
-
-    # Every attribute has a set of constraints.  For certain types they may have a
-    # further set of constraints.
-    if depth != ROOT_DEPTH:
-        generate_heading(content, depth+1, CONSTRAINTS_HEADING)
-        generate_flag(content, REQUIRED_LABEL, required)
-        generate_constraint(content, TYPE_LABEL, display_type)
-        generate_constraint(content, DEFAULT_LABEL, default)
-        generate_scalar_constraints(content, typ, schema)
-        generate_array_constraints(content, typ, array_type, schema)
-
-    # Print out the description after the flags.
-    if depth != ROOT_DEPTH:
-        generate_heading(content, depth+1, DESCRIPTION_HEADING)
-
-    generate_description(content, description)
-
-    # For objects, recursively descend into each property.
-    if typ == 'object':
-        if 'properties' in schema:
-            properties = schema['properties']
-
-            required = []
-            if 'required' in schema:
-                required = schema['required']
-
-            for property_name, property_schema in properties.items():
-                generate_schema(content, names, f'{path}.{property_name}', property_schema, property_name in required)
-        elif 'additionalProperties' in schema:
-            if map_type in ['array', 'object']:
-                raise RuntimeError(f'map of {map_type} detected, this is bad, sort your life out')
-
-    # Arrays are--obviously--special... Arrays of scalars have already been handled
-    # due to look-ahead, so we only need concern ourselves with arrays of objects.  Arrays
-    # of arrays are possible, but like ROUSs, I don't think they exist...
-    elif typ == 'array' and array_type == 'object':
-        try:
-            items = schema['items']
-            properties = items['properties']
-        except KeyError:
-            logging.error('unable to extract array item properties at %s', path)
+    elif context.type == 'array':
+        if 'items' not in context.schema:
+            logging.error('schema array has no items at %s', context.path)
             sys.exit(1)
 
-        required = []
-        if 'required' in items:
-            required = items['required']
+        if 'type' not in context.schema['items']:
+            logging.error('schema array items have no type at %s', context.path)
+            sys.exit(1)
 
-        for property_name, property_schema in properties.items():
-            generate_schema(content, names, f'{path}.{property_name}', property_schema, property_name in required)
+        if hasattr(visitor, 'array_type_handler'):
+            visitor.array_type_handler(context)
+
+        if context.schema['items']['type'] == 'object':
+            for name, item_schema in context.schema['items']['properties'].items():
+                property_required = False
+                if 'required' in context.schema['items'] and name in context.schema['items']['required']:
+                    property_required = True
+
+                child_path = JSONPath(*context.path.path)
+                child_path.append(name)
+
+                walk(visitor, WalkContext(context.resource, child_path, item_schema, property_required))
+
+    else:
+        if hasattr(visitor, 'scalar_type_handler'):
+            visitor.scalar_type_handler(context)
 
 
-def generate(args, crd, content):
+class ResourceContext:
+    """
+    Top level context for a custom resource type.
+    """
+    # pylint: disable=too-few-public-methods
+
+    # The capitalized kind, used in YAML.
+    kind = None
+
+    # The plural is used by the API.
+    plurial = None
+
+    # Singluar is only really used by CLI components.
+    singular = None
+
+    # Version is the API version in use.
+    version = None
+
+    def __init__(self, names, version):
+        try:
+            self.kind = names['kind']
+            self.plural = names['plural']
+            self.singular = names['singular']
+        except KeyError:
+            logging.error('CRD names malformed')
+            sys.exit(1)
+
+        self.version = version
+
+
+def generate(args, crd):
     """
     Create an asciidoc rendition of the CRD's structure and validation constraints.
     """
 
     try:
-        kind = crd['spec']['names']['kind']
-        plural = crd['spec']['names']['plural']
-        singular = crd['spec']['names']['singular']
         versions = crd['spec']['versions']
     except KeyError:
         logging.error('unable to extract CRD metadata')
@@ -334,23 +731,22 @@ def generate(args, crd, content):
             name = version['name']
             schema = version['schema']['openAPIV3Schema']
         except KeyError:
-            logging.error('unable to extract CRD version metadata for %s', kind)
+            logging.error('unable to extract CRD version metadata for %s', resource.kind)
             continue
 
         if name != args.version:
             continue
 
-        names = {
-            'plural': plural,
-            'singular': singular,
-            'kind': kind,
-        }
+        resource = ResourceContext(crd['spec']['names'], version["name"])
+        context = WalkContext(resource, JSONPath(), schema)
 
-        generate_schema(content, names, plural, schema, False)
+        yaml_visitor = YAMLVisitor(resource)
+        walk(yaml_visitor, context)
 
-        break
+        asciidoc_visitor = AsciidocVisitor(resource, yaml_visitor.content)
+        walk(asciidoc_visitor, context)
 
-    return names
+        return resource, asciidoc_visitor.content
 
 
 def main():
@@ -387,28 +783,27 @@ def main():
     generated_docs = []
 
     for crd in crds:
-        content = ["// THIS FILE IS AUTO-GENERATED - DO NOT EDIT"]
-
-        names = generate(args, crd, content)
+        resource, content = generate(args, crd)
 
         if args.dry_run:
             continue
 
-        adoc_file_name = f'{names["singular"]}.adoc'
+        adoc_file_name = f'{resource.singular}.adoc'
         adoc_file_path = f'{adoc_autogen_dir}/{adoc_file_name}'
 
         with open(adoc_file_path, 'w', encoding="utf-8") as adoc_file:
+            adoc_file.write("// THIS FILE IS AUTO-GENERATED - DO NOT EDIT\n")
             adoc_file.write("\n".join(content))
 
         generated_docs.append({
-            'names': names,
+            'resource': resource,
             'xref': f'{AUTOGEN_DIR}/{adoc_file_name}'
         })
 
     with open('docs/user/modules/ROOT/partials/autogen-reference.adoc', 'w', encoding="utf-8") as nav_file:
         nav_file.write("// THIS FILE IS AUTO-GENERATED - DO NOT EDIT\n")
         for generated_doc in generated_docs:
-            nav_file.write(f"** xref:{generated_doc['xref']}[{generated_doc['names']['kind']} Resource]\n")
+            nav_file.write(f"** xref:{generated_doc['xref']}[{generated_doc['resource'].kind} Resource]\n")
 
 
 if __name__ == '__main__':

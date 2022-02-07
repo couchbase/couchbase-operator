@@ -9,6 +9,20 @@ The CouchbaseMemcachedBucket resource defines a set of documents in Couchbase se
 A Couchbase client connects to and operates on a bucket, which provides independent management of a set documents and a security boundary for role based access control.
 A CouchbaseEphemeralBucket provides in-memory only storage for documents contained by it.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasememcachedbuckets-apiversion,apiVersion>>: v2
+<<couchbasememcachedbuckets-kind,kind>>: CouchbaseMemcachedBucket
+<<couchbasememcachedbuckets-metadata,metadata>>:
+  <<couchbasememcachedbuckets-metadata-name,name>>: ""
+<<couchbasememcachedbuckets-spec,spec>>:
+  <<couchbasememcachedbuckets-spec-enableflush,enableFlush>>: false
+  <<couchbasememcachedbuckets-spec-memoryquota,memoryQuota>>: 100Mi
+  <<couchbasememcachedbuckets-spec-name,name>>: ""
+----
+
 == couchbasememcachedbuckets.apiVersion
 
 === Constraints

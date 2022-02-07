@@ -7,6 +7,71 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasebackup]
 
 CouchbaseBackup allows automatic backup of all data from a Couchbase cluster into persistent storage.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasebackups-apiversion,apiVersion>>: v2
+<<couchbasebackups-kind,kind>>: CouchbaseBackup
+<<couchbasebackups-metadata,metadata>>:
+  <<couchbasebackups-metadata-name,name>>: ""
+<<couchbasebackups-spec,spec>>:
+  <<couchbasebackups-spec-autoscaling,autoScaling>>:
+    <<couchbasebackups-spec-autoscaling-incrementpercent,incrementPercent>>: 20
+    <<couchbasebackups-spec-autoscaling-limit,limit>>: ""
+    <<couchbasebackups-spec-autoscaling-thresholdpercent,thresholdPercent>>: 20
+  <<couchbasebackups-spec-backofflimit,backoffLimit>>: 2
+  <<couchbasebackups-spec-backupretention,backupRetention>>: 720h
+  <<couchbasebackups-spec-data,data>>:
+    <<couchbasebackups-spec-data-exclude,exclude>>:
+    - ""
+    <<couchbasebackups-spec-data-include,include>>:
+    - ""
+  <<couchbasebackups-spec-failedjobshistorylimit,failedJobsHistoryLimit>>: 3
+  <<couchbasebackups-spec-full,full>>:
+    <<couchbasebackups-spec-full-schedule,schedule>>: ""
+  <<couchbasebackups-spec-incremental,incremental>>:
+    <<couchbasebackups-spec-incremental-schedule,schedule>>: ""
+  <<couchbasebackups-spec-logretention,logRetention>>: 168h
+  <<couchbasebackups-spec-s3bucket,s3bucket>>: ""
+  <<couchbasebackups-spec-services,services>>:
+    <<couchbasebackups-spec-services-analytics,analytics>>: True
+    <<couchbasebackups-spec-services-bucketconfig,bucketConfig>>: True
+    <<couchbasebackups-spec-services-bucketquery,bucketQuery>>: True
+    <<couchbasebackups-spec-services-clusteranalytics,clusterAnalytics>>: True
+    <<couchbasebackups-spec-services-clusterquery,clusterQuery>>: True
+    <<couchbasebackups-spec-services-data,data>>: True
+    <<couchbasebackups-spec-services-eventing,eventing>>: True
+    <<couchbasebackups-spec-services-ftsaliases,ftsAliases>>: True
+    <<couchbasebackups-spec-services-ftsindexes,ftsIndexes>>: True
+    <<couchbasebackups-spec-services-gsindexes,gsIndexes>>: True
+    <<couchbasebackups-spec-services-views,views>>: True
+  <<couchbasebackups-spec-size,size>>: 20Gi
+  <<couchbasebackups-spec-storageclassname,storageClassName>>: ""
+  <<couchbasebackups-spec-strategy,strategy>>: full_incremental
+  <<couchbasebackups-spec-successfuljobshistorylimit,successfulJobsHistoryLimit>>: 3
+  <<couchbasebackups-spec-threads,threads>>: 1
+<<couchbasebackups-status,status>>:
+  <<couchbasebackups-status-archive,archive>>: ""
+  <<couchbasebackups-status-backups,backups>>:
+  - <<couchbasebackups-status-backups-full,full>>: ""
+    <<couchbasebackups-status-backups-incrementals,incrementals>>:
+    - ""
+    <<couchbasebackups-status-backups-name,name>>: ""
+  <<couchbasebackups-status-capacityused,capacityUsed>>: ""
+  <<couchbasebackups-status-cronjob,cronjob>>: ""
+  <<couchbasebackups-status-duration,duration>>: ""
+  <<couchbasebackups-status-failed,failed>>: false
+  <<couchbasebackups-status-job,job>>: ""
+  <<couchbasebackups-status-lastfailure,lastFailure>>: ""
+  <<couchbasebackups-status-lastrun,lastRun>>: ""
+  <<couchbasebackups-status-lastsuccess,lastSuccess>>: ""
+  <<couchbasebackups-status-output,output>>: ""
+  <<couchbasebackups-status-pod,pod>>: ""
+  <<couchbasebackups-status-repo,repo>>: ""
+  <<couchbasebackups-status-running,running>>: false
+----
+
 == couchbasebackups.apiVersion
 
 === Constraints

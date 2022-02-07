@@ -8,6 +8,34 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasereplication]
 The CouchbaseReplication resource represents a Couchbase-to-Couchbase, XDCR replication stream from a source bucket to a destination bucket.
 This provides off-site backup, migration, and disaster recovery.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasereplications-apiversion,apiVersion>>: v2
+<<couchbasereplications-explicitmapping,explicitMapping>>:
+  <<couchbasereplications-explicitmapping-allowrules,allowRules>>:
+  - <<couchbasereplications-explicitmapping-allowrules-sourcekeyspace,sourceKeyspace>>:
+      <<couchbasereplications-explicitmapping-allowrules-sourcekeyspace-collection,collection>>: ""
+      <<couchbasereplications-explicitmapping-allowrules-sourcekeyspace-scope,scope>>: ""
+    <<couchbasereplications-explicitmapping-allowrules-targetkeyspace,targetKeyspace>>:
+      <<couchbasereplications-explicitmapping-allowrules-targetkeyspace-collection,collection>>: ""
+      <<couchbasereplications-explicitmapping-allowrules-targetkeyspace-scope,scope>>: ""
+  <<couchbasereplications-explicitmapping-denyrules,denyRules>>:
+  - <<couchbasereplications-explicitmapping-denyrules-sourcekeyspace,sourceKeyspace>>:
+      <<couchbasereplications-explicitmapping-denyrules-sourcekeyspace-collection,collection>>: ""
+      <<couchbasereplications-explicitmapping-denyrules-sourcekeyspace-scope,scope>>: ""
+<<couchbasereplications-kind,kind>>: CouchbaseReplication
+<<couchbasereplications-metadata,metadata>>:
+  <<couchbasereplications-metadata-name,name>>: ""
+<<couchbasereplications-spec,spec>>:
+  <<couchbasereplications-spec-bucket,bucket>>: ""
+  <<couchbasereplications-spec-compressiontype,compressionType>>: Auto
+  <<couchbasereplications-spec-filterexpression,filterExpression>>: ""
+  <<couchbasereplications-spec-paused,paused>>: false
+  <<couchbasereplications-spec-remotebucket,remoteBucket>>: ""
+----
+
 == couchbasereplications.apiVersion
 
 === Constraints

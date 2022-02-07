@@ -8,6 +8,22 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbaseautoscaler]
 CouchbaseAutoscaler provides an interface for the Kubernetes Horizontal Pod Autoscaler to interactive with the Couchbase cluster and provide autoscaling.
 This resource is not defined by the end user, and is managed by the Operator.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbaseautoscalers-apiversion,apiVersion>>: v2
+<<couchbaseautoscalers-kind,kind>>: CouchbaseAutoscaler
+<<couchbaseautoscalers-metadata,metadata>>:
+  <<couchbaseautoscalers-metadata-name,name>>: ""
+<<couchbaseautoscalers-spec,spec>>:
+  <<couchbaseautoscalers-spec-servers,servers>>: ""
+  <<couchbaseautoscalers-spec-size,size>>: 0
+<<couchbaseautoscalers-status,status>>:
+  <<couchbaseautoscalers-status-labelselector,labelSelector>>: ""
+  <<couchbaseautoscalers-status-size,size>>: 0
+----
+
 == couchbaseautoscalers.apiVersion
 
 === Constraints

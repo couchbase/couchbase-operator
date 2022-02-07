@@ -9,6 +9,28 @@ The CouchbaseScopeMigration resource represents the use of the special migration
 The bucket-to-bucket replication cannot duplicate any used by the CouchbaseReplication resource, as these two types of replication are mutually exclusive between buckets.
 https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html#migration.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasemigrationreplications-apiversion,apiVersion>>: v2
+<<couchbasemigrationreplications-kind,kind>>: CouchbaseMigrationReplication
+<<couchbasemigrationreplications-metadata,metadata>>:
+  <<couchbasemigrationreplications-metadata-name,name>>: ""
+<<couchbasemigrationreplications-migrationmapping,migrationMapping>>:
+  <<couchbasemigrationreplications-migrationmapping-mappings,mappings>>:
+  - <<couchbasemigrationreplications-migrationmapping-mappings-filter,filter>>: _default._default
+    <<couchbasemigrationreplications-migrationmapping-mappings-targetkeyspace,targetKeyspace>>:
+      <<couchbasemigrationreplications-migrationmapping-mappings-targetkeyspace-collection,collection>>: ""
+      <<couchbasemigrationreplications-migrationmapping-mappings-targetkeyspace-scope,scope>>: ""
+<<couchbasemigrationreplications-spec,spec>>:
+  <<couchbasemigrationreplications-spec-bucket,bucket>>: ""
+  <<couchbasemigrationreplications-spec-compressiontype,compressionType>>: Auto
+  <<couchbasemigrationreplications-spec-filterexpression,filterExpression>>: ""
+  <<couchbasemigrationreplications-spec-paused,paused>>: false
+  <<couchbasemigrationreplications-spec-remotebucket,remoteBucket>>: ""
+----
+
 == couchbasemigrationreplications.apiVersion
 
 === Constraints

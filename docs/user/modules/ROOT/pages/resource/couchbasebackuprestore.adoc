@@ -7,6 +7,70 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasebackuprestore]
 
 CouchbaseBackupRestore allows the restoration of all Couchbase cluster data from a CouchbaseBackup resource.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasebackuprestores-apiversion,apiVersion>>: v2
+<<couchbasebackuprestores-kind,kind>>: CouchbaseBackupRestore
+<<couchbasebackuprestores-metadata,metadata>>:
+  <<couchbasebackuprestores-metadata-name,name>>: ""
+<<couchbasebackuprestores-spec,spec>>:
+  <<couchbasebackuprestores-spec-backofflimit,backoffLimit>>: 2
+  <<couchbasebackuprestores-spec-backup,backup>>: ""
+  <<couchbasebackuprestores-spec-buckets,buckets>>:
+  <<couchbasebackuprestores-spec-data,data>>:
+    <<couchbasebackuprestores-spec-data-exclude,exclude>>:
+    - ""
+    <<couchbasebackuprestores-spec-data-filterkeys,filterKeys>>: ""
+    <<couchbasebackuprestores-spec-data-filtervalues,filterValues>>: ""
+    <<couchbasebackuprestores-spec-data-include,include>>:
+    - ""
+    <<couchbasebackuprestores-spec-data-map,map>>:
+    - <<couchbasebackuprestores-spec-data-map-source,source>>: ""
+      <<couchbasebackuprestores-spec-data-map-target,target>>: ""
+  <<couchbasebackuprestores-spec-end,end>>:
+    <<couchbasebackuprestores-spec-end-int,int>>: 0
+    <<couchbasebackuprestores-spec-end-str,str>>: ""
+  <<couchbasebackuprestores-spec-forceupdates,forceUpdates>>: false
+  <<couchbasebackuprestores-spec-logretention,logRetention>>: 168h
+  <<couchbasebackuprestores-spec-repo,repo>>: ""
+  <<couchbasebackuprestores-spec-s3bucket,s3bucket>>: ""
+  <<couchbasebackuprestores-spec-services,services>>:
+    <<couchbasebackuprestores-spec-services-analytics,analytics>>: True
+    <<couchbasebackuprestores-spec-services-bucketconfig,bucketConfig>>: false
+    <<couchbasebackuprestores-spec-services-bucketquery,bucketQuery>>: True
+    <<couchbasebackuprestores-spec-services-clusteranalytics,clusterAnalytics>>: True
+    <<couchbasebackuprestores-spec-services-clusterquery,clusterQuery>>: True
+    <<couchbasebackuprestores-spec-services-data,data>>: True
+    <<couchbasebackuprestores-spec-services-eventing,eventing>>: True
+    <<couchbasebackuprestores-spec-services-ftalias,ftAlias>>: True
+    <<couchbasebackuprestores-spec-services-ftindex,ftIndex>>: True
+    <<couchbasebackuprestores-spec-services-gsiindex,gsiIndex>>: True
+    <<couchbasebackuprestores-spec-services-views,views>>: True
+  <<couchbasebackuprestores-spec-start,start>>:
+    <<couchbasebackuprestores-spec-start-int,int>>: 0
+    <<couchbasebackuprestores-spec-start-str,str>>: ""
+  <<couchbasebackuprestores-spec-threads,threads>>: 1
+<<couchbasebackuprestores-status,status>>:
+  <<couchbasebackuprestores-status-archive,archive>>: ""
+  <<couchbasebackuprestores-status-backups,backups>>:
+  - <<couchbasebackuprestores-status-backups-full,full>>: ""
+    <<couchbasebackuprestores-status-backups-incrementals,incrementals>>:
+    - ""
+    <<couchbasebackuprestores-status-backups-name,name>>: ""
+  <<couchbasebackuprestores-status-duration,duration>>: ""
+  <<couchbasebackuprestores-status-failed,failed>>: false
+  <<couchbasebackuprestores-status-job,job>>: ""
+  <<couchbasebackuprestores-status-lastfailure,lastFailure>>: ""
+  <<couchbasebackuprestores-status-lastrun,lastRun>>: ""
+  <<couchbasebackuprestores-status-lastsuccess,lastSuccess>>: ""
+  <<couchbasebackuprestores-status-output,output>>: ""
+  <<couchbasebackuprestores-status-pod,pod>>: ""
+  <<couchbasebackuprestores-status-repo,repo>>: ""
+  <<couchbasebackuprestores-status-running,running>>: false
+----
+
 == couchbasebackuprestores.apiVersion
 
 === Constraints

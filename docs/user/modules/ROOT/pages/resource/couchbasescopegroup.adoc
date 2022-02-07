@@ -13,6 +13,26 @@ In order to be considered by the Operator, a scope must be referenced by either 
 Unlike `CouchbaseScope` resources, scope groups represents multiple scopes, with the same common set of collections, to be expressed as a single resource, minimizing required configuration and Kubernetes API traffic.
 It also forms the basis of Couchbase RBAC security boundaries.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasescopegroups-apiversion,apiVersion>>: v2
+<<couchbasescopegroups-kind,kind>>: CouchbaseScopeGroup
+<<couchbasescopegroups-metadata,metadata>>:
+  <<couchbasescopegroups-metadata-name,name>>: ""
+<<couchbasescopegroups-spec,spec>>:
+  <<couchbasescopegroups-spec-collections,collections>>:
+    <<couchbasescopegroups-spec-collections-managed,managed>>: false
+    <<couchbasescopegroups-spec-collections-preservedefaultcollection,preserveDefaultCollection>>: false
+    <<couchbasescopegroups-spec-collections-resources,resources>>:
+    - <<couchbasescopegroups-spec-collections-resources-kind,kind>>: CouchbaseCollection
+      <<couchbasescopegroups-spec-collections-resources-name,name>>: ""
+    <<couchbasescopegroups-spec-collections-selector,selector>>: {}
+  <<couchbasescopegroups-spec-names,names>>:
+  - ""
+----
+
 == couchbasescopegroups.apiVersion
 
 === Constraints

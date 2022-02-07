@@ -10,6 +10,19 @@ Collections contain all documents and indexes in the system.
 Collections also form the finest grain basis for role-based access control (RBAC) and cross-datacenter replication (XDCR).
 In order to be considered by the Operator, every collection must be referenced by a `CouchbaseScope` or `CouchbaseScopeGroup` resource.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbasecollections-apiversion,apiVersion>>: v2
+<<couchbasecollections-kind,kind>>: CouchbaseCollection
+<<couchbasecollections-metadata,metadata>>:
+  <<couchbasecollections-metadata-name,name>>: ""
+<<couchbasecollections-spec,spec>>:
+  <<couchbasecollections-spec-maxttl,maxTTL>>: ""
+  <<couchbasecollections-spec-name,name>>: ""
+----
+
 == couchbasecollections.apiVersion
 
 === Constraints

@@ -9,6 +9,33 @@ The CouchbaseEphemeralBucket resource defines a set of documents in Couchbase se
 A Couchbase client connects to and operates on a bucket, which provides independent management of a set documents and a security boundary for role based access control.
 A CouchbaseEphemeralBucket provides in-memory only storage and replication for documents contained by it.
 
+The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
+
+[source,yaml,subs="+macros"]
+----
+<<couchbaseephemeralbuckets-apiversion,apiVersion>>: v2
+<<couchbaseephemeralbuckets-kind,kind>>: CouchbaseEphemeralBucket
+<<couchbaseephemeralbuckets-metadata,metadata>>:
+  <<couchbaseephemeralbuckets-metadata-name,name>>: ""
+<<couchbaseephemeralbuckets-spec,spec>>:
+  <<couchbaseephemeralbuckets-spec-compressionmode,compressionMode>>: passive
+  <<couchbaseephemeralbuckets-spec-conflictresolution,conflictResolution>>: seqno
+  <<couchbaseephemeralbuckets-spec-enableflush,enableFlush>>: false
+  <<couchbaseephemeralbuckets-spec-evictionpolicy,evictionPolicy>>: noEviction
+  <<couchbaseephemeralbuckets-spec-iopriority,ioPriority>>: low
+  <<couchbaseephemeralbuckets-spec-maxttl,maxTTL>>: ""
+  <<couchbaseephemeralbuckets-spec-memoryquota,memoryQuota>>: 100Mi
+  <<couchbaseephemeralbuckets-spec-minimumdurability,minimumDurability>>: ""
+  <<couchbaseephemeralbuckets-spec-name,name>>: ""
+  <<couchbaseephemeralbuckets-spec-replicas,replicas>>: 1
+  <<couchbaseephemeralbuckets-spec-scopes,scopes>>:
+    <<couchbaseephemeralbuckets-spec-scopes-managed,managed>>: false
+    <<couchbaseephemeralbuckets-spec-scopes-resources,resources>>:
+    - <<couchbaseephemeralbuckets-spec-scopes-resources-kind,kind>>: CouchbaseScope
+      <<couchbaseephemeralbuckets-spec-scopes-resources-name,name>>: ""
+    <<couchbaseephemeralbuckets-spec-scopes-selector,selector>>: {}
+----
+
 == couchbaseephemeralbuckets.apiVersion
 
 === Constraints
@@ -298,64 +325,3 @@ Legal scope names have a maximum length of 251 characters and may be composed of
 
 Selector allows resources to be implicitly considered for inclusion in this bucket.
 More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta.
-
-=== couchbaseephemeralbuckets.spec.scopes.selector.matchExpressions
-
-==== Constraints
-
-*Type*: `[]object`
-
-==== Description
-
-matchExpressions is a list of label selector requirements.
-The requirements are ANDed.
-
-=== couchbaseephemeralbuckets.spec.scopes.selector.matchExpressions.key
-
-==== Constraints
-
-*Required*
-
-*Type*: `string`
-
-==== Description
-
-key is the label key that the selector applies to.
-
-=== couchbaseephemeralbuckets.spec.scopes.selector.matchExpressions.operator
-
-==== Constraints
-
-*Required*
-
-*Type*: `string`
-
-==== Description
-
-operator represents a key's relationship to a set of values.
-Valid operators are In, NotIn, Exists and DoesNotExist.
-
-=== couchbaseephemeralbuckets.spec.scopes.selector.matchExpressions.values
-
-==== Constraints
-
-*Type*: `[]string`
-
-==== Description
-
-values is an array of string values.
-If the operator is In or NotIn, the values array must be non-empty.
-If the operator is Exists or DoesNotExist, the values array must be empty.
-This array is replaced during a strategic merge patch.
-
-=== couchbaseephemeralbuckets.spec.scopes.selector.matchLabels
-
-==== Constraints
-
-*Type*: `map[string]string`
-
-==== Description
-
-matchLabels is a map of {key,value} pairs.
-A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value".
-The requirements are ANDed.
