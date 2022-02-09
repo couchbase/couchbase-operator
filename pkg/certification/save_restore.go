@@ -694,9 +694,9 @@ func gatherClusterResources(clients *clients, cluster *couchbasev2.CouchbaseClus
 				Cert: cert,
 				Key:  key,
 			}
-
-			apiClient.SetTLS(tls)
 		}
+
+		apiClient.SetTLS(tls)
 	}
 
 	// Insert this here while we have the client tunnel open.
