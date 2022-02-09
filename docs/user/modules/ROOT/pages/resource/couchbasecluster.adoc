@@ -1838,7 +1838,7 @@ This field must be one of "NodePort" or "LoadBalancer", defaulting to "NodePort"
 
 ==== Description
 
-*DEPRECATED* - not required by Couchbase Server 6.5.0 onward.
+*DEPRECATED* - not required by Couchbase Server.
 
 AdminConsoleServices is a selector to choose specific services to expose via the admin console.
 This field may contain any of "data", "index", "query", "search", "eventing" and "analytics".

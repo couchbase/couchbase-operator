@@ -29,21 +29,6 @@ cb-example-0002   1/1     Running   0          68m
 
 <1> Replace `cb-example` with the cluster name you require.
 
-If you are using multi-dimensional scaling then you will need to specify the subset of pods to use.
-Versions of Couchbase Server before version 6.5.0 require you to connect to a node that is running the service you are trying to access.
-This can be achieved by providing a second filter to specify the service you require (`data`, `index`, `query`, `search`, `eventing` or `analytics`):
-
-[source,console]
-----
-$ kubectl get pods -l couchbase_cluster=cb-example,couchbase_service_query=enabled # <1>
-NAME              READY   STATUS    RESTARTS   AGE
-cb-example-0000   1/1     Running   0          73m
-cb-example-0001   1/1     Running   0          72m
-cb-example-0002   1/1     Running   0          72m
-----
-
-<1> Replace `query` with the service you require.
-
 To port forward to a chosen pod use the following command:
 
 [source,console]

@@ -6,7 +6,7 @@ This section shows a simple way to create and manage a TLS certificate hierarchy
 include::partial$tutorial.adoc[]
 
 Creating X.509 certificates is beyond the scope of this documentation and is given only for illustrative purposes only.
-Please consult the https://docs.couchbase.com/server/6.5/learn/security/certificates.html[Couchbase Server documentation^] for additional details on certificate and TLS configuration.
+Please consult the xref:server:learn:security/certificates.adoc[Couchbase Server documentation^] for additional details on certificate and TLS configuration.
 
 == EasyRSA
 

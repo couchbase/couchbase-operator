@@ -2371,7 +2371,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// The service is configured by the adminConsoleServiceTemplate field.
 	ExposeAdminConsole bool `json:"exposeAdminConsole,omitempty"`
 
-	// DEPRECATED - not required by Couchbase Server 6.5.0 onward.
+	// DEPRECATED - not required by Couchbase Server.
 	// AdminConsoleServices is a selector to choose specific services to expose via the admin
 	// console. This field may contain any of "data", "index", "query", "search", "eventing"
 	// and "analytics".  Each service may only be included once.

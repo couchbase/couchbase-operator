@@ -146,7 +146,7 @@ For further information consult the xref:concept-scopes-and-collections.adoc[Sco
 ==== Backup and Restore Improvements
 
 Due to interface changes introduced in Couchbase Server 7.0, a new backup image (1.2.0) is the only supported version that will run with Operator 2.3.
-It continues to support operation with Couchbase Server version 6.5 and 6.6.
+It continues to support operation with all supported Couchbase Server versions.
 
 [IMPORTANT]
 ====

@@ -76,11 +76,6 @@ Given our example cluster and namespace names:
 
 == DNS Based Addressing with External DNS
 
-[IMPORTANT]
-====
-XDCR in Couchbase Server 6.5.1 and 6.5.2 does not support load balancing, please see <<cbs-651>> for additional instructions.
-====
-
 DNS based addressing with External DNS is slightly different to plain DNS.
 The External DNS controller does not support SRV records, instead we use HTTPS.
 Fault-tolerance is provided by a load balancer service.
@@ -102,11 +97,6 @@ To mitigate the potential for errors, ensure your clients are not continually co
 ====
 
 == IP Based Addressing
-
-[IMPORTANT]
-====
-XDCR in Couchbase Server 6.5.1 and 6.5.2 does not support load balancing, please see <<cbs-651>> for additional instructions.
-====
 
 IP based addressing is only used when connecting a client SDK with a node-port service.
 As this is IP based TLS is not supported.
@@ -139,61 +129,3 @@ The address to connect to is `\http://10.0.2.15:31410?network=external`.
 ====
 Use of client SDKs with this network configuration relies on support for DNAT, which in turn requires that the SDK support xref:concept-couchbase-networking.adoc#exposed-features[exposed features].
 ====
-
-[#cbs-651]
-== Special Considerations for XDCR in Couchbase Server 6.5.1 and 6.5.2
-
-The Operator allows Couchbase Server to advertise alternate addresses--for cluster service discovery--that are visible outside of the Kubernetes cluster.
-Such addresses may be public DNS names--referencing external load balancers--or node ports--referencing Kubernetes node IP addresses.
-Couchbase Server 6.5.1 introduced a feature whereby it can infer whether to use the internal or alternate addresses based on the supplied connection string.
-
-In order for XDCR to use alternate addresses, it expects an exact match between the connection string and one of the alternate addresses advertised by the remote cluster.
-Likewise, when configuring XDCR with Couchbase Server 6.5.1 and 6.5.2 you must supply an individual pod's alternate address.
-
-As a result the connection string is not stable.
-You cannot remove a remote cluster reference and restore it, as the cluster topology and pod names may have changed in the intervening period.
-Therefore the configuration processes outlined in this section must be followed each time a connection is established.
-
-=== DNS Based Addressing with External DNS
-
-On your target cluster, first list pods associated with your Couchbase cluster, in this example named `foo`:
-
-[source,console]
-----
-$ kubectl get pods -l couchbase_cluster=foo
-----
-
-Select any pod that is returned e.g. `foo-0000`.
-The DNS domain is the same as specified by the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-dns-domain[`couchbaseclusters.spec.networking.dns.domain`] attribute.
-If the DNS domain is set to `my-cluster.acme.org`, then the connection string to use will be `\https://foo-0000.my-cluster.acme.org:18091`.
-
-=== IP Based Addressing
-
-On your target cluster, first list pods associated with your Couchbase cluster, in this example named `foo`:
-
-[source,console]
-----
-$ kubectl get pods -l couchbase_cluster=foo
-----
-
-Select any pod that is returned e.g. `foo-0000`.
-Get the Kubernetes node IP address that the pod is running on:
-
-[source,console]
-----
-$ kubectl get pod foo-0000 --template={{.status.hostIP}}
-10.0.2.15
-----
-
-Next get the node port service associated with the pod:
-
-[source,console]
-----
-$ kubectl get service foo-0000
-t svc cb-example-0000
-NAME       TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)                                                                                         AGE
-foo-0000   NodePort   10.111.214.55   <none>        11210:30295/TCP,11207:31890/TCP,8091:30816/TCP,18091:30597/TCP,8092:30804/TCP,18092:30523/TCP   21s
-----
-
-Select the node port associated with port 8091, in this instance `30816`.
-The connection string to use is `\https://10.0.2.15:30816`.
