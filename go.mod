@@ -12,7 +12,6 @@ require (
 	github.com/go-openapi/errors v0.20.0
 	github.com/golang/glog v1.0.0
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
-	github.com/golangci/golangci-lint v1.42.1 // indirect
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.2.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
@@ -29,9 +28,7 @@ require (
 	k8s.io/apimachinery v0.23.2
 	k8s.io/cli-runtime v0.23.2
 	k8s.io/client-go v0.23.2
-	k8s.io/code-generator v0.23.2 // indirect
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-aggregator v0.23.2
 	sigs.k8s.io/controller-runtime v0.11.0
-	sigs.k8s.io/controller-tools v0.8.0 // indirect
 )

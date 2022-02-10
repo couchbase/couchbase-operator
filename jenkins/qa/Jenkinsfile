@@ -43,8 +43,9 @@ pipeline {
 
   environment {
     GOVERSION = "1.17.1"
+    GOBIN = "${env.WORKSPACE}/bin"
     GOROOT = "${env.WORKSPACE}/go"
-    PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:${env.WORKSPACE}/google-cloud-sdk/bin:$PATH"
+    PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:${env.WORKSPACE}/google-cloud-sdk/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
     GITLAB_CREDENTIALS = credentials('gitlab-couchbaseqe')
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')

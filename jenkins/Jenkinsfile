@@ -4,9 +4,10 @@ pipeline {
   }
 
   environment {
+    GOBIN = "${env.WORKSPACE}/bin"
     GOVERSION = '1.17.1'
     NODEVERSION = '14.15.4'
-    PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
+    PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
   }
 
   stages {

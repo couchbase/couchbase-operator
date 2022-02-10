@@ -8,6 +8,15 @@ CERTIFICATION_BINARY = build/bin/certification
 CAO_BINARY = build/bin/cao
 ARTIFACTS = build/artifacts
 
+# External go tools configuration.
+# We install these when used, so they override things other builds have done
+# and also avoid scruitiny from scanners.
+GOPATH := $(shell go env GOPATH)
+GOBIN := $(if $(GOPATH),$(GOPATH)/bin,$(HOME)/go/bin)
+GOLINT_VERSION := v1.42.1
+CODE_GENERATOR_VERSION := v0.23.2 # Should be kept in sync with other libs in go.mod
+CONTROLLER_TOOLS_VERSION := v0.8.0 # See https://github.com/kubernetes-sigs/controller-tools/releases
+
 # These names are very important.  The directory name `couchbase-badger`
 # is used to determine the image name IRL `couchbase/badger` by the build
 # process.
@@ -107,22 +116,26 @@ touch-generated:
 
 # Build the V2 deep copy functions when the API source changes.
 pkg/apis/couchbase/v2/zz_generated.deepcopy.go: $(APISRC_V2)
-	go run k8s.io/code-generator/cmd/deepcopy-gen --input-dirs $(API_PACKAGE_V2) -O zz_generated.deepcopy --bounding-dirs $(API_PACKAGE_BASE) $(CODEGEN_ARGS)
+	@go install k8s.io/code-generator/cmd/deepcopy-gen@$(CODE_GENERATOR_VERSION)
+	$(GOBIN)/deepcopy-gen --input-dirs $(API_PACKAGE_V2) -O zz_generated.deepcopy --bounding-dirs $(API_PACKAGE_BASE) $(CODEGEN_ARGS)
 
 # Build the couchbase kubernetes client when any API source changes.
 pkg/generated/clientset: $(APISRC)
 	@rm -rf $@
-	go run k8s.io/code-generator/cmd/client-gen --clientset-name $(CLIENTSET_NAME) --input-base "" --input $(API_PACKAGE_V2) --output-package $(CLIENTSET_PACKAGE) $(CODEGEN_ARGS)
+	@go install k8s.io/code-generator/cmd/client-gen@$(CODE_GENERATOR_VERSION)
+	$(GOBIN)/client-gen --clientset-name $(CLIENTSET_NAME) --input-base "" --input $(API_PACKAGE_V2) --output-package $(CLIENTSET_PACKAGE) $(CODEGEN_ARGS)
 
 # Build the couchbase kubernetes listers when any API source changes.
 pkg/generated/listers: $(APISRC)
 	@rm -rf $@
-	go run k8s.io/code-generator/cmd/lister-gen --input-dirs $(API_PACKAGE_V2) --output-package $(LISTERS_PACKAGE) $(CODEGEN_ARGS)
+	@go install k8s.io/code-generator/cmd/lister-gen@$(CODE_GENERATOR_VERSION)
+	$(GOBIN)/lister-gen --input-dirs $(API_PACKAGE_V2) --output-package $(LISTERS_PACKAGE) $(CODEGEN_ARGS)
 
 # Build the couchbase kubernetes informers when the clients or listers update.
 pkg/generated/informers: pkg/generated/clientset pkg/generated/listers
 	@rm -rf $@
-	go run k8s.io/code-generator/cmd/informer-gen --input-dirs $(API_PACKAGE_V2) --versioned-clientset-package $(CLIENTSET_PACKAGE)/$(CLIENTSET_NAME) --listers-package $(LISTERS_PACKAGE) --output-package $(INFORMERS_PACKAGE) $(CODEGEN_ARGS)
+	@go install k8s.io/code-generator/cmd/informer-gen@$(CODE_GENERATOR_VERSION)
+	$(GOBIN)/informer-gen --input-dirs $(API_PACKAGE_V2) --versioned-clientset-package $(CLIENTSET_PACKAGE)/$(CLIENTSET_NAME) --listers-package $(LISTERS_PACKAGE) --output-package $(INFORMERS_PACKAGE) $(CODEGEN_ARGS)
 
 # Make all binaries
 binaries: $(OPERATOR_BINARY) $(ADMISSION_BINARY) $(CBOPCFG_BINARY) $(CBOPINFO_BINARY) $(CAO_BINARY)
@@ -172,7 +185,8 @@ crd: $(CRD_FILE)
 
 # Build the CRDs from the binary when the binary updates.
 $(CRD_FILE): $(APISRC_V2)
-	go run sigs.k8s.io/controller-tools/cmd/controller-gen crd:crdVersions=v1 paths=./pkg/apis/couchbase/v2 output:dir=example
+	@go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+	$(GOBIN)/controller-gen crd:crdVersions=v1 paths=./pkg/apis/couchbase/v2 output:dir=example
 	@cat example/couchbase.com_*.yaml > $@
 	go run -ldflags $(LDFLAGS) scripts/crd-transform.go -in $@ -out $@
 	@rm example/couchbase.com_*.yaml
@@ -182,7 +196,8 @@ build-test: ${CERTIFICATION_BINARY}
 
 # Lint target to test source code compliance.
 lint: $(GENERATED_FILES)
-	go run github.com/golangci/golangci-lint/cmd/golangci-lint run ./pkg/... ./cmd/... ./test/...
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLINT_VERSION)
+	$(GOBIN)/golangci-lint run ./pkg/... ./cmd/... ./test/...
 
 # Lint python scripts for dodgy code.
 lint-python:
