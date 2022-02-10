@@ -283,6 +283,9 @@ type saveOptions struct {
 	// filePath is where to write the save data to, and may be an absolute or relative
 	// path.  This parameter is required.
 	filePath string
+
+	// debug is a secret hidden flag that shows a lot more detail.
+	debug bool
 }
 
 // getSaveDataTopologyCommand returns a cobra command that encapsulates the save functionality.
@@ -334,6 +337,8 @@ func getSaveDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 				os.Exit(1)
 			}
 
+			o.prepare()
+
 			if err := o.save(flags); err != nil {
 				log.Info(err)
 				os.Exit(1)
@@ -344,6 +349,9 @@ func getSaveDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 	cmd.Flags().StringVar(&o.cluster, "cluster", "", "Cluster to save from (CouchbaseCluster resource name)")
 	cmd.Flags().Var(&o.path, "path", "Path to save data from.  Default will save all buckets, scopes and collections.  '/bucket' will save all scopes and collection in Couchbase bucket 'bucket'.  '/bucket/scope' will save all collections in Couchbase bucket 'bucket' and Couchbase scope 'scope'.")
 	cmd.Flags().StringVarP(&o.filePath, "filename", "f", "", "Filename to write the save data to.  This flag is required.")
+
+	cmd.Flags().BoolVar(&o.debug, "debug", false, "Enable debug output")
+	_ = cmd.Flags().MarkHidden("debug")
 
 	return cmd
 }
@@ -359,6 +367,13 @@ func (o *saveOptions) validate(args []string) error {
 	}
 
 	return nil
+}
+
+// prepare does any necessary setup work.
+func (o *saveOptions) prepare() {
+	if o.debug {
+		log.Verbosity = cli.Debug
+	}
 }
 
 // save is the top level save function.
@@ -633,16 +648,20 @@ func gatherClusterResources(clients *clients, cluster *couchbasev2.CouchbaseClus
 		return nil, err
 	}
 
-	host := fmt.Sprintf("http://localhost:%v", port)
-
 	// Default to "plaintext" (we still run over a HTTP/2 transport),
 	// but if using TLS, the inherent danger is you are using strict
 	// mode TLS, therefore no plaintext ports are open.
+	scheme := "http"
 	targetPort := k8sutil.AdminServicePort
 
 	if cluster.IsTLSEnabled() {
+		log.V(1).Info("Cluster using TLS, defaulting to https")
+
+		scheme = "https"
 		targetPort = k8sutil.AdminServicePortTLS
 	}
+
+	host := fmt.Sprintf("%s://localhost:%v", scheme, port)
 
 	pf := portforward.PortForwarder{
 		Config:    clients.config,
