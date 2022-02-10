@@ -56,7 +56,7 @@ Kubernetes::
 --
 [source,console,subs="attributes,verbatim"]
 ----
-helm install <my-release> {helm-repo}
+helm install <my-release> --set cluster.name=<cluster-name> {helm-repo}
 ----
 --
 

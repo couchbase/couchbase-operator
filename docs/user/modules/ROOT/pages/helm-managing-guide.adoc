@@ -46,37 +46,44 @@ Refer to the xref:howto-operator-upgrade.adoc#update-crd[Operator upgrade docume
 .To replace the CRDs:
 
 To replace the CRDs pull the current helm chart:
-[source,console]
+[source,console, subs="attributes,verbatim"]
 ----
-helm pull couchbase/couchbase-operator
+helm pull {helm-repo}
 tar -xf couchbase-operator-<version>.tgz
 ----
 
-Then replace the CRDs with the latest version:
+Then update the CRDs with the latest version:
 [source,console]
 ----
-kubectl replace -f  couchbase-operator/crds/couchbase.crds.yaml
+kubectl apply -f  couchbase-operator/crds/couchbase.crds.yaml
 ----
 
-.To upgrade the Autonomous Operator using Helm:
-
-To upgrade the Autonomous Operator using Helm, start by updating the CRD:
-[source,console]
-----
-kubectl apply -f <crds.yaml>
-----
-
-Where `<crds.yaml>` is the CRD definitions for the release to upgrade to, refer to the xref:howto-operator-upgrade.adoc[Operator upgrade documentation] for details on these.
-If the original CRDs were added using `kubectl create` then errors may be reported  during `kubectl apply` indicating this but they can be ignored: these errors will include text similar to `non applied resources being applied`.
-The point is to ensure any old ones are updated or removed plus new ones are added.
-
-Once those are complete then upgrade the chart version:
+The point is to ensure any new CRDs are added and the old ones are updated.
+Once the CRD upgrade is complete, then upgrade the chart version:
 [source,console,subs="attributes,verbatim"]
 ----
 helm upgrade --version <chart-version> <release-name> {helm-repo}
 ----
 
 Where `<chart-version>` is the version of the Couchbase Helm Chart that you want to upgrade to, and `<release-name>` is the name of the release that is managing the instance of the Autonomous Operator that you wish to upgrade.
+
+[WARNING]
+====
+Chart versions 2.2 and below are at risk of encountering an issue when upgrading to chart version 2.3 due to https://issues.couchbase.com/browse/MB-34280[Cluster name limitations^].
+In general if your Couchbase Server version is 6.6.3 and below, and you plan to upgrade to a higher version then your cluster will be at risk of this issue.
+====
+
+To determine if your cluster is potentially at risk of https://issues.couchbase.com/browse/MB-34280[Cluster name limitations^], you will need to deduce what sort of stream name Couchbase Server will derive from your Couchbase Pods.
+The stream name is what Couchbase Server uses internally to replicate data between nodes.
+Since the stream name consists of the Couchbase Custer name as both the hostname and domain in both source and target endpoints, a good general rule is the multiply your cluster name by `6` to account for additional bucket name and various other bits:
+[source,console]
+----
+name=<cluster_name>
+echo $(( `echo $cluster | wc -c`  * 6 ))
+----
+*If this value exceeds `200` you should proceed with caution.*
+If upgrade fails you will need to rebuild your cluster.
+
 
 ==== Limitations
 
@@ -93,7 +100,10 @@ The first method is to upgrade the release to a newer version of the Couchbase H
 The second method is to update the existing release to use a newer Couchbase Server image.
 The first method is preferred, since upgrading the entire chart will ensure that any potential new parameters required to configure the cluster are defined.
 
-IMPORTANT: When upgrading a Couchbase cluster, you should first upgrade the Autonomous Operator to the latest compatible version so as to ensure that the cluster can be properly managed.
+[IMPORTANT]
+====
+When upgrading a Couchbase cluster, you should first upgrade the Autonomous Operator to the latest compatible version so as to ensure that the cluster can be properly managed.
+====
 
 .To upgrade a Couchbase cluster by using a newer chart
 . Check the default Couchbase Server version of a chart to make sure that it uses the version that you want to upgrade your cluster to.

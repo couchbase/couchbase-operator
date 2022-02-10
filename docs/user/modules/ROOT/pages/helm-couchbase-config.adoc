@@ -179,10 +179,10 @@ cluster:
             storage: 1Gi
 ----
 
-Install the cluster chart using the custom value file:
-[source,console]
+Install the Couchbase Helm Chart using the custom value file:
+[source,console, subs="attributes,verbatim"]
 ----
-helm install my-release -f values-persistent.yaml couchbase/couchbase-cluster
+helm install my-release -f values-persistent.yaml {helm-repo}
 ----
 
 === additional values
@@ -244,9 +244,9 @@ ____
 === Custom TLS
 
 Create cluster with auto-generated TLS certs
-[source,console]
+[source,console, subs="attributes,verbatim"]
 ----
-helm install my-release --set tls.generate=true couchbase/couchbase-cluster
+helm install my-release --set tls.generate=true -f values-persistent.yaml {helm-repo}
 ----
 
 Use manually created secrets
@@ -267,9 +267,9 @@ cluster:
 
 Refer to xref:concept-tls.adoc[TLS Concept] documentation for additional information about available security options.
 
-[source,console]
+[source,console, subs="attributes,verbatim"]
 ----
-helm install  my-release -f tls_values.yaml couchbase/couchbase-cluster
+helm install  my-release -f tls_values.yaml {helm-repo}
 ----
 
 == Buckets
@@ -604,7 +604,7 @@ a| The `imagePullSecrets` value is a list which is not set by default.
 Refer to the Operator documentation about xref:install-openshift.adoc#create-an-imagepullsecret[creating pull secrets].
 When using the Helm CLI to override pull secrets, the list should be denoted as a comma delimited list within curly braces:
 
-[source,console]
+[source,console, subs="attributes,verbatim"]
 ----
 helm install --set admissionController.imagePullSecrets={pullsecret1,pullsecret2} {helm-repo}
 ----
@@ -687,7 +687,7 @@ openssl req -x509 -new -nodes -key myCA.key -sha256 -days 1825 -outform PEM -out
 +
 Use `--set-file` to import the files from your current directory:
 +
-[source,console]
+[source,console, subs="attributes,verbatim"]
 ----
 helm install  --set-file admissionCA.cert=myCA.pem \
               --set-file admissionCA.key=myCA.key \
@@ -758,7 +758,7 @@ Install chart with custom certs and be sure to set `admissionService.name` to DN
 +
 This example also sets `--namespace default` option since this is also included in the DNS of cert we created:
 +
-[source,console]
+[source,console, subs="attributes,verbatim"]
 ----
 helm install  --namespace ci-testcluster \
               --set admissionService.name=ci-testcluster \
