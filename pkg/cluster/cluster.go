@@ -220,7 +220,7 @@ func (c *Cluster) newCluster() error {
 
 	// Create a new persistence layer to store and retrieve state.  Add in
 	// defaults if they don't exist.
-	if c.state, err = persistence.New(c.k8s.KubeClient, c.cluster); err != nil {
+	if c.state, err = persistence.New(c.k8s, c.cluster); err != nil {
 		return err
 	}
 

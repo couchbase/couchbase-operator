@@ -5,15 +5,17 @@ import (
 	goerrors "errors"
 	"fmt"
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // PersistentKind is the sybolic name for something kept in persistent storage.
@@ -105,13 +107,13 @@ var ErrKeyError = goerrors.New("key error")
 // persistentStorageImpl provides state to the Operator, at present
 // through ConfigMaps to keep configuration simple.
 type persistentStorageImpl struct {
-	client kubernetes.Interface
-	secret *corev1.Secret
+	client    *client.Client
+	couchbase *couchbasev2.CouchbaseCluster
 }
 
 // upgrade spots old 2.0 and older config maps and makes them secrets.
-func upgrade(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) error {
-	configmap, err := client.CoreV1().ConfigMaps(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
+func upgrade(client *client.Client, couchbase *couchbasev2.CouchbaseCluster) error {
+	configmap, err := client.KubeClient.CoreV1().ConfigMaps(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -131,7 +133,7 @@ func upgrade(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluste
 		StringData: configmap.Data,
 	}
 
-	if _, err = client.CoreV1().Secrets(couchbase.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
+	if _, err = client.KubeClient.CoreV1().Secrets(couchbase.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 		if apierrors.IsConflict(err) {
 			return fmt.Errorf("cluster persistent storage secret already exists: %w", err)
 		}
@@ -139,7 +141,7 @@ func upgrade(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluste
 		return errors.NewStackTracedError(err)
 	}
 
-	if err := client.CoreV1().ConfigMaps(couchbase.Namespace).Delete(context.Background(), couchbase.Name, *metav1.NewDeleteOptions(0)); err != nil {
+	if err := client.KubeClient.CoreV1().ConfigMaps(couchbase.Namespace).Delete(context.Background(), couchbase.Name, *metav1.NewDeleteOptions(0)); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
@@ -148,18 +150,13 @@ func upgrade(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluste
 
 // New creates a new persistent storage object referencing a new or
 // existing config map.
-func New(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (PersistentStorage, error) {
+func New(client *client.Client, couchbase *couchbasev2.CouchbaseCluster) (PersistentStorage, error) {
 	if err := upgrade(client, couchbase); err != nil {
 		return nil, err
 	}
 
-	secret, err := client.CoreV1().Secrets(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, errors.NewStackTracedError(err)
-		}
-
-		secret = &corev1.Secret{
+	if _, ok := client.Secrets.Get(couchbase.Name); !ok {
+		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   couchbase.Name,
 				Labels: k8sutil.LabelsForCluster(couchbase),
@@ -169,113 +166,151 @@ func New(client kubernetes.Interface, couchbase *couchbasev2.CouchbaseCluster) (
 			},
 		}
 
-		if secret, err = client.CoreV1().Secrets(couchbase.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
+		if _, err := client.KubeClient.CoreV1().Secrets(couchbase.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 			return nil, errors.NewStackTracedError(err)
 		}
 	}
 
-	// Because it may be nil when first created.
-	if secret.Data == nil {
-		secret.Data = map[string][]byte{}
-	}
-
 	return &persistentStorageImpl{
-		client: client,
-		secret: secret,
+		client:    client,
+		couchbase: couchbase,
 	}, nil
 }
 
-func (p *persistentStorageImpl) Clear() error {
-	p.secret.Data = map[string][]byte{}
-
-	return p.flush()
-}
-
-// flush flushes the config map to etcd to persist changes.
-func (p *persistentStorageImpl) flush() error {
-	// Note: if there is a CAS collision then some evil 3rd party actor shouldn't have
-	// messing with the map.  First up, tell them off.  Second to recover simply restart
-	// the Operator.  If Kubernetes makes changes under the hood we may well need to do
-	// a read modify write.
-	secret, err := p.client.CoreV1().Secrets(p.secret.Namespace).Update(context.Background(), p.secret, metav1.UpdateOptions{})
-	if err != nil {
-		return errors.NewStackTracedError(err)
+func (p *persistentStorageImpl) get() (*corev1.Secret, error) {
+	s, ok := p.client.Secrets.Get(p.couchbase.Name)
+	if !ok {
+		return nil, fmt.Errorf("%w: persistent secret does not exist", errors.NewStackTracedError(errors.ErrResourceRequired))
 	}
+
+	secret := s.DeepCopy()
 
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}
 	}
 
-	p.secret = secret
+	return secret, nil
+}
+
+func (p *persistentStorageImpl) Clear() error {
+	f := func(secret *corev1.Secret) error {
+		secret.Data = nil
+
+		return nil
+	}
+
+	return p.apply(f)
+}
+
+// apply applies and flushes the config map to etcd to persist changes.
+func (p *persistentStorageImpl) apply(f func(*corev1.Secret) error) error {
+	callback := func() error {
+		secret, err := p.get()
+		if err != nil {
+			return err
+		}
+
+		if err := f(secret); err != nil {
+			return nil
+		}
+
+		if _, err := p.client.KubeClient.CoreV1().Secrets(secret.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{}); err != nil {
+			return errors.NewStackTracedError(err)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
+		return err
+	}
 
 	return nil
 }
 
 // Insert a value only if it doesn't exist.
 func (p *persistentStorageImpl) Insert(kind PersistentKind, value string) error {
-	if _, ok := p.secret.Data[string(kind)]; ok {
-		return fmt.Errorf("%w: key %v exists", errors.NewStackTracedError(ErrKeyError), kind)
+	f := func(secret *corev1.Secret) error {
+		if _, ok := secret.Data[string(kind)]; ok {
+			return fmt.Errorf("%w: key %v exists", errors.NewStackTracedError(ErrKeyError), kind)
+		}
+
+		secret.Data[string(kind)] = []byte(value)
+
+		return nil
 	}
 
-	p.secret.Data[string(kind)] = []byte(value)
-
-	return p.flush()
+	return p.apply(f)
 }
 
 // Upsert a key.
 func (p *persistentStorageImpl) Upsert(kind PersistentKind, value string) error {
-	p.secret.Data[string(kind)] = []byte(value)
-	return p.flush()
+	f := func(secret *corev1.Secret) error {
+		secret.Data[string(kind)] = []byte(value)
+
+		return nil
+	}
+
+	return p.apply(f)
 }
 
 // Update a key, if it already exists.
 func (p *persistentStorageImpl) Update(kind PersistentKind, value string) error {
-	if _, ok := p.secret.Data[string(kind)]; !ok {
-		return fmt.Errorf("%w: key %v doesn't exist", errors.NewStackTracedError(ErrKeyError), kind)
+	f := func(secret *corev1.Secret) error {
+		if _, ok := secret.Data[string(kind)]; !ok {
+			return fmt.Errorf("%w: key %v doesn't exist", errors.NewStackTracedError(ErrKeyError), kind)
+		}
+
+		secret.Data[string(kind)] = []byte(value)
+
+		return nil
 	}
 
-	p.secret.Data[string(kind)] = []byte(value)
-
-	return p.flush()
+	return p.apply(f)
 }
 
 // Delete a key if it exists.
 func (p *persistentStorageImpl) Delete(kind PersistentKind) error {
-	if _, ok := p.secret.Data[string(kind)]; !ok {
-		return fmt.Errorf("%w: key %v doesn't exist", errors.NewStackTracedError(ErrKeyError), kind)
+	f := func(secret *corev1.Secret) error {
+		if _, ok := secret.Data[string(kind)]; !ok {
+			return fmt.Errorf("%w: key %v doesn't exist", errors.NewStackTracedError(ErrKeyError), kind)
+		}
+
+		delete(secret.Data, string(kind))
+
+		return nil
 	}
 
-	delete(p.secret.Data, string(kind))
-
-	return p.flush()
+	return p.apply(f)
 }
 
 // DeleteXDCR deletes all keys associated with this connection.
 func (p *persistentStorageImpl) DeleteXDCR(connectionName string) error {
 	prefix := getPersistentKindPrefixXDCR(connectionName)
 
-	update := false
+	f := func(secret *corev1.Secret) error {
+		for key := range secret.Data {
+			if !strings.HasPrefix(key, prefix) {
+				continue
+			}
 
-	for key := range p.secret.Data {
-		if !strings.HasPrefix(key, prefix) {
-			continue
+			delete(secret.Data, key)
 		}
 
-		delete(p.secret.Data, key)
-
-		update = true
+		return nil
 	}
 
-	if update {
-		return p.flush()
-	}
-
-	return nil
+	return p.apply(f)
 }
 
 // Get a value.
 func (p *persistentStorageImpl) Get(kind PersistentKind) (string, error) {
-	value, ok := p.secret.Data[string(kind)]
+	secret, err := p.get()
+	if err != nil {
+		return "", err
+	}
+
+	value, ok := secret.Data[string(kind)]
 	if !ok {
 		return "", fmt.Errorf("%w: key %v doesn't exist", errors.NewStackTracedError(ErrKeyError), kind)
 	}
