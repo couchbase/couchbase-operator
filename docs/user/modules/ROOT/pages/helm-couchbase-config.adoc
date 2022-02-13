@@ -198,6 +198,7 @@ Also since Couchbase certs are represented as plain Kubernetes secrets, the secr
 ----
 tls:
   generate: false
+  legacy: false
   expiration: 365
   nodeToNodeEncryption: All
 ----
@@ -209,6 +210,14 @@ This value determines whether the chart should create the cluster with TLS.
 _Value rules:_ The `tls.generate` is a boolean which defaults to `false`.
 When set to `true` all of the certs and keys required for TLS will be auto-generated unless manually specified.
 When value is `false` certs are not generated, but manual Secrets can be provided by overriding `cluster.networking.tls`.
+
+=== `legacy`
+
+This value determines whether xref:concept-tls.adoc[legacy or Native TLS] format will be used.
+
+_Value rules:_ The `tls.legacy` is a boolean which defaults to `false`.
+When value is 'true' legacy TLS configuration with static format which requires PKCS#1 formatted keys.
+When value is 'false' native TLS is used and a root CA is generated along with separate client and server keys.
 
 === `expiration`
 
@@ -242,17 +251,21 @@ helm install my-release --set tls.generate=true couchbase/couchbase-cluster
 
 Use manually created secrets
 . Create a file named `tls_values.yaml` with the following custom override values for the Couchbase Chart:
-+
+
 [source,yaml]
 ----
 cluster:
    networking:
      tls:
-       static:
-         operatorSecret: tls-operator-secret
-         serverSecret: tls-server-secret
+       rootCAs:
+       - secure-couchbase-cluster-ca-tls
+       secretSource:
+         clientSecretName: secure-couchbase-cluster-operator-tls
+         serverSecretName: secure-couchbase-cluster-server-tls
 
 ----
+
+Refer to xref:concept-tls.adoc[TLS Concept] documentation for additional information about available security options.
 
 [source,console]
 ----
@@ -464,7 +477,7 @@ When specified the content of the Secret will be used to override the values of 
 
 == `coredns`
 
-DNS settings to apply to the Couchbase and Sync Gateway Deployments 
+DNS settings to apply to the Couchbase and Sync Gateway Deployments
 
 [source,yaml]
 ----
