@@ -45,7 +45,7 @@ spec:
 spec:
   ports:
   - name: metrics
-    port: 8091
+    port: 8091 <.>
     protocol: TCP
   selector:
     app: couchbase
@@ -55,6 +55,7 @@ spec:
 ----
 
 <.> Label allows service to be selected by the Prometheus `ServiceMonitor` resource.
+<.> Port to fetch metrics.  When Couchbase Cluster has TLS enabled, port `18091` must be used.
 <.> Replace `cb-example` with the name of your Couchbase cluster to ensure the correct Pods are selected for metric collection.
 
 Create the service resource in the same namespace as the `CouchbaseCluster` you wish to monitor, in this example we assume `default`:
@@ -106,6 +107,7 @@ spec:
       username:
         name: cb-example-auth
         key: username
+  tlsConfig: {} <.>
   namespaceSelector: # <.>
     matchNames:
     - default
@@ -116,7 +118,10 @@ spec:
 ----
 
 <.> The `ServiceMonitor` must be installed in the same namespace as the Prometheus Operator.
-<.> Prometheus Operator can authenticate to Couchbase using the same username and password as the Couchbase Operator as long as the authentication also exists in the same namespace.
+<.> Prometheus Operator can authenticate to Couchbase using the same username and password as the Couchbase Operator as long as the authentication Secret also exists in the same namespace as the `ServiceMonitor` resource.
+<.> The `tlsConfig` is required when the metric target is exposed over TLS.
+Refer to the https://prometheus-operator.dev/docs/operator/api/#tlsconfig[TLS Config Reference] documentation for supported attributes.
+In production you should ensure that your client cetificates are signed by the same root CA that is installed within the Couchbase Server.
 <.> You need to explicitly state what namespaces to poll for services.
 <.> Selects the metric services to monitor.
 This corresponds to the `Service` labels used in the previous step.
