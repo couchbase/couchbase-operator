@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -450,6 +452,55 @@ func TestLoggingUpgrade(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestLoggingMemoryBufferLimits starts the server with a pod annotations
+// which enables memory buffer limits in the logging sidecar.
+// Checks the sidecar logs to test that these limits are set.
+func TestLoggingMemoryBufferLimits(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	maxMem := e2eutil.MustGetMaxNodeMem(t, kubernetes)
+	memLimit := strconv.Itoa(int(0.8*maxMem)) + "M"
+
+	newAnnotations := make(map[string]string)
+	newAnnotations["fluentbit.couchbase.com/mem.buf.limits.enabled"] = "true"
+
+	expected := int(0.8 * maxMem / 13) // 13 is for the default Fluent Bit config
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithDefaultLogStreaming().WithPodAnnotations(newAnnotations).Generate(kubernetes)
+	cluster.Spec.Logging.Server.Sidecar.Resources = &corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse(memLimit),
+		},
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustAddCustomAnnotationAndLabels(t, kubernetes, cluster, newAnnotations, nil)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Check no audit enabled
+	e2eutil.MustCheckAuditConfiguration(t, kubernetes, cluster)
+
+	// Wait for logging to be ready on each pod, then check that each pod is exporting some logs
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
+	// General check for some logs
+	e2eutil.MustCheckLogging(t, kubernetes, cluster, 5*time.Minute)
+	// Specific check for logs we have specified in the custom config that are not in the default one
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 5*time.Minute, fmt.Sprintf("Setting new memory buffer limits %d", expected))
+
+	// Ensure no audit cleanup
+	e2eutil.MustCheckLoggingSidecarsCount(t, kubernetes, cluster, 1)
+
+	// Check that the user can not see the cluster settings being edited as they're custom.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(1),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

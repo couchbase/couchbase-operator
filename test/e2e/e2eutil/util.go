@@ -270,6 +270,31 @@ func applyMonitoring(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.
 	cluster.Spec.Monitoring = config
 }
 
+// applyAnnotations optionally applies custom annotations to cluster pods.
+func applyAnnotations(cluster *couchbasev2.CouchbaseCluster, annotations map[string]string) {
+	if annotations == nil {
+		return
+	}
+
+	for index := range cluster.Spec.Servers {
+		if cluster.Spec.Servers[index].Pod == nil {
+			cluster.Spec.Servers[index].Pod = &couchbasev2.PodTemplate{}
+		}
+
+		pod := cluster.Spec.Servers[index].Pod.DeepCopy()
+
+		if pod.ObjectMeta.Annotations == nil {
+			pod.ObjectMeta.Annotations = make(map[string]string)
+		}
+
+		for k, v := range annotations {
+			pod.ObjectMeta.Annotations[k] = v
+		}
+
+		cluster.Spec.Servers[index].Pod = pod
+	}
+}
+
 // ClusterOptions is used to generate or create all Couchbase clusters by the framework.
 // The key observation is all clusters are ostensibly the same, with features layered on
 // top.  We use the builder pattern to declare those features, so they are only defined
@@ -305,6 +330,15 @@ type ClusterOptions struct {
 	MonitoringConfiguration *couchbasev2.CouchbaseClusterMonitoringSpec
 
 	S3UseIAM bool
+
+	Annotations map[string]string
+}
+
+// WithPodAnnotations defines a cluster with annotations set on all pods.
+func (o *ClusterOptions) WithPodAnnotations(annotations map[string]string) *ClusterOptions {
+	o.Annotations = annotations
+
+	return o
 }
 
 // WithEphemeralTopology defines a cluster as being ephemeral (no volumes).
@@ -531,6 +565,7 @@ func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseClus
 	applyLogStreaming(cluster, o.LogStreaming)
 	applyAuditing(cluster, o.AuditConfiguration)
 	applyMonitoring(cluster, o.MonitoringConfiguration)
+	applyAnnotations(cluster, o.Annotations)
 
 	return cluster
 }

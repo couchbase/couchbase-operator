@@ -478,6 +478,7 @@ func registerTests() {
 		framework.NewTestDef(TestUpgradePVCStorageClass).WithTags(TagSuiteP1, TagFeatureUpgrade),
 		framework.NewTestDef(TestStatusRecovery).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestStatusStability).WithTags(TagSuiteP1),
+		framework.NewTestDef(TestLoggingMemoryBufferLimits).WithTags(TagSuiteP1, TagFeatureLogging),
 
 		// RBAC Tests
 		framework.NewTestDef(TestRBACRemoveUserFromBinding).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureRBAC),

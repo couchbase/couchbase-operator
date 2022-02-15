@@ -79,6 +79,27 @@ As described in <<enabling-log-forwarding>>, there are two primary components th
 The Autonomous Operator uses Couchbase-provided defaults for both of these components, which can be used _as-is_ (refer to <<using-default-log-forwarding>>).
 However, these components can be further customized to better meet the needs of your environment (refer to <<using-custom-log-forwarding>>).
 
+=== Enable memory buffer limits
+
+The Fluent Bit input plugins have memory buffer limits that can be used to help prevent the container from being terminated for exceeding memory limits.
+Once an input plugin reaches its memory buffer limit, all new incoming data is instead buffered to file system.
+
+Memory buffer limits are disabled by default and can be enabled by adding the annotation `fluentbit.couchbase.com/mem.buf.limits.enabled` to a pod.
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  servers:
+  - name: default
+    pod:
+      metadata:
+        annotations:
+          fluentbit.couchbase.com/mem.buf.limits.enabled: "true"
+----
+
+See https://docs.fluentbit.io/manual/administration/backpressure#mem_buf_limit[Fluent Bit Memory Buffer Limits^] and https://docs.fluentbit.io/manual/administration/buffering-and-storage[Fluent Bit Buffering and Storage^] from more information.
+
 [[using-default-log-forwarding]]
 === Using Default Log Forwarding
 

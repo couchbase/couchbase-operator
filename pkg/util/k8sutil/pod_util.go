@@ -1058,7 +1058,7 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 				},
 			},
 			{
-				Name: "CONTAINER_LIMITS_MEMORY",
+				Name: "CONTAINER_LIMITS_MEMORY_MEGABYTES",
 				ValueFrom: &v1.EnvVarSource{
 					ResourceFieldRef: &v1.ResourceFieldSelector{
 						ContainerName: CouchbaseLogSidecarContainerName,
