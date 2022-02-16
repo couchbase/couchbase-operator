@@ -1,0 +1,36 @@
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-200
+
+LABEL maintainer="docker@couchbase.com"
+ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
+
+# ubi-minimal updates frequently and has very few packages installed,
+# so no need for a "security-only" update.
+RUN microdnf update \
+ && microdnf -y install shadow-utils \
+ && microdnf clean all
+
+# Add licenses and help file
+COPY License.txt /licenses/License.txt
+COPY README.txt /help.1
+
+ARG PROD_VERSION
+ARG OS_BUILD
+ARG OPERATOR_BUILD
+
+# Install Couchbase Operator Admission Controller
+COPY openshift-linux-amd64/couchbase-operator-admission /usr/local/bin/
+
+RUN useradd -u 8453 -m -s /bin/false couchbase
+USER 8453
+
+LABEL name="couchbase/admission-controller" \
+      vendor="Couchbase" \
+      version="${PROD_VERSION}" \
+      go-version="${GO_VERSION}" \
+      openshift_build="${OS_BUILD}" \
+      operator_build="${OPERATOR_BUILD}" \
+      release="Latest" \
+      summary="Couchbase Autonomous Operator Admission Controller ${PROD_VERSION}" \
+      description="Couchbase Autonomous Operator Admission Controller ${PROD_VERSION}" \
+      architecture="x86_64" \
+      run="docker run -d --name couchbase-operator-admission registry.connect.redhat.com/couchbase/operator-admission:${PROD_VERSION}-${OS_BUILD}"

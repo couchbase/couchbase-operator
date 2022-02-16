@@ -24,6 +24,7 @@ couchbase-operator-certification*.tar.bz2
 
 # These are for CI/CD shizzle.
 /go/
+/bin/
 /venv/
 /node-*/
 

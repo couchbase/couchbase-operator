@@ -87,7 +87,7 @@ pipeline {
 
     stage('Build Binaries') {
       steps {
-        sh 'make touch-generated && make'
+        sh 'make touch-generated tools'
       }
     }
 
@@ -119,7 +119,7 @@ pipeline {
           stage('Validation Test') {
             steps {
               sh 'kind create cluster --name ${version} --image kindest/node:${version} --kubeconfig kubeconfig.${version}'
-              sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${version} ./build/bin/cao \
+              sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${version} ./build/bin/kubernetes-linux-amd64/cao \
                 certify \
                 --image ${DOCKER_CREDENTIALS_USR}/couchbase-operator-certification:${GIT_COMMIT} \
                 --timeout 10m \
@@ -146,7 +146,7 @@ pipeline {
       steps {
         // Warn if something went wrong, but don't fail, it's probably just an unstable test/platform.
         warnError('Suite failed') {
-          sh "KUBECONFIG=${WORKSPACE}/config ./build/bin/cao \
+          sh "KUBECONFIG=${WORKSPACE}/config ./build/bin/kubernetes-linux-amd64/cao \
             certify \
             --clean \
             --parallel 8 \

@@ -1,0 +1,51 @@
+# This must be kept in lockstep with the builder images due to library
+# dependencies.
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-200
+
+# ubi-minimal updates frequently and has very few packages installed,
+# so no need for a "security-only" update (which requires installing yum
+# thus defeating the point of using ubi8-minimal).
+RUN microdnf update \
+ && microdnf -y install \
+    shadow-utils \
+    tar \
+    gzip \
+    bzip2 \
+ && microdnf clean all
+
+ARG GO_VERSION=1.17.2
+RUN curl -s https://dl.google.com/go/go$GO_VERSION.linux-amd64.tar.gz | tar xz
+
+ARG TARGET=openshift-linux-amd64
+
+ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
+COPY ${TARGET}/cao /
+COPY ${TARGET}/couchbase-operator-certification /
+COPY crd.yaml /
+
+COPY License.txt /licenses/License.txt
+COPY README.txt /help.1
+
+COPY validation.yaml /resources/validation/
+
+RUN useradd -u 8453 -m -s /bin/false couchbase
+USER 8453
+
+ENTRYPOINT ["/certification"]
+
+ARG PROD_VERSION
+ARG OS_BUILD
+ARG OPERATOR_BUILD
+
+LABEL maintainer="docker@couchbase.com"
+LABEL name="couchbase/operator-certification" \
+      vendor="Couchbase" \
+      version="${PROD_VERSION}" \
+      go-version="${GO_VERSION}" \
+      openshift_build="${OS_BUILD}" \
+      operator_build="${OPERATOR_BUILD}" \
+      release="Latest" \
+      summary="Couchbase Autonomous Operator Certification ${PROD_VERSION}" \
+      description="Couchbase Autonomous Operator Certification ${PROD_VERSION}" \
+      architecture="x86_64" \
+      run="docker run -d --name couchbase-operator-certification registry.connect.redhat.com/couchbase/operator-certification:${PROD_VERSION}-${OS_BUILD}"

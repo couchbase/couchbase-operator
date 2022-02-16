@@ -38,31 +38,14 @@ pipeline {
         sh '. venv/bin/activate && make lint-python'
       }
     }
-    // This should build only the stand alone binaries that are required by 
-    // packaged downloads, and for all target platforms (don't bother with
-    // architectures... yet)
-    stage('Build Binaries') {
+    stage('Build Developer') {
       steps {
-        sh 'make cao clean'
-        sh "make cao clean -e BUILDFLAGS='-trimpath -tags redhat'"
+        sh 'make touch-generated all'
       }
     }
-    // Build all containers that will be pushed to docker hub or RHCC.
-    stage('Build Containers') {
-      matrix {
-        axes {
-          axis {
-            name 'dockerfile'
-            values 'Dockerfile', 'Dockerfile.rhel', 'Dockerfile.admission', 'Dockerfile.admission-rhel', 'Dockerfile.qa', 'Dockerfile.qa-rhel'
-          }
-        }
-        stages {
-          stage('Build Container') {
-            steps {
-              sh 'DOCKER_BUILDKIT=1 docker build -f ${dockerfile} .'
-            }
-          }
-        }
+    stage('Build Release') {
+      steps {
+        sh 'make dist'
       }
     }
     stage('Unit Test') {
