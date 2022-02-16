@@ -40,7 +40,7 @@ pipeline {
     string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-vanilla/fluent-bit:latest')
     string(name: 'logging_image_upgrade', defaultValue: 'couchbase/fluent-bit:1.1.0')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.3-enterprise')
-    string(name: 'kubernetes_version', defaultValue: '1.21.2')
+    string(name: 'kubernetes_version', defaultValue: '1.21.9')
     string(name: 'storage_class', defaultValue: 'default')
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
