@@ -124,9 +124,6 @@ include::partial$autogen-reference.adoc[]
  ** xref:tutorial-gke.adoc[Installing GKE]
 * Logging
  ** xref:tutorial-couchbase-log-forwarding.adoc[]
-* Metering
- ** xref:tutorial-metering-kubernetes.adoc[Metering Couchbase Resources In Kubernetes]
- ** xref:tutorial-metering.adoc[Metering Couchbase Resources In OpenShift]
 * Monitoring
  ** xref:tutorial-prometheus.adoc[Quick Start with Prometheus Monitoring]
 * Networking
