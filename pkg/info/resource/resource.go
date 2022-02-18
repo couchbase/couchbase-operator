@@ -216,6 +216,30 @@ func filterObject(context *context.Context, scope Scope, o *unstructured.Unstruc
 	return false
 }
 
+// mutateObject makes any necessary alterations to the object before being emitted e.g.
+// for security purposes etc.
+func mutateObject(o *unstructured.Unstructured) error {
+	if o.GetAPIVersion() == "v1" && o.GetKind() == "Secret" {
+		data, ok, err := unstructured.NestedMap(o.Object, "data")
+		if err != nil {
+			return err
+		}
+
+		if ok {
+			// Redact secret data (e.g. passwords and private keys).  The
+			// apimachinery unstructured interface doesn't support byte
+			// arrays, so we have to do this in an unclean way.
+			for key := range data {
+				data[key] = []byte{}
+			}
+
+			o.Object["data"] = data
+		}
+	}
+
+	return nil
+}
+
 // getArchivePath returns the path to archive the resource to.
 func getArchivePath(context *context.Context, mapping *meta.RESTMapping, o *unstructured.Unstructured) string {
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
@@ -280,6 +304,11 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 			o := &objects.Items[i]
 
 			if filterObject(context, r.Scope, o) {
+				continue
+			}
+
+			if err := mutateObject(o); err != nil {
+				fmt.Println("failed to mutate data:", err)
 				continue
 			}
 
