@@ -120,6 +120,30 @@ type Collector struct {
 	Scope Scope
 }
 
+// mutateObject makes any necessary alterations to the object before being emitted e.g.
+// for security purposes etc.
+func mutateObject(o *unstructured.Unstructured) error {
+	if o.GetAPIVersion() == "v1" && o.GetKind() == "Secret" {
+		data, ok, err := unstructured.NestedMap(o.Object, "data")
+		if err != nil {
+			return err
+		}
+
+		if ok {
+			// Redact secret data (e.g. passwords and private keys).  The
+			// apimachinery unstructured interface doesn't support byte
+			// arrays, so we have to do this in an unclean way.
+			for key := range data {
+				data[key] = []byte{}
+			}
+
+			o.Object["data"] = data
+		}
+	}
+
+	return nil
+}
+
 // Collect goes through each defined type and lists all resources, filtered by the
 // scoping rules.
 func Collect(context *context.Context, backend backend.Backend, resources []Collector) []Reference {
@@ -173,7 +197,7 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 		}
 
 	NextObject:
-		for _, o := range objects.Items {
+		for i, o := range objects.Items {
 			// Watch out for the operator, we need to flag this for special
 			// handling down the line.
 			var isOperatorDeployment bool
@@ -238,6 +262,11 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 				if !context.Config.All && !isOperatorDeployment {
 					continue NextObject
 				}
+			}
+
+			if err := mutateObject(&objects.Items[i]); err != nil {
+				fmt.Println("failed to mutate data:", err)
+				continue
 			}
 
 			// Finally marshal to YAML and add to the backend archive.
