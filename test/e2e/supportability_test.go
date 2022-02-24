@@ -31,6 +31,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -374,6 +375,67 @@ NextPod:
 
 	if len(errs) != 0 {
 		e2eutil.Die(t, NewCompoundError(errs))
+	}
+}
+
+func mustCheckSecretsRedacted(t *testing.T, archive string) {
+	// Open the archive file.
+	file, err := os.OpenFile(archive, os.O_RDONLY, 0444)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	defer func() { _ = file.Close() }()
+
+	// Read each entry in the archive and store the file names.
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	defer func() { _ = gzipReader.Close() }()
+
+	tarReader := tar.NewReader(gzipReader)
+
+	// Create a regex for a secret.
+	re := regexp.MustCompile(`.*/namespace/.*/secret/.*/.*\.yaml`)
+
+	// Loop through the files in the archive.
+	for {
+		hdr, err := tarReader.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			e2eutil.Die(t, err)
+		}
+
+		// If the file doesn't match, it's not a secret.
+		if !re.MatchString(hdr.Name) {
+			continue
+		}
+
+		// Read the contents of the file.
+		b, err := ioutil.ReadAll(tarReader)
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		// Unmarshall the file into a secret struct.
+		secret := corev1.Secret{}
+
+		err = yaml.Unmarshal(b, &secret)
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		// Check that each data entry is empty (and therefore redacted).
+		for k, v := range secret.Data {
+			if string(v) != "" {
+				e2eutil.Die(t, fmt.Errorf("secret not redacted: %s", k))
+			}
+		}
 	}
 }
 
@@ -1994,4 +2056,32 @@ func TestLogsMetadata(t *testing.T) {
 
 		mustVerifyArchiveMetadata(t, archive, false, cluster1, cluster2)
 	})
+}
+
+// TestSecretCollectRedacted checks that the data for secrets collected by
+// cbopinfo is correctly redacted, such that it does not include sensitive info.
+func TestSecretCollectRedacted(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create cluster.
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+	clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
+
+	// Collect cluster info
+	args := e2eutil.ArgumentList{}
+	args.AddClusterDefaults(kubernetes)
+	args.AddEnvironmentDefaults(f.OpImage)
+	args.Add("--all", "")
+
+	archive, cleanCbopinfo := cbopinfo(t, args)
+	defer cleanCbopinfo()
+
+	// Check that secrets are redacted
+	mustCheckSecretsRedacted(t, archive)
 }

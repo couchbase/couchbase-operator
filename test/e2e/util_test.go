@@ -450,6 +450,7 @@ func registerTests() {
 		framework.NewTestDef(TestScheduleEvacuateAllPersistent).WithTags(TagSuiteP1, TagFeaturePersistentVolumes, TagFeatureScheduling),
 		framework.NewTestDef(TestScheduleCleanupUninitializedPod).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestCustomAnnotationsAndLabelsStayAfterReconcile).WithTags(TagSuiteP1, TagFeatureReconcile),
+		framework.NewTestDef(TestSecretCollectRedacted).WithTags(TagSuiteP1, TagFeatureSupportability),
 
 		// System tests.
 		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem),
