@@ -149,6 +149,13 @@ If true, the server's certificate will not be checked for validity. This will ma
 +
 Path to the kubeconfig file to use for CLI requests.
 
+--log-level::
+*Type*: int
++
+*Default*: 0
++
+Control the verbosity of collection, 0 will collect couchbase resources and those scoped to the cluster, 1 will collect more sensitive things that may be required for support such as secrets, roles etc.
+
 --namespace, -n::
 *Type*: string
 +

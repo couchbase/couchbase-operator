@@ -1686,6 +1686,7 @@ func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPa
 	args.AddEnvironmentDefaults(operatorImage)
 	args.Add("--all", "")
 	args.Add("--directory", logDir)
+	args.Add("--log-level", "1")
 
 	if collectServerLogs {
 		args.Add("--collectinfo", "")

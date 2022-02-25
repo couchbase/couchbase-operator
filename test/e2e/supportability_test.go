@@ -20,6 +20,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	log_meta "github.com/couchbase/couchbase-operator/pkg/info/meta"
+	log_resource "github.com/couchbase/couchbase-operator/pkg/info/resource"
 	operator_constants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -412,7 +413,7 @@ func verifyLogCollectListJSON(k8s *types.Cluster, cbClusterName, collectInfoList
 }
 
 // mustGetFileList lists all resources that should be collected by cbopinfo.
-func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, operatorImage string, all, pprof, metrics bool, clusters ...string) []string {
+func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, operatorImage string, all, pprof, metrics bool, logLevel int, clusters ...string) []string {
 	// The base file path will have a top level directory named the same as the archive.
 	base := strings.TrimSuffix(filepath.Base(archive), ".tar.gz")
 
@@ -425,17 +426,46 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 	// These are files that will always exist
 	files := []string{
 		fmt.Sprintf("%s/metadata.json", base),
+		fmt.Sprintf("%s/namespace/%s/%s.yaml", base, namespace, namespace),
 	}
 
 	// Gather cluster scoped resources.
-	clusterRoles, err := k8s.KubeClient.RbacV1().ClusterRoles().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
+	if logLevel >= int(log_resource.LogLevelSensitive) {
+		clusterRoles, err := k8s.KubeClient.RbacV1().ClusterRoles().List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
 
-	clusterRoleBindings, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
+		clusterRoleBindings, err := k8s.KubeClient.RbacV1().ClusterRoleBindings().List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		persistentVolumes, err := k8s.KubeClient.CoreV1().PersistentVolumes().List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		for _, clusterRole := range clusterRoles.Items {
+			files = append(files, fmt.Sprintf("%s/clusterrole/%s/%s.yaml", base, clusterRole.Name, clusterRole.Name))
+		}
+
+		for _, clusterRoleBinding := range clusterRoleBindings.Items {
+			files = append(files, fmt.Sprintf("%s/clusterrolebinding/%s/%s.yaml", base, clusterRoleBinding.Name, clusterRoleBinding.Name))
+		}
+
+		for _, node := range nodes.Items {
+			files = append(files, fmt.Sprintf("%s/node/%s/%s.yaml", base, node.Name, node.Name))
+		}
+
+		for _, persistentVolume := range persistentVolumes.Items {
+			files = append(files, fmt.Sprintf("%s/persistentvolume/%s/%s.yaml", base, persistentVolume.Name, persistentVolume.Name))
+		}
 	}
 
 	crds, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().List(context.Background(), metav1.ListOptions{})
@@ -443,38 +473,10 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 		e2eutil.Die(t, err)
 	}
 
-	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	persistentVolumes, err := k8s.KubeClient.CoreV1().PersistentVolumes().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	files = append(files, fmt.Sprintf("%s/namespace/%s/%s.yaml", base, namespace, namespace))
-
-	for _, clusterRole := range clusterRoles.Items {
-		files = append(files, fmt.Sprintf("%s/clusterrole/%s/%s.yaml", base, clusterRole.Name, clusterRole.Name))
-	}
-
-	for _, clusterRoleBinding := range clusterRoleBindings.Items {
-		files = append(files, fmt.Sprintf("%s/clusterrolebinding/%s/%s.yaml", base, clusterRoleBinding.Name, clusterRoleBinding.Name))
-	}
-
 	for _, crd := range crds.Items {
 		if strings.HasSuffix(crd.Name, ".couchbase.com") {
 			files = append(files, fmt.Sprintf("%s/customresourcedefinition/%s/%s.yaml", base, crd.Name, crd.Name))
 		}
-	}
-
-	for _, node := range nodes.Items {
-		files = append(files, fmt.Sprintf("%s/node/%s/%s.yaml", base, node.Name, node.Name))
-	}
-
-	for _, persistentVolume := range persistentVolumes.Items {
-		files = append(files, fmt.Sprintf("%s/persistentvolume/%s/%s.yaml", base, persistentVolume.Name, persistentVolume.Name))
 	}
 
 	// Gather namespace scoped resources.
@@ -498,26 +500,6 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 		e2eutil.Die(t, err)
 	}
 
-	roles, err := k8s.KubeClient.RbacV1().Roles(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	rolebindings, err := k8s.KubeClient.RbacV1().RoleBindings(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	secrets, err := k8s.KubeClient.CoreV1().Secrets(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	serviceaccounts, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
 	for _, bucket := range buckets.Items {
 		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasebucket/%s/%s.yaml", base, namespace, bucket.Name, bucket.Name))
 	}
@@ -534,20 +516,42 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasereplication/%s/%s.yaml", base, namespace, replication.Name, replication.Name))
 	}
 
-	for _, role := range roles.Items {
-		files = append(files, fmt.Sprintf("%s/namespace/%s/role/%s/%s.yaml", base, namespace, role.Name, role.Name))
-	}
+	if logLevel >= int(log_resource.LogLevelSensitive) {
+		roles, err := k8s.KubeClient.RbacV1().Roles(namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
 
-	for _, rolebinding := range rolebindings.Items {
-		files = append(files, fmt.Sprintf("%s/namespace/%s/rolebinding/%s/%s.yaml", base, namespace, rolebinding.Name, rolebinding.Name))
-	}
+		rolebindings, err := k8s.KubeClient.RbacV1().RoleBindings(namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
 
-	for _, secret := range secrets.Items {
-		files = append(files, fmt.Sprintf("%s/namespace/%s/secret/%s/%s.yaml", base, namespace, secret.Name, secret.Name))
-	}
+		secrets, err := k8s.KubeClient.CoreV1().Secrets(namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
 
-	for _, serviceaccount := range serviceaccounts.Items {
-		files = append(files, fmt.Sprintf("%s/namespace/%s/serviceaccount/%s/%s.yaml", base, namespace, serviceaccount.Name, serviceaccount.Name))
+		serviceaccounts, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		for _, role := range roles.Items {
+			files = append(files, fmt.Sprintf("%s/namespace/%s/role/%s/%s.yaml", base, namespace, role.Name, role.Name))
+		}
+
+		for _, rolebinding := range rolebindings.Items {
+			files = append(files, fmt.Sprintf("%s/namespace/%s/rolebinding/%s/%s.yaml", base, namespace, rolebinding.Name, rolebinding.Name))
+		}
+
+		for _, secret := range secrets.Items {
+			files = append(files, fmt.Sprintf("%s/namespace/%s/secret/%s/%s.yaml", base, namespace, secret.Name, secret.Name))
+		}
+
+		for _, serviceaccount := range serviceaccounts.Items {
+			files = append(files, fmt.Sprintf("%s/namespace/%s/serviceaccount/%s/%s.yaml", base, namespace, serviceaccount.Name, serviceaccount.Name))
+		}
 	}
 
 	// Deployments are special, we only collect them if the image matches the operator image,
@@ -1006,7 +1010,22 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, cluster1.Name)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster1.Name)
+		mustVerifyArchiveContents(t, archive, files)
+	})
+
+	t.Run("TestLogCollectSingleVerbose", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		args := commonArgs.Clone()
+		args.Add("--couchbase-cluster", cluster1.Name)
+		args.Add("--log-level", "1")
+
+		archive, cleanCbopinfo := cbopinfo(t, args)
+		defer cleanCbopinfo()
+
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 1, cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1021,7 +1040,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, cluster1.Name, cluster3.Name)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster1.Name, cluster3.Name)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1032,7 +1051,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, commonArgs)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1047,8 +1066,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, cluster2.Name)
-		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true)...)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster2.Name)
+		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0)...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1064,8 +1083,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, cluster1.Name, cluster3.Name)
-		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true)...)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster1.Name, cluster3.Name)
+		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0)...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1079,8 +1098,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true)
-		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true)...)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0)
+		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0)...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1096,7 +1115,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, cluster1.Name)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
 		mustVerifyServerLogs(t, kubernetes, archive, false, cluster1.Name)
 	})
@@ -1111,7 +1130,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 }
@@ -1276,7 +1295,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	archive, cleanCbopinfo := cbopinfo(t, args)
 	defer cleanCbopinfo()
 
-	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, operatorImage, true, true, true)
+	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, operatorImage, true, true, true, 0)
 	mustVerifyArchiveContents(t, archive, files)
 	mustVerifyServerLogs(t, kubernetes, archive, false)
 }
@@ -1350,7 +1369,7 @@ func TestLogCollectInvalid(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, invalidImgName, false, true, true)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, invalidImgName, false, true, true, 0)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1367,7 +1386,7 @@ func TestLogCollectInvalid(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, false, true)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, false, true, 0)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 }
@@ -1400,7 +1419,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	defer cleanCbopinfo()
 
 	// Verify file list
-	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true)
+	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0)
 	mustVerifyArchiveContents(t, archive, files)
 	mustVerifyServerLogs(t, kubernetes, archive, false)
 }

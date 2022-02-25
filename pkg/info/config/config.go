@@ -38,6 +38,8 @@ type Configuration struct {
 	ServerImage string
 	// Directory records where to store the files.
 	Directory string
+	// LogLevel tells us what to collect.
+	LogLevel int
 }
 
 const (
@@ -53,6 +55,7 @@ const (
 	collectInfoCollectFlag  = "collectinfo-collect"
 	directoryFlag           = "directory"
 	clusterFlag             = "couchbase-cluster"
+	logLevelFlag            = "log-level"
 )
 
 type AppendStringVar struct {
@@ -87,4 +90,5 @@ func (c *Configuration) AddFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&c.CollectInfoRedact, collectInfoRedactFlag, false, "Redact couchbase server logs, requires the -"+collectInfoFlag+" flag to be set")
 	flags.BoolVar(&c.CollectInfoList, collectInfoListFlag, false, "List all log sources in json and exit, requires the -"+collectInfoFlag+" flag to be set")
 	flags.Var(&c.Clusters, clusterFlag, "Collect only resource for the named CouchbaseCluster, may be used multiple times")
+	flags.IntVar(&c.LogLevel, logLevelFlag, 0, "Control the verbosity of collection, 0 will collect couchbase resources and those scoped to the cluster, 1 will collect more sensitive things that may be required for support such as secrets, roles etc.")
 }

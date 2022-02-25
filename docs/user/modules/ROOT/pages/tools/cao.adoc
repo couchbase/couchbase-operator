@@ -223,7 +223,7 @@ When you encounter a problem with the Autonomous Operator, our support
 teams require more than just the last line of the logs to diagnose and,
 ultimately, resolve the issue quickly.
 
-log collection, in its most basic form, collects all resources associated
+Log collection, in its most basic form, collects all resources associated
 with the Autonomous Operator and Couchbase clusters in the specified
 namespace, this includes associated logs and events.  Most resource
 types are filtered, so the tool collects only what is necessary. Where
@@ -298,6 +298,13 @@ Collect only resource for the named CouchbaseCluster, may be used multiple times
 *Type*: string
 +
 Collect logs in a specific directory
+
+--log-level::
+*Type*: int
++
+*Default*: 0
++
+Control the verbosity of collection, 0 will collect couchbase resources and those scoped to the cluster, 1 will collect more sensitive things that may be required for support such as secrets, roles etc.
 
 --operator-image::
 *Type*: string

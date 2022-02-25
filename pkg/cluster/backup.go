@@ -515,14 +515,13 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 		affinity = k8sutil.AntiAffinityForCluster(c.cluster.Name)
 	}
 
+	labels := k8sutil.LabelsForCluster(c.cluster)
+	labels[constants.LabelBackup] = backup.Name
+
 	cronjob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: backup.Name + "-" + string(action),
-			Labels: map[string]string{
-				constants.LabelApp:     constants.App,
-				constants.LabelCluster: c.cluster.Name,
-				constants.LabelBackup:  backup.Name,
-			},
+			Name:   backup.Name + "-" + string(action),
+			Labels: labels,
 			OwnerReferences: []metav1.OwnerReference{
 				c.cluster.AsOwner(),
 			},
@@ -713,14 +712,13 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 		}
 	}
 
+	labels := k8sutil.LabelsForCluster(c.cluster)
+	labels[constants.LabelBackupRestore] = restore.Name
+
 	restorejob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: restore.Name,
-			Labels: map[string]string{
-				constants.LabelApp:           constants.App,
-				constants.LabelCluster:       c.cluster.Name,
-				constants.LabelBackupRestore: restore.Name,
-			},
+			Name:   restore.Name,
+			Labels: labels,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: couchbasev2.Group,

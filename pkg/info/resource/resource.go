@@ -110,6 +110,20 @@ const (
 	ScopeOperatorDeployment Scope = "operator"
 )
 
+// LogLevel records how necessary a resource collection is.
+type LogLevel int
+
+const (
+	// LogLevelRequired means we absolutely need to see this to debug
+	// issues.
+	LogLevelRequired LogLevel = iota
+
+	// LogLevelSensitive means we may need this, but it also may contain
+	// sensitive information, or we're just hoovering up all the data
+	// which could be considered naughty.
+	LogLevelSensitive
+)
+
 // Collector defines types to collect and how to collect them.
 type Collector struct {
 	// Resource is the object type.  We will use reflection to infer API
@@ -118,6 +132,10 @@ type Collector struct {
 
 	// Scope is the scope of a collection.
 	Scope Scope
+
+	// LogLevel is how much we want/need to see the data vs how sensitive
+	// it is to the customer.
+	LogLevel LogLevel
 }
 
 // getRESTMapping translates from a concrete opbect type into a group/version/kind with
@@ -282,6 +300,11 @@ func Collect(context *context.Context, backend backend.Backend, resources []Coll
 	references := []Reference{}
 
 	for _, r := range resources {
+		// Filter out sensitive collections based on log level.
+		if int(r.LogLevel) > context.Config.LogLevel {
+			continue
+		}
+
 		mapping, err := getRESTMapping(context, r.Resource)
 		if err != nil {
 			fmt.Println(err)

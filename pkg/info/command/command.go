@@ -42,7 +42,7 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
                         teams require more than just the last line of the logs to diagnose and,
                         ultimately, resolve the issue quickly.
 
-                        log collection, in its most basic form, collects all resources associated
+                        Log collection, in its most basic form, collects all resources associated
                         with the Autonomous Operator and Couchbase clusters in the specified
                         namespace, this includes associated logs and events.  Most resource
                         types are filtered, so the tool collects only what is necessary. Where
