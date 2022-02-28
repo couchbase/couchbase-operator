@@ -38,6 +38,12 @@ func TestSyncGatewayCreateLocal(t *testing.T) {
 	k8s1, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
+	// checking against any one of the k8s cluster that
+	// sgw image provided has version <= 2.8.3.
+	// Test is skipped for sgw image >=3.0.0 since
+	// the intended functionality is tested in TestSyncGatewayCreateLocalTLS.
+	framework.Requires(t, k8s1).AtMostSyncGatewayVersion("2.8.3")
+
 	testSyncGatewayCreate(t, k8s1, k8s1, nil, nil, nil)
 }
 
@@ -77,6 +83,12 @@ func TestSyncGatewayCreateLocalMandatoryMutualTLS(t *testing.T) {
 func TestSyncGatewayCreateRemote(t *testing.T) {
 	k8s1, k8s2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
+
+	// checking against any one of the k8s cluster that
+	// sgw image provided has version <= 2.8.3.
+	// Test is skipped for sgw image >=3.0.0 since
+	// the intended functionality is tested in TestSyncGatewayCreateRemoteTLS.
+	framework.Requires(t, k8s1).AtMostSyncGatewayVersion("2.8.3")
 
 	dns := e2eutil.MustProvisionCoreDNS(t, k8s1, k8s2)
 
@@ -160,6 +172,8 @@ func TestSyncGatewayRBAC(t *testing.T) {
 
 	framework.Requires(t, k8s1).AtLeastVersion("6.6.0")
 
+	tls := e2eutil.MustInitClusterTLS(t, k8s1, &e2eutil.TLSOpts{})
+
 	// Static configuration.
 	// NOTE: the secret handling is a hack, by default the sync-gateway configuration will
 	// use the cluster's admin account secret, so while RBAC requires "password" we also put
@@ -228,11 +242,11 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, k8s1, bucket)
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, k8s1)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, nil).MustCreate(t, k8s1)
 	e2eutil.MustWaitUntilBucketExists(t, k8s1, cluster, bucket, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.
-	e2eutil.MustCreateSyncGateway(t, k8s1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), secret, nil, nil, time.Minute)
+	e2eutil.MustCreateSyncGateway(t, k8s1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), secret, nil, tls, time.Minute)
 
 	// Ensure meta-data documents appear in the Couchbase cluster.
 	e2eutil.MustVerifyDocCountInBucketNonZero(t, k8s1, cluster, bucket.GetName(), 5*time.Minute)

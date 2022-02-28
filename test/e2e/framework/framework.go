@@ -1226,6 +1226,34 @@ func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
 	return r
 }
 
+// AtMostSyncGatewayVersion skips the test for sync-gateway versions after this threshold.
+func (r *TestRequirement) AtMostSyncGatewayVersion(v string) *TestRequirement {
+	if Global.SyncGatewayImage == "" {
+		r.t.Skip("Sync Gateway image version not specified")
+	}
+
+	parts := strings.Split(Global.SyncGatewayImage, ":")
+	if len(parts) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.SyncGatewayImage))
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+	}
+
+	v2, err := couchbaseutil.NewVersion(v)
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+	}
+
+	if v2.Less(v1) {
+		r.t.Skip("Couchbase Sync Gateway Image version not supported (geriatric)")
+	}
+
+	return r
+}
+
 // ServerGroups skips the test is there aren't enough server groups to play with.
 func (r *TestRequirement) ServerGroups(i int) *TestRequirement {
 	capabilities := clustercapabilities.MustNewCapabilities(r.t, r.kubernetes.KubeClient)
