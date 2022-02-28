@@ -30,6 +30,22 @@ const (
 	syncGatewayMetricsPort = 4986
 )
 
+// applyImagePullSecrets applies the k8s pull secrets to sync-gateway pod spec
+// in order to use sync-gateway images from private registries.
+func applyImagePullSecrets(podTemplate *corev1.PodTemplateSpec, imagePullSecrets []string) {
+	if imagePullSecrets == nil {
+		return
+	}
+
+	references := make([]corev1.LocalObjectReference, len(imagePullSecrets))
+
+	for i, secret := range imagePullSecrets {
+		references[i].Name = secret
+	}
+
+	podTemplate.Spec.ImagePullSecrets = references
+}
+
 // createSyncGateway creates a sync gateway instance in the given cluster.
 // Communication, being external has to be with a port-forward so creating
 // a service is pointless.
@@ -206,6 +222,9 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 			Searches: getSearchDomains(k8s),
 		}
 	}
+
+	// Adding imagePullSecrets for SGW image.
+	applyImagePullSecrets(&podTemplate, k8s.PullSecrets)
 
 	replicas := int32(1)
 	deployment := &appsv1.Deployment{
