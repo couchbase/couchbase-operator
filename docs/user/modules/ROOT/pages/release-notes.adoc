@@ -205,6 +205,12 @@ This occurs when the underlying storage provider returns an error, rather than a
 The error appears as if the file doesn't exist, and so the container erroneously reinitializes its persistent storage and resets configuration, particularly storage path locations.
 This fix removes the condition check, and replaces with a non-destructive copy instead.
 
+a| https://issues.couchbase.com/browse/K8S-2534[K8S-2534^]
+a| *Summary:* Couchbase Cluster becomes inoperable when its internal replication streams are longer than 200 Characters.
+This occurs when Operator is installed with Couchbase Server version 6.6.3 and below and is caused by runtime validation checks made by Couchbase Server against internal replication streams.
+The fix is made to Couchbase Server 6.6.4 and 7.0.x.
+Also, the Couchbase Helm Chart has been improved to shorten the default cluster name in order to prevent the creation of clusters with long names.
+
 |===
 
 == Feedback
