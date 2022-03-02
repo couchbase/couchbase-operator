@@ -142,28 +142,33 @@ func (v *pathVar) Set(s string) error {
 		return fmt.Errorf("%w: path must not end with a /", errParameterError)
 	}
 
-	// We can have 3 components max, /bucket/scope becomes ["", "bucket", "scope"]
-	// after the split.
-	parts := strings.Split(s, "/")
-	if len(parts) > 3 {
-		return fmt.Errorf("%w: path must only have bucket and scope components", errParameterError)
-	}
+	// The root path will have no parts to its path...
+	var parts []string
 
-	// Check that the elements that matter are non empty.
-	if ok := util.All(nonEmptyStrings(parts[1:])); !ok {
-		return fmt.Errorf("%w: path elements must be non empty", errParameterError)
+	if s != "/" {
+		// We can have 2 components max, /bucket/scope becomes ["bucket", "scope"]
+		// after the split.
+		parts := strings.Split(s, "/")[1:]
+		if len(parts) > 2 {
+			return fmt.Errorf("%w: path must only have bucket and scope components", errParameterError)
+		}
+
+		// Check that the elements that matter are non empty.
+		if ok := util.All(nonEmptyStrings(parts)); !ok {
+			return fmt.Errorf("%w: path elements must be non empty", errParameterError)
+		}
 	}
 
 	v.path = s
-	v.elements = parts[1:]
+	v.elements = parts
 	v.level = len(v.elements)
 
 	if v.level > 0 {
-		v.bucket = parts[1]
+		v.bucket = parts[0]
 	}
 
 	if v.level > 1 {
-		v.scope = parts[2]
+		v.scope = parts[1]
 	}
 
 	return nil
