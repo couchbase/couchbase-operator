@@ -25,9 +25,13 @@ const (
 
 	// coreFileTemplate is used to configure CoreDNS.
 	coreFileTemplate = `%s.svc.cluster.local:%d {
+	log
+	errors
   forward . %s
 }
 .:%d {
+	log
+	errors
   forward . %s
 }
 `
@@ -133,7 +137,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, error) {
 					Containers: []corev1.Container{
 						{
 							Name:  "coredns",
-							Image: "coredns/coredns:1.6.6",
+							Image: "coredns/coredns:1.9.0",
 							Args: []string{
 								"-conf",
 								"/etc/coredns/Corefile",
