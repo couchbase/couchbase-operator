@@ -1920,7 +1920,7 @@ and lead to catastrophic data loss.
 cao restore -f save-data.yaml
 
 # Restore the full data topology to the specific cluster
-cao restore --cluster squirrel -f save-data.yaml
+cao restore --couchbase-cluster squirrel -f save-data.yaml
 
 # Restore all scope and collections in a bucket
 cao restore --path /bucket -f save-data.yaml
@@ -1931,7 +1931,7 @@ cao restore --path /bucket/scope -f save-data.yaml
 
 === Flags
 
---cluster::
+--couchbase-cluster::
 *Type*: string
 +
 Cluster to save from (CouchbaseCluster resource name)
@@ -2080,7 +2080,7 @@ and lead to catastrophic data loss.
 cao save --filename save.yaml
 
 # Save the full data topology for a specific cluster
-cao save --cluster cluster-name --filename save.yaml
+cao save --couchbase-cluster cluster-name --filename save.yaml
 
 # Save all scope and collections in a bucket
 cao save --path /bucket --filename save.yaml
@@ -2091,7 +2091,7 @@ cao save --path /bucket/scope --filename save.yaml
 
 === Flags
 
---cluster::
+--couchbase-cluster::
 *Type*: string
 +
 Cluster to save from (CouchbaseCluster resource name)

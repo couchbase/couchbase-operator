@@ -323,7 +323,7 @@ func getSaveDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 			cao save --filename save.yaml
 
 			# Save the full data topology for a specific cluster
-			cao save --cluster cluster-name --filename save.yaml
+			cao save --couchbase-cluster cluster-name --filename save.yaml
 
 			# Save all scope and collections in a bucket
 			cao save --path /bucket --filename save.yaml
@@ -346,7 +346,7 @@ func getSaveDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 		},
 	}
 
-	cmd.Flags().StringVar(&o.cluster, "cluster", "", "Cluster to save from (CouchbaseCluster resource name)")
+	cmd.Flags().StringVar(&o.cluster, "couchbase-cluster", "", "Cluster to save from (CouchbaseCluster resource name)")
 	cmd.Flags().Var(&o.path, "path", "Path to save data from.  Default will save all buckets, scopes and collections.  '/bucket' will save all scopes and collection in Couchbase bucket 'bucket'.  '/bucket/scope' will save all collections in Couchbase bucket 'bucket' and Couchbase scope 'scope'.")
 	cmd.Flags().StringVarP(&o.filePath, "filename", "f", "", "Filename to write the save data to.  This flag is required.")
 
@@ -1011,7 +1011,7 @@ func getRestoreDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.
 			cao restore -f save-data.yaml
 
 			# Restore the full data topology to the specific cluster
-			cao restore --cluster squirrel -f save-data.yaml
+			cao restore --couchbase-cluster squirrel -f save-data.yaml
 
 			# Restore all scope and collections in a bucket
 			cao restore --path /bucket -f save-data.yaml
@@ -1034,7 +1034,7 @@ func getRestoreDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.
 		},
 	}
 
-	cmd.Flags().StringVar(&o.cluster, "cluster", "", "Cluster to save from (CouchbaseCluster resource name)")
+	cmd.Flags().StringVar(&o.cluster, "couchbase-cluster", "", "Cluster to save from (CouchbaseCluster resource name)")
 	cmd.Flags().Var(&o.path, "path", "Path restore data to.  Default will restore all buckets, scopes and collections.  '/bucket' will restore all scopes and collection in Couchbase bucket 'bucket'.  '/bucket/scope' will restore all collections in Couchbase bucket 'bucket' and Couchbase scope 'scope'.")
 	cmd.Flags().Var(&o.strategy, "strategy", "Strategy to use when merging the save data with the current cluster's data.  When 'merge', this will retain any existing items that are in the current cluster, but not in the save.  When 'replace', this will fully replace the existing items that exist in the current cluster, but don't exist in the save.  Merging protects the user from accidental data loss, whereas replacement may cause data loss, but ensures old data is purged to enforce data retention policies.  This flag defaults to 'merge'.")
 	cmd.Flags().StringVarP(&o.filePath, "filename", "f", "", "Filename to read the save data from.")
