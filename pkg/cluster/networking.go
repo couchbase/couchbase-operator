@@ -217,7 +217,13 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		// and potentially break them.
 		log.Info("Polling for DNS availability", "cluster", c.namespacedName(), "service", member.Name())
 
-		if err := waitAlternateAddressReachable(c.cluster.Spec.Networking.WaitForAddressReachable.Duration, addresses); err != nil {
+		timeout := 10 * time.Minute
+
+		if c.cluster.Spec.Networking.WaitForAddressReachable != nil {
+			timeout = c.cluster.Spec.Networking.WaitForAddressReachable.Duration
+		}
+
+		if err := waitAlternateAddressReachable(timeout, addresses); err != nil {
 			return err
 		}
 
