@@ -217,7 +217,7 @@ Modifications to this field will only take effect on the next full backup.
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-\_%]|\\.)\{1,100}(\.\_default(\.\_default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
 
 ==== Description
 
@@ -237,7 +237,7 @@ This field cannot be used at the same time as included items.
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-\_%]|\\.)\{1,100}(\.\_default(\.\_default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
 
 ==== Description
 
@@ -526,9 +526,9 @@ Name of StorageClass to use.
 
 *Type*: `string`
 
-*Default*: `full\_incremental`
+*Default*: `full_incremental`
 
-*Enumerations*: `full\_incremental, full\_only`
+*Enumerations*: `full_incremental, full_only`
 
 ==== Description
 

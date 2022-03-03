@@ -84,7 +84,7 @@ def escape_attributes(attribute):
         attribute = re.sub(r'\*', r'\*', attribute)
 
         # Escape italics.
-        attribute = re.sub(r'_', r'\_', attribute)
+        attribute = re.sub(r'[A-Za-z]^_([A-Za-z]*?)_', '/_\\1/_', attribute)
 
     return attribute
 

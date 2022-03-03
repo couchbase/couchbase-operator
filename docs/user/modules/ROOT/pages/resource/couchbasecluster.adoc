@@ -1149,9 +1149,9 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 *Type*: `string`
 
-*Default*: `memory\_optimized`
+*Default*: `memory_optimized`
 
-*Enumerations*: `memory\_optimized, plasma`
+*Enumerations*: `memory_optimized, plasma`
 
 ==== Description
 
@@ -1233,9 +1233,9 @@ This defaults to 5s, and must be greater than or equal to 1ms.
 
 *Type*: `string`
 
-*Default*: `memory\_optimized`
+*Default*: `memory_optimized`
 
-*Enumerations*: `memory\_optimized, plasma`
+*Enumerations*: `memory_optimized, plasma`
 
 ==== Description
 

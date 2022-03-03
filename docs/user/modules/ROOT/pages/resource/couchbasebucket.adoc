@@ -228,7 +228,7 @@ This field must be either "none", "majority", "majorityAndPersistActive" or "per
 
 *Maximum Length*: `100`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9-\_%\.]\{1,100}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]\{1,100}$`
 
 ==== Description
 
@@ -322,7 +322,7 @@ This field defaults to `CouchbaseScope` if not specified.
 
 *Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%\_]\{0,250}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,250}$`
 
 ==== Description
 
