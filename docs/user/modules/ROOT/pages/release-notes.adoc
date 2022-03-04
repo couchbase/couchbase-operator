@@ -55,6 +55,21 @@ You can use the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rolli
 To enable this feature while upgrading the Autonomous Operator, stop the old Operator, replace the CRDs, edit the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] field to enable bulk upgrades, then start the new Operator.
 Refer to xref:howto-operator-upgrade.adoc[] for further details.
 
+
+[#release-v223]
+== Release 2.2.3
+
+Couchbase Autonomous Operator 2.2.3 was released in March 2022.
+
+=== Common Vulnerabilities and Exposures
+
+This section lists common vulnerabilities and exposures that are fixed in this release.
+
+See https://www.couchbase.com/alerts[Couchbase Alerts] for the complete list of common vulnerabilities and exposures.
+
+* https://nvd.nist.gov/vuln/detail/CVE-2022-26311[CVE-2022-26311]
+
+
 [#release-v222]
 == Release 2.2.2
 
