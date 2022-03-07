@@ -18,6 +18,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// persistenceCacheTimeout caters for retries in case the platform has
+	// modified the underlying secret (CAS error), the initial race between
+	// the secret being created and appearing in the cache to be read.  It
+	// also affects start up time when a cluster exists, but the secret
+	// doesn't, so don't set this too high!
+	persistenceCacheTimeout = 5 * time.Second
+)
+
 // PersistentKind is the sybolic name for something kept in persistent storage.
 type PersistentKind string
 
@@ -221,7 +230,7 @@ func (p *persistentStorageImpl) apply(f func(*corev1.Secret) error) error {
 		return nil
 	}
 
-	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
+	if err := retryutil.RetryFor(persistenceCacheTimeout, callback); err != nil {
 		return err
 	}
 
@@ -305,15 +314,27 @@ func (p *persistentStorageImpl) DeleteXDCR(connectionName string) error {
 
 // Get a value.
 func (p *persistentStorageImpl) Get(kind PersistentKind) (string, error) {
-	secret, err := p.get()
-	if err != nil {
+	var value string
+
+	callback := func() error {
+		secret, err := p.get()
+		if err != nil {
+			return err
+		}
+
+		raw, ok := secret.Data[string(kind)]
+		if !ok {
+			return fmt.Errorf("%w: key %v doesn't exist", errors.NewStackTracedError(ErrKeyError), kind)
+		}
+
+		value = string(raw)
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(persistenceCacheTimeout, callback); err != nil {
 		return "", err
 	}
 
-	value, ok := secret.Data[string(kind)]
-	if !ok {
-		return "", fmt.Errorf("%w: key %v doesn't exist", errors.NewStackTracedError(ErrKeyError), kind)
-	}
-
-	return string(value), nil
+	return value, nil
 }
