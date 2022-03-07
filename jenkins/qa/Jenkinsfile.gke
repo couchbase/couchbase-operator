@@ -117,7 +117,7 @@ pipeline {
         script {
           currentBuild.description = "refspec:${params.refspec}, operator_version:${params.operator_image}, server_version:${params.server_image}, upgrade_version:${params.server_image_upgrade}, kubernetes_version:${params.kubernetes_version}"
         }
-        sh 'make build/bin/cao'
+        sh 'make touch-generated tools'
       }
     }
 
@@ -152,7 +152,7 @@ pipeline {
 
         script {
           try {
-            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
             --clean \
             --parallel 6 \
             --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
@@ -209,7 +209,7 @@ pipeline {
       steps {
         script {
           try {
-            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
             --clean \
             --parallel 6 \
             --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
@@ -266,7 +266,7 @@ pipeline {
       steps {
         script {
           try {
-            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
             --clean \
             --parallel 6 \
             --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
@@ -323,7 +323,7 @@ pipeline {
       steps {
         script {
           try {
-            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
             --clean \
             --parallel 6 \
             --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
@@ -380,7 +380,7 @@ pipeline {
       steps {
         script {
           try {
-            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
             --clean \
             --parallel 6 \
             --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
@@ -437,7 +437,7 @@ pipeline {
       steps {
         script {
           try {
-            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/cao certify \
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
             --clean \
             --parallel 6 \
             --registry=https://registry.gitlab.com/,${env.GITLAB_CREDENTIALS_USR},${env.GITLAB_CREDENTIALS_PSW} \
