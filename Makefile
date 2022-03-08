@@ -546,7 +546,7 @@ image-artifacts: | $(ARTIFACTSDIR)
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-admission TARGET=openshift-linux-amd64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=kubernetes-linux-amd64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=openshift-linux-amd64
-	tar czf $(IMAGE_ARTIFACT) -C $(BUILDDIR) $(IMAGE_ARTIFACT_NAME)
+	tar czf $(IMAGE_ARTIFACT) -C $(BUILDDIR)/$(IMAGE_ARTIFACT_NAME) $(IMAGES)
 
 # Interface used by build to trigger things it needs.
 # Here's where/why the build system is totally in need of some love...
