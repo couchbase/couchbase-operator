@@ -2297,7 +2297,8 @@ type CouchbaseClusterSecuritySpec struct {
 	RBAC RBAC `json:"rbac,omitempty"`
 
 	// LDAP provides settings to authenticate and authorize LDAP users with Couchbase Server.
-	// `RBAC.managed` must also be set to `true` in order to apply LDAP settings to Cocuhbase Server.
+	// When specified, the Operator keeps these settings in sync with Cocuhbase Server's
+	// LDAP configuration. Leave empty to manually manage LDAP configuration.
 	LDAP *CouchbaseClusterLDAPSpec `json:"ldap,omitempty"`
 }
 

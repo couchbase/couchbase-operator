@@ -346,3 +346,47 @@ func TestVerifyLDAPConfigRetention(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestVerifyLDAPManualManagement tests that LDAP can be manually managed by user while
+// RBAC is fully managed by the operator.
+func TestVerifyLDAPManualManagement(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	timeout := 2 * time.Minute
+
+	// Create Cluster
+	clusterSize := 1
+	cluster := setupLDAP(t, kubernetes)
+
+	// Expect user delete event to eventually occur
+	event := k8sutil.UserDeleteEvent(e2e_constants.CouchbaseLDAPUserName, cluster)
+	echan := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, event, timeout)
+
+	defer echan.Cancel()
+
+	// Create User
+	user, _, _ := mustCreateLDAPBoundUser(t, kubernetes)
+	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user, timeout)
+
+	// Check that couchbase LDAP url setting exists
+	e2eutil.MustVerifyLDAPConfigured(t, kubernetes, cluster)
+
+	// Remove LDAP settings to allow for manual management.
+	patches := jsonpatch.NewPatchSet().Remove("/spec/security/ldap")
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patches, time.Minute)
+
+	// Verify that the operator does not attempt to sync the k8s LDAP settings with server.
+	// This implies manual management is in check.
+	e2eutil.MustCheckLDAPSettingsPersisted(t, kubernetes, cluster, 15*time.Second)
+
+	// Validation
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

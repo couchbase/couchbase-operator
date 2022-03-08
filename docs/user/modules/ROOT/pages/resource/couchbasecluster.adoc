@@ -2363,7 +2363,8 @@ The password data must be at least 6 characters in length, and not contain the a
 ==== Description
 
 LDAP provides settings to authenticate and authorize LDAP users with Couchbase Server.
-`RBAC.managed` must also be set to `true` in order to apply LDAP settings to Cocuhbase Server.
+When specified, the Operator keeps these settings in sync with Cocuhbase Server's LDAP configuration.
+Leave empty to manually manage LDAP configuration.
 
 === couchbaseclusters.spec.security.ldap.authenticationEnabled
 

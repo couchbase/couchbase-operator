@@ -898,17 +898,21 @@ func (c *Cluster) reconcilePersistentStatus() error {
 
 // reconcileRBAC reconciles users, groups, along with ldap settings.
 func (c *Cluster) reconcileRBAC() error {
-	// Skip reconciliation when RBAC disabled
-	if !c.cluster.Spec.Security.RBAC.Managed {
-		return nil
+	// When RBAC management is enabled, then all related resources
+	// such as users, groups, collections, and scopes, are fully managed.
+	if c.cluster.Spec.Security.RBAC.Managed {
+		if err := c.reconcileRBACResources(); err != nil {
+			return err
+		}
 	}
 
-	if err := c.reconcileLDAPSettings(); err != nil {
-		return err
-	}
-
-	if err := c.reconcileRBACResources(); err != nil {
-		return err
+	// When LDAP settings are provided to Couchbase Cluster then
+	// LDAP is also managed.
+	// When empty, then LDAP can be manually managed.
+	if c.cluster.Spec.Security.LDAP != nil {
+		if err := c.reconcileLDAPSettings(); err != nil {
+			return err
+		}
 	}
 
 	return nil

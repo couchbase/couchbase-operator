@@ -702,20 +702,8 @@ func (c *Cluster) getRBACAuthPassword(authSecret string) (string, error) {
 
 // reconcileLDAPSettings synchronizes couchbase ldap settings with requested settings.
 func (c *Cluster) reconcileLDAPSettings() error {
-	// Get current ldap cluster spec
-	apiLDAPSettings := &couchbaseutil.LDAPSettings{}
-	if err := couchbaseutil.GetLDAPSettings(apiLDAPSettings).On(c.api, c.readyMembers()); err != nil {
-		return err
-	}
-
 	ldap := c.cluster.Spec.Security.LDAP
 	if ldap == nil {
-		if len(apiLDAPSettings.Hosts) > 0 {
-			// Reset settings to default
-			settings := couchbaseutil.LDAPSettings{Encryption: couchbaseutil.LDAPEncryptionNone}
-			return couchbaseutil.SetLDAPSettings(&settings).On(c.api, c.readyMembers())
-		}
-
 		// nothing to reconcile
 		return nil
 	}
@@ -752,6 +740,12 @@ func (c *Cluster) reconcileLDAPSettings() error {
 
 			specLDAPSettings.CACert = string(ca)
 		}
+	}
+
+	// Get current ldap cluster spec
+	apiLDAPSettings := &couchbaseutil.LDAPSettings{}
+	if err := couchbaseutil.GetLDAPSettings(apiLDAPSettings).On(c.api, c.readyMembers()); err != nil {
+		return err
 	}
 
 	// API will do some whack things that need fixing:
