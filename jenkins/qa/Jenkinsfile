@@ -128,7 +128,7 @@ pipeline {
                 -suite validation \
                 -suite-suffix ${version} \
                 -operator-image ${DOCKER_CREDENTIALS_USR}/couchbase-operator:${GIT_COMMIT} \
-                -admission-image ${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:${GIT_COMMIT}'
+                -admission-image ${DOCKER_CREDENTIALS_USR}/couchbase-admission-controller:${GIT_COMMIT}'
               sh 'tar xf logs-${version}.tar.bz2'
             }
 
@@ -159,7 +159,7 @@ pipeline {
             ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
             -platform-type kubernetes \
             -operator-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator:\${GIT_COMMIT} \
-            -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:\${GIT_COMMIT} \
+            -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-admission-controller:\${GIT_COMMIT} \
             -mobile-image \${mobile_image} \
             -server-image \${server_image} \
             -server-image-upgrade \${server_image_upgrade} \

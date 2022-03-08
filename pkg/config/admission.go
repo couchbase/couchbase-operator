@@ -548,7 +548,7 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 							Image:           o.image,
 							ImagePullPolicy: corev1.PullPolicy(o.imagePullPolicy),
 							Command: []string{
-								"couchbase-operator-admission",
+								"couchbase-admission-controller",
 							},
 							Args: []string{
 								"-zap-log-level=" + o.logLevel.value,

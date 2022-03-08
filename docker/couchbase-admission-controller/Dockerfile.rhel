@@ -18,7 +18,7 @@ ARG OS_BUILD
 ARG OPERATOR_BUILD
 
 # Install Couchbase Operator Admission Controller
-COPY openshift-linux-amd64/couchbase-operator-admission /usr/local/bin/
+COPY openshift-linux-amd64/couchbase-admission-controller /usr/local/bin/
 
 RUN useradd -u 8453 -m -s /bin/false couchbase
 USER 8453
@@ -33,4 +33,4 @@ LABEL name="couchbase/admission-controller" \
       summary="Couchbase Autonomous Operator Admission Controller ${PROD_VERSION}" \
       description="Couchbase Autonomous Operator Admission Controller ${PROD_VERSION}" \
       architecture="x86_64" \
-      run="docker run -d --name couchbase-operator-admission registry.connect.redhat.com/couchbase/operator-admission:${PROD_VERSION}-${OS_BUILD}"
+      run="docker run -d --name couchbase-operator-admission registry.connect.redhat.com/couchbase/admission-controller:${PROD_VERSION}-${OS_BUILD}"

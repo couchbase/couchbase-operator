@@ -163,7 +163,7 @@ STATIC_BINARIES := \
 	cbopcfg \
 	cbopinfo \
 	couchbase-operator \
-	couchbase-operator-admission
+	couchbase-admission-controller
 
 DYNAMIC_BINARIES := \
 	couchbase-operator-certification
@@ -364,7 +364,7 @@ IMAGE := undefined
 # A list of all possible images.
 IMAGES := \
 	couchbase-operator \
-	couchbase-operator-admission \
+	couchbase-admission-controller \
 	couchbase-operator-certification
 
 # Explicitly select the files that will be part of an image artifact.
@@ -380,7 +380,7 @@ IMAGE_FILES := \
 
 ifeq ($(IMAGE),couchbase-operator)
 IMAGE_FILES += passwd
-else ifeq ($(IMAGE),couchbase-operator-admission)
+else ifeq ($(IMAGE),couchbase-admission-controller)
 IMAGE_FILES += passwd
 else ifeq ($(IMAGE),couchbase-operator-certification)
 IMAGE_FILES += \
@@ -542,8 +542,8 @@ tools-artifacts:
 image-artifacts: | $(ARTIFACTSDIR)
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator TARGET=kubernetes-linux-amd64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator TARGET=openshift-linux-amd64
-	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-admission TARGET=kubernetes-linux-amd64
-	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-admission TARGET=openshift-linux-amd64
+	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-admission-controller TARGET=kubernetes-linux-amd64
+	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-admission-controller TARGET=openshift-linux-amd64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=kubernetes-linux-amd64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=openshift-linux-amd64
 	tar czf $(IMAGE_ARTIFACT) -C $(BUILDDIR)/$(IMAGE_ARTIFACT_NAME) $(IMAGES)
