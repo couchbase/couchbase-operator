@@ -25,7 +25,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-autoresourceallocation-overheadpercent,overheadPercent>>: 25
   <<couchbaseclusters-spec-autoscalestabilizationperiod,autoscaleStabilizationPeriod>>: ""
   <<couchbaseclusters-spec-backup,backup>>:
-    <<couchbaseclusters-spec-backup-image,image>>: ""
+    <<couchbaseclusters-spec-backup-image,image>>: couchbase/operator-backup:1.3.0
     <<couchbaseclusters-spec-backup-imagepullsecrets,imagePullSecrets>>:
     - <<couchbaseclusters-spec-backup-imagepullsecrets-name,name>>: ""
     <<couchbaseclusters-spec-backup-managed,managed>>: false
@@ -444,6 +444,8 @@ Backup defines whether the Operator should manage automated backups, and how to 
 *Required*
 
 *Type*: `string`
+
+*Default*: `couchbase/operator-backup:1.3.0`
 
 ==== Description
 

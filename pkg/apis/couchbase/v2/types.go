@@ -2124,6 +2124,7 @@ type Backup struct {
 	Managed bool `json:"managed,omitempty"`
 
 	// The Backup Image to run on backup pods.
+	// +kubebuilder:default="couchbase/operator-backup:1.3.0"
 	Image string `json:"image"`
 
 	// The Service Account to run backup (and restore) pods under.
