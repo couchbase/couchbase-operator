@@ -154,7 +154,9 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	// in the system as we are waiting for external-DNS to do its thing, and all
 	// services will be processed in bulk.
 	delay := time.Duration(0)
-	if c.cluster.Spec.Networking.WaitForAddressReachableDelay != nil {
+	needsReachableDelay := c.cluster.Spec.IsExposedFeatureServiceTypePublic() || c.cluster.Spec.IsAdminConsoleServiceTypePublic()
+
+	if needsReachableDelay && c.cluster.Spec.Networking.WaitForAddressReachableDelay != nil {
 		delay = c.cluster.Spec.Networking.WaitForAddressReachableDelay.Duration
 	}
 
