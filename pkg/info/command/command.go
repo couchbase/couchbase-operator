@@ -131,6 +131,7 @@ func GenerateCommand() *cobra.Command {
                         cbopinfo --all
                 `),
 		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("\nWARNING: This tool is deprecated and will be removed in a later release. Please use cao binary that features the same functionality: https://docs.couchbase.com/operator/current/tools/cao.html#cao-collect-logs-flags\n\n")
 			collect(c)
 		},
 	}

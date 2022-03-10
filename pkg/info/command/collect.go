@@ -106,9 +106,6 @@ func clusterExists(clusters *couchbasev2.CouchbaseClusterList, name string) bool
 
 // main is the entry point of this application.
 func collect(c config.Configuration) {
-	// And by the way.. this is not the way.
-	fmt.Printf("\nWARNING: This tool is deprecated and will be removed in a later release. Please use cao binary that features the same functionality: https://docs.couchbase.com/operator/current/tools/cao.html#cao-collect-logs-flags\n\n")
-
 	// Parse our configuration.
 	context := &context.Context{Config: c}
 
