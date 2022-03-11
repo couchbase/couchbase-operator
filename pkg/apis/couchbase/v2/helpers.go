@@ -897,6 +897,23 @@ func (c *CouchbaseCluster) GetBucketLabelSelector() (labels.Selector, error) {
 	return metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector)
 }
 
+// AddressFamily returns the cluster address family, defaulting to IPv4 if
+// none is specified.
+func (c *CouchbaseCluster) AddressFamily() AddressFamily {
+	af := AFInet
+
+	if c.Spec.Networking.AddressFamily != nil {
+		af = *c.Spec.Networking.AddressFamily
+	}
+
+	return af
+}
+
+// DualStack returns true if the address family is not explicitly stated.
+func (c *CouchbaseCluster) DualStack() bool {
+	return c.Spec.Networking.AddressFamily == nil
+}
+
 // GetMinimumDurability returns a safe default for the bucket durability, because it's
 // always set to something, it allows the feature to be disabled when posted to the API.
 func (b *CouchbaseBucket) GetMinimumDurability() CouchbaseBucketMinimumDurability {

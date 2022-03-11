@@ -275,35 +275,25 @@ func (c *Cluster) supportsAFFiltering() bool {
 	return version.GreaterEqualString("7.0.2")
 }
 
+// apiAddressFamilyToCouchbase translates from our consistent API to Couchbase's.
+func apiAddressFamilyToCouchbase(af couchbasev2.AddressFamily) couchbaseutil.AddressFamily {
+	if af == couchbasev2.AFInet6 {
+		return couchbaseutil.AddressFamilyIPV6
+	}
+
+	return couchbaseutil.AddressFamilyIPV4
+}
+
 // generateNetworkConfiguration generates the required network configuration for
 // the requested cluster configuration.
 func (c *Cluster) generateNetworkConfiguration() *couchbaseutil.NodeNetworkConfiguration {
-	networkConfiguration := &couchbaseutil.NodeNetworkConfiguration{}
-
-	t := true
-	f := false
-
-	// If nothing is specified, or we explcitly ask for IPv4 set the current protocol.
-	// If IPv4 is explcitly asked for, and it's supported, turn off dual stack support.
-	if c.cluster.Spec.Networking.AddressFamily == nil || *c.cluster.Spec.Networking.AddressFamily == couchbasev2.AFInet {
-		networkConfiguration.AddressFamily = couchbaseutil.AddressFamilyIPV4
-
-		if c.supportsAFFiltering() {
-			networkConfiguration.AddressFamilyOnly = &f
-
-			if c.cluster.Spec.Networking.AddressFamily != nil {
-				networkConfiguration.AddressFamilyOnly = &t
-			}
-		}
+	networkConfiguration := &couchbaseutil.NodeNetworkConfiguration{
+		AddressFamily: apiAddressFamilyToCouchbase(c.cluster.AddressFamily()),
 	}
 
-	// If IPv6 was asked for, set that as the communication protocol and disable IPv4.
-	if c.cluster.Spec.Networking.AddressFamily != nil && *c.cluster.Spec.Networking.AddressFamily == couchbasev2.AFInet6 {
-		networkConfiguration.AddressFamily = couchbaseutil.AddressFamilyIPV6
-
-		if c.supportsAFFiltering() {
-			networkConfiguration.AddressFamilyOnly = &t
-		}
+	if c.supportsAFFiltering() {
+		notDualStack := !c.cluster.DualStack()
+		networkConfiguration.AddressFamilyOnly = &notDualStack
 	}
 
 	return networkConfiguration
@@ -313,6 +303,18 @@ func (c *Cluster) generateNetworkConfiguration() *couchbaseutil.NodeNetworkConfi
 // setup node-to-node networking because Server will collapse in a heap.  Apply all configuration
 // blindly because we cannot see what Couchbase's configuration is at this time...
 func (c *Cluster) initMemberNetworking(member couchbaseutil.Member) error {
+	// Apparently setting the cluster's configuration to IPv6 is not enough for it
+	// to work, there is some other magical -- and completely undocumented -- thing
+	// called a listener that needs to be manually turned on.  Why?  Surely telling
+	// it to use IPv6 is enough right?
+	listenerSettings := &couchbaseutil.ListenerConfiguration{
+		AddressFamily: apiAddressFamilyToCouchbase(c.cluster.AddressFamily()),
+	}
+
+	if err := couchbaseutil.EnableExternalListener(listenerSettings).InPlaintext().RetryFor(10*time.Second).On(c.api, member); err != nil {
+		return err
+	}
+
 	if err := couchbaseutil.SetNodeNetworkConfiguration(c.generateNetworkConfiguration()).InPlaintext().RetryFor(10*time.Second).On(c.api, member); err != nil {
 		return err
 	}
