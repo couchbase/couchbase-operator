@@ -31,7 +31,7 @@ COPY validation.yaml /resources/validation/
 RUN useradd -u 8453 -m -s /bin/false couchbase
 USER 8453
 
-ENTRYPOINT ["/certification"]
+ENTRYPOINT ["/couchbase-operator-certification"]
 
 ARG PROD_VERSION
 ARG OS_BUILD
