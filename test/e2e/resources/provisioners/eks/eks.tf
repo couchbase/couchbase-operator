@@ -23,7 +23,7 @@ provider "kubernetes" {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = "us-east-2"
   default_tags {
     tags = {
       Owner = "cao"
@@ -46,7 +46,7 @@ module "vpc1" {
   version        = "~>3.12.0"
   name           = "${var.name}-vpc1"
   cidr           = "10.0.0.0/16"
-  azs            = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  azs            = ["us-east-2a", "us-east-2b", "us-east-2c"]
   public_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
 
   default_security_group_egress = [
@@ -248,7 +248,7 @@ resource "aws_vpc_peering_connection" "peering" {
 
   vpc_id      = module.vpc1.vpc_id
   peer_vpc_id = module.vpc2[0].vpc_id
-  peer_region = "us-east-1"
+  peer_region = "us-east-2"
   auto_accept = false
 }
 
