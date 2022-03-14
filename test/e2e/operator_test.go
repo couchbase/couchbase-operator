@@ -98,7 +98,7 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/EnableFlush", false), time.Minute)
 	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BucketEditEvent(bucket.GetName(), cluster), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BucketEditEvent(bucket.GetName(), cluster), 2*time.Minute)
 
 	// Check the events match what we expect:
 	// * Admin console service created

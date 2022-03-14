@@ -147,14 +147,23 @@ func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Valida
 func upgradeDownRecoverableSequence(victimName string) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
+			// Server sometimes gets a bit stuck...
+			eventschema.Optional{
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+					},
+				},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
 	}
@@ -538,6 +547,61 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * For iterations up to the victim cycle expect nodes upgrade
+	// * Victim node failed to balance in and is ejected to maintain scale
+	// * For the remaining iterations upgrades nodes upgrade
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
+		upgradeDownRecoverableSequence(victimName),
+		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpgradeSupportableKillExistingStatefulPodOnRebalance tests that upgrades work for a
+// supportable cluster where a stateful pod is killed on rebalance.
+func TestUpgradeSupportableKillExistingStatefulPodOnRebalance(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	mdsGroupSize := constants.Size2
+	clusterSize := mdsGroupSize * 2
+	victimCycle := 1
+	victimIndex := clusterSize + victimCycle
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+
+	// Runtime configuration.
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimCycle)
+
+	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
+	// kill it.  The cluster should reach a healthy upgraded condition.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
+	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimCycle, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
 
 	// Check the events match what we expect:

@@ -36,6 +36,7 @@ var (
 
 	PodSpecAnnotation             = "pod.couchbase.com/spec"
 	PVCSpecAnnotation             = "pvc.couchbase.com/spec"
+	PVCImageAnnotation            = "pvc.couchbase.com/image"
 	SVCSpecAnnotation             = "svc.couchbase.com/spec"
 	PodTLSAnnotation              = "pod.couchbase.com/tls"
 	PodInitializedAnnotation      = "pod.couchbase.com/initialized"

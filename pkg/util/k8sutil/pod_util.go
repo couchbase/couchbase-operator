@@ -71,13 +71,21 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 		serverGroup = pvcState.availabilityZone
 	}
 
+	image := cluster.Spec.CouchbaseImage()
+
+	if pvcState != nil && pvcState.Image != "" {
+		image = pvcState.Image
+	}
+
+	log.Info("Creating pod", "cluster", cluster.NamespacedName(), "name", m.Name(), "image", image)
+
 	serverGroup, err = scheduler.Create(config.Name, m.Name(), serverGroup)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create the actual pod specification.
-	pod, err := CreateCouchbasePodSpec(client, m, cluster, config, serverGroup, pvcState)
+	pod, err := CreateCouchbasePodSpec(client, m, cluster, config, serverGroup, pvcState, image)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +112,7 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 		// the init command is idempotent.
 		for _, pvc := range pvcState.pvcs {
 			if pvc.Annotations[constants.AnnotationVolumeMountPath] == couchbaseVolumeDefaultConfigDir {
-				initContainer := couchbaseInitContainer(cluster, pvc.Name, config)
+				initContainer := couchbaseInitContainer(cluster, pvc.Name, config, image)
 				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 			}
 		}
@@ -145,6 +153,9 @@ type PersistentVolumeClaimState struct {
 
 	// diff records any changes to the specification.
 	diff string
+
+	// image records the exact image used for recovery.
+	Image string
 }
 
 // NeedsUpdate indicates whether any PVCs need updating.
@@ -224,6 +235,10 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 	// Set any scheduling hints.
 	if group, ok := pvc.Annotations[constants.ServerGroupLabel]; ok {
 		p.availabilityZone = group
+	}
+
+	if image, ok := pvc.Annotations[constants.PVCImageAnnotation]; ok {
+		p.Image = image
 	}
 
 	existingSpec := v1.PersistentVolumeClaimSpec{}
@@ -339,6 +354,7 @@ func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Mem
 		constants.AnnotationVolumeMountPath:     mount.mountPath,
 		constants.AnnotationVolumeNodeConf:      config.Name,
 		constants.CouchbaseVersionAnnotationKey: version,
+		constants.PVCImageAnnotation:            cluster.Spec.Image,
 	}
 
 	// Merge our labels/annotations on top of any user defined ones.  We take
@@ -706,9 +722,9 @@ func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
 // in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
-func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState) (*v1.Pod, error) {
+func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState, image string) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
-	container := couchbaseContainer(cluster, &config)
+	container := couchbaseContainer(cluster, &config, image)
 
 	// The readiness probe does a TCP check against Couchbase Server to determine
 	// whether NS server is running.  It may not be actually functional, but it's
@@ -791,7 +807,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	}
 
 	// Set the Couchbase version metadata.
-	if err := SetCouchbaseVersion(pod, cluster.Spec.CouchbaseImage()); err != nil {
+	if err := SetCouchbaseVersion(pod, image); err != nil {
 		return nil, err
 	}
 
@@ -964,7 +980,7 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	}
 
 	// Iterate over mounts to find the one we need for logs
-	container, _ := getCouchbaseContainer(pod)
+	container, _ := GetCouchbaseContainer(pod)
 	mount := getLoggingMount(container)
 
 	sidecarConfig := fbs.Sidecar
@@ -1326,13 +1342,9 @@ func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.Ser
 }
 
 func CouchbaseContainer(image string) v1.Container {
-	cluster := &couchbasev2.CouchbaseCluster{
-		Spec: couchbasev2.ClusterSpec{
-			Image: image,
-		},
-	}
+	cluster := &couchbasev2.CouchbaseCluster{}
 
-	return couchbaseContainer(cluster, nil)
+	return couchbaseContainer(cluster, nil, image)
 }
 
 func couchbaseContainerPorts() ([]v1.ContainerPort, error) {
@@ -1364,12 +1376,12 @@ func couchbaseContainerPorts() ([]v1.ContainerPort, error) {
 	return ports, nil
 }
 
-func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.ServerConfig) v1.Container {
+func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.ServerConfig, image string) v1.Container {
 	ports, _ := couchbaseContainerPorts()
 
 	c := v1.Container{
 		Name:  constants.CouchbaseContainerName,
-		Image: cluster.Spec.CouchbaseImage(),
+		Image: image,
 		Ports: ports,
 	}
 
@@ -1447,8 +1459,8 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 // Init container is same as runtime container except it used
 // to copy the etc dir into a persisted volume which will be
 // shared with with the Pod's main container.
-func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig) v1.Container {
-	initContainer := couchbaseContainer(cluster, &config)
+func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig, image string) v1.Container {
+	initContainer := couchbaseContainer(cluster, &config, image)
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
 	// NOTE: we originally did a [[ ! -e /mnt/etc ]] but alas some people insist on
 	// using NFS, which will return false on an EIO, say, and just end up resetting
@@ -1528,7 +1540,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 }
 
 // Given a pod, return a pointer to the couchbase container.
-func getCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
+func GetCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
 	for index := range pod.Spec.Containers {
 		if pod.Spec.Containers[index].Name == constants.CouchbaseContainerName {
 			return &pod.Spec.Containers[index], nil
@@ -1550,7 +1562,7 @@ func ShadowTLSCASecretName(cluster *couchbasev2.CouchbaseCluster) string {
 
 // Adds any necessary pod prerequisites before enabling TLS.
 func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
-	container, err := getCouchbaseContainer(pod)
+	container, err := GetCouchbaseContainer(pod)
 	if err != nil {
 		return err
 	}

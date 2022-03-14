@@ -19,8 +19,6 @@ import (
 // createPod is used to create EVERY Couchbase server pod, either provisioning or
 // reprovisioning them.
 func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig, deleteVolumes bool) (err error) {
-	log.Info("Creating pod", "cluster", c.namespacedName(), "name", m.Name(), "image", c.cluster.Spec.CouchbaseImage())
-
 	// In the event of an error, dump out all information we know about
 	// and raise an event.  Delete all resources
 	defer func() {
@@ -169,7 +167,13 @@ func (c *Cluster) reconcilePods() error {
 			}
 		}
 
-		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState)
+		image := c.cluster.Spec.CouchbaseImage()
+
+		if pvcState != nil && pvcState.Image != "" {
+			image = pvcState.Image
+		}
+
+		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image)
 		if err != nil {
 			return err
 		}
@@ -218,7 +222,10 @@ func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, ser
 		}
 	}
 
-	requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState)
+	// Regeneration is used for upgrades, so the CRD is the source of truth here.
+	image := c.cluster.Spec.CouchbaseImage()
+
+	requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image)
 	if err != nil {
 		return nil, err
 	}

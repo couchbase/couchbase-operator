@@ -2,8 +2,11 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
 	corev1 "k8s.io/api/core/v1"
@@ -101,6 +104,7 @@ func (r *pvcUpgradableResource) commit(item int) error {
 // upgradePersistentVolumeClaimFrom000000To020300 performs pvc upgrades to 2.3.0 from any version.
 // * The server group label was changed from failure-domain.beta.kubernetes.io/zone
 //   to topology.kubernetes.io/zone.
+// * It got a new image label.
 func upgradePersistentVolumeClaimFrom000000To020300(cluster *Cluster, pvc *corev1.PersistentVolumeClaim) error {
 	pvc.Annotations[constants.ResourceVersionAnnotation] = version.Version
 
@@ -109,6 +113,18 @@ func upgradePersistentVolumeClaimFrom000000To020300(cluster *Cluster, pvc *corev
 
 		delete(pvc.Annotations, corev1.LabelFailureDomainBetaZone)
 	}
+
+	pod, ok := cluster.k8s.Pods.Get(pvc.Labels[constants.LabelNode])
+	if !ok {
+		return fmt.Errorf("%w: pod for volume missing", errors.NewStackTracedError(errors.ErrResourceRequired))
+	}
+
+	container, err := k8sutil.GetCouchbaseContainer(pod)
+	if err != nil {
+		return err
+	}
+
+	pvc.Annotations[constants.PVCImageAnnotation] = container.Image
 
 	return nil
 }
