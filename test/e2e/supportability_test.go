@@ -702,10 +702,7 @@ func cbopinfo(t *testing.T, args e2eutil.ArgumentList) (string, func()) {
 	// Collect into per-cbopinfo directories in the interests of
 	// parallelization.  Also make them relative to the workspace so
 	// they get cleaned up by Jenkins.
-	pwd, err := os.Getwd()
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
+	pwd := "/artifacts"
 
 	temp, err := ioutil.TempDir(pwd, "test-logs-")
 	if err != nil {
