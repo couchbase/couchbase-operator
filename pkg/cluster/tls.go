@@ -1131,7 +1131,7 @@ func (c *Cluster) disableMutualTLS() error {
 
 	// Get the current encryption settings
 	existingSettings := &couchbaseutil.ClientCertAuth{}
-	if err := couchbaseutil.GetClientCertAuth(existingSettings).On(c.api, c.members); err != nil {
+	if err := couchbaseutil.GetClientCertAuth(existingSettings).On(c.api, c.callableMembers); err != nil {
 		return err
 	}
 
@@ -1184,7 +1184,7 @@ func (c *Cluster) updateNodeToNode() error {
 func (c *Cluster) reconcileNodeToNodeGetUpdatableMembers(requestedEncryption bool) (couchbaseutil.MemberSet, error) {
 	updatableMembers := couchbaseutil.NewMemberSet()
 
-	for _, m := range c.members {
+	for _, m := range c.callableMembers {
 		s := &couchbaseutil.NodeNetworkConfiguration{}
 		if err := c.getNodeNetworkConfiguration(m, s); err != nil {
 			return nil, err

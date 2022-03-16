@@ -281,7 +281,7 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 
 // exec runs the state machine until a finished condition or error
 // is encountered.
-func (r *ReconcileMachine) exec(c *Cluster) error {
+func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 	reconcileFunctions := []func(*ReconcileMachine, *Cluster) error{
 		(*ReconcileMachine).handleRebalanceCheck,
 		(*ReconcileMachine).handleWarmupNodes,
@@ -305,12 +305,12 @@ func (r *ReconcileMachine) exec(c *Cluster) error {
 
 	for i := 0; i < len(reconcileFunctions); i++ {
 		if err := reconcileFunctions[i](r, c); err != nil {
-			return err
+			return false, err
 		}
 
 		if r.abortReason != "" {
 			log.Info("Aborting topology reconcile", "cluster", c.namespacedName(), "reason", r.abortReason)
-			return nil
+			return true, nil
 		}
 
 		if err := c.updateCRStatus(); err != nil {
@@ -318,7 +318,7 @@ func (r *ReconcileMachine) exec(c *Cluster) error {
 		}
 	}
 
-	return nil
+	return false, nil
 }
 
 // If we have nodes that are warming up then we need to wait for them to finish
@@ -425,6 +425,8 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 
 	// Get the duration that the node has been down from the status
 	// and check if it has persistent volumes to be recovered
+	recovered := 0
+
 	for name, m := range r.couchbase.DownNodes {
 		// Ephemeral clusters are handled either automatically by server or
 		// manually by the user.
@@ -449,7 +451,11 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 		delete(c.recoveryTime, name)
 
-		r.abort("pod is recovering")
+		recovered++
+	}
+
+	if recovered != 0 {
+		r.abort("waiting for cluster recovery")
 
 		return nil
 	}

@@ -152,6 +152,8 @@ func (c *Cluster) reconcile() error {
 
 	// Run pre-topology change reconcilers.  These are the things that need
 	// a running cluster, but must be performed before any pods are modified.
+	// These should not use c.members, preferring c.callableMembers to avoid
+	// log spam until the cluster is repaired.
 	preTopologyReconcilers := reconcileFuncList{
 		(*Cluster).reconcilePersistentStatus,
 		(*Cluster).reconcileAdminPassword,
@@ -167,8 +169,10 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
-	if err := c.reconcileMembers(fsm); err != nil {
+	if aborted, err := c.reconcileMembers(fsm); err != nil {
 		return err
+	} else if aborted {
+		return nil
 	}
 
 	// Update the status and ready list to reflect any new members added.
@@ -252,7 +256,7 @@ func (c *Cluster) reconcilePeerServices() error {
 // 7. Remove any nodes from the cached member set that are not part actually
 //    part of the cluster.
 // Returns true if reconciliation completed properly.
-func (c *Cluster) reconcileMembers(rm *ReconcileMachine) error {
+func (c *Cluster) reconcileMembers(rm *ReconcileMachine) (bool, error) {
 	return rm.exec(c)
 }
 
@@ -863,7 +867,7 @@ func (c *Cluster) resourcesEqual(current, requested interface{}) (bool, string) 
 // balanced.  It also reconciles a pod disruption budget so we only tolerate a certain
 // number of evictions during a drain i.e. k8s upgrade.
 func (c *Cluster) reconcileReadiness() error {
-	for name := range c.members {
+	for name := range c.callableMembers {
 		if err := k8sutil.FlagPodReady(c.k8s, name); err != nil {
 			return err
 		}
