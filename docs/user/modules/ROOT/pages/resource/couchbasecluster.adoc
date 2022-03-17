@@ -126,7 +126,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-logging-server-manageconfiguration,manageConfiguration>>: True
       <<couchbaseclusters-spec-logging-server-sidecar,sidecar>>:
         <<couchbaseclusters-spec-logging-server-sidecar-configurationmountpath,configurationMountPath>>: /fluent-bit/config/
-        <<couchbaseclusters-spec-logging-server-sidecar-image,image>>: couchbase/fluent-bit:1.1.1
+        <<couchbaseclusters-spec-logging-server-sidecar-image,image>>: couchbase/fluent-bit:1.2.0
         <<couchbaseclusters-spec-logging-server-sidecar-resources,resources>>: {}
   <<couchbaseclusters-spec-monitoring,monitoring>>:
     <<couchbaseclusters-spec-monitoring-prometheus,prometheus>>:
@@ -1690,7 +1690,7 @@ Note that the configuration file must be called 'fluent-bit.conf' at the root of
 
 *Type*: `string`
 
-*Default*: `couchbase/fluent-bit:1.1.1`
+*Default*: `couchbase/fluent-bit:1.2.0`
 
 ==== Description
 

@@ -18,7 +18,7 @@ var (
 	serverImageUpgradeFromDefault   = imageRepo + "/couchbase/server:6.6.4-1"
 	exporterImageDefault            = imageRepo + "/couchbase/exporter:1.0.5-1"
 	exporterImageUpgradeFromDefault = imageRepo + "/couchbase/exporter:1.0.4-2"
-	backupImageDefault              = imageRepo + "/couchbase/operator-backup:1.2.0-1"
-	loggingImageDefault             = imageRepo + "/couchbase/fluent-bit:1.1.1-1"
-	loggingImageUpgradeFromDefault  = imageRepo + "/couchbase/fluent-bit:1.0.4-1"
+	backupImageDefault              = imageRepo + "/couchbase/operator-backup:1.3.0-1"
+	loggingImageDefault             = imageRepo + "/couchbase/fluent-bit:1.2.0-1"
+	loggingImageUpgradeFromDefault  = imageRepo + "/couchbase/fluent-bit:1.1.1-1"
 )

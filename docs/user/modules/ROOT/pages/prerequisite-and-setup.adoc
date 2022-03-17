@@ -43,7 +43,7 @@ This release supports the following container images for xref:concept-backup.ado
 | Backup Utility
 | Backup From and Restore To
 
-a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.2.0`^]
+a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.3.0`^]
 a| xref:7.0@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 7.0.0`]
 | Couchbase Server 6.6--7.0
 |===
