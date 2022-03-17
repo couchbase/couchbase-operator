@@ -184,13 +184,13 @@ WitnessLoop:
 func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList) error {
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
-	c.raiseEvent(k8sutil.RebalanceStartedEvent(c.cluster))
-
 	c.cluster.Status.SetUnbalancedCondition()
 
 	if err := c.updateCRStatus(); err != nil {
 		return err
 	}
+
+	c.raiseEvent(k8sutil.RebalanceStartedEvent(c.cluster))
 
 	// The rebalance API is crap, rather than accepting a list of host names to eject
 	// it requires a list of nodes that it already knows about as well.  On top of that

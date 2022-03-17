@@ -646,7 +646,7 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 	// If a server configuration was deleted in a spec update then we will clean
 	// up all of the nodes from that server config here.
-	for name, m := range r.runningMembers {
+	for name, m := range r.clusteredMembers {
 		if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
 			log.Info("Pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
 
