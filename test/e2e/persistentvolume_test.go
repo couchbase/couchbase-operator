@@ -235,7 +235,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	pvcName := "couchbase"
 
 	// Create the cluster.
-	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
 	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
@@ -248,6 +248,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// When ready kill all pods while the operator is down.  Upon restart expect
 	// the operator to recover a single node, then manually recover the others.
@@ -284,7 +285,7 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
-	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Name = ctx.ClusterName
 	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -304,6 +305,7 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// When ready kill all pods while the operator is down.  Upon restart expect
 	// the operator to recover a single node, then manually recover the others.
