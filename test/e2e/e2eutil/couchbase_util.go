@@ -321,6 +321,10 @@ func addDocs(d *DocumentSet) error {
 
 	bucket := c.Bucket(d.bucket)
 
+	if err := bucket.WaitUntilReady(time.Minute, &gocb.WaitUntilReadyOptions{}); err != nil {
+		return err
+	}
+
 	scope := bucket.DefaultScope()
 	if d.scope != "" {
 		scope = bucket.Scope(d.scope)

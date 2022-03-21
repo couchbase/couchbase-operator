@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/aws/aws-sdk-go v1.38.40
-	github.com/couchbase/gocb/v2 v2.3.0
+	github.com/couchbase/gocb/v2 v2.4.1
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.2.0
@@ -13,7 +13,7 @@ require (
 	github.com/golang/glog v1.0.0
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/google/go-cmp v0.5.6
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/imdario/mergo v0.3.12
 	github.com/prometheus/client_golang v1.11.1
