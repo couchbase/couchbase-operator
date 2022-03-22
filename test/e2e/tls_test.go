@@ -1734,10 +1734,10 @@ func TestMultipleCAsAddAndRemove(t *testing.T) {
 	tls2 := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/rootCAs", []string{tls2.CASecretName}), time.Minute)
-	e2eutil.MustValidateCAPool(t, kubernetes, cluster, time.Minute, tls, tls2)
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, 2*time.Minute, tls, tls2)
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/networking/tls/rootCAs"), time.Minute)
-	e2eutil.MustValidateCAPool(t, kubernetes, cluster, time.Minute, tls)
+	e2eutil.MustValidateCAPool(t, kubernetes, cluster, 2*time.Minute, tls)
 }
 
 // TestMandatoryMutualTLSWithMultipleCAsAndRotateServerPKI checks that the server PKI can be

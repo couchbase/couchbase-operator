@@ -51,14 +51,14 @@ func TestDataSynchronizationBasic(t *testing.T) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/selector", labelSelector).Add("/spec/buckets/synchronize", true), time.Minute)
 
 	// Wait for completion.
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, 3*time.Minute)
 
 	// Go managed.
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", true), time.Minute)
 
 	// Check things are alive still.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScopes(scopeName).WithCollection(collectionName)
-	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, time.Minute)
+	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, 3*time.Minute)
 }
 
 // TestDataSyncronizationUpdate sets up a managed cluster, disables managed, externally
@@ -98,7 +98,7 @@ func TestDataSynchronizationUpdate(t *testing.T) {
 
 	// Go unmanaged.
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", false), time.Minute)
-	time.Sleep(5 * time.Second)
+	time.Sleep(30 * time.Second)
 
 	// Externally add a collection.
 	e2eutil.MustCreateCollectionManually(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName2)
@@ -107,14 +107,14 @@ func TestDataSynchronizationUpdate(t *testing.T) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/selector", labelSelector).Add("/spec/buckets/synchronize", true), time.Minute)
 
 	// Wait for completion.
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, 3*time.Minute)
 
 	// Go managed.
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", true), time.Minute)
 
 	// Check things are alive still.
 	expected = e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScope(scopeName).WithCollections(collectionName1, collectionName2)
-	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucket.GetName(), expected, time.Minute)
+	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucket.GetName(), expected, 3*time.Minute)
 }
 
 func testDataSynchronizationBucketConfig(t *testing.T, bucket *e2eutil.Bucket) {
@@ -127,7 +127,7 @@ func testDataSynchronizationBucketConfig(t *testing.T, bucket *e2eutil.Bucket) {
 	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0")
 
 	// Static configuration.
-	clusterSize := 1
+	clusterSize := 3
 	bucketName := "pale"
 	labelSelector := &metav1.LabelSelector{
 		MatchLabels: map[string]string{
@@ -147,7 +147,7 @@ func testDataSynchronizationBucketConfig(t *testing.T, bucket *e2eutil.Bucket) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/selector", labelSelector).Add("/spec/buckets/synchronize", true), time.Minute)
 
 	// Wait for completion.
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, 3*time.Minute)
 
 	// Go managed.
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", true), time.Minute)
@@ -253,14 +253,14 @@ func TestDataSynchronizationDefaultCollectionDeleted(t *testing.T) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/selector", labelSelector).Add("/spec/buckets/synchronize", true), time.Minute)
 
 	// Wait for completion.
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, 3*time.Minute)
 
 	// Go managed.
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", true), time.Minute)
 
 	// Check things are alive still - and the default collection hasn't been reanimated.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScope().WithScopes(scopeName).WithCollection(collectionName)
-	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, time.Minute)
+	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, 3*time.Minute)
 }
 
 // TestDataSynchronizationErrorTopologyChange ensures that, should the topology be changed,
@@ -298,7 +298,7 @@ func TestDataSynchronizationErrorTopologyChange(t *testing.T) {
 	// Start synchronization.
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/selector", labelSelector).Add("/spec/buckets/synchronize", true), time.Minute)
 
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, 3*time.Minute)
 
 	// Edit the bucket, expecting failure.
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucketName, jsonpatch.NewPatchSet().Add("/BucketMemoryQuota", int64(256)), time.Minute)
@@ -344,7 +344,7 @@ func TestDataSynchronizationOperatorRestart(t *testing.T) {
 	e2eutil.MustKillOperatorAndWaitForRecovery(t, kubernetes)
 
 	// Wait for completion.
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, 3*time.Minute)
 
 	// Go managed, and kill the operator (again!).
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", true), time.Minute)
@@ -354,5 +354,5 @@ func TestDataSynchronizationOperatorRestart(t *testing.T) {
 
 	// Check things are alive still.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScopes(scopeName).WithCollection(collectionName)
-	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, time.Minute)
+	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, 3*time.Minute)
 }

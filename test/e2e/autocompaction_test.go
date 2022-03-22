@@ -41,6 +41,13 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Twiddle the knobs, and ensure the server settings are changed.
+	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/start", "01:01").
+		Replace("/spec/cluster/autoCompaction/timeWindow/end", "07:37"), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/FromHour", 1), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/FromMinute", 1), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/ToHour", 7), time.Minute)
+	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/ToMinute", 37), time.Minute)
+
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/databaseFragmentationThreshold/percent", &thresholdPercent), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/DatabaseFragmentationThreshold/Percentage", thresholdPercent), time.Minute)
 
@@ -56,14 +63,6 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/parallelCompaction", true), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/ParallelDBAndViewCompaction", true), time.Minute)
 
-	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/start", "01:01"), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/FromHour", 1), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/FromMinute", 1), time.Minute)
-
-	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/end", "07:37"), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/ToHour", 7), time.Minute)
-	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/ToMinute", 37), time.Minute)
-
 	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/abortCompactionOutsideWindow", true), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/AbortOutside", true), time.Minute)
 
@@ -75,7 +74,7 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	// * Settings edited N times
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		eventschema.Repeat{Times: 9, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Repeat{Times: 8, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, couchbase, expectedEvents)
