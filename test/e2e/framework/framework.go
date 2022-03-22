@@ -980,6 +980,15 @@ func (r *TestRequirement) CouchbaseBucket() *TestRequirement {
 	return r
 }
 
+// IstioDisabled skips the test if Istio is enabled on the Kubernetes platform.
+func (r *TestRequirement) IstioDisabled() *TestRequirement {
+	if Global.EnableIstio {
+		r.t.Skip("Test not compatible with Istio enabled.")
+	}
+
+	return r
+}
+
 // NotVersion skips the test if the Couchbase version is buggy.
 func (r *TestRequirement) NotVersion(v ...string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseServerImage, ":")

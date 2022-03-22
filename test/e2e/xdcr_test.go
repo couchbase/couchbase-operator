@@ -132,6 +132,9 @@ func XDCRCreateCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dn
 // xdcrClusterRemoveNode removes nodes from the selected cluster in numerous
 // nefarious ways.
 func xdcrClusterRemoveNode(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, cluster xdcrCluster, operation xdcrOperation) {
+	// Skip the test if it utilises GenericNetworking with Istio enabled.
+	framework.Requires(t, kubernetes1).IstioDisabled()
+
 	// Static configuration.
 	clusterSize := constants.Size3
 	scaleDownSize := constants.Size1
@@ -352,7 +355,7 @@ func TestXDCRCreateCluster(t *testing.T) {
 	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
 
 	// Static configuration.
 	clusterSize := constants.Size3
@@ -400,7 +403,7 @@ func TestXDCRPauseReplication(t *testing.T) {
 	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
 
 	// Static configuration.
 	clusterSize := 1
@@ -462,7 +465,7 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
 
 	// Static configuration.
 	clusterSize := 3
@@ -520,7 +523,7 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -576,7 +579,7 @@ func TestXDCRTargetNodeServiceDelete(t *testing.T) {
 	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
 
 	// Static configuration.
 	clusterSize := constants.Size1
@@ -700,7 +703,7 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
 
 	// Static configuration.
 	clusterSize := 1
@@ -765,7 +768,7 @@ func TestXDCRFilterExp(t *testing.T) {
 	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
 
 	// Static configuration.
 	clusterSize := 1
@@ -825,7 +828,7 @@ func TestXDCRRotatePassword(t *testing.T) {
 	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1")
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
 
 	// Static configuration.
 	clusterSize := 1
@@ -1012,7 +1015,7 @@ func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
 
 	// Static configuration.
 	numOfDocs := framework.Global.DocsCount
@@ -1098,7 +1101,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
 
 	// Static configuration.
 	numOfDocs := framework.Global.DocsCount
@@ -1198,7 +1201,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
 
 	// Static configuration.
 	numOfDocs := f.DocsCount
@@ -1307,7 +1310,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
 
 	// Static configuration.
 	numOfDocs := framework.Global.DocsCount
@@ -1441,7 +1444,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
 
 	// Static configuration.
 	numOfDocs := f.DocsCount
@@ -1510,7 +1513,7 @@ func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
 
 	// Static configuration.
 	numOfDocs := framework.Global.DocsCount
@@ -1623,7 +1626,7 @@ func TestXDCRMigrationLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
 
 	// Static configuration.
 	numOfDocs := framework.Global.DocsCount
@@ -1758,7 +1761,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
 
 	// Static configuration.
 	numOfDocs := f.DocsCount
