@@ -1226,6 +1226,34 @@ func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
 	return r
 }
 
+// AtLeastLoggingVersion skips the test for logging versions before this threshold.
+func (r *TestRequirement) AtLeastLoggingVersion(v string) *TestRequirement {
+	parts := strings.Split(Global.CouchbaseLoggingImage, ":")
+	if len(parts) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseLoggingImage))
+	}
+
+	if parts[1] == "latest" {
+		return r
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+	}
+
+	v2, err := couchbaseutil.NewVersion(v)
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+	}
+
+	if v1.Less(v2) {
+		r.t.Skip("Couchbase Logging Image version not supported (geriatric)")
+	}
+
+	return r
+}
+
 // AtMostSyncGatewayVersion skips the test for sync-gateway versions after this threshold.
 func (r *TestRequirement) AtMostSyncGatewayVersion(v string) *TestRequirement {
 	if Global.SyncGatewayImage == "" {

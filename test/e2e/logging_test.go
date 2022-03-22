@@ -466,6 +466,8 @@ func TestLoggingMemoryBufferLimits(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).AtLeastLoggingVersion("1.2.0")
+
 	maxMem := e2eutil.MustGetMaxNodeMem(t, kubernetes)
 	memLimit := strconv.Itoa(int(0.8*maxMem)) + "M"
 
