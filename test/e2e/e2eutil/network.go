@@ -186,19 +186,11 @@ func checkServicePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClust
 			couchbasev2.IndexService:     {},
 		}
 
-		// We should always be exposing these on every service
-		allServicePorts := servicePorts[couchbasev2.DataService]
-
 		// For the service, check its matching pod to confirm what type of Couchbase Service is running (data, index, etc.).
 		// Using that confirm the appropriate ports are open on the service.
 		for _, service := range services.Items {
 			if service.Spec.Type != corev1.ServiceTypeNodePort {
 				continue
-			}
-			// Check it has all the ports every service must include.
-			err := checkForExpectedPorts(service, allServicePorts)
-			if err != nil {
-				return err
 			}
 
 			// Get matching pod and find out what types are attached to it.

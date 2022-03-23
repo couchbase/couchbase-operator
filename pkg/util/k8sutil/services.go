@@ -830,11 +830,9 @@ func memberServices(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.
 	}
 
 	// Always allow the admin service, this is not explicitly enabled
-	// per server class. Likewise always allow the data service irrespective
-	// of class as it's used for GCCCP client boot-strapping and XDCR.
+	// per server class.
 	services := couchbasev2.ServiceList{
 		couchbasev2.AdminService,
-		couchbasev2.DataService,
 	}
 
 	// Build up the node services based on enabled services, but don't duplicate,
