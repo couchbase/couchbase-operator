@@ -138,6 +138,7 @@ def start(args):
                '--machine-type', args.machine,
                '--network', args.name,
                '--subnetwork', args.name,
+               '--num-nodes', "4",
                '--no-enable-ip-alias',
                '--no-enable-basic-auth',
                '--no-enable-legacy-authorization',
