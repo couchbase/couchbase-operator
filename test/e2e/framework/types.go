@@ -74,6 +74,9 @@ type Framework struct {
 	// DynamicPlatform is your GKE Autopilots or anything with cluster autoscaling
 	// enabled.
 	DynamicPlatform bool
+
+	// IgnoreErrors tells the application not to fatally die on errors.
+	IgnoreErrors bool
 }
 
 // RegistryConfig defines a container image registry.  Registry configurations will

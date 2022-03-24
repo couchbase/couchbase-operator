@@ -156,6 +156,10 @@ func preflight() error {
 	}
 
 	if fails > 0 {
+		if Global.IgnoreErrors {
+			return nil
+		}
+
 		return fmt.Errorf("%d preflight checks failed", fails)
 	}
 
@@ -299,6 +303,9 @@ func configure() (err error) {
 		"Force the use use of IPv6 with Couchbase Server.")
 	flag.Var(&params.PodImagePullPolicy, "image-pull-policy",
 		"Image pull policy to use for Operator and Admission Pods.")
+	flag.BoolVar(&params.IgnoreErrors, "ignore-errors",
+		false,
+		"Ignore normally fatal errors and continue execution.")
 
 	flag.Parse()
 
