@@ -431,6 +431,9 @@ func TestPrometheusRotateCA(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	// test scenario was broken pre exporter:1.0.5
+	framework.Requires(t, kubernetes).AtLeastExporterVersion("1.0.5")
+
 	// Static configuration.
 	clusterSize := 3
 

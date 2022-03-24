@@ -1291,6 +1291,34 @@ func (r *TestRequirement) AtMostSyncGatewayVersion(v string) *TestRequirement {
 	return r
 }
 
+// AtLeastExporterVersion skips the test for exporter versions before this threshold.
+func (r *TestRequirement) AtLeastExporterVersion(v string) *TestRequirement {
+	parts := strings.Split(Global.CouchbaseExporterImage, ":")
+	if len(parts) != 2 {
+		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseExporterImage))
+	}
+
+	if parts[1] == "latest" {
+		return r
+	}
+
+	v1, err := couchbaseutil.NewVersion(parts[1])
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+	}
+
+	v2, err := couchbaseutil.NewVersion(v)
+	if err != nil {
+		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+	}
+
+	if v1.Less(v2) {
+		r.t.Skip("Couchbase Exporter Image version not supported (geriatric)")
+	}
+
+	return r
+}
+
 // ServerGroups skips the test is there aren't enough server groups to play with.
 func (r *TestRequirement) ServerGroups(i int) *TestRequirement {
 	capabilities := clustercapabilities.MustNewCapabilities(r.t, r.kubernetes.KubeClient)
