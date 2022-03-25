@@ -37,6 +37,7 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -124,6 +125,130 @@ var rlimitChecks = []rlimitCheck{
 	},
 }
 
+var (
+	// Okay, anything you change here, will also need to go in the user facing
+	// documentation concept-platform-certification.adoc.
+	nodeMinimumCPU    = resource.MustParse("2")
+	nodeMinimumMemory = resource.MustParse("4Gi")
+
+	certificationCPU    = resource.MustParse("2")
+	certificationMemory = resource.MustParse("4Gi")
+
+	serverCPU    = resource.MustParse("2")
+	serverMemory = resource.MustParse("2560Mi")
+
+	// This is a total guess, some tests will fill up the cluster like a
+	// lunatic, some are smaller, some don't take in to account backup
+	// and restore, some require two clusters.  There's just no really
+	// nice way of knowing other than to attach some metadata to the tests
+	// and use the power of maths.
+	averageClusterSize = 3
+)
+
+func nodeResourceCheck(fails *int, node *v1.Node, allocatableTotalCPU, allocatableTotalMemory *resource.Quantity) error {
+	result := types.ResultTypePass
+
+	cpu, ok := node.Status.Allocatable[v1.ResourceCPU]
+	if !ok {
+		return fmt.Errorf("node %s has no allocatable CPU", node.Name)
+	}
+
+	if cpu.Cmp(nodeMinimumCPU) < 0 {
+		result = types.ResultTypeFail
+	}
+
+	allocatableTotalCPU.Add(cpu)
+
+	memory, ok := node.Status.Allocatable[v1.ResourceMemory]
+	if !ok {
+		return fmt.Errorf("node %s has no allocatable memory", node.Name)
+	}
+
+	if memory.Cmp(nodeMinimumMemory) < 0 {
+		result = types.ResultTypeFail
+	}
+
+	allocatableTotalMemory.Add(memory)
+
+	logrus.Infof("Node %s = %v CPU, %v memory (>= %v CPU, %v memory) %s", node.Name, &cpu, &memory, &nodeMinimumCPU, &nodeMinimumMemory, util.PrettyResult(result))
+
+	if result == types.ResultTypeFail {
+		*fails++
+	}
+
+	return nil
+}
+
+func totalResourceCheck(fails *int, allocatableTotalCPU, allocatableTotalMemory *resource.Quantity) {
+	totalCPU := certificationCPU.DeepCopy()
+
+	for i := 0; i < Global.Parallelism; i++ {
+		for j := 0; j < averageClusterSize; j++ {
+			totalCPU.Add(serverCPU)
+		}
+	}
+
+	totalMemory := certificationMemory.DeepCopy()
+
+	for i := 0; i < Global.Parallelism; i++ {
+		for j := 0; j < averageClusterSize; j++ {
+			totalMemory.Add(serverMemory)
+		}
+	}
+
+	result := types.ResultTypePass
+
+	if allocatableTotalCPU.Cmp(totalCPU) < 0 {
+		result = types.ResultTypeFail
+	}
+
+	if allocatableTotalMemory.Cmp(totalMemory) < 0 {
+		result = types.ResultTypeFail
+	}
+
+	logrus.Infof("Cluster = %v CPU, %v memory (>= %v CPU, %v memory) %s", allocatableTotalCPU, allocatableTotalMemory, &totalCPU, &totalMemory, util.PrettyResult(result))
+
+	if result == types.ResultTypeFail {
+		*fails++
+	}
+}
+
+func resourceCheck(fails *int) error {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return err
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	nodes, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var allocatableTotalCPU resource.Quantity
+
+	var allocatableTotalMemory resource.Quantity
+
+	// Where users will start to moan most likely is:
+	// * I have some nodes that are correct and others that aren't so why don't you
+	//   just ignore the ones that arenn't big enough?
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+
+		if err := nodeResourceCheck(fails, node, &allocatableTotalCPU, &allocatableTotalMemory); err != nil {
+			return err
+		}
+	}
+
+	totalResourceCheck(fails, &allocatableTotalCPU, &allocatableTotalMemory)
+
+	return nil
+}
+
 // preflight checks the platform is capable of running Couchbase before allowing
 // the test framework to run.
 func preflight() error {
@@ -153,6 +278,10 @@ func preflight() error {
 		}
 
 		logrus.Infof("%s = %s (>= %d) %s", check.metric, value, check.threshold, util.PrettyResult(result))
+	}
+
+	if err := resourceCheck(&fails); err != nil {
+		return err
 	}
 
 	if fails > 0 {
@@ -306,6 +435,9 @@ func configure() (err error) {
 	flag.BoolVar(&params.IgnoreErrors, "ignore-errors",
 		false,
 		"Ignore normally fatal errors and continue execution.")
+	flag.IntVar(&params.Parallelism, "parallelism",
+		0,
+		"How many tests to run in parallel, must match -test.parallel exactly.")
 
 	flag.Parse()
 

@@ -131,7 +131,9 @@ var (
 	}
 
 	// podTemplate is a genrica template for all tasks in the pipeline, it mounts the
-	// PVC in the /artifacts directory.
+	// PVC in the /artifacts directory.  We use Guaranteed QoS to prevent this pod
+	// from getting evicted, essentially ensure all containers have CPU and memory
+	// limits.
 	podTemplate = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: certificationName,
@@ -148,11 +150,11 @@ var (
 						},
 					},
 					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
+						Limits: corev1.ResourceList{
 							// Fairly low as this is event driven.
 							corev1.ResourceCPU: resource.MustParse("2"),
 							// Has been seen as high as "2614504Ki".
-							corev1.ResourceMemory: resource.MustParse("3Gi"),
+							corev1.ResourceMemory: resource.MustParse("4Gi"),
 						},
 					},
 				},
@@ -603,6 +605,8 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 		"-test.timeout",
 		o.timeout,
 		"-test.parallel",
+		strconv.Itoa(o.parallel),
+		"-parallelism",
 		strconv.Itoa(o.parallel),
 		"-color",
 		"-collect-logs",

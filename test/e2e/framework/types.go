@@ -77,6 +77,9 @@ type Framework struct {
 
 	// IgnoreErrors tells the application not to fatally die on errors.
 	IgnoreErrors bool
+
+	// Parallelism is essentially a copy of -test.parallel that we can acually see.
+	Parallelism int
 }
 
 // RegistryConfig defines a container image registry.  Registry configurations will

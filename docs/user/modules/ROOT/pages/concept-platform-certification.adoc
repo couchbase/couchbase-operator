@@ -105,7 +105,7 @@ Failure to submit this archive, or simply returning a screen capture, will resul
 Kubernetes cluster size and node size directly impact how many test can be run in parallel, and inversely, how long a self-certification test takes to run:
 
 * Kubernetes nodes must have at least 4 GiB *available* memory and 2 vCPUs in order to run self-certification
-** The certification image itself needs approximately 3 GiB of memory and 2 vCPUs to run
+** The certification image itself needs approximately 4 GiB of memory and 2 vCPUs to run
 ** Couchbase server instances require at least 2.5 GiB of memory and 2 vCPUs
 * Each test typically uses a 3 pod -- the minimum supported -- Couchbase cluster to execute.
 * Couchbase server is very CPU intensive, and the tests are time constrained, so we recommend using only the latest generation of CPU available on the platform
@@ -116,8 +116,8 @@ Given these constraints, and the default parallelism of 8, we can calculate:
 [source]
 ----
 memory = certification + (parallelism * couchbase_cluster_size * couchbase_memory)
-memory = 3 + (8 * 3 * 3)
-memory = 75 GiB
+memory = 4 + (8 * 3 * 3)
+memory = 76 GiB
 
 CPU = certification + (parallelism * couchbase_cluster_size * couchbase_cpu)
 CPU = 2 + (8 * 3 * 2)
@@ -134,7 +134,7 @@ We would arrive at:
 [source]
 ----
 nodes = total_memory / node_memory
-nodes = 75 / 13
+nodes = 76 / 13
 nodes = ~6 nodes
 
 nodes = total_cpu / node_cpu
