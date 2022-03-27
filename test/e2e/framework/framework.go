@@ -281,6 +281,10 @@ func preflight() error {
 	}
 
 	if err := resourceCheck(&fails); err != nil {
+		if Global.IgnoreErrors {
+			return nil
+		}
+
 		return err
 	}
 

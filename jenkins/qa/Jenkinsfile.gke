@@ -180,7 +180,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=true"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -237,7 +238,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=true"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -294,7 +296,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=true"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -351,7 +354,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=true"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -408,7 +412,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=true"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -465,7 +470,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=true"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
