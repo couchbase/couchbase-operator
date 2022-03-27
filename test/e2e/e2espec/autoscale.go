@@ -7,6 +7,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
@@ -426,4 +428,37 @@ func GenerateMetricAPIService(namespace string) *apiregistrationv1.APIService {
 			VersionPriority:       200,
 		},
 	}
+}
+
+// GenerateMetricsPeerAuthRule creates Istio Peer Authentication
+// rule for custom metrics to run in PERMISSIVE mode when Istio enabled.
+func GenerateMetricsPeerAuthRule(namespace string) (*unstructured.Unstructured, schema.GroupVersionResource) {
+	policy := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "security.istio.io/v1beta1",
+			"kind":       "PeerAuthentication",
+			"metadata": map[string]interface{}{
+				"name":      "autoscaler",
+				"namespace": namespace,
+			},
+			"spec": map[string]interface{}{
+				"selector": map[string]interface{}{
+					"matchLabels": map[string]string{
+						"app": "custom-metrics-apiserver",
+					},
+				},
+				"mtls": map[string]interface{}{
+					"mode": "PERMISSIVE",
+				},
+			},
+		},
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "security.istio.io",
+		Version:  "v1beta1",
+		Resource: "peerauthentications",
+	}
+
+	return policy, gvr
 }

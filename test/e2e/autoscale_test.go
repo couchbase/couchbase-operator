@@ -172,7 +172,7 @@ func TestAutoscaleUp(t *testing.T) {
 	targetValue := e2espec.DefaultMetricTarget
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, f.EnableIstio, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
@@ -214,7 +214,7 @@ func TestAutoscaleUpMandatoryMutualTLS(t *testing.T) {
 	options := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, &policy).Options
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, f.EnableIstio, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
@@ -253,7 +253,7 @@ func TestAutoscaleDown(t *testing.T) {
 	hpaStabilization := e2espec.LowHPAStabilizationPeriod
 	config := e2espec.NewDecrementingHPAConfig(targetValue).WithScaleDownStabilizationWindow(hpaStabilization)
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, f.EnableIstio, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale down event
@@ -296,7 +296,7 @@ func TestAutoscaleDownMandatoryMutualTLS(t *testing.T) {
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 	options := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, &policy).Options
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, f.EnableIstio, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale down event
@@ -356,7 +356,7 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	targetValue = 100
 	scaleDownConfig := e2espec.NewDecrementingHPAConfig(targetValue).WithScaleDownStabilizationWindow(hpaStabilization)
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options.Options, scaleUpConfig, scaleDownConfig)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options.Options, f.EnableIstio, scaleUpConfig, scaleDownConfig)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event from 2 -> 3 of data/index Pods
@@ -410,7 +410,7 @@ func TestAutoscaleConflict(t *testing.T) {
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 	config.Behavior.ScaleUp.Policies[0].PeriodSeconds = 120
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, f.EnableIstio, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
@@ -469,7 +469,7 @@ func TestAutoscaleEnabledAllowsStatefulTLS(t *testing.T) {
 	targetValue := e2espec.DefaultMetricTarget
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, f.EnableIstio, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
@@ -509,14 +509,14 @@ func TestAutoscaleVerifyMaintenanceMode(t *testing.T) {
 	targetValue := e2espec.DefaultMetricTarget
 	config := e2espec.NewIncrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, f.EnableIstio, config)
 	defer hpaManager.Cleanup()
 
 	// Wait for scale up event
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 1, 2), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 1, 2), 5*time.Minute)
 
 	// Autoscaler must be in Maintenance Mode after event is posted
 	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
@@ -530,7 +530,7 @@ func TestAutoscaleVerifyMaintenanceMode(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/autoscaleStabilizationPeriod"), time.Minute)
 
 	// Wait for next scale up event
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 5*time.Minute)
 
 	// Autoscale condition must remain ready and not go into maintenance mode
 	e2eutil.MustValidateAutoscaleReadyStatus(t, kubernetes, cluster.Namespace, cluster.Name, v1.ConditionTrue)
@@ -572,7 +572,7 @@ func TestAutoscaleManualMaintenanceMode(t *testing.T) {
 	targetValue := e2espec.DefaultMetricTarget
 	config := e2espec.NewDecrementingHPAConfig(targetValue).WithSinglePodScalingPolicy()
 
-	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, config)
+	hpaManager := e2eutil.MustNewHPAManager(t, kubernetes, options, f.EnableIstio, config)
 	defer hpaManager.Cleanup()
 
 	// Manually scale up server config to from 1 -> 3
@@ -593,7 +593,7 @@ func TestAutoscaleManualMaintenanceMode(t *testing.T) {
 	// Expecting HPA to scale down cluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 3, 2), 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 3, 2), 5*time.Minute)
 
 	// Wait for rebalance after scale down
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)

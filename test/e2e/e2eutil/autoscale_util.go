@@ -28,7 +28,7 @@ type HPAManager struct {
 	Cleanup func()
 }
 
-func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2espec.ClusterOptions, hpaConfigs ...*e2espec.HPAConfig) *HPAManager {
+func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2espec.ClusterOptions, istioEnabled bool, hpaConfigs ...*e2espec.HPAConfig) *HPAManager {
 	// Begin with basic autoscale enabled cluster
 	clusterSpec := MustNewAutoscaleCluster(t, k8s, couchbaseOptions)
 
@@ -51,7 +51,7 @@ func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2esp
 	}
 
 	// Create the metric server for metric generation
-	cleanup := MustCreateCustomMetricServer(t, k8s, clusterSpec.Namespace, clusterSpec.Name)
+	cleanup := MustCreateCustomMetricServer(t, k8s, clusterSpec.Namespace, clusterSpec.Name, istioEnabled)
 
 	return &HPAManager{
 		CouchbaseCluster:         clusterSpec,
@@ -141,7 +141,7 @@ func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace strin
 // These collection of resources are used by HPA for reacting to target values.
 // Specifically, the custom metric service exposes test metrics with various behaviors,
 // such as incrementing, decrementing, average, and random value metrics.
-func CreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string, clusterName string) (func(), error) {
+func CreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string, clusterName string, istioEnabled bool) (func(), error) {
 	// generate resources
 	serviceAccount := e2espec.GenerateCustomMetricServiceAccount(namespace)
 	deploymentRole := e2espec.GenerateCustomMetricDeploymentRole(namespace)
@@ -151,6 +151,7 @@ func CreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string
 	deployment := e2espec.GenerateCustomMetricDeployment(namespace, clusterName)
 	deploymentService := e2espec.GenerateMetricService(namespace)
 	serviceMetric := e2espec.GenerateMetricAPIService(namespace)
+	istioPolicy, resourceSchema := e2espec.GenerateMetricsPeerAuthRule(namespace)
 
 	// prepare to cleanup rootscoped resources
 	cleanup := func() {
@@ -160,6 +161,12 @@ func CreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string
 	}
 
 	// create resources
+	if istioEnabled {
+		if _, err := k8s.DynamicClient.Resource(resourceSchema).Namespace(k8s.Namespace).Create(context.Background(), istioPolicy, metav1.CreateOptions{}); err != nil {
+			return cleanup, err
+		}
+	}
+
 	if _, err := k8s.KubeClient.CoreV1().ServiceAccounts(namespace).Create(context.Background(), serviceAccount, metav1.CreateOptions{}); err != nil {
 		return cleanup, err
 	}
@@ -197,8 +204,8 @@ func CreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string
 }
 
 // MustCreateCustomMetricServer requires creation of metric server or fails.
-func MustCreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string, clusterName string) func() {
-	cleanup, err := CreateCustomMetricServer(t, k8s, namespace, clusterName)
+func MustCreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string, clusterName string, istioEnabled bool) func() {
+	cleanup, err := CreateCustomMetricServer(t, k8s, namespace, clusterName, istioEnabled)
 	if err != nil {
 		cleanup()
 		Die(t, err)
