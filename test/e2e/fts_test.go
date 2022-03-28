@@ -37,6 +37,7 @@ func TestFTSCreateCluster(t *testing.T) {
 
 	// CB cluster instance
 	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
+	defer host.Close(nil)
 
 	// Index Manager.
 	searchManager := host.SearchIndexes()
@@ -79,6 +80,7 @@ func TestFTSResizeCluster(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
+	defer host.Close(nil)
 
 	searchManager := host.SearchIndexes()
 	searchIndex := e2eutil.NewFTSIndex(bucket.GetName())
@@ -153,6 +155,7 @@ func TestFTSWithScopesAndCollections(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 2*numOfDocs, 5*time.Minute)
 
 	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
+	defer host.Close(nil)
 
 	// Instance to manage FTS.
 	searchManager := host.SearchIndexes()

@@ -269,6 +269,8 @@ func getDocs(d *DocumentSet) ([]map[string]interface{}, error) {
 		return nil, err
 	}
 
+	defer c.Close(nil)
+
 	bucket := c.Bucket(d.bucket)
 
 	scope := bucket.DefaultScope()
@@ -318,6 +320,8 @@ func addDocs(d *DocumentSet) error {
 	if err != nil {
 		return err
 	}
+
+	defer c.Close(nil)
 
 	bucket := c.Bucket(d.bucket)
 

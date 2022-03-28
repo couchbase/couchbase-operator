@@ -73,34 +73,29 @@ func PodReady(client kubernetes.Interface, namespace, name string) error {
 	return ErrConditionMissing
 }
 
-func PodCompleted(client kubernetes.Interface, namespace, name string, exitCode *int32) error {
+func PodCompleted(client kubernetes.Interface, namespace, name string, exitCode *int32, debug bool) error {
 	pod, err := client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	// This can happen if the pod is evicted due to memory pressure, and annoyingly
-	// there are no status conditions #legacy.
-	if pod.Status.Phase == corev1.PodFailed {
-		return nil
+	if debug {
+		fmt.Println(pod)
 	}
 
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady {
-			if condition.Status == corev1.ConditionFalse {
-				if pod.Status.ContainerStatuses[0].State.Terminated == nil {
-					return ErrStatusNotTerminated
-				}
-
-				if exitCode != nil {
-					*exitCode = pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
-				}
-
-				return nil
-			}
-
-			return ErrConditionRunning
+	switch pod.Status.Phase {
+	case corev1.PodPending, corev1.PodRunning:
+		return ErrConditionRunning
+	case corev1.PodSucceeded, corev1.PodFailed:
+		if pod.Status.ContainerStatuses[0].State.Terminated == nil {
+			return ErrStatusNotTerminated
 		}
+
+		if exitCode != nil {
+			*exitCode = pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
+		}
+
+		return nil
 	}
 
 	return ErrConditionMissing

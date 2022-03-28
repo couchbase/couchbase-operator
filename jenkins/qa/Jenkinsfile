@@ -155,6 +155,8 @@ pipeline {
             --parallel 8 \
             --image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-certification:${GIT_COMMIT} \
             --archive-name logs \
+            --profile \
+            --profile-dir profile \
             -- \
             -suite sanity \
             ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} \
@@ -194,6 +196,15 @@ pipeline {
       // Archive any logs as an artifact, these may be needed to debug an issue.
       sh 'tar czf logs.tar.gz artifacts/logs'
       archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
+
+      // Archive profiling data so we can debug the certification image.
+      sh 'tar czf profile.tar.gz profile'
+      archiveArtifacts artifacts: 'profile.tar.gz', fingerprint: true
+
+      // Make a pretty graph.
+      sh 'go run scripts/metrics.go --path profile > data.csv'
+      sh 'gnuplot scripts/metrics.gnuplot > metrics.png'
+      archiveArtifacts artifacts: 'metrics.png'
 
       // Clean up the workspace to free disk space.
       cleanWs()

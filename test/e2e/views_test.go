@@ -31,6 +31,8 @@ func TestViewsCreateCluster(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
+	defer host.Close(nil)
+
 	// Design Doc definition.
 	designDoc := e2eutil.NewViewsDesignDoc()
 
@@ -72,6 +74,8 @@ func TestViewsResizeCluster(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, 2*time.Minute)
 
 	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
+	defer host.Close(nil)
+
 	// Design Doc definition.
 	designDoc := e2eutil.NewViewsDesignDoc()
 
@@ -148,6 +152,8 @@ func TestViewsWithScopesAndCollections(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 2*numOfDocs, 5*time.Minute)
 
 	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
+	defer host.Close(nil)
+
 	// Design Doc definition.
 	designDoc := e2eutil.NewViewsDesignDoc()
 

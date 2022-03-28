@@ -787,6 +787,7 @@ func TestGSIWithCollections(t *testing.T) {
 
 	// Couchbase Cluster Instance.
 	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
+	defer host.Close(nil)
 
 	// Instance to manage Indexes.
 	queryManager := host.QueryIndexes()

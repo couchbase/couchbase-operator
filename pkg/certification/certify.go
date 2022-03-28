@@ -5,16 +5,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/certification/util"
+	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
 
 	"github.com/spf13/cobra"
 
@@ -29,6 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
 const (
@@ -153,8 +158,8 @@ var (
 						Limits: corev1.ResourceList{
 							// Fairly low as this is event driven.
 							corev1.ResourceCPU: resource.MustParse("2"),
-							// Has been seen as high as "2614504Ki".
-							corev1.ResourceMemory: resource.MustParse("4Gi"),
+							// Current profiling shows this at ~1Gi with 8 way testing.
+							corev1.ResourceMemory: resource.MustParse("3Gi"),
 						},
 					},
 				},
@@ -194,6 +199,9 @@ type certifyOptions struct {
 	// client is set at runtime and is a Kubernetes client.
 	client kubernetes.Interface
 
+	// metricsclient allows us to see CPU and memory utilization.
+	metricsclient metricsclient.Interface
+
 	// namespace is set at runtime and is the namespace this is being run in.
 	namespace string
 
@@ -210,9 +218,25 @@ type certifyOptions struct {
 
 	// fsGroup allows the file system group to be set.
 	fsGroup int
+
 	// RegistryConfigs define private container registries that need to be defined
 	// as docker pull secrets in order to access private container images.
 	registries RegistryConfigValue
+
+	// enable periodic profiling via pprof.
+	profile bool
+
+	// profileDir defines where to dump profiling information.
+	profileDir profileDirConfigValue
+
+	// profilerStopChan is used to stop the profiler.
+	profilerStopChan chan interface{}
+
+	// profilerStoppedChan is used to wait for the profiler to stop.
+	profilerStoppedChan chan interface{}
+
+	// debug is used to dump out verbose information.
+	debug bool
 }
 
 // RegistryConfig defines a container image registry.  Registry configurations will
@@ -272,6 +296,14 @@ func (v *RegistryConfigValue) Type() string {
 type archiveNameConfigValue struct {
 	name     string
 	explicit bool
+	ts       time.Time
+}
+
+func newArchiveNameConfigValue(name string, ts time.Time) archiveNameConfigValue {
+	return archiveNameConfigValue{
+		name: name,
+		ts:   ts,
+	}
 }
 
 func (v *archiveNameConfigValue) Set(value string) error {
@@ -291,18 +323,55 @@ func (v *archiveNameConfigValue) Type() string {
 
 func (v *archiveNameConfigValue) archiveName() string {
 	if !v.explicit {
-		return fmt.Sprintf("%s-%s.tar.bz2", v.name, time.Now().Format("20060102T150405-0700"))
+		return fmt.Sprintf("%s-%s.tar.bz2", v.name, v.ts.Format("20060102T150405-0700"))
 	}
 
 	return fmt.Sprintf("%s.tar.bz2", v.name)
 }
 
+type profileDirConfigValue struct {
+	name     string
+	explicit bool
+	ts       time.Time
+}
+
+func newProfileDirConfigValue(name string, ts time.Time) profileDirConfigValue {
+	return profileDirConfigValue{
+		name: name,
+		ts:   ts,
+	}
+}
+
+func (v *profileDirConfigValue) Set(value string) error {
+	v.name = value
+	v.explicit = true
+
+	return nil
+}
+
+func (v *profileDirConfigValue) String() string {
+	return v.name
+}
+
+func (v *profileDirConfigValue) Type() string {
+	return "string"
+}
+
+func (v *profileDirConfigValue) profileDir() string {
+	if !v.explicit {
+		return fmt.Sprintf("%s-%s", v.name, v.ts.Format("20060102T150405-0700"))
+	}
+
+	return v.name
+}
+
 // getCertifyCommand returns a new Cobra certification command.
 func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
+	ts := time.Now()
+
 	o := certifyOptions{
-		archiveName: archiveNameConfigValue{
-			name: "couchbase-operator-certification",
-		},
+		archiveName: newArchiveNameConfigValue("couchbase-operator-certification", ts),
+		profileDir:  newProfileDirConfigValue("couchbase-operator-certification-profile", ts),
 	}
 
 	cmd := &cobra.Command{
@@ -371,6 +440,16 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().Var(&o.registries, "registry", "Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.")
 	cmd.Flags().StringVar(&o.imagePullPolicy, "image-pull-policy", imagePullPolicyDefault, "Pull Policy to use when downloading the Certification container")
 
+	// Secret hidden things for internal use.
+	cmd.Flags().BoolVar(&o.profile, "profile", false, "Collect pprof profiling data")
+	_ = cmd.Flags().MarkHidden("profile")
+
+	cmd.Flags().Var(&o.profileDir, "profile-dir", "Directory to store profling result in")
+	_ = cmd.Flags().MarkHidden("profile-dir")
+
+	cmd.Flags().BoolVar(&o.debug, "debug", false, "Collect verbose tool information")
+	_ = cmd.Flags().MarkHidden("debug")
+
 	return cmd
 }
 
@@ -390,8 +469,14 @@ func (o *certifyOptions) initializeRuntime(flags *genericclioptions.ConfigFlags)
 		return err
 	}
 
+	mc, err := metricsclient.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
 	o.config = config
 	o.client = client
+	o.metricsclient = mc
 	o.namespace, _, _ = configLoader.Namespace()
 
 	return nil
@@ -720,7 +805,7 @@ func (o *certifyOptions) retryStreamLogs() {
 	var since *metav1.Time
 
 	for {
-		if err := util.PodCompleted(o.client, o.namespace, certificationName, nil); err == nil {
+		if err := util.PodCompleted(o.client, o.namespace, certificationName, nil, o.debug); err == nil {
 			break
 		}
 
@@ -745,7 +830,7 @@ func (o *certifyOptions) waitCertificationPodCompletion() (int32, error) {
 	var exitCode int32
 
 	callback := func() error {
-		return util.PodCompleted(o.client, o.namespace, certificationName, &exitCode)
+		return util.PodCompleted(o.client, o.namespace, certificationName, &exitCode, o.debug)
 	}
 
 	if err := util.WaitFor(callback, 5*time.Minute); err != nil {
@@ -890,6 +975,136 @@ func (o *certifyOptions) downloadArtifacts() error {
 	return nil
 }
 
+// startProfiling begins periodic profiling of the certification container
+// using the magic of pprof.
+func (o *certifyOptions) startProfiling() {
+	if !o.profile {
+		return
+	}
+
+	o.profilerStopChan = make(chan interface{})
+	o.profilerStoppedChan = make(chan interface{})
+
+	go func() {
+		tick := time.NewTicker(time.Minute)
+
+		defer tick.Stop()
+
+		for {
+			select {
+			case <-o.profilerStopChan:
+				close(o.profilerStoppedChan)
+
+				return
+
+			case <-tick.C:
+				o.profileCertification()
+			}
+		}
+	}()
+}
+
+// profileCertification collects process and memory statistics from
+// the certification process so we capture any routine or memory leaks,
+// or just generally capture resource utilization.
+func (o *certifyOptions) profileCertification() {
+	restorer := portforward.Silent()
+	defer restorer()
+
+	pf := portforward.PortForwarder{
+		Config:    o.config,
+		Client:    o.client,
+		Namespace: o.namespace,
+		Pod:       certificationName,
+		Port:      "6060",
+	}
+
+	if err := pf.ForwardPorts(); err != nil {
+		return
+	}
+
+	defer pf.Close()
+
+	endpoints := []string{
+		"goroutine",
+		"heap",
+		"allocs",
+		"block",
+		"mutex",
+		"threads",
+	}
+
+	dir := filepath.Join(o.profileDir.profileDir(), time.Now().Format("20060102T150405-0700"))
+
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return
+	}
+
+	for _, endpoint := range endpoints {
+		data, err := gatherProfileData(endpoint)
+		if err != nil {
+			continue
+		}
+
+		file := filepath.Join(dir, endpoint)
+
+		if err := ioutil.WriteFile(file, data, 0640); err != nil {
+			continue
+		}
+	}
+
+	metrics, err := o.gatherPodMetrics()
+	if err == nil {
+		file := filepath.Join(dir, "metrics")
+
+		_ = ioutil.WriteFile(file, metrics, 0640)
+	}
+}
+
+// gatherProfileData grabs raw pprof data from a specified endpoint.
+func gatherProfileData(endpoint string) ([]byte, error) {
+	resp, err := http.Get(fmt.Sprintf("http://localhost:6060/debug/pprof/%s", endpoint))
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, err
+}
+
+// gatherPodMetrics grabs raw pod metrics (CPU/memory as seen by Kubernetes) from
+// the metrics service, if it happens to be running on your cluster.
+func (o *certifyOptions) gatherPodMetrics() ([]byte, error) {
+	podMetrics, err := o.metricsclient.MetricsV1beta1().PodMetricses(o.namespace).Get(context.Background(), certificationName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(podMetrics)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+// endProfiling stops the profiling of the certification container.
+func (o *certifyOptions) endProfiling() {
+	if !o.profile {
+		return
+	}
+
+	close(o.profilerStopChan)
+
+	<-o.profilerStoppedChan
+}
+
 // certify runs the certification suite on the provided options.
 func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []string) error {
 	// Create any runtime objects we need in the certification steps.
@@ -971,8 +1186,12 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 		return err
 	}
 
+	o.startProfiling()
+
 	// Stream off the certification pod logs.
 	o.retryStreamLogs()
+
+	o.endProfiling()
 
 	// Wait for the certification pod to properly complete and get
 	// the exit code that will be propagated to this command's exit code.

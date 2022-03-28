@@ -30,5 +30,6 @@ require (
 	k8s.io/client-go v0.23.2
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-aggregator v0.23.2
+	k8s.io/metrics v0.23.2 // indirect
 	sigs.k8s.io/controller-runtime v0.11.0
 )
