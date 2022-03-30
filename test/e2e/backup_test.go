@@ -2755,7 +2755,7 @@ func TestBackupAndForcedRestore(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).StaticCluster()
+	framework.Requires(t, kubernetes).StaticCluster().AtLeastBackupVersion("1.3.0")
 
 	// Create a normal cluster.
 	clusterSize := constants.Size3
