@@ -65,6 +65,14 @@ If this is the case then you may use any existing storage class.
 Please consult with your Kubernetes vendor to confirm.
 ====
 
+=== Storage Reclaim Policy
+
+The storage reclaim policy related to a storage class in use by the Operator is largely irrelevant.
+The Operator uses `PersistentVolumeClaims` to keep storage volumes alive.
+
+Our recommendation is to use the `Delete` policy.
+Operator volume names are based on the cluster name, and therefore deleting and recreating a cluster with the same name may alias resource names and cause provisioning failure when a retaining policy is in use.
+
 == Using Storage Classes
 
 Couchbase Server pods never run as root.
