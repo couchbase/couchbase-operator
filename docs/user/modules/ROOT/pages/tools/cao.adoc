@@ -491,13 +491,6 @@ CPU limit for constraining, only valid when used with --with-resources
 +
 CPU requested for scheduling, only valid when used with --with-resources
 
---default-file-system-group::
-*Type*: bool
-+
-*Default*: true
-+
-Fills in default file system group information on Couchbase volumes
-
 --image::
 *Type*: string
 +
@@ -1375,13 +1368,6 @@ CPU limit for constraining, only valid when used with --with-resources
 *Default*: 500m
 +
 CPU requested for scheduling, only valid when used with --with-resources
-
---default-file-system-group::
-*Type*: bool
-+
-*Default*: true
-+
-Fills in default file system group information on Couchbase volumes
 
 --image::
 *Type*: string

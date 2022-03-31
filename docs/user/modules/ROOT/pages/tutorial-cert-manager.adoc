@@ -240,24 +240,10 @@ metadata:
   name: couchbase-operator-admission
 ----
 
-Next, locate the `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration` resources.
-These need to be updated to include the signing CA's certificate.
+Next, locate the `ValidatingWebhookConfiguration` resource.
+This needs to be updated to include the signing CA's certificate.
 If you recall, when we <<create-an-issuer,created the certificate issuer>>, we configured its `Secret` with a `tls.crt` key.
 We simply need to copy this same `tls.crt` key into each instance of `caBundle` in the webhook resources.
-
-[source,yaml]
-----
-apiVersion: admissionregistration.k8s.io/v1beta1
-kind: MutatingWebhookConfiguration
-metadata:
-  creationTimestamp: null
-  name: couchbase-operator-admission
-webhooks:
-- clientConfig:
-    caBundle: LS0tLS1CRU... # <.>
-----
-
-<.> Replace the existing key with the `tls.crt` key of the certificate issuer.
 
 [source,yaml]
 ----
@@ -296,7 +282,7 @@ However, if you see something similar to the following, it means that the Kubern
 [source,console]
 ----
 $ kubectl create -f example/couchbase-cluster.yaml 
-Error from server (InternalError): error when creating "example/couchbase-cluster.yaml": Internal error occurred: failed calling webhook "couchbase-operator-admission.default.svc": Post "https://couchbase-operator-admission.default.svc:443/couchbaseclusters/mutate?timeout=10s": x509: certificate signed by unknown authority
+Error from server (InternalError): error when creating "example/couchbase-cluster.yaml": Internal error occurred: failed calling webhook "couchbase-operator-admission.default.svc": Post "https://couchbase-operator-admission.default.svc:443/couchbaseclusters/validate?timeout=10s": x509: certificate signed by unknown authority
 ----
 
 If this is the case, check that the correct CA is installed in the webhooks, and ensure that the server certificate issued by cert-manager is valid and verifies against the CA.

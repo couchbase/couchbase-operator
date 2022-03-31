@@ -81,13 +81,6 @@ spec:
 Address for the server to listen for requests on.
 By default it will listen to port 8443 on all interfaces.
 
--default-file-system-group | -default-file-system-group=false::
-*Type*: `boolean`
-+
-*Default*: `true`
-+
-Enables mutation of `CouchbaseCluster` resources, setting a default file system group for when persistent volumes are in use.
-
 -tls-cert-file::
 *Type*: `string`
 +

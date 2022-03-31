@@ -15,21 +15,17 @@ couchbase.com/couchbaserolebindings::
 couchbase.com/couchbasebackups::
 couchbase.com/couchbasebackuprestores::
 couchbase.com/couchbaseautoscalers::
+couchbase.com/couchbasecollections::
+couchbase.com/couchbasecollectiongroups::
+couchbase.com/couchbasescopes::
+couchbase.com/couchbasescopegroups::
+couchbase.com/couchbasemigrationreplications::
 Used by the DAC to collect resources associated with a `CouchbaseCluster`.
 The DAC ensures -- when considered as a whole -- the configuration is valid for the Couchbase cluster.
 +
 _Required Permissions_: `list`
 
 == Optional Permissions
-
-namespaces::
-Used the the DAC to lookup the namespace a cluster is running in.
-This is used on determine whether the cluster is running on Red Hat OpenShift.
-This information is used to determine correct defaults for the platform.
-+
-You can opt out of this requirement with the xref:tools/cao.adoc[`--default-file-system-group` `cao` flag].
-+
-_Required Permissions_: `get`
 
 secrets::
 Used by the DAC to look for secrets references in the `CouchbaseCluster` specification.
@@ -50,7 +46,7 @@ _Required Permissions_: `get`
 
 [NOTE]
 ====
-`Namespace`, `Secret` and `StorageClass` resources are only interrogated -- as described -- for existence and correctness.
+`Secret` and `StorageClass` resources are only interrogated -- as described -- for existence and correctness.
 The admission controller only performs `get` operations based on the names specified in the `CouchbaseCluster` specification.
 These resources will never be leaked through logs and are never persisted by the admission controller.
 

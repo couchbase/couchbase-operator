@@ -14,17 +14,8 @@ This allows the Kubernetes API server to check the structure and types of incomi
 
 == Dynamic Admission Controller
 
-Builtin Kubernetes resources function differently to Couchbase custom resources.
-Kubernetes will raise errors when creating Pod resources with additional illegal fields.
-Kubernetes will also insert default values for certain attributes.
-Neither of these things happen by default with custom resources.
-While this functionality is now present in Kubernetes 1.16+ with v1 CRDs, the Operator still supports earlier versions so cannot make use of this functionality.
-To this end the Operator comes with a dynamic admission controller (DAC).
-
-The DAC allows custom resources to be modified and interrogated before a resource is accepted and committed to etcd.
-Running the DAC allows us to add sensible defaults to Couchbase cluster configurations thus minimizing the size of specifications.
-It also allows us to maintain backwards compatibility when new attributes are added and must be populated.
-This makes the experience of using Couchbase resources similar to that of native resource types.
+The DAC allows custom resources to be interrogated before a resource is accepted and committed to etcd.
+It provides context specific validation logic for Couchbase clusters, that cannot be achieved through CRD JSON schema validation alone.
 
 Another benefit is that Couchbase specific configuration errors are synchronously reported back to the user in real time, rather than errors appearing in the Operator log and going unnoticed.
 
@@ -44,7 +35,7 @@ In the following <<dynamic-admission-controller-architecture,DAC architecture se
 
 Regardless of chosen security model, the DAC will require cluster administrator privileges to deploy.
 The roles and role bindings require privilege escalation.
-Additionally the mutating and validating webhooks affect the Kubernetes API, so must be installed by an administrator.
+Additionally the validating webhook affects the Kubernetes API, so must be installed by an administrator.
 ====
 
 .Dynamic Admission Controller Security Rules
@@ -66,14 +57,11 @@ image:admission.png["Admission Controller Architecture"]
 
 1. A client connects to the Kubernetes API and sends a request to create a resource.
 The resource specification is encoded as JSON.
-2. The API forwards the JSON to the _mutating_ endpoint of the admission controller.
-A mutating webhook is responsible for altering the resource (applying default values, for example).
-It may optionally choose to accept or reject the create request.
-3. The API forwards the JSON to the _validating_ endpoint of the admission controller.
+2. The API forwards the JSON to the _validating_ endpoint of the admission controller.
 A validating webhook is responsible for validating specification constraints above and beyond those offered by JSON schema validation provided by the custom resource definition.
 It may optionally choose to accept or reject the create request. 
-4. Once all admission checks have passed, the resource is persisted in the database (etcd).
-5. The API responds to the client that the create request has been accepted.
+3. Once all admission checks have passed, the resource is persisted in the database (etcd).
+4. The API responds to the client that the create request has been accepted.
 
 If either of the admission checks in stages 2 and 3 respond that the resource is not acceptable, the API will go directly to stage 5 and return any errors returned by the admission controller.
 
@@ -100,8 +88,8 @@ It also allows the admission controller to poll for existing `CouchbaseCluster` 
 
 A `Secret` is used to provide TLS certificates to the DAC container.
 A service endpoint is exposed with a Kubernetes `Service` resource that provides a stable DNS name, fault tolerance, and load balancing.
-The service endpoint is finally bound to the Kubernetes API with `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration` resources.
-The webhooks identify the resource type and version, and the types of operation to respond to.
+The service endpoint is finally bound to the Kubernetes API with a `ValidatingWebhookConfiguration` resource.
+The webhook identifies the resource type and version, and the types of operation to respond to.
 They also define the TLS CA certificate to use for validation of the service endpoint and the HTTP path to route requests to.
 
 == Operator

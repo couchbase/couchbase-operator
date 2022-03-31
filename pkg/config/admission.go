@@ -75,9 +75,6 @@ type generateAdmissionOptions struct {
 	// validateStorageClasses causes the validation of storage classes.
 	validateStorageClasses bool
 
-	// defaultFileSystemGroup causes the fsGroup to be filled in.
-	defaultFileSystemGroup bool
-
 	// logLevel allows the setting of the logging level.
 	logLevel zapLogLevelVar
 
@@ -122,7 +119,6 @@ func (o *generateAdmissionOptions) registerAdmissionGenerateFlags(cmd *cobra.Com
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
 	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
-	cmd.Flags().BoolVar(&o.defaultFileSystemGroup, "default-file-system-group", true, "Fills in default file system group information on Couchbase volumes")
 	cmd.Flags().IntVar(&o.replicas, "replicas", admissionDefaultReplicas, "The number of replicas in the deployment")
 	cmd.Flags().BoolVar(&o.withResources, "with-resources", false, "Populates pod resource requests and limits")
 	cmd.Flags().Var(&o.cpuRequest, "cpu-request", "CPU requested for scheduling, only valid when used with --with-resources")
@@ -309,7 +305,6 @@ func (o *generateAdmissionOptions) validate() error {
 	// bother checking them.
 	if o.scope.value.isNamespaceScope() {
 		o.validateStorageClasses = false
-		o.defaultFileSystemGroup = false
 	}
 
 	return nil
@@ -415,20 +410,6 @@ func (o *generateAdmissionOptions) getAdmissionRole() runtime.Object {
 	}
 
 	if o.scope.value.isClusterScope() {
-		if o.defaultFileSystemGroup {
-			rules = append(rules, rbacv1.PolicyRule{
-				APIGroups: []string{
-					"",
-				},
-				Resources: []string{
-					"namespaces",
-				},
-				Verbs: []string{
-					"get",
-				},
-			})
-		}
-
 		if o.validateStorageClasses {
 			rules = append(rules, rbacv1.PolicyRule{
 				APIGroups: []string{
@@ -556,7 +537,6 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 								"-tls-private-key-file=" + "/var/run/secrets/couchbase.com/couchbase-operator-admission/tls.key",
 								"-validate-secrets=" + strconv.FormatBool(o.validateSecrets),
 								"-validate-storage-classes=" + strconv.FormatBool(o.validateStorageClasses),
-								"-default-file-system-group=" + strconv.FormatBool(o.defaultFileSystemGroup),
 							},
 							Ports: []corev1.ContainerPort{
 								{
