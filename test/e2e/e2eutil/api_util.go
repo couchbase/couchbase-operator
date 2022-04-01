@@ -156,7 +156,7 @@ func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration)
 
 		// Wait for PDBs to allow eviction before scheduling the next death.
 		callback := func() error {
-			pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
+			pdbs, err := k8s.KubeClient.PolicyV1().PodDisruptionBudgets(k8s.Namespace).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
 				return err
 			}

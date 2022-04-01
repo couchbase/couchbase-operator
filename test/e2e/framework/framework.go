@@ -34,7 +34,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -59,10 +58,6 @@ func Init() error {
 	fmt.Println("couchbase-operator-certification", version.WithBuildNumberAndRevision())
 
 	// Register CouchbaseCluster and CustomResourceDefinition types with the main library.
-	if err := v1beta1.SchemeBuilder.AddToScheme(scheme.Scheme); err != nil {
-		return err
-	}
-
 	if err := couchbasev2.AddToScheme(scheme.Scheme); err != nil {
 		return err
 	}

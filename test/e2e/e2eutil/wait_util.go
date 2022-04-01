@@ -320,7 +320,7 @@ func mustWaitForResourceEventFromNow(t *testing.T, k8s *types.Cluster, resource 
 func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, timeout time.Duration) error {
 	callback := func() error {
 		// TODO: you can check more than presence, the schedule for example can allow you to wait for updates...
-		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-full", metav1.GetOptions{}); err != nil {
+		if _, err := k8s.KubeClient.BatchV1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-full", metav1.GetOptions{}); err != nil {
 			return err
 		}
 
@@ -329,7 +329,7 @@ func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, time
 		}
 
 		// TODO: you can check more than presence, the schedule for example can allow you to wait for updates...
-		if _, err := k8s.KubeClient.BatchV1beta1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-incremental", metav1.GetOptions{}); err != nil {
+		if _, err := k8s.KubeClient.BatchV1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-incremental", metav1.GetOptions{}); err != nil {
 			return err
 		}
 
@@ -348,7 +348,7 @@ func MustWaitForBackup(t *testing.T, k8s *types.Cluster, backup *couchbasev2.Cou
 func WaitForCronjob(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		listOptions := metav1.ListOptions{}
-		cronjobs, err := k8s.KubeClient.BatchV1beta1().CronJobs(couchbase.Namespace).List(context.Background(), listOptions)
+		cronjobs, err := k8s.KubeClient.BatchV1().CronJobs(couchbase.Namespace).List(context.Background(), listOptions)
 		if err != nil {
 			return err
 		}

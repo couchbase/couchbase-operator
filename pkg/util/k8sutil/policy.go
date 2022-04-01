@@ -8,7 +8,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -17,12 +17,12 @@ import (
 func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
 	name := cluster.Name + "-pdb"
 
-	required := &policyv1beta1.PodDisruptionBudget{
+	required := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: LabelsForCluster(cluster),
 		},
-		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: LabelsForCluster(cluster),
 			},
@@ -37,7 +37,7 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 	// Get any existing budgets, creating one if it doesn't exist.
 	actual, found := client.PodDisruptionBudgets.Get(name)
 	if !found {
-		if _, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(context.Background(), required, metav1.CreateOptions{}); err != nil {
+		if _, err := client.KubeClient.PolicyV1().PodDisruptionBudgets(cluster.Namespace).Create(context.Background(), required, metav1.CreateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 
@@ -51,11 +51,11 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 	}
 
 	// Delete and recreate as the spec is immutable.
-	if err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
+	if err := client.KubeClient.PolicyV1().PodDisruptionBudgets(cluster.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
-	if _, err := client.KubeClient.PolicyV1beta1().PodDisruptionBudgets(cluster.Namespace).Create(context.Background(), required, metav1.CreateOptions{}); err != nil {
+	if _, err := client.KubeClient.PolicyV1().PodDisruptionBudgets(cluster.Namespace).Create(context.Background(), required, metav1.CreateOptions{}); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 

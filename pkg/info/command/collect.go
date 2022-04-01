@@ -18,9 +18,8 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -61,9 +60,9 @@ var (
 		{Resource: &rbacv1.Role{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
 		{Resource: &rbacv1.RoleBinding{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
 		{Resource: &batchv1.Job{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-		{Resource: &batchv1beta1.CronJob{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
+		{Resource: &batchv1.CronJob{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
 		{Resource: &apiextensionsv1.CustomResourceDefinition{}, Scope: resource.ScopeCouchbaseGroup, LogLevel: resource.LogLevelRequired},
-		{Resource: &policyv1beta1.PodDisruptionBudget{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
+		{Resource: &policyv1.PodDisruptionBudget{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
 	}
 
 	// Define all implied sub-resources we can collect information for.

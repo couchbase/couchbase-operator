@@ -654,7 +654,7 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 		e2eutil.Die(t, err)
 	}
 
-	pdbs, err := k8s.KubeClient.PolicyV1beta1().PodDisruptionBudgets(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+	pdbs, err := k8s.KubeClient.PolicyV1().PodDisruptionBudgets(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}

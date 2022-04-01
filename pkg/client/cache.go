@@ -10,9 +10,8 @@ import (
 	couchbaseclientv2 "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -284,7 +283,7 @@ type PodDisruptionBudgetCache struct {
 
 // newPodDisruptionBudgetCache creates a new synchronized cache for PodDisruptionBudget resources.
 func newPodDisruptionBudgetCache(ctx context.Context, client kubernetes.Interface, namespace string, selector fmt.Stringer) (*PodDisruptionBudgetCache, error) {
-	resourceCache, err := newResourceCache(ctx, client.PolicyV1beta1().RESTClient(), &policyv1beta1.PodDisruptionBudget{}, selector, "poddisruptionbudgets", namespace)
+	resourceCache, err := newResourceCache(ctx, client.PolicyV1().RESTClient(), &policyv1.PodDisruptionBudget{}, selector, "poddisruptionbudgets", namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +295,7 @@ func newPodDisruptionBudgetCache(ctx context.Context, client kubernetes.Interfac
 }
 
 // get returns the requested poddisruptionbudget based on name.
-func (c *PodDisruptionBudgetCache) Get(name string) (*policyv1beta1.PodDisruptionBudget, bool) {
+func (c *PodDisruptionBudgetCache) Get(name string) (*policyv1.PodDisruptionBudget, bool) {
 	key := c.namespace + "/" + name
 
 	// Cannot error
@@ -305,14 +304,14 @@ func (c *PodDisruptionBudgetCache) Get(name string) (*policyv1beta1.PodDisruptio
 		return nil, exists
 	}
 
-	return obj.(*policyv1beta1.PodDisruptionBudget), true
+	return obj.(*policyv1.PodDisruptionBudget), true
 }
 
 // list returns all poddisruptionbudgets.
-func (c *PodDisruptionBudgetCache) List() (poddisruptionbudgets []*policyv1beta1.PodDisruptionBudget) {
+func (c *PodDisruptionBudgetCache) List() (poddisruptionbudgets []*policyv1.PodDisruptionBudget) {
 	objs := c.resourceCache.informer.GetStore().List()
 	for _, obj := range objs {
-		poddisruptionbudgets = append(poddisruptionbudgets, obj.(*policyv1beta1.PodDisruptionBudget))
+		poddisruptionbudgets = append(poddisruptionbudgets, obj.(*policyv1.PodDisruptionBudget))
 	}
 
 	return
@@ -730,7 +729,7 @@ type CronJobCache struct {
 
 // newJobCache creates a new synchronized cache for Job resources.
 func newCronJobCache(ctx context.Context, client kubernetes.Interface, namespace string, selector fmt.Stringer) (*CronJobCache, error) {
-	resourceCache, err := newResourceCache(ctx, client.BatchV1beta1().RESTClient(), &batchv1beta1.CronJob{}, selector, "cronjobs", namespace)
+	resourceCache, err := newResourceCache(ctx, client.BatchV1().RESTClient(), &batchv1.CronJob{}, selector, "cronjobs", namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -742,7 +741,7 @@ func newCronJobCache(ctx context.Context, client kubernetes.Interface, namespace
 }
 
 // get returns the requested job based on name.
-func (c *CronJobCache) Get(name string) (*batchv1beta1.CronJob, bool) {
+func (c *CronJobCache) Get(name string) (*batchv1.CronJob, bool) {
 	key := c.namespace + "/" + name
 
 	// Cannot error
@@ -751,14 +750,14 @@ func (c *CronJobCache) Get(name string) (*batchv1beta1.CronJob, bool) {
 		return nil, exists
 	}
 
-	return obj.(*batchv1beta1.CronJob), true
+	return obj.(*batchv1.CronJob), true
 }
 
 // list returns all jobs.
-func (c *CronJobCache) List() (resources []*batchv1beta1.CronJob) {
+func (c *CronJobCache) List() (resources []*batchv1.CronJob) {
 	objs := c.resourceCache.informer.GetStore().List()
 	for _, obj := range objs {
-		resources = append(resources, obj.(*batchv1beta1.CronJob))
+		resources = append(resources, obj.(*batchv1.CronJob))
 	}
 
 	return

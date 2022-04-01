@@ -14,7 +14,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,10 +38,10 @@ type backupResources struct {
 	backup *couchbasev2.CouchbaseBackup
 
 	// fullCronJob deals with running and scheduling a full backup.
-	fullCronJob *batchv1beta1.CronJob
+	fullCronJob *batchv1.CronJob
 
 	// incrementalCronJob (optional) deals with running and schedling an incremental backup.
-	incrementalCronJob *batchv1beta1.CronJob
+	incrementalCronJob *batchv1.CronJob
 
 	// pvc deals with persisting the backup data.
 	pvc *corev1.PersistentVolumeClaim
@@ -192,12 +191,12 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 		}
 	}
 
-	if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.fullCronJob, metav1.CreateOptions{}); err != nil {
+	if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.fullCronJob, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 
 	if resource.incrementalCronJob != nil {
-		if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.incrementalCronJob, metav1.CreateOptions{}); err != nil {
+		if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.incrementalCronJob, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 	}
@@ -257,13 +256,13 @@ func (c *Cluster) updateBackupResource(requested backupResources, current *backu
 
 // updateBackupCronJob recreates jobs if they have been deleted, deletes them if they need
 // to be e.g. switching from incremental to full, or modifies the configuration.
-func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested, current *batchv1beta1.CronJob) error {
+func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested, current *batchv1.CronJob) error {
 	if requested == nil && current == nil {
 		return nil
 	}
 
 	if requested != nil && current == nil {
-		if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{}); err != nil {
+		if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 
@@ -273,7 +272,7 @@ func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested,
 	}
 
 	if requested == nil && current != nil {
-		if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), current.Name, metav1.DeleteOptions{}); err != nil {
+		if err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Delete(context.Background(), current.Name, metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 
@@ -282,13 +281,13 @@ func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested,
 		return nil
 	}
 
-	requestedSpec := &batchv1beta1.CronJobSpec{}
+	requestedSpec := &batchv1.CronJobSpec{}
 
 	if err := json.Unmarshal([]byte(requested.Annotations[constants.CronjobSpecAnnotation]), requestedSpec); err != nil {
 		return err
 	}
 
-	currentSpec := &batchv1beta1.CronJobSpec{}
+	currentSpec := &batchv1.CronJobSpec{}
 
 	if err := json.Unmarshal([]byte(current.Annotations[constants.CronjobSpecAnnotation]), currentSpec); err != nil {
 		return err
@@ -302,7 +301,7 @@ func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested,
 	resource.Annotations = requested.Annotations
 	resource.Spec = requested.Spec
 
-	if _, err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Update(context.Background(), resource, metav1.UpdateOptions{}); err != nil {
+	if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Update(context.Background(), resource, metav1.UpdateOptions{}); err != nil {
 		return err
 	}
 
@@ -402,13 +401,13 @@ func (c *Cluster) updateBackupPVC(notifier *backupUpdateNotifier, backup *couchb
 // use the shared informer to raise it for us (if we are online at the time).
 func (c *Cluster) deleteBackupResource(resource backupResources) error {
 	if resource.fullCronJob != nil {
-		if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.fullCronJob.Name, metav1.DeleteOptions{}); err != nil {
+		if err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.fullCronJob.Name, metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}
 
 	if resource.incrementalCronJob != nil {
-		if err := c.k8s.KubeClient.BatchV1beta1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.incrementalCronJob.Name, metav1.DeleteOptions{}); err != nil {
+		if err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.incrementalCronJob.Name, metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}
@@ -495,7 +494,7 @@ func applyTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, job *batchv1.J
 }
 
 // generateBackupCronjob generates a backup cronjob taking into account the backup strategy and the cbbackupmgr action.
-func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction) (*batchv1beta1.CronJob, error) {
+func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction) (*batchv1.CronJob, error) {
 	var schedule string
 
 	var container corev1.Container
@@ -518,7 +517,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 	labels := k8sutil.LabelsForCluster(c.cluster)
 	labels[constants.LabelBackup] = backup.Name
 
-	cronjob := &batchv1beta1.CronJob{
+	cronjob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   backup.Name + "-" + string(action),
 			Labels: labels,
@@ -526,12 +525,12 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 				c.cluster.AsOwner(),
 			},
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:                   schedule,
 			SuccessfulJobsHistoryLimit: &backup.Spec.SuccessfulJobsHistoryLimit,
 			FailedJobsHistoryLimit:     &backup.Spec.FailedJobsHistoryLimit,
-			ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					BackoffLimit: &backup.Spec.BackoffLimit,
 					Template: corev1.PodTemplateSpec{
@@ -920,7 +919,7 @@ func (c *Cluster) applyObjEndpointCertToJob(job *batchv1.Job) {
 	}
 }
 
-func (c *Cluster) applyObjEndpointCertToCronJob(cronjob *batchv1beta1.CronJob) {
+func (c *Cluster) applyObjEndpointCertToCronJob(cronjob *batchv1.CronJob) {
 	if c.cluster.Spec.Backup.ObjectEndpoint == nil {
 		return
 	}
