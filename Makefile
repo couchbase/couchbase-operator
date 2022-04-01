@@ -105,7 +105,7 @@ PRODUCT := couchbase-autonomous-operator
 # These are overidden by the build system, so need to be optional
 # if undefined.  The build system also doesn't use -e to override
 # so we need to be careful here.
-VERSION ?= 2.3.0
+VERSION ?= 2.4.0
 BLD_NUM ?= 999
 
 # This controls the build version of docker used.

@@ -1,6 +1,6 @@
 name: operator
 title: Autonomous Operator
-version: '2.3'
+version: '2.4'
 prerelease: true
 start_page: ROOT:overview.adoc
 nav:
