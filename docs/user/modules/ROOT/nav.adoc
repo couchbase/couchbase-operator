@@ -20,6 +20,7 @@
 * Couchbase Cluster Concepts
  ** Authentication and Authorization
   *** xref:concept-user-rbac.adoc[Couchbase User RBAC]
+  *** xref:howto-guide-couchbase-user-rbac.adoc[How-to Guide: Couchbase User RBAC]
   *** xref:concept-credential-rotation.adoc[Couchbase Credential Rotation]
  ** Autoscaling
   *** xref:concept-couchbase-autoscaling.adoc[]

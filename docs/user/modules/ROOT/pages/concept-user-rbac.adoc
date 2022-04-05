@@ -191,3 +191,7 @@ image::user-label-example.png[]
 
 In the example above, the individual users are each selected by different clusters, and each bound to cluster-specific groups.
 However, each user is also bound to a shared XDCR group that is selected by both clusters.
+
+== Related Links
+
+* *How-to guide:* xref:howto-guide-couchbase-user-rbac.adoc[Couchbase User RBAC]
