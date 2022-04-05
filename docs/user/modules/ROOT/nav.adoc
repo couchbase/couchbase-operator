@@ -50,6 +50,8 @@
   *** xref:concept-server-groups.adoc[Couchbase Server Groups]
  ** Upgrade
   *** xref:concept-upgrade.adoc[Couchbase Upgrades]
+ ** XDCR
+  *** xref:howto-guide-xdcr-scopes-collections.adoc[How-to Guide: XDCR with Scopes and Collections]
 
 .Manage
 * Operator
