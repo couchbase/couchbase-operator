@@ -307,6 +307,12 @@ DOCKER_BUILD_ARGS := \
 # Archive is the archive type used to create a tools artifact.
 ARCHIVE := tar.gz
 
+ifeq ($(TARGET_OS),windows)
+EXE_SUFFIX := .exe
+else
+EXE_SUFFIX :=
+endif
+
 # Define files that must be part of a build artifact, then append
 # any platform specific ones.  This is the canonical list that controls
 # what's distributed to customers.
@@ -317,9 +323,9 @@ TOOLS_PACKAGE_FILES := \
 	crd.yaml \
 	couchbase-cluster.yaml \
 	sync-gateway.yaml \
-	bin/cao \
-	bin/cbopcfg \
-	bin/cbopinfo
+	bin/cao$(EXE_SUFFIX) \
+	bin/cbopcfg$(EXE_SUFFIX) \
+	bin/cbopinfo$(EXE_SUFFIX)
 
 ifeq ($(TARGET_PLATFORM),kubernetes)
 TOOLS_PACKAGE_FILES += network-policies.yaml pillowfight-data-loader.yaml
@@ -644,7 +650,7 @@ $(TOOLS_ARTIFACT_BUILDDIR)/%.txt: docs/%.txt | $(TOOLS_ARTIFACT_BUILDDIR)
 	cp $< $@
 $(TOOLS_ARTIFACT_BUILDDIR)/crd.yaml: $(CRD_FILE) | $(TOOLS_ARTIFACT_BUILDDIR)
 	cp $< $@
-$(TOOLS_ARTIFACT_BUILDDIR)/bin/%: $(TARGET_BINDIR)/% | $(TOOLS_ARTIFACT_BUILDDIR)/bin
+$(TOOLS_ARTIFACT_BUILDDIR)/bin/%$(EXE_SUFFIX): $(TARGET_BINDIR)/% | $(TOOLS_ARTIFACT_BUILDDIR)/bin
 	cp $< $@
 $(TOOLS_ARTIFACT_BUILDDIR)/%.yaml: docs/user/modules/ROOT/examples/$(TARGET_PLATFORM)/%.yaml | $(TOOLS_ARTIFACT_BUILDDIR)
 	cp $< $@
