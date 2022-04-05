@@ -56,10 +56,10 @@ Consider the following:
 
 [source,console]
 ----
-$ cao save --cluster my-cluster --filename my-cluster-save.yaml
+$ cao save --couchbase-cluster my-cluster --filename my-cluster-save.yaml
 ----
 
-The `cao` tool will connect to the named cluster defined by the `--cluster` flag.
+The `cao` tool will connect to the named cluster defined by the `--couchbase-cluster` flag.
 The command will read all buckets from Couchbase Server, then recursively any scopes and collections contained within them.
 The command will then convert all discovered resources into native Kubernetes resource types, preserving all configuration and linkage information.
 Finally the save file is stored as defined by the `--filename` flag.
@@ -83,7 +83,7 @@ Restoring a save file to a cluster is equally easy as saving:
 
 [source,console,subs="verbatim,macros"]
 ----
-$ cao restore --cluster my-cluster --filename my-cluster-save.yaml
+$ cao restore --couchbase-cluster my-cluster --filename my-cluster-save.yaml
 +++<span style="font-weight: bold">Data topology solution:</span>+++
 
   /
