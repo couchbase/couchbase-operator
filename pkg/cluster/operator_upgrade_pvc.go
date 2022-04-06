@@ -106,6 +106,13 @@ func (r *pvcUpgradableResource) commit(item int) error {
 //   to topology.kubernetes.io/zone.
 // * It got a new image label.
 func upgradePersistentVolumeClaimFrom000000To020300(cluster *Cluster, pvc *corev1.PersistentVolumeClaim) error {
+	// If the PVC doesn't have a server config annotation then
+	// there isn't any need to add the server image annotation
+	// since the additional request for a node label will fail.
+	if _, ok := pvc.Annotations[constants.AnnotationVolumeNodeConf]; !ok {
+		return nil
+	}
+
 	pvc.Annotations[constants.ResourceVersionAnnotation] = version.Version
 
 	if zone, ok := pvc.Annotations[corev1.LabelFailureDomainBetaZone]; ok {
