@@ -372,3 +372,7 @@ $ kubectl patch couchbasecluster my-cluster --type=merge -p '{"spec":{"buckets":
 ----
 
 From this point onward, any managed resources that are deleted or modified manually will be recovered, and any additional resources that are added will be deleted, as per the usual operation of the Operator.
+
+== Related Links
+
+* *How-to guide*: xref:howto-guide-save-restore.adoc[Data Topology Save and Restore]
