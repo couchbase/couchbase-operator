@@ -1,4 +1,4 @@
-= Operator Self-Certification
+= Operator Self-Certification Lifecycle
 :stem:
 
 [abstract]
@@ -64,6 +64,27 @@ Additionally, to test platform behavior, the self-certification image will need 
 *It is highly recommended that any platform under test is ephemeral* -- created on demand, tested, then deprovisioned.
 ====
 
+== What is the Self-Certification Lifecycle Process?
+
+Couchbase Operator Self-Certification Lifecycle is a self-service offering with an easy, step-by-step process to validate the compatibility of Kubernetes platforms and other platform-specific components such as storage and networking with Autonomous Operator.
+
+The certification workflows consist of the following steps:
+
+. Ensure platform requirements for running the self-certification tool are met.
+
+. Configure the Kubernetes platform and other platform-specific components such as storage and networking correctly.
+
+. Run the Operator Self-Certification Tool (shipped with Couchbase Autonomous Operator 2.3 and above).
+
+. Submit the results to Couchbase for approval. 
+
+. The Couchbase Cloud-Native approval committee will review the results submitted.
+Based on the review, we will notify you whether the results meet the acceptance criteria or if issues are identified.
+
+. Once approval is successful, our Couchbase Partner team will enter into a partnership agreement with the platform vendor or platform-specific component vendor, as applicable.
+
+IMPORTANT: All the above steps must be completed for Couchbase to accept and fully support compatibility with a Kubernetes platform and other platform-specific components.
+
 == Running Self-Certification
 
 In its most basic form self-certification is started with the following command:
@@ -99,6 +120,16 @@ If any tests fail +++<span style="color: red">&#10007;</span>+++ then you will n
 The only thing that is required for review by Couchbase is the downloaded archive that will be in the directory where the `cao certify` command was run.
 The archive will be named something like `couchbase-operator-certification-20060102T150405-0700.tar.bz2`.
 Failure to submit this archive, or simply returning a screen capture, will result in delays until it is provided.
+
+To submit the self-certification results to Couchbase, follow these steps: 
+
+. Capture the output archive in the directory where the cao certify was run; it will be named something like `couchbase-operator-certification-20060102T150405-0700.tar.bz2`.
+
+. Capture the Kubernetes platform's version information and other platform-specific components such as storage and networking.
+
+. To upload the results to Couchbase, you will need a JIRA account for Couchbase; you can request a JIRA account here: https://issues.couchbase.com/secure/ContactAdministrators!default.jspa.
+
+. Create a new JIRA ticket, project - Couchbase Kubernetes (K8S), and Summary - [Operator Self-Certification Lifecycle].
 
 == Platform Requirements
 
