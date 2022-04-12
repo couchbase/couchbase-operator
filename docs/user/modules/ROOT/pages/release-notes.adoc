@@ -120,6 +120,80 @@ Unlike synchronization, this feature supports partial save and restore, differen
 
 For more information, see the xref:concept-data-save-restore.adoc[] concepts page.
 
+=== Known Issues
+
+[#table_known_issues,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2690[K8S-2690]
+a| *Summary*:
+Kubernetes resource names are based on DNS, and may be up to ~250 characters in length.
+Prior to Couchbase Server `6.6.5` and `7.0.0`, host names were used to generate a key for internal communication, however, long names caused a buffer overflow.
+
+This was fixed in `6.6.5` (though not fully implemented for Eventing) and `7.0.0`.
+When using long namespaces or cluster names, ensure that you use a version of Couchbase Server greater than `6.6.5` or `7.0.0`.
+
+a| https://issues.couchbase.com/browse/K8S-2698[K8S-2698]
+a| *Summary*:
+The restore process can determine what repository to use in a `CouchbaseBackupRestore` resource, and therefore the `repo` field _should_ be entirely optional.
+However, the underlying API erroneously requires this field to be set.
+
+To avoid any errors, we recommend setting the `repo` field to an empty string until the issue is fixed in a future release.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+spec:
+  repo: ""
+----
+
+a| https://issues.couchbase.com/browse/K8S-2713[K8S-2713] 
+a| *Summary*:
+Due to a mismatch between the catalog version of our backup image and the version recommended by the certification tool, you will need to override the default backup used for certification with OpenShift.
+The override can be provided via:
+
+[source,console]
+----
+$  cao certify -- -backup-image registry.connect.redhat.com/couchbase/operator-backup:1.3.0-2
+----
+
+a| https://issues.couchbase.com/browse/K8S-2676[K8S-2676]
+a| *Summary*:
+Currently, it is not possible to specify a raw IPv6 Address for XDCR. +
+This will be fixed in the next Operator release, and will include an update to the CRD.
+As a workaround to support XDCR to an IPv6 endpoint, you will need to remove the XDCR hostname rules from the `CouchbaseCluster` custom resource.
+
+Run the `kubectl edit` command:
+
+[source,console]
+----
+$ kubectl edit crd couchbaseclusters.couchbase.com
+----
+
+Then, remove `pattern` from the yaml:
+
+[source,yaml]
+----
+xdcr:
+  hostname:
+    description: Hostname is the connection string to use to connect the remote cluster.
+    pattern: ^((couchbase\|couchbases\|http\|https)://)?[0-9a-zA-Z\-\.]+(:\d+)?(\?network=[^&]+)?$
+----
+
+Note that removing `pattern` will disable any validation on this field (i.e. if an invalid hostname is provided it won't be validated).
+Contact the https://support.couchbase.com[Couchbase Support team] for further help on this workaround.
+
+a| https://issues.couchbase.com/browse/K8S-2717[K8S-2717]
+a| *Summary*: 
+At this point in time, you cannot set the storage class used for the artifact logs during certification.
+This means the `default` storage class is always used when running the `cao certify` command. +
+Passing the `-storage-class` flag to the command will only affect volumes created during test, but *not* the volume used to store test results.
+
+If you need to use a specific type of storage class for both artifacts and testing, please contact the https://support.couchbase.com[Couchbase Support team] for advice on a workaround.
+|===
+
 [#release-v230-beta1]
 == Release 2.3.0-beta1
 
