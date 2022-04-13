@@ -133,9 +133,6 @@ We'll use one scope and one collection for this scenario -- named `Inventory` an
 Alice is the `Transport` collection's `Data Writer`, and Bob is the `Transport` collection's `Data Reader`.
 This means that Alice can write but not read data in the `Transport` collection, and Bob can read but not write data in the same.
 
-Alice is the `Transport` collection's `Data Writer`, and Bob is the `Transport` collection's `Data Reader`. 
-This means that Alice can write but not read data in the `Transport` collection, and Bob can read but not write data in the same.
-
 image::rbac-single-scope-coll.png[]
 
 ==== Updating Roles
