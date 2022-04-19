@@ -323,12 +323,13 @@ TOOLS_PACKAGE_FILES := \
 	crd.yaml \
 	couchbase-cluster.yaml \
 	sync-gateway.yaml \
+	pillowfight-data-loader.yaml \
 	bin/cao$(EXE_SUFFIX) \
 	bin/cbopcfg$(EXE_SUFFIX) \
 	bin/cbopinfo$(EXE_SUFFIX)
 
 ifeq ($(TARGET_PLATFORM),kubernetes)
-TOOLS_PACKAGE_FILES += network-policies.yaml pillowfight-data-loader.yaml
+TOOLS_PACKAGE_FILES += network-policies.yaml
 endif
 
 ifeq ($(TARGET_PLATFORM),openshift)
