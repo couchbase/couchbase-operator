@@ -474,7 +474,7 @@ type CouchbaseBackupRestoreSpec struct {
 
 	// Repo is the backup folder to restore from.  If no repository is specified,
 	// the backup container will choose the latest.
-	Repo string `json:"repo"`
+	Repo string `json:"repo,omitempty"`
 
 	// Start denotes the first backup to restore from.  This may be specified as
 	// an integer index (starting from 1), a string specifying a short date
