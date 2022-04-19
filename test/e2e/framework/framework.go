@@ -1203,7 +1203,7 @@ func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase Server Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Server Image version not supported (too old)")
 	}
 
 	return r
@@ -1226,7 +1226,7 @@ func (r *TestRequirement) BeforeVersion(v string) *TestRequirement {
 	}
 
 	if v2.Less(v1) {
-		r.t.Skip("Couchbase Server Image version not supported (immature)")
+		r.t.Skip("Couchbase Server Image version not supported (too new)")
 	}
 
 	return r
@@ -1372,7 +1372,7 @@ func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase Backup Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Backup Image version not supported (too old)")
 	}
 
 	return r
@@ -1400,7 +1400,7 @@ func (r *TestRequirement) AtLeastLoggingVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase Logging Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Logging Image version not supported (too old)")
 	}
 
 	return r
@@ -1428,7 +1428,7 @@ func (r *TestRequirement) AtMostSyncGatewayVersion(v string) *TestRequirement {
 	}
 
 	if v2.Less(v1) {
-		r.t.Skip("Couchbase Sync Gateway Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Sync Gateway Image version not supported (too old)")
 	}
 
 	return r
@@ -1456,7 +1456,7 @@ func (r *TestRequirement) AtLeastExporterVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase Exporter Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Exporter Image version not supported (too old)")
 	}
 
 	return r
