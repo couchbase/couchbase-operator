@@ -182,6 +182,11 @@ func (c *Cluster) refreshTLSShadowCASecret() error {
 		return nil
 	}
 
+	// There is a difference between empty and nil in Go...
+	if len(requestedShadowSecret.Data) == 0 && len(currentShadowSecret.Data) == 0 {
+		return nil
+	}
+
 	if reflect.DeepEqual(requestedShadowSecret.Data, currentShadowSecret.Data) {
 		return nil
 	}
