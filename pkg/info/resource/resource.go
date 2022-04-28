@@ -136,6 +136,9 @@ type Collector struct {
 	// LogLevel is how much we want/need to see the data vs how sensitive
 	// it is to the customer.
 	LogLevel LogLevel
+
+	// Reason why this data is being collected.
+	Reason string
 }
 
 // getRESTMapping translates from a concrete opbect type into a group/version/kind with

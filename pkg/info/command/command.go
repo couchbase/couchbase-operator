@@ -68,6 +68,9 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 
                         # Collect all known resources, applying no filtering
                         cao collect-logs --all
+
+                        # Collect only required resources, filtering potentially sensitive information
+                        cao collect-logs --log-level 0
                 `),
 		Run: func(cmd *cobra.Command, args []string) {
 			collect(c)
