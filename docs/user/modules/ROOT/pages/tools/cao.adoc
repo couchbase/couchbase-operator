@@ -73,6 +73,13 @@ Set the default test archive name
 +
 Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run
 
+--collected-log-level::
+*Type*: int
++
+*Default*: 0
++
+Log level to be collected by cbopinfo
+
 --fsgroup::
 *Type*: int
 +

@@ -76,6 +76,10 @@ type certifyOptions struct {
 	// debug is used to dump out verbose information.
 	debug bool
 
+	// collectedLogLevel is passed to the certification container for controlling the
+	// sensitivity of collected information by cbopinfo
+	collectedLogLevel int
+
 	// SharedTestFlags are flags shared between the cao cli and test suite.
 	SharedTestFlags
 }

@@ -377,6 +377,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().IntVar(&o.fsGroup, "fsgroup", 1000, "Set the file system group for persistent volumes.")
 	cmd.Flags().Var(&o.registries, "registry", "Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.")
 	cmd.Flags().StringVar(&o.imagePullPolicy, "image-pull-policy", imagePullPolicyDefault, "Pull Policy to use when downloading the Certification container")
+	cmd.Flags().IntVar(&o.collectedLogLevel, "collected-log-level", 0, "Log level to be collected by cbopinfo")
 
 	// Setup shared flags
 	o.BindSharedFlags(cmd.Flags())
@@ -641,6 +642,8 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 		"-color",
 		"-collect-logs",
 		"-collect-server-logs",
+		"-collected-log-level",
+		strconv.Itoa(o.collectedLogLevel),
 	}
 
 	certificationArgs = append(certificationArgs, args...)

@@ -418,6 +418,7 @@ func configure() (err error) {
 	flag.StringVar(&params.LogLevel, "log-level",
 		"debug",
 		"Log level to use.  This affects Couchbase Autonomous Operator logs.  Either 'info', or 'debug'")
+	flag.IntVar(&params.CollectedLogLevel, "collected-log-level", 0, "Log level to be collected by cbopinfo")
 	flag.Var(&podCreateTimeout, "pod-creation-timeout",
 		"Time before giving up on pod creation.  Platforms with cluster autoscaling may require a larger value e.g. 15m.")
 	flag.BoolVar(&params.EnableIstio, "istio",
@@ -1056,7 +1057,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 
 		// Collect any kubernetes/server logs using cbopinfo call.
 		if t.Failed() && f.CollectLogs {
-			e2eutil.CollectLogs(t, cluster, logDir, f.CbopinfoPath, f.OpImage, f.CollectServerLogsOnFailure)
+			e2eutil.CollectLogs(t, cluster, logDir, f.CbopinfoPath, f.OpImage, f.CollectServerLogsOnFailure, f.CollectedLogLevel)
 		}
 
 		// Cleanup, which is now trivial.
