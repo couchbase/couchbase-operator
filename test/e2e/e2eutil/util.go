@@ -1671,7 +1671,7 @@ func Cbopinfo(path string, cmdArgs []string) ([]byte, error) {
 	return exec.Command(path, args...).CombinedOutput()
 }
 
-func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPath, operatorImage string, collectServerLogs bool) {
+func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPath, operatorImage string, collectServerLogs bool, logLevel int) {
 	// Create and move to the log directory.
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		t.Logf("Failed to create dir %s: %v", logDir, err)
@@ -1686,7 +1686,7 @@ func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPa
 	args.AddEnvironmentDefaults(operatorImage)
 	args.Add("--all", "")
 	args.Add("--directory", logDir)
-	args.Add("--log-level", "1")
+	args.Add("--log-level", strconv.Itoa(logLevel))
 
 	if collectServerLogs {
 		args.Add("--collectinfo", "")

@@ -50,6 +50,7 @@ type Framework struct {
 	LogLevel                      string
 	IPv6                          bool
 	PodImagePullPolicy            PullPolicyFlag
+	CollectedLogLevel             int
 
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual
