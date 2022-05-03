@@ -206,7 +206,10 @@ pipeline {
       sh 'gnuplot scripts/metrics.gnuplot > metrics.png'
       archiveArtifacts artifacts: 'metrics.png'
 
-      // Clean up the workspace to free disk space.
+ 
+    }
+    cleanup {
+     // Clean up the workspace to free disk space.
       cleanWs()
     }
   }
