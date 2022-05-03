@@ -205,7 +205,8 @@ pipeline {
       sh 'go run scripts/metrics.go --path profile > data.csv'
       sh 'gnuplot scripts/metrics.gnuplot > metrics.png'
       archiveArtifacts artifacts: 'metrics.png'
-
+    }
+    cleanup {
       // Clean up the workspace to free disk space.
       cleanWs()
     }
