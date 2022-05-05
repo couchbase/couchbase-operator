@@ -48,7 +48,7 @@ with Istio injecton enabled.
 cao certify
 
 # Run platform certification with a custom storage class
-cao certify -- -storage-class my-class
+cao certify -storage-class my-class
 
 # Run platform certification with private image repository
 cao certify --registry=https://index.docker.io/v1/,username,password
@@ -94,6 +94,13 @@ Certification image to use
 +
 Pull Policy to use when downloading the Certification container
 
+--ipv6::
+*Type*: bool
++
+*Default*: false
++
+Force the use of IPv6 with Couchbase Server.
+
 --parallel::
 *Type*: int
 +
@@ -105,6 +112,11 @@ Test concurrency
 *Type*: string
 +
 Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.
+
+--storage-class::
+*Type*: string
++
+Storage class to use for result artifacts and test volumes. The default storage class of the platform is used if not specified.
 
 --timeout::
 *Type*: string

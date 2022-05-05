@@ -8,12 +8,15 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/certification"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 )
 
 // Main framework structure.
 type Framework struct {
+	certification.SharedTestFlags
+
 	// CbopinfoPath is the absolute path to the cbopinfo binary
 	CbopinfoPath                  string
 	OpImage                       string
@@ -48,7 +51,6 @@ type Framework struct {
 	IAMSecretID                   string
 	DocsCount                     int
 	LogLevel                      string
-	IPv6                          bool
 	PodImagePullPolicy            PullPolicyFlag
 
 	// TestClusters is the current set of clusters to use for a test. This
@@ -62,7 +64,6 @@ type Framework struct {
 	// CouchbaseServerImageUpgrade is the image of Couchbase server we are upgrading to
 	CouchbaseServerImageUpgrade string
 	ServiceAccountName          string
-	StorageClassName            string
 	// PodCreateTimeout is the time we expect to wait when pods are failing to be
 	// created.
 	PodCreateTimeout time.Duration

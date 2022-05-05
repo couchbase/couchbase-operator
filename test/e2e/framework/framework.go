@@ -369,9 +369,6 @@ func configure() (err error) {
 	flag.StringVar(&params.CouchbaseLoggingImageUpgrade, "logging-image-upgrade",
 		loggingImageUpgradeFromDefault,
 		"Docker image to use for couchbase log shipping upgrades to upgrade from.")
-	flag.StringVar(&params.StorageClassName, "storage-class",
-		"",
-		"Storage class to use, platform default if not specified.")
 	flag.Var(&bucket, "bucket-type",
 		"Bucket type to use.  Either 'couchbase', 'ephemeral' or 'memcached'.")
 	flag.Var(&compression, "compression-mode",
@@ -431,9 +428,6 @@ func configure() (err error) {
 	flag.BoolVar(&params.DynamicPlatform, "dynamic-platform",
 		false,
 		"Enable dynamic platform support e.g. GKE Autopilot, AWS Fargate or anything with cluster autoscaling enabled.")
-	flag.BoolVar(&params.IPv6, "ipv6",
-		false,
-		"Force the use use of IPv6 with Couchbase Server.")
 	flag.Var(&params.PodImagePullPolicy, "image-pull-policy",
 		"Image pull policy to use for Operator and Admission Pods.")
 	flag.BoolVar(&params.IgnoreErrors, "ignore-errors",
@@ -442,7 +436,7 @@ func configure() (err error) {
 	flag.IntVar(&params.Parallelism, "parallelism",
 		0,
 		"How many tests to run in parallel, must match -test.parallel exactly.")
-
+	params.SharedTestFlags.BindSharedFlags(nil)
 	flag.Parse()
 
 	if util.UseANSIColor {
@@ -533,7 +527,7 @@ func setup() error {
 	logrus.Info(" →  Logging Level: " + Global.LogLevel)
 
 	logrus.Info(util.PrettyHeading("Kubernetes"))
-	logrus.Info(" →  storage class: " + Global.StorageClassName)
+	logrus.Info(" →  storage class: " + Global.SharedTestFlags.StorageClassName)
 
 	logrus.Info(util.PrettyHeading("Logs"))
 	logrus.Info(" →  directory: " + Global.LogDir)
@@ -599,7 +593,7 @@ func createKubeClusterObject() (*types.Cluster, error) {
 		RESTMapper:      restMapper,
 		Platform:        string(Global.Platform),
 		PlatformType:    Global.KubeType,
-		IPv6:            Global.IPv6,
+		IPv6:            Global.SharedTestFlags.IPv6,
 		DynamicPlatform: Global.DynamicPlatform,
 	}
 
@@ -1491,7 +1485,7 @@ func (r *TestRequirement) getDefaultStorageClassName() (string, error) {
 // DefaultAndExplicitStorageClass does what it says, looks for an implicit storage class
 // and that an explcit named one is configured.
 func (r *TestRequirement) DefaultAndExplicitStorageClass() *TestRequirement {
-	if Global.StorageClassName == "" {
+	if Global.SharedTestFlags.StorageClassName == "" {
 		r.t.Skip("No storage class name configured")
 	}
 
@@ -1504,7 +1498,7 @@ func (r *TestRequirement) DefaultAndExplicitStorageClass() *TestRequirement {
 
 // ExpandableStorage skips the test if the storage class does not have allowVolumeExpansion set to True.
 func (r *TestRequirement) ExpandableStorage() *TestRequirement {
-	storageClassName := Global.StorageClassName
+	storageClassName := Global.SharedTestFlags.StorageClassName
 
 	if storageClassName == "" {
 		name, err := r.getDefaultStorageClassName()
