@@ -77,6 +77,17 @@ This release supports the following versions of the Couchbase Fluent Bit image f
 .Operator Fluent Bit Compatibility
 image:compatibility-fluentbit.png[]
 
+[[couchbase-exporter-compatibility]]
+=== Couchbase Exporter Compatibility
+
+This release is compatible with all versions of the Couchbase Exporter image.
+The Couchbase Exporter images are all compatible with all versions of Couchbase Server that are supported by this release.
+
+[IMPORTANT]
+====
+With the release of Couchbase Server 7.0.0, Prometheus endpoints are built into Couchbase Server and as such, the exporter image is no longer required to expose metrics.
+====
+
 [[kubernetes-platform-compatibility]]
 == Kubernetes Compatibility
 

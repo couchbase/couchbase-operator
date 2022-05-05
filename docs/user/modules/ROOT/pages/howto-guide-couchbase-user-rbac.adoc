@@ -87,7 +87,7 @@ EOF
 <.> Password for Alice
 <.> Password for Bob
 
-== Create Groups and RoleBindings
+== Create Groups and `RoleBindings`
 
 Now that we've created the users, we can bind them with groups.
 In order to do that, we are going to create groups and bind them with the users using role bindings.
@@ -378,7 +378,7 @@ cbc get mydoc -u alice -P password -U couchbase://cb-example/travel \
 ----
 mydoc                LCB_ERR_AUTHENTICATION_FAILURE (206)
                      Ref:                      Context:
----- 
+----
 
 We can observe that Alice was unable to read data, and an authentication failure error was returned.
 

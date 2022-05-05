@@ -6,7 +6,7 @@
 
 == Overview
 
-In the following guide, we'll show you how to discover the configuration of a Couchbase cluster in the form of Kuberntes resources, and how the Autonomous Operator manages those resources.
+In the following guide, we'll show you how to discover the configuration of a Couchbase cluster in the form of Kubernetes resources, and how the Autonomous Operator manages those resources.
 
 == Prerequisites
 

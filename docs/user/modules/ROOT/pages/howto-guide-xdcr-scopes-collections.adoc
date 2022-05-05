@@ -61,9 +61,9 @@ spec:
 
 <.> `spec.networking.adminConsoleServiceTemplate` type is set to `NodePort` surfacing the administrative console service on the Kubernetes node network.
 
-<.> `spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster. In this instance the xdcr feature set exposes the admin, data and index ports required for XDCR replication.
+<.> `spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster. In this instance the XDCR feature set exposes the admin, data and index ports required for XDCR replication.
 
-<.> `spec.networking.exposedFeatureServiceTemplate` type is set to NodePort which surfaces the exposed feature sets, per-pod, on the Kubernetes node network.
+<.> `spec.networking.exposedFeatureServiceTemplate` type is set to `NodePort` which surfaces the exposed feature sets, per-pod, on the Kubernetes node network.
 This allows the cluster to escape the confines of any overlay network and be seen by the local cluster.
 
 ==== Local Cluster
@@ -183,10 +183,10 @@ spec:
 
 <.> `spec.networking.exposeAdminConsole` creates a load balanced service used to connect to the remote cluster.
 
-<.> `spec.networking.adminConsoleServiceTemplate` type is set to NodePort surfacing the administrative console service on the Kubernetes node network.
+<.> `spec.networking.adminConsoleServiceTemplate` type is set to `NodePort` surfacing the administrative console service on the Kubernetes node network.
 
 <.> `spec.networking.exposedFeatures` selects the feature set of ports to expose external to the Kubernetes cluster.
-In this instance the xdcr feature set exposes the admin, data and index ports required for XDCR replication.
+In this instance the XDCR feature set exposes the admin, data and index ports required for XDCR replication.
 
 <.> `spec.networking.exposedFeatureServiceTemplate` type is set to `NodePort` which surfaces the exposed feature sets, per-pod, on the Kubernetes node network.
 This allows the cluster to escape the confines of any overlay network and be seen by the local cluster.
