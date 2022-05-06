@@ -69,6 +69,7 @@ func registerTests() {
 		framework.NewTestDef(TestNegValidationCreateCouchbaseClusterSettings).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseClusterSecurity).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseClusterXDCR).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationCreateCouchbaseClusterXDCR).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseBucket).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseEphemeralBucket).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseMemcachedBucket).WithTags(TagSuiteValidation, TagSuitePlatform),
