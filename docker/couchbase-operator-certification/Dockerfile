@@ -1,6 +1,6 @@
 # This must be kept in lockstep with the builder images due to library
 # dependencies.
-ARG GO_VERSION=1.17.2
+ARG GO_VERSION=1.17.8
 
 FROM golang:$GO_VERSION-alpine
 

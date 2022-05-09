@@ -111,7 +111,7 @@ BLD_NUM ?= 999
 # This controls the build version of docker used.
 # The only caveat, is the build system doesn't use this as the source
 # of truth, so you'll want to update the defaults found in ./docker/...
-GO_VERSION := 1.17.2
+GO_VERSION := 1.17.8
 
 # Short cut for setting the platform across all targets.
 PLATFORM := kubernetes
