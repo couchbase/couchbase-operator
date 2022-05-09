@@ -13,7 +13,7 @@ const (
 var (
 	admissionImageDefault           = imageRepo + "/couchbase/admission-controller:" + version.WithRevision()
 	operatorImageDefault            = imageRepo + "/couchbase/operator:" + version.WithRevision()
-	mobileImageDefault              = imageRepo + "/couchbase/sync-gateway:2.8.3-1"
+	mobileImageDefault              = imageRepo + "/couchbase/sync-gateway:3.0.0-1"
 	serverImageDefault              = imageRepo + "/couchbase/server:7.0.3-1"
 	serverImageUpgradeFromDefault   = imageRepo + "/couchbase/server:6.6.4-1"
 	exporterImageDefault            = imageRepo + "/couchbase/exporter:1.0.6-1"
