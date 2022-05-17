@@ -12,8 +12,9 @@ import (
 
 // define flag names shared between cao and test suite.
 const (
-	ipv6Flag         = "ipv6"
-	storageClassFlag = "storage-class"
+	ipv6Flag            = "ipv6"
+	storageClassFlag    = "storage-class"
+	collectLogLevelFlag = "collected-log-level"
 )
 
 // certifyOptions defines all options for a certification task.
@@ -76,10 +77,6 @@ type certifyOptions struct {
 	// debug is used to dump out verbose information.
 	debug bool
 
-	// collectedLogLevel is passed to the certification container for controlling the
-	// sensitivity of collected information by cbopinfo
-	collectedLogLevel int
-
 	// SharedTestFlags are flags shared between the cao cli and test suite.
 	SharedTestFlags
 }
@@ -93,6 +90,10 @@ type SharedTestFlags struct {
 	// StorageClassName is the name of storage class to use for storing test artifacts
 	// along with provisioning test persistent volumes.
 	StorageClassName string
+
+	// CollectedLogLevel is passed to the certification container for controlling the
+	// sensitivity of collected information by cbopinfo
+	CollectedLogLevel int
 }
 
 // Bind flags shared with test framework to typed variables.
@@ -104,6 +105,7 @@ func (s *SharedTestFlags) BindSharedFlags(flagSet *pflag.FlagSet) {
 	flag.StringVar(&s.StorageClassName, storageClassFlag,
 		"",
 		"Storage class to use for result artifacts and test volumes. The default storage class of the platform is used if not specified.")
+	flag.IntVar(&s.CollectedLogLevel, collectLogLevelFlag, 0, "Log level to be collected by cbopinfo")
 
 	// add flag to cli flagset if provided
 	if flagSet != nil {

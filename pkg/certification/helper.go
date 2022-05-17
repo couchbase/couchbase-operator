@@ -1,6 +1,7 @@
 package certification
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -22,6 +23,13 @@ func getOverrides(t SharedTestFlags, testArgs []string) []string {
 		flagName := "-" + storageClassFlag
 		if !contains(testArgs, flagName) {
 			args = append(args, flagName, t.StorageClassName)
+		}
+	}
+
+	if t.CollectedLogLevel != 0 {
+		flagName := "-" + collectLogLevelFlag
+		if !contains(testArgs, flagName) {
+			args = append(args, flagName, strconv.Itoa(t.CollectedLogLevel))
 		}
 	}
 
