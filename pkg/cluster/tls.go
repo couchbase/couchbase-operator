@@ -305,7 +305,7 @@ func tlsValid(member couchbaseutil.Member, cache *tlsCache, cert *x509.Certifica
 
 // reloadMemberCAs reloads the cluster CA certificates.
 func (c *Cluster) reloadMemberCAs(member couchbaseutil.Member) error {
-	ok, err := c.IsAtLeastVersion("7.1.0")
+	ok, err := c.RunningVersionIsAtLeast("7.1.0")
 	if err != nil {
 		return err
 	}
@@ -1439,7 +1439,6 @@ func (c *Cluster) reconcileTLSPreTopologyChange() error {
 	if _, err := c.state.Get(persistence.Upgrading); err == nil {
 		return nil
 	}
-
 	// When disabling TLS, this causes an "upgrade" to remove the TLS volume
 	// from the pods, and doesn't install certificates, leading to the client
 	// potentially failing to connect to the new pods.  If the user intends to
