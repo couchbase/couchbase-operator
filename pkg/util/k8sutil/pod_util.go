@@ -735,7 +735,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	// limiting the blast radius.
 	port := AdminServicePort
 
-	if cluster.IsTLSEnabled() {
+	if cluster.IsMutualTLSEnabled() {
 		port = AdminServicePortTLS
 	}
 
