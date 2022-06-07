@@ -14,8 +14,9 @@ RUN microdnf update \
     findutils \
  && microdnf clean all
 
+ARG TARGETARCH
 ARG GO_VERSION=1.17.2
-RUN curl -s https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz | tar xz
+RUN curl -s https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz | tar xz
 ENV PATH="/go/bin:${PATH}"
 
 # Create the working directory to build in.

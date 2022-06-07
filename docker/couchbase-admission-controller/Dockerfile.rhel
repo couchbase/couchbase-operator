@@ -13,12 +13,13 @@ RUN microdnf update \
 COPY License.txt /licenses/License.txt
 COPY README.txt /help.1
 
+ARG TARGETARCH
 ARG PROD_VERSION
 ARG OS_BUILD
 ARG OPERATOR_BUILD
 
 # Install Couchbase Operator Admission Controller
-COPY openshift-linux-amd64/couchbase-admission-controller /usr/local/bin/
+COPY openshift-linux-${TARGETARCH}/couchbase-admission-controller /usr/local/bin/
 
 RUN useradd -u 8453 -m -s /bin/false couchbase
 USER 8453

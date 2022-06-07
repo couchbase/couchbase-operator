@@ -138,6 +138,8 @@ TARGET_PLATFORM := $(word 1,$(subst -, ,$(TARGET)))
 TARGET_OS := $(word 2,$(subst -, ,$(TARGET)))
 TARGET_ARCH := $(word 3,$(subst -, ,$(TARGET)))
 
+# derives the platform to use for docker image building.
+DOCKER_PLATFORM := linux/$(TARGET_ARCH)
 # Static configuration parameters.
 BUILDDIR := build
 ARTIFACTSDIR := dist
@@ -274,7 +276,7 @@ endif
 
 # This allows the container image tags to be explicitly set.
 DOCKER_USER := couchbase
-DOCKER_TAG := $(VERSION)
+DOCKER_TAG := $(VERSION)-$(TARGET_ARCH)
 
 # We can select the flavor of container that a binary is built in.
 DOCKERFILE := Dockerfile
@@ -517,7 +519,7 @@ binary: $(BINDIR)/$(BINARY)
 # Create a single image from an image artifact.  Requires IMAGE to be set.
 .PHONY: image
 image: image-artifact
-	cd $(IMAGE_ARTIFACT_BUILDDIR) && DOCKER_BUILDKIT=1 docker build -f $(DOCKERFILE) -t ${DOCKER_USER}/$(IMAGE):${DOCKER_TAG} $(IMAGE_DOCKER_BUILD_ARGS) .
+	cd $(IMAGE_ARTIFACT_BUILDDIR) && DOCKER_BUILDKIT=1 docker buildx build --platform ${DOCKER_PLATFORM} -f $(DOCKERFILE) -t ${DOCKER_USER}/$(IMAGE):${DOCKER_TAG} $(IMAGE_DOCKER_BUILD_ARGS) .
 
 ################################################################################
 # Build System Goals
@@ -535,23 +537,33 @@ tools-artifact: $(TOOLS_ARTIFACT)
 .PHONY: tools-artifacts
 tools-artifacts:
 	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=kubernetes-linux-amd64 ARCHIVE=tar.gz
+	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=kubernetes-linux-arm64 ARCHIVE=tar.gz
 	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=kubernetes-darwin-amd64 ARCHIVE=zip
 	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=kubernetes-darwin-arm64 ARCHIVE=zip
 	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=kubernetes-windows-amd64 ARCHIVE=zip
+	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=kubernetes-windows-arm64 ARCHIVE=zip
 	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=openshift-linux-amd64 ARCHIVE=tar.gz
+	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=openshift-linux-arm64 ARCHIVE=tar.gz
 	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=openshift-darwin-amd64 ARCHIVE=zip
 	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=openshift-darwin-arm64 ARCHIVE=zip
 	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=openshift-windows-amd64 ARCHIVE=zip
+	$(MAKE) tools-artifact -e $(BUILD_ENV) TARGET=openshift-windows-arm64 ARCHIVE=zip
 
 # target to build all combinations of images for various platforms.
 .PHONY: image-artifacts
 image-artifacts: | $(ARTIFACTSDIR)
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator TARGET=kubernetes-linux-amd64
+	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator TARGET=kubernetes-linux-arm64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator TARGET=openshift-linux-amd64
+	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator TARGET=openshift-linux-arm64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-admission-controller TARGET=kubernetes-linux-amd64
+	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-admission-controller TARGET=kubernetes-linux-arm64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-admission-controller TARGET=openshift-linux-amd64
+	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-admission-controller TARGET=openshift-linux-arm64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=kubernetes-linux-amd64
+	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=kubernetes-linux-arm64
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=openshift-linux-amd64
+	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=openshift-linux-arm64
 	tar czf $(IMAGE_ARTIFACT) -C $(BUILDDIR)/$(IMAGE_ARTIFACT_NAME) $(IMAGES)
 
 # Interface used by build to trigger things it needs.
@@ -624,8 +636,8 @@ $(DYNAMIC_BINARIES): $(GENERATED_FILES) $(SOURCE)
 # All binary builds for image builds will match these rules, and all builds will happen in a container
 # so we have full, in-tree, control of the tool chain.
 $(TARGET_BINARIES): .dockerignore docker/couchbase-operator-build/$(DOCKERFILE) $(GENERATED_FILES) $(SOURCE) | $(TARGET_BINDIR)
-	DOCKER_BUILDKIT=1 docker build -f docker/couchbase-operator-build/$(DOCKERFILE) -t $(DOCKER_BUILD_IMAGE) --build-arg GOAL=binary --build-arg BINARY=$(notdir $@) $(DOCKER_BUILD_ARGS) .
-	docker run --rm --entrypoint /bin/cat $(DOCKER_BUILD_IMAGE) /tmp/src/github.com/couchbase/couchbase-operator/$(BINDIR)/$(notdir $@) > $(TARGET_BINDIR)/$(notdir $@)
+	DOCKER_BUILDKIT=1 docker buildx build --platform=${DOCKER_PLATFORM} -f docker/couchbase-operator-build/$(DOCKERFILE) -t $(DOCKER_BUILD_IMAGE) --build-arg GOAL=binary --build-arg BINARY=$(notdir $@) --build-arg PLATFORM=${PLATFORM}  $(DOCKER_BUILD_ARGS) .
+	docker run --platform ${DOCKER_PLATFORM} --rm --entrypoint /bin/cat $(DOCKER_BUILD_IMAGE) /tmp/src/github.com/couchbase/couchbase-operator/$(BINDIR)/$(notdir $@) > $(TARGET_BINDIR)/$(notdir $@)
 	chmod +x $(TARGET_BINDIR)/$(notdir $@)
 	docker rmi -f $(DOCKER_BUILD_IMAGE)
 
