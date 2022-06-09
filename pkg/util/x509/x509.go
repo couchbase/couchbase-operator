@@ -112,19 +112,19 @@ func Verify(rootCAs [][]byte, chainData, keyData []byte, extKeyUsage x509.ExtKey
 		// Decode CA certificate
 		caPem := DecodePEM(caData)
 
-		switch {
-		case len(caPem) < 1:
+		if len(caPem) < 1 {
 			return nil, fmt.Errorf("%w: CA contains no PEM blocks", errors.NewStackTracedError(errors.ErrCertificateInvalid))
-		case len(caPem) > 1:
-			return nil, fmt.Errorf("%w: CA contains %d PEM blocks, expected 1", errors.NewStackTracedError(errors.ErrCertificateInvalid), len(caPem))
 		}
 
-		ca, err := x509.ParseCertificate(caPem[0].Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("CA failed to decode: %w", errors.NewStackTracedError(err))
-		}
+		// Parse each Root CA
+		for _, caBlock := range caPem {
+			ca, err := x509.ParseCertificate(caBlock.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("CA failed to decode: %w", errors.NewStackTracedError(err))
+			}
 
-		roots.AddCert(ca)
+			roots.AddCert(ca)
+		}
 	}
 
 	// Decode chain

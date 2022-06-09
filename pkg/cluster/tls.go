@@ -122,7 +122,13 @@ func (c *Cluster) getCAs() ([][]byte, error) {
 			return nil, fmt.Errorf("%w: TLS CA secret missing tls.crt", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
-		rootCAs = append(rootCAs, ca)
+		// We need to decode the PEM to separate into separate CAs
+		caPem := util_x509.DecodePEM(ca)
+		for _, caBlock := range caPem {
+			// Then re-encode and append to list of known CAs
+			caPem := pem.EncodeToMemory(caBlock)
+			rootCAs = append(rootCAs, caPem)
+		}
 	}
 
 	// The assumption is that this call will be made if TLS is enabled, and in

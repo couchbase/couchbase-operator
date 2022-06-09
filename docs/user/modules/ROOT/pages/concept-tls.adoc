@@ -49,7 +49,18 @@ image:tls-kubernetes.png[]
 All Kubernetes secrets are of the standard `kubernetes.io/tls` type.
 This provides the most generic method of TLS configuration, and the largest scope for 3rd party TLS management integration.
 
+Couchbase Server has strict naming and format requirements for server certificates and keys (see <<legacy-tls>>).
+When using Kubernetes native TLS, the Operator abstracts some of these away to make configuration more flexible and compatible with your security requirements.
+For example, this configuration mode supports PKCS#8 formatted RSA keys.
+Elliptic curve is not supported by Couchbase Server, and the Operator is unable to convert between EC and RSA key types.
+
+
+.Kubernetes Native TLS CA Certificates
+
 CA certificates are provided as a pool, whose referenced secrets only need contain the `tls.crt` field -- it is unnecessary to expose private keys to maintain security.
+When using Native TLS, the contents of `tls.crt` may also contain multiple CA certificates.
+Providing multiple CA certificates within a single secret is effectively the same as providing a CA Pool with multiple secrets containing a single CA certificate.
+
 A CA pool allows Couchbase Server to utilize one CA, while client certificates can authenticate against an arbitrary number of certificate authorities.
 This provides isolated security domains and allows rolling CA rotation with minimal operational impact.
 
@@ -59,11 +70,7 @@ When using Couchbase 7.0 and earlier, only one CA is supported, therefore all se
 Specifying multiple CA certificates with Couchbase Server 7.0 and earlier will result in undefined behavior.
 ====
 
-Couchbase Server has strict naming and format requirements for server certificates and keys (see <<legacy-tls>>).
-When using Kubernetes native TLS, the Operator abstracts some of these away to make configuration more flexible and compatible with your security requirements.
-For example, this configuration mode supports PKCS#8 formatted RSA keys.
-Elliptic curve is not supported by Couchbase Server, and the Operator is unable to convert between EC and RSA key types.
-
+ 
 === Cert-Manager TLS
 kbd:[operator 2.2]
 

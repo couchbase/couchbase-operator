@@ -2121,7 +2121,7 @@ This field must be either "ControlPlaneOnly", "All", or "Strict".
 
 RootCAs defines a set of secrets that reside in this namespace that contain additional CA certificates that should be installed in Couchbase.
 The CA certificates that are defined here are in addition to those defined for the cluster, optionally by couchbaseclusters.spec.networking.tls.secretSource, and thus should not be duplicated.
-Secrets referred to must be of well-know type "kubernetes.io/tls" and must contain the CA certificate under the key "tls.crt".
+Each Secret referred to must be of well-known type "kubernetes.io/tls" and must contain one or more CA certificates under the key "tls.crt".
 Multiple root CA certificates are only supported on Couchbase Server 7.1 and greater, and not with legacy couchbaseclusters.spec.networking.tls.static configuration.
 
 === couchbaseclusters.spec.networking.tls.secretSource
@@ -2160,6 +2160,8 @@ The secret is expected to contain "tls.crt" and "tls.key" as per the Kubernetes.
 ServerSecretName specifies the secret name, in the same namespace as the cluster, that contains server TLS data.
 The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.
 It may also contain "ca.crt".
+Only a single Root CA can be provided to "ca.crt".
+Refer to couchbaseclusters.spec.networking.tls.rootcas for multiple Root CA deployments.
 
 === couchbaseclusters.spec.networking.tls.static
 

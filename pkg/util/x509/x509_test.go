@@ -133,9 +133,9 @@ func TestVerifyInvalidCACertificate(t *testing.T) {
 	mustNotVerify(t, rootCAsFromCA(ca2), cert, key, x509.ExtKeyUsageServerAuth, validZone)
 }
 
-// TestVerifyInvalidCACertificateMultiple checks that multiple CA certificates are rejected.
-func TestVerifyInvalidCACertificateMultiple(t *testing.T) {
+// TestVerifyCACertificateMultiple checks that multiple CA certificates are allowed.
+func TestVerifyCACertificateMultiple(t *testing.T) {
 	ca, _ := NewCertificateAuthority(KeyTypeRSA, caCN, time.Now(), time.Now().Add(time.Hour), CertTypeCA)
 	key, cert, _ := reqTemplate.Generate(ca)
-	mustNotVerify(t, [][]byte{append(ca.Certificate, ca.Certificate...)}, cert, key, x509.ExtKeyUsageServerAuth, validZone)
+	mustVerify(t, [][]byte{append(ca.Certificate, ca.Certificate...)}, cert, key, x509.ExtKeyUsageServerAuth, validZone)
 }
