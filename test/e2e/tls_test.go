@@ -1677,7 +1677,7 @@ func TestTLSEditSettings(t *testing.T) {
 
 // testMandatoryMutualTLSWithMultipleCAs tests that a cluster using server secrets from
 // various different sources, works with client certs from a different PKI.
-func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2eutil.TLSSource) {
+func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2eutil.TLSSource, multipleCAs bool) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -1690,7 +1690,7 @@ func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2e
 	clusterSize := constants.Size1
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 
-	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: serverTLSSourceType})
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: serverTLSSourceType, MultipleCAs: multipleCAs})
 	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
@@ -1707,13 +1707,25 @@ func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2e
 // TestMandatoryMutualTLSWithMultipleCAsAndKubernetesSecrets tests that a cluster using Kubernetes
 // server secrets (CA supplied separately), works with client certs from a different PKI.
 func TestMandatoryMutualTLSWithMultipleCAsAndKubernetesSecrets(t *testing.T) {
-	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceKubernetesSecret)
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceKubernetesSecret, false)
+}
+
+// TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndKubernetesSecrets tests that a cluster using Kubernetes
+// server secrets (CA supplied separately), works with client certs from a different PKI.
+func TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndKubernetesSecrets(t *testing.T) {
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceKubernetesSecret, true)
 }
 
 // TestMandatoryMutualTLSWithMultipleCAsAndCertManagerSecrets tests that a cluster using cert-manager
 // server secrets (CA integrated), works with client certs from a different PKI.
 func TestMandatoryMutualTLSWithMultipleCAsAndCertManagerSecrets(t *testing.T) {
-	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret)
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret, false)
+}
+
+// TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndCertManagerSecrets tests that a cluster using cert-manager
+// server secrets (CA integrated), works with client certs from a different PKI.
+func TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndCertManagerSecrets(t *testing.T) {
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret, true)
 }
 
 // TestMultipleCAsAddAndRemove tests that addition and removal of CAs works, and is
