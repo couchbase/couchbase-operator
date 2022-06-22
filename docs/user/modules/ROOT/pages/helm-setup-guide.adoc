@@ -211,6 +211,33 @@ Likewise, if you already had the Autonomous Operator and Admission Controller de
 
 Even though the Couchbase Helm Chart has full configuration parameters for each component, if a component is disabled in the `install` section, then that component's configuration parameters are ignored.
 
+=== Users
+
+By default, when creating a custom user, the corresponding Group resource is automatically created and bound.
+
+[source,yaml]
+----
+users:
+  developer:
+    # When autobind is 'true' then the user is
+    # created and automatically bound to a group named 'developer'.
+    autobind: true
+    # password to use for user authentication
+    # (alternatively use authSecret)
+    password: password
+    # optional secret to use containing user password
+    authSecret:
+    # domain of user authentication
+    authDomain: local
+    # roles attributed to group
+    roles:
+      - name: bucket_admin
+        bucket: default
+----
+
+To manually configure the corresponding Group resource, set `users.<name>.autobind` to `false` and
+specify the `groups` and `rolebindings` resources.
+
 == Deploying Sync Gateway
 
 Sync Gateway is disabled by default in the Couchbase Helm Chart.
