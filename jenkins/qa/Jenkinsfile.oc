@@ -39,7 +39,7 @@ pipeline {
     string(name: 'exporter_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.5-1')
     string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-rhcc/fluent-bit:latest')
     string(name: 'logging_image_upgrade', defaultValue: 'registry.gitlab.com/ch-rhcc/fluent-bit:1.1.0')
-    string(name: 'mobile_image', defaultValue: 'registry.connect.redhat.com/couchbase/sync-gateway:2.8.3-1')
+    string(name: 'mobile_image', defaultValue: 'registry.connect.redhat.com/couchbase/sync-gateway:3.0.3')
     string(name: 'platform', defaultValue: 'openshift')
     string(name: 'openshift_version', defaultValue: '4.9')
     string(name: 'storage_class', defaultValue: 'gp2')
