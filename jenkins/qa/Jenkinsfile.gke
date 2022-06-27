@@ -104,7 +104,7 @@ pipeline {
         sh "wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${params.gcloud_sdk_version}.0.0-linux-x86_64.tar.gz | tar xzf -"
         sh "gcloud auth activate-service-account ${GCLOUD_AUTH_ACCOUNT} --key-file ${GCLOUD_AUTH_JSON} --project ${GCLOUD_AUTH_PROJECT}"
         sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --release-channel ${params.release_channel} --cluster-version ${params.kubernetes_version} --machine n2-standard-4"
-	      sh "KUBECONFIG=${env.WORKSPACE}/config1 gcloud container clusters get-credentials ${env.NAME} --region us-east1"
+	      sh "KUBECONFIG=${env.WORKSPACE}/config1 gcloud container clusters get-credentials ${env.NAME} --region us-central1"
         sh "KUBECONFIG=${env.WORKSPACE}/config2 gcloud container clusters get-credentials ${env.NAME} --region us-west1"
       }
     }

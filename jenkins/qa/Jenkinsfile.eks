@@ -107,9 +107,8 @@ pipeline {
         sh "aws configure set default.output json"
         dir("./test/e2e/resources/provisioners/eks") {
           sh 'terraform init -no-color -input=false'
-          sh "terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -var remote=true -auto-approve -no-color"
+          sh "terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
           sh "terraform output -raw kubeconfig1 > ${env.WORKSPACE}/config1"
-          sh "terraform output -raw kubeconfig2 > ${env.WORKSPACE}/config2"
         }
       }
     }
