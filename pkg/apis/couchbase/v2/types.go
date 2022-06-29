@@ -1597,7 +1597,7 @@ const (
 
 type Role struct {
 	// Name of role.
-	// +kubebuilder:validation:Enum=admin;cluster_admin;security_admin;ro_admin;replication_admin;query_external_access;query_system_catalog;analytics_reader;bucket_admin;views_admin;fts_admin;bucket_full_access;data_reader;data_writer;data_dcp_reader;data_backup;data_monitoring;replication_target;analytics_manager;views_reader;fts_searcher;query_select;query_update;query_insert;query_delete;query_manage_index;mobile_sync_gateway
+	// +kubebuilder:validation:Enum=admin;cluster_admin;security_admin;ro_admin;external_stats_reader;replication_admin;query_external_access;query_system_catalog;query_manage_global_functions;query_execute_global_functions;query_manage_functions;query_execute_functions;query_manage_global_external_functions;query_execute_global_external_functions;query_manage_external_functions;query_execute_external_functions;analytics_reader;bucket_admin;scope_admin;views_admin;fts_admin;bucket_full_access;data_reader;data_writer;data_dcp_reader;data_backup;data_monitoring;replication_target;analytics_manager;views_reader;fts_searcher;query_select;query_update;query_insert;query_delete;query_manage_index;mobile_sync_gateway;backup_admin;analytics_select;analytics_admin
 	Name RoleName `json:"name"`
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped
