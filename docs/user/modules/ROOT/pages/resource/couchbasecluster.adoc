@@ -1327,7 +1327,7 @@ If another log shipping image is used that needs a different mount then modify t
 
 *Type*: `string`
 
-*Default*: `couchbase/fluent-bit:1.0.4`
+*Default*: `couchbase/fluent-bit:1.1.0`
 
 ==== Description
 
