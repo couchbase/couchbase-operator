@@ -55,7 +55,7 @@ Collect all resources from the namespace
 --as::
 *Type*: string
 +
-Username to impersonate for the operation
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
 
 --as-group::
 *Type*: stringArray
@@ -63,6 +63,11 @@ Username to impersonate for the operation
 *Default*: []
 +
 Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
 
 --cache-dir::
 *Type*: string

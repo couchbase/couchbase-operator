@@ -61,7 +61,7 @@ func (c *Cluster) reconcileLogConfig(client *client.Client) error {
 			"fluent-bit.conf": []byte("@include /fluent-bit/etc/fluent-bit.conf\n"),
 
 			// Redaction salt if required using default of cluster name
-			"redaction.salt": []byte(c.cluster.ClusterName),
+			"redaction.salt": []byte(c.cluster.Name),
 		},
 	}
 

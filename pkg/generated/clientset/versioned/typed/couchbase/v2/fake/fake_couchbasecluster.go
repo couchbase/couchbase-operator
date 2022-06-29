@@ -106,7 +106,7 @@ func (c *FakeCouchbaseClusters) UpdateStatus(ctx context.Context, couchbaseClust
 // Delete takes name of the couchbaseCluster and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseClusters) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbaseclustersResource, c.ns, name), &v2.CouchbaseCluster{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbaseclustersResource, c.ns, name, opts), &v2.CouchbaseCluster{})
 
 	return err
 }

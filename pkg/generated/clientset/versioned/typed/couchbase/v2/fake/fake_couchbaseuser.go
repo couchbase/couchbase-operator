@@ -94,7 +94,7 @@ func (c *FakeCouchbaseUsers) Update(ctx context.Context, couchbaseUser *v2.Couch
 // Delete takes name of the couchbaseUser and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseUsers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbaseusersResource, c.ns, name), &v2.CouchbaseUser{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbaseusersResource, c.ns, name, opts), &v2.CouchbaseUser{})
 
 	return err
 }

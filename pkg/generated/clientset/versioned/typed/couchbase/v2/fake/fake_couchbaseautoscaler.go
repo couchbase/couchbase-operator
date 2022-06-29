@@ -107,7 +107,7 @@ func (c *FakeCouchbaseAutoscalers) UpdateStatus(ctx context.Context, couchbaseAu
 // Delete takes name of the couchbaseAutoscaler and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseAutoscalers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbaseautoscalersResource, c.ns, name), &v2.CouchbaseAutoscaler{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbaseautoscalersResource, c.ns, name, opts), &v2.CouchbaseAutoscaler{})
 
 	return err
 }

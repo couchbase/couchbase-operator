@@ -41,7 +41,7 @@ pipeline {
   }
 
   environment {
-    GOVERSION = "1.16.3"
+    GOVERSION = "1.17.3"
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
@@ -61,6 +61,7 @@ pipeline {
 
     stage('Install Go') {
       steps {
+        sh 'rm -rf ./go'
         sh 'wget -q -O- https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz | tar xz'
       }
     }
@@ -125,8 +126,7 @@ pipeline {
         sh 'wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-315.0.0-linux-x86_64.tar.gz | tar xz'
         sh './google-cloud-sdk/bin/gcloud components install kubectl'
         sh './google-cloud-sdk/bin/gcloud auth activate-service-account couchbase-operator@couchbase-engineering.iam.gserviceaccount.com --project couchbase-engineering --key-file ${GCLOUD_SERVICE_TOKEN}'
-        sh 'KUBECONFIG=config1 ./google-cloud-sdk/bin/gcloud container clusters get-credentials couchbase-operator-ci --region us-east1'
-        sh 'KUBECONFIG=config2 ./google-cloud-sdk/bin/gcloud container clusters get-credentials couchbase-operator-ci --region us-west1'
+        sh 'KUBECONFIG=config ./google-cloud-sdk/bin/gcloud container clusters get-credentials couchbase-operator-ci-certification --region us-east1'
       }
     }
 
@@ -134,7 +134,7 @@ pipeline {
       steps {
         // Warn if something went wrong, but don't fail, it's probably just an unstable test/platform.
         warnError('Suite failed') {
-          sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -suite sanity ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} ${params.features.split().collect{s -> '-suite ' + s}.join(' ')} ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} -platform-type kubernetes -operator-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator:\${GIT_COMMIT} -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:\${GIT_COMMIT} -mobile-image \${mobile_image} -server-image \${server_image} -server-image-upgrade \${server_image_upgrade} -exporter-image \${exporter_image} -exporter-image-upgrade \${exporter_image_upgrade} -backup-image \${backup_image} -logging-image \${logging_image} -storage-class dynamic-bound -bucket-type \${bucket_type} -compression-mode \${compression_mode} -cluster \${WORKSPACE}/config1 -cluster \${WORKSPACE}/config2 -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} -collect-logs -s3-access-key \${AWS_CREDENTIALS_USR} -s3-secret-id \${AWS_CREDENTIALS_PSW}"
+          sh "go test github.com/couchbase/couchbase-operator/test/e2e -run TestOperator -v -race -timeout 12h -parallel 8 -args -suite sanity ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} ${params.features.split().collect{s -> '-suite ' + s}.join(' ')} ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} -platform-type kubernetes -operator-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator:\${GIT_COMMIT} -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator-admission:\${GIT_COMMIT} -mobile-image \${mobile_image} -server-image \${server_image} -server-image-upgrade \${server_image_upgrade} -exporter-image \${exporter_image} -exporter-image-upgrade \${exporter_image_upgrade} -backup-image \${backup_image} -logging-image \${logging_image} -storage-class dynamic-bound -bucket-type \${bucket_type} -compression-mode \${compression_mode} -cluster \${WORKSPACE}/config -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} -collect-logs -s3-access-key \${AWS_CREDENTIALS_USR} -s3-secret-id \${AWS_CREDENTIALS_PSW}"
         }
       }
     }

@@ -33,7 +33,7 @@ type CouchbaseClusterReconciler struct {
 // TODO: The reconcile.Result allows events to be requeued which *may*
 // allow us to do away with the separate go routine sitting in a loop,
 // or it may just fill up with events due to status updates...
-func (r *CouchbaseClusterReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *CouchbaseClusterReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.V(2).Info("Received couchbase cluster event", "cluster", request.NamespacedName)
 
 	// By using the requeue mechanism we can get a periodic and synchronous reconcile.

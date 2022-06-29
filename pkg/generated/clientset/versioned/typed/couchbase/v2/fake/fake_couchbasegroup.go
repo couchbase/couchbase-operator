@@ -94,7 +94,7 @@ func (c *FakeCouchbaseGroups) Update(ctx context.Context, couchbaseGroup *v2.Cou
 // Delete takes name of the couchbaseGroup and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseGroups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(couchbasegroupsResource, c.ns, name), &v2.CouchbaseGroup{})
+		Invokes(testing.NewDeleteActionWithOptions(couchbasegroupsResource, c.ns, name, opts), &v2.CouchbaseGroup{})
 
 	return err
 }

@@ -8,6 +8,8 @@
 package v2
 
 import (
+	"net/http"
+
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
@@ -78,12 +80,28 @@ func (c *CouchbaseV2Client) CouchbaseUsers(namespace string) CouchbaseUserInterf
 }
 
 // NewForConfig creates a new CouchbaseV2Client for the given config.
+// NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *rest.Config) (*CouchbaseV2Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientFor(&config)
+	httpClient, err := rest.HTTPClientFor(&config)
+	if err != nil {
+		return nil, err
+	}
+	return NewForConfigAndClient(&config, httpClient)
+}
+
+// NewForConfigAndClient creates a new CouchbaseV2Client for the given config and http client.
+// Note the http client provided takes precedence over the configured transport values.
+func NewForConfigAndClient(c *rest.Config, h *http.Client) (*CouchbaseV2Client, error) {
+	config := *c
+	if err := setConfigDefaults(&config); err != nil {
+		return nil, err
+	}
+	client, err := rest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}
