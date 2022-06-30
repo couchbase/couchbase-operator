@@ -104,12 +104,12 @@ pipeline {
 
     stage('EKS Provisioning') {
       steps {
-        sh "aws configure set default.region us-west-2"
+        sh "aws configure set default.region us-east-2"
         sh "aws configure set default.output json"
         dir("./test/e2e/resources/provisioners/eks") {
           sh 'terraform init -no-color -input=false'
           sh "terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
-          sh "terraform output -raw kubeconfig1 > ${env.WORKSPACE}/config1"
+          sh "aws eks update-kubeconfig --name ${env.NAME} --kubeconfig ${env.WORKSPACE}/config1"
         }
       }
     }
