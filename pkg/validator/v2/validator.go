@@ -287,7 +287,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 				errs = append(errs, fmt.Errorf("spec.security.adminSecret must contain \"password\" key"))
 			} else {
 				if len(value) < 6 {
-					errs = append(errs, errors.TooShort("password", "spec.security.adminSecret", 6))
+					errs = append(errs, errors.TooShort("password", "spec.security.adminSecret", 6, nil))
 				}
 				if strings.ContainsAny(string(value), `()<>,;:\"/[]?={}`) {
 					errs = append(errs, fmt.Errorf(`password in spec.security.adminSecret must not contain any of the following characters ()<>,;:\"/[]?={}`))
@@ -391,7 +391,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	}
 
 	if !hasDataService {
-		err := errors.Required("at least one \"data\" service", "spec.servers[*].services")
+		err := errors.Required("at least one \"data\" service", "spec.servers[*].services", nil)
 		errs = append(errs, err)
 	}
 
@@ -418,10 +418,10 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		for index, class := range customResource.Spec.Servers {
 			// Volume mounts must be specified if any others are supportable
 			if class.VolumeMounts == nil {
-				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d]", index)))
+				errs = append(errs, errors.Required("volumeMounts", fmt.Sprintf("spec.servers[%d]", index), nil))
 			} else if couchbasev2.ServiceList(class.Services).ContainsAny(couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.AnalyticsService) && class.VolumeMounts.DefaultClaim == "" {
 				// These stateful services must have a "default" mount
-				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
+				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index), nil))
 				// Note that we don't test for search here but we do allow the Index mount to be used for it later though for performance reasons.
 			}
 		}
@@ -510,7 +510,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 					}
 				}
 			case hasSecondaryMounts:
-				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index)))
+				errs = append(errs, errors.Required("default", fmt.Sprintf("spec.servers[%d].volumeMounts", index), nil))
 			}
 		}
 	}
@@ -535,7 +535,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		}
 
 		if !hasStorageQuantity {
-			err := errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates[*].resources.requests|limits")
+			err := errors.Required(string(v1.ResourceStorage), "spec.volumeClaimTemplates[*].resources.requests|limits", nil)
 			errs = append(errs, err)
 		}
 
@@ -601,11 +601,11 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// Require that publically visible service ports have DNS information available.
 	if customResource.Spec.IsExposedFeatureServiceTypePublic() || customResource.Spec.IsAdminConsoleServiceTypePublic() {
 		if customResource.Spec.Networking.TLS == nil {
-			errs = append(errs, errors.Required("spec.networking.tls", "body"))
+			errs = append(errs, errors.Required("spec.networking.tls", "body", nil))
 		}
 
 		if customResource.Spec.Networking.DNS == nil {
-			errs = append(errs, errors.Required("spec.networking.dns", "body"))
+			errs = append(errs, errors.Required("spec.networking.dns", "body", nil))
 		}
 	}
 
@@ -620,7 +620,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// Check mutual verification
 	if customResource.Spec.Networking.TLS != nil && customResource.Spec.Networking.TLS.ClientCertificatePolicy != nil {
 		if len(customResource.Spec.Networking.TLS.ClientCertificatePaths) == 0 {
-			errs = append(errs, errors.TooFewItems("spec.networking.tls.clientCertificatePaths", "", 1))
+			errs = append(errs, errors.TooFewItems("spec.networking.tls.clientCertificatePaths", "", 1, nil))
 		}
 	}
 
@@ -637,14 +637,14 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 	// Check LDAP Settings
 	if ldap := customResource.Spec.Security.LDAP; ldap != nil {
 		if len(ldap.Hosts) == 0 {
-			errs = append(errs, errors.TooFewItems("spec.security.ldap.hosts", "", 1))
+			errs = append(errs, errors.TooFewItems("spec.security.ldap.hosts", "", 1, nil))
 		}
 
 		// If authentication enabled then require username mapping
 		if ldap.AuthenticationEnabled {
 			// Both mapping options cannot be empty
 			if (ldap.UserDNMapping.Template == "") && (ldap.UserDNMapping.Query == "") {
-				errs = append(errs, errors.Required("spec.security.ldap.userDNMapping", "body"))
+				errs = append(errs, errors.Required("spec.security.ldap.userDNMapping", "body", nil))
 			}
 			// Only 1 mapping option allowed
 			if (ldap.UserDNMapping.Template != "") && (ldap.UserDNMapping.Query != "") {
@@ -663,7 +663,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 			// If encryption enabled then require cert secret
 			tlsSecretName := customResource.Spec.Security.LDAP.TLSSecret
 			if tlsSecretName == "" {
-				errs = append(errs, errors.Required("spec.security.ldap.tlsSecret", "body"))
+				errs = append(errs, errors.Required("spec.security.ldap.tlsSecret", "body", nil))
 			}
 
 			// secret containing ldap ca must exist
@@ -682,7 +682,7 @@ func CheckConstraints(v *types.Validator, customResource *couchbasev2.CouchbaseC
 		// require groups query when group auth enabled
 		if ldap.AuthorizationEnabled {
 			if ldap.GroupsQuery == "" {
-				errs = append(errs, errors.Required("security.ldap.groupsQuery", "body"))
+				errs = append(errs, errors.Required("security.ldap.groupsQuery", "body", nil))
 			}
 		}
 	}
@@ -707,11 +707,11 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		timeout := int(bucket.Spec.MaxTTL.Duration.Seconds())
 
 		if timeout < 0 {
-			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false))
+			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false, nil))
 		}
 
 		if timeout > bucketTTLMax {
-			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false))
+			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false, nil))
 		}
 	}
 
@@ -743,11 +743,11 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 		timeout := int(bucket.Spec.MaxTTL.Duration.Seconds())
 
 		if timeout < 0 {
-			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false))
+			errs = append(errs, errors.ExceedsMinimumInt("spec.maxTTL", "body", 0, false, nil))
 		}
 
 		if timeout > bucketTTLMax {
-			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false))
+			errs = append(errs, errors.ExceedsMaximumInt("spec.maxTTL", "body", bucketTTLMax, false, nil))
 		}
 	}
 
@@ -805,7 +805,7 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 		authSecretName := user.Spec.AuthSecret
 		if authSecretName == "" {
 			emsg := fmt.Sprintf("spec.authSecret for `%s` domain", domain)
-			errs = append(errs, errors.Required(emsg, user.Name))
+			errs = append(errs, errors.Required(emsg, user.Name, nil))
 		} else if v.Options.ValidateSecrets {
 			// Check the ldap auth secret exists and has the correct keys
 			authSecret, err := v.Abstraction.GetSecret(user.Namespace, authSecretName)
