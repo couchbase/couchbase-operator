@@ -977,6 +977,9 @@ func TestBackupFullIncrementalOverTLSS3(t *testing.T) {
 	testFullIncrementalOverTLS(t, true)
 }
 
+func TestBackupFullOnlyOverTLSKubernetes(t *testing.T) {
+	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret, MultipleCAs: true}, nil)
+}
 func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2.ClientCertificatePolicy) {
 	f := framework.Global
 

@@ -265,6 +265,7 @@ func registerTests() {
 		framework.NewTestDef(TestBackupFullIncrementalOverTLSS3).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureBackup),
 		framework.NewTestDef(TestBackupFullOnlyOverTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureBackup),
 		framework.NewTestDef(TestBackupFullOnlyOverTLSStandard).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureBackup),
+		framework.NewTestDef(TestBackupFullOnlyOverTLSKubernetes).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureBackup),
 		framework.NewTestDef(TestBackupFullOnlyOverMutualTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureBackup),
 		framework.NewTestDef(TestBackupFullOnlyOverMandatoryMutualTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureBackup),
 		framework.NewTestDef(TestBackupFullOnlyOverTLSS3).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureBackup),
