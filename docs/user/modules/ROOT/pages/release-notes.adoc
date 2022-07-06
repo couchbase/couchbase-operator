@@ -56,6 +56,25 @@ To enable this feature while upgrading the Autonomous Operator, stop the old Ope
 Refer to xref:howto-operator-upgrade.adoc[] for further details.
 
 
+[#release-v224]
+== Release 2.2.4
+
+Couchbase Autonomous Operator 2.2.4 was released in July 2022.
+
+[#fixed-issues-v224]
+=== Fixed Issues
+
+[#table-fixed-issues-v224,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2753[K8S-2753^]
+a| *Summary:* Prior to Autonomous Operator 2.2.4, Couchbase Server 6.6.2 was the highest compatible version of Couchbase Server available for use with the Red Hat Marketplace. This release updates the list of compatible Couchbase Server builds to allow Marketplace users to take advantage of the security enhancements provided by Server 6.6.4 and higher.
+
+To address security related issues, compatibility with Server 6.6.4-7.0.2 was added to Operator Lifecycle Manager, allowing the use of Server 6.6.5 as the default in the Red Hat Marketplace.
+
+|===
+
 [#release-v223]
 == Release 2.2.3
 
