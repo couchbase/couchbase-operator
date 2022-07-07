@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 )
@@ -29,6 +30,10 @@ func (c *Cluster) RunningVersionIsAtLeast(v string) (bool, error) {
 		}
 
 		for _, con := range actual.Spec.Containers {
+			if con.Name != constants.CouchbaseContainerName {
+				continue
+			}
+
 			tag, err := k8sutil.CouchbaseVersion(con.Image)
 			if err != nil {
 				return false, err
