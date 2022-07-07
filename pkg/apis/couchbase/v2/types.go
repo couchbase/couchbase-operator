@@ -1590,14 +1590,20 @@ const (
 	RoleQueryDelete                         RoleName = "query_delete"
 	RoleQueryManageIndex                    RoleName = "query_manage_index"
 	RoleSyncGateway                         RoleName = "mobile_sync_gateway"
+	RoleSyncGatewayApplication              RoleName = "mobile_sync_gateway_application"
+	RoleSyncGatewayApplicationReadOnly      RoleName = "mobile_sync_gateway_application_read_only"
+	RoleSyncGatewayArchitect                RoleName = "mobile_sync_gateway_architect"
+	RoleSyncDevOps                          RoleName = "mobile_sync_gateway_dev_ops"
+	RoleSyncReplicator                      RoleName = "mobile_sync_gateway_replicator"
 	RoleBackupAdmin                         RoleName = "backup_admin"
 	RoleAnalyticsSelect                     RoleName = "analytics_select"
 	RoleAnalyticsAdmin                      RoleName = "analytics_admin"
+	RoleEventingAdmin                       RoleName = "eventing_admin"
 )
 
 type Role struct {
 	// Name of role.
-	// +kubebuilder:validation:Enum=admin;cluster_admin;security_admin;ro_admin;external_stats_reader;replication_admin;query_external_access;query_system_catalog;query_manage_global_functions;query_execute_global_functions;query_manage_functions;query_execute_functions;query_manage_global_external_functions;query_execute_global_external_functions;query_manage_external_functions;query_execute_external_functions;analytics_reader;bucket_admin;scope_admin;views_admin;fts_admin;bucket_full_access;data_reader;data_writer;data_dcp_reader;data_backup;data_monitoring;replication_target;analytics_manager;views_reader;fts_searcher;query_select;query_update;query_insert;query_delete;query_manage_index;mobile_sync_gateway;backup_admin;analytics_select;analytics_admin
+	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;mobile_sync_gateway_application;mobile_sync_gateway_application_read_only;mobile_sync_gateway_architect;mobile_sync_gateway_dev_ops;mobile_sync_gateway_replicator;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_select;query_system_catalog;query_update;replication_admin;replication_target;ro_admin;scope_admin;security_admin;security_admin_external;security_admin_local;views_admin;views_reader
 	Name RoleName `json:"name"`
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped
