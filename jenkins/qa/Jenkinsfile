@@ -50,7 +50,7 @@ pipeline {
     GITLAB_CREDENTIALS = credentials('gitlab-couchbaseqe')
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
     AWS_CREDENTIALS = credentials('aws-simon')
-    KIND_VERSION = "0.11.1"
+    KIND_VERSION = "0.14.0"
   }
 
   stages {
