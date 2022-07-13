@@ -43,6 +43,12 @@ var (
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"
 
+	// AddNodeInsecureAnnotation is an experimental and insecure annotation
+	// that enforces the use of HTTP use when clustering Couchbase Nodes.
+	// This will only work for Server versions 6.5 - 7.0 since 7.1 will
+	// enforce the use https.
+	AddNodeInsecureAnnotation = "server.couchbase.com/add-node-insecure"
+
 	// ConfigurationVersionAnnotation is used to flag who created resources e.g.
 	// us, and for what version.  This gives us the ability in the future to reason
 	// about what needs doing to upgrade the operator, or can be used by support as a
