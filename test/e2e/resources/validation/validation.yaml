@@ -315,6 +315,7 @@ spec:
     maxUpgradablePercent: 75%
   recoveryPolicy: PrioritizeDataIntegrity
   hibernationStrategy: Immediate
+  envImagePrecedence: false
   security:
     adminSecret: basic-test-secret
     rbac:

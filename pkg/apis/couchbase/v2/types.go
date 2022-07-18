@@ -1954,6 +1954,12 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Pattern="^(.*?(:\\d+)?/)?.*?/.*?(:.*?\\d+\\.\\d+\\.\\d+.*|@sha256:[0-9a-f]{64})$"
 	Image string `json:"image"`
 
+	// EnvImagePrecedence gives precedence over the default container image name in
+	// `spec.Image` to an image name provided through Operator environment variables.
+	// For more info on using Operator environment variables:
+	// https://docs.couchbase.com/operator/current/reference-operator-configuration.html
+	EnvImagePrecedence bool `json:"envImagePrecedence,omitempty"`
+
 	// Paused is to pause the control of the operator for the Couchbase cluster.
 	// This does not pause the cluster itself, instead stopping the operator from
 	// taking any action.

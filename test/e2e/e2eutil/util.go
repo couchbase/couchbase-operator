@@ -1160,6 +1160,15 @@ func MustCreateOperatorDeployment(t *testing.T, k8s *types.Cluster) {
 	}
 }
 
+func MustCreateOperatorDeploymentWithEnvVars(t *testing.T, k8s *types.Cluster, envVars []v1.EnvVar) {
+	operatorContainer := &k8s.OperatorDeployment.Spec.Template.Spec.Containers[0]
+	operatorContainer.Env = append(operatorContainer.Env, envVars...)
+
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Create(context.Background(), k8s.OperatorDeployment, metav1.CreateOptions{}); err != nil {
+		Die(t, err)
+	}
+}
+
 func GetOperatorName(k8s *types.Cluster) (string, error) {
 	var pods *v1.PodList
 

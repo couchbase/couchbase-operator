@@ -279,12 +279,13 @@ func (cs *ClusterSpec) GetServerConfigByName(name string) *ServerConfig {
 }
 
 // Couchbase Image represents the image that will actually be deployed by cluster.
-// Defaults to Spec.Image unless image is provided by env variable.
+// Defaults to Spec.Image unless image is provided by operator environment variable
+// and environment image precedence is also enabled.
 func (cs *ClusterSpec) CouchbaseImage() string {
 	image := cs.Image
 
 	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
-		if annotatedImage != "" {
+		if cs.EnvImagePrecedence && annotatedImage != "" {
 			image = annotatedImage
 		}
 	}
@@ -299,7 +300,7 @@ func (cs *ClusterSpec) BackupImage() string {
 	image := cs.Backup.Image
 
 	if annotatedImage, ok := os.LookupEnv(constants.EnvBackupImageName); ok {
-		if annotatedImage != "" {
+		if cs.EnvImagePrecedence && annotatedImage != "" {
 			image = annotatedImage
 		}
 	}
@@ -322,11 +323,11 @@ func (cs *ClusterSpec) ConfigHasDataService(name string) bool {
 
 // Monitoring Image represents the image to use for metrics exporter for monitoring.
 // defaults to Spec.Image when provided then falls back to relatedImage env variable.
-func (m *CouchbaseClusterMonitoringPrometheusSpec) MetricsImage() string {
-	image := m.Image
+func (cs *ClusterSpec) MetricsImage() string {
+	image := cs.Monitoring.Prometheus.Image
 
 	if annotatedImage, ok := os.LookupEnv(constants.EnvMetricsImageName); ok {
-		if annotatedImage != "" {
+		if cs.EnvImagePrecedence && annotatedImage != "" {
 			image = annotatedImage
 		}
 	}

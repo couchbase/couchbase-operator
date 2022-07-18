@@ -100,6 +100,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-cluster-searchservicememoryquota,searchServiceMemoryQuota>>: 256Mi
   <<couchbaseclusters-spec-enableonlinevolumeexpansion,enableOnlineVolumeExpansion>>: false
   <<couchbaseclusters-spec-enablepreviewscaling,enablePreviewScaling>>: false
+  <<couchbaseclusters-spec-envimageprecedence,envImagePrecedence>>: false
   <<couchbaseclusters-spec-hibernate,hibernate>>: false
   <<couchbaseclusters-spec-hibernationstrategy,hibernationStrategy>>: ""
   <<couchbaseclusters-spec-image,image>>: ""
@@ -1400,6 +1401,17 @@ More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expa
 *DEPRECATED* - This option only exists for backwards compatibility and no longer restricts autoscaling to ephemeral services.
 
 EnablePreviewScaling enables autoscaling for stateful services and buckets.
+
+=== couchbaseclusters.spec.envImagePrecedence
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+EnvImagePrecedence gives precedence over the default container image name in `spec.Image` to an image name provided through Operator environment variables.
+For more info on using Operator environment variables: https://docs.couchbase.com/operator/current/reference-operator-configuration.html.
 
 === couchbaseclusters.spec.hibernate
 

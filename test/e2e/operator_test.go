@@ -1,16 +1,63 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	pkgconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	corev1 "k8s.io/api/core/v1"
 )
+
+const (
+	// version of couchbase server in relation to redhat catalog.
+	defaultOlmServerVersion = "couchbase-7.0.4-1"
+	// version of backup image in relation to redhat catalog.
+	defaultOlmBackupVersion = "backup-1.3.0-2"
+	// version of exporter sidecar in relation to redhat catalog.
+	defaultOlmMetricVersion = "metrics-1.0.6-2"
+)
+
+// createRelatedVersionEnvVars is a helper function for creating
+// environment variables used to specify overriding sidecar versions.
+// Within the context of OLM (operator lifecycle manager) these vars
+// are called 'Related Image Versions' as they allow the operator to
+// pre-define related images (sidecars) for pre-installation in a
+// disconnected deployment.
+func createRelatedVersionEnvVars(serverVersion string, backupVersion string, exporterVersion string) []corev1.EnvVar {
+	// perform reverse lookup to get sha256 digest of version string
+	for digest, value := range pkgconstants.ImageDigests {
+		switch value {
+		case serverVersion:
+			serverVersion = "registry.connect.redhat.com/couchbase/server@sha256:" + digest
+		case backupVersion:
+			backupVersion = "registry.connect.redhat.com/couchbase/operator-backup@sha256:" + digest
+		case exporterVersion:
+			exporterVersion = "registry.connect.redhat.com/couchbase/exporter@sha256:" + digest
+		}
+	}
+
+	return []corev1.EnvVar{
+		{
+			Name:  pkgconstants.EnvCouchbaseImageName,
+			Value: serverVersion,
+		},
+		{
+			Name:  pkgconstants.EnvBackupImageName,
+			Value: backupVersion,
+		},
+		{
+			Name:  pkgconstants.EnvMetricsImageName,
+			Value: exporterVersion,
+		},
+	}
+}
 
 // TestPauseControl tests the user can pause the operator from controlling
 // an couchbase cluster.
@@ -110,5 +157,75 @@ func TestKillOperatorAndUpdateClusterConfig(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 	}
 
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestImageVersionPrecedence checks that spec.image has default precedence
+// over image version provided through the operators environment variable.
+func TestImageVersionDefaultPrecedence(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
+
+	envVars := createRelatedVersionEnvVars(defaultOlmServerVersion, defaultOlmBackupVersion, defaultOlmMetricVersion)
+	e2eutil.MustCreateOperatorDeploymentWithEnvVars(t, kubernetes, envVars)
+
+	// Create the cluster.
+	clusterSize := 1
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Verify that the version displayed in cluster.status matches cluster.spec
+	// as this indicates we did not give precedence to the environment variable.
+	expectedServerVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
+	// (assuming that no one is providing redhat style server versions to begin with)
+	if expectedServerVersion == defaultOlmServerVersion {
+		e2eutil.Die(t, fmt.Errorf("initial server version %s already matches version provided to EnvVar", expectedServerVersion))
+	}
+
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, expectedServerVersion, time.Minute)
+
+	// Since this test isn't going to be running in OpenShift then we cannot expect
+	// upgrade to succeed because the images refer to the redhat registry.
+	// The point is simply to demonstrate that the env var has taken precedence.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestImageVersionPrecedence checks that spec.image has default precedence
+// over image version provided through the operators environment variable.
+func TestImageVersionEnvPrecedence(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
+
+	envVars := createRelatedVersionEnvVars(defaultOlmServerVersion, defaultOlmBackupVersion, defaultOlmMetricVersion)
+	e2eutil.MustCreateOperatorDeploymentWithEnvVars(t, kubernetes, envVars)
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Patching the clustr to give precedence to Env Var should result in an upgrade.
+	_ = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/envImagePrecedence", true), time.Minute)
+
+	// Since this test isn't going to be running in OpenShift then we cannot expect
+	// upgrade to succeed because the images refer to the redhat registry.
+	// The point is simply to demonstrate that the env var has taken precedence.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

@@ -1471,7 +1471,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 
 	return v1.Container{
 		Name:  MetricsContainerName,
-		Image: cs.Monitoring.Prometheus.MetricsImage(),
+		Image: cs.MetricsImage(),
 		Env: []v1.EnvVar{
 			{
 				Name: "COUCHBASE_OPERATOR_USER",
