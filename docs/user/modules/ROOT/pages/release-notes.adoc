@@ -99,6 +99,51 @@ This change will affect all users of logging, and will require a cluster upgrade
 Additionally a bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
 This has been fixed so that logs older than or equal to the time period are cleaned.
 
+[#release-v231]
+== Release 2.3.1
+
+Couchbase Autonomous Operator 2.3.1 was released in July 2022.
+
+=== New Features and Behavioral Changes
+
+==== Operator Recognizes and Distinguishes Server Containers
+
+Versions of Couchbase Server available in the Red Hat Container Catalog 
+lacked SHA-256 tagging to allow the Operator to distinguish between versions. As of release 2.3.1 
+all versions of Couchbase Server are recognizable and distinguishable by the Operator.
+
+==== Support for Additional User Roles
+
+Previously, Couchbase Autonomous Operator did not support the role "external_stats_reader", which
+is supported by Couchbase Server. This led to the Operator being unable to validate users with roles
+that were valid for Couchbase Server. This release adds support for "external_stats_reader" and allows 
+use of this supported role.
+
+=== Fixed Issues
+
+[#table-fixed-issues-v231,cols="25,66"]
+|===
+| Issue | Description
+a| https://issues.couchbase.com/browse/K8S-2717[K8S-2717^]
+a| *Summary* Previously there was no way to set the storage class used for the artifact logs 
+used during certification. This resulted in the storage class "default" always being used when
+running "cao certify". Setting the storage class only affects the volumes created during the 
+test, but not the volume used to store the results. 
+The workaround is to delete the default storage class and recreate it with the same specification
+as the storage class passed by the "-storage-class" argument.
+a| https://issues.couchbase.com/browse/K8S-2698[K8S-2698^]
+a| *Summary* There was a mismatch between the restore process and the CRD. The repository
+required by the CRD was optional for the restore process, which sometimes resulted in an 
+empty field in the JSON document used by both, causing an error in the CRD.
+This situation is corrected in 2.3.1.
+a| https://issues.couchbase.com/browse/K8S-2676[K8S-2676^]
+a| *Summary* Previously Operator did not support use of a raw IPv6 address for 
+cross datacenter replication (XDCR). Version 2.3.1 allows use of a raw IPv6 address in 
+this context.
+|===
+
+
+
 [#release-v230]
 == Release 2.3.0
 
