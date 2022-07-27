@@ -109,6 +109,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).initTLSCache,
 		(*Cluster).refreshTLSShadowCASecret,
 		(*Cluster).refreshTLSShadowSecret,
+		(*Cluster).refreshTLSClientSecret,
 		(*Cluster).reconcileLogConfig,
 	}
 
