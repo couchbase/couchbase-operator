@@ -49,4 +49,5 @@ LABEL name="couchbase/operator-certification" \
       summary="Couchbase Autonomous Operator Certification ${PROD_VERSION}" \
       description="Couchbase Autonomous Operator Certification ${PROD_VERSION}" \
       architecture="x86_64" \
-      run="docker run -d --name couchbase-operator-certification registry.connect.redhat.com/couchbase/operator-certification:${PROD_VERSION}-${OS_BUILD}"
+      run="docker run -d --name couchbase-operator-certification registry.connect.redhat.com/couchbase/operator-certification:${PROD_VERSION}-${OS_BUILD}" \
+      io.k8s.description="The Couchbase Autonomous Operator makes the easiest to manage data platform even easier by providing native OpenShift integration with Couchbase. It automates administrative tasks and operational best practices while maintaining full data platform capabilities from within and across clouds and on-premises deployments."
