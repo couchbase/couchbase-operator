@@ -519,7 +519,7 @@ binary: $(BINDIR)/$(BINARY)
 # Create a single image from an image artifact.  Requires IMAGE to be set.
 .PHONY: image
 image: image-artifact
-	cd $(IMAGE_ARTIFACT_BUILDDIR) && DOCKER_BUILDKIT=1 docker buildx build --platform ${DOCKER_PLATFORM} -f $(DOCKERFILE) -t ${DOCKER_USER}/$(IMAGE):${DOCKER_TAG} $(IMAGE_DOCKER_BUILD_ARGS) .
+	cd $(IMAGE_ARTIFACT_BUILDDIR) && docker buildx build --platform ${DOCKER_PLATFORM} -f $(DOCKERFILE) -t ${DOCKER_USER}/$(IMAGE):${DOCKER_TAG} --load $(IMAGE_DOCKER_BUILD_ARGS) .
 
 ################################################################################
 # Build System Goals
@@ -636,7 +636,7 @@ $(DYNAMIC_BINARIES): $(GENERATED_FILES) $(SOURCE)
 # All binary builds for image builds will match these rules, and all builds will happen in a container
 # so we have full, in-tree, control of the tool chain.
 $(TARGET_BINARIES): .dockerignore docker/couchbase-operator-build/$(DOCKERFILE) $(GENERATED_FILES) $(SOURCE) | $(TARGET_BINDIR)
-	DOCKER_BUILDKIT=1 docker buildx build --platform=${DOCKER_PLATFORM} -f docker/couchbase-operator-build/$(DOCKERFILE) -t $(DOCKER_BUILD_IMAGE) --build-arg GOAL=binary --build-arg BINARY=$(notdir $@) --build-arg PLATFORM=${PLATFORM}  $(DOCKER_BUILD_ARGS) .
+	docker buildx build --platform=${DOCKER_PLATFORM} -f docker/couchbase-operator-build/$(DOCKERFILE) -t $(DOCKER_BUILD_IMAGE) --load --build-arg GOAL=binary --build-arg BINARY=$(notdir $@) --build-arg PLATFORM=${PLATFORM}  $(DOCKER_BUILD_ARGS) .
 	docker run --platform ${DOCKER_PLATFORM} --rm --entrypoint /bin/cat $(DOCKER_BUILD_IMAGE) /tmp/src/github.com/couchbase/couchbase-operator/$(BINDIR)/$(notdir $@) > $(TARGET_BINDIR)/$(notdir $@)
 	chmod +x $(TARGET_BINDIR)/$(notdir $@)
 	docker rmi -f $(DOCKER_BUILD_IMAGE)
