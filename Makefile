@@ -519,7 +519,7 @@ binary: $(BINDIR)/$(BINARY)
 # Create a single image from an image artifact.  Requires IMAGE to be set.
 .PHONY: image
 image: image-artifact
-	cd $(IMAGE_ARTIFACT_BUILDDIR) && docker buildx build --platform ${DOCKER_PLATFORM} -f $(DOCKERFILE) -t ${DOCKER_USER}/$(IMAGE):${DOCKER_TAG} --load $(IMAGE_DOCKER_BUILD_ARGS) .
+	cd $(IMAGE_ARTIFACT_BUILDDIR) && docker buildx build --platform ${DOCKER_PLATFORM} -f $(DOCKERFILE) -t ${DOCKER_USER}/$(IMAGE):${DOCKER_TAG} --load $(DOCKER_BUILD_ARGS) .
 
 ################################################################################
 # Build System Goals
