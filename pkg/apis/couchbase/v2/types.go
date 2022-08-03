@@ -2130,7 +2130,7 @@ type Backup struct {
 	Managed bool `json:"managed,omitempty"`
 
 	// The Backup Image to run on backup pods.
-	// +kubebuilder:default="couchbase/operator-backup:1.3.0"
+	// +kubebuilder:default="couchbase/operator-backup:1.3.1"
 	Image string `json:"image"`
 
 	// The Service Account to run backup (and restore) pods under.
@@ -3492,7 +3492,7 @@ type LogShipperSidecarSpec struct {
 	// Image is the image to be used to deal with logging as a sidecar.
 	// No validation is carried out as this can be any arbitrary repo and tag.
 	// It will default to the latest supported version of Fluent Bit.
-	// +kubebuilder:default="couchbase/fluent-bit:1.2.0"
+	// +kubebuilder:default="couchbase/fluent-bit:1.2.1"
 	Image string `json:"image,omitempty"`
 
 	// ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
