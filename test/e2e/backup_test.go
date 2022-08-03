@@ -2816,3 +2816,47 @@ func TestBackupAndForcedRestore(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestBackupAndRestoreServices(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+	numOfDocs := f.DocsCount
+
+	// Create a normal cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).WithoutFTAlias().MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+
+	// Expect the full backup to complete.
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	e2eutil.NewRestore(backup).WithoutFTAlias().MustCreate(t, kubernetes)
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
