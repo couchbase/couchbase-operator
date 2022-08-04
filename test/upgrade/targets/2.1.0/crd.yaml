@@ -1005,6 +1005,12 @@ spec:
                         attribute must be greater than or equal to 0.
                       minimum: 0
                       type: integer
+                    numReplica:
+                      description: NumberOfReplica specifies number of secondary index replicas
+                        to be created by the Index Service whenever CREATE INDEX is invoked. The
+                        default is 0, with a minimum of 0.
+                      minimum: 0
+                      type: integer
                   type: object
                 searchServiceMemoryQuota:
                   anyOf:

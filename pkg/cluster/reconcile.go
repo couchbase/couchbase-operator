@@ -570,6 +570,7 @@ func (c *Cluster) reconcileIndexSettings() error {
 			MemSnapInterval:    int(apiSettings.MemorySnapshotInterval.Milliseconds()),
 			StableSnapInterval: int(apiSettings.StableSnapshotInterval.Milliseconds()),
 			StorageMode:        couchbaseutil.IndexStorageMode(apiSettings.StorageMode),
+			NumberOfReplica:    apiSettings.NumberOfReplica,
 		}
 	}
 

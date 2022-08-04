@@ -188,11 +188,13 @@ func TestIndexerSettings(t *testing.T) {
 	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/StableSnapInterval", 1000), time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/StorageMode", couchbaseutil.IndexStoragePlasma), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/numReplica", 1), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NumberOfReplica", 1), time.Minute)
 
 	// Check that the user can see the cluster being edited.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{Times: 6, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Repeat{Times: 7, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

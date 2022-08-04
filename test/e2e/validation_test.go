@@ -1152,6 +1152,12 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.buckets.selector`},
 		},
+		{
+			name:           "TestValidateIndexerNumberOfReplicaInValid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/numReplica", "-1")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.numReplica`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

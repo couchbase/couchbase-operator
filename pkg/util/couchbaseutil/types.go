@@ -152,6 +152,7 @@ type IndexSettings struct {
 	StableSnapInterval int              `url:"stableSnapshotInterval" json:"stableSnapshotInterval"`
 	MaxRollbackPoints  int              `url:"maxRollbackPoints" json:"maxRollbackPoints"`
 	LogLevel           IndexLogLevel    `url:"logLevel" json:"logLevel"`
+	NumberOfReplica    int              `url:"numReplica" json:"numReplica"`
 }
 
 type FailoverOnDiskFailureSettings struct {

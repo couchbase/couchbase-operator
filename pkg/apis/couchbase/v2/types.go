@@ -2724,6 +2724,17 @@ type CouchbaseClusterIndexerSettings struct {
 	// defaulting to "memory_optimized".
 	// +kubebuilder:default="memory_optimized"
 	StorageMode CouchbaseClusterIndexStorageSetting `json:"storageMode,omitempty"`
+
+	// NumberOfReplica specifies number of secondary index replicas to be created
+	// by the Index Service whenever CREATE INDEX is invoked, which ensures
+	// high availability and high performance.
+	// Note, if nodes and num_replica are both specified in the WITH clause,
+	// the specified number of nodes must be one greater than num_replica
+	// This defaults to 0, which means no index replicas to be created by default.
+	// Minimum must be 0.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	NumberOfReplica int `json:"numReplica,omitempty"`
 }
 
 // CouchbaseClusterQuerySettings allow query tweaks.
