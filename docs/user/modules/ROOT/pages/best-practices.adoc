@@ -202,12 +202,18 @@ spec:
 
 These ulimit settings are necessary when running under heavy load. If you are just doing light testing and development, you can omit these settings, and everything will still work.
 
+[CAUTION]
+====
+Red Hat OpenShift 4.0 and above sets the default limit of the maximum number of process IDs in the cgroup to be `1024`; you can read about this https://access.redhat.com/solutions/5366631[here] (Red Hat subscription required).
+A workaround is to increase the `pids_limit` in both the `KubeletConfig` and `ContainerRuntimeConfig`.
+====
+
 The Couchbase Pod ulimits are inherited from the default ulimits set on the container runtime daemon on each Kubernetes node.
 Configuration of this daemon varies according to the container runtime daemon used by the distribution and its service management system.
 
 === Systemd
 
-Systemd-compatible hosts can configure ulimits for the daemon by editing its service configuration file.  
+Systemd-compatible hosts can configure ulimits for the daemon by editing its service configuration file.
 
 Run the following command to detect the location of the configuration file for the Docker container runtime:
 

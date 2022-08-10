@@ -40,8 +40,7 @@ const (
 	etcSubPathName                            = "etc"
 	prometheusPort                            = 9091
 	prometheusPath                            = "/metrics"
-	serverSecretMountPath                     = "/var/run/secrets/couchbase.com/couchbase-server-tls"
-	operatorSecretMountPath                   = "/var/run/secrets/couchbase.com/couchbase-operator-tls"
+	tlsSecretMountPath                        = "/var/run/secrets/couchbase.com/couchbase-tls"
 	metricsTokenMountPath                     = "/var/run/secrets/couchbase.com/metrics-token"
 	MetricsContainerName                      = "metrics"
 	podReadinessCondition                     = v1.PodConditionType("pod.couchbase.com/readiness")
@@ -735,7 +734,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	// limiting the blast radius.
 	port := AdminServicePort
 
-	if cluster.IsTLSEnabled() {
+	if cluster.IsMutualTLSEnabled() {
 		port = AdminServicePortTLS
 	}
 
@@ -908,7 +907,10 @@ func applyPodMonitoring(client *client.Client, cluster *couchbasev2.CouchbaseClu
 		return err
 	}
 
-	applyMetricsPodTLS(cluster.Spec, &metricsContainer, pod)
+	if cluster.IsTLSEnabled() {
+		applyMetricsPodTLS(cluster, &metricsContainer, pod)
+	}
+
 	pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
 
 	return nil
@@ -1212,71 +1214,37 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	pod.Spec.Containers = append(pod.Spec.Containers, auditcleaner)
 }
 
-func applyMetricsPodTLS(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) {
-	if cs.Networking.TLS != nil {
-		// Static configuration:
-		// * Defines a (new) volume which contains the secrets necessary
-		//   to explicitly define TLS certificates and keys
-		// * K8S won't allow us to re-use the previous volume for Couchbase Pod TLS
-		// * Mounts the volume in in the correct location so that API
-		//   calls to /node/controller/reloadCertificate succeed
-		if cs.Networking.TLS.Static != nil {
-			// Add the TLS server secret volume to the metrics pod
-			volume := v1.Volume{
-				Name: constants.CouchbaseTLSVolumeName + "-metrics",
-				VolumeSource: v1.VolumeSource{
-					Secret: &v1.SecretVolumeSource{
-						SecretName: cs.Networking.TLS.Static.ServerSecret,
-					},
-				},
-			}
-			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+func applyMetricsPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
+	// Add the TLS server secret volume to the metrics pod
+	secretName := ClientTLSSecretName(cluster)
+	volume := v1.Volume{
+		Name: constants.CouchbaseTLSVolumeName + "-metrics",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	}
 
-			// Mount the secret volume
-			volumeMount := v1.VolumeMount{
-				Name:      constants.CouchbaseTLSVolumeName + "-metrics",
-				ReadOnly:  true,
-				MountPath: serverSecretMountPath,
-			}
-			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+	// Mount the secret volume
+	pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+	volumeMount := v1.VolumeMount{
+		Name:      constants.CouchbaseTLSVolumeName + "-metrics",
+		ReadOnly:  true,
+		MountPath: tlsSecretMountPath,
+	}
 
-			// add the TLS server flags to the couchbase-exporter binary
-			container.Args = append(container.Args,
-				"--cert", serverSecretMountPath+"/chain.pem",
-				"--key", serverSecretMountPath+"/pkey.key")
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+	container.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URISchemeHTTPS
+	container.Args = append(container.Args,
+		"--ca", tlsSecretMountPath+"/ca.crt",
+		"--cert", tlsSecretMountPath+"/tls.crt",
+		"--key", tlsSecretMountPath+"/tls.key")
 
-			// Add the TLS server secret volume to the metrics pod
-			volume = v1.Volume{
-				Name: "couchbase-operator-tls-metrics",
-				VolumeSource: v1.VolumeSource{
-					Secret: &v1.SecretVolumeSource{
-						SecretName: cs.Networking.TLS.Static.OperatorSecret,
-					},
-				},
-			}
-			pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
-
-			// Mount the secret volume
-			volumeMount = v1.VolumeMount{
-				Name:      "couchbase-operator-tls-metrics",
-				ReadOnly:  true,
-				MountPath: operatorSecretMountPath,
-			}
-			container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-
-			// add the TLS server flags to the couchbase-exporter binary
-			container.Args = append(container.Args,
-				"--ca", operatorSecretMountPath+"/ca.crt")
-
-			container.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URISchemeHTTPS
-		}
-
-		if cs.Networking.TLS.ClientCertificatePolicy != nil {
-			// add the TLS server flags to the couchbase-exporter binary
-			container.Args = append(container.Args,
-				"--client-cert", operatorSecretMountPath+"/couchbase-operator.crt",
-				"--client-key", operatorSecretMountPath+"/couchbase-operator.key")
-		}
+	if cluster.IsMutualTLSEnabled() {
+		container.Args = append(container.Args,
+			"--client-cert", tlsSecretMountPath+"/mtls.crt",
+			"--client-key", tlsSecretMountPath+"/mtls.key")
 	}
 }
 
@@ -1558,6 +1526,11 @@ func ShadowTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
 // ShadowTLSCASecretName generates a TLS secret name for CA certificates on CBS 7.1+.
 func ShadowTLSCASecretName(cluster *couchbasev2.CouchbaseCluster) string {
 	return cluster.Name + "-tls-ca-shadow"
+}
+
+// ClientTLSSecretName generates a TLS secret name for the client certificates.
+func ClientTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
+	return cluster.Name + "-tls-client"
 }
 
 // Adds any necessary pod prerequisites before enabling TLS.

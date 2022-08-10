@@ -324,6 +324,7 @@ Users are installed whenever `install.CouchbaseCluster` is set to `true`.
 ----
   users:
     developer:   # username <.>
+      autobind: true
       password: password
       authSecret:
       authDomain: local
@@ -334,6 +335,13 @@ Users are installed whenever `install.CouchbaseCluster` is set to `true`.
 
 <.> The username is set from the key of each user configuration.
 NOTE: Users are automatically provisioned with xref:concept-label-selection.adoc[label selectors] matching the corresponding Couchbase cluster.
+
+=== `autobind`
+_Value rules:_ The `user.<name>.autobind` value is a boolean.
+If `autobind` is set, then Users are automatically created
+alongside groups with specified roles.  To manually create
+groups and bind users then set `autobind` to 'false' and
+specify `groups` and `rolebindings` resources
 
 === `password`
 

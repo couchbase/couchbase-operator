@@ -26,7 +26,7 @@ pipeline {
 
   parameters {
     string(name: 'refspec', defaultValue: 'refs/heads/master', description: 'Gerrit ref spec of your source tree')
-    string(name: 'server_image', defaultValue: 'couchbase/server:7.0.3', , description: 'Version of Couchbase to test')
+    string(name: 'server_image', defaultValue: 'couchbase/server:7.0.4', , description: 'Version of Couchbase to test')
     string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.4', description: 'Version of Couchbase to upgrade from')
     string(name: 'backup_image', defaultValue: 'aemerycb/couchbase-operator-backup:d12b81bc47995916ff1689c2d2f1a38170d9b97f', description: 'Version of the Couchbase backup image to test')
     string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.5', description: 'Version of the Prometheus exporter to test')
@@ -50,7 +50,7 @@ pipeline {
     GITLAB_CREDENTIALS = credentials('gitlab-couchbaseqe')
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
     AWS_CREDENTIALS = credentials('aws-simon')
-    KIND_VERSION = "0.11.1"
+    KIND_VERSION = "0.14.0"
   }
 
   stages {
@@ -111,7 +111,7 @@ pipeline {
         axes {
           axis {
             name 'version'
-            values 'v1.19.1', 'v1.20.0', 'v1.21.1', 'v1.22.0', 'v1.23.0'
+            values 'v1.20.15', 'v1.21.12', 'v1.22.9', 'v1.23.6', 'v1.24.2'
           }
         }
 
@@ -205,6 +205,7 @@ pipeline {
       sh 'go run scripts/metrics.go --path profile > data.csv'
       sh 'gnuplot scripts/metrics.gnuplot > metrics.png'
       archiveArtifacts artifacts: 'metrics.png'
+ 
     }
     cleanup {
       // Clean up the workspace to free disk space.

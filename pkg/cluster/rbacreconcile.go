@@ -369,6 +369,20 @@ func isVersionGreaterThan(image string, version string) (bool, error) {
 
 func (c *Cluster) handleRole(role couchbasev2.Role) ([]couchbaseutil.UserRole, error) {
 	roles := []couchbaseutil.UserRole{}
+
+	// Adding a short circuit here for cluster roles, as we don't need to go through all the
+	// ceremony to expand buckets, scopes, or collections when we don't care.
+	if couchbasev2.IsClusterRole(role.Name) {
+		roles = append(roles, couchbaseutil.UserRole{
+			Role:           string(role.Name),
+			BucketName:     "",
+			ScopeName:      "",
+			CollectionName: "",
+		})
+
+		return roles, nil
+	}
+
 	// Roles that relate to buckets are scoped to either one, or
 	// all of them.  We used to have a special mutator that would fill
 	// in the default "all the things" if not specified for bucket

@@ -54,7 +54,7 @@ func TestRBACCreateAdminUser(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Create user
-	user, _, _ := mustCreateBoundUser(t, kubernetes)
+	user, group, _ := mustCreateBoundUser(t, kubernetes)
 	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user, 4*time.Minute)
 
 	// Check the events match what we expect:
@@ -66,6 +66,10 @@ func TestRBACCreateAdminUser(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+
+	// Check if group has appropriate role
+	role := e2eutil.NewRole(string(couchbasev2.RoleClusterAdmin)).Create()
+	e2eutil.MustHaveRoles(t, kubernetes, cluster, group, role)
 }
 
 // TestRBACDeleteUser verifies basic user deletion.

@@ -364,9 +364,6 @@ func configure() (err error) {
 	flag.StringVar(&params.CouchbaseLoggingImageUpgrade, "logging-image-upgrade",
 		loggingImageUpgradeFromDefault,
 		"Docker image to use for couchbase log shipping upgrades to upgrade from.")
-	flag.StringVar(&params.StorageClassName, "storage-class",
-		"",
-		"Storage class to use, platform default if not specified.")
 	flag.Var(&bucket, "bucket-type",
 		"Bucket type to use.  Either 'couchbase', 'ephemeral' or 'memcached'.")
 	flag.Var(&compression, "compression-mode",
@@ -416,7 +413,6 @@ func configure() (err error) {
 	flag.StringVar(&params.LogLevel, "log-level",
 		"debug",
 		"Log level to use.  This affects Couchbase Autonomous Operator logs.  Either 'info', or 'debug'")
-	flag.IntVar(&params.CollectedLogLevel, "collected-log-level", 0, "Log level to be collected by cbopinfo")
 	flag.Var(&podCreateTimeout, "pod-creation-timeout",
 		"Time before giving up on pod creation.  Platforms with cluster autoscaling may require a larger value e.g. 15m.")
 	flag.BoolVar(&params.EnableIstio, "istio",
@@ -427,9 +423,6 @@ func configure() (err error) {
 	flag.BoolVar(&params.DynamicPlatform, "dynamic-platform",
 		false,
 		"Enable dynamic platform support e.g. GKE Autopilot, AWS Fargate or anything with cluster autoscaling enabled.")
-	flag.BoolVar(&params.IPv6, "ipv6",
-		false,
-		"Force the use use of IPv6 with Couchbase Server.")
 	flag.Var(&params.PodImagePullPolicy, "image-pull-policy",
 		"Image pull policy to use for Operator and Admission Pods.")
 	flag.BoolVar(&params.IgnoreErrors, "ignore-errors",
@@ -438,7 +431,7 @@ func configure() (err error) {
 	flag.IntVar(&params.Parallelism, "parallelism",
 		0,
 		"How many tests to run in parallel, must match -test.parallel exactly.")
-
+	params.SharedTestFlags.BindSharedFlags(nil)
 	flag.Parse()
 
 	if util.UseANSIColor {
@@ -529,7 +522,7 @@ func setup() error {
 	logrus.Info(" →  Logging Level: " + Global.LogLevel)
 
 	logrus.Info(util.PrettyHeading("Kubernetes"))
-	logrus.Info(" →  storage class: " + Global.StorageClassName)
+	logrus.Info(" →  storage class: " + Global.SharedTestFlags.StorageClassName)
 
 	logrus.Info(util.PrettyHeading("Logs"))
 	logrus.Info(" →  directory: " + Global.LogDir)
@@ -595,7 +588,7 @@ func createKubeClusterObject() (*types.Cluster, error) {
 		RESTMapper:      restMapper,
 		Platform:        string(Global.Platform),
 		PlatformType:    Global.KubeType,
-		IPv6:            Global.IPv6,
+		IPv6:            Global.SharedTestFlags.IPv6,
 		DynamicPlatform: Global.DynamicPlatform,
 	}
 
@@ -1058,7 +1051,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 
 		// Collect any kubernetes/server logs using cbopinfo call.
 		if t.Failed() && f.CollectLogs {
-			e2eutil.CollectLogs(t, cluster, logDir, f.CbopinfoPath, f.OpImage, f.CollectServerLogsOnFailure, f.CollectedLogLevel)
+			e2eutil.CollectLogs(t, cluster, logDir, f.CbopinfoPath, f.OpImage, f.CollectServerLogsOnFailure, f.SharedTestFlags.CollectedLogLevel)
 		}
 
 		// Cleanup, which is now trivial.
@@ -1199,7 +1192,7 @@ func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase Server Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Server Image version not supported (too old)")
 	}
 
 	return r
@@ -1222,7 +1215,7 @@ func (r *TestRequirement) BeforeVersion(v string) *TestRequirement {
 	}
 
 	if v2.Less(v1) {
-		r.t.Skip("Couchbase Server Image version not supported (immature)")
+		r.t.Skip("Couchbase Server Image version not supported (too new)")
 	}
 
 	return r
@@ -1368,7 +1361,7 @@ func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase Backup Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Backup Image version not supported (too old)")
 	}
 
 	return r
@@ -1396,7 +1389,7 @@ func (r *TestRequirement) AtLeastLoggingVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase Logging Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Logging Image version not supported (too old)")
 	}
 
 	return r
@@ -1424,7 +1417,7 @@ func (r *TestRequirement) AtMostSyncGatewayVersion(v string) *TestRequirement {
 	}
 
 	if v2.Less(v1) {
-		r.t.Skip("Couchbase Sync Gateway Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Sync Gateway Image version not supported (too old)")
 	}
 
 	return r
@@ -1452,7 +1445,7 @@ func (r *TestRequirement) AtLeastExporterVersion(v string) *TestRequirement {
 	}
 
 	if v1.Less(v2) {
-		r.t.Skip("Couchbase Exporter Image version not supported (geriatric)")
+		r.t.Skip("Couchbase Exporter Image version not supported (too old)")
 	}
 
 	return r
@@ -1487,7 +1480,7 @@ func (r *TestRequirement) getDefaultStorageClassName() (string, error) {
 // DefaultAndExplicitStorageClass does what it says, looks for an implicit storage class
 // and that an explcit named one is configured.
 func (r *TestRequirement) DefaultAndExplicitStorageClass() *TestRequirement {
-	if Global.StorageClassName == "" {
+	if Global.SharedTestFlags.StorageClassName == "" {
 		r.t.Skip("No storage class name configured")
 	}
 
@@ -1500,7 +1493,7 @@ func (r *TestRequirement) DefaultAndExplicitStorageClass() *TestRequirement {
 
 // ExpandableStorage skips the test if the storage class does not have allowVolumeExpansion set to True.
 func (r *TestRequirement) ExpandableStorage() *TestRequirement {
-	storageClassName := Global.StorageClassName
+	storageClassName := Global.SharedTestFlags.StorageClassName
 
 	if storageClassName == "" {
 		name, err := r.getDefaultStorageClassName()

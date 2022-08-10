@@ -35,6 +35,7 @@
   *** xref:concept-scopes-and-collections.adoc[Couchbase Scopes and Collections]
   *** xref:concept-data-save-restore.adoc[Data Topology Save, Restore and Synchronization]
   *** xref:howto-guide-save-restore.adoc[How-to Guide: Data Topology Save and Restore]
+  *** xref:howto-guide-data-topology-sync.adoc[How-to Guide: Data Topology Synchronization]
  ** Hibernation
   *** xref:concept-hibernation.adoc[Couchbase Cluster Hibernation]
  ** Logging

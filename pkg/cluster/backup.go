@@ -26,6 +26,7 @@ const (
 	Incremental       CBBackupmgrAction = "incremental"
 	Full              CBBackupmgrAction = "full"
 	ObjEndpointCrtDir string            = "/var/run/secrets/objectendpoint"
+	backupTLSMountDir string            = "/var/run/secrets/couchbase.com/tls-mount"
 )
 
 // backupResources contains all the resources required to create and manage a backup.
@@ -444,17 +445,12 @@ func applyTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, job *batchv1.J
 		return nil
 	}
 
-	var secret string
-
-	if cluster.IsTLSShadowed() {
-		secret = cluster.Spec.Networking.TLS.SecretSource.ServerSecretName
-	} else {
-		secret = cluster.Spec.Networking.TLS.Static.OperatorSecret
-	}
+	secret := k8sutil.ClientTLSSecretName(cluster)
+	volumeName := constants.CouchbaseTLSVolumeName + "-backup"
 
 	// Add the TLS secret volume to the podSpec
 	volume := corev1.Volume{
-		Name: "couchbase-operator-tls",
+		Name: volumeName,
 	}
 	volume.VolumeSource.Secret = &corev1.SecretVolumeSource{
 		SecretName: secret,
@@ -464,14 +460,14 @@ func applyTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, job *batchv1.J
 	// add --cacert argument to backup_script
 	containerArgs := job.Template.Spec.Containers[0].Args
 	containerArgs = append(containerArgs, "--cacert")
-	containerArgs = append(containerArgs, "/var/run/secrets/couchbase.com/tls-mount/ca.crt")
+	containerArgs = append(containerArgs, backupTLSMountDir+"/ca.crt")
 	job.Template.Spec.Containers[0].Args = containerArgs
 
 	// Mount the secret volume in Couchbase's inbox
 	volumeMount := corev1.VolumeMount{
-		Name:      "couchbase-operator-tls",
+		Name:      volumeName,
 		ReadOnly:  true,
-		MountPath: "/var/run/secrets/couchbase.com/tls-mount",
+		MountPath: backupTLSMountDir,
 	}
 
 	containerName := job.Template.Spec.Containers[0].Name
@@ -634,7 +630,7 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 		"--disable-views":             backup.Spec.Services.Views,
 		"--disable-gsi-indexes":       backup.Spec.Services.GSIndexes,
 		"--disable-ft-indexes":        backup.Spec.Services.FTSIndexes,
-		"--disable-ft-aliases":        backup.Spec.Services.FTSAliases,
+		"--disable-ft-alias":          backup.Spec.Services.FTSAliases,
 		"--disable-data":              backup.Spec.Services.Data,
 		"--disable-analytics":         backup.Spec.Services.Analytics,
 		"--disable-eventing":          backup.Spec.Services.Eventing,
@@ -856,7 +852,7 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		"--disable-views":             spec.Services.Views,
 		"--disable-gsi-indexes":       spec.Services.GSIIndex,
 		"--disable-ft-indexes":        spec.Services.FTIndex,
-		"--disable-ft-aliases":        spec.Services.FTAlias,
+		"--disable-ft-alias":          spec.Services.FTAlias,
 		"--disable-data":              spec.Services.Data,
 		"--disable-analytics":         spec.Services.Analytics,
 		"--disable-eventing":          spec.Services.Eventing,

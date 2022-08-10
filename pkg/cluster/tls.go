@@ -122,7 +122,13 @@ func (c *Cluster) getCAs() ([][]byte, error) {
 			return nil, fmt.Errorf("%w: TLS CA secret missing tls.crt", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
-		rootCAs = append(rootCAs, ca)
+		// We need to decode the PEM to separate into separate CAs
+		caPem := util_x509.DecodePEM(ca)
+		for _, caBlock := range caPem {
+			// Then re-encode and append to list of known CAs
+			caPem := pem.EncodeToMemory(caBlock)
+			rootCAs = append(rootCAs, caPem)
+		}
 	}
 
 	// The assumption is that this call will be made if TLS is enabled, and in
@@ -133,6 +139,52 @@ func (c *Cluster) getCAs() ([][]byte, error) {
 	}
 
 	return rootCAs, nil
+}
+
+// refreshTLSClientSecret creates/updates a secret that contains tls certificates
+// for use by sidecars and applications.  This method fetches known tls configuration
+// from tlsCache which alleviates the need to evaluate which tls model is in use and
+// having to inspect underlying Kubernetes Secrets.
+func (c *Cluster) refreshTLSClientSecret() error {
+	if !c.cluster.IsTLSEnabled() {
+		return nil
+	}
+
+	name := k8sutil.ClientTLSSecretName(c.cluster)
+	requestedClientSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: k8sutil.LabelsForCluster(c.cluster),
+			OwnerReferences: []metav1.OwnerReference{
+				c.cluster.AsOwner(),
+			},
+		},
+		Data: map[string][]byte{},
+	}
+
+	// Bundle all known CA's into a single certificate
+	// beginning with the known server CA.
+	caBundle := c.tlsCache.serverCA
+
+	for _, ca := range c.tlsCache.rootCAs {
+		if !reflect.DeepEqual(ca, c.tlsCache.serverCA) {
+			caBundle = append(caBundle, ca...)
+		}
+	}
+
+	// Set secret CA and cert/key to allow clients to easily
+	// host secure services on same network as couchbase.
+	requestedClientSecret.Data["ca.crt"] = caBundle
+	requestedClientSecret.Data["tls.crt"] = c.tlsCache.serverCert
+	requestedClientSecret.Data["tls.key"] = c.tlsCache.serverKey
+	// Provide client cert/keys when mtls is enabled so allow
+	// applications to communitcate securely with Couchbase.
+	if c.cluster.IsMutualTLSEnabled() {
+		requestedClientSecret.Data["mtls.crt"] = c.tlsCache.clientCert
+		requestedClientSecret.Data["mtls.key"] = c.tlsCache.clientKey
+	}
+
+	return c.reconcileTLSSecrets(requestedClientSecret)
 }
 
 // refreshTLSShadowCASecret creates/updates a shadow secret that contains one
@@ -170,32 +222,7 @@ func (c *Cluster) refreshTLSShadowCASecret() error {
 		}
 	}
 
-	// Look for the shadow secret, if it exists update it, otherwise create it.
-	currentShadowSecret, ok := c.k8s.Secrets.Get(name)
-	if !ok {
-		log.Info("Creating shadow TLS CA secret", "cluster", c.namespacedName())
-
-		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedShadowSecret, metav1.CreateOptions{}); err != nil {
-			return errors.NewStackTracedError(err)
-		}
-
-		return nil
-	}
-
-	if reflect.DeepEqual(requestedShadowSecret.Data, currentShadowSecret.Data) {
-		return nil
-	}
-
-	log.Info("Updating shadow TLS CA secret", "cluster", c.namespacedName())
-
-	updatedShadowSecret := currentShadowSecret.DeepCopy()
-	updatedShadowSecret.Data = requestedShadowSecret.Data
-
-	if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), updatedShadowSecret, metav1.UpdateOptions{}); err != nil {
-		return errors.NewStackTracedError(err)
-	}
-
-	return nil
+	return c.reconcileTLSSecrets(requestedShadowSecret)
 }
 
 // refreshTLSShadowSecret does what it says, it keeps a shadow version of the TLS
@@ -260,28 +287,38 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 		return fmt.Errorf("%w: private key in unhandled format %s", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid), block.Type)
 	}
 
-	// Look for the shadow secret, if it exists update it, otherwise create it.
-	currentShadowSecret, ok := c.k8s.Secrets.Get(name)
-	if !ok {
-		log.Info("Creating shadow TLS secret", "cluster", c.namespacedName())
+	return c.reconcileTLSSecrets(requestedShadowSecret)
+}
 
-		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedShadowSecret, metav1.CreateOptions{}); err != nil {
+// Reconciles TLS secrets by keeping the current state in sync with with incomming requests.
+func (c *Cluster) reconcileTLSSecrets(requestedSecret *corev1.Secret) error {
+	// Look the secret, if it exists update it, otherwise create it.
+	currentSecret, ok := c.k8s.Secrets.Get(requestedSecret.Name)
+	if !ok {
+		log.Info(fmt.Sprintf("Creating TLS secret `%s`", requestedSecret.Name), "cluster", c.namespacedName())
+
+		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedSecret, metav1.CreateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 
 		return nil
 	}
 
-	if reflect.DeepEqual(requestedShadowSecret.Data, currentShadowSecret.Data) {
+	// There is a difference between empty and nil in Go...
+	if len(requestedSecret.Data) == 0 && len(currentSecret.Data) == 0 {
 		return nil
 	}
 
-	log.Info("Updating shadow TLS secret", "cluster", c.namespacedName())
+	if reflect.DeepEqual(requestedSecret.Data, currentSecret.Data) {
+		return nil
+	}
 
-	updatedShadowSecret := currentShadowSecret.DeepCopy()
-	updatedShadowSecret.Data = requestedShadowSecret.Data
+	log.Info(fmt.Sprintf("Updating TLS secret `%s`", requestedSecret.Name), "cluster", c.namespacedName())
 
-	if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), updatedShadowSecret, metav1.UpdateOptions{}); err != nil {
+	updatedSecret := currentSecret.DeepCopy()
+	updatedSecret.Data = requestedSecret.Data
+
+	if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), updatedSecret, metav1.UpdateOptions{}); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
@@ -300,7 +337,7 @@ func tlsValid(member couchbaseutil.Member, cache *tlsCache, cert *x509.Certifica
 
 // reloadMemberCAs reloads the cluster CA certificates.
 func (c *Cluster) reloadMemberCAs(member couchbaseutil.Member) error {
-	ok, err := c.IsAtLeastVersion("7.1.0")
+	ok, err := c.RunningVersionIsAtLeast("7.1.0")
 	if err != nil {
 		return err
 	}
@@ -1434,7 +1471,6 @@ func (c *Cluster) reconcileTLSPreTopologyChange() error {
 	if _, err := c.state.Get(persistence.Upgrading); err == nil {
 		return nil
 	}
-
 	// When disabling TLS, this causes an "upgrade" to remove the TLS volume
 	// from the pods, and doesn't install certificates, leading to the client
 	// potentially failing to connect to the new pods.  If the user intends to

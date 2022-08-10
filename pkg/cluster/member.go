@@ -245,7 +245,15 @@ func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.
 		return newMember, err
 	}
 
-	if err := couchbaseutil.AddNode(newMember.GetDNSName(), c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
+	// Get dns name of member being added but reduce to plain text http if insecure annotation exists.
+	url := newMember.GetDNSName()
+
+	if _, ok := c.cluster.Annotations[constants.AddNodeInsecureAnnotation]; ok {
+		log.Info("Enforcing HTTP to add member", "cluster", c.namespacedName(), "name", newMember.Name())
+		url = newMember.GetHostURLPlaintext()
+	}
+
+	if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
 		return newMember, err
 	}
 

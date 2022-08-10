@@ -11,14 +11,20 @@ Together, Scopes and Collections change the game by making Couchbase one of the 
 At the same time, they provide data isolation which is very useful for high-density applications.
 
 We are introducing Scopes and Collections for Kubernetes deployments where Data Isolation and Dynamic Data Containment are very important use-cases, especially for modern application developments based on microservices architecture.
-With this release, Autonomous Operator has the ability to fully manage scopes and collections within a bucket. With Scopes and Collections, Autonomous Operator provides fine-grained access control and cross-datacenter-replication, and improved scalability.
+Couchbase Autonomous Operator can now manage scopes and collections within buckets.
+Specifically, this release adds the capability to "catalog" important operational aspects of Couchbase such as configurations, resource specifications, topology, and database settings to make it easier to deploy Couchbase in any other environment or cloud.
+
+Developers can also create new scopes and collections programmatically to support their modern microservices architectures and be assured that these will be managed autonomously once they are created.
+With Scopes and Collections, Autonomous Operator provides fine-grained access control and cross-datacenter-replication, and improved scalability.
 Migration from Couchbase Server 6.x to 7.x happens seamlessly with no additional steps required at your end.
 
 xref:concept-scopes-and-collections.adoc[Learn more] about how Scopes and Collections work in Autonomous Operator.
 
-== Self-Certify Autonomous Operator for any certified Kubernetes platform
+== Operator Self-Certification Lifecycle Tool
 
-We are introducing a self-certification tool that allows you to certify your platform and other platform specific components such as storage, networking for use with Autonomous Operator.
+We are introducing an operator self-certification lifecycle tool that removes barriers to adopting certified Kubernetes platforms.
+The self-certification lifecycle tool allows users to validate the compatibility of Kubernetes platforms and other platform-specific components such as storage and networking with Autonomous Operator.
+To be fully eligible for Couchbase support, users need to follow the xref:concept-platform-certification.adoc#what-is-the-self-certification-lifecycle-process[approval process for the validated platform].
 
 Today Autonomous Operator is tested and certified against a number of major platforms such as Amazon EKS, Google GKE, Microsoft AKS, and Red Hat OCP.
 Official certification is often a time-consuming process, so this has to be constrained. However, we understand that end users may not want to use one of the officially certified platforms for some of the reasons listed below:
@@ -52,5 +58,5 @@ In Couchbase Server 7.0 some new roles and RBAC settings have been added specifi
 
 == Couchbase Helm Chart
 
-Couchbase Helm Chart provides an alternate way to deploy Autonomous Operator and Couchbase Clusters on Kubernetes platforms. Hence, with every release.
-We plan to reconcile Couchbase Helm Chart with enhancements made to Autonomous Operator to maintain a consistent user experience.
+Using the xref:helm-couchbase-config.adoc[Couchbase Helm Chart] provides an alternative way to deploy the Couchbase Autonomous Operator, providing operators with an easy way to deploy, manage, and maintain Couchbase clusters.
+Keeping up with the new {operator-version-minor} enhancements in the Autonomous operator, the Couchbase Helm chart is kept up-to-date, delivering the best possible user experience.

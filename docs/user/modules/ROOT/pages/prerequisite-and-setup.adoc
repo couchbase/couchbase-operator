@@ -10,12 +10,13 @@ NOTE: For all supported software versions listed on this page, maintenance/patch
 
 == Couchbase Compatibility
 
-[IMPORTANT]
-====
-Couchbase Server versions 6.6-7.0 are susceptible to the 'log4shell' CVE, read https://blog.couchbase.com/what-to-know-about-the-log4j-vulnerability-cve-2021-44228/[our blog on this vulnerability^] for more details.
+Couchbase compatibility falls under these 3 categories:
 
-It is _strongly recommended_ that users upgrade to at least server version 6.6.4, or 7.0.3, when using the analytics service.
-====
+* *Unsupported*: This combination is not tested and is not within the scope of technical support if you have purchased a support agreement.
+
+* *Compatible*: This combination has been tested previously and should be compatible. Our technical support organization does not recommend this combination. You may run the xref:concept-platform-certification.adoc[] tooling to verify the Operator will work on a compatible platform. We therefore highly encourage the use of a supported platform version.
+
+* *Supported*: This combination is subject to ongoing quality assurance and is fully supported by our technical support organization.
 
 This release supports the deployment of the following Couchbase software:
 
@@ -75,6 +76,17 @@ This release supports the following versions of the Couchbase Fluent Bit image f
 
 .Operator Fluent Bit Compatibility
 image:compatibility-fluentbit.png[]
+
+[[couchbase-exporter-compatibility]]
+=== Couchbase Exporter Compatibility
+
+This release is compatible with all versions of the Couchbase Exporter image.
+The Couchbase Exporter images are all compatible with all versions of Couchbase Server that are supported by this release.
+
+[IMPORTANT]
+====
+With the release of Couchbase Server 7.0.0, Prometheus endpoints are built into Couchbase Server and as such, the exporter image is no longer required to expose metrics.
+====
 
 [[kubernetes-platform-compatibility]]
 == Kubernetes Compatibility

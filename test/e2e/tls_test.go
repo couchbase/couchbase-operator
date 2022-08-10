@@ -14,7 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // Create couchbase cluster over TLS certificates
@@ -841,19 +841,23 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonCreateClientAuth), 5*time.Minute)
-	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
+	// * Cluster upgrades (due to readiness becoming non-tls port)
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonCreateClientAuth)},
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
-		e2eutil.ClusterScaleUpSequence(1),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -887,18 +891,22 @@ func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePoli
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/networking/tls/clientCertificatePolicy"), time.Minute)
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonDeleteClientAuth), 5*time.Minute)
-	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
+	// * Cluster upgrades (due to readiness becoming non-tls port)
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonDeleteClientAuth)},
-		e2eutil.ClusterScaleUpSequence(1),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1420,7 +1428,7 @@ func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbas
 	// Enable N2N encryption and check the state is as we expect.
 	patchset := jsonpatch.NewPatchSet().Add("/spec/networking/tls", tls)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
 
@@ -1669,7 +1677,7 @@ func TestTLSEditSettings(t *testing.T) {
 
 // testMandatoryMutualTLSWithMultipleCAs tests that a cluster using server secrets from
 // various different sources, works with client certs from a different PKI.
-func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2eutil.TLSSource) {
+func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2eutil.TLSSource, multipleCAs bool) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -1682,7 +1690,7 @@ func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2e
 	clusterSize := constants.Size1
 	policy := couchbasev2.ClientCertificatePolicyMandatory
 
-	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: serverTLSSourceType})
+	serverTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: serverTLSSourceType, MultipleCAs: multipleCAs})
 	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &policy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
@@ -1699,13 +1707,25 @@ func testMandatoryMutualTLSWithMultipleCAs(t *testing.T, serverTLSSourceType e2e
 // TestMandatoryMutualTLSWithMultipleCAsAndKubernetesSecrets tests that a cluster using Kubernetes
 // server secrets (CA supplied separately), works with client certs from a different PKI.
 func TestMandatoryMutualTLSWithMultipleCAsAndKubernetesSecrets(t *testing.T) {
-	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceKubernetesSecret)
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceKubernetesSecret, false)
+}
+
+// TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndKubernetesSecrets tests that a cluster using Kubernetes
+// server secrets (CA supplied separately), works with client certs from a different PKI.
+func TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndKubernetesSecrets(t *testing.T) {
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceKubernetesSecret, true)
 }
 
 // TestMandatoryMutualTLSWithMultipleCAsAndCertManagerSecrets tests that a cluster using cert-manager
 // server secrets (CA integrated), works with client certs from a different PKI.
 func TestMandatoryMutualTLSWithMultipleCAsAndCertManagerSecrets(t *testing.T) {
-	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret)
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret, false)
+}
+
+// TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndCertManagerSecrets tests that a cluster using cert-manager
+// server secrets (CA integrated), works with client certs from a different PKI.
+func TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndCertManagerSecrets(t *testing.T) {
+	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret, true)
 }
 
 // TestMultipleCAsAddAndRemove tests that addition and removal of CAs works, and is

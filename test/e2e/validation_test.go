@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -339,7 +340,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 		e2eutil.Die(t, err)
 	}
 
-	// This is slow (entropy and modular exponetiation) so cache where possible,
+	// This is slow (entropy and modular exponentiation) so cache where possible,
 	// this will make tests 4x faster!
 	tlsCache := map[string]*e2eutil.TLSContext{}
 
@@ -494,7 +495,10 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 
 				if len(test.expectedErrors) > 0 {
 					for _, message := range test.expectedErrors {
-						if !strings.Contains(err.Error(), message) || message == "" {
+						// match all expected errors as regex strings
+						re := regexp.MustCompile(message)
+
+						if !re.Match([]byte(err.Error())) {
 							t.Logf("expected message: %v", message)
 							t.Logf("actual message: %v", err)
 							e2eutil.Die(t, fmt.Errorf("expected message not encountered"))
@@ -653,13 +657,13 @@ func TestNegValidationCreateCouchbaseClusterNetworking(t *testing.T) {
 			name:           "TestValidateTLSClientCertificatePathInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/clientCertificatePaths/0/path", "invalid")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths.path`},
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths(\[0\])?.path`},
 		},
 		{
 			name:           "TestValidateTLSClientCertificatePathRequired",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/networking/tls/clientCertificatePaths/0/path")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths.path`},
+			expectedErrors: []string{`spec.networking.tls.clientCertificatePaths(\[0\])?.path`},
 		},
 		{
 			name:           "TestValidateTLSClientCertificateNoPaths",
@@ -777,7 +781,7 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			name:           "TestValidateServerServicesEnumInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.Service("indxe"), couchbasev2.QueryService, couchbasev2.SearchService})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers.services"},
+			expectedErrors: []string{`spec.servers(\[0\])?.services(\[1\])?`},
 		},
 		{
 			name:           "TestValidateServerNameUnique",
@@ -789,13 +793,13 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			name:           "TestValidateServerServicesUnique",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.DataService})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[0].services"},
+			expectedErrors: []string{`spec.servers(\[0\])?.services`},
 		},
 		{
 			name:           "TestServerSizeRangeInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", -2)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers.size"},
+			expectedErrors: []string{`spec.servers(\[0\])?.size`},
 		},
 		{
 			name:           "TestNoDataService",
@@ -807,7 +811,7 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			name:           "TestValidateServerServerGroupsUnique",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/2/serverGroups", []string{"us-east-1a", "us-east-1b", "us-east-1a"})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[2].serverGroups"},
+			expectedErrors: []string{`spec.servers(\[2\])?.serverGroups`},
 		},
 	}
 
@@ -827,27 +831,27 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/metadata/name", "InvalidVolumeClaim")},
 			shouldFail: true,
 			expectedErrors: []string{
-				"spec.servers[0].default",
-				"spec.servers[1].default",
-				"spec.servers[1].data",
-				"spec.servers[1].index",
-				"spec.servers[1].analytics[0]",
-				"spec.servers[1].analytics[1]",
-				"spec.servers[2].default",
-				"spec.servers[4].default",
+				`spec.servers(\[0\])?.default`,
+				`spec.servers(\[1\])?.default`,
+				`spec.servers(\[1\])?.data`,
+				`spec.servers(\[1\])?.index`,
+				`spec.servers(\[1\])?.analytics(\[0\])?`,
+				`spec.servers(\[1\])?.analytics(\[1\])?`,
+				`spec.servers(\[2\])?.default`,
+				`spec.servers(\[4\])?.default`,
 			},
 		},
 		{
 			name:           "TestValidateLogsVolumeMountMutuallyExclusive_1",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/volumeMounts/logs", "couchbase")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[0].volumeMounts.default"},
+			expectedErrors: []string{`spec.servers(\[0\])?.volumeMounts.default`},
 		},
 		{
 			name:           "TestValidateLogsVolumeMountMutuallyExclusive_2",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/volumeMounts/default", "couchbase-log-pv")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[3].volumeMounts.default"},
+			expectedErrors: []string{`spec.servers(\[3\])?.volumeMounts.default`},
 		},
 		{
 			name:       "TestValidateDefaultVolumeMountRequiredForStatefulServices",
@@ -858,13 +862,13 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 			name:           "TestValidateServerServiceRequiredForVolumeMountData",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/0")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.servers[1].volumeMounts.data`},
+			expectedErrors: []string{`spec.servers(\[1\])?.volumeMounts.data`},
 		},
 		{
 			name:           "TestValidateServerServiceRequiredForVolumeMountIndex",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/3").Remove("/spec/servers/1/services/1")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.servers[1].volumeMounts.index`},
+			expectedErrors: []string{`spec.servers(\[1\])?.volumeMounts.index`},
 		},
 		{
 			name:       "TestValidateServerServiceRequiredForVolumeMountIndexSearchOnly",
@@ -875,7 +879,7 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 			name:           "TestValidateServerServiceRequiredForVolumeMountAnalytics",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/servers/1/services/2")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.servers[1].volumeMounts.analytics`},
+			expectedErrors: []string{`spec.servers(\[1\])?.volumeMounts.analytics`},
 		},
 	}
 
@@ -890,7 +894,7 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 			name:           "TestValidateVolumeClaimTemplateMustExist_" + mntName,
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/volumeMounts/"+mntField, "invalidClaim")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[1]." + mntName},
+			expectedErrors: []string{`spec.servers(\[1\])?.` + mntName},
 		}
 		testDefs = append(testDefs, testCase)
 	}
@@ -914,7 +918,7 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 				Replace("/spec/servers/0/volumeMounts/"+claimField, "couchbase").
 				Remove("/spec/servers/0/volumeMounts/default")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[0].volumeMounts"},
+			expectedErrors: []string{`spec.servers(\[0\])?.volumeMounts`},
 		}
 		testDefs = append(testDefs, testCase)
 	}
@@ -925,7 +929,7 @@ func TestNegValidationCreateCouchbaseClusterPersistentVolumes(t *testing.T) {
 			Replace("/spec/servers/0/volumeMounts/analytics", []string{"couchbase"}).
 			Remove("/spec/servers/0/volumeMounts/default")},
 		shouldFail:     true,
-		expectedErrors: []string{"spec.servers[0].volumeMounts"},
+		expectedErrors: []string{`spec.servers(\[0\])?.volumeMounts`},
 	}
 	testDefs = append(testDefs, testCase)
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1182,19 +1186,61 @@ func TestNegValidationCreateCouchbaseClusterXDCR(t *testing.T) {
 			name:           "TestValidateXDCRUUIDInvalid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/uuid", "cat")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.xdcr.remoteClusters.uuid`},
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.uuid`},
 		},
 		{
 			name:           "TestValidateXDCRHostnameInvalidName",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "illegal_dns")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.xdcr.remoteClusters.hostname`},
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
 		},
 		{
 			name:           "TestValidateXDCRHostnameInvalidPort",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "starsky-and-hutch.tv:huggy-bear")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.xdcr.remoteClusters.hostname`},
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameInvalidIpv6",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "0[2001:0000:1234:0000:0000:C1C0:ABCD:0876]")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameInvalidPrefix",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "hoopy://127.0.0.1")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameOnlyHttpPrefix",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameOnlyHttpsPrefix",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameOnlyCouchbasePrefix",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameOnlyCouchbasesPrefix",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
+		},
+		{
+			name:           "TestValidateXDCRHostnameInvalidIpv6BadCompression", // can only use one set of :: in an ipv6 address
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[3ffe:b00::1::a]")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.xdcr.remoteClusters(\[0\])?.hostname`},
 		},
 		{
 			name:           "TestValidateXDCRTLSSecretMissing",
@@ -1207,6 +1253,457 @@ func TestNegValidationCreateCouchbaseClusterXDCR(t *testing.T) {
 			mutations:      patchMap{"xdcr-tls-secret": jsonpatch.NewPatchSet().Remove("/data/ca")},
 			shouldFail:     true,
 			expectedErrors: []string{`xdcr tls secret xdcr-tls-secret for remote cluster starsky must contain key 'ca'`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestValidationCreateCouchbaseClusterXDCR(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv4",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://127.0.0.1")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv4WithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://127.0.0.1:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv4WithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://127.0.0.1:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv4",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://127.0.0.1")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv4WithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://127.0.0.1:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv4WithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://127.0.0.1:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv4",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://127.0.0.1")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv4WithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://127.0.0.1:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv4WithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://127.0.0.1:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv4",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://127.0.0.1")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv4WithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://127.0.0.1:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv4WithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://127.0.0.1:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv4",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "127.0.0.1")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv4WithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "127.0.0.1:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpHostname",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://abc.example.com")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpHostnameWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://abc.example.com:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpHostnameWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://abc.example.com:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsHostname",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://abc.example.com")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsHostnameWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://abc.example.com:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsHostnameWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://abc.example.com:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseHostname",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://abc.example.com")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseHostnameWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://abc.example.com:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseHostnameWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://abc.example.com:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesHostname",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://abc.example.com")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesHostnameWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://abc.example.com:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesHostnameWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://abc.example.com:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawHostname",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "abc.example.com")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawHostnameWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "abc.example.com:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawHostnameWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "abc.example.com:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6Http",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6HttpWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6HttpWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv6",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6HttpsWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6HttpsWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv6",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6CouchbaseWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6CouchbaseWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv6",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6CouchbasesWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6CouchbasesWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv6",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6RawWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameIpv6RawWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[2001:0000:0dea:C1AB:0000:00D0:ABCD:004E]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv6OmitPreceedingZeroes",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[1050:0:0:0:5:600:300c:326b]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv6OmitPreceedingZeroesWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[1050:0:0:0:5:600:300c:326b]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv6OmitPreceedingZeroesWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[1050:0:0:0:5:600:300c:326b]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv6OmitPreceedingZeroes",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[1050:0:0:0:5:600:300c:326b]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv6OmitPreceedingZeroesWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[1050:0:0:0:5:600:300c:326b]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv6OmitPreceedingZeroesWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[1050:0:0:0:5:600:300c:326b]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv6OmitPreceedingZeroes",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[1050:0:0:0:5:600:300c:326b]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv6OmitPreceedingZeroesWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[1050:0:0:0:5:600:300c:326b]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv6OmitPreceedingZeroesWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[1050:0:0:0:5:600:300c:326b]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv6OmitPreceedingZeroes",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[1050:0:0:0:5:600:300c:326b]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv6OmitPreceedingZeroesWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[1050:0:0:0:5:600:300c:326b]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv6OmitPreceedingZeroesWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[1050:0:0:0:5:600:300c:326b]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv6OmitPreceedingZeroes",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[1050:0:0:0:5:600:300c:326b]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv6OmitPreceedingZeroesWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[1050:0:0:0:5:600:300c:326b]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv6OmitPreceedingZeroesWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[1050:0:0:0:5:600:300c:326b]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv6Compact",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[ff06::c3]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv6CompactWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[ff06::c3]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpIpv6CombactWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "http://[ff06::c3]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv6Compact",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[ff06::c3]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv6CompactWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[ff06::c3]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameHttpsIpv6CombactWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "https://[ff06::c3]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv6Compact",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[ff06::c3]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv6CompactWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[ff06::c3]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbaseIpv6CombactWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbase://[ff06::c3]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv6Compact",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[ff06::c3]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv6CompactWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[ff06::c3]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameCouchbasesIpv6CombactWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "couchbases://[ff06::c3]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv6Compact",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[ff06::c3]")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv6CompactWithPort",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[ff06::c3]:8091")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
+			name:           "TestValidateXDCRHostnameRawIpv6CombactWithPortAndNetwork",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters/0/hostname", "[ff06::c3]:8091?network=abc")},
+			shouldFail:     false,
+			expectedErrors: []string{},
 		},
 	}
 
@@ -1231,7 +1728,7 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			name:           "TestValidateBucketQuotaOverflow",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
 			shouldFail:     true,
-			expectedErrors: []string{"bucket memory allocation (1001Mi) exceeds data service quota (600Mi) on cluster cluster"},
+			expectedErrors: []string{`bucket memory allocation \(1001Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
@@ -1396,19 +1893,19 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			name:           "TestValidateXDCRKeyspaceTooShort",
 			mutations:      patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().Replace("/explicitMapping/allowRules/0/sourceKeyspace/scope", "")},
 			shouldFail:     true,
-			expectedErrors: []string{`explicitMapping.allowRules.sourceKeyspace`}, // the regex validation does not give you the array index
+			expectedErrors: []string{`explicitMapping.allowRules(\[0\])?.sourceKeyspace`}, // the regex validation does not give you the array index
 		},
 		{
 			name:           "TestValidateXDCRKeyspaceTooLong",
 			mutations:      patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().Replace("/explicitMapping/allowRules/0/targetKeyspace/collection", "123456789012345678901234567890.1234567890123456789012345678901")},
 			shouldFail:     true,
-			expectedErrors: []string{`explicitMapping.allowRules.targetKeyspace`},
+			expectedErrors: []string{`explicitMapping.allowRules(\[0\])?.targetKeyspace`},
 		},
 		{
 			name:           "TestValidateXDCRKeyspaceInvalidFirstCharacter",
 			mutations:      patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().Replace("/explicitMapping/allowRules/0/targetKeyspace/scope", "_scopefail")},
 			shouldFail:     true,
-			expectedErrors: []string{`explicitMapping.allowRules.targetKeyspace`},
+			expectedErrors: []string{`explicitMapping.allowRules(\[0\])?.targetKeyspace`},
 		},
 		{
 			name: "TestValidateXDCRKeyspaceInvalidFirstCharacterCollection",
@@ -1416,7 +1913,7 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 				Replace("/explicitMapping/allowRules/0/targetKeyspace/scope", "scope").
 				Replace("/explicitMapping/allowRules/0/targetKeyspace/collection", "_collectionfail")},
 			shouldFail:     true,
-			expectedErrors: []string{`explicitMapping.allowRules.targetKeyspace`},
+			expectedErrors: []string{`explicitMapping.allowRules(\[0\])?.targetKeyspace`},
 		},
 		// Test that source and target keyspaces are the same size, i.e. either both contain collections or scopes only or neither.
 		{
@@ -1430,7 +1927,7 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 					Collection: "collection",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`explicitMapping.allowRules[0].sourceKeyspace`},
+			expectedErrors: []string{`explicitMapping.allowRules(\[0\])?.sourceKeyspace`},
 		},
 		// Test that a source collection is not permitted to be mapped (by means of multiple rules) to multiple target collections.
 		{
@@ -1451,7 +1948,7 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 					Scope:      "scope0",
 					Collection: "collection0"})},
 			shouldFail:     true,
-			expectedErrors: []string{`explicitMapping.allowRules[1].sourceKeyspace`},
+			expectedErrors: []string{`explicitMapping.allowRules(\[1\])?.sourceKeyspace`},
 		},
 		// Test that multiple source collections are not permitted to be mapped (by means of multiples rules) to a single target collection.
 		{
@@ -1473,7 +1970,7 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 					Collection: "lola",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`explicitMapping.allowRules[1].targetKeyspace`},
+			expectedErrors: []string{`explicitMapping.allowRules(\[1\])?.targetKeyspace`},
 		},
 		// Test that if you have an allow rule for a scope you do not have a more specific allow rule for a
 		// collection inside it, but you can have a deny rule for a collection.
@@ -1482,7 +1979,7 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			mutations: patchMap{"replicationscopesandcollections": jsonpatch.NewPatchSet().
 				Replace("/explicitMapping/allowRules/1/sourceKeyspace/scope", "scope0")},
 			shouldFail:     true,
-			expectedErrors: []string{`explicitMapping.allowRules[1].sourceKeyspace`},
+			expectedErrors: []string{`explicitMapping.allowRules(\[1\])?.sourceKeyspace`},
 		},
 		// Test that for migration you can only have one rule if using the _default collection as the source.
 		{
@@ -1490,7 +1987,7 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			mutations: patchMap{"migrationscopesandcollections": jsonpatch.NewPatchSet().
 				Replace("/migrationMapping/mappings/0/filter", "_default._default")},
 			shouldFail:     true,
-			expectedErrors: []string{`migrationMapping.mappings[0].filter`},
+			expectedErrors: []string{`migrationMapping.mappings(\[0\])?.filter`},
 		},
 		// Test that you cannot have migration and replication rules together in the same definition
 		{
@@ -1762,7 +2259,7 @@ func TestNegValidationCreateCouchbaseScopesAndCollections(t *testing.T) {
 			name:           "TestValidateScopeSelectorTypeIllegal",
 			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Replace("/spec/collections/resources/0/kind", "CouchbaseScope")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.collections.resources.kind`},
+			expectedErrors: []string{`spec.collections.resources(\[0\])?.kind`},
 		},
 		// Check that bucket scope collection is working.  This shared between
 		// couchbase and ephemeral buckets, so we only need to do this once.
@@ -1770,7 +2267,7 @@ func TestNegValidationCreateCouchbaseScopesAndCollections(t *testing.T) {
 			name:           "TestValidateBucketSelectorTypeIllegal",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/scopes/resources/0/kind", "CouchbaseCollection")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.scopes.resources.kind`},
+			expectedErrors: []string{`spec.scopes.resources(\[0\])?.kind`},
 		},
 		// Check TTLs are working.
 		{
@@ -1939,7 +2436,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 			name:           "TestValidateDataServiceMemoryQuotaDefault",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/dataServiceMemoryQuota")},
 			shouldFail:     true,
-			expectedErrors: []string{"bucket memory allocation (500Mi) exceeds data service quota (256Mi) on cluster cluster"},
+			expectedErrors: []string{`bucket memory allocation \(500Mi\) exceeds data service quota \(256Mi\) on cluster cluster`},
 		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -2015,7 +2512,7 @@ func TestNegValidationApply(t *testing.T) {
 			name:           "TestValidateServerServicesImmutable",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/services/0", "analytics")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[0].services"},
+			expectedErrors: []string{`spec.servers(\[0\])?.services`},
 		},
 		// Validation for logRetentionTime and logRetentionCount field
 		{
@@ -2073,7 +2570,7 @@ func TestNegValidationApply(t *testing.T) {
 			name:           "TestValidateApplyServerServicesImmutable_" + string(serviceToSkip),
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/1/services", fieldValueToUse)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[1].services"},
+			expectedErrors: []string{`spec.servers(\[1\])?.services`},
 		}
 		testDefs = append(testDefs, testCase)
 	}
@@ -2087,7 +2584,7 @@ func TestNegValidationApply(t *testing.T) {
 			name:           "TestValidateApplyServerServicesImmutable_" + string(serviceName),
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", fieldValueToUse)},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[3].services"},
+			expectedErrors: []string{`spec.servers(\[3\])?.services`},
 		}
 		testDefs = append(testDefs, testCase)
 	}
@@ -2187,13 +2684,13 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name:           "TestValidateApplyServerServicesImmutable_1",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.IndexService, couchbasev2.SearchService})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[0].services"},
+			expectedErrors: []string{`spec.servers(\[0\])?.services`},
 		},
 		{
 			name:           "TestValidateApplyServerServicesImmutable_2",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/services", couchbasev2.ServiceList{couchbasev2.DataService, couchbasev2.DataService})},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.servers[0].services"},
+			expectedErrors: []string{`spec.servers(\[0\])?.services`},
 		},
 		{
 			name:           "TestValidateApplyIndexStorageSettingsImmutable",
@@ -2248,7 +2745,7 @@ func TestRBACValidationCreate(t *testing.T) {
 			mutations:      patchMap{"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "default")},
 			validations:    patchMap{"admin-group": jsonpatch.NewPatchSet().Test("/spec/roles/0/bucket", "default")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.roles[0].bucket"},
+			expectedErrors: []string{`spec.roles(\[0\])?.bucket`},
 		},
 		{
 			name:           "TestValidateUnkownDomain",
@@ -2276,7 +2773,7 @@ func TestRBACValidationCreate(t *testing.T) {
 			name:           "TestRejectInvalidBucketName",
 			mutations:      patchMap{"data-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/bucket", "default#bucket")},
 			shouldFail:     true,
-			expectedErrors: []string{"spec.roles.bucket"},
+			expectedErrors: []string{`spec.roles(\[0\])?.bucket`},
 		},
 	}
 

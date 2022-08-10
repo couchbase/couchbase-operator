@@ -786,8 +786,8 @@ func TestGSIWithCollections(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Couchbase Cluster Instance.
-	host := e2eutil.MustGetCBInstance(t, kubernetes, cluster)
-	defer host.Close(nil)
+	host, sdkCleanup := e2eutil.MustGetCouchbaseClientSDK(t, kubernetes, cluster)
+	defer sdkCleanup()
 
 	// Instance to manage Indexes.
 	queryManager := host.QueryIndexes()

@@ -145,11 +145,12 @@ kind: CouchbaseCluster
 metadata:
   name: my-cluster
 spec:
-  rbac:
-    managed: true
-    selector:
-      matchLabels:
-        cluster: my-cluster
+  security:
+    rbac:
+      managed: true
+      selector:
+        matchLabels:
+          cluster: my-cluster
 ----
 
 The `CouchbaseCluster` resource configuration above will only select `CouchbaseUser` and `CouchbaseGroup` resources that are labeled with `cluster: my-cluster`.
