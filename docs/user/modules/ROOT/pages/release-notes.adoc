@@ -99,6 +99,44 @@ This change will affect all users of logging, and will require a cluster upgrade
 Additionally a bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
 This has been fixed so that logs older than or equal to the time period are cleaned.
 
+[#release-v232]
+== Release 2.3.2
+
+Couchbase Autonomous Operator 2.3.2 was released in August 2022.
+
+=== New Features and Behavioral Changes
+
+==== Golang Compiler Upgraded
+
+The Golang compiler used by couchbase-exporter has been upgraded to version 1.18.4 to maintain compatibility and take advantage of improvements in the compiler.
+
+=== Fixed Issues
+
+[#table-fixed-issues-v232,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2779[K8S-2779]
+a| *Summary:* The backup sidecar used by the Operator expects secrets to contain a "ca.crt" field as used by cert-manager.
+The specified secret is mounted to the backup pod, and passes the '/path/ca.crt' argument to the backup.
+
+Native Kubernetes secrets do not contain the ca.crt argument, causing backups to fail when TLS
+is enabled.
+
+Beginning in this release, the Operator is able to use either type of certificate for backup.
+a| https://issues.couchbase.com/browse/K8S-2795[K8S-2795]
+a| In prior releases, native TLS secrets were incompatible with the Exporter, causing Exporter to
+fail when used with a configured cluster.
+
+Beginning in Operator 2.3.2, Exporter can accept TLS secrets in the native format.
+a| https://issues.couchbase.com/browse/K8S-2803[K8S-2803]
+a| In previous versions of Couchbase Operator, an incorrect flag for --disable-ft-alias was passed
+to the backup process, causing it to fail.
+
+This flag has been corrected beginning in version 2.3.2.
+|===
+
+
 [#release-v231]
 == Release 2.3.1
 
@@ -108,37 +146,59 @@ Couchbase Autonomous Operator 2.3.1 was released in July 2022.
 
 ==== Operator Recognizes and Distinguishes Server Containers
 
-Versions of Couchbase Server available in the Red Hat Container Catalog 
-lacked SHA-256 tagging to allow the Operator to distinguish between versions. As of release 2.3.1 
+Versions of Couchbase Server available in the Red Hat Container Catalog
+lacked SHA-256 tagging to allow the Operator to distinguish between versions. As of release 2.3.1,
 all versions of Couchbase Server are recognizable and distinguishable by the Operator.
 
 ==== Support for Additional User Roles
 
 Previously, Couchbase Autonomous Operator did not support the role "external_stats_reader", which
 is supported by Couchbase Server. This led to the Operator being unable to validate users with roles
-that were valid for Couchbase Server. This release adds support for "external_stats_reader" and allows 
+that were valid for Couchbase Server. This release adds support for "external_stats_reader" and allows
 use of this supported role.
+
+==== The Operator now checks both locations when using user TLS certificates.
+
+In previous versions in order to derive multiple Root CA certificates,
+the Operator required multiple secrets, delivered in multiple files. This is inconsistent
+with the wider implementation of multiple certificates. Version 2.3.1 can derive multiple
+root certificates from a single secrets file.
 
 === Fixed Issues
 
 [#table-fixed-issues-v231,cols="25,66"]
 |===
 | Issue | Description
+//a| https://issues.couchbase.com/browse/K8S-2750[K8S-2750^]
+//a| *Summary:* When using user-provided TLS certificates, the Operator Helm chart defaulted
+//to checking only tls.static for the location of secrets. Secrets could also be provided
+//via tls.secretSource.
+//a| https://issues.couchbase.com/browse/K8S-2741[K8S-2741^]
+//a| *Summary* Upgrading from Couchbase Server 7.0.3 to 7.1.0 while TLS is enabled caused an
+//API access issue that resulted in a crash loop. This condition has been corrected in Operator 2.3.1.
+//a| https://issues.couchbase.com/browse/K8S-2739[K8S-2739^]
+//a| *Summary* Using an Azure file as a storage class caused a failure during backup due to
+//an improperly set Create flag in the Mount Options. This condition has been corrected in 2.3.1
+//a| https://issues.couchbase.com/browse/K8S-2727[K8S-2727^]
+//a| *Summary* The Operator was not reconciling RBAC user roles with cluster user roles.
+//This was due to an incomplete specification of cluster roles, resulting in user role assignments
+//not being completed.
+//This condition is corrected in 2.3.1
 a| https://issues.couchbase.com/browse/K8S-2717[K8S-2717^]
-a| *Summary* Previously there was no way to set the storage class used for the artifact logs 
+a| *Summary* Previously there was no way to set the storage class used for the artifact logs
 used during certification. This resulted in the storage class "default" always being used when
-running "cao certify". Setting the storage class only affects the volumes created during the 
-test, but not the volume used to store the results. 
+running "cao certify". Setting the storage class only affects the volumes created during the
+test, but not the volume used to store the results.
 The workaround is to delete the default storage class and recreate it with the same specification
 as the storage class passed by the "-storage-class" argument.
 a| https://issues.couchbase.com/browse/K8S-2698[K8S-2698^]
 a| *Summary* There was a mismatch between the restore process and the CRD. The repository
-required by the CRD was optional for the restore process, which sometimes resulted in an 
+required by the CRD was optional for the restore process, which sometimes resulted in an
 empty field in the JSON document used by both, causing an error in the CRD.
 This situation is corrected in 2.3.1.
 a| https://issues.couchbase.com/browse/K8S-2676[K8S-2676^]
-a| *Summary* Previously Operator did not support use of a raw IPv6 address for 
-cross datacenter replication (XDCR). Version 2.3.1 allows use of a raw IPv6 address in 
+a| *Summary* Previously Operator did not support use of a raw IPv6 address for
+cross datacenter replication (XDCR). Version 2.3.1 allows use of a raw IPv6 address in
 this context.
 |===
 
@@ -194,7 +254,7 @@ spec:
   repo: ""
 ----
 
-a| https://issues.couchbase.com/browse/K8S-2713[K8S-2713] 
+a| https://issues.couchbase.com/browse/K8S-2713[K8S-2713]
 a| *Summary*:
 Due to a mismatch between the catalog version of our backup image and the version recommended by the certification tool, you will need to override the default backup used for certification with OpenShift.
 The override can be provided via:
@@ -231,7 +291,7 @@ Note that removing `pattern` will disable any validation on this field (i.e. if 
 Contact the https://support.couchbase.com[Couchbase Support team] for further help on this workaround.
 
 a| https://issues.couchbase.com/browse/K8S-2717[K8S-2717]
-a| *Summary*: 
+a| *Summary*:
 At this point in time, you cannot set the storage class used for the artifact logs during certification.
 This means the `default` storage class is always used when running the `cao certify` command. +
 Passing the `-storage-class` flag to the command will only affect volumes created during test, but *not* the volume used to store test results.
@@ -246,6 +306,9 @@ Couchbase Autonomous Operator 2.3.0-beta1 was released in October 2021.
 
 [#changes-in-behavior-v230-beta1]
 === New Features and Behavioral Changes
+
+==== Support for Couchbase Server 7.1.x
+Couchbase Autonomous Operator 2.3.0-beta1 includes support for Coucbhase Server 7.1.x.
 
 === Logging Defaults
 The new default image for logging is `couchbase/fluent-bit:1.1.1`.
