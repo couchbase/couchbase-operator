@@ -303,7 +303,7 @@ Note that running tests is a good thing but target the effort at the areas chang
 To run tests:
 
 . In Gerrit click `Download` and copy the git reference that looks like `refs/changes/88/136688/2`.
-. Navigate to https://jenkins.spjmurray.co.uk/job/couchbase-operator-continuous-integration/[Jenkins CICD job^]
+. Navigate to https://cloud-native.jenkins.couchbase.com/job/couchbase-operator-continuous-integration/[Jenkins CICD job^]
 . Select `build with parameters` and replace the `refspec` with the one you have just copied from Gerrit.
 . Add any other parameters (especially suites), and click `build`.
 
