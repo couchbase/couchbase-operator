@@ -115,10 +115,10 @@ spec:
     server:
       enabled: true
       manageConfiguration: true # <.>
-      configurationName: “fluent-bit-config” # <.>
+      configurationName: "fluent-bit-config" # <.>
       sidecar:
-        image: couchbase/{logging-version}” # <.>
-        configurationMountPath: “/fluent-bit/config/”
+        image: "couchbase/{logging-version}" # <.>
+        configurationMountPath: "/fluent-bit/config/"
         resources:
           requests:
             cpu: 100m
@@ -172,10 +172,10 @@ spec:
     server:
       enabled: true
       manageConfiguration: false # <.>
-      configurationName: fluent-bit-config” # <.>
+      configurationName: "fluent-bit-config" # <.>
       sidecar:
-        image: couchbase/{logging-version}” # <.>
-        configurationMountPath: “/fluent-bit/config/” # <.>
+        image: "couchbase/{logging-version}" # <.>
+        configurationMountPath: "/fluent-bit/config/" # <.>
         resources:
           requests:
             cpu: 100m
