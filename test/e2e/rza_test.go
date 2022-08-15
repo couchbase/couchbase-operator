@@ -546,3 +546,142 @@ func TestServerGroupReplaceGroup(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestGlobalServerGroupsAddsToPodNodeSelector tests the addition of spec.ServerGroups to the nodeSlector for pods
+// to show that it's appended as a new entry to nodeselector rather than overriding any other keys.
+func TestGlobalServerGroupsAddsToPodNodeSelector(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	// Create cluster spec for RZA feature
+	clusterSize := 3
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	nodes := e2eutil.MustNodes(t, kubernetes)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{}
+
+	region := getRegionFromNodeWithFailureDomainRegionLabel(nodes)
+	if region != "" {
+		cluster.Spec.Servers[0].Pod.Spec.NodeSelector = map[string]string{
+			constants.FailureDomainRegionLabel: region,
+		}
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Expected only spec.servers.pod.spec.nodeSelector to be added
+	expectedNodeSelLabels := map[string]string{
+		constants.FailureDomainRegionLabel: region,
+	}
+
+	e2eutil.MustCheckPodSpecAnnotationsForNodeSelector(t, kubernetes, cluster, expectedNodeSelLabels)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", availableServerGroups[:1]), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Expected one of spec.serverGroups to be added, after patch
+	expectedNodeSelLabels = map[string]string{
+		constants.FailureDomainRegionLabel: region,
+		constants.FailureDomainZoneLabel:   availableServerGroups[:1][0],
+	}
+
+	e2eutil.MustCheckPodSpecAnnotationsForNodeSelector(t, kubernetes, cluster, expectedNodeSelLabels)
+}
+
+// TestServersServerGroupsAddsToPodNodeSelector tests the addition of spec.Servers.ServerGroups to the nodeSlector for pods
+// to show that it's appended as a new entry to nodeselector rather than overriding any other keys.
+func TestServersServerGroupsAddsToPodNodeSelector(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	// Create cluster spec for RZA feature
+	clusterSize := 3
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	nodes := e2eutil.MustNodes(t, kubernetes)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{}
+
+	region := getRegionFromNodeWithFailureDomainRegionLabel(nodes)
+	if region != "" {
+		cluster.Spec.Servers[0].Pod.Spec.NodeSelector = map[string]string{
+			constants.FailureDomainRegionLabel: region,
+		}
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Expected only spec.servers.pod.spec.nodeSelector to be added
+	expectedNodeSelLabels := map[string]string{
+		constants.FailureDomainRegionLabel: region,
+	}
+
+	e2eutil.MustCheckPodSpecAnnotationsForNodeSelector(t, kubernetes, cluster, expectedNodeSelLabels)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", availableServerGroups[:1]), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Expected one of spec.serverGroups to be added, after patch
+	expectedNodeSelLabels = map[string]string{
+		constants.FailureDomainRegionLabel: region,
+		constants.FailureDomainZoneLabel:   availableServerGroups[:1][0],
+	}
+
+	e2eutil.MustCheckPodSpecAnnotationsForNodeSelector(t, kubernetes, cluster, expectedNodeSelLabels)
+
+	// Patch the spec.serverGroups with first two serverGroups from availableServerGroups
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", availableServerGroups[:2]), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	if len(availableServerGroups) >= 3 {
+		// Patch the cluster spec.servers.serverGroups with second serverGroup from availableServerGroups
+		servGrps := availableServerGroups[1:2]
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/serverGroups", servGrps), time.Minute)
+		e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+		// Expected to `add` the `common matching` spec.serverGroups and spec.servers.serverGroups to pod nodeSelector
+		expectedNodeSelLabels := map[string]string{
+			constants.FailureDomainZoneLabel:   availableServerGroups[1:2][0],
+			constants.FailureDomainRegionLabel: region,
+		}
+
+		e2eutil.MustCheckPodSpecAnnotationsForNodeSelector(t, kubernetes, cluster, expectedNodeSelLabels)
+	}
+}
+
+func getRegionFromNodeWithFailureDomainRegionLabel(nodes []*corev1.Node) string {
+	for _, node := range nodes {
+		// All nodes must have a region
+		region, ok := node.Labels[constants.FailureDomainRegionLabel]
+		if ok {
+			return region
+		}
+	}
+
+	return ""
+}

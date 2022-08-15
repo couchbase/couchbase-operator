@@ -212,6 +212,8 @@ func registerTests() {
 		framework.NewTestDef(TestServerGroupAddGroup).WithTags(TagSuiteP0, TagFeatureServerGroups, TagSuitePlatform),
 		framework.NewTestDef(TestServerGroupRemoveGroup).WithTags(TagSuiteP0, TagFeatureServerGroups),
 		framework.NewTestDef(TestServerGroupReplaceGroup).WithTags(TagSuiteP0, TagFeatureServerGroups),
+		framework.NewTestDef(TestGlobalServerGroupsAddsToPodNodeSelector).WithTags(TagSuiteP0, TagFeatureServerGroups),
+		framework.NewTestDef(TestServersServerGroupsAddsToPodNodeSelector).WithTags(TagSuiteP0, TagFeatureServerGroups),
 		framework.NewTestDef(TestPersistentVolumeAutoFailover).WithTags(TagSuiteP0, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestPersistentVolumeAutoRecovery).WithTags(TagSuiteP0, TagSuitePlatform, TagFeaturePersistentVolumes, TagFeatureRecovery),
 		framework.NewTestDef(TestPersistentVolumeKillAllPodsTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeaturePersistentVolumes, TagSuitePlatform),

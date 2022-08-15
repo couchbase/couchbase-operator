@@ -41,8 +41,9 @@ var (
 
 // Labels for K8S nodes.
 var (
-	NodeRoleMasterLabel    = "node-role.kubernetes.io/master"
-	FailureDomainZoneLabel = util_const.ServerGroupLabel
+	NodeRoleMasterLabel      = "node-role.kubernetes.io/master"
+	FailureDomainZoneLabel   = util_const.ServerGroupLabel
+	FailureDomainRegionLabel = util_const.TopologyRegionLabel
 )
 
 // Operator constants.
@@ -99,4 +100,9 @@ const (
 // test secrets Label.
 const (
 	TestLabelSelector = "couchbaseqe"
+)
+
+// Pod level keys and fields.
+const (
+	PodSpecAnnotation = "pod.couchbase.com/spec"
 )

@@ -38,7 +38,7 @@ func (c *Cluster) getServerGroups() []string {
 }
 
 // createServerGroups creates any server groups defined in the specification
-// whuch Couchbase doesn't know about.
+// which Couchbase doesn't know about.
 func (c *Cluster) createServerGroups(existingGroups *couchbaseutil.ServerGroups) error {
 	serverGroups := c.getServerGroups()
 
@@ -143,7 +143,10 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 
 			// TODO: should we flag this as a warning and leave it where it is?
 			if scheduledServerGroup == "" {
-				return false, fmt.Errorf("%w: server group unset for pod %s", errors.NewStackTracedError(errors.ErrCouchbaseServerError), podName)
+				// Flagging this as a WARNING and returns false if no serverGroup found for the existing pod
+				// This is very likely to happen when spec.ServerGroups are added to the couchbasecluster manifest later
+				fmt.Printf("\nWARNING: %s: server group unset for pod %s", errors.ErrCouchbaseServerError.Error(), podName)
+				return false, nil
 			}
 
 			// If the node is in the wrong server group schedule an update

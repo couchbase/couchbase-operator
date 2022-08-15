@@ -1234,6 +1234,16 @@ func MustNumNodesAbsolute(t *testing.T, k8s *types.Cluster) int {
 	return len(nodes.Items)
 }
 
+// MustNodes returns the nodes in the cluster.
+func MustNodes(t *testing.T, k8s *types.Cluster) []*v1.Node {
+	nodes, err := getSchedulableNodes(k8s)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return nodes
+}
+
 // MustNumNodes returns the number of nodes in the cluster.
 func MustNumNodes(t *testing.T, k8s *types.Cluster) int {
 	nodes, err := getSchedulableNodes(k8s)

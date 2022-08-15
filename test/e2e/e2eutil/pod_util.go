@@ -2,7 +2,9 @@ package e2eutil
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -121,6 +124,39 @@ func checkCustomAnnotationAndLabels(k8s *types.Cluster, couchbase *couchbasev2.C
 		err = checkPodMaps(pod.Labels, labels, pod.Name, "label")
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func MustCheckPodSpecAnnotationsForNodeSelector(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedNodeSelLabel map[string]string) {
+	err := checkPodSpecAnnotationsForNodeSelector(k8s, couchbase, expectedNodeSelLabel)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func checkPodSpecAnnotationsForNodeSelector(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedNodeSelLabel map[string]string) error {
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		return err
+	}
+
+	for _, pod := range pods.Items {
+		actualSpec := &v1.PodSpec{}
+		if annotation, ok := pod.Annotations[constants.PodSpecAnnotation]; ok {
+			if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
+				return err
+			}
+		}
+
+		if !reflect.DeepEqual(actualSpec.NodeSelector, expectedNodeSelLabel) {
+			return fmt.Errorf("expected nodeSelector %v, but actual nodeSelector %v on pod %s", expectedNodeSelLabel, actualSpec.NodeSelector, pod.Name)
 		}
 	}
 

@@ -161,6 +161,7 @@ func (c *Cluster) reconcilePods() error {
 
 		serverGroup := ""
 
+		// Checks existing NodeSelectors on the pod
 		if actual.Spec.NodeSelector != nil {
 			if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
 				serverGroup = group
@@ -212,7 +213,7 @@ func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, ser
 			}
 		}
 
-		// Check the rescheuling information for any overrides.
+		// Check the rescheduling information for any overrides.
 		for _, move := range moves {
 			if move.Name == member.Name() {
 				serverGroup = move.To

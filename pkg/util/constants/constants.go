@@ -96,7 +96,8 @@ const (
 	AnnotationPrometheusPath   = "prometheus.io/path"
 	AnnotationPrometheusPort   = "prometheus.io/port"
 
-	ServerGroupLabel = corev1.LabelTopologyZone
+	ServerGroupLabel    = corev1.LabelTopologyZone
+	TopologyRegionLabel = corev1.LabelTopologyRegion
 
 	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
 	DNSAnnotation = "external-dns.alpha.kubernetes.io/hostname"

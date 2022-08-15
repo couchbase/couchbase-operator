@@ -721,9 +721,9 @@ func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
 // in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
-func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig, serverGroup string, pvcState *PersistentVolumeClaimState, image string) (*v1.Pod, error) {
+func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, serverConfig couchbasev2.ServerConfig, serverGroupZone string, pvcState *PersistentVolumeClaimState, image string) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
-	container := couchbaseContainer(cluster, &config, image)
+	container := couchbaseContainer(cluster, &serverConfig, image)
 
 	// The readiness probe does a TCP check against Couchbase Server to determine
 	// whether NS server is running.  It may not be actually functional, but it's
@@ -755,12 +755,12 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	// Use the user provided Pod template if provided.
 	pod := &v1.Pod{}
 
-	if config.Pod != nil {
+	if serverConfig.Pod != nil {
 		// Always copy from cached data, don't modify the cache.
 		// Cache data is only updated when something has changed,
 		// any changes you make will linger and cause unexpected
 		// things to happen...
-		podTemplate := config.Pod.DeepCopy()
+		podTemplate := serverConfig.Pod.DeepCopy()
 
 		pod.ObjectMeta = podTemplate.ObjectMeta.ToObjectMeta()
 		pod.Spec = podTemplate.Spec
@@ -768,7 +768,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 
 	// For metadata, override the name and merge the labels and annotations.
 	pod.Name = m.Name()
-	pod.Labels = mergeLabels(pod.Labels, createCouchbasePodLabels(m.Name(), cluster.Name, config))
+	pod.Labels = mergeLabels(pod.Labels, createCouchbasePodLabels(m.Name(), cluster.Name, serverConfig))
 	ApplyBaseAnnotations(pod)
 
 	// Populate the main specification, overriding whatever the template specified.
@@ -785,7 +785,23 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		},
 	}
 
-	applyPodScheduling(cluster, pod, serverGroup)
+	// This attribute can even be added later to manifest and that won't cause an error anymore
+	// see reconcileServerGroups() for more details.
+	globalServerGroup := serverConfig.ServerGroups
+
+	// If serverGroupZone is empty,
+	// the pod will be scheduled based ONLY on the matching AZs declared in manifest
+	// for spec.serverGroups and spec.servers.serverGroups
+
+	// NOTE: you could still get FailedScheduling if there is no node available with the ServerGroup label.
+	// Any other way than describing the pod to know the error? Can we log it out via Fluent?
+	if commonSg := couchbaseutil.FindFirstCommon(globalServerGroup, cluster.Spec.ServerGroups); commonSg != "" {
+		if serverGroupZone == "" {
+			serverGroupZone = commonSg
+		}
+	}
+
+	applyPodScheduling(cluster, pod, serverGroupZone)
 	applyPodNetworking(cluster, pod, m)
 	applyPodStorage(pod, pvcState)
 	applyPodLogging(cluster, pod)
@@ -833,7 +849,7 @@ func applyContainerStorage(container *v1.Container, pvcState *PersistentVolumeCl
 }
 
 // applyPodScheduling adds any scheduling to place the pods in the right place.
-func applyPodScheduling(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, serverGroup string) {
+func applyPodScheduling(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, serverGroupZone string) {
 	// If anti-affinity is set then ensure no two pods from the same cluster
 	// run on the same hosts.
 	if cluster.Spec.AntiAffinity {
@@ -844,12 +860,12 @@ func applyPodScheduling(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, serv
 	// we are recovering from a pod deletion, and we have to place the pod in the
 	// same AZ as the volume from which it is recovering.  Pods are scheduled where
 	// they want, irrespective of existing volumes (is this still the case??)
-	if serverGroup != "" {
+	if serverGroupZone != "" {
 		if pod.Spec.NodeSelector == nil {
 			pod.Spec.NodeSelector = map[string]string{}
 		}
-
-		pod.Spec.NodeSelector[constants.ServerGroupLabel] = serverGroup
+		// Adds or replaces here
+		pod.Spec.NodeSelector[constants.ServerGroupLabel] = serverGroupZone
 	}
 }
 
