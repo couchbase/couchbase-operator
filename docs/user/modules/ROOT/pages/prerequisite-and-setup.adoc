@@ -138,6 +138,10 @@ Bottlerocket is a Linux-based open-source operating system that is purpose-built
 To create an EKS cluster with Bottlerocket OS, follow the steps https://github.com/bottlerocket-os/bottlerocket/blob/develop/QUICKSTART-EKS.md[here^].
 ====
 
+=== Multiple Architectures
+
+While it is technically possible to build a K8s cluster with multiple architectures in it, we currently do not test or support this.
+
 [#compatibility-pv]
 == Persistent Volume Compatibility
 
