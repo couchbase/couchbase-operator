@@ -75,14 +75,14 @@ spec:
         - "@eventing/local"
         - "@cbq-engine/local"
       rotation:
-        interval: “15m”
-        size: “20Mi”
+        interval: "15m"
+        size: "20Mi"
       garbageCollection:
         sidecar:
           enabled: true # <.>
           image: "{logging-helper}" # <.>
-          age: “1h”
-          interval: “20m”
+          age: "1h"
+          interval: "20m"
           resources:
             requests:
               cpu:
@@ -112,6 +112,8 @@ This sidecar is a standard Linux container that only needs to find and remove fi
 Be aware that there are security concerns with using a standard Linux image, such as the potential for arbitrary shell execution and write-access to the volumes, which can potentially be exploited by a malicious image.
 In order to limit potential abuse, the garbage collection sidecar uses a sub-path to only mount the logs directory.
 In addition, the commands run by the garbage collector are not configurable, and the filenames of removed logs are printed to the garbage collector's standard output.
++
+NOTE: OpenShift users should locate Red Hat's Universal Base Image within the https://catalog.redhat.com/software/containers/search[Container Catalog^] for auditing as it contains the necessary utilities for cleaning and rotating logs.
 
 After enabling automated audit logging, you should take care only to use the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification for making further modifications to the audit logging configuration.
 Manual changes that are made to the configuration via the Couchbase UI, CLI, or REST API (such as changing the audit log directory) are not prevented by the Autonomous Operator, and can cause audit logging failures.
