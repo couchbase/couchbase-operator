@@ -108,10 +108,10 @@ PRODUCT := couchbase-autonomous-operator
 VERSION ?= 2.4.0
 BLD_NUM ?= 999
 
-# This controls the build version of docker used.
-# The only caveat, is the build system doesn't use this as the source
-# of truth, so you'll want to update the defaults found in ./docker/...
-GO_VERSION := 1.17.2
+# This controls the golang version of the docker container used
+# to build binaries. This version takes precedence over the build
+# version specified by the build system.
+GO_VERSION := 1.18.3
 
 # Short cut for setting the platform across all targets.
 PLATFORM := kubernetes
@@ -325,12 +325,13 @@ TOOLS_PACKAGE_FILES := \
 	crd.yaml \
 	couchbase-cluster.yaml \
 	sync-gateway.yaml \
+	pillowfight-data-loader.yaml \
 	bin/cao$(EXE_SUFFIX) \
 	bin/cbopcfg$(EXE_SUFFIX) \
 	bin/cbopinfo$(EXE_SUFFIX)
 
 ifeq ($(TARGET_PLATFORM),kubernetes)
-TOOLS_PACKAGE_FILES += network-policies.yaml pillowfight-data-loader.yaml
+TOOLS_PACKAGE_FILES += network-policies.yaml
 endif
 
 ifeq ($(TARGET_PLATFORM),openshift)

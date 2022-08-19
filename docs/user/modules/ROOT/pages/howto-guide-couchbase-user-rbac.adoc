@@ -87,7 +87,7 @@ EOF
 <.> Password for Alice
 <.> Password for Bob
 
-== Create Groups and RoleBindings
+== Create Groups and `RoleBindings`
 
 Now that we've created the users, we can bind them with groups.
 In order to do that, we are going to create groups and bind them with the users using role bindings.
@@ -131,9 +131,6 @@ As you may know, buckets contain scopes, and scopes have collections.
 We'll use one scope and one collection for this scenario -- named `Inventory` and `Transport`, respectively.
 
 Alice is the `Transport` collection's `Data Writer`, and Bob is the `Transport` collection's `Data Reader`.
-This means that Alice can write but not read data in the `Transport` collection, and Bob can read but not write data in the same.
-
-Alice is the `Transport` collection's `Data Writer`, and Bob is the `Transport` collection's `Data Reader`. 
 This means that Alice can write but not read data in the `Transport` collection, and Bob can read but not write data in the same.
 
 image::rbac-single-scope-coll.png[]
@@ -381,7 +378,7 @@ cbc get mydoc -u alice -P password -U couchbase://cb-example/travel \
 ----
 mydoc                LCB_ERR_AUTHENTICATION_FAILURE (206)
                      Ref:                      Context:
----- 
+----
 
 We can observe that Alice was unable to read data, and an authentication failure error was returned.
 

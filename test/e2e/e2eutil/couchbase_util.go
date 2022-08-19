@@ -106,25 +106,34 @@ func newRequest(path string, body []byte, result interface{}) *couchbaseutil.Req
 	}
 }
 
-// GetCBInstance returns CouchbaseCluster Instance.
-func GetCBInstance(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*gocb.Cluster, error) {
+// getCouchbaseClientSDK is the canonical place to grab an SDK client to do client ops.
+// The returned cleanup callback must be called somewhere, as this is a hog and will
+// cause massive memory leaks.
+func getCouchbaseClientSDK(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*gocb.Cluster, func(), error) {
 	opts := gocb.ClusterOptions{
 		Username: string(k8s.DefaultSecret.Data["username"]),
 		Password: string(k8s.DefaultSecret.Data["password"]),
 	}
 
 	host, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", cluster.Name, cluster.Namespace), opts)
+	if err != nil {
+		return host, nil, err
+	}
 
-	return host, err
+	cleanup := func() {
+		host.Close(nil)
+	}
+
+	return host, cleanup, nil
 }
 
-func MustGetCBInstance(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) *gocb.Cluster {
-	host, err := GetCBInstance(k8s, cluster)
+func MustGetCouchbaseClientSDK(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*gocb.Cluster, func()) {
+	host, cleanup, err := getCouchbaseClientSDK(k8s, cluster)
 	if err != nil {
 		Die(t, err)
 	}
 
-	return host
+	return host, cleanup
 }
 
 // PatchBucketInfo tries patching the bucket information returned directly from Couchbase server.
@@ -259,17 +268,12 @@ func VerifyContents(timeout time.Duration, d *DocumentSet, expected map[string]i
 }
 
 func getDocs(d *DocumentSet) ([]map[string]interface{}, error) {
-	opts := gocb.ClusterOptions{
-		Username: string(d.kubernetes.DefaultSecret.Data["username"]),
-		Password: string(d.kubernetes.DefaultSecret.Data["password"]),
-	}
-
-	c, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", d.cluster.Name, d.cluster.Namespace), opts)
+	c, sdkCleanup, err := getCouchbaseClientSDK(d.kubernetes, d.cluster)
 	if err != nil {
 		return nil, err
 	}
 
-	defer c.Close(nil)
+	defer sdkCleanup()
 
 	bucket := c.Bucket(d.bucket)
 
@@ -311,17 +315,12 @@ func getDocs(d *DocumentSet) ([]map[string]interface{}, error) {
 
 // addDocs uses the Couchbase Go SDK to add documents, with a DocumentSet used to specify options.
 func addDocs(d *DocumentSet) error {
-	opts := gocb.ClusterOptions{
-		Username: string(d.kubernetes.DefaultSecret.Data["username"]),
-		Password: string(d.kubernetes.DefaultSecret.Data["password"]),
-	}
-
-	c, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", d.cluster.Name, d.cluster.Namespace), opts)
+	c, sdkCleanup, err := getCouchbaseClientSDK(d.kubernetes, d.cluster)
 	if err != nil {
 		return err
 	}
 
-	defer c.Close(nil)
+	defer sdkCleanup()
 
 	bucket := c.Bucket(d.bucket)
 

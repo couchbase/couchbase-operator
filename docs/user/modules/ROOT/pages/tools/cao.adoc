@@ -48,7 +48,7 @@ with Istio injecton enabled.
 cao certify
 
 # Run platform certification with a custom storage class
-cao certify -- -storage-class my-class
+cao certify -storage-class my-class
 
 # Run platform certification with private image repository
 cao certify --registry=https://index.docker.io/v1/,username,password
@@ -101,6 +101,13 @@ Certification image to use
 +
 Pull Policy to use when downloading the Certification container
 
+--ipv6::
+*Type*: bool
++
+*Default*: false
++
+Force the use of IPv6 with Couchbase Server.
+
 --parallel::
 *Type*: int
 +
@@ -112,6 +119,11 @@ Test concurrency
 *Type*: string
 +
 Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.
+
+--storage-class::
+*Type*: string
++
+Storage class to use for result artifacts and test volumes. The default storage class of the platform is used if not specified.
 
 --timeout::
 *Type*: string
@@ -241,6 +253,195 @@ redacts values, so if your support request relates to TLS, you may
 need to manually collect these resources and include them in your
 support request.
 
+=== Collected Resources
+Collected resources are categorised based on log level and scope.
+
+Log level::
+Required: Couchbase resources and those scoped to the cluster.
++
+Sensitive: may include secrets, roles, etc
+
+Scope::
+all: All resources found
++
+cluster: All resources associated with a cluster
++
+name: All resources limited by cluster names
++
+namespace: All resources limited by namespace name
++
+group: All resources limited by resource name
++
+operator: Only the Operator deployment
+
+==== Log Level - Required
+CouchbaseCollectionGroup::
+Log Level: Required
++
+Scope: all
+CouchbaseBucket::
+Log Level: Required
++
+Scope: all
+CouchbaseEphemeralBucket::
+Log Level: Required
++
+Scope: all
+CouchbaseMemcachedBucket::
+Log Level: Required
++
+Scope: all
+CouchbaseReplication::
+Log Level: Required
++
+Scope: all
+CouchbaseUser::
+Log Level: Required
++
+Scope: all
+CouchbaseGroup::
+Log Level: Required
++
+Scope: all
+CouchbaseRoleBinding::
+Log Level: Required
++
+Scope: all
+CouchbaseBackup::
+Log Level: Required
++
+Scope: all
+CouchbaseBackupRestore::
+Log Level: Required
++
+Scope: all
+CouchbaseAutoscaler::
+Log Level: Required
++
+Scope: all
+CouchbaseScope::
+Log Level: Required
++
+Scope: all
+CouchbaseScopeGroup::
+Log Level: Required
++
+Scope: all
+CouchbaseCollection::
+Log Level: Required
++
+Scope: all
+Service::
+Log Level: Required
++
+Scope: cluster
+ConfigMap::
+Log Level: Required
++
+Scope: cluster
++
+Reason: Used to determine issues with Couchbase Cluster state, server environment variables, and logging configuration
+Endpoints::
+Log Level: Required
++
+Scope: cluster
+PodDisruptionBudget::
+Log Level: Required
++
+Scope: cluster
++
+Reason: Used to determine issues with automatic Kubernetes upgrades
+Pod::
+Log Level: Required
++
+Scope: cluster
+CronJob::
+Log Level: Required
++
+Scope: cluster
++
+Reason: Used to determine issues with Cronjobs for scheduled backups
+PersistentVolumeClaim::
+Log Level: Required
++
+Scope: cluster
++
+Reason: Used to determine compatibility issues with underlying persistent volume
+Job::
+Log Level: Required
++
+Scope: cluster
++
+Reason: Used to determine issues with Jobs created for restoring from backup
+CustomResourceDefinition::
+Log Level: Required
++
+Scope: group
++
+Reason: Used to determine issues with installed CRD version against installed Operator and DAC version
+CouchbaseCluster::
+Log Level: Required
++
+Scope: name
+Namespace::
+Log Level: Required
++
+Scope: namespace
+Deployment::
+Log Level: Required
++
+Scope: operator
++
+Reason: Used to determine issues with Operator and Dynamic Admission Control deployments
+
+==== Log Level - Sensitive
+ServiceAccount::
+Log Level: Sensitive
++
+Scope: all
+ClusterRole::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine whether RBAC Is correctly setup for the running Operator version.
+Role::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine whether RBAC Is correctly setup for the running Operator version.
+RoleBinding::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine whether RBAC Is correctly setup for the running Operator version.
+Secret::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine issues with stored cluster passwords, TLS configurations and other private keys stored in secrets
+PersistentVolume::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine compatibility issues with underlying persistent volume
+Node::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine issues with orchestration platform and identify potential images problems
+ClusterRoleBinding::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine whether RBAC Is correctly setup for the running Operator version.
+
 === Examples
 
 [source,console]
@@ -259,6 +460,9 @@ cao collect-logs --system
 
 # Collect all known resources, applying no filtering
 cao collect-logs --all
+
+# Collect only required resources, filtering potentially sensitive information
+cao collect-logs --log-level 0
 ----
 
 === Flags

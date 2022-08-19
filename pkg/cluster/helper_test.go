@@ -37,10 +37,10 @@ func TestClusterIsAtLeastVersion(t *testing.T) {
 			"7.0.0",
 			true,
 		},
-		// Use digest for 6.6.3
+		// Use digest for 7.0.4
 		{
-			"cb8c5aba14feb955854a17c0923f79c8476872f86b3f52570d859b991d23231b",
-			"7.0.0",
+			"05aad0f1d3a373b60dece893a9c185dcb0e0630aa6f0c0f310ad8767918fd2af",
+			"7.1.0",
 			false,
 		},
 	}

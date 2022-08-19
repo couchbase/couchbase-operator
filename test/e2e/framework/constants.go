@@ -10,7 +10,7 @@ import (
 var (
 	admissionImageDefault           = "couchbase/admission-controller:" + version.WithRevision()
 	operatorImageDefault            = "couchbase/operator:" + version.WithRevision()
-	mobileImageDefault              = "couchbase/sync-gateway:2.8.3-enterprise"
+	mobileImageDefault              = "couchbase/sync-gateway:3.0.3-enterprise"
 	serverImageDefault              = "couchbase/server:7.0.3"
 	serverImageUpgradeFromDefault   = "couchbase/server:6.6.4"
 	exporterImageDefault            = "couchbase/exporter:1.0.6"

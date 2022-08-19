@@ -474,7 +474,7 @@ type CouchbaseBackupRestoreSpec struct {
 
 	// Repo is the backup folder to restore from.  If no repository is specified,
 	// the backup container will choose the latest.
-	Repo string `json:"repo"`
+	Repo string `json:"repo,omitempty"`
 
 	// Start denotes the first backup to restore from.  This may be specified as
 	// an integer index (starting from 1), a string specifying a short date
@@ -1590,14 +1590,20 @@ const (
 	RoleQueryDelete                         RoleName = "query_delete"
 	RoleQueryManageIndex                    RoleName = "query_manage_index"
 	RoleSyncGateway                         RoleName = "mobile_sync_gateway"
+	RoleSyncGatewayApplication              RoleName = "mobile_sync_gateway_application"
+	RoleSyncGatewayApplicationReadOnly      RoleName = "mobile_sync_gateway_application_read_only"
+	RoleSyncGatewayArchitect                RoleName = "mobile_sync_gateway_architect"
+	RoleSyncDevOps                          RoleName = "mobile_sync_gateway_dev_ops"
+	RoleSyncReplicator                      RoleName = "mobile_sync_gateway_replicator"
 	RoleBackupAdmin                         RoleName = "backup_admin"
 	RoleAnalyticsSelect                     RoleName = "analytics_select"
 	RoleAnalyticsAdmin                      RoleName = "analytics_admin"
+	RoleEventingAdmin                       RoleName = "eventing_admin"
 )
 
 type Role struct {
 	// Name of role.
-	// +kubebuilder:validation:Enum=admin;cluster_admin;security_admin;ro_admin;replication_admin;query_external_access;query_system_catalog;analytics_reader;bucket_admin;views_admin;fts_admin;bucket_full_access;data_reader;data_writer;data_dcp_reader;data_backup;data_monitoring;replication_target;analytics_manager;views_reader;fts_searcher;query_select;query_update;query_insert;query_delete;query_manage_index;mobile_sync_gateway
+	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;mobile_sync_gateway_application;mobile_sync_gateway_application_read_only;mobile_sync_gateway_architect;mobile_sync_gateway_dev_ops;mobile_sync_gateway_replicator;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_select;query_system_catalog;query_update;replication_admin;replication_target;ro_admin;scope_admin;security_admin;security_admin_external;security_admin_local;views_admin;views_reader
 	Name RoleName `json:"name"`
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped
@@ -2124,7 +2130,7 @@ type Backup struct {
 	Managed bool `json:"managed,omitempty"`
 
 	// The Backup Image to run on backup pods.
-	// +kubebuilder:default="couchbase/operator-backup:1.3.0"
+	// +kubebuilder:default="couchbase/operator-backup:1.3.1"
 	Image string `json:"image"`
 
 	// The Service Account to run backup (and restore) pods under.
@@ -2895,8 +2901,8 @@ type RemoteCluster struct {
 	// +kubebuilder:validation:Pattern="^[0-9a-f]{32}$"
 	UUID string `json:"uuid"`
 
-	// Hostname is the connection string to use to connect the remote cluster.
-	// +kubebuilder:validation:Pattern="^((couchbase|couchbases|http|https)://)?[0-9a-zA-Z\\-\\.]+(:\\d+)?(\\?network=[^&]+)?$"
+	// Hostname is the connection string to use to connect the remote cluster.  To use IPv6, place brackets (`[`, `]`) around the IPv6 value.
+	// +kubebuilder:validation:Pattern=`^((couchbase|http)(s)?(://))?((\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$)){4}\b)|((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))|\[(\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*\]))(:[0-9]{0,5})?(\\{0,1}\?network=[^&]+)?$`
 	Hostname string `json:"hostname"`
 
 	// AuthenticationSecret is a secret used to authenticate when establishing a
@@ -3140,8 +3146,8 @@ type TLSPolicy struct {
 	// additional CA certificates that should be installed in Couchbase.  The CA
 	// certificates that are defined here are in addition to those defined for the
 	// cluster, optionally by couchbaseclusters.spec.networking.tls.secretSource, and
-	// thus should not be duplicated.  Secrets referred to must be of well-know type
-	// "kubernetes.io/tls" and must contain the CA certificate under the key "tls.crt".
+	// thus should not be duplicated.  Each Secret referred to must be of well-known type
+	// "kubernetes.io/tls" and must contain one or more CA certificates under the key "tls.crt".
 	// Multiple root CA certificates are only supported on Couchbase Server 7.1 and greater,
 	// and not with legacy couchbaseclusters.spec.networking.tls.static configuration.
 	RootCAs []string `json:"rootCAs,omitempty"`
@@ -3201,6 +3207,8 @@ type TLSSecretSource struct {
 	// ServerSecretName specifies the secret name, in the same namespace as the cluster,
 	// that contains server TLS data.  The secret is expected to contain "tls.crt" and
 	// "tls.key" as per the kubernetes.io/tls secret type.  It may also contain "ca.crt".
+	// Only a single Root CA can be provided to "ca.crt". Refer to
+	// couchbaseclusters.spec.networking.tls.rootcas for multiple Root CA deployments.
 	ServerSecretName string `json:"serverSecretName"`
 
 	// ClientSecretName specifies the secret name, in the same namespace as the cluster,
@@ -3495,7 +3503,7 @@ type LogShipperSidecarSpec struct {
 	// Image is the image to be used to deal with logging as a sidecar.
 	// No validation is carried out as this can be any arbitrary repo and tag.
 	// It will default to the latest supported version of Fluent Bit.
-	// +kubebuilder:default="couchbase/fluent-bit:1.2.0"
+	// +kubebuilder:default="couchbase/fluent-bit:1.2.1"
 	Image string `json:"image,omitempty"`
 
 	// ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.

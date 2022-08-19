@@ -16,67 +16,14 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 	"github.com/couchbase/couchbase-operator/pkg/info/util"
 
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-var (
-	// Add a resource type here for it to be collected.
-	resources = []resource.Collector{
-		{Resource: &couchbasev2.CouchbaseCluster{}, Scope: resource.ScopeClusterName, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseBucket{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseEphemeralBucket{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseMemcachedBucket{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseReplication{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseUser{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseGroup{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseRoleBinding{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseBackup{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseBackupRestore{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseAutoscaler{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseScope{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseScopeGroup{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseCollection{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &couchbasev2.CouchbaseCollectionGroup{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
-		{Resource: &corev1.ConfigMap{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-		{Resource: &corev1.Endpoints{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-		{Resource: &corev1.Namespace{}, Scope: resource.ScopeNamespace, LogLevel: resource.LogLevelRequired},
-		{Resource: &corev1.Node{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
-		{Resource: &corev1.PersistentVolume{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
-		{Resource: &corev1.PersistentVolumeClaim{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-		{Resource: &corev1.Pod{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-		{Resource: &corev1.Secret{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
-		{Resource: &corev1.Service{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-		{Resource: &corev1.ServiceAccount{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
-		{Resource: &appsv1.Deployment{}, Scope: resource.ScopeOperatorDeployment, LogLevel: resource.LogLevelRequired},
-		{Resource: &rbacv1.ClusterRole{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
-		{Resource: &rbacv1.ClusterRoleBinding{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
-		{Resource: &rbacv1.Role{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
-		{Resource: &rbacv1.RoleBinding{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive},
-		{Resource: &batchv1.Job{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-		{Resource: &batchv1.CronJob{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-		{Resource: &apiextensionsv1.CustomResourceDefinition{}, Scope: resource.ScopeCouchbaseGroup, LogLevel: resource.LogLevelRequired},
-		{Resource: &policyv1.PodDisruptionBudget{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired},
-	}
-
-	// Define all implied sub-resources we can collect information for.
-	collectorInitializers = []collector.Initializer{
-		collector.NewEventCollector,
-		collector.NewLogCollector,
-		collector.NewOperatorCollector,
-	}
 )
 
 // harvestSub collects resources implicitly associated with a resource type e.g. logs/events.
 func harvestSub(context *context.Context, backend backend.Backend, references []resource.Reference) {
 	// For all sub resource types create a handler, fetch and write to the backend.
-	for _, initializer := range collectorInitializers {
+	for _, initializer := range collector.Initializers {
 		for _, ref := range references {
 			collector := initializer(context)
 			if err := collector.Fetch(ref); err != nil {
@@ -202,7 +149,7 @@ func collect(c config.Configuration) {
 
 	defer backend.Close()
 
-	references := resource.Collect(context, backend, resources)
+	references := resource.Collect(context, backend, collector.Resources)
 	harvestSub(context, backend, references)
 
 	// Store the logs metadata
@@ -220,7 +167,7 @@ func collect(c config.Configuration) {
 		context.NamespaceOverride = "kube-system"
 		context.Config.All = true
 
-		references := resource.Collect(context, backend, resources)
+		references := resource.Collect(context, backend, collector.Resources)
 		harvestSub(context, backend, references)
 	}
 }

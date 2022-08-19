@@ -91,7 +91,7 @@ In its most basic form self-certification is started with the following command:
 
 [source,console]
 ----
-$ cao certify
+$ `cao certify`
 ----
 
 This will run the platform certification suite for the Operator version the tool came bundled with.
@@ -123,7 +123,7 @@ Failure to submit this archive, or simply returning a screen capture, will resul
 
 To submit the self-certification results to Couchbase, follow these steps: 
 
-. Capture the output archive in the directory where the cao certify was run; it will be named something like `couchbase-operator-certification-20060102T150405-0700.tar.bz2`.
+. Capture the output archive in the directory where the `cao certify` was run; it will be named something like `couchbase-operator-certification-20060102T150405-0700.tar.bz2`.
 
 . Capture the Kubernetes platform's version information and other platform-specific components such as storage and networking.
 

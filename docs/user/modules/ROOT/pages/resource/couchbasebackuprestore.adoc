@@ -323,8 +323,6 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `string`
 
 ==== Description

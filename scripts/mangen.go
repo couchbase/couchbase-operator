@@ -5,12 +5,16 @@ import (
 	"io"
 	"os"
 	"path"
+	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 
 	cao "github.com/couchbase/couchbase-operator/pkg/certification"
 	cbopcfg "github.com/couchbase/couchbase-operator/pkg/config"
+	"github.com/couchbase/couchbase-operator/pkg/info/collector"
 	cbopinfo "github.com/couchbase/couchbase-operator/pkg/info/command"
+	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -30,6 +34,67 @@ type documenter struct {
 	cobra *cobra.Command
 }
 
+var logLevelMap = map[resource.LogLevel]string{
+	0: "Required",
+	1: "Sensitive",
+}
+
+func generateCollectedResourceDocumentation(file io.StringWriter) {
+	write(file, "=== Collected Resources")
+	write(file, "Collected resources are categorised based on log level and scope.")
+	write(file, "")
+	write(file, "Log level::")
+	write(file, "Required: Couchbase resources and those scoped to the cluster.")
+	write(file, "+")
+	write(file, "Sensitive: may include secrets, roles, etc")
+	write(file, "")
+	write(file, "Scope::")
+	write(file, "all: All resources found")
+	write(file, "+")
+	write(file, "cluster: All resources associated with a cluster")
+	write(file, "+")
+	write(file, "name: All resources limited by cluster names")
+	write(file, "+")
+	write(file, "namespace: All resources limited by namespace name")
+	write(file, "+")
+	write(file, "group: All resources limited by resource name")
+	write(file, "+")
+	write(file, "operator: Only the Operator deployment")
+	write(file, "")
+	resources := collector.Resources
+
+	sort.Slice(resources, func(i, j int) bool {
+		if resources[i].LogLevel == resources[j].LogLevel {
+			return resources[i].Scope < resources[j].Scope
+		}
+		return resources[i].LogLevel < resources[j].LogLevel
+	})
+
+	if len(resources) > 0 {
+		write(file, "==== Log Level - %s", logLevelMap[resources[0].LogLevel])
+	}
+
+	for i, resource := range resources {
+		if i > 0 && resource.LogLevel != resources[i-1].LogLevel {
+			write(file, "")
+			write(file, "==== Log Level - %s", logLevelMap[resources[i].LogLevel])
+		}
+		writeResourceDocumentation(file, &resource)
+	}
+	write(file, "")
+}
+
+func writeResourceDocumentation(file io.StringWriter, resource *resource.Collector) {
+	write(file, "%s::", reflect.TypeOf(resource.Resource).Elem().Name())
+	write(file, "Log Level: %s", logLevelMap[resource.LogLevel])
+	write(file, "+")
+	write(file, "Scope: %s", resource.Scope)
+
+	if resource.Reason != "" {
+		write(file, "+")
+		write(file, "Reason: %s", resource.Reason)
+	}
+}
 func normalize(s string) string {
 	lines := []string{}
 
@@ -46,6 +111,10 @@ func generateDocumentation(file io.StringWriter, command *cobra.Command) {
 
 	write(file, normalize(command.Long))
 	write(file, "")
+
+	if command.Use == "collect-logs" {
+		generateCollectedResourceDocumentation(file)
+	}
 
 	if command.HasExample() {
 		write(file, "=== Examples")
@@ -153,4 +222,5 @@ func main() {
 
 		file.Close()
 	}
+
 }

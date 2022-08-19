@@ -31,7 +31,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	metricsclient "k8s.io/metrics/pkg/client/clientset/versioned"
 )
@@ -177,71 +176,6 @@ var (
 		},
 	}
 )
-
-// certifyOptions defines all options for a certification task.
-type certifyOptions struct {
-	// image is the certification image name.
-	image string
-
-	// image pull policy to use when downloading the certification container.
-	imagePullPolicy string
-
-	// parallel is the default parallelism (really concurrency) to use when running
-	// test cases.
-	parallel int
-
-	// timeout is timeout for the certification process.
-	timeout string
-
-	// config is set at runtime and is the Kubernetes configuration.
-	config *rest.Config
-
-	// client is set at runtime and is a Kubernetes client.
-	client kubernetes.Interface
-
-	// metricsclient allows us to see CPU and memory utilization.
-	metricsclient metricsclient.Interface
-
-	// namespace is set at runtime and is the namespace this is being run in.
-	namespace string
-
-	// clean assumes the previous run was aborted and there are some resources
-	// left lying about.
-	clean bool
-
-	// archiveName allows us to set a unique archive name for each run, in case
-	// there are any races.
-	archiveName archiveNameConfigValue
-
-	// useFSGroup dictates whether to set the file system group.
-	useFSGroup bool
-
-	// fsGroup allows the file system group to be set.
-	fsGroup int
-
-	// RegistryConfigs define private container registries that need to be defined
-	// as docker pull secrets in order to access private container images.
-	registries RegistryConfigValue
-
-	// enable periodic profiling via pprof.
-	profile bool
-
-	// profileDir defines where to dump profiling information.
-	profileDir profileDirConfigValue
-
-	// profilerStopChan is used to stop the profiler.
-	profilerStopChan chan interface{}
-
-	// profilerStoppedChan is used to wait for the profiler to stop.
-	profilerStoppedChan chan interface{}
-
-	// debug is used to dump out verbose information.
-	debug bool
-
-	// collectedLogLevel is passed to the certification container for controlling the
-	// sensitivity of collected information by cbopinfo
-	collectedLogLevel int
-}
 
 // RegistryConfig defines a container image registry.  Registry configurations will
 // automatically be added to all Operator/DAC deployments as image pull secrets.  They
@@ -417,7 +351,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 			cao certify
 
 			# Run platform certification with a custom storage class
-			cao certify -- -storage-class my-class
+			cao certify -storage-class my-class
 
 			# Run platform certification with private image repository
 			cao certify --registry=https://index.docker.io/v1/,username,password
@@ -443,7 +377,10 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().IntVar(&o.fsGroup, "fsgroup", 1000, "Set the file system group for persistent volumes.")
 	cmd.Flags().Var(&o.registries, "registry", "Allows container image registry configuration e.g. SERVER,USERNAME,PASSWORD.  This will be added as an image pull secret.  Can be specified multiple times.")
 	cmd.Flags().StringVar(&o.imagePullPolicy, "image-pull-policy", imagePullPolicyDefault, "Pull Policy to use when downloading the Certification container")
-	cmd.Flags().IntVar(&o.collectedLogLevel, "collected-log-level", 0, "Log level to be collected by cbopinfo")
+	cmd.Flags().IntVar(&o.CollectedLogLevel, "collected-log-level", 0, "Log level to be collected by cbopinfo")
+
+	// Setup shared flags
+	o.BindSharedFlags(cmd.Flags())
 
 	// Secret hidden things for internal use.
 	cmd.Flags().BoolVar(&o.profile, "profile", false, "Collect pprof profiling data")
@@ -606,8 +543,12 @@ func (o *certifyOptions) deleteNamespaces() {
 
 // createVolume creates a workspace volume to communicate results from the certification
 // container to the artifacts one.
-func (o *certifyOptions) createVolume() (func(), error) {
+func (o *certifyOptions) createVolume(storageClassName string) (func(), error) {
 	fmt.Println("Creating artifacts volume ...")
+
+	if storageClassName != "" {
+		pvcTemplate.Spec.StorageClassName = &storageClassName
+	}
 
 	if _, err := o.client.CoreV1().PersistentVolumeClaims(o.namespace).Create(context.TODO(), pvcTemplate, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("%s: %w", resourceExistsMessage, err)
@@ -702,7 +643,7 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 		"-collect-logs",
 		"-collect-server-logs",
 		"-collected-log-level",
-		strconv.Itoa(o.collectedLogLevel),
+		strconv.Itoa(o.CollectedLogLevel),
 	}
 
 	certificationArgs = append(certificationArgs, args...)
@@ -712,6 +653,9 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 	for _, registry := range o.registries.values {
 		certificationArgs = append(certificationArgs, "-registry", registry.String())
 	}
+
+	extraArgs := getOverrides(o.SharedTestFlags, args)
+	certificationArgs = append(certificationArgs, extraArgs...)
 
 	certificationPod.Spec.ServiceAccountName = serviceAccount
 	certificationPod.Spec.Containers[0].Image = o.image
@@ -1158,7 +1102,7 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 	defer cleanClusterRoleBinding()
 
 	// Create the artifacts volume.
-	cleanVolume, err := o.createVolume()
+	cleanVolume, err := o.createVolume(o.StorageClassName)
 	if err != nil {
 		return err
 	}

@@ -693,6 +693,8 @@ type TLSOpts struct {
 	LDAPCertType *CertType
 	// Source is the type of TLS to use for the Operator.
 	Source TLSSource
+	// MultipleCAs defines whether or not multiple CAs should be generated within the secret. Defaults to false.
+	MultipleCAs bool
 }
 
 // clusterSANs generates a valid set of SANs for a cluster.
@@ -777,6 +779,16 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 	// Generate the CA.
 	if ctx.CA, err = NewCertificateAuthority(keyType, caCN, validFrom, validTo, caCertType); err != nil {
 		return
+	}
+
+	if opts.MultipleCAs {
+		var ca2 *CertificateAuthority
+
+		if ca2, err = NewCertificateAuthority(keyType, caCN, validFrom, validTo, caCertType); err != nil {
+			return
+		}
+
+		ctx.CA.Certificate = append(ctx.CA.Certificate, ca2.Certificate...)
 	}
 
 	// Create the client TLS certifcates.

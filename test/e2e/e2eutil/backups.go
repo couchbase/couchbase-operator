@@ -61,6 +61,9 @@ type Backup struct {
 
 	// storageClass allows the storage class to be explcitly defined.
 	storageClass string
+
+	// withoutFTAlias prevents FT alias from being backed up.
+	withoutFTAlias bool
 }
 
 // NewFullBackup creates a full-only backup with all required parameters.
@@ -159,6 +162,12 @@ func (b *Backup) WithStorageClass(storageClass string) *Backup {
 	return b
 }
 
+// WithServices allows specifying specific services to be backedup.
+func (b *Backup) WithoutFTAlias() *Backup {
+	b.withoutFTAlias = true
+	return b
+}
+
 // MustCreate generates the concrete backup resource and creates it in Kubernetes.
 func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackup {
 	generateName := "backup-"
@@ -210,6 +219,11 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 		backup.Spec.StorageClassName = &b.storageClass
 	}
 
+	if b.withoutFTAlias {
+		falseRef := false
+		backup.Spec.Services.FTSAliases = &falseRef
+	}
+
 	newBackup, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackups(kubernetes.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
 	if err != nil {
 		Die(t, err)
@@ -240,6 +254,9 @@ type Restore struct {
 
 	// withoutAnalytics omits analytics restoration.
 	withoutAnalytics bool
+
+	// withoutFTAlias omits ft alias restoration.
+	withoutFTAlias bool
 
 	// include are data items to include in the restore.
 	include []couchbasev2.BucketScopeOrCollectionNameWithDefaults
@@ -303,6 +320,12 @@ func (r *Restore) WithoutAnalytics() *Restore {
 	return r
 }
 
+// WithoutFTAlias omits ft alias restoration.
+func (r *Restore) WithoutFTAlias() *Restore {
+	r.withoutFTAlias = true
+	return r
+}
+
 // WithIncludes includes data in the restore.
 func (r *Restore) WithIncludes(includes ...string) *Restore {
 	for _, include := range includes {
@@ -363,6 +386,10 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 
 	if r.withoutEventing {
 		restore.Spec.Services.Eventing = &falseRef
+	}
+
+	if r.withoutFTAlias {
+		restore.Spec.Services.FTAlias = &falseRef
 	}
 
 	if r.withoutAnalytics {

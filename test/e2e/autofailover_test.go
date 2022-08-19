@@ -28,10 +28,9 @@ func TestServerGroupAutoFailover(t *testing.T) {
 
 	availableServerGroupList := getAvailabilityZones(t, kubernetes)
 
-	// Create cluster spec for RZA feature.  Ensure that data is correctly
-	// balanced by rounding down the largest multiple of number of AZs that
-	// will fit.
-	clusterSize := e2eutil.MustNumNodes(t, kubernetes) / len(availableServerGroupList) * len(availableServerGroupList)
+	// Create cluster spec for RZA feature.  Size the cluster such that
+	// there are 2 nodes per available server group/AZ.
+	clusterSize := len(availableServerGroupList) * 2
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)

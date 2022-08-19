@@ -772,6 +772,7 @@ var bucketRoles = []RoleName{
 	RoleViewsAdmin,
 	RoleViewsReader,
 	RoleSyncGateway,
+	RoleEventingAdmin,
 }
 
 // scopeRoles can be bucket + scope scoped.
@@ -796,6 +797,11 @@ var collectionRoles = []RoleName{
 	RoleQueryManageIndex,
 	RoleSearchReader,
 	RoleAnalyticsSelect,
+	RoleSyncGatewayApplication,
+	RoleSyncGatewayApplicationReadOnly,
+	RoleSyncGatewayArchitect,
+	RoleSyncDevOps,
+	RoleSyncReplicator,
 }
 
 func ValidRolePattern() string {

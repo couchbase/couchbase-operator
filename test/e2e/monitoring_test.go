@@ -200,6 +200,46 @@ func TestPrometheusMetricsEnableMandatoryMutualTLS(t *testing.T) {
 	testPrometheusMetrics(t, kubernetes, tls, &policy, false)
 }
 
+func TestPrometheusMetricsEnableShadowTLS(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
+
+	testPrometheusMetrics(t, kubernetes, tls, nil, false)
+}
+
+func TestPrometheusMetricsEnableMutualShadowTLS(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
+
+	policy := couchbasev2.ClientCertificatePolicyEnable
+
+	testPrometheusMetrics(t, kubernetes, tls, &policy, false)
+}
+
+func TestPrometheusMetricsEnableMandatoryMutualShadowTLS(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding})
+
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	testPrometheusMetrics(t, kubernetes, tls, &policy, false)
+}
+
 func TestPrometheusMetricsPerformOps(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
