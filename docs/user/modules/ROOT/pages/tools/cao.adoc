@@ -111,9 +111,9 @@ Force the use of IPv6 with Couchbase Server.
 --parallel::
 *Type*: int
 +
-*Default*: 8
+*Default*: 1
 +
-Test concurrency
+Controls how many tests are executed concurrently.  This value should be based on the size of your kubernetes cluster.  See our documention at https://docs.couchbase.com/operator/current/concept-platform-certification.html#platform-requirements for help on understanding what parallelism to utilize.
 
 --registry::
 *Type*: string

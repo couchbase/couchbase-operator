@@ -371,7 +371,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd.Flags().StringVar(&o.image, "image", imageDefault, "Certification image to use")
 	cmd.Flags().StringVar(&o.timeout, "timeout", "12h", "Maximum runtime to allow.  4h is enough for all tests on most platforms with 8 way concurrency.  It may take over a day running with 1 way concurrency")
 	cmd.Flags().Var(&o.archiveName, "archive-name", "Set the default test archive name")
-	cmd.Flags().IntVar(&o.parallel, "parallel", 8, "Test concurrency")
+	cmd.Flags().IntVar(&o.parallel, "parallel", 1, "Controls how many tests are executed concurrently.  This value should be based on the size of your kubernetes cluster.  See our documention at https://docs.couchbase.com/operator/current/concept-platform-certification.html#platform-requirements for help on understanding what parallelism to utilize.")
 	cmd.Flags().BoolVar(&o.clean, "clean", false, "Force a cleanup of existing resources on start up.  These may have been left over from an earlier aborted run")
 	cmd.Flags().BoolVar(&o.useFSGroup, "use-fsgroup", useFSGroup, "Use a file system group for persistent volumes.")
 	cmd.Flags().IntVar(&o.fsGroup, "fsgroup", 1000, "Set the file system group for persistent volumes.")
@@ -397,7 +397,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 
 // initializeRuntime creates any runtime objects we need in the certification steps.
 func (o *certifyOptions) initializeRuntime(flags *genericclioptions.ConfigFlags) error {
-	fmt.Println("Initializing ...")
+	fmt.Println(util.PrettyHeading("Initializing ..."))
 
 	configLoader := flags.ToRawKubeConfigLoader()
 
@@ -1056,14 +1056,38 @@ func (o *certifyOptions) endProfiling() {
 	<-o.profilerStoppedChan
 }
 
+func (o *certifyOptions) isParallelDefaulted() bool {
+	defaulted := true
+
+	for _, arg := range os.Args {
+		if arg == "--parallel" {
+			defaulted = false
+		}
+	}
+
+	return defaulted
+}
+
 // certify runs the certification suite on the provided options.
 func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []string) error {
+	fmt.Println(util.PrettyHeading("Pre-Run Parameter Checks"))
+
+	if o.isParallelDefaulted() {
+		line := fmt.Sprintf("Parallel = %d %s  (see cao certify --help)", o.parallel, util.PrettyResult(util.ResultTypeFail))
+		fmt.Println(line)
+	} else {
+		line := fmt.Sprintf("Parallel = %d %s", o.parallel, util.PrettyResult(util.ResultTypePass))
+		fmt.Println(line)
+	}
+
 	// Create any runtime objects we need in the certification steps.
 	if err := o.initializeRuntime(flags); err != nil {
 		return err
 	}
 
 	if o.clean {
+		fmt.Println(util.PrettyHeading("Cleaning Environment ..."))
+
 		o.deleteServiceAccount()
 		o.deleteClusterRole()
 		o.deleteClusterRoleBinding()
@@ -1079,6 +1103,8 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 		// cannot be scheduled.
 		o.deleteNamespaces()
 	}
+
+	fmt.Println(util.PrettyHeading("Creating Resources ..."))
 
 	cleanServiceAccount, err := o.createServiceAccount()
 	if err != nil {
