@@ -495,6 +495,7 @@ pipeline {
   post {
     always {
       sh "./test/e2e/resources/provisioners/gke/gcloud_provision stop --name ${env.NAME}"
+      sh 'docker system prune --force' // Clean up docker - optimise disk usage
       cleanWs()
     }
   }

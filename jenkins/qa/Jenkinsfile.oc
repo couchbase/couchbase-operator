@@ -456,6 +456,7 @@ pipeline {
   post {
     always {
       sh './openshift-install destroy cluster'
+      sh 'docker system prune --force' // Clean up docker - optimise disk usage
       cleanWs()
     }
   }

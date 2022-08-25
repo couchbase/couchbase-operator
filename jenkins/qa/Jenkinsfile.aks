@@ -490,6 +490,7 @@ pipeline {
       dir("./test/e2e/resources/provisioners/aks") {
         sh "terraform destroy -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
       }
+      sh 'docker system prune --force' // Clean up docker - optimise disk usage
       cleanWs()
     }
   }

@@ -491,6 +491,7 @@ pipeline {
       dir("./test/e2e/resources/provisioners/eks") {
         sh "terraform destroy -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
       }
+      sh 'docker system prune --force' // Clean up docker - optimise disk usage
       cleanWs()
     }
   }
