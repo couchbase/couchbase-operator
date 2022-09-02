@@ -1422,3 +1422,40 @@ type TrustedCA struct {
 
 // TrustedCAList is a list of CAs that CBS knows about.
 type TrustedCAList []TrustedCA
+
+// PrivateKeyPassphraseSettings used to register a passphrase via script or rest.
+type PrivateKeyPassphraseSettings struct {
+	PrivateKeyPassphrase PrivateKeyPassphrase `url:"privateKeyPassphrase" json:"privateKeyPassphrase"`
+}
+
+type PrivateKeyPassphrase struct {
+
+	// Type of passphrase registration to use.
+	Type string `url:"type" json:"type"`
+
+	// Path to the script on the current node. must be in couchbase/scripts dir.
+	Path string `json:"path,omitempty"`
+
+	// Args is the list of arguments passed to the script.
+	Args []string `json:"args,omitempty"`
+
+	// Trim determines whether redundant characters are to be removed from the script.
+	Trim bool `json:"trim,omitempty"`
+
+	// URL is the endpoint to be called to retrieve the passphrase.
+	// URL will be called using the GET method and may use http/https protocol.
+	URL string `json:"url,omitempty"`
+
+	// HttpOpts is a map of optional arguments to provide alongside the URL request.
+	// When specified the key must be 'verifyPeer' as a boolean.
+	HTTPOpts map[string]bool `json:"httpOpts,omitempty"`
+
+	// Headers is a map of one or more key-value pairs to pass alongside the Get request.
+	Headers map[string]string `json:"headers,omitempty"`
+
+	// AddressFamily is the address family to use. By default inet (meaning IPV4) is used.
+	AddressFamily string `json:"addressFamily,omitempty"`
+
+	// Timeout is  the number of milliseconds that must elapse before the call is timed out.
+	Timeout uint64 `json:"timeout,omitempty"`
+}

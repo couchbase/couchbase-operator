@@ -50,6 +50,8 @@ const (
 	loggingSidecarMetadataMountName           = "podinfo"
 	loggingPort                               = 2020
 	LoggingConfigurationFile                  = "fluent-bit.conf"
+	passphraseScriptName                      = "tls-passphrase-script"
+	passphraseScriptPath                      = "/opt/couchbase/var/lib/couchbase/scripts/"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -805,6 +807,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	applyPodNetworking(cluster, pod, m)
 	applyPodStorage(pod, pvcState)
 	applyPodLogging(cluster, pod)
+	applyPodPassphraseVolumes(cluster, pod)
 
 	// Note: anything using clients to look up state at this point, is probably doing
 	// it wrong, gut feeling.
@@ -988,6 +991,47 @@ func getLoggingMount(container *v1.Container) *v1.VolumeMount {
 	}
 
 	return nil
+}
+
+// applyPodPassphraseVolumes adds private key and configmap to Pod as volume mounts.
+func applyPodPassphraseVolumes(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+	if !cluster.IsTLSScriptPassphraseEnabled() {
+		return
+	}
+
+	container, _ := GetCouchbaseContainer(pod)
+	container.VolumeMounts = append(container.VolumeMounts, v1.VolumeMount{
+		Name:      passphraseScriptName,
+		MountPath: passphraseScriptPath,
+	}, v1.VolumeMount{
+		Name:      constants.CouchbaseTLSPassphraseKey,
+		ReadOnly:  true,
+		MountPath: tlsSecretMountPath,
+	})
+
+	passphraseSecretName := PassphraseKeySecretName(cluster)
+
+	// ensure group users can execute script as we may be subject to fsGroup
+	var chmod int32 = 0550
+
+	pod.Spec.Volumes = append(pod.Spec.Volumes,
+		v1.Volume{
+			Name: passphraseScriptName,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{Name: passphraseSecretName},
+					DefaultMode:          &chmod,
+				},
+			},
+		},
+		v1.Volume{
+			Name: constants.CouchbaseTLSPassphraseKey,
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName: passphraseSecretName,
+				},
+			},
+		})
 }
 
 func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
@@ -1548,6 +1592,11 @@ func ShadowTLSCASecretName(cluster *couchbasev2.CouchbaseCluster) string {
 // ClientTLSSecretName generates a TLS secret name for the client certificates.
 func ClientTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
 	return cluster.Name + "-tls-client"
+}
+
+// PassphraseSecretName generates a TLS secret name for passphrase encryption.
+func PassphraseKeySecretName(cluster *couchbasev2.CouchbaseCluster) string {
+	return cluster.Name + "-tls-passphrase"
 }
 
 // Adds any necessary pod prerequisites before enabling TLS.

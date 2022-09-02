@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -539,4 +542,32 @@ func MustExposePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 	if err := exposePorts(k8s, couchbase, protocol, unique, timeout); err != nil {
 		Die(t, err)
 	}
+}
+
+// get the IP Address of this container.
+func GetHostAddress(t *testing.T) string {
+	containerHostname, err := os.Hostname()
+	if err != nil {
+		Die(t, err)
+	}
+
+	addrs, err := net.LookupHost(containerHostname)
+	if err != nil {
+		Die(t, err)
+	}
+
+	// there must be at least one IP
+	if len(addrs) == 0 {
+		Die(t, fmt.Errorf("expected at least one IP address"))
+	}
+
+	return addrs[0]
+}
+
+// generates address with a random port between min - max.
+func GetHostAddressWithPort(t *testing.T, min, max int) string {
+	address := GetHostAddress(t)
+	port := rand.Intn(max-min) + min
+
+	return address + ":" + strconv.Itoa(port)
 }

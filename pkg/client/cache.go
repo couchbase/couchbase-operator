@@ -768,6 +768,54 @@ func (c *CronJobCache) stop() {
 	c.resourceCache.stop()
 }
 
+// ConfigMapCache is a wrapper around a resourceCache that provides concrete typing for
+// ConfigMap resources.
+type ConfigMapCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newConfigMapCache creates a new synchronized cache for ConfigMap resources.
+func newConfigMapCache(ctx context.Context, client kubernetes.Interface, namespace string, selector fmt.Stringer) (*ConfigMapCache, error) {
+	resourceCache, err := newResourceCache(ctx, client.CoreV1().RESTClient(), &corev1.ConfigMap{}, selector, "configmaps", namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ConfigMapCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// get returns the requested configmap based on name.
+func (c *ConfigMapCache) Get(name string) (*corev1.ConfigMap, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*corev1.ConfigMap), true
+}
+
+// list returns all configmaps.
+func (c *ConfigMapCache) List() (resources []*corev1.ConfigMap) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*corev1.ConfigMap))
+	}
+
+	return
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *ConfigMapCache) stop() {
+	c.resourceCache.stop()
+}
+
 // CouchbaseBackupCache is a wrapper around a resourceCache that provides concrete typing for
 // CouchbaseBackup resources.
 type CouchbaseBackupCache struct {

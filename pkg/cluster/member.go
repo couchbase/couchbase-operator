@@ -459,7 +459,12 @@ func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member) 
 		return err
 	}
 
-	if err := couchbaseutil.ReloadNodeCert().InPlaintext().On(c.api, m); err != nil {
+	settings, err := c.passphraseSettings()
+	if err != nil {
+		return err
+	}
+
+	if err := couchbaseutil.ReloadNodeCert(settings).InPlaintext().On(c.api, m); err != nil {
 		return err
 	}
 
@@ -478,7 +483,12 @@ func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Membe
 		return err
 	}
 
-	if err := couchbaseutil.ReloadNodeCert().InPlaintext().On(c.api, m); err != nil {
+	settings, err := c.passphraseSettings()
+	if err != nil {
+		return err
+	}
+
+	if err := couchbaseutil.ReloadNodeCert(settings).InPlaintext().On(c.api, m); err != nil {
 		return err
 	}
 

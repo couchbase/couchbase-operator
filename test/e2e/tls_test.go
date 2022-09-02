@@ -1,10 +1,14 @@
 package e2e
 
 import (
+	"context"
+	"io"
+	"net/http"
 	"testing"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	pkgconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -15,6 +19,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Create couchbase cluster over TLS certificates
@@ -476,7 +481,7 @@ func testTLSRotate(t *testing.T, opts *e2eutil.TLSOpts) {
 
 	// When the cluster is ready, swap out the old certificate for a new one and verify
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	e2eutil.MustRotateServerCertificate(t, ctx, []string{})
+	e2eutil.MustRotateServerCertificate(t, ctx, opts)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
@@ -1601,7 +1606,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
-	e2eutil.MustRotateServerCertificate(t, ctx, []string{})
+	e2eutil.MustRotateServerCertificate(t, ctx, &e2eutil.TLSOpts{})
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
@@ -1923,5 +1928,350 @@ func TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKIWithOperatorDown(t *
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 	}
 
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// Create couchbase cluster over with encrypted TLS using
+// the script method to register associated passphrase.
+func TestTLSScriptPassphrase(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	secretName := "tls-passphrase"
+	passphrase := "password"
+
+	// Create the passphrase secret
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		Data: map[string][]byte{
+			pkgconstants.PassphraseSecretKey: []byte(passphrase),
+		},
+	}
+	e2eutil.MustCreateSecret(t, kubernetes, secret)
+
+	// Setting TLS Options to generate encrypted key
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := e2eutil.TLSOpts{
+		KeyPassphrase: passphrase,
+		KeyEncoding:   &keyEncoding,
+		Source:        e2eutil.TLSSourceCertManagerSecret,
+	}
+
+	// Add Script config settings to cluster options
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &opts)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).Generate(kubernetes)
+	cluster.Spec.Networking.TLS.PassphraseConfig.Script = &couchbasev2.PassphraseScriptConfig{
+		Secret: secretName,
+	}
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is healthy, check the TLS is correctly configured.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// Test rotation of encrypted server key using the script passphrase.
+func TestTLSRotateScriptPassphrase(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size3
+	secretName := "tls-passphrase"
+	passphrase := "password"
+
+	// Create the passphrase secret
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		Data: map[string][]byte{
+			pkgconstants.PassphraseSecretKey: []byte(passphrase),
+		},
+	}
+	e2eutil.MustCreateSecret(t, kubernetes, secret)
+
+	// Setting TLS Options to generate encrypted key
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := e2eutil.TLSOpts{
+		KeyPassphrase: passphrase,
+		KeyEncoding:   &keyEncoding,
+		Source:        e2eutil.TLSSourceCertManagerSecret,
+	}
+
+	// Add Script config settings to cluster options
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &opts)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).Generate(kubernetes)
+	cluster.Spec.Networking.TLS.PassphraseConfig.Script = &couchbasev2.PassphraseScriptConfig{
+		Secret: secretName,
+	}
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is healthy, check the TLS is correctly configured.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Rotate the server certificates.
+	// Can take a while because Operator also rotates internal pub/priv key
+	// used to encrypt the passphrase.
+	e2eutil.MustRotateServerCertificate(t, ctx, &opts)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * TLS update event occurred
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// Test that server key can be rotated with a different passphrase.
+func TestTLSRotateAndChangeScriptPassphrase(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration.
+	clusterSize := constants.Size3
+	secretName := "tls-passphrase"
+	passphrase := "password"
+	passphraseNew := "passwordnew"
+
+	// Create the passphrase secret
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		Data: map[string][]byte{
+			pkgconstants.PassphraseSecretKey: []byte(passphrase),
+		},
+	}
+	e2eutil.MustCreateSecret(t, kubernetes, secret)
+
+	// Setting TLS Options to generate encrypted key
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := e2eutil.TLSOpts{
+		KeyPassphrase: passphrase,
+		KeyEncoding:   &keyEncoding,
+		Source:        e2eutil.TLSSourceCertManagerSecret,
+	}
+
+	// Add Script config settings to cluster options
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &opts)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).Generate(kubernetes)
+	cluster.Spec.Networking.TLS.PassphraseConfig.Script = &couchbasev2.PassphraseScriptConfig{
+		Secret: secretName,
+	}
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is healthy, check the TLS is correctly configured.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Change the passphrase secret
+	secret.Data[pkgconstants.PassphraseSecretKey] = []byte(passphraseNew)
+	e2eutil.MustUpdateSecret(t, kubernetes, secret)
+
+	// Rotate the server certificates with new passphrase
+	opts.KeyPassphrase = passphraseNew
+	e2eutil.MustRotateServerCertificate(t, ctx, &opts)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * TLS update event occurred
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{
+			Times:     clusterSize,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
+		},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// Start web server on requested address and send specified response.
+// Address should include random port as web servers can run in parallel.
+func startWebServ(address string, response string) *http.Server {
+	// webRoot is a handler func that sends respons
+	webRoot := func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, response)
+	}
+
+	// initialize web server with listening address
+	m := http.NewServeMux()
+	s := http.Server{Addr: address, Handler: m}
+
+	// register webroot handler to "/" path
+	m.HandleFunc("/", webRoot)
+
+	// start webserver in background
+	go func() {
+		_ = s.ListenAndServe()
+	}()
+
+	return &s
+}
+
+// Test creation of server with encrypted key and passphrase registered as rest endpoint.
+func TestTLSRestPassphrase(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes, cleanup := f.SetupTest(t)
+
+	defer cleanup()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	//  Single node cluster
+	clusterSize := constants.Size1
+
+	// Start web server with passphrase as response
+	passphrase := "webpass"
+	address := e2eutil.GetHostAddressWithPort(t, 1000, 6000)
+	s := startWebServ(address, passphrase)
+
+	defer func() {
+		_ = s.Shutdown(context.Background())
+	}()
+
+	// Setting TLS Options to generate encrypted key
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := e2eutil.TLSOpts{
+		KeyPassphrase: passphrase,
+		KeyEncoding:   &keyEncoding,
+		Source:        e2eutil.TLSSourceCertManagerSecret,
+	}
+
+	// Add Script config settings to cluster options
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &opts)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).Generate(kubernetes)
+	cluster.Spec.Networking.TLS.PassphraseConfig.Rest = &couchbasev2.PassphraseRestConfig{
+		URL: "http://" + address,
+	}
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is healthy, check the TLS is correctly configured.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * TLS update event occurred
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// Test creation of server with encrypted key and passphrase registered as
+// rest endpoint  followed by cert rotation relying on script passphrase.
+func TestTLSRotateRestToScriptPassphrase(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+	kubernetes, cleanup := f.SetupTest(t)
+
+	defer cleanup()
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	//  3 node cluster with key encryption
+	clusterSize := constants.Size3
+	passphrase := "webpass"
+	passphraseNew := "scriptpass"
+	secretName := "tls-passphrase"
+
+	// Start web server with passphrase as response
+	address := e2eutil.GetHostAddressWithPort(t, 1000, 6000)
+	s := startWebServ(address, passphrase)
+
+	defer func() {
+		_ = s.Shutdown(context.Background())
+	}()
+
+	// Setting TLS Options to generate encrypted key
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := e2eutil.TLSOpts{
+		KeyPassphrase: passphrase,
+		KeyEncoding:   &keyEncoding,
+		Source:        e2eutil.TLSSourceCertManagerSecret,
+	}
+
+	// Add Script config settings to cluster options
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &opts)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).Generate(kubernetes)
+	cluster.Spec.Networking.TLS.PassphraseConfig.Rest = &couchbasev2.PassphraseRestConfig{
+		URL: "http://" + address,
+	}
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is healthy, check the TLS is correctly configured.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Create the passphrase secret
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		Data: map[string][]byte{
+			pkgconstants.PassphraseSecretKey: []byte(passphraseNew),
+		},
+	}
+	e2eutil.MustCreateSecret(t, kubernetes, secret)
+
+	// Rotate the server certificates with new passphrase
+	opts.KeyPassphrase = passphraseNew
+	e2eutil.MustRotateServerCertificate(t, ctx, &opts)
+
+	// Change the passphrase config from rest to script
+	patchset := jsonpatch.NewPatchSet().
+		Remove("/spec/networking/tls/passphrase/rest").
+		Add("/spec/networking/tls/passphrase/script", &couchbasev2.PassphraseScriptConfig{
+			Secret: secretName,
+		})
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+
+	// Config change should result in cluster upgrade
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * TLS update event occurred
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

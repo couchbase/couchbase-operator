@@ -3,8 +3,10 @@ package cluster
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"reflect"
@@ -45,8 +47,11 @@ type tlsCache struct {
 	// clientCert is the operator client certificate (optional).
 	clientCert []byte
 
-	// clientKey is thte operator client key (optional).
+	// clientKey is the operator client key (optional).
 	clientKey []byte
+
+	// publicPassphraseKey is used to encrypt the passphrase before sending to server
+	publicPassphraseKey *rsa.PublicKey
 }
 
 // initTLSCache populates the TLS cache if TLS is enabled, and attaches it to
@@ -260,8 +265,31 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 	case "RSA PRIVATE KEY":
 		// PKCS#1, in the right format.
 		break
+	case "ENCRYPTED PRIVATE KEY":
+		// Encrypted Key requires server 7.1.0 or higher
+		ok, err := c.RunningVersionIsAtLeast("7.1.0")
+		if err != nil {
+			return errors.NewStackTracedError(err)
+		}
+
+		if !ok {
+			return fmt.Errorf("%w: encrypted private key requires server version 7.1.0", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid))
+		}
+
+		break
 	case "PRIVATE KEY":
-		// PKCS#8, way more modern and widely used, but needs conversion.
+		// PKCS#8, way more modern and widely used, but needs conversion
+		// if server version is lower than 7.1.
+		ok, err := c.RunningVersionIsAtLeast("7.1.0")
+		if err != nil {
+			return errors.NewStackTracedError(err)
+		}
+
+		if ok {
+			// no need to convert unencrypted PKCS#8 for server 7.1.0
+			break
+		}
+
 		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
 			return errors.NewStackTracedError(err)
@@ -322,7 +350,181 @@ func (c *Cluster) reconcileTLSSecrets(requestedSecret *corev1.Secret) error {
 		return errors.NewStackTracedError(err)
 	}
 
+	// also refreshing the internal passphrase only when server certs are rotated to
+	// prevent them from being a security risk in the event server was comprimized
+	if c.cluster.IsTLSScriptPassphraseEnabled() {
+		if requestedSecret.Name == k8sutil.ClientTLSSecretName(c.cluster) {
+			if _, err := c.updateInternalPassphraseSecret(); err != nil {
+				return errors.NewStackTracedError(err)
+			}
+		}
+	}
+
 	return nil
+}
+
+// refreshTLSPassphraseResources creates resources used by Operator and
+// Couchbase Server for securely unlocking an encrypted private key.
+// Specifically, the Operator needs a private/public key pair and
+// Couchbase Server needs a copy of the private key along with a
+// shell script (as ConfigMap) to invoke the private key as a means
+// of decrypting incoming information that Operator has encrypted with
+// the public key.
+func (c *Cluster) refreshTLSPassphraseResources() error {
+	if !c.cluster.IsTLSScriptPassphraseEnabled() {
+		// currently only applies to script passphrase
+		return nil
+	}
+
+	// update public/private key resources
+	if err := c.refreshPassphrasePublicKey(); err != nil {
+		return err
+	}
+
+	// update configmap script
+	if err := c.refreshPassphraseConfigMap(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// refreshPassphrasePublicKey updates the cached public key used by Operator
+// to encode the passphrase.  The public key is derived from private key.
+func (c *Cluster) refreshPassphrasePublicKey() error {
+	var err error
+
+	name := k8sutil.PassphraseKeySecretName(c.cluster)
+	secret, ok := c.k8s.Secrets.Get(name)
+
+	if ok && !c.cluster.IsTLSEnabled() {
+		// TLS is disabled remove internal Private key
+		if err := c.k8s.KubeClient.CoreV1().Secrets(secret.Namespace).Delete(context.Background(), secret.Name, metav1.DeleteOptions{}); err != nil {
+			return errors.NewStackTracedError(err)
+		}
+
+		return nil
+	} else if !ok {
+		// TLS is enabled and internal Private key doesn't
+		// exist so create it
+		secret, err = c.updateInternalPassphraseSecret()
+		if err != nil {
+			return errors.NewStackTracedError(err)
+		}
+	}
+
+	// retrieve prviate key
+	privateKeyBytes, ok := secret.Data[constants.CouchbaseTLSPassphraseKey]
+	if !ok {
+		return fmt.Errorf("%w: TLS Passphrase secret missing private key `%s`", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.CouchbaseTLSPassphraseKey)
+	}
+
+	privateKey, err := util_x509.ParsePrivateKey(privateKeyBytes)
+	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	// derive corresponding publickey and cache
+	c.tlsCache.publicPassphraseKey = privateKey.Public().(*rsa.PublicKey)
+
+	return nil
+}
+
+// refreshPassphraseConfigMap creatse configmap script if it doesn't exist
+// and deletes when TLS is disabled.
+func (c *Cluster) refreshPassphraseConfigMap() error {
+	name := k8sutil.PassphraseKeySecretName(c.cluster)
+	configMap, ok := c.k8s.ConfigMaps.Get(name)
+
+	if ok && !c.cluster.IsTLSEnabled() {
+		// TLS is disabled remove configMap script
+		if err := c.k8s.KubeClient.CoreV1().ConfigMaps(configMap.Namespace).Delete(context.Background(), configMap.Name, metav1.DeleteOptions{}); err != nil {
+			return errors.NewStackTracedError(err)
+		}
+
+		return nil
+	} else if !ok {
+		// Creating the config map as a mountable script.
+		// The script receives encoded passphrase as arg '$1'
+		// and decrypts with mounted private key
+		decoderScript := fmt.Sprintf("#!/bin/sh\necho $1 | base64 -d | openssl rsautl -decrypt -inkey /var/run/secrets/couchbase.com/couchbase-tls/%s", constants.CouchbaseTLSPassphraseKey)
+		configMap = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   name,
+				Labels: k8sutil.LabelsForCluster(c.cluster),
+				OwnerReferences: []metav1.OwnerReference{
+					c.cluster.AsOwner(),
+				},
+			},
+			Data: map[string]string{
+				constants.CouchbaseTLSPassphraseScript: decoderScript,
+			},
+		}
+
+		log.Info(fmt.Sprintf("Creating TLS configmap `%s`", configMap.Name), "cluster", c.namespacedName())
+		if _, err := c.k8s.KubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Create(context.Background(), configMap, metav1.CreateOptions{}); err != nil {
+			return errors.NewStackTracedError(err)
+		}
+	}
+
+	return nil
+}
+
+// updateInternalPassphraseSecret updates the prviate key used by server to decode the passphrase.
+func (c *Cluster) updateInternalPassphraseSecret() (*corev1.Secret, error) {
+	// create private key
+	privateKey, err := util_x509.CreateRSAPrivateKey()
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	// generate internal secret and check for existence
+	name := k8sutil.PassphraseKeySecretName(c.cluster)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: k8sutil.LabelsForCluster(c.cluster),
+			OwnerReferences: []metav1.OwnerReference{
+				c.cluster.AsOwner(),
+			},
+		},
+		Data: map[string][]byte{
+			constants.CouchbaseTLSPassphraseKey: privateKey,
+		},
+	}
+
+	// create internal secret, otherwise update as it may have been rotated
+	_, ok := c.k8s.Secrets.Get(secret.Name)
+	if !ok {
+		log.Info(fmt.Sprintf("Creating TLS secret `%s`", secret.Name), "cluster", c.namespacedName())
+
+		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
+			return nil, errors.NewStackTracedError(err)
+		}
+	} else {
+		log.Info(fmt.Sprintf("Updating TLS secret `%s`", secret.Name), "cluster", c.namespacedName())
+
+		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{}); err != nil {
+			return nil, errors.NewStackTracedError(err)
+		}
+	}
+
+	return secret, nil
+}
+
+// getPrivateKeyPassphrase fetches the user provided passphrase key.
+func (c *Cluster) getPrivateKeyPassphrase() ([]byte, error) {
+	secret, ok := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.PassphraseConfig.Script.Secret)
+	if !ok {
+		return []byte{}, fmt.Errorf("%w: unable to get TLS Passphrase secret", errors.NewStackTracedError(errors.ErrResourceRequired))
+	}
+
+	passphrase, ok := secret.Data[constants.PassphraseSecretKey]
+	if !ok {
+		return []byte{}, fmt.Errorf("%w: TLS Passphrase secret doesn't not contain passphrase in key `%s`", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.PassphraseSecretKey)
+	}
+
+	return passphrase, nil
 }
 
 // tlsValid checks the members TLS is valid for the CA and the certificate leaf matches.
@@ -349,8 +551,8 @@ func (c *Cluster) reloadMemberCAs(member couchbaseutil.Member) error {
 	return c.reloadMemberCALegacy(member)
 }
 
-// certiifcatesEqual accepts two PEM encoded certificates and compare them.
-func certiifcatesEqual(a, b []byte) (bool, error) {
+// certificatesEqual accepts two PEM encoded certificates and compare them.
+func certificatesEqual(a, b []byte) (bool, error) {
 	cert1, err := util_x509.ParseCertificate(a)
 	if err != nil {
 		return false, err
@@ -370,7 +572,7 @@ func certiifcatesEqual(a, b []byte) (bool, error) {
 // it.
 func serverHasCA(serverCAs couchbaseutil.TrustedCAList, requestedCA []byte) (bool, error) {
 	for _, serverCA := range serverCAs {
-		ok, err := certiifcatesEqual(requestedCA, []byte(serverCA.PEM))
+		ok, err := certificatesEqual(requestedCA, []byte(serverCA.PEM))
 		if err != nil {
 			return false, err
 		}
@@ -408,7 +610,7 @@ func (c *Cluster) serverHasAllCAs(member couchbaseutil.Member) (bool, error) {
 // apiHasCA tells us whether the CA is requested by the API.
 func (c *Cluster) apiHasCA(serverCA []byte) (bool, error) {
 	for _, requestedCA := range c.tlsCache.rootCAs {
-		ok, err := certiifcatesEqual(requestedCA, serverCA)
+		ok, err := certificatesEqual(requestedCA, serverCA)
 		if err != nil {
 			return false, err
 		}
@@ -476,7 +678,7 @@ func (c *Cluster) reloadMemberCALegacy(member couchbaseutil.Member) error {
 		return err
 	}
 
-	ok, err := certiifcatesEqual(c.tlsCache.serverCA, oldcacert)
+	ok, err := certificatesEqual(c.tlsCache.serverCA, oldcacert)
 	if err != nil {
 		return err
 	}
@@ -564,7 +766,12 @@ func (c *Cluster) cleanCAs() error {
 
 // reloadChain does an insecure reload of the TLS certificates and keys.
 func (c *Cluster) reloadChain(member couchbaseutil.Member) error {
-	return couchbaseutil.ReloadNodeCert().On(c.api, member)
+	settings, err := c.passphraseSettings()
+	if err != nil {
+		return err
+	}
+
+	return couchbaseutil.ReloadNodeCert(settings).On(c.api, member)
 }
 
 // reloadChainAndVerify reloads the certificate chain for a member when necessary,
@@ -962,8 +1169,8 @@ func (c *Cluster) updateTLS() error {
 		return errors.NewStackTracedError(err)
 	}
 
-	// Quiesce persistent connections, NS server doesn't quite work if some are
-	// still open.
+	// Quiesce persistent connections, NS server doesn't quite
+	// work if some are still open.
 	c.api.CloseIdleConnections()
 
 	// Update the CA and any server certificate chains that require it.
@@ -1471,6 +1678,7 @@ func (c *Cluster) reconcileTLSPreTopologyChange() error {
 	if _, err := c.state.Get(persistence.Upgrading); err == nil {
 		return nil
 	}
+
 	// When disabling TLS, this causes an "upgrade" to remove the TLS volume
 	// from the pods, and doesn't install certificates, leading to the client
 	// potentially failing to connect to the new pods.  If the user intends to
@@ -1561,4 +1769,69 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 // nodeToNodeEnabled tells us whether N2N encyption is enabled.
 func (c *Cluster) nodeToNodeEnabled() bool {
 	return c.cluster.IsTLSEnabled() && c.cluster.Spec.Networking.TLS.NodeToNodeEncryption != nil
+}
+
+// passphraseSettings gets the settings to use when retrieving passphrase to unlock node key cert.
+// by default rest is used when url is provided otherwise attempt to get use script settings.
+func (c *Cluster) passphraseSettings() (*couchbaseutil.PrivateKeyPassphraseSettings, error) {
+	if c.cluster.IsTLSRestPassphraseEnabled() {
+		return c.restPassphraseSettings()
+	}
+
+	if c.cluster.IsTLSScriptPassphraseEnabled() {
+		return c.scriptPassphraseSettings()
+	}
+
+	return nil, nil
+}
+
+// restPassphraseSettings compiles parameters needed to reload node certs using a rest endpoint.
+func (c *Cluster) restPassphraseSettings() (*couchbaseutil.PrivateKeyPassphraseSettings, error) {
+	restPassphrase := couchbaseutil.PrivateKeyPassphrase{
+		Type:          string(couchbasev2.PassphraseTypeRest),
+		URL:           c.cluster.Spec.Networking.TLS.PassphraseConfig.Rest.URL,
+		Headers:       c.cluster.Spec.Networking.TLS.PassphraseConfig.Rest.Headers,
+		AddressFamily: c.cluster.Spec.Networking.TLS.PassphraseConfig.Rest.AddressFamily,
+		Timeout:       c.cluster.Spec.Networking.TLS.PassphraseConfig.Rest.Timeout,
+	}
+
+	if !c.cluster.Spec.Networking.TLS.PassphraseConfig.Rest.VerifyPeer {
+		restPassphrase.HTTPOpts = map[string]bool{
+			"verifyPeer": false,
+		}
+	}
+
+	settings := &couchbaseutil.PrivateKeyPassphraseSettings{PrivateKeyPassphrase: restPassphrase}
+
+	return settings, nil
+}
+
+// scriptPassphraseSettings compiles parameters needed to reload node certs using a local script.
+// The server Pod has the script mounted in a known path and simply needs the passphrase arg
+// which is first encrypted and then passed along.
+func (c *Cluster) scriptPassphraseSettings() (*couchbaseutil.PrivateKeyPassphraseSettings, error) {
+	passphrase, err := c.getPrivateKeyPassphrase()
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, c.tlsCache.publicPassphraseKey, passphrase)
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	// encoding the encrypted passphrase as base64 for better transport
+	encodedPassphrase := base64.StdEncoding.EncodeToString(ciphertext)
+
+	scriptPassphrase := couchbaseutil.PrivateKeyPassphrase{
+		Type:    string(couchbasev2.PassphraseTypeScript),
+		Path:    constants.CouchbaseTLSPassphraseScript,
+		Args:    []string{encodedPassphrase},
+		Trim:    true,
+		Timeout: 500,
+	}
+
+	settings := &couchbaseutil.PrivateKeyPassphraseSettings{PrivateKeyPassphrase: scriptPassphrase}
+
+	return settings, nil
 }

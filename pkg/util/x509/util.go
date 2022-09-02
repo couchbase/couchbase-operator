@@ -113,7 +113,7 @@ func GeneratePrivateKey(keyType KeyType) (crypto.PrivateKey, error) {
 	}
 }
 
-// CreatePrivateKeyPEM takes a private key input and returns it as a PEM
+// CreatePrivateKey takes a private key input and returns it as a PEM
 // encoded slice.
 func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 	var block *pem.Block
@@ -157,6 +157,36 @@ func CreatePrivateKey(key crypto.PrivateKey, pkcs8 bool) ([]byte, error) {
 	}
 
 	return data.Bytes(), nil
+}
+
+// CreateRSAPrivateKey creates a PEM formated private key using RSA algorithm.
+func CreateRSAPrivateKey() ([]byte, error) {
+	// generate private key.
+	key, err := GeneratePrivateKey(KeyTypeRSA)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// pem formated PrivateKey. and intentionally not using pkcs8
+	// because when we derive the public key from this there doesn't
+	// seem to be a way to then encode cypher text using std pkgs.
+	return CreatePrivateKey(key, false)
+}
+
+// ParseCertificate accepts a PEM encoded key and
+// returns the rsa.PrivateKey representation of it.
+func ParsePrivateKey(data []byte) (*rsa.PrivateKey, error) {
+	pem, _ := pem.Decode(data)
+	if pem == nil {
+		return nil, errors.NewStackTracedError(errors.ErrCertificateInvalid)
+	}
+
+	key, err := x509.ParsePKCS1PrivateKey(pem.Bytes)
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	return key, nil
 }
 
 // CreateCertificate encodes ASN1 certificate data into a PEM encoded certificate.

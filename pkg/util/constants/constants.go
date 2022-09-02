@@ -106,6 +106,15 @@ const (
 	CouchbaseTLSVolumeName   = "couchbase-server-tls"
 	CouchbaseTLSCAVolumeName = "couchbase-server-tls-ca"
 
+	// Name of private key mounted within server used to decrypt incoming passphrase.
+	CouchbaseTLSPassphraseKey = "tls-passphrase-key"
+
+	// Name of passphrase configmap script.
+	CouchbaseTLSPassphraseScript = "tls-passphrase-script"
+
+	// Name of the key containing the actual passphrase string within the Passphrase Secret.
+	PassphraseSecretKey = "passphrase"
+
 	EnabledValue = "enabled"
 )
 

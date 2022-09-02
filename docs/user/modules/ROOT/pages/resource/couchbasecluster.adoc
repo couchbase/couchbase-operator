@@ -167,6 +167,15 @@ The following is an example resource, depicting the overall structure and any de
         <<couchbaseclusters-spec-networking-tls-clientcertificatepaths-prefix,prefix>>: ""
       <<couchbaseclusters-spec-networking-tls-clientcertificatepolicy,clientCertificatePolicy>>: ""
       <<couchbaseclusters-spec-networking-tls-nodetonodeencryption,nodeToNodeEncryption>>: ""
+      <<couchbaseclusters-spec-networking-tls-passphrase,passphrase>>:
+        <<couchbaseclusters-spec-networking-tls-passphrase-rest,rest>>:
+          <<couchbaseclusters-spec-networking-tls-passphrase-rest-addressfamily,addressFamily>>: inet
+          <<couchbaseclusters-spec-networking-tls-passphrase-rest-headers,headers>>:
+          <<couchbaseclusters-spec-networking-tls-passphrase-rest-timeout,timeout>>: 5000
+          <<couchbaseclusters-spec-networking-tls-passphrase-rest-url,url>>: ""
+          <<couchbaseclusters-spec-networking-tls-passphrase-rest-verifypeer,verifyPeer>>: True
+        <<couchbaseclusters-spec-networking-tls-passphrase-script,script>>:
+          <<couchbaseclusters-spec-networking-tls-passphrase-script-secret,secret>>: ""
       <<couchbaseclusters-spec-networking-tls-rootcas,rootCAs>>:
       - ""
       <<couchbaseclusters-spec-networking-tls-secretsource,secretSource>>:
@@ -2170,6 +2179,116 @@ Strict mode is only available on Couchbase Server versions 7.1 and greater.
 Node to node encryption can only be used when TLS certificates are managed by the Operator.
 This field must be either "ControlPlaneOnly", "All", or "Strict".
 
+=== couchbaseclusters.spec.networking.tls.passphrase
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+PassphraseConfig configures the passphrase key to use with encrypted certificates.
+The passphrase may be registered with Couchbase Server using a local script or a rest endpoint.
+Private key encryption is only available on Couchbase Server versions 7.1 and greater.
+
+=== couchbaseclusters.spec.networking.tls.passphrase.rest
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+PassphraseRestConfig is the configuration to register a private key passphrase with a rest endpoint.
+When the private key is accessed, Couchbase Server attempts to extract the password by means of the specified endpoint.
+The response status must be 200 and the response text must be the exact passphrase excluding newlines and extraneous spaces.
+
+=== couchbaseclusters.spec.networking.tls.passphrase.rest.addressFamily
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `inet`
+
+*Enumerations*: `inet, inet6`
+
+==== Description
+
+AddressFamily is the address family to use.
+By default inet (meaning IPV4) is used.
+
+=== couchbaseclusters.spec.networking.tls.passphrase.rest.headers
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+Headers is a map of one or more key-value pairs to pass alongside the Get request.
+
+=== couchbaseclusters.spec.networking.tls.passphrase.rest.timeout
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `5000`
+
+==== Description
+
+Timeout is  the number of milliseconds that must elapse before the call is timed out.
+
+=== couchbaseclusters.spec.networking.tls.passphrase.rest.url
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+URL is the endpoint to be called to retrieve the passphrase.
+URL will be called using the GET method and may use http/https protocol.
+
+=== couchbaseclusters.spec.networking.tls.passphrase.rest.verifyPeer
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+VerifyPeer ensures peer verification is performed when Https is used.
+
+=== couchbaseclusters.spec.networking.tls.passphrase.script
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+PassphraseScriptConfig is the configuration to register a private key passphrase with a script.
+The Operator auto-provisions the underlying script so this config simply provides a mechanism to perform the decryption of the Couchbase Private Key using a local script.
+
+=== couchbaseclusters.spec.networking.tls.passphrase.script.secret
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Secret is the secret containing the passphrase string.
+The secret is expected to contain "passphrase" key with the passphrase string as a value.
+
 === couchbaseclusters.spec.networking.tls.rootCAs
 
 ==== Constraints
@@ -2193,7 +2312,8 @@ Multiple root CA certificates are only supported on Couchbase Server 7.1 and gre
 
 SecretSource enables the user to specify a secret conforming to the Kubernetes TLS secret specification that is used for the Couchbase server certificate, and optionally the Operator's client certificate, providing cert-manager compatibility without having to specify a separate root CA.
 A server CA certificate must be supplied by one of the provided methods.
-Certificates referred to must be of well-known type "kubernetes.io/tls".
+Certificates referred to must conform to the keys of well-known type "kubernetes.io/tls" with "tls.crt" and "tls.key".
+If the "tls.key" is an encrypted private key then the secret type can be the generic Opaque type since "kubernetes.io/tls" type secrets cannot verify encrypted keys.
 
 === couchbaseclusters.spec.networking.tls.secretSource.clientSecretName
 

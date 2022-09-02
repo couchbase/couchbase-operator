@@ -502,8 +502,19 @@ func DeleteCA(id int) *Request {
 }
 
 // ReloadNodeCert causes server to reload the server certificate chain and key from disk.
-func ReloadNodeCert() *Request {
-	return NewRequest((*Client).PostNoContentType, "/node/controller/reloadCertificate", []byte{}, nil)
+func ReloadNodeCert(settings *PrivateKeyPassphraseSettings) *Request {
+	data := []byte{}
+
+	if settings != nil {
+		var err error
+
+		data, err = json.Marshal(settings)
+		if err != nil {
+			return NewRequestError(err)
+		}
+	}
+
+	return NewRequest((*Client).PostJSON, "/node/controller/reloadCertificate", data, nil)
 }
 
 // GetClientCertAuth gets client certificate authentication settings.

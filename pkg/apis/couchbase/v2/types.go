@@ -3148,8 +3148,10 @@ type TLSPolicy struct {
 	// secret specification that is used for the Couchbase server certificate, and optionally
 	// the Operator's client certificate, providing cert-manager compatibility without having
 	// to specify a separate root CA.  A server CA certificate must be supplied by one of the
-	// provided methods. Certificates referred to must be of well-known type
-	// "kubernetes.io/tls".
+	// provided methods. Certificates referred to must conform to the keys of well-known type
+	// "kubernetes.io/tls" with "tls.crt" and "tls.key". If the "tls.key" is an encrypted
+	// private key then the secret type can be the generic Opaque type since "kubernetes.io/tls"
+	// type secrets cannot verify encrypted keys.
 	SecretSource *TLSSecretSource `json:"secretSource,omitempty"`
 
 	// RootCAs defines a set of secrets that reside in this namespace that contain
@@ -3193,6 +3195,60 @@ type TLSPolicy struct {
 	// interrogate supported values.
 	// +listType=set
 	CipherSuites []string `json:"cipherSuites,omitempty"`
+
+	// PassphraseConfig configures the passphrase key to use with encrypted certificates.
+	// The passphrase may be registered with Couchbase Server using a local script or a
+	// rest endpoint. Private key encryption is only available on Couchbase Server
+	// versions 7.1 and greater.
+	PassphraseConfig PassphraseConfig `json:"passphrase,omitempty"`
+}
+
+type PassphraseType string
+
+const (
+	PassphraseTypeScript PassphraseType = "script"
+	PassphraseTypeRest   PassphraseType = "rest"
+)
+
+type PassphraseConfig struct {
+	// PassphraseScriptConfig is the configuration to register a private key passphrase with a script.
+	// The Operator auto-provisions the underlying script so this config simply provides a mechanism
+	// to perform the decryption of the Couchbase Private Key using a local script.
+	Script *PassphraseScriptConfig `json:"script,omitempty"`
+
+	// PassphraseRestConfig is the configuration to register a private key passphrase with a rest endpoint.
+	// When the private key is accessed, Couchbase Server attempts to extract the password by means of the
+	// specified endpoint. The response status must be 200 and the response text must be the exact passphrase
+	// excluding newlines and extraneous spaces.
+	Rest *PassphraseRestConfig `json:"rest,omitempty"`
+}
+
+type PassphraseScriptConfig struct {
+	// Secret is the secret containing the passphrase string. The secret is expected
+	// to contain "passphrase" key with the passphrase string as a value.
+	Secret string `json:"secret"`
+}
+
+type PassphraseRestConfig struct {
+	// URL is the endpoint to be called to retrieve the passphrase.
+	// URL will be called using the GET method and may use http/https protocol.
+	URL string `json:"url"`
+
+	// VerifyPeer ensures peer verification is performed when Https is used.
+	// +kubebuilder:default=true
+	VerifyPeer bool `json:"verifyPeer,omitempty"`
+
+	// Headers is a map of one or more key-value pairs to pass alongside the Get request.
+	Headers map[string]string `json:"headers,omitempty"`
+
+	// AddressFamily is the address family to use. By default inet (meaning IPV4) is used.
+	// +kubebuilder:validation:Enum=inet;inet6
+	// +kubebuilder:default=inet
+	AddressFamily string `json:"addressFamily,omitempty"`
+
+	// Timeout is  the number of milliseconds that must elapse before the call is timed out.
+	// +kubebuilder:default=5000
+	Timeout uint64 `json:"timeout,omitempty"`
 }
 
 type StaticTLS struct {

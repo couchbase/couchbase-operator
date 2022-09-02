@@ -29,6 +29,7 @@ import (
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"github.com/youmark/pkcs8"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -187,6 +188,37 @@ func CreatePrivateKey(key crypto.PrivateKey, keyEncoding KeyEncodingType) ([]byt
 	data := &bytes.Buffer{}
 	if err := pem.Encode(data, block); err != nil {
 		return nil, err
+	}
+
+	return data.Bytes(), nil
+}
+
+// addPKCS8Passphrase converts an unencrypted PKCS#8 key
+// to an encrypted key with specified passphrase.
+func addPKCS8Passphrase(privateKey []byte, passphrase []byte) ([]byte, error) {
+	// decode from pem and parse out binary key
+	p, _ := pem.Decode(privateKey)
+
+	pkcs8key, err := pkcs8.ParsePKCS8PrivateKey(p.Bytes)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// apply passphrase
+	keyBytes, err := pkcs8.ConvertPrivateKeyToPKCS8(pkcs8key, passphrase)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// re-encode to pem
+	block := &pem.Block{
+		Type:  "ENCRYPTED PRIVATE KEY",
+		Bytes: keyBytes,
+	}
+
+	data := &bytes.Buffer{}
+	if err = pem.Encode(data, block); err != nil {
+		return []byte{}, err
 	}
 
 	return data.Bytes(), nil
@@ -695,6 +727,8 @@ type TLSOpts struct {
 	Source TLSSource
 	// MultipleCAs defines whether or not multiple CAs should be generated within the secret. Defaults to false.
 	MultipleCAs bool
+	// KeyPassphrase is the passphrase used to encrypt private key.
+	KeyPassphrase string
 }
 
 // clusterSANs generates a valid set of SANs for a cluster.
@@ -812,6 +846,14 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 		return
 	}
 
+	// Convert to password protected key if passphrase is provided
+	if opts.KeyPassphrase != "" {
+		clusterKey, err = addPKCS8Passphrase(clusterKey, []byte(opts.KeyPassphrase))
+		if err != nil {
+			return
+		}
+	}
+
 	ctx.ServerKey = clusterKey
 	ctx.ServerCert = clusterCert
 
@@ -867,21 +909,38 @@ func MustInitClusterTLS(t *testing.T, k8s *types.Cluster, opts *TLSOpts) (ctx *T
 }
 
 // MustRotateServerCertificate generates a new server certificate and updates the existing secret.
-func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, subjectAltNames []string) {
+func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, opts *TLSOpts) {
 	validFrom := time.Now().In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
+	subjectAltNames := ctx.clusterSANs()
+	keyEncoding := KeyEncodingPKCS1
 
-	// Generate a new server certificate
-	if len(subjectAltNames) == 0 {
-		subjectAltNames = ctx.clusterSANs()
+	// allow overrides via opts
+	if opts != nil {
+		if len(opts.AltNames) != 0 {
+			subjectAltNames = opts.AltNames
+		}
+
+		if opts.KeyEncoding != nil {
+			keyEncoding = *opts.KeyEncoding
+		}
 	}
 
+	// Generate a new server certificate
 	clusterReq := CreateCertReqDNS(clusterCN, subjectAltNames)
-	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
+	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, keyEncoding, CertTypeServer, clusterReq)
 
 	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
+	}
+
+	// Encrypt key if passphrase provided
+	if opts != nil && opts.KeyPassphrase != "" {
+		clusterKey, err = addPKCS8Passphrase(clusterKey, []byte(opts.KeyPassphrase))
+		if err != nil {
+			Die(t, err)
+		}
 	}
 
 	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {

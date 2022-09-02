@@ -431,6 +431,14 @@ func (c *CouchbaseCluster) IsTLSShadowed() bool {
 	return c.IsTLSEnabled() && c.Spec.Networking.TLS.SecretSource != nil
 }
 
+func (c *CouchbaseCluster) IsTLSScriptPassphraseEnabled() bool {
+	return c.IsTLSEnabled() && c.Spec.Networking.TLS.PassphraseConfig.Script != nil
+}
+
+func (c *CouchbaseCluster) IsTLSRestPassphraseEnabled() bool {
+	return c.IsTLSEnabled() && c.Spec.Networking.TLS.PassphraseConfig.Rest != nil
+}
+
 func (c *CouchbaseCluster) IsServerLoggingEnabled() bool {
 	return c.Spec.Logging.Server != nil && c.Spec.Logging.Server.Enabled
 }

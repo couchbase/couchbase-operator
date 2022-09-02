@@ -410,6 +410,8 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 			},
 			Verbs: []string{
 				"get",    // used by the controller-runtime for leadership.
+				"list",   // used by operator for caching
+				"watch",  // used by operator for caching
 				"create", // used by the controller-runtime for leadership.
 				"update", // used by the controller-runtime for leadership.
 				"delete", // used to migrate persistent state to 2.1

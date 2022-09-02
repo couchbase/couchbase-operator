@@ -94,6 +94,9 @@ type Client struct {
 	// CronJobs is a read only cache of cronjobs
 	CronJobs *CronJobCache
 
+	// ConfigMap is a read only cache of configmaps
+	ConfigMaps *ConfigMapCache
+
 	// CouchbaseScopes is a read only cache of scopes (namespace scoped)
 	CouchbaseScopes *CouchbaseScopeCache
 
@@ -213,6 +216,11 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
+	c.ConfigMaps, err = newConfigMapCache(ctx, c.KubeClient, namespace, selector)
+	if err != nil {
+		return nil, err
+	}
+
 	c.CouchbaseBackups, err = newCouchbaseBackupCache(ctx, c.CouchbaseClient, namespace)
 	if err != nil {
 		return nil, err
@@ -272,6 +280,7 @@ func (c *Client) Shutdown() {
 	c.CouchbaseRoleBindings.stop()
 	c.Jobs.stop()
 	c.CronJobs.stop()
+	c.ConfigMaps.stop()
 	c.CouchbaseBackups.stop()
 	c.CouchbaseBackupRestores.stop()
 	c.CouchbaseAutoscalers.stop()

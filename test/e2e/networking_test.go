@@ -178,7 +178,10 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	e2eutil.MustCheckForNodeServiceType(t, kubernetes, cluster, corev1.ServiceTypeLoadBalancer, time.Minute)
 	subjectAltNames := x509.MandatorySANs(cluster.Name, cluster.Namespace)
 	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
-	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
+	opts := e2eutil.TLSOpts{
+		AltNames: subjectAltNames,
+	}
+	e2eutil.MustRotateServerCertificate(t, ctx, &opts)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", newDomain), time.Minute)
 	e2eutil.MustCheckForDNSAlternateAddresses(t, cluster, newDomain, 5*time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, kubernetes, cluster, newDomain, time.Minute)
@@ -340,7 +343,10 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	e2eutil.MustCheckForConsoleServiceType(t, kubernetes, cluster, corev1.ServiceTypeLoadBalancer, time.Minute)
 	subjectAltNames := x509.MandatorySANs(cluster.Name, cluster.Namespace)
 	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
-	e2eutil.MustRotateServerCertificate(t, ctx, subjectAltNames)
+	opts := e2eutil.TLSOpts{
+		AltNames: subjectAltNames,
+	}
+	e2eutil.MustRotateServerCertificate(t, ctx, &opts)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/networking/dns/domain", newDomain), time.Minute)
 	e2eutil.MustCheckForDNSAdminAnnotation(t, kubernetes, cluster, newDomain, 5*time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, kubernetes, cluster, corev1.ServiceTypeLoadBalancer, time.Minute)
