@@ -33,7 +33,7 @@ sync_gateway sync-gateway-bootstrap.json
 
 === Bootstrap Configuration Schema
 
-json_config_ui::sync-gateway::{attachmentsdir}/sg-Bootstrap_model.yaml[]
+json_config_ui::{attachmentsdir}/sg-Bootstrap_model.yaml[]
 
 [#configure-an-rbac-user-for-sync-gateway]
 === Configuring an RBAC User for Sync Gateway
