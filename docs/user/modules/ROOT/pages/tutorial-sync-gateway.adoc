@@ -21,159 +21,19 @@ However, this guide and all of its instructions assume that Couchbase Server is 
 
 [#configuring-sync-gateway]
 == Configuring Sync Gateway
+The `sync gateway` bootstrap configuration is provisioned as a JSON file.
+Unless directed otherwise, the container will look for the configuration file: `/home/sync_gateway/sync_gateway.json`.
 
-Sync Gateway is configured with a configuration file within its container.
-The configuration contains sensitive data such as usernames, passwords, and TLS private keys.
-We therefore should define the configuration as a secret.
-Create a `sync-gateway-config.yaml` file with the relevant configuration variables.
-An example is shown below:
+Use the following command to start the sync gateway:
 
-[source,yaml]
+[source, bash]
 ----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: sync-gateway
-stringData:
-  config.json: |-
-    {
-      "logging": {
-        "console": {
-          "enabled": true, # <.>
-          "log_level": "info", # <.>
-          "log_keys": [
-            "*"
-          ]
-        }
-      },
-      "databases": {
-        "cb-example": { # <.>
-          "server": "couchbase://cb-example-srv.my-namespace?network=default", # <.>
-          "bucket": "default", # <.>
-          "username": "Administrator", # <.>
-          "password": "password", # <.>
-          "users": {
-            "GUEST": {
-              "disabled": false,
-              "admin_channels": [
-                "*"
-              ]
-            }
-          },
-          "allow_conflicts": false,
-          "revs_limit": 20,
-          "enable_shared_bucket_access": true
-        }
-      }
-    }
+sync_gateway sync-gateway-bootstrap.json
 ----
 
-<.> `logging.console.enabled` enables logging to the console.
-This is especially relevant on Kubernetes where applications are expected to log to standard out.
+=== Bootstrap Configuration Schema
 
-<.> `logging.console.log_level` defines what messages are printed.
-For most use cases `info` is sufficient, however `debug` may provide additional information that can aid in problem determination.
-
-<.> `databases.cb-example` is the name of a database connection.
-The database name is arbitrary.
-In this instance we have named it after the `CouchbaseCluster` resource it references.
-
-<.> `databases.cb-example.server` defines the connection string of the Couchbase Server instance that Sync Gateway will connect to.
-The connection string may be determined in the same way as for xref:howto-client-sdks.adoc[client SDKs].
-+
-The connection string in the example -- `couchbase://cb-example-srv.my-namespace` -- assumes that Sync Gateway and Couchbase Server are running on the same Kubernetes cluster.
-If we examine each part of the string:
-+
---
-* `couchbase` (as opposed to `couchbases`) specifies that the connection is over plain text and not secured by TLS
-* `cb-example` is the name of the Couchbase cluster
-* `-srv` specifies that the connection utilizes DNS SRV lookup to xref:howto-client-sdks.adoc#dns-based-addressing[discover] Couchbase cluster pods running the Data Service
-* `?network=default` instructs Sync Gateway to xref:howto-client-sdks.adoc#client-explicit-network-selection[explicitly select] the internal network addresses of Couchbase cluster pods.
-_Requires Sync Gateway 2.8.2 or higher; otherwise omit this parameter._
-* `my-namespace` is the namespace in which the Couchbase cluster is deployed.
---
-+
-NOTE: The `server` property can technically accept connection endpoints as defined in the Sync Gateway xref:sync-gateway::configuration-properties.adoc#databases-this_db-server[documentation].
-However, many of these connection endpoints are not recommended (some not even supported) when connecting to Couchbase Server deployments that are managed by the Autonomous Operator.
-In particular, there are xref:concept-couchbase-networking.adoc#sync-gateway-exposed-features-limitations[limitations when using exposed features] that affect which connection methods can be used with certain versions of Sync Gateway. 
-
-<.> `databases.cb-example.bucket` defines the `metadata.name` to connect to and use to store mobile data.
-
-<.> `databases.cb-example.username` defines the user that will be used to connect to the cluster.
-
-<.> `databases.cb-example.password` defines the user password that will be used to connect to the cluster.
-
-If the configuration file is named `sync-gateway-config.yaml`, the command to deploy it would be:
-
-[source,console]
-----
-$ kubectl create -f sync-gateway.yaml
-----
-
-=== Enabling TLS Connectivity to Couchbase Server
-
-TLS is fully supported between Sync Gateway and Couchbase Server.
-This includes xref:concept-tls.adoc[server-side TLS or mutual TLS].
-
-Your Sync Gateway configuration can be modified to allow use of TLS as follows:
-
-[source,yaml]
-----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: sync-gateway
-stringData:
-  config.json: |-
-    {
-      "databases": {
-        "cb-example": {
-            "cacertpath": "/etc/sync_gateway/ca.pem", # <.>
-            "certpath": "/etc/sync_gateway/cert.pem", # <.>
-            "keypath": "/etc/sync_gateway/key.pem", # <.>
-        }
-      }
-    }
-  ca.pem: |- # <.>
-    -----BEGIN CERTIFICATE-----
-    MIIDSzCCAjOgAwIBAgIUDsYnaG+RFwhtoz9hSMwyzfoxOCcwDQYJKoZIhvcNAQEL
-    ...
-  cert.pem: |- # <.>
-    -----BEGIN CERTIFICATE-----
-    MIIDXDCCAkSgAwIBAgIRAOUsHgVlGyJbvOIYuxD90x4wDQYJKoZIhvcNAQELBQAw
-    ...
-  key.pem: |- # <.>
-    -----BEGIN PRIVATE KEY-----
-    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDLaRvd8BxDBsPc
-    ...
-----
-
-Certificates have been truncated for brevity.
-
-<.> `databases.cb-example.cacertpath` defines where the CA certificate will be read from.
-This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
-
-<.> **Mutual TLS Only:** `databases.cb-example.certpath` defines where the client certificate chain will be read from.
-This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
-
-<.> **Mutual TLS Only:** `databases.cb-example.keypath` defines where the client key will be read from.
-This path is related to the deployment volume mount as described in <<deploying-sync-gateway>> and the file name as described in this `Secret`.
-
-<.> The `ca.pem` secret is the CA certificate.
-The name of this secret data item defines the file name as used by `databases.cb-example.cacertpath` in the Sync Gateway configuration.
-
-<.> **Mutual TLS Only:** The `cert.pem` secret is the client certificate chain.
-The name of this secret data item defines the file name as used by `databases.cb-example.certpath` in the Sync Gateway configuration.
-
-<.> **Mutual TLS Only:** The `key.pem` secret is the client key.
-The name of this secret data item defines the file name as used by `databases.cb-example.keypath` in the Sync Gateway configuration.
-
-If the configuration file is named `sync-gateway-tls.yaml`, the command to deploy it would be:
-
-[source,console]
-----
-$ kubectl create -f sync-gateway-tls.yaml
-----
+json_config_ui::sync-gateway::attachment$sg-Bootstrap_model.yaml[]
 
 [#configure-an-rbac-user-for-sync-gateway]
 === Configuring an RBAC User for Sync Gateway
