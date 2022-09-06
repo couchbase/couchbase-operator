@@ -351,62 +351,6 @@ func TestBucketSelection(t *testing.T) {
 	ValidateEvents(t, kubernetes, couchbase, expectedEvents)
 }
 
-// TestDeltaRecoveryImpossible ensures that the operator handles the situation where
-// it can attempt a delta node recovery, however Couchbase server prevents it.  This
-// is an esoteric case that shouldn't happen in reality, but it can, because users.
-func TestDeltaRecoveryImpossible(t *testing.T) {
-	// Platform configuration.
-	f := framework.Global
-
-	kubernetes, cleanup := f.SetupTest(t)
-	defer cleanup()
-
-	// Static configuration.
-	clusterSize := 3
-	victim := 1
-	foreignBucketName := "foreign"
-
-	// Create the cluster
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, kubernetes, bucket)
-
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
-	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
-	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, kubernetes, cluster)
-
-	// Pause the operator, failover the victim, then create a new bucket and populate it.
-	// The operator - when restarted - should flag the node for delta recovery, but Server
-	// will not allow this due to not all buckets being delta recoverable ("default" contains
-	// partial data whereas "foreign" contains none).
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
-	e2eutil.MustFailoverNode(t, kubernetes, cluster, victim, 5*time.Minute)
-	e2eutil.MustCreateBucket(t, kubernetes, cluster, foreignBucketName, time.Minute)
-	// Wait for the active nodes to warm up. Operator behaves differently if this hasn't happened
-	time.Sleep(10 * time.Second)
-	e2eutil.NewDocumentSet(foreignBucketName, f.DocsCount).MustCreate(t, kubernetes, cluster)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Failed node added back, fails delta rebalance
-	// * Failed node added back, succeeds full rebalance
-	// * Foreign bucket is deleted
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
-	}
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
-}
-
 // TestBucketWithExplicitName checks that overriding the resource name works.
 func TestBucketWithExplicitName(t *testing.T) {
 	// Platform configuration.

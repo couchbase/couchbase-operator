@@ -410,7 +410,6 @@ func registerTests() {
 		framework.NewTestDef(TestAntiAffinityOnCannotBeScaled).WithTags(TagSuiteP1, TagFeatureScheduling),
 		framework.NewTestDef(TestBucketAddRemoveExtended).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestRevertExternalBucketUpdates).WithTags(TagSuiteP1),
-		framework.NewTestDef(TestDeltaRecoveryImpossible).WithTags(TagSuiteP1, TagFeatureRecovery),
 		framework.NewTestDef(TestPauseOperator).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestNegPodResourcesBasic).WithTags(TagSuiteP1, TagFeatureScheduling),
 		framework.NewTestDef(TestTLSRemoveOperatorCertificateAndAddBack).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureTLS),
