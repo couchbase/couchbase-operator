@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	cbcluster "github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/robfig/cron/v3"
 )
 
@@ -1384,6 +1385,10 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = err
 	}
 
+	if err := checkConstaintBackupObjStoreSecret(v, backup); err != nil {
+		errs = append(errs, err)
+	}
+
 	if backup.Spec.Size.Value() <= 0 {
 		errs = append(errs, fmt.Errorf("spec.size %d must be greater than 0", backup.Spec.Size.Value()))
 	}
@@ -1413,12 +1418,84 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 	return nil
 }
 
+func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	if backup.Spec.ObjectStore == nil {
+		return nil
+	}
+	// only validate the secret if it exists
+	if len(backup.Spec.ObjectStore.Secret) == 0 {
+		return nil
+	}
+
+	secretName := backup.Spec.ObjectStore.Secret
+
+	secret, found, err := v.Abstraction.GetSecret(backup.Namespace, secretName)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("secret %s referenced by spec.backup.storeSecret must exist", secretName)
+	}
+
+	if _, ok := secret.Data[cbcluster.StoreSecretAccessID]; !ok {
+		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessID)
+	}
+
+	if _, ok := secret.Data[cbcluster.StoreSecretAccessKey]; !ok {
+		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessKey)
+	}
+
+	return nil
+}
+
+func checkConstaintBackupRestoreObjStoreSecret(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	if restore.Spec.ObjectStore == nil {
+		return nil
+	}
+
+	// only validate the secret if it exists
+	if len(restore.Spec.ObjectStore.Secret) == 0 {
+		return nil
+	}
+
+	secretName := restore.Spec.ObjectStore.Secret
+
+	secret, found, err := v.Abstraction.GetSecret(restore.Namespace, secretName)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("secret %s referenced by spec.backup.storeSecret must exist", secretName)
+	}
+
+	if _, ok := secret.Data[cbcluster.StoreSecretAccessID]; !ok {
+		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessID)
+	}
+
+	if _, ok := secret.Data[cbcluster.StoreSecretAccessKey]; !ok {
+		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessKey)
+	}
+
+	return nil
+}
+
 func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseBackupRestore) error{
 		checkContraintRestoreStart,
 		checkContraintRestoreEnd,
 		checkContraintRestoreRange,
 		checkContraintRestoreData,
+		checkConstaintBackupRestoreObjStoreSecret,
 	}
 
 	var errs []error

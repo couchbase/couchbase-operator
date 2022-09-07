@@ -42,6 +42,8 @@ type Framework struct {
 	S3Region                      string
 	S3AccessKey                   string
 	S3SecretID                    string
+	AZAccountName                 string
+	AZAccountKey                  string
 	MinioRegion                   string
 	MinioAccessKey                string
 	MinioSecretID                 string

@@ -34,6 +34,9 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackuprestores-spec-end-str,str>>: ""
   <<couchbasebackuprestores-spec-forceupdates,forceUpdates>>: false
   <<couchbasebackuprestores-spec-logretention,logRetention>>: 168h
+  <<couchbasebackuprestores-spec-objectstore,objectStore>>:
+    <<couchbasebackuprestores-spec-objectstore-secret,secret>>: ""
+    <<couchbasebackuprestores-spec-objectstore-uri,uri>>: ""
   <<couchbasebackuprestores-spec-repo,repo>>: ""
   <<couchbasebackuprestores-spec-s3bucket,s3bucket>>: ""
   <<couchbasebackuprestores-spec-services,services>>:
@@ -319,6 +322,41 @@ Forces data in the Couchbase cluster to be overwritten even if the data in the c
 Number of hours to hold restore script logs for, everything older will be deleted.
 More info: https://golang.org/pkg/time/#ParseDuration.
 
+=== couchbasebackuprestores.spec.objectStore
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The remote destination for backup.
+
+=== couchbasebackuprestores.spec.objectStore.secret
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ObjStoreSecret must contain two fields, access-key-id, secret-access-key and optionally region.
+These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-backup.html#optional-2.
+
+=== couchbasebackuprestores.spec.objectStore.uri
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(az|s3)://.\{3,}$`
+
+==== Description
+
+URI is a reference to a remote object store.
+This is the prefix of the object store and the bucket name.
+i.e s3://bucket, az://bucket or gs://bucket.
+
 === couchbasebackuprestores.spec.repo
 
 ==== Constraints
@@ -340,7 +378,8 @@ If no repository is specified, the backup container will choose the latest.
 
 ==== Description
 
-Name of S3 bucket to restore from.
+*DEPRECATED* - by spec.objectStore.uri Name of S3 bucket to restore from.
+
 If non-empty this overrides local backup.
 
 === couchbasebackuprestores.spec.services

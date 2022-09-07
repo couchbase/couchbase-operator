@@ -3,10 +3,10 @@ module github.com/couchbase/couchbase-operator
 go 1.16
 
 require (
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
 	github.com/Masterminds/semver v1.5.0
 	github.com/aws/aws-sdk-go v1.38.40
 	github.com/couchbase/gocb/v2 v2.4.1
-	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.2.0
@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/imdario/mergo v0.3.12
-	github.com/mholt/archiver/v4 v4.0.0-alpha.7 // indirect
+	github.com/mholt/archiver/v4 v4.0.0-alpha.7
 	github.com/prometheus/client_golang v1.11.1
 	github.com/prometheus/common v0.32.0
 	github.com/robfig/cron/v3 v3.0.1
@@ -33,6 +33,6 @@ require (
 	k8s.io/client-go v0.23.2
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-aggregator v0.23.2
-	k8s.io/metrics v0.23.2 // indirect
+	k8s.io/metrics v0.23.2
 	sigs.k8s.io/controller-runtime v0.11.0
 )

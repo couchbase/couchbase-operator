@@ -23,10 +23,12 @@ import (
 type CBBackupmgrAction string
 
 const (
-	Incremental       CBBackupmgrAction = "incremental"
-	Full              CBBackupmgrAction = "full"
-	ObjEndpointCrtDir string            = "/var/run/secrets/objectendpoint"
-	backupTLSMountDir string            = "/var/run/secrets/couchbase.com/tls-mount"
+	Incremental          CBBackupmgrAction = "incremental"
+	Full                 CBBackupmgrAction = "full"
+	ObjEndpointCrtDir    string            = "/var/run/secrets/objectendpoint"
+	backupTLSMountDir    string            = "/var/run/secrets/couchbase.com/tls-mount"
+	StoreSecretAccessID  string            = "access-key-id"
+	StoreSecretAccessKey string            = "secret-access-key"
 )
 
 // backupResources contains all the resources required to create and manage a backup.
@@ -675,11 +677,12 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 		Resources: resources,
 	}
 
-	if len(backup.Spec.S3Bucket) != 0 {
-		c.applyS3Configuration(&container, backup.Spec.S3Bucket)
+	if backup.Spec.ObjectStore != nil {
+		c.applyObjStoreConfiguration(&container, backup.Spec.ObjectStore)
+	} else if len(backup.Spec.S3Bucket) != 0 {
+		c.applyLegacyS3Configuration(&container, backup.Spec.S3Bucket)
 	}
 
-	// Set container volume mount and update args if custom endpoint is set.
 	c.applyObjEndpointToContainer(&container)
 
 	return container
@@ -887,8 +890,10 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		Resources: resources,
 	}
 
-	if len(spec.S3Bucket) != 0 {
-		c.applyS3Configuration(&container, spec.S3Bucket)
+	if spec.ObjectStore != nil {
+		c.applyObjStoreConfiguration(&container, spec.ObjectStore)
+	} else if len(spec.S3Bucket) != 0 {
+		c.applyLegacyS3Configuration(&container, spec.S3Bucket)
 	}
 
 	// Set container volume mount and update args if custom endpoint is set.
@@ -957,21 +962,84 @@ func (c *Cluster) applyObjEndpointToContainer(container *corev1.Container) {
 	}
 }
 
-func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName couchbasev2.S3BucketURI) {
-	container.Args = append(container.Args, "--s3-bucket", string(s3BucketName))
-	container.Env = []corev1.EnvVar{
-		{
-			Name: "AWS_REGION",
+func (c *Cluster) applyObjStoreConfiguration(container *corev1.Container, storeSpec *couchbasev2.ObjectStoreSpec) {
+	if storeSpec == nil || len(storeSpec.URI) == 0 {
+		return
+	}
+
+	url := storeSpec.URI
+
+	container.Args = append(container.Args, "--obj-store", string(url))
+
+	if storeSpec.Secret == "" {
+		return
+	}
+
+	secretName := storeSpec.Secret
+	secret, found := c.k8s.Secrets.Get(secretName)
+
+	if !found {
+		if c.cluster.Spec.Backup.UseIAMRole && strings.HasPrefix(string(url), "s3://") {
+			container.Args = append(container.Args, "--obj-auth-by-instance-metadata")
+		}
+
+		return
+	}
+
+	if _, ok := secret.Data["region"]; ok {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name: "CB_OBJSTORE_REGION",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: c.cluster.Spec.Backup.S3Secret,
+						Name: secretName,
 					},
 					Key: "region",
 				},
 			},
-		},
+		})
 	}
+
+	container.Env = append(container.Env, []corev1.EnvVar{
+		{
+			Name: "CB_OBJSTORE_ACCESS_KEY_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: StoreSecretAccessID,
+				},
+			},
+		},
+		{
+			Name: "CB_OBJSTORE_SECRET_ACCESS_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: StoreSecretAccessKey,
+				},
+			},
+		},
+	}...)
+}
+
+func (c *Cluster) applyLegacyS3Configuration(container *corev1.Container, s3BucketName couchbasev2.S3BucketURI) {
+	container.Args = append(container.Args, "--s3-bucket", string(s3BucketName))
+
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name: "AWS_REGION",
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: c.cluster.Spec.Backup.S3Secret, //nolint:staticcheck
+				},
+				Key: "region",
+			},
+		},
+	})
 
 	if c.cluster.Spec.Backup.UseIAMRole {
 		container.Env = append(container.Env, corev1.EnvVar{
@@ -985,9 +1053,9 @@ func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: c.cluster.Spec.Backup.S3Secret,
+							Name: c.cluster.Spec.Backup.S3Secret, //nolint:staticcheck
 						},
-						Key: "access-key-id",
+						Key: StoreSecretAccessID,
 					},
 				},
 			},
@@ -996,9 +1064,9 @@ func (c *Cluster) applyS3Configuration(container *corev1.Container, s3BucketName
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: c.cluster.Spec.Backup.S3Secret,
+							Name: c.cluster.Spec.Backup.S3Secret, //nolint:staticcheck
 						},
-						Key: "secret-access-key",
+						Key: StoreSecretAccessKey,
 					},
 				},
 			},

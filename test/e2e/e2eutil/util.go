@@ -215,7 +215,7 @@ func applyS3(cluster *couchbasev2.CouchbaseCluster, secret *v1.Secret) {
 		return
 	}
 
-	cluster.Spec.Backup.S3Secret = secret.Name
+	cluster.Spec.Backup.S3Secret = secret.Name //nolint:staticcheck
 }
 
 // applyObjEndpoint optionally applies a custom obj endpoint to the backup config.

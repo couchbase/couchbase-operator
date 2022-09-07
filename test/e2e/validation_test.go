@@ -448,6 +448,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 				if err != nil {
 					e2eutil.Die(t, err)
 				}
+
 				objects[i] = raw
 			}
 
@@ -1167,6 +1168,63 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/redistributeIndexes", "slim-shady")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.indexer.redistributeIndexes`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestValidationCreateCouchbaseBackup(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateBackupSecretS3",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", &couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3",
+					}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateBackupSecretAzure",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "az://blah",
+						Secret: "test-example-az",
+					}),
+			},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+func TestValidationCreateCouchbaseBackupRestore(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateBackupRestoreSecretS3",
+			mutations: patchMap{
+				"restore0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", &couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3",
+					}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateBackupRestoreSecretAzure",
+			mutations: patchMap{
+				"restore0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "az://blah",
+						Secret: "test-example-az",
+					}),
+			},
+			shouldFail: false,
 		},
 	}
 

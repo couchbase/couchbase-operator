@@ -5,6 +5,32 @@ metadata:
 data:
   ca: YmxhaCBibGFoIGJsYWgK
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-example-s3
+data:
+  access-key-id: YmxhaCBibGFoIGJsYWgK
+  secret-access-key: YmxhaCBibGFoIGJsYWgK
+  region: ZXUtd2VzdC0y
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-example-gs
+data:
+  access-key-id: YmxhaCBibGFoIGJsYWgK
+  secret-access-key: YmxhaCBibGFoIGJsYWgK
+  refresh-token: YmxhaCBibGFoIGJsYWgK
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-example-az
+data:
+  access-key-id: YmxhaCBibGFoIGJsYWgK
+  secret-access-key: YmxhaCBibGFoIGJsYWgK
+---
 apiVersion: couchbase.com/v2
 kind: CouchbaseCollection
 metadata:

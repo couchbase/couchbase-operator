@@ -367,6 +367,8 @@ func configure() (err error) {
 		"Bucket type to use.  Either 'couchbase', 'ephemeral' or 'memcached'.")
 	flag.Var(&compression, "compression-mode",
 		"Compression mode to use.  Either 'off', 'passive' or 'active'.")
+	flag.StringVar(&params.AZAccountName, "az-account-name", "", "Azure account name")
+	flag.StringVar(&params.AZAccountKey, "az-account-key", "", "Azure account key")
 	flag.StringVar(&params.S3Region, "s3-region",
 		"us-west-2",
 		"S3 region to use for backup.")
@@ -1150,6 +1152,15 @@ func (r *TestRequirement) NotVersion(v ...string) *TestRequirement {
 func (r *TestRequirement) HasS3Parameters() *TestRequirement {
 	if Global.S3AccessKey == "" || Global.S3SecretID == "" {
 		r.t.Skip("S3 Config parameters are not provided")
+	}
+
+	return r
+}
+
+// HasAzureParameters skips the Azure tests if Azure parameters are not provided.
+func (r *TestRequirement) HasAzureParameters() *TestRequirement {
+	if Global.AZAccountName == "" || Global.AZAccountKey == "" {
+		r.t.Skip("Azure Config parameters are not provided")
 	}
 
 	return r

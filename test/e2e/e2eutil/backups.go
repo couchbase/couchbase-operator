@@ -9,6 +9,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -50,6 +51,11 @@ type Backup struct {
 	// s3Bucket indicates the backup should be to s3.
 	s3Bucket string
 
+	// objStoreSecret is the secret to be used for authentication to
+	// the objStore
+	objStoreSecret *corev1.Secret
+	// objStore indicates the remote destination for backup.
+	objStore string
 	// retention is the length of time to retain backups for.
 	retention time.Duration
 
@@ -132,6 +138,22 @@ func (b *Backup) ToS3(bucket string) *Backup {
 	return b
 }
 
+// ToObjStore, if not empty, sends the backup to the remote object store.
+func (b *Backup) ToObjStore(objStore string) *Backup {
+	b.objStore = objStore
+
+	return b
+}
+
+// WithObjStoreSecret the secret to use to authenticate against the object store.
+func (b *Backup) WithObjStoreSecret(secret *corev1.Secret) *Backup {
+	if secret != nil {
+		b.objStoreSecret = secret
+	}
+
+	return b
+}
+
 // WithRetention allows backup retention to be set.
 func (b *Backup) WithRetention(duration time.Duration) *Backup {
 	b.retention = duration
@@ -184,10 +206,26 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 		},
 	}
 
+	if b.s3Bucket != "" && b.objStore != "" {
+		Die(t, fmt.Errorf("object store can not be used with s3 bucket"))
+	}
+
 	if b.incrementalSchedule != "" {
 		backup.Spec.Incremental = &couchbasev2.CouchbaseBackupSchedule{
 			Schedule: b.incrementalSchedule,
 		}
+	}
+
+	if backup.Spec.ObjectStore == nil {
+		backup.Spec.ObjectStore = &couchbasev2.ObjectStoreSpec{}
+	}
+
+	if b.objStoreSecret != nil {
+		backup.Spec.ObjectStore.Secret = b.objStoreSecret.Name
+	}
+
+	if b.objStore != "" {
+		backup.Spec.ObjectStore.URI = couchbasev2.ObjectStoreURI(b.objStore)
 	}
 
 	if b.s3Bucket != "" {
@@ -240,6 +278,12 @@ type Restore struct {
 	// s3Bucket indicates the restore should be to s3.
 	s3Bucket string
 
+	// objStore indicates the restore should be from a cloud store.
+	objStore string
+
+	// objStoreSecret containst the credentials for use when restoring from a cloud store.
+	objStoreSecret *corev1.Secret
+
 	// withBucketConfig enables bucket configuration restoration.
 	withBucketConfig bool
 
@@ -287,6 +331,17 @@ func (r *Restore) WithForcedUpdates() *Restore {
 // FromS3, if not empty, retrieves the backup to S3.
 func (r *Restore) FromS3(bucket string) *Restore {
 	r.s3Bucket = bucket
+	return r
+}
+
+// FromObjStore, if not empty, retrieves the backup from a cloud store.
+func (r *Restore) FromObjStore(objStore string) *Restore {
+	r.objStore = objStore
+	return r
+}
+
+func (r *Restore) WithObjStoreSecret(secret *corev1.Secret) *Restore {
+	r.objStoreSecret = secret
 	return r
 }
 
@@ -368,8 +423,24 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 		},
 	}
 
+	if r.s3Bucket != "" && r.objStore != "" {
+		Die(t, fmt.Errorf("object store can not be used with s3 bucket"))
+	}
+
 	if r.s3Bucket != "" {
 		restore.Spec.S3Bucket = couchbasev2.S3BucketURI(fmt.Sprintf("s3://%s", r.s3Bucket))
+	}
+
+	if restore.Spec.ObjectStore == nil {
+		restore.Spec.ObjectStore = &couchbasev2.ObjectStoreSpec{}
+	}
+
+	if r.objStore != "" {
+		restore.Spec.ObjectStore.URI = couchbasev2.ObjectStoreURI(r.objStore)
+	}
+
+	if r.objStoreSecret != nil {
+		restore.Spec.ObjectStore.Secret = r.objStoreSecret.Name
 	}
 
 	if r.withBucketConfig {

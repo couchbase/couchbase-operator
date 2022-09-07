@@ -49,7 +49,8 @@ pipeline {
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
     GITLAB_CREDENTIALS = credentials('gitlab-couchbaseqe')
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
-    AWS_CREDENTIALS = credentials('aws-simon')
+    AWS_CREDENTIALS = credentials('aws-alex')
+    AZURE_CREDENTIALS = credentials('azure-alex')
     KIND_VERSION = "0.14.0"
   }
 
@@ -127,6 +128,7 @@ pipeline {
                 --timeout 10m \
                 --parallel 8 \
                 --archive-name logs-${version} \
+                --parallel 8 \
                 -- \
                 -suite validation \
                 -suite-suffix ${version} \
@@ -182,7 +184,9 @@ pipeline {
             -collect-logs \
             -collect-server-logs=false \
             -s3-access-key \${AWS_CREDENTIALS_USR} \
-            -s3-secret-id \${AWS_CREDENTIALS_PSW}"
+            -s3-secret-id \${AWS_CREDENTIALS_PSW} \
+            -az-account-name \${AZURE_CREDENTIALS_USR} \
+            -az-account-key \${AZURE_CREDENTIALS_PSW}"
         }
         sh 'tar xf logs.tar.bz2'
         sh 'tar xf results.tar.bz'

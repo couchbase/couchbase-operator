@@ -3,13 +3,9 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -17,10 +13,9 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil/cloud"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
-	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,250 +23,19 @@ const (
 	fullBackupResourceName = "full"
 )
 
-func createS3Bucket(t *testing.T, bucket, accessKey, secretID, region, endpoint string, cert []byte) error {
-	// create S3 bucket
-	helper := e2eutil.AwsHelper(accessKey, secretID, region).WithEndpoint(endpoint).WithEndpointCert(cert).Create()
-
-	// Create S3 service client
-	svc := s3.New(helper.Sess)
-
-	if MustGetS3Bucket(t, svc, bucket) {
-		return nil
-	}
-
-	// Create the S3 Bucket
-	_, err := svc.CreateBucket(&s3.CreateBucketInput{
-		ACL:    aws.String("private"),
-		Bucket: aws.String(bucket),
-		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: aws.String(region),
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	// Make Objects of the bucket private
-	if !strings.Contains(endpoint, "minio") { // minio doesn't support this action.
-		_, err = svc.PutPublicAccessBlock(&s3.PutPublicAccessBlockInput{
-			Bucket: aws.String(bucket),
-			PublicAccessBlockConfiguration: &s3.PublicAccessBlockConfiguration{
-				BlockPublicAcls:       aws.Bool(true),
-				IgnorePublicAcls:      aws.Bool(true),
-				BlockPublicPolicy:     aws.Bool(true),
-				RestrictPublicBuckets: aws.Bool(true),
-			},
-		})
-
-		if err != nil {
-			return err
-		}
-	}
-
-	err = svc.WaitUntilBucketExists(&s3.HeadBucketInput{
-		Bucket: aws.String(bucket),
-	})
-
-	if err != nil {
-		return fmt.Errorf("Error occurred while waiting for bucket to be created, %w", err)
-	}
-
-	return nil
-}
-
-func MustCreateS3Bucket(t *testing.T, bucket, accessKey, secretID, region string, endpoint string, cert []byte) {
-	if err := createS3Bucket(t, bucket, accessKey, secretID, region, endpoint, cert); err != nil {
-		MustDeleteS3Bucket(t, bucket, accessKey, secretID, region, endpoint, cert)
-		e2eutil.Die(t, err)
-	}
-}
-
-func getS3Bucket(svc *s3.S3, bucket string) (bool, error) {
-	result, err := svc.ListBuckets(&s3.ListBucketsInput{})
-	if err != nil {
-		return false, err
-	}
-
-	var bucketPresent bool
-
-	for _, s3bucket := range result.Buckets {
-		if bucket == *s3bucket.Name {
-			bucketPresent = true
-			break
-		}
-	}
-
-	return bucketPresent, nil
-}
-
-func MustGetS3Bucket(t *testing.T, svc *s3.S3, bucket string) bool {
-	bucketPresent, err := getS3Bucket(svc, bucket)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	return bucketPresent
-}
-
-func deleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string, endpoint string, cert []byte) error {
-	// create S3 bucket
-	helper := e2eutil.AwsHelper(accessKey, secretID, region).WithEndpoint(endpoint).WithEndpointCert(cert).Create()
-
-	// Create S3 service client
-	svc := s3.New(helper.Sess)
-
-	// Check if the bucket is present
-	if bucketPresent := MustGetS3Bucket(t, svc, bucket); bucketPresent == false {
-		return nil
-	}
-
-	// Empty the bucket before deleting it
-	// Setup BatchDeleteIterator to iterate through a list of objects.
-	iter := s3manager.NewDeleteListIterator(svc, &s3.ListObjectsInput{
-		Bucket: aws.String(bucket),
-	})
-
-	// Traverse iterator deleting each object
-	if err := s3manager.NewBatchDeleteWithClient(svc).Delete(aws.BackgroundContext(), iter); err != nil {
-		return fmt.Errorf("Unable to delete objects from bucket %q, %w", bucket, err)
-	}
-
-	// Create the S3 Bucket
-	_, err := svc.DeleteBucket(&s3.DeleteBucketInput{
-		Bucket: aws.String(bucket),
-	})
-	if err != nil {
-		return fmt.Errorf("Bucket can not be deleted %w", err)
-	}
-
-	err = svc.WaitUntilBucketNotExists(&s3.HeadBucketInput{
-		Bucket: aws.String(bucket),
-	})
-
-	if err != nil {
-		return fmt.Errorf("Error occurred while waiting for bucket to be deleted, %w", err)
-	}
-
-	return nil
-}
-
-func MustDeleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string, endpoint string, cert []byte) {
-	if err := deleteS3Bucket(t, bucket, accessKey, secretID, region, endpoint, cert); err != nil {
-		e2eutil.Die(t, err)
-	}
-}
-
-// exact same as createS3Secret but with custom endpoint and cert.
-func createObjEndpointS3Secret(t *testing.T, kubernetes *types.Cluster, endpoint string, cert []byte) (*corev1.Secret, string, func()) {
-	f := framework.Global
-
-	framework.Requires(t, kubernetes).AtLeastVersion("6.6.0")
-
-	s3secret := "s3-secret"
-	s3BucketName := "s3bucket-" + kubernetes.Namespace
-
-	secret := &corev1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name: s3secret,
-		},
-		Data: map[string][]byte{
-			"region":            []byte(f.MinioRegion),
-			"access-key-id":     []byte(f.MinioAccessKey),
-			"secret-access-key": []byte(f.MinioSecretID),
-		},
-	}
-
-	if _, err := kubernetes.KubeClient.CoreV1().Secrets(kubernetes.Namespace).Create(context.Background(), secret, v1.CreateOptions{}); err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	MustCreateS3Bucket(t, s3BucketName, f.MinioAccessKey, f.MinioSecretID, f.MinioRegion, endpoint, cert)
-
-	// Note: deferred functions must not call Die.
-	cleanup := func() {
-		_ = deleteS3Bucket(t, s3BucketName, f.MinioAccessKey, f.MinioSecretID, f.MinioRegion, endpoint, cert)
-	}
-
-	return secret, s3BucketName, cleanup
-}
-
-func createS3RegionSecret(t *testing.T, kubernetes *types.Cluster) (*corev1.Secret, string, func()) {
-	f := framework.Global
-
-	framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").PlatformIs(v2.PlatformTypeAWS).HasS3Parameters()
-
-	s3secret := "s3-secret"
-	s3BucketName := "s3bucket-" + kubernetes.Namespace
-
-	secret := &corev1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name: s3secret,
-		},
-		Data: map[string][]byte{
-			"region": []byte(f.S3Region),
-		},
-	}
-
-	if _, err := kubernetes.KubeClient.CoreV1().Secrets(kubernetes.Namespace).Create(context.Background(), secret, v1.CreateOptions{}); err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	MustCreateS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region, "", nil)
-
-	// Note: deferred functions must not call Die.
-	cleanup := func() {
-		_ = deleteS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region, "", nil)
-	}
-
-	return secret, s3BucketName, cleanup
-}
-
-// creates an s3 bucket AND the s3 secret.
-func createS3Secret(t *testing.T, kubernetes *types.Cluster, s3 bool) (*corev1.Secret, string, func()) {
-	if !s3 {
-		return nil, "", func() {}
-	}
-
-	f := framework.Global
-
-	framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").HasS3Parameters()
-
-	s3secret := "s3-secret"
-	s3BucketName := "s3bucket-" + kubernetes.Namespace
-
-	secret := &corev1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name: s3secret,
-		},
-		Data: map[string][]byte{
-			"region":            []byte(f.S3Region),
-			"access-key-id":     []byte(f.S3AccessKey),
-			"secret-access-key": []byte(f.S3SecretID),
-		},
-	}
-
-	if _, err := kubernetes.KubeClient.CoreV1().Secrets(kubernetes.Namespace).Create(context.Background(), secret, v1.CreateOptions{}); err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	MustCreateS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region, "", nil)
-
-	// Note: deferred functions must not call Die.
-	cleanup := func() {
-		_ = deleteS3Bucket(t, s3BucketName, f.S3AccessKey, f.S3SecretID, f.S3Region, "", nil)
-	}
-
-	return secret, s3BucketName, cleanup
-}
-
-func testFullIncremental(t *testing.T, s3 bool) {
+func testFullIncremental(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	// create provider
+	provider := MustNewProvider(t, kubernetes, providerType)
+	// setup environment
+
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -280,7 +44,7 @@ func testFullIncremental(t *testing.T, s3 bool) {
 	numOfDocs := f.DocsCount
 
 	// Create a normal cluster.
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -290,7 +54,7 @@ func testFullIncremental(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	// Expect the full backup to complete, followed by the the incremental.
@@ -313,21 +77,28 @@ func testFullIncremental(t *testing.T, s3 bool) {
 }
 
 func TestBackupFullIncremental(t *testing.T) {
-	testFullIncremental(t, false)
+	testFullIncremental(t, cloud.NoCloudProvider)
 }
 
 func TestBackupFullIncrementalS3(t *testing.T) {
-	testFullIncremental(t, true)
+	testFullIncremental(t, cloud.CloudProviderAWS)
 }
 
-func testFullOnly(t *testing.T, s3 bool) {
+func TestBackupFullIncrementalAzure(t *testing.T) {
+	testFullIncremental(t, cloud.CloudProviderAzure)
+}
+
+func testFullOnly(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -336,7 +107,7 @@ func testFullOnly(t *testing.T, s3 bool) {
 	numOfDocs := f.DocsCount
 
 	// Create a normal cluster.
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -346,7 +117,7 @@ func testFullOnly(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	// Expect the full backup to complete.
@@ -367,23 +138,28 @@ func testFullOnly(t *testing.T, s3 bool) {
 }
 
 func TestBackupFullOnly(t *testing.T) {
-	testFullOnly(t, false)
+	testFullOnly(t, cloud.NoCloudProvider)
 }
 
 func TestBackupFullOnlyS3(t *testing.T) {
-	testFullOnly(t, true)
+	testFullOnly(t, cloud.CloudProviderAWS)
+}
+func TestBackupFullOnlyAzure(t *testing.T) {
+	testFullOnly(t, cloud.CloudProviderAzure)
 }
 
 // Cluster goes down during a backup (all pods go down)
 // Tests --purge behaviour is working as expected - this should allow us to ignore the previous backup and start anew.
-func testFailedBackupBehaviour(t *testing.T, s3 bool) {
+func testFailedBackupBehaviour(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -393,10 +169,6 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 
 	// Create cluster.
 	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(kubernetes)
-
-	if s3secret != nil {
-		cluster.Spec.Backup.S3Secret = s3secret.Name
-	}
 
 	cluster.Spec.Backup.Image = f.CouchbaseBackupImage
 
@@ -411,7 +183,7 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 	e2eutil.MustPopulateWithDataSize(t, kubernetes, cluster, bucket.GetName(), f.CouchbaseServerImage, 1<<30, time.Minute)
 
 	// create this backup to run every 2 minutes so we can test the backup still runs successfully after a failure.
-	backup := e2eutil.NewFullBackup("*/2 * * * *").ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup("*/2 * * * *").ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -456,23 +228,29 @@ func testFailedBackupBehaviour(t *testing.T, s3 bool) {
 }
 
 func TestFailedBackupBehaviour(t *testing.T) {
-	testFailedBackupBehaviour(t, false)
+	testFailedBackupBehaviour(t, cloud.NoCloudProvider)
 }
 
 func TestFailedBackupBehaviourS3(t *testing.T) {
-	testFailedBackupBehaviour(t, true)
+	testFailedBackupBehaviour(t, cloud.CloudProviderAWS)
+}
+
+func TestFailedBackupBehaviourAzure(t *testing.T) {
+	testFailedBackupBehaviour(t, cloud.CloudProviderAzure)
 }
 
 // Make sure a new Backup PVC comes up if the Backup PVC is deleted (stupidly)
 // N.B. Obviously all old data on the old PVC is gone forever and cannot be recovered.
-func testBackupPVCReconcile(t *testing.T, s3 bool) {
+func testBackupPVCReconcile(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -482,7 +260,7 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	// Create cluster.
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -493,7 +271,7 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.ScheduleIn(7*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.ScheduleIn(7*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
@@ -530,11 +308,15 @@ func testBackupPVCReconcile(t *testing.T, s3 bool) {
 }
 
 func TestBackupPVCReconcile(t *testing.T) {
-	testBackupPVCReconcile(t, false)
+	testBackupPVCReconcile(t, cloud.NoCloudProvider)
 }
 
 func TestBackupPVCReconcileS3(t *testing.T) {
-	testBackupPVCReconcile(t, true)
+	testBackupPVCReconcile(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupPVCReconcileAzure(t *testing.T) {
+	testBackupPVCReconcile(t, cloud.CloudProviderAzure)
 }
 
 // check that replacing a CouchbaseBackup works as expected
@@ -543,14 +325,16 @@ func TestBackupPVCReconcileS3(t *testing.T) {
 // wait for backup to perform
 // delete backup
 // create new full/incremental CouchbaseBackup.
-func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
+func testReplaceFullOnlyBackup(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -560,7 +344,7 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -570,7 +354,7 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// create initial backup
-	backup1 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup1 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
@@ -584,7 +368,7 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackupDeletion(t, kubernetes, backup1, 2*time.Minute)
 
 	// create new backup
-	backup2 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup2 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup2, 2*time.Minute)
 
 	// wait for backups to complete
@@ -613,11 +397,15 @@ func testReplaceFullOnlyBackup(t *testing.T, s3 bool) {
 }
 
 func TestReplaceFullOnlyBackup(t *testing.T) {
-	testReplaceFullOnlyBackup(t, false)
+	testReplaceFullOnlyBackup(t, cloud.NoCloudProvider)
 }
 
 func TestReplaceFullOnlyBackupS3(t *testing.T) {
-	testReplaceFullOnlyBackup(t, true)
+	testReplaceFullOnlyBackup(t, cloud.CloudProviderAWS)
+}
+
+func TestReplaceFullOnlyBackupAzure(t *testing.T) {
+	testReplaceFullOnlyBackup(t, cloud.CloudProviderAzure)
 }
 
 // check that replacing a CouchbaseBackup works as expected
@@ -626,14 +414,16 @@ func TestReplaceFullOnlyBackupS3(t *testing.T) {
 // wait for backup to perform
 // delete backup
 // create new full-only CouchbaseBackup.
-func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
+func testReplaceFullIncrementalBackup(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -643,7 +433,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -653,7 +443,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// create initial backup
-	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
@@ -667,7 +457,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 	e2eutil.MustWaitForBackupDeletion(t, kubernetes, backup1, 2*time.Minute)
 
 	// create new backup
-	backup2 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup2 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup2, 2*time.Minute)
 
 	// wait for backup to complete
@@ -693,22 +483,28 @@ func testReplaceFullIncrementalBackup(t *testing.T, s3 bool) {
 }
 
 func TestReplaceFullIncrementalBackup(t *testing.T) {
-	testReplaceFullIncrementalBackup(t, false)
+	testReplaceFullIncrementalBackup(t, cloud.NoCloudProvider)
 }
 
 func TestReplaceFullIncrementalBackupS3(t *testing.T) {
-	testReplaceFullIncrementalBackup(t, true)
+	testReplaceFullIncrementalBackup(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestore(t *testing.T, s3 bool) {
+func TestReplaceFullIncrementalBackupAzure(t *testing.T) {
+	testReplaceFullIncrementalBackup(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
+	provider := MustNewProvider(t, kubernetes, providerType)
 
-	defer s3cleanup()
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -716,7 +512,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 
 	numOfDocs := f.DocsCount
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -726,7 +522,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -747,7 +543,7 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -772,24 +568,30 @@ func testBackupAndRestore(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestore(t *testing.T) {
-	testBackupAndRestore(t, false)
+	testBackupAndRestore(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreS3(t *testing.T) {
-	testBackupAndRestore(t, true)
+	testBackupAndRestore(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupAndRestoreAzure(t *testing.T) {
+	testBackupAndRestore(t, cloud.CloudProviderAzure)
 }
 
 // Test that CouchbaseBackup Status fields update when the initial backup job is created
 // Archive, Repo, RepoList, LastRun, Running will be updated once the job is started
 // LastSuccess, RepoList and Duration fields will be updated once the job is finished.
-func testUpdateBackupStatus(t *testing.T, s3 bool) {
+func testUpdateBackupStatus(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -798,7 +600,7 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -808,7 +610,7 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -840,21 +642,27 @@ func testUpdateBackupStatus(t *testing.T, s3 bool) {
 }
 
 func TestUpdateBackupStatus(t *testing.T) {
-	testUpdateBackupStatus(t, false)
+	testUpdateBackupStatus(t, cloud.NoCloudProvider)
 }
 
 func TestUpdateBackupStatusS3(t *testing.T) {
-	testUpdateBackupStatus(t, true)
+	testUpdateBackupStatus(t, cloud.CloudProviderAWS)
 }
 
-func testMultipleBackups(t *testing.T, s3 bool) {
+func TestUpdateBackupStatusAzure(t *testing.T) {
+	testUpdateBackupStatus(t, cloud.CloudProviderAzure)
+}
+
+func testMultipleBackups(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -862,7 +670,7 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 	// Create a normal cluster.
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -872,10 +680,10 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create Backup object 1.
-	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// Create Backup object 2.
-	backup2 := e2eutil.NewFullBackup(e2eutil.ScheduleIn(7*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup2 := e2eutil.NewFullBackup(e2eutil.ScheduleIn(7*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backups
 	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
@@ -907,21 +715,27 @@ func testMultipleBackups(t *testing.T, s3 bool) {
 }
 
 func TestMultipleBackups(t *testing.T) {
-	testMultipleBackups(t, false)
+	testMultipleBackups(t, cloud.NoCloudProvider)
 }
 
 func TestMultipleBackupsS3(t *testing.T) {
-	testMultipleBackups(t, true)
+	testMultipleBackups(t, cloud.CloudProviderAWS)
 }
 
-func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
+func TestMultipleBackupsAzure(t *testing.T) {
+	testMultipleBackups(t, cloud.CloudProviderAzure)
+}
+
+func testFullIncrementalOverTLS(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -932,7 +746,7 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -943,7 +757,7 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -968,25 +782,31 @@ func testFullIncrementalOverTLS(t *testing.T, s3 bool) {
 }
 
 func TestBackupFullIncrementalOverTLS(t *testing.T) {
-	testFullIncrementalOverTLS(t, false)
+	testFullIncrementalOverTLS(t, cloud.NoCloudProvider)
 }
 
 func TestBackupFullIncrementalOverTLSS3(t *testing.T) {
-	testFullIncrementalOverTLS(t, true)
+	testFullIncrementalOverTLS(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupFullIncrementalOverTLSAzure(t *testing.T) {
+	testFullIncrementalOverTLS(t, cloud.CloudProviderAzure)
 }
 
 func TestBackupFullOnlyOverTLSKubernetes(t *testing.T) {
-	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret, MultipleCAs: true}, nil)
+	testFullOnlyOverTLS(t, cloud.NoCloudProvider, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret, MultipleCAs: true}, nil)
 }
 
-func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2.ClientCertificatePolicy) {
+func testFullOnlyOverTLS(t *testing.T, providerType cloud.ProviderType, tls *e2eutil.TLSOpts, policy *v2.ClientCertificatePolicy) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -997,7 +817,7 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tls)
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, policy).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, policy).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -1008,7 +828,7 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1034,48 +854,61 @@ func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2
 }
 
 func TestBackupFullOnlyOverTLS(t *testing.T) {
-	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, nil)
+	testFullOnlyOverTLS(t, cloud.NoCloudProvider, &e2eutil.TLSOpts{}, nil)
 }
 
 func TestBackupFullOnlyOverTLSStandard(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding}
 
-	testFullOnlyOverTLS(t, false, opts, nil)
+	testFullOnlyOverTLS(t, cloud.NoCloudProvider, opts, nil)
 }
 
 func TestBackupFullOnlyOverMutualTLS(t *testing.T) {
 	policy := v2.ClientCertificatePolicyEnable
 
-	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, &policy)
+	testFullOnlyOverTLS(t, cloud.NoCloudProvider, &e2eutil.TLSOpts{}, &policy)
 }
 
 func TestBackupFullOnlyOverMandatoryMutualTLS(t *testing.T) {
 	policy := v2.ClientCertificatePolicyMandatory
 
-	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{}, &policy)
+	testFullOnlyOverTLS(t, cloud.NoCloudProvider, &e2eutil.TLSOpts{}, &policy)
 }
 
 func TestBackupFullOnlyOverTLSS3(t *testing.T) {
-	testFullOnlyOverTLS(t, true, &e2eutil.TLSOpts{}, nil)
+	testFullOnlyOverTLS(t, cloud.CloudProviderAWS, &e2eutil.TLSOpts{}, nil)
 }
 
 func TestBackupFullOnlyOverTLSS3Standard(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding}
 
-	testFullOnlyOverTLS(t, true, opts, nil)
+	testFullOnlyOverTLS(t, cloud.CloudProviderAWS, opts, nil)
 }
 
-func testBackupRetention(t *testing.T, s3 bool) {
+func TestBackupFullOnlyOverTLSAzure(t *testing.T) {
+	testFullOnlyOverTLS(t, cloud.CloudProviderAzure, &e2eutil.TLSOpts{}, nil)
+}
+
+func TestBackupFullOnlyOverTLSAzureStandard(t *testing.T) {
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding}
+
+	testFullOnlyOverTLS(t, cloud.CloudProviderAzure, opts, nil)
+}
+
+func testBackupRetention(t *testing.T, providerType cloud.ProviderType) {
 	// Platform configuration.
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1086,11 +919,11 @@ func testBackupRetention(t *testing.T, s3 bool) {
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// Trigger a full backup.
-	backup := e2eutil.NewFullBackup(e2eutil.ScheduleIn(5*time.Minute)).ToS3(s3BucketName).WithRetention(time.Minute).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithRetention(time.Minute).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
 
 	// Trigger another full backup, the old one should be discarded because it is
@@ -1104,23 +937,29 @@ func testBackupRetention(t *testing.T, s3 bool) {
 }
 
 func TestBackupRetention(t *testing.T) {
-	testBackupRetention(t, false)
+	testBackupRetention(t, cloud.NoCloudProvider)
 }
 
 func TestBackupRetentionS3(t *testing.T) {
-	testBackupRetention(t, true)
+	testBackupRetention(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupRetentionAzure(t *testing.T) {
+	testBackupRetention(t, cloud.CloudProviderAzure)
 }
 
 // Manually editing the size of the PVC in a CouchbaseBackup should be reflected in the PVC and PV
 // N.B. Requires a SC with allowVolumeExpansion: true.
-func testBackupPVCResize(t *testing.T, s3 bool) {
+func testBackupPVCResize(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster().ExpandableStorage()
 
@@ -1130,7 +969,7 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	// Create cluster.
 	numOfDocs := 100
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -1141,7 +980,7 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
@@ -1178,11 +1017,15 @@ func testBackupPVCResize(t *testing.T, s3 bool) {
 }
 
 func TestBackupPVCResize(t *testing.T) {
-	testBackupPVCResize(t, false)
+	testBackupPVCResize(t, cloud.NoCloudProvider)
 }
 
 func TestBackupPVCResizeS3(t *testing.T) {
-	testBackupPVCResize(t, true)
+	testBackupPVCResize(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupPVCResizeAzure(t *testing.T) {
+	testBackupPVCResize(t, cloud.CloudProviderAzure)
 }
 
 // TestBackupAutoscaling populates the database with a load of data, then backs it up.
@@ -1257,14 +1100,16 @@ func TestBackupAutoscaling(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
+func testBackupAndRestoreDisableEventing(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1274,7 +1119,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 	buckets := []v1.Object{}
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
 	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, v2.EventingService)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = dataQuota
@@ -1294,7 +1139,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[2].GetName(), f.DocsCount, 5*time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1320,7 +1165,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 	}
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithoutEventing().MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutEventing().MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// if eventing function is restored raise error.
@@ -1351,21 +1196,27 @@ func testBackupAndRestoreDisableEventing(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreDisableEventing(t *testing.T) {
-	testBackupAndRestoreDisableEventing(t, false)
+	testBackupAndRestoreDisableEventing(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreDisableEventingS3(t *testing.T) {
-	testBackupAndRestoreDisableEventing(t, true)
+	testBackupAndRestoreDisableEventing(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
+func TestBackupAndRestoreDisableEventingAzure(t *testing.T) {
+	testBackupAndRestoreDisableEventing(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestoreDisableGSI(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1373,7 +1224,7 @@ func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -1396,7 +1247,7 @@ func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
 	}
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1415,7 +1266,7 @@ func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithoutGSI().MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutGSI().MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check Index is not restored.
@@ -1446,21 +1297,27 @@ func testBackupAndRestoreDisableGSI(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreDisableGSI(t *testing.T) {
-	testBackupAndRestoreDisableGSI(t, false)
+	testBackupAndRestoreDisableGSI(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreDisableGSIS3(t *testing.T) {
-	testBackupAndRestoreDisableGSI(t, true)
+	testBackupAndRestoreDisableGSI(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
+func TestBackupAndRestoreDisableGSIAzure(t *testing.T) {
+	testBackupAndRestoreDisableGSI(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestoreDisableAnalytics(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1468,7 +1325,7 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
 	numOfDocs := f.DocsCount
 	clusterSize := constants.Size3
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
 	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, v2.AnalyticsService)
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -1500,7 +1357,7 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
 	}
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1523,7 +1380,7 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithoutAnalytics().MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutAnalytics().MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	datasetCount := e2eutil.MustGetDatasetCount(t, kubernetes, cluster, time.Minute)
@@ -1553,21 +1410,27 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreDisableAnalytics(t *testing.T) {
-	testBackupAndRestoreDisableAnalytics(t, false)
+	testBackupAndRestoreDisableAnalytics(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreDisableAnalyticsS3(t *testing.T) {
-	testBackupAndRestoreDisableAnalytics(t, true)
+	testBackupAndRestoreDisableAnalytics(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestoreDisableData(t *testing.T, s3 bool) {
+func TestBackupAndRestoreDisableAnalyticsAzure(t *testing.T) {
+	testBackupAndRestoreDisableAnalytics(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestoreDisableData(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1575,7 +1438,7 @@ func testBackupAndRestoreDisableData(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -1586,7 +1449,7 @@ func testBackupAndRestoreDisableData(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1607,7 +1470,7 @@ func testBackupAndRestoreDisableData(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithoutData().MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutData().MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that no items were restored.
@@ -1633,21 +1496,27 @@ func testBackupAndRestoreDisableData(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreDisableData(t *testing.T) {
-	testBackupAndRestoreDisableData(t, false)
+	testBackupAndRestoreDisableData(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreDisableDataS3(t *testing.T) {
-	testBackupAndRestoreDisableData(t, true)
+	testBackupAndRestoreDisableData(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
+func TestBackupAndRestoreDisableDataAzure(t *testing.T) {
+	testBackupAndRestoreDisableData(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1655,7 +1524,7 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
 	numOfDocs := f.DocsCount
 	clusterSize := constants.Size3
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -1666,7 +1535,7 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1685,7 +1554,7 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, newBucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithBucketConfig().MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithBucketConfig().MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// verify replica count was restored.
@@ -1721,21 +1590,27 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreEnableBucketConfig(t *testing.T) {
-	testBackupAndRestoreEnableBucketConfig(t, false)
+	testBackupAndRestoreEnableBucketConfig(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreEnableBucketConfigS3(t *testing.T) {
-	testBackupAndRestoreEnableBucketConfig(t, true)
+	testBackupAndRestoreEnableBucketConfig(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestoreMapBuckets(t *testing.T, s3 bool) {
+func TestBackupAndRestoreEnableBucketConfigAzure(t *testing.T) {
+	testBackupAndRestoreEnableBucketConfig(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestoreMapBuckets(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1746,13 +1621,13 @@ func testBackupAndRestoreMapBuckets(t *testing.T, s3 bool) {
 
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1771,7 +1646,7 @@ func testBackupAndRestoreMapBuckets(t *testing.T, s3 bool) {
 	e2eutil.MustNewBucket(t, kubernetes, newBucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithMapping(bucket.GetName(), targetBucketName).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithMapping(bucket.GetName(), targetBucketName).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, newBucket.GetName(), f.DocsCount, 5*time.Minute)
@@ -1796,21 +1671,27 @@ func testBackupAndRestoreMapBuckets(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreMapBuckets(t *testing.T) {
-	testBackupAndRestoreMapBuckets(t, false)
+	testBackupAndRestoreMapBuckets(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreMapBucketsS3(t *testing.T) {
-	testBackupAndRestoreMapBuckets(t, true)
+	testBackupAndRestoreMapBuckets(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
+func TestBackupAndRestoreMapBucketsAzure(t *testing.T) {
+	testBackupAndRestoreMapBuckets(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestoreIncludeBuckets(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1819,7 +1700,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	buckets := []v1.Object{}
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -1834,7 +1715,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	}
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1853,7 +1734,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 	}
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithIncludes(buckets[0].GetName()).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithIncludes(buckets[0].GetName()).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), f.DocsCount, time.Minute)
@@ -1881,21 +1762,27 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreIncludeBuckets(t *testing.T) {
-	testBackupAndRestoreIncludeBuckets(t, false)
+	testBackupAndRestoreIncludeBuckets(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreIncludeBucketsS3(t *testing.T) {
-	testBackupAndRestoreIncludeBuckets(t, true)
+	testBackupAndRestoreIncludeBuckets(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
+func TestBackupAndRestoreIncludeBucketsAzure(t *testing.T) {
+	testBackupAndRestoreIncludeBuckets(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestoreExcludeBuckets(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1904,7 +1791,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	buckets := []v1.Object{}
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2 * 256))
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -1922,7 +1809,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	}
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -1941,7 +1828,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 	}
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).WithExcludes(buckets[0].GetName()).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithExcludes(buckets[0].GetName()).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), 0, time.Minute)
@@ -1969,14 +1856,18 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreExcludeBuckets(t *testing.T) {
-	testBackupAndRestoreExcludeBuckets(t, false)
+	testBackupAndRestoreExcludeBuckets(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreExcludeBucketsS3(t *testing.T) {
-	testBackupAndRestoreExcludeBuckets(t, true)
+	testBackupAndRestoreExcludeBuckets(t, cloud.CloudProviderAWS)
 }
 
-func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
+func TestBackupAndRestoreExcludeBucketsAzure(t *testing.T) {
+	testBackupAndRestoreExcludeBuckets(t, cloud.CloudProviderAzure)
+}
+
+func testBackupAndRestoreNodeSelector(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTestExclusive(t)
@@ -1987,8 +1878,10 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 		e2eutil.Die(t, fmt.Errorf("failed to get node list: %w", err))
 	}
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -1996,9 +1889,10 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).Generate(kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
 	zone, ok := nodes.Items[0].Labels[constants.FailureDomainZoneLabel]
+
 	if !ok {
 		e2eutil.Die(nil, fmt.Errorf("node %s missing label %s", nodes.Items[0].Name, constants.FailureDomainZoneLabel))
 	}
@@ -2019,7 +1913,7 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).WithStorageClass(f.StorageClassName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithStorageClass(f.StorageClassName).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -2040,7 +1934,7 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that no items were restored.
@@ -2066,11 +1960,15 @@ func testBackupAndRestoreNodeSelector(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreNodeSelector(t *testing.T) {
-	testBackupAndRestoreNodeSelector(t, false)
+	testBackupAndRestoreNodeSelector(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreNodeSelectorS3(t *testing.T) {
-	testBackupAndRestoreNodeSelector(t, true)
+	testBackupAndRestoreNodeSelector(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupAndRestoreNodeSelectorAzure(t *testing.T) {
+	testBackupAndRestoreNodeSelector(t, cloud.CloudProviderAzure)
 }
 
 // TestBackupBucketInclusion tests we can selectively include a bucket in the backup.
@@ -2155,14 +2053,16 @@ func TestBackupBucketExclusion(t *testing.T) {
 // testBackupAndRestoreScopesAndCollection tests data backup taken of a bucket
 // with managed scopes and collections,
 // is restored successfully in a managed bucket with unmanaged scopes and collections.
-func testBackupAndRestoreScopesAndCollections(t *testing.T, s3 bool) {
+func testBackupAndRestoreScopesAndCollections(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
@@ -2183,7 +2083,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, s3 bool) {
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
@@ -2194,7 +2094,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, s3 bool) {
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, cluster)
 
 	// Create and wait for a backup
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
@@ -2207,7 +2107,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, s3 bool) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that all items were restored in collection.
@@ -2234,25 +2134,31 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreScopesAndCollections(t *testing.T) {
-	testBackupAndRestoreScopesAndCollections(t, false)
+	testBackupAndRestoreScopesAndCollections(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreScopesAndCollectionsS3(t *testing.T) {
-	testBackupAndRestoreScopesAndCollections(t, true)
+	testBackupAndRestoreScopesAndCollections(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupAndRestoreScopesAndCollectionsAzure(t *testing.T) {
+	testBackupAndRestoreScopesAndCollections(t, cloud.CloudProviderAzure)
 }
 
 // testBackupAndRestoreCollection tests data backup taken of a bucket
 // with managed scopes and collections,
 // is restored successfully in a managed bucket with managed scopes
 // and unmanaged collection.
-func testBackupAndRestoreCollections(t *testing.T, s3 bool) {
+func testBackupAndRestoreCollections(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
@@ -2273,7 +2179,7 @@ func testBackupAndRestoreCollections(t *testing.T, s3 bool) {
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
@@ -2284,7 +2190,7 @@ func testBackupAndRestoreCollections(t *testing.T, s3 bool) {
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, cluster)
 
 	// Create and wait for a backup
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
@@ -2306,7 +2212,7 @@ func testBackupAndRestoreCollections(t *testing.T, s3 bool) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that all items were restored in collection.
@@ -2334,23 +2240,29 @@ func testBackupAndRestoreCollections(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreCollections(t *testing.T) {
-	testBackupAndRestoreCollections(t, false)
+	testBackupAndRestoreCollections(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreCollectionsS3(t *testing.T) {
-	testBackupAndRestoreCollections(t, true)
+	testBackupAndRestoreCollections(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupAndRestoreCollectionsAzure(t *testing.T) {
+	testBackupAndRestoreCollections(t, cloud.CloudProviderAzure)
 }
 
 // testBackupAndRestoreScope tests data backup taken of a managed scope
 // is restored successfully in an unmanaged scope with the same name.
-func testBackupAndRestoreScope(t *testing.T, s3 bool) {
+func testBackupAndRestoreScope(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().PlatformIs(v2.PlatformTypeAWS)
 
@@ -2371,7 +2283,7 @@ func testBackupAndRestoreScope(t *testing.T, s3 bool) {
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
@@ -2386,7 +2298,7 @@ func testBackupAndRestoreScope(t *testing.T, s3 bool) {
 	backupInclude := fmt.Sprintf("%s.%s", bucket.GetName(), scopeName)
 
 	// Create and wait for a backup
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).Include(backupInclude).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).Include(backupInclude).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
@@ -2399,7 +2311,7 @@ func testBackupAndRestoreScope(t *testing.T, s3 bool) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -2428,23 +2340,29 @@ func testBackupAndRestoreScope(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreScope(t *testing.T) {
-	testBackupAndRestoreScope(t, false)
+	testBackupAndRestoreScope(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreScopeS3(t *testing.T) {
-	testBackupAndRestoreScope(t, true)
+	testBackupAndRestoreScope(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupAndRestoreScopeAzure(t *testing.T) {
+	testBackupAndRestoreScope(t, cloud.CloudProviderAzure)
 }
 
 // testBackupAndRestoreCollection tests data backup taken of a managed collection
 // is restored successfully in an unmanaged collection with the same name.
-func testBackupAndRestoreCollection(t *testing.T, s3 bool) {
+func testBackupAndRestoreCollection(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, s3)
-	defer s3cleanup()
+	provider := MustNewProvider(t, kubernetes, providerType)
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
 
 	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
@@ -2468,7 +2386,7 @@ func testBackupAndRestoreCollection(t *testing.T, s3 bool) {
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
@@ -2483,7 +2401,7 @@ func testBackupAndRestoreCollection(t *testing.T, s3 bool) {
 	backupInclude := fmt.Sprintf("%s.%s.%s", bucket.GetName(), scopeName, collectionName1)
 
 	// Create and wait for a backup
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).Include(backupInclude).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).Include(backupInclude).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
@@ -2496,7 +2414,7 @@ func testBackupAndRestoreCollection(t *testing.T, s3 bool) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that all items were restored in included collection only.
@@ -2524,11 +2442,15 @@ func testBackupAndRestoreCollection(t *testing.T, s3 bool) {
 }
 
 func TestBackupAndRestoreCollection(t *testing.T) {
-	testBackupAndRestoreCollection(t, false)
+	testBackupAndRestoreCollection(t, cloud.NoCloudProvider)
 }
 
 func TestBackupAndRestoreCollectionS3(t *testing.T) {
-	testBackupAndRestoreCollection(t, true)
+	testBackupAndRestoreCollection(t, cloud.CloudProviderAWS)
+}
+
+func TestBackupAndRestoreCollectionAzure(t *testing.T) {
+	testBackupAndRestoreCollection(t, cloud.CloudProviderAzure)
 }
 
 // TestBackupThenDelete tests that a backup resource can be created

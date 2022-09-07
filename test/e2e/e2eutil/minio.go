@@ -1,17 +1,10 @@
 package e2eutil
 
 import (
-	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
-	"log"
-	"math/big"
 	"net/http"
 	"testing"
 	"time"
@@ -266,84 +259,34 @@ func (minio *Minio) CleanUp() {
 	_ = minio.kubernetes.KubeClient.CoreV1().Services(minio.Namespace).Delete(context.TODO(), minio.Service.Name, metav1.DeleteOptions{})
 }
 
-func publicKey(priv interface{}) interface{} {
-	switch k := priv.(type) {
-	case *rsa.PrivateKey:
-		return &k.PublicKey
-	default:
-		return nil
-	}
-}
-
 func CreateTLSPair(kubernetes *types.Cluster, host string) (*v1.Secret, error) {
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	CA, err := NewCertificateAuthority(KeyTypeRSA, "Couchbase CA", validFrom, validTo, CertTypeCA)
 	if err != nil {
 		return nil, err
 	}
 
-	keyUsage := x509.KeyUsageDigitalSignature
-	keyUsage |= x509.KeyUsageKeyEncipherment
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour)
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	req := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS8, CertTypeServer, CreateCertReqDNS("Couchbase CA", []string{host}))
 
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	key, cert, err := req.Generate(CA, validFrom, validTo)
 	if err != nil {
-		log.Fatalf("Failed to generate serial number: %v", err)
-	}
-
-	template := x509.Certificate{
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization: []string{"Couchbase Testing"},
-		},
-		NotBefore: notBefore,
-		NotAfter:  notAfter,
-
-		KeyUsage:              keyUsage,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              []string{host},
-		IsCA:                  true,
-	}
-	template.KeyUsage |= x509.KeyUsageCertSign
-
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
-	if err != nil {
-		log.Fatalf("Failed to create certificate: %v", err)
-	}
-
-	cerr, err := CreateCertificate(derBytes)
-	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
-
-	privBytes, err := x509.MarshalPKCS8PrivateKey(priv)
-	if err != nil {
-		log.Fatalf("Unable to marshal private key: %v", err)
-	}
-
-	keyOut := &bytes.Buffer{}
-
-	if err := pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}); err != nil {
-		log.Fatalf("Failed to write data to private.key: %v", err)
-	}
-	// // Create the actual secrets.
-	secretName := "secret-tls"
 
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: secretName,
+			Name: "minio-secret",
 		},
-		Type: v1.SecretTypeTLS,
 		Data: map[string][]byte{
-			"tls.crt": cerr,
-			"tls.key": keyOut.Bytes(),
+			v1.TLSCertKey:       cert,
+			v1.TLSPrivateKeyKey: key,
 		},
 	}
 
-	if secret, err = CreateSecret(kubernetes, secret); err != nil {
+	secret, err = CreateSecret(kubernetes, secret)
+	if err != nil {
 		return nil, err
 	}
 

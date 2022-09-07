@@ -31,6 +31,12 @@ type BucketScopeOrCollectionNameWithDefaults string
 // +kubebuilder:validation:Pattern="^s3://[a-z0-9-\\.]{3,63}$"
 type S3BucketURI string
 
+// ObjectStoreURI is a reference to a remote object store.
+// This is the prefix of the object store and the bucket name.
+// i.e s3://bucket or az://bucket.
+// +kubebuilder:validation:Pattern="^(az|s3)://.{3,}$"
+type ObjectStoreURI string
+
 // CouchbaseBucketCompressionMode defines the available compression modes for Couchbase
 // and Ephemeral bucket types.
 // +kubebuilder:validation:Enum=off;passive;active
@@ -135,6 +141,19 @@ const (
 	CouchbaseEphemeralBucketMinimumDurabilityMajority CouchbaseEphemeralBucketMinimumDurability = "majority"
 )
 
+// ObjectStore allows for backing up to a remote cloud storage.
+type ObjectStoreSpec struct {
+	// URI is a reference to a remote object store.
+	// This is the prefix of the object store and the bucket name.
+	// i.e s3://bucket, az://bucket or gs://bucket.
+	URI ObjectStoreURI `json:"uri,omitempty"`
+
+	// ObjStoreSecret must contain two fields, access-key-id, secret-access-key and optionally region.
+	// These correspond to the fields used by cbbackupmgr
+	// https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-backup.html#optional-2
+	Secret string `json:"secret,omitempty"`
+}
+
 // CouchbaseBackup allows automatic backup of all data from a Couchbase cluster
 // into persistent storage.
 // +genclient
@@ -219,8 +238,12 @@ type CouchbaseBackupSpec struct {
 	// Name of StorageClass to use.
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
+	// DEPRECATED - by spec.objectStore.uri
 	// Name of S3 bucket to backup to. If non-empty this overrides local backup.
 	S3Bucket S3BucketURI `json:"s3bucket,omitempty"`
+
+	// ObjectStore allows for backing up to a remote cloud storage.
+	ObjectStore *ObjectStoreSpec `json:"objectStore,omitempty"`
 
 	// How many threads to use during the backup.  This field defaults to 1.
 	// +kubebuilder:default=1
@@ -497,8 +520,12 @@ type CouchbaseBackupRestoreSpec struct {
 	// +kubebuilder:default=2
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
 
+	// DEPRECATED - by spec.objectStore.uri
 	// Name of S3 bucket to restore from. If non-empty this overrides local backup.
 	S3Bucket S3BucketURI `json:"s3bucket,omitempty"`
+
+	// The remote destination for backup.
+	ObjectStore *ObjectStoreSpec `json:"objectStore,omitempty"`
 
 	// DEPRECATED - by spec.data.
 	// Specific buckets can be explicitly included or excluded in the restore,
@@ -2161,6 +2188,7 @@ type Backup struct {
 	// repositories and non-dockerhub ones.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
+	// Deprecated: by backup.spec.objectStore.secret
 	// S3Secret contains the region and credentials for operating backups in S3.
 	// This field must be popluated when the `spec.s3bucket` field is specified
 	// for a backup or restore resource.
