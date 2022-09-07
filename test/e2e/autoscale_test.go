@@ -151,12 +151,12 @@ func TestAutoscaleSelectiveMDS(t *testing.T) {
 }
 
 // TestAutoscaleUp tests that operator reacts to upscale requests from HPA.
-// 1. Create cluster with Autoscaling
-// 2. Create associate HPA with query config
-// 3. Set target value to 80
-// 4. As the custom metrics adaptor increments to 100, HPA will scale up at least once
-//      causing target value to drop within expected range
-// 5. Verify scale up.
+//  1. Create cluster with Autoscaling
+//  2. Create associate HPA with query config
+//  3. Set target value to 80
+//  4. As the custom metrics adaptor increments to 100, HPA will scale up at least once
+//     causing target value to drop within expected range
+//  5. Verify scale up.
 func TestAutoscaleUp(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global

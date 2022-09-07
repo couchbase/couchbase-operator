@@ -342,7 +342,6 @@ func (c *Cluster) bucketExists(bucket string) bool {
 	}
 
 	b, err := bucketList.Get(bucket)
-
 	if err != nil {
 		log.Info("Error retrieving bucket", "bucket", bucket)
 		return false
@@ -418,7 +417,6 @@ func (c *Cluster) handleRole(role couchbasev2.Role) ([]couchbaseutil.UserRole, e
 	}
 
 	roleCombinations, err := c.getRoleCombinations(role, buckets, scopes, collections)
-
 	if err != nil {
 		// handle validation errors
 		return roles, err

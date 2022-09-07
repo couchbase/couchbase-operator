@@ -55,6 +55,7 @@ func (minio *Minio) WithName(name string) *Minio {
 	minio.name = name
 	return minio
 }
+
 func (minio *Minio) WithTLS(enabled bool) *Minio {
 	minio.tls = enabled
 	return minio
@@ -82,7 +83,7 @@ func (minio *Minio) Create(t *testing.T) (*Minio, error) {
 }
 
 func (minio *Minio) WaitUntilReady(waitTime time.Duration) error {
-	var client = http.Client{}
+	client := http.Client{}
 
 	if minio.tls {
 		cert := minio.CASecret.Data["tls.crt"]
@@ -234,15 +235,16 @@ func (minio *Minio) createPod() error {
 			},
 		}
 
-		tlsVolMount := []v1.VolumeMount{{
-			Name:      volName,
-			MountPath: "/root/.minio/certs/private.key",
-			SubPath:   "tls.key",
-		}, {
-			Name:      volName,
-			MountPath: "/root/.minio/certs/public.crt",
-			SubPath:   "tls.crt",
-		},
+		tlsVolMount := []v1.VolumeMount{
+			{
+				Name:      volName,
+				MountPath: "/root/.minio/certs/private.key",
+				SubPath:   "tls.key",
+			}, {
+				Name:      volName,
+				MountPath: "/root/.minio/certs/public.crt",
+				SubPath:   "tls.crt",
+			},
 		}
 
 		minioPod.Spec.Volumes = append(minioPod.Spec.Volumes, tlsVol)
@@ -284,8 +286,8 @@ func CreateTLSPair(kubernetes *types.Cluster, host string) (*v1.Secret, error) {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
 		log.Fatalf("Failed to generate serial number: %v", err)
 	}

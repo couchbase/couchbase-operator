@@ -1712,8 +1712,9 @@ func getClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 // * correct keys exist in the secrets
 // * cerificate chain validates with the CA
 // * certificates are
-//   * in date
-//   * have the correct attributes
+//   - in date
+//   - have the correct attributes
+//
 // * leaf certificate has the correct SANs.
 func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subjectAltNames []string) []error {
 	if !cluster.IsTLSEnabled() || !v.Options.ValidateSecrets {

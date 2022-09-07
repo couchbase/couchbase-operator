@@ -12,23 +12,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var (
-	// clusterFixture is a basic cluster with a 1 minute log retention time
-	// and a maximum retention of 3 logs.
-	clusterFixture = &Cluster{
-		cluster: &couchbasev2.CouchbaseCluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default",
-			},
-			Spec: couchbasev2.ClusterSpec{
-				Logging: couchbasev2.CouchbaseClusterLoggingSpec{
-					LogRetentionTime:  "1m",
-					LogRetentionCount: 3,
-				},
+// clusterFixture is a basic cluster with a 1 minute log retention time
+// and a maximum retention of 3 logs.
+var clusterFixture = &Cluster{
+	cluster: &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+		},
+		Spec: couchbasev2.ClusterSpec{
+			Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+				LogRetentionTime:  "1m",
+				LogRetentionCount: 3,
 			},
 		},
-	}
-)
+	},
+}
 
 // janitorAbstractionInterfaceTestImpl implments the logPVCInterface interface
 // for unit tests. For each test it allows the pvcListing of a single invariant set
@@ -68,8 +66,8 @@ func (j *janitorAbstractionInterfaceTestImpl) LogPVCUpdate(pvc *corev1.Persisten
 	}
 
 	// Oddly reflect doesn't work here, probably nil vs empty slice
-	a, _ := json.Marshal(j.pvcUpdates[j.pvcUpdate])
-	b, _ := json.Marshal(pvc)
+	a, _ := json.Marshal(j.pvcUpdates[j.pvcUpdate]) //nolint: errchkjson
+	b, _ := json.Marshal(pvc)                       //nolint: errchkjson
 
 	if string(a) != string(b) {
 		j.t.Fatalf("Update() mismatch\nexpected: %s\nactual: %s", string(a), string(b))

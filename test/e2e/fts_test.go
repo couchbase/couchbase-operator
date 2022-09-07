@@ -103,7 +103,8 @@ func TestFTSResizeCluster(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{
 			Times:     2,
-			Validator: e2eutil.ClusterScaleUpSequence(1)},
+			Validator: e2eutil.ClusterScaleUpSequence(1),
+		},
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 

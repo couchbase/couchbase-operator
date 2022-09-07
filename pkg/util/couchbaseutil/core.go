@@ -7,7 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -27,9 +27,11 @@ const (
 	tcpConnectTimeout = 5 * time.Second
 )
 
-var ErrCertificateError = fmt.Errorf("certificate error")
-var ErrStatusError = fmt.Errorf("unexpected status code")
-var ErrUUIDError = fmt.Errorf("cluster UUID error")
+var (
+	ErrCertificateError = fmt.Errorf("certificate error")
+	ErrStatusError      = fmt.Errorf("unexpected status code")
+	ErrUUIDError        = fmt.Errorf("cluster UUID error")
+)
 
 func (c *Client) getTLSConfig() (*tls.Config, error) {
 	if c.tls == nil {
@@ -193,7 +195,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	// Read the body so we can display it for really verbose debugging.
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}

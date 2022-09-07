@@ -527,8 +527,8 @@ func (o *certifyOptions) deleteVolume() {
 // deleteNamespaces cleans up namespaces created by certification testing.
 func (o *certifyOptions) deleteNamespaces() {
 	selector, _ := labels.NewRequirement("app", selection.Equals, []string{namespaceLabel})
-	namespaces, err := o.client.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 
+	namespaces, err := o.client.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		util.PrintError("Error retrieving namespaces ...", err)
 	}
@@ -986,7 +986,7 @@ func (o *certifyOptions) profileCertification() {
 
 	dir := filepath.Join(o.profileDir.profileDir(), time.Now().Format("20060102T150405-0700"))
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return
 	}
 

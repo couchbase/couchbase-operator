@@ -128,8 +128,8 @@ func MustDisableCouchbaseAutoscaling(t *testing.T, k8s *types.Cluster, cluster *
 // MustCreateAverageValueHPA uses Averaging algorithm on target metrics to determine resize activity.
 func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, config *e2espec.HPAConfig) *autoscalingv2beta2.HorizontalPodAutoscaler {
 	hpa := e2espec.NewAverageValueHPA(name, config)
-	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), hpa, metav1.CreateOptions{})
 
+	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), hpa, metav1.CreateOptions{})
 	if err != nil {
 		Die(t, err)
 	}

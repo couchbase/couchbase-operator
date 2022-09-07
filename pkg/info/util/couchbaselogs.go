@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
@@ -130,7 +130,7 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 			path = filepath.Join(context.Config.Directory, path)
 		}
 
-		if err := ioutil.WriteFile(path, stdout.Bytes(), 0600); err != nil {
+		if err := os.WriteFile(path, stdout.Bytes(), 0o600); err != nil {
 			return err
 		}
 	}

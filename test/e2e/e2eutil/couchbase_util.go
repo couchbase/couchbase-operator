@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -295,7 +295,6 @@ func getDocs(d *DocumentSet) ([]map[string]interface{}, error) {
 		itemResult, err := collection.Get(fmt.Sprintf("%s%d", d.prefix, id), &gocb.GetOptions{
 			Timeout: 2 * time.Minute,
 		})
-
 		if err != nil {
 			return nil, err
 		}
@@ -860,7 +859,7 @@ func getEventingData(t *testing.T, kubernetes *types.Cluster, cluster *couchbase
 
 		defer response.Body.Close()
 
-		responseData, _ = ioutil.ReadAll(response.Body)
+		responseData, _ = io.ReadAll(response.Body)
 
 		if response.StatusCode != http.StatusOK {
 			return fmt.Errorf("remote call failed with response: %s %s", response.Status, string(responseData))
@@ -980,7 +979,7 @@ func ExecuteQuery(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, que
 
 		defer response.Body.Close()
 
-		data, err = ioutil.ReadAll(response.Body)
+		data, err = io.ReadAll(response.Body)
 		if err != nil {
 			return err
 		}
@@ -1010,6 +1009,7 @@ func MustExecuteAnalyticsQuery(t *testing.T, k8s *types.Cluster, cluster *couchb
 
 	return data
 }
+
 func getAnalyticsData(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, query string, timeout time.Duration) (int64, error) {
 	data, err := ExecuteAnalyticsQuery(k8s, cluster, query, timeout)
 	if err != nil {

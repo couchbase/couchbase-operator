@@ -70,10 +70,8 @@ var (
 	}
 )
 
-var (
-	// dataServiceMemoryQuota is enough memory to support the bucket requirements.
-	dataServiceMemoryQuota = e2espec.NewResourceQuantityMi(300)
-)
+// dataServiceMemoryQuota is enough memory to support the bucket requirements.
+var dataServiceMemoryQuota = e2espec.NewResourceQuantityMi(300)
 
 const (
 	// function is a basic test eventing function that populates a destination

@@ -18,8 +18,10 @@ import (
 
 var log = logf.Log.WithName("api")
 
-var ErrTypeError = fmt.Errorf("unsupported type")
-var ErrMemberError = fmt.Errorf("member error")
+var (
+	ErrTypeError   = fmt.Errorf("unsupported type")
+	ErrMemberError = fmt.Errorf("member error")
+)
 
 // Certificate and key used by TLS client authentication.
 type TLSClientAuth struct {

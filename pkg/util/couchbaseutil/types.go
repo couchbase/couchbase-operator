@@ -11,9 +11,11 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
-var ErrInvalidResourceName = fmt.Errorf("unsupported resource name")
-var ErrMissingResource = fmt.Errorf("requested resource not found")
-var ErrDuplicatedResource = fmt.Errorf("requested resource duplicated")
+var (
+	ErrInvalidResourceName = fmt.Errorf("unsupported resource name")
+	ErrMissingResource     = fmt.Errorf("requested resource not found")
+	ErrDuplicatedResource  = fmt.Errorf("requested resource duplicated")
+)
 
 type RebalanceStatus string
 
@@ -381,8 +383,10 @@ type PoolsDefaults struct {
 	AnalyticsMemoryQuota int64  `url:"cbasMemoryQuota,omitempty"`
 }
 
-type IoPriorityType string
-type IoPriorityThreadCount int
+type (
+	IoPriorityType        string
+	IoPriorityThreadCount int
+)
 
 const (
 	IoPriorityTypeLow         IoPriorityType        = "low"

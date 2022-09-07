@@ -21,8 +21,8 @@ func TestCustomMarshallingOfUserRole(t *testing.T) {
 		  }`
 	data := []byte(jsonRole)
 	role := &UserRole{}
-	err := json.Unmarshal(data, &role)
 
+	err := json.Unmarshal(data, &role)
 	if err != nil {
 		t.Errorf("Error while unmarshalling json %s", err)
 	}
@@ -57,8 +57,8 @@ func TestCustomMarshallDoesNotFailifMissingFields(t *testing.T) {
 		  }`
 	data := []byte(jsonRole)
 	role := &UserRole{}
-	err := json.Unmarshal(data, &role)
 
+	err := json.Unmarshal(data, &role)
 	if err != nil {
 		t.Errorf("Error while unmarshalling json %s", err)
 	}
@@ -84,8 +84,8 @@ func TestCustomMarshallReplacesAsterickWithBlankOnCollection(t *testing.T) {
 		  }`
 	data := []byte(jsonRole)
 	role := &UserRole{}
-	err := json.Unmarshal(data, &role)
 
+	err := json.Unmarshal(data, &role)
 	if err != nil {
 		t.Errorf("Error while unmarshalling json %s", err)
 	}
@@ -123,8 +123,8 @@ func TestCustomMarshallReplacesAsterickWithBlankOnScope(t *testing.T) {
 		  }`
 	data := []byte(jsonRole)
 	role := &UserRole{}
-	err := json.Unmarshal(data, &role)
 
+	err := json.Unmarshal(data, &role)
 	if err != nil {
 		t.Errorf("Error while unmarshalling json %s", err)
 	}

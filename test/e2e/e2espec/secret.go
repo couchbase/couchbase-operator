@@ -7,12 +7,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var (
-	BasicSecretData = map[string][]byte{
-		constants.SecretUsernameKey: []byte(constants.CbClusterUsername),
-		constants.SecretPasswordKey: []byte(constants.CbClusterPassword),
-	}
-)
+var BasicSecretData = map[string][]byte{
+	constants.SecretUsernameKey: []byte(constants.CbClusterUsername),
+	constants.SecretPasswordKey: []byte(constants.CbClusterPassword),
+}
 
 func NewDefaultSecret(namespace string) *v1.Secret {
 	return &v1.Secret{

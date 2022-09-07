@@ -126,7 +126,7 @@ func NewVolumeExpandStartedEvent(volumeName string, from string, to string, cl *
 	return k8sutil.ExpandVolumeStartedEvent(volumeName, from, to, cl)
 }
 
-//  VolumeExpansionSuccessSequence combines the successful series of events associated with expanding persistent volumes.
+// VolumeExpansionSuccessSequence combines the successful series of events associated with expanding persistent volumes.
 func VolumeExpansionSuccessSequence() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{

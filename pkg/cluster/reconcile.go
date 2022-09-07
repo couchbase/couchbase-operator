@@ -61,16 +61,16 @@ func (l reconcileFuncList) run(c *Cluster) error {
 
 // reconcile is the main function for the whole cluster lifecycle.  It works like this:
 //
-// * Deletes any completed pods, these are not considered as members, but do pollute the
-//   namespace and will prevent clusters from being resurrected.  Pods typically enter this
-//   state when Kubernetes comes back from the dead.
-// * Setup any networking, this is essential for the Operator to be able to contact any
-//   pods to perform initialization or reconciliation actions.
-// * Create an initial member if there are no members, this handles creation and recovery
-//   if an in-memory cluster has vanished.
-// * Fix up TLS, we will be completely unable to communicate with the cluster if this is
-//   not performed first.
-// * Topology and feature updates.
+//   - Deletes any completed pods, these are not considered as members, but do pollute the
+//     namespace and will prevent clusters from being resurrected.  Pods typically enter this
+//     state when Kubernetes comes back from the dead.
+//   - Setup any networking, this is essential for the Operator to be able to contact any
+//     pods to perform initialization or reconciliation actions.
+//   - Create an initial member if there are no members, this handles creation and recovery
+//     if an in-memory cluster has vanished.
+//   - Fix up TLS, we will be completely unable to communicate with the cluster if this is
+//     not performed first.
+//   - Topology and feature updates.
 func (c *Cluster) reconcile() error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
 	defer log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
@@ -242,20 +242,21 @@ func (c *Cluster) reconcilePeerServices() error {
 // 2. If we are currently in a rebalance then we should finish it.
 // 3. If any nodes are down then wait for them to be failed over.
 // 4. Decide which nodes should be removed and whether we need to add nodes.
-//    - Nodes added to the cluster that are failed, but not rebalanced should
-//      be removed.
-//    - Nodes that have been failed over should be removed from the cluster
-//      and rebalanced out.
-//    - Nodes that are pending addition, healthy, but not yet rebalanced in
-//      should be fully added in.
-//    - Healthy active nodes should remain in the cluster.
-// 5. We will now know what the current cluster would look like if we handled
-//    any issues with the current nodes in the cluster. We now need to either
-//    remove healthy nodes if we're scaling down, or add noew nodes if we need
-//    to scale up.
-// 6. Run a rebalance if necessary.
-// 7. Remove any nodes from the cached member set that are not part actually
-//    part of the cluster.
+//   - Nodes added to the cluster that are failed, but not rebalanced should
+//     be removed.
+//   - Nodes that have been failed over should be removed from the cluster
+//     and rebalanced out.
+//   - Nodes that are pending addition, healthy, but not yet rebalanced in
+//     should be fully added in.
+//   - Healthy active nodes should remain in the cluster.
+//     5. We will now know what the current cluster would look like if we handled
+//     any issues with the current nodes in the cluster. We now need to either
+//     remove healthy nodes if we're scaling down, or add noew nodes if we need
+//     to scale up.
+//     6. Run a rebalance if necessary.
+//     7. Remove any nodes from the cached member set that are not part actually
+//     part of the cluster.
+//
 // Returns true if reconciliation completed properly.
 func (c *Cluster) reconcileMembers(rm *ReconcileMachine) (bool, error) {
 	return rm.exec(c)

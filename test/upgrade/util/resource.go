@@ -3,7 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -41,7 +41,7 @@ func parseYAMLs(data []byte) ([]*unstructured.Unstructured, error) {
 
 // LoadYAMLs reads the specified file and returns an ordered list of YAML blobs.
 func LoadYAMLs(path string) ([]*unstructured.Unstructured, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

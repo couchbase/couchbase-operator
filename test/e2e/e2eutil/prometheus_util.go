@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -84,7 +84,7 @@ func getPodMetrics(k8s *types.Cluster, podName, podPort string, ctx *TLSContext)
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("unable to read response %s for pod %s", uri, podName)
 	}
@@ -298,7 +298,7 @@ func CheckPrometheusWithAuthSecret(k8s *types.Cluster, couchbase *couchbasev2.Co
 		defer resp.Body.Close()
 
 		// Buffer up the responses
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			fmt.Printf("unable to read response %s for pod %s\n", uri, pod.Name)
 			continue

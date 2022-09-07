@@ -63,6 +63,7 @@ func AwsHelper(accessKey, secretID, region string) *AWSHelperOptions {
 		region:    region,
 	}
 }
+
 func (o *AWSHelperOptions) WithEndpoint(endpoint string) *AWSHelperOptions {
 	o.endpoint = endpoint
 
@@ -152,6 +153,7 @@ func (helper *AWSUtil) attachPolicyToRole() error {
 
 	return err
 }
+
 func (helper *AWSUtil) getIAM() *iam.IAM {
 	if helper.iam == nil {
 		helper.iam = iam.New(helper.Sess)
@@ -188,7 +190,6 @@ func (helper *AWSUtil) createPolicy(s3Bucket string) error {
 		PolicyDocument: aws.String(string(b)),
 		PolicyName:     aws.String("certification-test-policy-" + RandomString(6)),
 	})
-
 	if err != nil {
 		return err
 	}
@@ -236,8 +237,8 @@ func (helper *AWSUtil) createRole(namespace string, accountid string, oidcProvid
 
 	result, err := svc.CreateRole(&iam.CreateRoleInput{
 		AssumeRolePolicyDocument: aws.String(string(b)),
-		RoleName:                 aws.String("certification-test-role-" + RandomString(6))})
-
+		RoleName:                 aws.String("certification-test-role-" + RandomString(6)),
+	})
 	if err != nil {
 		return err
 	}
@@ -270,7 +271,6 @@ func (helper *AWSUtil) Cleanup() {
 func annotateServiceRoleWithIAM(t *testing.T, kubernetes *types.Cluster, arn string) {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		serviceAccount, err := kubernetes.KubeClient.CoreV1().ServiceAccounts(kubernetes.Namespace).Get(context.Background(), config.BackupResourceName, v1.GetOptions{})
-
 		if err != nil {
 			Die(t, err)
 		}

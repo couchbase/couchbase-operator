@@ -20,23 +20,21 @@ const (
 	serverCN = "Server"
 )
 
-var (
-	// reqTemplate is a valid request template.
-	reqTemplate = KeyPairRequest{
-		KeyType:   KeyTypeRSA,
-		CertType:  CertTypeServer,
-		ValidFrom: time.Now(),
-		ValidTo:   time.Now().Add(time.Hour),
-		Req: &x509.CertificateRequest{
-			Subject: pkix.Name{
-				CommonName: serverCN,
-			},
-			DNSNames: []string{
-				validZone,
-			},
+// reqTemplate is a valid request template.
+var reqTemplate = KeyPairRequest{
+	KeyType:   KeyTypeRSA,
+	CertType:  CertTypeServer,
+	ValidFrom: time.Now(),
+	ValidTo:   time.Now().Add(time.Hour),
+	Req: &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: serverCN,
 		},
-	}
-)
+		DNSNames: []string{
+			validZone,
+		},
+	},
+}
 
 // rootCAsFromCA returns a CA pool from a single CA.
 func rootCAsFromCA(ca *CertificateAuthority) [][]byte {

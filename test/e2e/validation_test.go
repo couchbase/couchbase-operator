@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -101,7 +101,7 @@ func (failures *failureList) CheckFailures(t *testing.T) {
 // around in a generic way.  To this end we use the object interface which all API
 // types implement.
 func loadResources(path string) (resourceList, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -1945,14 +1945,16 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 				}).
 				Replace("/explicitMapping/allowRules/0/targetKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
 					Scope:      "scope0",
-					Collection: "lola"}).
+					Collection: "lola",
+				}).
 				Replace("/explicitMapping/allowRules/1/sourceKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
 					Scope:      "scope0",
 					Collection: "bugs",
 				}).
 				Replace("/explicitMapping/allowRules/1/targetKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
 					Scope:      "scope0",
-					Collection: "collection0"})},
+					Collection: "collection0",
+				})},
 			shouldFail:     true,
 			expectedErrors: []string{`explicitMapping.allowRules(\[1\])?.sourceKeyspace`},
 		},
@@ -1966,7 +1968,8 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 				}).
 				Replace("/explicitMapping/allowRules/0/targetKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
 					Scope:      "scope0",
-					Collection: "lola"}).
+					Collection: "lola",
+				}).
 				Replace("/explicitMapping/allowRules/1/sourceKeyspace", &couchbasev2.CouchbaseReplicationKeyspace{
 					Scope:      "scope0",
 					Collection: "collection0",
@@ -2226,14 +2229,12 @@ func TestNegValidationCreateCouchbaseScopesAndCollections(t *testing.T) {
 			expectedErrors: []string{`spec.name`},
 		},
 		{
-
 			name:           "TestValidateScopeNameIllegalCharacter",
 			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "abc&")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.name`},
 		},
 		{
-
 			name:           "TestValidateScopeNameIllegalFirstCharacter",
 			mutations:      patchMap{"scope0": jsonpatch.NewPatchSet().Add("/spec/name", "%pewpew")},
 			shouldFail:     true,

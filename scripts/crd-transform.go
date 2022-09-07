@@ -4,7 +4,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -288,7 +287,7 @@ func main() {
 	flag.StringVar(&out, "out", "example/crd.yaml", "Output file")
 	flag.Parse()
 
-	input, err := ioutil.ReadFile(in)
+	input, err := os.ReadFile(in)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -352,7 +351,7 @@ func main() {
 
 	output := strings.Join(manifests, "---\n")
 
-	if err := ioutil.WriteFile(out, []byte(output), 0644); err != nil {
+	if err := os.WriteFile(out, []byte(output), 0o644); err != nil {
 		glog.Exit(err)
 	}
 }

@@ -17,6 +17,16 @@ linters:
   # Selectively disable things to get a pass.  These probably are
   # masking bugs so re-enable and fix them!
   disable:
+  - varnamelen
+  - exhaustruct
+  - contextcheck
+  - nosprintfhostport
+  - nonamedreturns
+  - nilnil
+  - maintidx
+  - ireturn
+  - gosimple
+  - containedctx
   - gosec # insecure!
   - nestif # complicated code
   - gomnd # magic numbers

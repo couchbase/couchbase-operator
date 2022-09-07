@@ -7,15 +7,13 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 )
 
-var (
-	replicationSpec = couchbasev2.CouchbaseReplicationSpec{
-		Bucket:           "bucket",
-		RemoteBucket:     "remoteBucket",
-		CompressionType:  "Auto",
-		FilterExpression: "",
-		Paused:           false,
-	}
-)
+var replicationSpec = couchbasev2.CouchbaseReplicationSpec{
+	Bucket:           "bucket",
+	RemoteBucket:     "remoteBucket",
+	CompressionType:  "Auto",
+	FilterExpression: "",
+	Paused:           false,
+}
 
 func TestXDCRGenerateMigrationMappings(t *testing.T) {
 	t.Parallel()

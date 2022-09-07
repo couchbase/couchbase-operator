@@ -125,8 +125,8 @@ func (c *Cluster) autoscalingReady() bool {
 
 		// Check if we need to wait for the stabilization period to complete.
 		stabilizationPeriod := c.cluster.Spec.AutoscaleStabilizationPeriod
-		stabilizationStartTime, err := time.Parse(time.RFC3339, autoscaleReadyCondition.LastTransitionTime)
 
+		stabilizationStartTime, err := time.Parse(time.RFC3339, autoscaleReadyCondition.LastTransitionTime)
 		if err != nil {
 			message := fmt.Sprintf("Failed to parse transition time from autoscale condition %v", err)
 			log.Error(err, message, "cluster", c.namespacedName())
@@ -349,8 +349,8 @@ func (c *Cluster) endAutoscalingMaintenanceMode() error {
 			// Restore autoscaler size from the config size
 			requestedAutoscaler := autoscaler.DeepCopy()
 			requestedAutoscaler.Spec.Size = config.Size
-			_, err := k8sutil.UpdateAutoscaler(c.k8s, c.cluster.Namespace, requestedAutoscaler)
 
+			_, err := k8sutil.UpdateAutoscaler(c.k8s, c.cluster.Namespace, requestedAutoscaler)
 			if err != nil {
 				return err
 			}

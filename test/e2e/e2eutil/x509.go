@@ -14,7 +14,7 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -1217,7 +1217,7 @@ func tlsCheckForPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, p
 
 	defer response.Body.Close()
 
-	raw, err := ioutil.ReadAll(response.Body)
+	raw, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}

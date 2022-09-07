@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -96,7 +95,7 @@ func hasPath(path string, paths []string) bool {
 // situations, the actual contents are irrelevant.
 func mustVerifyArchiveMetadata(t *testing.T, archive string, withOperator bool, clusters ...*couchbasev2.CouchbaseCluster) {
 	// Open the archive file.
-	file, err := os.OpenFile(archive, os.O_RDONLY, 0444)
+	file, err := os.OpenFile(archive, os.O_RDONLY, 0o444)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -134,7 +133,7 @@ func mustVerifyArchiveMetadata(t *testing.T, archive string, withOperator bool, 
 			continue
 		}
 
-		if buf, err = ioutil.ReadAll(tarReader); err != nil {
+		if buf, err = io.ReadAll(tarReader); err != nil {
 			e2eutil.Die(t, err)
 		}
 	}
@@ -201,7 +200,7 @@ func mustVerifyArchiveMetadata(t *testing.T, archive string, withOperator bool, 
 // are not present, or unexpected files are present.
 func mustVerifyArchiveContents(t *testing.T, archive string, expected []string) {
 	// Open the archive file.
-	file, err := os.OpenFile(archive, os.O_RDONLY, 0444)
+	file, err := os.OpenFile(archive, os.O_RDONLY, 0o444)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -346,7 +345,7 @@ func mustVerifyServerLogs(t *testing.T, k8s *types.Cluster, archive string, reda
 	dir := filepath.Dir(archive)
 
 	// List all files.
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -704,12 +703,12 @@ func cbopinfo(t *testing.T, args e2eutil.ArgumentList) (string, func()) {
 	// they get cleaned up by Jenkins.
 	pwd := "/artifacts"
 
-	temp, err := ioutil.TempDir(pwd, "test-logs-")
+	temp, err := os.MkdirTemp(pwd, "test-logs-")
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	if err := os.MkdirAll(temp, 0755); err != nil {
+	if err := os.MkdirAll(temp, 0o755); err != nil {
 		e2eutil.Die(t, err)
 	}
 
@@ -906,7 +905,7 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	kubeconfig, err := ioutil.TempFile("/tmp", "*")
+	kubeconfig, err := os.CreateTemp("/tmp", "*")
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -1201,7 +1200,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	kubeconfig, err := ioutil.TempFile("/tmp", "*")
+	kubeconfig, err := os.CreateTemp("/tmp", "*")
 	if err != nil {
 		e2eutil.Die(t, err)
 	}

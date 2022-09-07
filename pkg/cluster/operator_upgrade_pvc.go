@@ -102,9 +102,9 @@ func (r *pvcUpgradableResource) commit(item int) error {
 }
 
 // upgradePersistentVolumeClaimFrom000000To020300 performs pvc upgrades to 2.3.0 from any version.
-// * The server group label was changed from failure-domain.beta.kubernetes.io/zone
-//   to topology.kubernetes.io/zone.
-// * It got a new image label.
+//   - The server group label was changed from failure-domain.beta.kubernetes.io/zone
+//     to topology.kubernetes.io/zone.
+//   - It got a new image label.
 func upgradePersistentVolumeClaimFrom000000To020300(cluster *Cluster, pvc *corev1.PersistentVolumeClaim) error {
 	// If the PVC doesn't have a server config annotation then
 	// there isn't any need to add the server image annotation

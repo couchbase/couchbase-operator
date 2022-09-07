@@ -247,7 +247,7 @@ REVISION := $(shell git rev-parse HEAD)
 # and also avoid scruitiny from scanners.
 GOPATH := $(shell go env GOPATH)
 GOBIN := $(if $(GOPATH),$(GOPATH)/bin,$(HOME)/go/bin)
-GOLINT_VERSION := v1.42.1
+GOLINT_VERSION := v1.46.0
 CODE_GENERATOR_VERSION := v0.23.2 # Should be kept in sync with other libs in go.mod
 CONTROLLER_TOOLS_VERSION := v0.8.0 # See https://github.com/kubernetes-sigs/controller-tools/releases
 

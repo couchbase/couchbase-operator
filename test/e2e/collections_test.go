@@ -15,13 +15,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-var (
-	// defaultLabelSelector is used to select scope and collection
-	// resources for implicit referencing.
-	defaultLabelSelector = map[string]string{
-		"chicken": "boo",
-	}
-)
+// defaultLabelSelector is used to select scope and collection
+// resources for implicit referencing.
+var defaultLabelSelector = map[string]string{
+	"chicken": "boo",
+}
 
 // TestScopeCreateExplicit tests scope selectors in buckets can reference
 // scopes and scope groups explicitly.

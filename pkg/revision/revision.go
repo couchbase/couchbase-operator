@@ -1,8 +1,6 @@
 package revision
 
-var (
-	gitRevision = ""
-)
+var gitRevision = ""
 
 // Revision returns the SCM revision information for development builds to
 // pinpoint the exact source code tree a defect was raised against.  If the

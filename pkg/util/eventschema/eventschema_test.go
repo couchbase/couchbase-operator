@@ -2,7 +2,7 @@ package eventschema
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -11,7 +11,7 @@ import (
 // mustValidate validates an event list against a schema dying on error.
 func mustValidate(t *testing.T, events []corev1.Event, schema Validatable) {
 	v := Validator{Events: events, Schema: schema}
-	if err := v.Validate(ioutil.Discard); err != nil {
+	if err := v.Validate(io.Discard); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -20,7 +20,7 @@ func mustValidate(t *testing.T, events []corev1.Event, schema Validatable) {
 func mustNotValidate(t *testing.T, events []corev1.Event, schema Validatable, expectedErr error) {
 	v := Validator{Events: events, Schema: schema}
 
-	err := v.Validate(ioutil.Discard)
+	err := v.Validate(io.Discard)
 	if err == nil {
 		t.Fatal(err)
 	}

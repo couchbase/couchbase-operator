@@ -3,7 +3,7 @@ package analyzer
 import (
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -443,7 +443,7 @@ func Report() {
 
 	// TODO: There is a chance here that the timestamps will collide, work out how to make this
 	// totally unique when running in parallel.
-	if err := ioutil.WriteFile(fmt.Sprintf("/artifacts/results-%s.xml", time.Now().Format(time.RFC3339Nano)), data, 0660); err != nil {
+	if err := os.WriteFile(fmt.Sprintf("/artifacts/results-%s.xml", time.Now().Format(time.RFC3339Nano)), data, 0o660); err != nil {
 		logrus.Warn("unable to write junit xml", err)
 		return
 	}

@@ -18,9 +18,7 @@ type Fixture struct {
 	K map[string]*Fixture
 }
 
-var (
-	fixture = &Fixture{}
-)
+var fixture = &Fixture{}
 
 func mustAdd(t *testing.T, document interface{}, path string, value interface{}) {
 	if err := add(document, path, value); err != nil {

@@ -1,7 +1,7 @@
 package portforward
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -56,7 +56,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 	pf.stopChan = make(chan struct{})
 	pf.readyChan = make(chan struct{})
 
-	portForwarder, err := portforward.New(dialer, []string{pf.Port}, pf.stopChan, pf.readyChan, ioutil.Discard, ioutil.Discard)
+	portForwarder, err := portforward.New(dialer, []string{pf.Port}, pf.stopChan, pf.readyChan, io.Discard, io.Discard)
 	if err != nil {
 		return err
 	}

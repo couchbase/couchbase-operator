@@ -14,6 +14,4 @@ const (
 	imagePullPolicyDefault = string(corev1.PullIfNotPresent)
 )
 
-var (
-	imageDefault = imageRepo + "/couchbase/operator-certification:" + version.WithRevision()
-)
+var imageDefault = imageRepo + "/couchbase/operator-certification:" + version.WithRevision()

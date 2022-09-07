@@ -25,18 +25,16 @@ const (
 	targetVersionIllegalDowngrade = "couchbase/server:enterprise-5.0.0"
 )
 
-var (
-	// upgradeSequence is a common upgrade sequence of adding a node, balancing it
-	// in, ejecting another and the rebalance completing.
-	upgradeSequence = eventschema.Sequence{
-		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-		},
-	}
-)
+// upgradeSequence is a common upgrade sequence of adding a node, balancing it
+// in, ejecting another and the rebalance completing.
+var upgradeSequence = eventschema.Sequence{
+	Validators: []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	},
+}
 
 // rollingUpgradeSequence is what to expect when a cluster is upgraded all at once.
 func rollingUpgradeSequence(clusterSize, maxNumber int) eventschema.Validatable {

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
@@ -28,7 +29,7 @@ func getMetrics(path string) ([]metricsv1beta1.PodMetrics, error) {
 	for _, sample := range samples {
 		metricsFile := filepath.Join(path, sample.Name(), metricsFileBase)
 
-		metricsJSON, err := ioutil.ReadFile(metricsFile)
+		metricsJSON, err := os.ReadFile(metricsFile)
 		if err != nil {
 			return nil, err
 		}

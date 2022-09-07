@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -640,7 +639,7 @@ func recreateCRDs(k8s *types.Cluster) error {
 		}
 	}
 
-	crdsRaw, err := ioutil.ReadFile("/crd.yaml")
+	crdsRaw, err := os.ReadFile("/crd.yaml")
 	if err != nil {
 		return err
 	}
@@ -696,8 +695,8 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	logrus.Info("Cleaning-Up Namespaces")
 
 	selector, _ := labels.NewRequirement(constants.LabelApp, selection.Equals, []string{namespaceLabel})
-	namespaces, err := k8s.KubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 
+	namespaces, err := k8s.KubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return err
 	}

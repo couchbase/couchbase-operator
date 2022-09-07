@@ -7,9 +7,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
-var (
-	logsMeta LogsMetadata
-)
+var logsMeta LogsMetadata
 
 // Init fills in as much useful platform information as it can get.
 func Init(ctx *context.Context, args []string) error {

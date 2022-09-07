@@ -60,7 +60,6 @@ const (
 
 // Configuration for a HorizontalPodAutoscaler.
 type HPAConfig struct {
-
 	// Minimum number of Couchbase Pods when scaling down
 	MinSize int32
 

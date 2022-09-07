@@ -1658,7 +1658,6 @@ type BucketLocalObjectReference struct {
 }
 
 type ScopeRoleSpec struct {
-
 	// Resources is an explicit list of named resources that will be considered
 	// for inclusion in this scope or scopes.  If a resource reference doesn't
 	// match a resource, then no error conditions are raised due to undefined
@@ -1672,7 +1671,6 @@ type ScopeRoleSpec struct {
 }
 
 type CollectionRoleSpec struct {
-
 	// Resources is an explicit list of named resources that will be considered
 	// for inclusion in this collection or collections.  If a resource reference doesn't
 	// match a resource, then no error conditions are raised due to undefined

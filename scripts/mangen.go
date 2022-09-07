@@ -95,6 +95,7 @@ func writeResourceDocumentation(file io.StringWriter, resource *resource.Collect
 		write(file, "Reason: %s", resource.Reason)
 	}
 }
+
 func normalize(s string) string {
 	lines := []string{}
 
@@ -204,7 +205,7 @@ func main() {
 	}
 
 	for _, document := range documents {
-		file, err := os.OpenFile("docs/user/modules/ROOT/pages/tools/"+document.name+".adoc", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		file, err := os.OpenFile("docs/user/modules/ROOT/pages/tools/"+document.name+".adoc", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -222,5 +223,4 @@ func main() {
 
 		file.Close()
 	}
-
 }

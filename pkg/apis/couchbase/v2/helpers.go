@@ -183,7 +183,6 @@ func (sc *ServerConfig) AutoscalerName(cluster string) string {
 }
 
 func (cs *ClusterSpec) Cleanup() {
-
 }
 
 func (cs *ClusterSpec) TotalSize() int {

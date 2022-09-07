@@ -36,7 +36,7 @@ func NewTGZ(config *config.Configuration) (Backend, error) {
 func (b *tgzBackend) WriteFile(path, data string) error {
 	header := &tar.Header{
 		Name: path,
-		Mode: 0644,
+		Mode: 0o644,
 		Size: int64(len(data)),
 	}
 	if err := b.writer.WriteHeader(header); err != nil {
@@ -65,7 +65,7 @@ func (b *tgzBackend) Close() error {
 		path = filepath.Join(b.directory, path)
 	}
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		return err
 	}

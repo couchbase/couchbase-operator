@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -61,11 +60,9 @@ var (
 	minVersion = "7.0.0"
 )
 
-var (
-	// log is the interface all logging should use, so we can control the verbosity
-	// of logs for supportability and UX.
-	log = cli.NewLogger()
-)
+// log is the interface all logging should use, so we can control the verbosity
+// of logs for supportability and UX.
+var log = cli.NewLogger()
 
 // intMin returns the smaller of two signed integers.
 func intMin(a, b int) int {
@@ -192,11 +189,9 @@ func newPathVar() pathVar {
 	}
 }
 
-var (
-	// defaultPath is used as default for operations that work implictly
-	// on full trees.
-	defaultPath = newPathVar()
-)
+// defaultPath is used as default for operations that work implictly
+// on full trees.
+var defaultPath = newPathVar()
 
 // clients is a container for various Kubernetes interfaces.
 type clients struct {
@@ -406,7 +401,7 @@ func (o *saveOptions) save(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	// Dump out the resources now they have been collated and linked.
-	out, err := os.OpenFile(o.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
+	out, err := os.OpenFile(o.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o640)
 	if err != nil {
 		return err
 	}
@@ -2422,7 +2417,7 @@ func BreadthFirstSearch(t TreeNode) TreeNodeList {
 // loadRestoreObjects reads a save file, breaks the YAML down into individual resources
 // and then parses them into concrete types, returning them as abstract objects.
 func (o *restoreOptions) loadRestoreObjects() ([]runtime.Object, error) {
-	save, err := ioutil.ReadFile(o.filePath)
+	save, err := os.ReadFile(o.filePath)
 	if err != nil {
 		return nil, err
 	}

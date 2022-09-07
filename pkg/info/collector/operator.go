@@ -2,7 +2,7 @@ package collector
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
@@ -75,7 +75,7 @@ func (r *operatorCollector) collectHTTP(pod *corev1.Pod, targetPort string, path
 		defer resp.Body.Close()
 
 		// Buffer up the responses
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			fmt.Printf("unable to read response %s for pod %s\n", uri, pod.Name)
 			continue

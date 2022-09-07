@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -35,7 +35,7 @@ func getRootDomain() string {
 	// Parse /etc/resolv.conf as this will be filled in by kubelet for every
 	// pod and features the cluster root domain.  The DNS server doesn't respond
 	// to PTR lookups, so we just hack it.
-	resolv, err := ioutil.ReadFile("/etc/resolv.conf")
+	resolv, err := os.ReadFile("/etc/resolv.conf")
 	if err != nil {
 		return rootDomain
 	}

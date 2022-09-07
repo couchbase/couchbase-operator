@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -940,7 +939,7 @@ func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 
 			logFile := filepath.Join(logDir, fmt.Sprintf("%s-%s.log", container.Name, pod.Name))
 
-			if err := ioutil.WriteFile(logFile, data, 0644); err != nil {
+			if err := os.WriteFile(logFile, data, 0o644); err != nil {
 				return err
 			}
 		}
@@ -1673,7 +1672,7 @@ func Cbopinfo(path string, cmdArgs []string) ([]byte, error) {
 
 func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPath, operatorImage string, collectServerLogs bool, logLevel int) {
 	// Create and move to the log directory.
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		t.Logf("Failed to create dir %s: %v", logDir, err)
 		return
 	}

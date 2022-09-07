@@ -47,7 +47,6 @@ func createS3Bucket(t *testing.T, bucket, accessKey, secretID, region, endpoint 
 			LocationConstraint: aws.String(region),
 		},
 	})
-
 	if err != nil {
 		return err
 	}
@@ -141,7 +140,6 @@ func deleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string, en
 	_, err := svc.DeleteBucket(&s3.DeleteBucketInput{
 		Bucket: aws.String(bucket),
 	})
-
 	if err != nil {
 		return fmt.Errorf("Bucket can not be deleted %w", err)
 	}
@@ -980,6 +978,7 @@ func TestBackupFullIncrementalOverTLSS3(t *testing.T) {
 func TestBackupFullOnlyOverTLSKubernetes(t *testing.T) {
 	testFullOnlyOverTLS(t, false, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret, MultipleCAs: true}, nil)
 }
+
 func testFullOnlyOverTLS(t *testing.T, s3 bool, tls *e2eutil.TLSOpts, policy *v2.ClientCertificatePolicy) {
 	f := framework.Global
 
@@ -2580,6 +2579,7 @@ func TestBackupThenDelete(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
 func TestBackupCustomObjEndpoint(t *testing.T) {
 	testBackupCustomObjectEndpoint(t, false)
 }

@@ -32,10 +32,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	// Target is the name of the target directory to use for sourceing YAML.
-	target string
-)
+// Target is the name of the target directory to use for sourceing YAML.
+var target string
 
 // TestMain does any static configuration before the tests kick off.
 func TestMain(m *testing.M) {

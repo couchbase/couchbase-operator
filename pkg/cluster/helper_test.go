@@ -52,8 +52,8 @@ func TestClusterIsAtLeastVersion(t *testing.T) {
 				},
 			},
 		}
-		valid, err := c.IsAtLeastVersion(testcase.requiredVersion)
 
+		valid, err := c.IsAtLeastVersion(testcase.requiredVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
