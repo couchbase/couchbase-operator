@@ -116,6 +116,9 @@ GO_VERSION := 1.18.3
 # Short cut for setting the platform across all targets.
 PLATFORM := kubernetes
 
+# Assume we compile for the same arch as host
+HOST_ARCH := $(shell go env GOHOSTARCH)
+
 # The target controls what's built as regards cross compilation.
 # These are similar to target triplets in the C world e.g. x86_64-unknown-linux.
 # The syntax is <platform>-<os>-<arch>, where platform is either
@@ -124,8 +127,8 @@ PLATFORM := kubernetes
 # whose laptop and kubernetes clusters may have wildly different environments.
 # These targets will be recursively passed to the make system based on
 # the context of what's being built as TARGET.
-TOOLS_TARGET := $(PLATFORM)-$(shell go env GOHOSTOS)-$(shell go env GOHOSTARCH)
-IMAGE_TARGET := $(PLATFORM)-linux-amd64
+TOOLS_TARGET := $(PLATFORM)-$(shell go env GOHOSTOS)-$(HOST_ARCH)
+IMAGE_TARGET := $(PLATFORM)-linux-$(HOST_ARCH)
 
 ################################################################################
 # Static/Generated Variables
@@ -276,7 +279,10 @@ endif
 
 # This allows the container image tags to be explicitly set.
 DOCKER_USER := couchbase
-DOCKER_TAG := $(VERSION)-$(TARGET_ARCH)
+
+# Target arch is undefined for "developer" level make targets i.e kind-images
+DOCKER_ARCH_TAG := $(or $(TARGET_ARCH),$(HOST_ARCH))
+DOCKER_TAG := $(VERSION)-$(DOCKER_ARCH_TAG)
 
 # We can select the flavor of container that a binary is built in.
 DOCKERFILE := Dockerfile
