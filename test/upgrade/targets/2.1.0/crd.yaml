@@ -1011,6 +1011,11 @@ spec:
                         default is 0, with a minimum of 0.
                       minimum: 0
                       type: integer
+                    RedistributeIndexes:
+                      description: RedistributeIndexes when true, Couchbase Server redistributes indexes
+	                      when rebalance occurs, in order to optimize performance.
+                        If false (the default), such redistribution does not occur.
+                      type: boolean
                   type: object
                 searchServiceMemoryQuota:
                   anyOf:

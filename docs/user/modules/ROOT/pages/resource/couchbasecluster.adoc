@@ -88,6 +88,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-indexer-maxrollbackpoints,maxRollbackPoints>>: 2
       <<couchbaseclusters-spec-cluster-indexer-memorysnapshotinterval,memorySnapshotInterval>>: 200ms
       <<couchbaseclusters-spec-cluster-indexer-numreplica,numReplica>>: 0
+      <<couchbaseclusters-spec-cluster-indexer-redistributeindexes,redistributeIndexes>>: false
       <<couchbaseclusters-spec-cluster-indexer-stablesnapshotinterval,stableSnapshotInterval>>: 5s
       <<couchbaseclusters-spec-cluster-indexer-storagemode,storageMode>>: memory_optimized
       <<couchbaseclusters-spec-cluster-indexer-threads,threads>>: 0
@@ -1232,6 +1233,19 @@ This defaults to 200ms, and must be greater than or equal to 1ms.
 NumberOfReplica specifies number of secondary index replicas to be created by the Index Service whenever CREATE INDEX is invoked, which ensures high availability and high performance.
 Note, if nodes and num_replica are both specified in the WITH clause, the specified number of nodes must be one greater than num_replica This defaults to 0, which means no index replicas to be created by default.
 Minimum must be 0.
+
+=== couchbaseclusters.spec.cluster.indexer.redistributeIndexes
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+RedistributeIndexes when true, Couchbase Server redistributes indexes when rebalance occurs, in order to optimize performance.
+If false (the default), such redistribution does not occur.
 
 === couchbaseclusters.spec.cluster.indexer.stableSnapshotInterval
 

@@ -1162,6 +1162,12 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.indexer.numReplica`},
 		},
+		{
+			name:           "TestValidateIndexerRedistributeIndexesInValid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/redistributeIndexes", "slim-shady")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.redistributeIndexes`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

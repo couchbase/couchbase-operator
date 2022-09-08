@@ -565,13 +565,14 @@ func (c *Cluster) reconcileIndexSettings() error {
 	apiSettings := c.cluster.Spec.ClusterSettings.Indexer
 	if apiSettings != nil {
 		requested = couchbaseutil.IndexSettings{
-			Threads:            apiSettings.Threads,
-			LogLevel:           couchbaseutil.IndexLogLevel(apiSettings.LogLevel),
-			MaxRollbackPoints:  apiSettings.MaxRollbackPoints,
-			MemSnapInterval:    int(apiSettings.MemorySnapshotInterval.Milliseconds()),
-			StableSnapInterval: int(apiSettings.StableSnapshotInterval.Milliseconds()),
-			StorageMode:        couchbaseutil.IndexStorageMode(apiSettings.StorageMode),
-			NumberOfReplica:    apiSettings.NumberOfReplica,
+			Threads:             apiSettings.Threads,
+			LogLevel:            couchbaseutil.IndexLogLevel(apiSettings.LogLevel),
+			MaxRollbackPoints:   apiSettings.MaxRollbackPoints,
+			MemSnapInterval:     int(apiSettings.MemorySnapshotInterval.Milliseconds()),
+			StableSnapInterval:  int(apiSettings.StableSnapshotInterval.Milliseconds()),
+			StorageMode:         couchbaseutil.IndexStorageMode(apiSettings.StorageMode),
+			NumberOfReplica:     apiSettings.NumberOfReplica,
+			RedistributeIndexes: apiSettings.RedistributeIndexes,
 		}
 	}
 

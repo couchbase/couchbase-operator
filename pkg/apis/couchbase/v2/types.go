@@ -2741,6 +2741,12 @@ type CouchbaseClusterIndexerSettings struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=0
 	NumberOfReplica int `json:"numReplica,omitempty"`
+
+	// RedistributeIndexes when true, Couchbase Server redistributes indexes
+	// when rebalance occurs, in order to optimize performance.
+	// If false (the default), such redistribution does not occur.
+	// +kubebuilder:default=false
+	RedistributeIndexes bool `json:"redistributeIndexes,omitempty"`
 }
 
 // CouchbaseClusterQuerySettings allow query tweaks.

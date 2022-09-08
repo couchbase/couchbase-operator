@@ -146,13 +146,14 @@ func (c *ClusterInfo) PoolsDefaults() *PoolsDefaults {
 }
 
 type IndexSettings struct {
-	StorageMode        IndexStorageMode `url:"storageMode" json:"storageMode"`
-	Threads            int              `url:"indexerThreads" json:"indexerThreads"`
-	MemSnapInterval    int              `url:"memorySnapshotInterval" json:"memorySnapshotInterval"`
-	StableSnapInterval int              `url:"stableSnapshotInterval" json:"stableSnapshotInterval"`
-	MaxRollbackPoints  int              `url:"maxRollbackPoints" json:"maxRollbackPoints"`
-	LogLevel           IndexLogLevel    `url:"logLevel" json:"logLevel"`
-	NumberOfReplica    int              `url:"numReplica" json:"numReplica"`
+	StorageMode         IndexStorageMode `url:"storageMode" json:"storageMode"`
+	Threads             int              `url:"indexerThreads" json:"indexerThreads"`
+	MemSnapInterval     int              `url:"memorySnapshotInterval" json:"memorySnapshotInterval"`
+	StableSnapInterval  int              `url:"stableSnapshotInterval" json:"stableSnapshotInterval"`
+	MaxRollbackPoints   int              `url:"maxRollbackPoints" json:"maxRollbackPoints"`
+	LogLevel            IndexLogLevel    `url:"logLevel" json:"logLevel"`
+	NumberOfReplica     int              `url:"numReplica" json:"numReplica"`
+	RedistributeIndexes bool             `url:"redistributeIndexes" json:"redistributeIndexes"`
 }
 
 type FailoverOnDiskFailureSettings struct {
