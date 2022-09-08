@@ -404,3 +404,12 @@ Later when you no longer want to use the Docker host in the MiniKube VM you can 
 ----
 $ eval $(minikube docker-env -u)
 ----
+
+=== Cross Architecture Image Compilation
+By default all make actions assume you are working for the same target as your host machine.
+
+To build a different image target override `IMAGE_TARGET` in the `Makefile`. e.g.
+- To build AMD64 images on an ARM64 machine, run `make images -e IMAGE_TARGET=kubernetes-linux-amd64`.
+- To build ARM64 images on an AMD64 machine, run `make images -e IMAGE_TARGET=kubernetes-linux-arm64`.
+
+For more information on what variables exist and overwriting them, the `Makefile` is fairly well documented.
