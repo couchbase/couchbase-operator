@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,7 +18,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/certification/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
-
+	"github.com/mholt/archiver/v4"
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
@@ -397,7 +396,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 
 // initializeRuntime creates any runtime objects we need in the certification steps.
 func (o *certifyOptions) initializeRuntime(flags *genericclioptions.ConfigFlags) error {
-	fmt.Println(util.PrettyHeading("Initializing ..."))
+	util.PrintLine(util.PrettyHeading("Initializing ..."))
 
 	configLoader := flags.ToRawKubeConfigLoader()
 
@@ -429,15 +428,15 @@ func (o *certifyOptions) deleteServiceAccount() {
 		return
 	}
 
-	fmt.Println("Deleting service account ...")
+	util.PrintLine("Deleting service account ...")
 
 	if err := o.client.CoreV1().ServiceAccounts(o.namespace).Delete(context.TODO(), serviceAccountTemplate.Name, metav1.DeleteOptions{}); err != nil {
-		fmt.Println(err)
+		util.PrintError("Error deleting service account ...", err)
 	}
 }
 
 func (o *certifyOptions) createServiceAccount() (func(), error) {
-	fmt.Println("Creating service account ...")
+	util.PrintLine("Creating service account ...")
 
 	if _, err := o.client.CoreV1().ServiceAccounts(o.namespace).Create(context.TODO(), serviceAccountTemplate, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("%s: %w", resourceExistsMessage, err)
@@ -455,15 +454,15 @@ func (o *certifyOptions) deleteClusterRole() {
 		return
 	}
 
-	fmt.Println("Deleting cluster role ...")
+	util.PrintLine("Deleting cluster role ...")
 
 	if err := o.client.RbacV1().ClusterRoles().Delete(context.TODO(), clusterRoleTemplate.Name, metav1.DeleteOptions{}); err != nil {
-		fmt.Println(err)
+		util.PrintError("Error deleting cluster role ...", err)
 	}
 }
 
 func (o *certifyOptions) createClusterRole() (func(), error) {
-	fmt.Println("Creating cluster role ...")
+	util.PrintLine("Creating cluster role ...")
 
 	if _, err := o.client.RbacV1().ClusterRoles().Create(context.TODO(), clusterRoleTemplate, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("%s: %w", resourceExistsMessage, err)
@@ -481,15 +480,15 @@ func (o *certifyOptions) deleteClusterRoleBinding() {
 		return
 	}
 
-	fmt.Println("Deleting cluster role binding ...")
+	util.PrintLine("Deleting cluster role binding ...")
 
 	if err := o.client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingTemplate.Name, metav1.DeleteOptions{}); err != nil {
-		fmt.Println(err)
+		util.PrintError("Error deleting cluster role binding ...", err)
 	}
 }
 
 func (o *certifyOptions) createClusterRoleBinding() (func(), error) {
-	fmt.Println("Creating cluster role binding ...")
+	util.PrintLine("Creating cluster role binding ...")
 
 	clusterRoleBinding := clusterRoleBindingTemplate.DeepCopy()
 	clusterRoleBinding.Subjects[0].Namespace = o.namespace
@@ -510,10 +509,10 @@ func (o *certifyOptions) deleteVolume() {
 		return
 	}
 
-	fmt.Println("Deleting artifacts volume ...")
+	util.PrintLine("Deleting artifacts volume ...")
 
 	if err := o.client.CoreV1().PersistentVolumeClaims(o.namespace).Delete(context.TODO(), pvcTemplate.Name, metav1.DeleteOptions{}); err != nil {
-		fmt.Println(err)
+		util.PrintError("Error deleting artifacts volume ...", err)
 	}
 
 	callback := func() error {
@@ -521,7 +520,7 @@ func (o *certifyOptions) deleteVolume() {
 	}
 
 	if err := util.WaitFor(callback, 5*time.Minute); err != nil {
-		fmt.Println(err)
+		util.PrintError("Timeout waiting for artifact volume to be deleted ...", err)
 	}
 }
 
@@ -531,12 +530,12 @@ func (o *certifyOptions) deleteNamespaces() {
 	namespaces, err := o.client.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
 
 	if err != nil {
-		fmt.Println(err)
+		util.PrintError("Error retrieving namespaces ...", err)
 	}
 
 	for _, namespace := range namespaces.Items {
 		if err := o.client.CoreV1().Namespaces().Delete(context.Background(), namespace.Name, *metav1.NewDeleteOptions(0)); err != nil {
-			fmt.Println(err)
+			util.PrintError("Error deleting namespaces ...", err)
 		}
 	}
 }
@@ -544,7 +543,7 @@ func (o *certifyOptions) deleteNamespaces() {
 // createVolume creates a workspace volume to communicate results from the certification
 // container to the artifacts one.
 func (o *certifyOptions) createVolume(storageClassName string) (func(), error) {
-	fmt.Println("Creating artifacts volume ...")
+	util.PrintLine("Creating artifacts volume ...")
 
 	if storageClassName != "" {
 		pvcTemplate.Spec.StorageClassName = &storageClassName
@@ -565,7 +564,7 @@ func (o *certifyOptions) createVolume(storageClassName string) (func(), error) {
 // This secret, if defined, will be added to the operator and admission controllers in
 // order to pull from a private repository.
 func (o *certifyOptions) createPullSecrets() ([]string, func(), error) {
-	fmt.Println("Creating pull secrets ...")
+	util.PrintLine("Creating pull secrets ...")
 
 	cleanup := func() {
 		o.deletePullSecrets()
@@ -610,24 +609,24 @@ func (o *certifyOptions) createPullSecrets() ([]string, func(), error) {
 }
 
 func (o *certifyOptions) deletePullSecrets() {
-	fmt.Println("Deleting pull secrets ...")
+	util.PrintLine("Deleting pull secrets ...")
 
 	requirement, err := labels.NewRequirement(pullSecretLabel, selection.Equals, []string{pullSecretValue})
 	if err != nil {
-		fmt.Println(err)
+		util.PrintError("Error retrieving pull secrets ...", err)
 	}
 
 	selector := labels.NewSelector().Add(*requirement).String()
 
 	if err := o.client.CoreV1().Secrets(o.namespace).DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), metav1.ListOptions{LabelSelector: selector}); err != nil {
-		fmt.Println(err)
+		util.PrintError("Error deleting pull secrets ...", err)
 	}
 }
 
 // createCertificationPod is responsible for creating the certification pod and acting
 // as an interface between this command's parameters and the actual container's.
 func (o *certifyOptions) createCertificationPod(args []string, secrets []string) (func(), error) {
-	fmt.Println("Creating certification pod ...")
+	util.PrintLine("Creating certification pod ...")
 
 	certificationArgs := []string{
 		"-test.v",
@@ -686,10 +685,10 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 	}
 
 	cleanup := func() {
-		fmt.Println("Deleting certification pod ...")
+		util.PrintLine("Deleting certification pod ...")
 
 		if err := o.client.CoreV1().Pods(o.namespace).Delete(context.TODO(), certificationPod.Name, metav1.DeleteOptions{}); err != nil {
-			fmt.Println(err)
+			util.PrintError("Error deleting certification pod ...", err)
 		}
 	}
 
@@ -699,7 +698,7 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 // waitCertificationPodReady waits for the certification pod to report as ready,
 // thus running, and thus ready for log streaming.
 func (o *certifyOptions) waitCertificationPodReady() error {
-	fmt.Println("Waiting for certification pod to become ready ...")
+	util.PrintLine("Waiting for certification pod to become ready ...")
 
 	callback := func() error {
 		return util.PodReady(o.client, o.namespace, certificationName)
@@ -735,7 +734,7 @@ func (o *certifyOptions) streamLogs(since *metav1.Time) error {
 
 	for {
 		bytes, err := r.ReadBytes('\n')
-		os.Stderr.Write(bytes)
+		util.WriteToStdout(bytes)
 
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
@@ -760,10 +759,10 @@ func (o *certifyOptions) retryStreamLogs() {
 			break
 		}
 
-		fmt.Println("Certification pod running, streaming logs ...")
+		util.PrintLine("Certification pod running, streaming logs ...")
 
 		if err := o.streamLogs(since); err != nil {
-			fmt.Println("Log stream terminated with error:", err)
+			util.PrintError("Log stream terminated with error:", err)
 		}
 
 		since = &metav1.Time{
@@ -776,7 +775,7 @@ func (o *certifyOptions) retryStreamLogs() {
 // implying the container has also finished.  As an extra safetly measure this ensures
 // it actually has completed before continuing.
 func (o *certifyOptions) waitCertificationPodCompletion() (int32, error) {
-	fmt.Println("Waiting for certification pod to complete ...")
+	util.PrintLine("Waiting for certification pod to complete ...")
 
 	var exitCode int32
 
@@ -786,13 +785,13 @@ func (o *certifyOptions) waitCertificationPodCompletion() (int32, error) {
 
 	if err := util.WaitFor(callback, 5*time.Minute); err != nil {
 		if pod, err := o.client.CoreV1().Pods(o.namespace).Get(context.TODO(), certificationName, metav1.GetOptions{}); err == nil {
-			fmt.Println(pod)
+			util.PrintLine(fmt.Sprintf("%+v", pod))
 		}
 
 		return -1, err
 	}
 
-	fmt.Println("Certification exit code", exitCode)
+	util.PrintLine(fmt.Sprintf("Certification exit code: %d", exitCode))
 
 	return exitCode, nil
 }
@@ -801,7 +800,7 @@ func (o *certifyOptions) waitCertificationPodCompletion() (int32, error) {
 // behave differently, so kill off the pods entirely so the PVC is available to be mounted
 // in the artifacts extraction container.
 func (o *certifyOptions) deleteCertificationPod() error {
-	fmt.Println("Deleting certification pod ...")
+	util.PrintLine("Deleting certification pod ...")
 
 	return o.client.CoreV1().Pods(o.namespace).Delete(context.TODO(), certificationName, metav1.DeleteOptions{})
 }
@@ -811,17 +810,17 @@ func (o *certifyOptions) deleteArtifactsPod() {
 		return
 	}
 
-	fmt.Println("Deleting artifact pod ...")
+	util.PrintLine("Deleting artifact pod ...")
 
 	if err := o.client.CoreV1().Pods(o.namespace).Delete(context.TODO(), artifactsName, metav1.DeleteOptions{}); err != nil {
-		fmt.Println(err)
+		util.PrintError("Error deleting artifact pod ...", err)
 	}
 }
 
 // createArtifactsPod creates a basic pod that can consume artifacts generated by the
 // main certification pod.
 func (o *certifyOptions) createArtifactsPod(secrets []string) (func(), error) {
-	fmt.Println("Creating artifact pod ...")
+	util.PrintLine("Creating artifact pod ...")
 
 	artifactPod := podTemplate.DeepCopy()
 	artifactPod.Name = artifactsName
@@ -868,7 +867,7 @@ func (o *certifyOptions) createArtifactsPod(secrets []string) (func(), error) {
 // waitArtifactsPodReady waits for the artifacts pod to be running before we attempt to
 // shell into it to extract the artifacts archive.
 func (o *certifyOptions) waitArtifactsPodReady() error {
-	fmt.Println("Waiting for artifact pod to become ready ...")
+	util.PrintLine("Waiting for artifact pod to become ready ...")
 
 	callback := func() error {
 		return util.PodReady(o.client, o.namespace, artifactsName)
@@ -876,7 +875,7 @@ func (o *certifyOptions) waitArtifactsPodReady() error {
 
 	if err := util.WaitFor(callback, 5*time.Minute); err != nil {
 		if pod, err := o.client.CoreV1().Pods(o.namespace).Get(context.TODO(), artifactsName, metav1.GetOptions{}); err == nil {
-			fmt.Println(pod)
+			util.PrintLine(fmt.Sprintf("%+v", pod))
 		}
 
 		return err
@@ -889,7 +888,7 @@ func (o *certifyOptions) waitArtifactsPodReady() error {
 // and streams the contents out via stdout.  We buffer the archive stream and write it
 // out locally.
 func (o *certifyOptions) downloadArtifacts() error {
-	fmt.Println("Copying artifacts from artifact pod ...")
+	util.PrintLine("Copying artifacts from artifact pod ...")
 
 	execRequest := o.client.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -919,7 +918,7 @@ func (o *certifyOptions) downloadArtifacts() error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(o.archiveName.archiveName(), stdout.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(o.archiveName.archiveName(), stdout.Bytes(), 0644); err != nil {
 		return err
 	}
 
@@ -999,7 +998,7 @@ func (o *certifyOptions) profileCertification() {
 
 		file := filepath.Join(dir, endpoint)
 
-		if err := ioutil.WriteFile(file, data, 0640); err != nil {
+		if err := os.WriteFile(file, data, 0640); err != nil {
 			continue
 		}
 	}
@@ -1008,7 +1007,7 @@ func (o *certifyOptions) profileCertification() {
 	if err == nil {
 		file := filepath.Join(dir, "metrics")
 
-		_ = ioutil.WriteFile(file, metrics, 0640)
+		_ = os.WriteFile(file, metrics, 0640)
 	}
 }
 
@@ -1021,7 +1020,7 @@ func gatherProfileData(endpoint string) ([]byte, error) {
 
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -1068,25 +1067,105 @@ func (o *certifyOptions) isParallelDefaulted() bool {
 	return defaulted
 }
 
-// certify runs the certification suite on the provided options.
-func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []string) error {
-	fmt.Println(util.PrettyHeading("Pre-Run Parameter Checks"))
+func (o *certifyOptions) appendStdout() {
+	util.PrintLine("Appending stdout to archive ...")
 
-	if o.isParallelDefaulted() {
-		line := fmt.Sprintf("Parallel = %d %s  (see cao certify --help)", o.parallel, util.PrettyResult(util.ResultTypeFail))
-		fmt.Println(line)
-	} else {
-		line := fmt.Sprintf("Parallel = %d %s", o.parallel, util.PrettyResult(util.ResultTypePass))
-		fmt.Println(line)
+	// get stdout lines and get ready
+
+	lines := ""
+
+	for _, line := range util.GetStdout() {
+		if line == "" {
+			continue
+		}
+
+		if strings.HasSuffix(line, "\n") {
+			lines += line
+		} else {
+			lines += line + "\n"
+		}
 	}
 
+	// create temp file with stdout name
+	tempFile, err := os.CreateTemp("", "stdout-*")
+	if err != nil {
+		fmt.Println("Unable to create temporary file")
+	}
+
+	if _, err := tempFile.Write([]byte(lines)); err != nil {
+		fmt.Println(err)
+	}
+
+	// Append file to archive
+	tempArchive, err := os.CreateTemp("", strings.ReplaceAll(o.archiveName.archiveName(), ".tar.bz2", "")+"-*.tar.bz2")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	defer tempArchive.Close()
+
+	input, err := os.ReadFile(o.archiveName.archiveName())
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = os.WriteFile(tempArchive.Name(), input, 0644)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	format := archiver.CompressedArchive{
+		Compression: archiver.Bz2{},
+		Archival:    archiver.Tar{},
+	}
+
+	files, err := archiver.FilesFromDisk(nil, map[string]string{
+		tempFile.Name():    "stdout.txt",
+		tempArchive.Name(): "results.tar.bz",
+	})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	output, err := os.OpenFile(o.archiveName.archiveName(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = output.Truncate(0)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	_, err = output.Seek(0, 0)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = format.Archive(context.Background(), output, files)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+// certify runs the certification suite on the provided options.
+func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []string) error {
+	util.PrintLine(util.PrettyHeading("Pre-Run Parameter Checks"))
+
+	if o.isParallelDefaulted() {
+		util.PrintLine(fmt.Sprintf("Parallel = %d %s  (see cao certify --help)", o.parallel, util.PrettyResult(util.ResultTypeFail)))
+	} else {
+		util.PrintLine(fmt.Sprintf("Parallel = %d %s", o.parallel, util.PrettyResult(util.ResultTypePass)))
+	}
+
+	defer o.appendStdout()
 	// Create any runtime objects we need in the certification steps.
 	if err := o.initializeRuntime(flags); err != nil {
 		return err
 	}
 
 	if o.clean {
-		fmt.Println(util.PrettyHeading("Cleaning Environment ..."))
+		util.PrintLine(util.PrettyHeading("Cleaning Environment ..."))
 
 		o.deleteServiceAccount()
 		o.deleteClusterRole()
@@ -1104,7 +1183,7 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 		o.deleteNamespaces()
 	}
 
-	fmt.Println(util.PrettyHeading("Creating Resources ..."))
+	util.PrintLine(util.PrettyHeading("Creating Resources ..."))
 
 	cleanServiceAccount, err := o.createServiceAccount()
 	if err != nil {
@@ -1156,7 +1235,7 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 		if errors.Is(err, util.ErrStatusTerminated) {
 			// Certification pod has already terminated stream all logs
 			if err := o.streamLogs(nil); err != nil {
-				fmt.Println("Log stream terminated with error:", err)
+				util.PrintError("Log stream terminated with error:", err)
 			}
 		}
 

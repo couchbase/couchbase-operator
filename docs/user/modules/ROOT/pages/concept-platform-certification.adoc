@@ -95,7 +95,7 @@ $ `cao certify`
 ----
 
 This will run the platform certification suite for the Operator version the tool came bundled with.
-It will run with 8-way parallelism, taking approximately 2 hours to run.
+It will run with no parallelism, taking approximately 8 hours to run.
 For more information see <<platform-requirements>> below.
 
 === Interpreting Results
