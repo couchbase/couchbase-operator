@@ -4,16 +4,29 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func MustAddCustomAnnotationAndLabels(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, annotations, labels map[string]string) {
-	err := addCustomAnnotationAndLabels(k8s, couchbase, annotations, labels)
-	if err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	callback := func() error {
+		err := addCustomAnnotationAndLabels(k8s, couchbase, annotations, labels)
+		if err != nil {
+			Die(t, err)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.Retry(ctx, 10*time.Second, callback); err != nil {
 		Die(t, err)
 	}
 }
