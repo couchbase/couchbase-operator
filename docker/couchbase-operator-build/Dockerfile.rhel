@@ -1,6 +1,6 @@
 # This must be kept in lockstep with any non-static images due to library
 # dependencies.
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-200
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 RUN microdnf update \
  && microdnf -y install \

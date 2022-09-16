@@ -1,6 +1,6 @@
 # This must be kept in lockstep with the builder images due to library
 # dependencies.
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-200
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 # ubi-minimal updates frequently and has very few packages installed,
 # so no need for a "security-only" update (which requires installing yum
@@ -48,6 +48,6 @@ LABEL name="couchbase/operator-certification" \
       release="Latest" \
       summary="Couchbase Autonomous Operator Certification ${PROD_VERSION}" \
       description="Couchbase Autonomous Operator Certification ${PROD_VERSION}" \
-      architecture="x86_64" \
+      architecture="${TARGETARCH}" \
       run="docker run -d --name couchbase-operator-certification registry.connect.redhat.com/couchbase/operator-certification:${PROD_VERSION}-${OS_BUILD}" \
       io.k8s.description="The Couchbase Autonomous Operator makes the easiest to manage data platform even easier by providing native OpenShift integration with Couchbase. It automates administrative tasks and operational best practices while maintaining full data platform capabilities from within and across clouds and on-premises deployments."
