@@ -5,7 +5,7 @@ pipeline {
 
   environment {
     GOBIN = "${env.WORKSPACE}/bin"
-    GOVERSION = '1.17.1'
+    GOVERSION = '1.18.3'
     NODEVERSION = '14.15.4'
     PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
   }
