@@ -187,6 +187,7 @@ pipeline {
             currentBuild.result = 'UNSTABLE'
           }
           sh 'tar xf validation.tar.bz2'
+          sh 'tar xf results.tar.bz'
         }
       }
       post {
@@ -245,6 +246,7 @@ pipeline {
             currentBuild.result = 'UNSTABLE'
           }
           sh 'tar xf sanity.tar.bz2'
+          sh 'tar xf results.tar.bz'
         }
       }
       post {
@@ -303,6 +305,7 @@ pipeline {
             currentBuild.result = 'UNSTABLE'
           }
           sh 'tar xf p0.tar.bz2'
+          sh 'tar xf results.tar.bz'
         }
       }
       post {
@@ -361,6 +364,7 @@ pipeline {
             currentBuild.result = 'UNSTABLE'
           }
           sh 'tar xf p1.tar.bz2'
+          sh 'tar xf results.tar.bz'
         }
       }
       post {
@@ -419,6 +423,7 @@ pipeline {
             currentBuild.result = 'UNSTABLE'
           }
           sh 'tar xf platform.tar.bz2'
+          sh 'tar xf results.tar.bz'
         }
       }
       post {
@@ -477,6 +482,7 @@ pipeline {
             currentBuild.result = 'UNSTABLE'
           }
           sh 'tar xf custom.tar.bz2'
+          sh 'tar xf results.tar.bz'
         }
       }
       post {

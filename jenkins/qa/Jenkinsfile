@@ -184,6 +184,7 @@ pipeline {
             -s3-secret-id \${AWS_CREDENTIALS_PSW}"
         }
         sh 'tar xf logs.tar.bz2'
+        sh 'tar xf results.tar.bz'
       }
     }
   }
