@@ -1,0 +1,16 @@
+Elastic Kubernetes Service Auto Provisioning with Terraform
+
+`terraform init` to initialise Terraform in the directory.
+
+`terraform apply ...` to apply the Terraform plan, including the relevant `-var` flags:
+- `-var name`: The prefix for provisioned resources.
+- `-var kubernetes-version`: The desired Kubernetes version to be used.
+  - AWS allows Kubernetes minor versions to be specified, and will use the latest available patch version.
+- `-var remote`: If `true`, creates two clusters and peers them, for use with XDCR remote testing. (Defaults to `false`)
+
+Terraform will use your currently configured AWS credentials for provisioning, the same used by CLI tools. These can be checked and configured in `~/.aws/config` and `~/.aws/credentials`.
+
+`terraform output ...` can be used to access the two generated kubeconfigs:
+- `terraform output -raw kubeconfig1 > config` outputs the first cluster's kubeconfig to the `config` file.
+
+When finished with the provisioned cluster, `terraform destroy ...` will deprovision any resources it created. `destroy` requires the same `-var` flags used with `apply`.

@@ -58,6 +58,7 @@ pipeline {
     booleanParam(name: 'platformcert', defaultValue: false)
     booleanParam(name: 'custom', defaultValue: false)
     string(name: 'custom_args', defaultValue: '')
+    choice(name: 'machine', choices: ['x86_64', 'arm'], defaultValue:'x86_64', description: 'Architecture')
   }
 
   environment {
@@ -87,10 +88,6 @@ pipeline {
         sh "chmod +x kubectl"
         sh "mv kubectl ${env.WORKSPACE}/bin/"
 
-        sh 'wget -q https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
-        sh 'chmod +x jq-linux64'
-        sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
-
         sh "wget -q https://releases.hashicorp.com/terraform/${params.terraform_version}/terraform_${params.terraform_version}_linux_amd64.zip"
         sh "unzip terraform_${params.terraform_version}_linux_amd64.zip"
         sh "mv terraform ${env.WORKSPACE}/bin"
@@ -104,21 +101,24 @@ pipeline {
 
     stage('EKS Provisioning') {
       steps {
-        sh "aws configure set default.region us-east-2"
-        sh "aws configure set default.output json"
-        dir("./test/e2e/resources/provisioners/eks") {
-          sh 'terraform init -no-color -input=false'
-          sh "terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
-          sh "aws eks update-kubeconfig --name ${env.NAME} --kubeconfig ${env.WORKSPACE}/config1"
-        }
-      }
+        script {
+	  tfdir = "./test/e2e/resources/provisioners/eks"
+          if (params.machine == "arm") {
+            tfdir = "./test/e2e/resources/provisioners/arm"
+          }
+          sh "aws configure set default.region us-east-2"
+          sh "aws configure set default.output json"
+          dir(tfdir) {
+            sh 'terraform init -no-color -input=false'
+            sh "terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+            sh "aws eks update-kubeconfig --name ${env.NAME} --kubeconfig ${env.WORKSPACE}/config1"
+          }
+       }
     }
+}
 
     stage('Build') {
       steps {
-        sh "docker pull ${params.operator_image}"
-        sh "docker run -i ${params.operator_image} /usr/local/bin/couchbase-operator --version 2>&1 | jq -c {version:'.version'}"
-        sh "docker rmi -f ${params.operator_image}"
         script {
           currentBuild.description = "refspec:${params.refspec}, operator_version:${params.operator_image}, server_version:${params.server_image}, upgrade_version:${params.server_image_upgrade}, kubernetes_version:${params.kubernetes_version}"
         }
@@ -494,11 +494,17 @@ pipeline {
 
   post {
     always {
-      dir("./test/e2e/resources/provisioners/eks") {
+      script {
+        tfdir = "./test/e2e/resources/provisioners/eks"
+        if (params.machine == "arm") {
+          tfdir = "./test/e2e/resources/provisioners/arm"
+        }
+        dir(tfdir) {
         sh "terraform destroy -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+        sh 'docker system prune --force' // Clean up docker - optimise disk usage
+        cleanWs()
+        }
       }
-      sh 'docker system prune --force' // Clean up docker - optimise disk usage
-      cleanWs()
     }
   }
 }
