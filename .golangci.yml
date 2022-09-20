@@ -17,6 +17,7 @@ linters:
   # Selectively disable things to get a pass.  These probably are
   # masking bugs so re-enable and fix them!
   disable:
+  - nosnakecase # removed in v1.49.0 due to bugs
   - varnamelen
   - exhaustruct
   - contextcheck
