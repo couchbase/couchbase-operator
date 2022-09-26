@@ -58,7 +58,7 @@ pipeline {
     booleanParam(name: 'platformcert', defaultValue: false)
     booleanParam(name: 'custom', defaultValue: false)
     string(name: 'custom_args', defaultValue: '')
-    choice(name: 'machine', choices: ['x86_64', 'arm'], defaultValue:'x86_64', description: 'Architecture')
+    choice(name: 'machine', choices: 'x86_64, arm', description: 'Architecture')
   }
 
   environment {
