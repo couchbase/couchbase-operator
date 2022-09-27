@@ -77,6 +77,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintLDAPAuthorization,
 		checkConstraintAutoscalingStabilizationPeriod,
 		checkConstraintBackupObjectEndpointSecret,
+		checkConstraintBucketStorageBackend,
 	}
 
 	var errs []error
@@ -1167,6 +1168,18 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
 		}
+	}
+
+	if bucket.Spec.StorageBackend != "" && bucket.Spec.MemoryQuota == nil {
+		errs = append(errs, fmt.Errorf("spec.memoryQuota (nil) in body should be present and greater than or equal to 1024Mi for spec.storageBackend: magma"))
+	}
+
+	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+		errs = append(errs, fmt.Errorf("spec.memoryQuota (%v) in body should be greater than or equal to 1024Mi for spec.storageBackend: magma", bucket.Spec.MemoryQuota))
+	}
+
+	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.EvictionPolicy != couchbasev2.CouchbaseBucketEvictionPolicyFullEviction {
+		errs = append(errs, fmt.Errorf("spec.evictionPolicy (%v) must be fullEviction for magma storage backend", bucket.Spec.EvictionPolicy))
 	}
 
 	if bucket.Spec.MaxTTL != nil {
@@ -2709,6 +2722,10 @@ func checkImmutableVolumeTemplateSize(current, updated *couchbasev2.CouchbaseClu
 func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 	var errs []error
 
+	if prev.Spec.StorageBackend != curr.Spec.StorageBackend {
+		errs = append(errs, fmt.Errorf("spec.storageBackend value in body %s can not be different from previous value %s", curr.Spec.StorageBackend, prev.Spec.StorageBackend))
+	}
+
 	if prev.Spec.ConflictResolution != curr.Spec.ConflictResolution {
 		errs = append(errs, util.NewUpdateError("spec.conflictResolution", "body"))
 	}
@@ -2836,6 +2853,42 @@ func CheckImmutableFieldsCollectionGroup(prev, curr *couchbasev2.CouchbaseCollec
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Buckets aren't managed by Cluster.
+	if !cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
+
+	var hasMagma bool
+
+	// find if any bucket has storage backend as "magma"
+	for _, cbBucket := range couchbaseBuckets.Items {
+		if cbBucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+			hasMagma = true
+			break
+		}
+	}
+
+	if !hasMagma {
+		return nil
+	}
+
+	// check if any server class has FTS, Eventing, or Analytics.
+	for _, config := range cluster.Spec.Servers {
+		services := couchbasev2.ServiceList(config.Services)
+		if services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService) {
+			return fmt.Errorf("search, eventing or analytics services cannot be used in magma buckets for CB Server 7.1.0. One or more of those services has been used as server class: %v", services.StringSlice())
+		}
 	}
 
 	return nil

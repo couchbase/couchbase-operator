@@ -212,10 +212,10 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 		// on disk.
 		log.V(1).Info("Previous resource", "resource", ar.Request.OldObject)
 
-		existingCouchbaseCluser, err := decodeObject(ar, ar.Request.OldObject)
+		existingCouchbaseCluster, err := decodeObject(ar, ar.Request.OldObject)
 		if err != nil {
 			log.Error(err, "Resource decode failed")
-		} else if err := validator.CheckImmutableFields(existingCouchbaseCluser, couchbaseCluster); err != nil {
+		} else if err := validator.CheckImmutableFields(existingCouchbaseCluster, couchbaseCluster); err != nil {
 			log.Error(err, "Rejecting resource")
 			return errorResponse(err)
 		}

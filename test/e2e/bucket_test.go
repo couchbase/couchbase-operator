@@ -6,10 +6,12 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
@@ -448,4 +450,142 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster1, expectedEvents)
 	ValidateEvents(t, kubernetes, cluster2, expectedEvents)
+}
+
+// TestCouchbaseBucketStorageBackendDefault checks the behaviors related to
+// no specified (explicit) storageBackend addition and then amendments.
+func TestCouchbaseBucketStorageBackendDefault(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration
+	clusterSize := constants.Size1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1431)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bucket-storage-backend-not-specified",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: true,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+		},
+	}
+
+	b := e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// assert bucket storage backend is couchstore (default)
+	e2eutil.MustAssertBucketStorageBackend(t, kubernetes, cluster, bucket.Name, couchbaseutil.CouchbaseStorageBackendCouchstore, 2*time.Minute)
+	// Must not be able to change storage backend.
+	e2eutil.MustNotPatchBucket(t, kubernetes, b, jsonpatch.NewPatchSet().Replace("/spec/storageBackend", couchbaseutil.CouchbaseStorageBackendMagma))
+}
+
+// TestCouchbaseBucketStorageBackendMagma checks the behaviors related to
+// magma storageBackend addition and amendments.
+func TestCouchbaseBucketStorageBackendMagma(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration
+	clusterSize := constants.Size1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1431)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bucket-magma",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        e2espec.NewResourceQuantityMi(1024),
+			StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: true,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+		},
+	}
+
+	b := e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// assert bucket storage backend is magma
+	e2eutil.MustAssertBucketStorageBackend(t, kubernetes, cluster, bucket.Name, couchbaseutil.CouchbaseStorageBackendMagma, 2*time.Minute)
+	// Must not be able to change storage backend.
+	e2eutil.MustNotPatchBucket(t, kubernetes, b, jsonpatch.NewPatchSet().Replace("/spec/storageBackend", couchbaseutil.CouchbaseStorageBackendCouchstore))
+}
+
+func TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	// Static configuration
+	clusterSize := constants.Size1
+
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bucket-magma",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        e2espec.NewResourceQuantityMi(1024),
+			StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: true,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+		},
+	}
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1431)
+	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, couchbasev2.SearchService)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// Bucket couldn't be added to cluster.
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.Name, 2*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket added with the correct name
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucket.Name},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

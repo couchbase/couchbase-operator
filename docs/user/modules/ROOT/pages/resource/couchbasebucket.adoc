@@ -35,6 +35,7 @@ The following is an example resource, depicting the overall structure and any de
     - <<couchbasebuckets-spec-scopes-resources-kind,kind>>: CouchbaseScope
       <<couchbasebuckets-spec-scopes-resources-name,name>>: ""
     <<couchbasebuckets-spec-scopes-selector,selector>>: {}
+  <<couchbasebuckets-spec-storagebackend,storageBackend>>: couchstore
 ----
 
 == couchbasebuckets.apiVersion
@@ -339,3 +340,20 @@ Legal scope names have a maximum length of 251 characters and may be composed of
 
 Selector allows resources to be implicitly considered for inclusion in this bucket.
 More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta.
+
+=== couchbasebuckets.spec.storageBackend
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `couchstore`
+
+*Enumerations*: `couchstore, magma`
+
+==== Description
+
+StorageBackend to be assigned to and used by the bucket.
+This cannot be edited after bucket creation.
+Two different backend storage mechanisms can be used - "couchstore" or "magma".
+The value can be either of those, defaulting to "couchstore".

@@ -62,6 +62,7 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			Name:               couchbasev2.BucketName(bucket.BucketName),
+			StorageBackend:     couchbasev2.CouchbaseStorageBackend(bucket.BucketStorageBackend),
 			MemoryQuota:        resource.NewQuantity(bucket.BucketMemoryQuota<<20, resource.BinarySI),
 			Replicas:           bucket.BucketReplicas,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),

@@ -554,3 +554,25 @@ func mustAssertMemcachedBucket(t *testing.T, got *couchbasev2.CouchbaseMemcached
 		Die(t, fmt.Errorf("enable flush does not match: expected %t, got %t", expected.EnableFlush, got.Spec.EnableFlush))
 	}
 }
+
+// MustAssertBucketStorageBackend checks that the status version is as we expect.
+func MustAssertBucketStorageBackend(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, bucketStorageBackend couchbaseutil.CouchbaseStorageBackend, timeout time.Duration) {
+	callback := func() error {
+		cls, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		for _, bucket := range cls.Status.Buckets {
+			if bucket.BucketName == bucketName && couchbaseutil.CouchbaseStorageBackend(bucket.BucketStorageBackend) != bucketStorageBackend {
+				return fmt.Errorf("expected bucket storage backend %s, got %s", bucketStorageBackend, bucket.BucketStorageBackend)
+			}
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}

@@ -559,6 +559,13 @@ spec:
               maxLength: 100
               pattern: ^[a-zA-Z0-9-_%\.]+$
               type: string
+            storageBackend:
+              description: StorageBackend defines the available storage engine/backend
+                options available for Couchbase buckets.
+              enum:
+              - couchstore
+              - magma
+              type: string
             replicas:
               maximum: 3
               minimum: 0

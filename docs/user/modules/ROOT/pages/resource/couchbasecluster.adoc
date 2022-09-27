@@ -280,6 +280,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-status-buckets-name,name>>: ""
     <<couchbaseclusters-status-buckets-password,password>>: ""
     <<couchbaseclusters-status-buckets-replicas,replicas>>: 0
+    <<couchbaseclusters-status-buckets-storagebackend,storageBackend>>: ""
     <<couchbaseclusters-status-buckets-type,type>>: ""
   <<couchbaseclusters-status-clusterid,clusterId>>: ""
   <<couchbaseclusters-status-conditions,conditions>>:
@@ -3514,6 +3515,18 @@ BucketPassword will never be populated.
 ==== Description
 
 BucketReplicas is the number of data replicas.
+
+=== couchbaseclusters.status.buckets.storageBackend
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+BucketStorageBackend is the storage backend of the bucket.
 
 === couchbaseclusters.status.buckets.type
 

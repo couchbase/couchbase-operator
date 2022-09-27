@@ -395,6 +395,13 @@ const (
 	IoPriorityThreadCountHigh IoPriorityThreadCount = 8
 )
 
+type CouchbaseStorageBackend string
+
+const (
+	CouchbaseStorageBackendCouchstore CouchbaseStorageBackend = "couchstore"
+	CouchbaseStorageBackendMagma      CouchbaseStorageBackend = "magma"
+)
+
 type CompressionMode string
 
 const (
@@ -412,20 +419,22 @@ const (
 	DurabilityPersistToMajority        Durability = "persistToMajority"
 )
 
+// Bucket is a canonical representation of the parameters used for creating/editing buckets with the REST API.
 type Bucket struct {
-	BucketName         string          `json:"name"`
-	BucketType         string          `json:"type"`
-	BucketMemoryQuota  int64           `json:"memoryQuota"`
-	BucketReplicas     int             `json:"replicas"`
-	IoPriority         IoPriorityType  `json:"ioPriority"`
-	EvictionPolicy     string          `json:"evictionPolicy"`
-	ConflictResolution string          `json:"conflictResolution"`
-	EnableFlush        bool            `json:"enableFlush"`
-	EnableIndexReplica bool            `json:"enableIndexReplica"`
-	BucketPassword     string          `json:"password"`
-	CompressionMode    CompressionMode `json:"compressionMode"`
-	DurabilityMinLevel Durability      `json:"durabilityMinLevel"`
-	MaxTTL             int             `json:"maxTTL"`
+	BucketName           string                  `json:"name"`
+	BucketType           string                  `json:"type"`
+	BucketStorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
+	BucketMemoryQuota    int64                   `json:"memoryQuota"`
+	BucketReplicas       int                     `json:"replicas"`
+	IoPriority           IoPriorityType          `json:"ioPriority"`
+	EvictionPolicy       string                  `json:"evictionPolicy"`
+	ConflictResolution   string                  `json:"conflictResolution"`
+	EnableFlush          bool                    `json:"enableFlush"`
+	EnableIndexReplica   bool                    `json:"enableIndexReplica"`
+	BucketPassword       string                  `json:"password"`
+	CompressionMode      CompressionMode         `json:"compressionMode"`
+	DurabilityMinLevel   Durability              `json:"durabilityMinLevel"`
+	MaxTTL               int                     `json:"maxTTL"`
 }
 
 type BucketList []Bucket
@@ -455,23 +464,24 @@ type BucketBasicStats struct {
 // SM: THIS IS SO M****RF***KING ANNOYING.  HAVE A SINGLE SOURCE OF TRUTH!!!!!
 // THIS IS UTTERLY POINTLESS OVERENGINEERING.  (Fix me essentially).
 type BucketStatus struct {
-	Nodes                  []NodeInfo            `json:"nodes"`
-	BucketName             string                `json:"name"`
-	BucketType             string                `json:"bucketType"`
-	EvictionPolicy         string                `json:"evictionPolicy"`
-	ConflictResolution     string                `json:"conflictResolutionType"`
-	EnableIndexReplica     bool                  `json:"replicaIndex"`
-	AutoCompactionSettings interface{}           `json:"autoCompactionSettings"`
-	ReplicaNumber          int                   `json:"replicaNumber"`
-	ThreadsNumber          IoPriorityThreadCount `json:"threadsNumber"`
-	Controllers            map[string]string     `json:"controllers"`
-	Quota                  map[string]int64      `json:"quota"`
-	Stats                  map[string]string     `json:"stats"`
-	VBServerMap            VBucketServerMap      `json:"vBucketServerMap"`
-	CompressionMode        CompressionMode       `json:"compressionMode"`
-	DurabilityMinLevel     Durability            `json:"durabilityMinLevel"`
-	MaxTTL                 int                   `json:"maxTTL"`
-	BasicStats             BucketBasicStats      `json:"basicStats"`
+	Nodes                  []NodeInfo              `json:"nodes"`
+	BucketName             string                  `json:"name"`
+	BucketType             string                  `json:"bucketType"`
+	StorageBackend         CouchbaseStorageBackend `json:"storageBackend"`
+	EvictionPolicy         string                  `json:"evictionPolicy"`
+	ConflictResolution     string                  `json:"conflictResolutionType"`
+	EnableIndexReplica     bool                    `json:"replicaIndex"`
+	AutoCompactionSettings interface{}             `json:"autoCompactionSettings"`
+	ReplicaNumber          int                     `json:"replicaNumber"`
+	ThreadsNumber          IoPriorityThreadCount   `json:"threadsNumber"`
+	Controllers            map[string]string       `json:"controllers"`
+	Quota                  map[string]int64        `json:"quota"`
+	Stats                  map[string]string       `json:"stats"`
+	VBServerMap            VBucketServerMap        `json:"vBucketServerMap"`
+	CompressionMode        CompressionMode         `json:"compressionMode"`
+	DurabilityMinLevel     Durability              `json:"durabilityMinLevel"`
+	MaxTTL                 int                     `json:"maxTTL"`
+	BasicStats             BucketBasicStats        `json:"basicStats"`
 }
 
 type VBucketServerMap struct {
@@ -739,6 +749,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.IoPriority = status.GetIoPriority()
 	b.DurabilityMinLevel = status.DurabilityMinLevel
 	b.MaxTTL = status.MaxTTL
+	b.BucketStorageBackend = status.StorageBackend
 
 	if b.BucketType == "ephemeral" {
 		return nil

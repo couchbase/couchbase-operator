@@ -13,6 +13,15 @@ import (
 // +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]{1,100}$"
 type BucketName string
 
+// CouchbaseStorageBackend can either be "couchstore" or "magma"
+// +kubebuilder:validation:Enum=couchstore;magma
+type CouchbaseStorageBackend string
+
+const (
+	CouchbaseStorageBackendCouchstore CouchbaseStorageBackend = "couchstore"
+	CouchbaseStorageBackendMagma      CouchbaseStorageBackend = "magma"
+)
+
 // BucketScopeOrCollectionName is the name of a fully qualifed bucket, scope or collection.
 // The _default scope or collection are not valid for this type.
 // As these names are period separated, and buckets can contain periods, the latter need
@@ -1071,6 +1080,13 @@ type CouchbaseBucketSpec struct {
 	// field overrides `metadata.name`.  Legal bucket names have a maximum length of 100
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	Name BucketName `json:"name,omitempty"`
+
+	// StorageBackend to be assigned to and used by the bucket.
+	// This cannot be edited after bucket creation.
+	// Two different backend storage mechanisms can be used - "couchstore" or "magma".
+	// The value can be either of those, defaulting to "couchstore"
+	// +kubebuilder:default="couchstore"
+	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
 	// documents will be evicted from memory to disk as defined by the eviction policy.  The
@@ -3498,6 +3514,9 @@ type BucketStatus struct {
 
 	// BucketType is the type of the bucket.
 	BucketType string `json:"type"`
+
+	// BucketStorageBackend is the storage backend of the bucket.
+	BucketStorageBackend string `json:"storageBackend"`
 
 	// BucketMemoryQuota is the bucket memory quota in megabytes.
 	BucketMemoryQuota int64 `json:"memoryQuota"`

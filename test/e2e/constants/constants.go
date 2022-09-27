@@ -106,3 +106,9 @@ const (
 const (
 	PodSpecAnnotation = "pod.couchbase.com/spec"
 )
+
+// Couchbase server image tags.
+const (
+	// Couchbase server image version 7.1.0.
+	CouchbaseImageVersion710 = "couchbase/server:7.1.0"
+)

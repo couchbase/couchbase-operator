@@ -12,35 +12,15 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// gatherBuckets loads up bucket configurations from Kubernetes and marshalls them into canonical form.
-func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
-	selector, err := c.cluster.GetBucketLabelSelector()
-	if err != nil {
-		return nil, err
-	}
-
-	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
-	if err != nil {
-		return nil, err
-	}
-
-	durable, err := couchbaseutil.VersionAfter(tag, "6.6.0")
-	if err != nil {
-		return nil, err
-	}
-
-	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
-	couchbaseEphemeralBuckets := c.k8s.CouchbaseEphemeralBuckets.List()
-	couchbaseMemcachedBuckets := c.k8s.CouchbaseMemcachedBuckets.List()
-
-	buckets := []couchbaseutil.Bucket{}
-
-	for _, bucket := range couchbaseBuckets {
+// gatherCouchbaseBuckets gathers all K8s CB buckets and marshalls them into canonical form.
+func gatherCouchbaseBuckets(durablitySupported, storageBackendSupported bool, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+	for _, bucket := range k8sBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
 		}
 
 		name := bucket.Name
+
 		if bucket.Spec.Name != "" {
 			name = string(bucket.Spec.Name)
 		}
@@ -58,7 +38,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			CompressionMode:    couchbaseutil.CompressionMode(bucket.Spec.CompressionMode),
 		}
 
-		if durable {
+		if durablitySupported {
 			b.DurabilityMinLevel = couchbaseutil.Durability(bucket.GetMinimumDurability())
 		}
 
@@ -66,10 +46,20 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
 		}
 
-		buckets = append(buckets, b)
+		if storageBackendSupported {
+			// default is "couchstore" (validated).
+			b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(bucket.Spec.StorageBackend)
+		}
+
+		outputBuckets = append(outputBuckets, b)
 	}
 
-	for _, bucket := range couchbaseEphemeralBuckets {
+	return outputBuckets
+}
+
+// gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
+func gatherEphemeralBuckets(durablitySupported bool, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+	for _, bucket := range k8sEphemeralBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
 		}
@@ -92,7 +82,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			CompressionMode:    couchbaseutil.CompressionMode(bucket.Spec.CompressionMode),
 		}
 
-		if durable {
+		if durablitySupported {
 			b.DurabilityMinLevel = couchbaseutil.Durability(bucket.GetMinimumDurability())
 		}
 
@@ -100,10 +90,15 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
 		}
 
-		buckets = append(buckets, b)
+		outputBuckets = append(outputBuckets, b)
 	}
 
-	for _, bucket := range couchbaseMemcachedBuckets {
+	return outputBuckets
+}
+
+// gatherMemcachedBuckets gathers all K8s CB Memcached buckets and marshalls them into canonical form.
+func gatherMemcachedBuckets(selector labels.Selector, k8sMemcachedBuckets []*couchbasev2.CouchbaseMemcachedBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+	for _, bucket := range k8sMemcachedBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
 		}
@@ -114,15 +109,49 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 			name = string(bucket.Spec.Name)
 		}
 
-		buckets = append(buckets, couchbaseutil.Bucket{
+		b := couchbaseutil.Bucket{
 			BucketName:        name,
 			BucketType:        constants.BucketTypeMemcached,
 			BucketMemoryQuota: k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			EnableFlush:       bucket.Spec.EnableFlush,
-		})
+		}
+
+		outputBuckets = append(outputBuckets, b)
 	}
 
-	return buckets, nil
+	return outputBuckets
+}
+
+// gatherBuckets loads up bucket configurations from Kubernetes and marshalls them into canonical form.
+func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
+	selector, err := c.cluster.GetBucketLabelSelector()
+	if err != nil {
+		return nil, err
+	}
+
+	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	if err != nil {
+		return nil, err
+	}
+
+	durablitySupported, err := couchbaseutil.VersionAfter(tag, "6.6.0")
+	if err != nil {
+		return nil, err
+	}
+
+	// storageBackend is only allowed above CB version 7.1.0.
+	storageBackendSupported, err := couchbaseutil.VersionAfter(tag, "7.1.0")
+	if err != nil {
+		return nil, err
+	}
+
+	allBuckets := []couchbaseutil.Bucket{}
+
+	allBuckets = gatherCouchbaseBuckets(durablitySupported, storageBackendSupported, selector, c.k8s.CouchbaseBuckets.List(), allBuckets)
+	allBuckets = gatherEphemeralBuckets(durablitySupported, selector, c.k8s.CouchbaseEphemeralBuckets.List(), allBuckets)
+	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets)
+
+	return allBuckets, nil
 }
 
 // inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
@@ -238,16 +267,17 @@ func (c *Cluster) reconcileBuckets() error {
 		names[i] = bucket.BucketName
 
 		statuses[bucket.BucketName] = couchbasev2.BucketStatus{
-			BucketName:         bucket.BucketName,
-			BucketType:         bucket.BucketType,
-			BucketMemoryQuota:  bucket.BucketMemoryQuota,
-			BucketReplicas:     bucket.BucketReplicas,
-			IoPriority:         string(bucket.IoPriority),
-			EvictionPolicy:     bucket.EvictionPolicy,
-			ConflictResolution: bucket.ConflictResolution,
-			EnableFlush:        bucket.EnableFlush,
-			EnableIndexReplica: bucket.EnableIndexReplica,
-			CompressionMode:    string(bucket.CompressionMode),
+			BucketName:           bucket.BucketName,
+			BucketType:           bucket.BucketType,
+			BucketStorageBackend: string(bucket.BucketStorageBackend),
+			BucketMemoryQuota:    bucket.BucketMemoryQuota,
+			BucketReplicas:       bucket.BucketReplicas,
+			IoPriority:           string(bucket.IoPriority),
+			EvictionPolicy:       bucket.EvictionPolicy,
+			ConflictResolution:   bucket.ConflictResolution,
+			EnableFlush:          bucket.EnableFlush,
+			EnableIndexReplica:   bucket.EnableIndexReplica,
+			CompressionMode:      string(bucket.CompressionMode),
 		}
 	}
 

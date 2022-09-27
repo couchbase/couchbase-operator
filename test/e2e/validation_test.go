@@ -1842,6 +1842,30 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`bucket0`},
 		},
+		{
+			name:           "TestValidateBucketInvalidCouchbaseStorageBackend",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "abracadabra")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.storageBackend`},
+		},
+		{
+			name:           "TestValidateBucketStorageBackendMagmaNeedsMoreThanDefaultMemoryQuota",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.storageBackend`},
+		},
+		{
+			name:           "TestValidateBucketStorageBackendMagmaNeedsMoreThanOrEqualTo1024Mi",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "1023Mi")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.storageBackend`},
+		},
+		{
+			name:           "TestValidateBucketStorageBackendMagmaInvalidEvictionPolicy",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.storageBackend`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
