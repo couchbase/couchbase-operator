@@ -1993,6 +1993,29 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
+func TestValidationCreateCouchbaseBackup(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestValidateBackupS3BucketSubpath",
+			mutations:  patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/s3bucket", "s3://hello/beans")},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestValidationCreateCouchbaseBackupRestore(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestValidateBackupS3BucketSubpath",
+			mutations:  patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/s3bucket", "s3://hello/beans")},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
 func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 	testDefs := []testDef{
 		{

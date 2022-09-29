@@ -2860,3 +2860,76 @@ func TestBackupAndRestoreServices(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestBackupAndRestoreToSubPath(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	s3secret, s3BucketName, s3cleanup := createS3Secret(t, kubernetes, true)
+
+	s3BucketName += "/subpath"
+
+	defer s3cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Create a normal cluster.
+	clusterSize := constants.Size3
+
+	numOfDocs := f.DocsCount
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+
+	// wait for backup
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// wait for backup to complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
+
+	// create new restore
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+
+	// restore job is too fast, just validate bucket item count
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * Remove Bucket
+	// * Bucket created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

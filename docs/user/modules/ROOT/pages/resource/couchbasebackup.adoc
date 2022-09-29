@@ -328,7 +328,7 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]\{3,63}$`
+*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.\/]\{3,63}$`
 
 ==== Description
 

@@ -28,7 +28,7 @@ type BucketScopeOrCollectionName string
 type BucketScopeOrCollectionNameWithDefaults string
 
 // S3BucketURI is an Amazon object storage reference.
-// +kubebuilder:validation:Pattern="^s3://[a-z0-9-\\.]{3,63}$"
+// +kubebuilder:validation:Pattern="^s3://[a-z0-9-\\.\\/]{3,63}$"
 type S3BucketURI string
 
 // CouchbaseBucketCompressionMode defines the available compression modes for Couchbase

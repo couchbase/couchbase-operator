@@ -49,7 +49,7 @@ pipeline {
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
     GITLAB_CREDENTIALS = credentials('gitlab-couchbaseqe')
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
-    AWS_CREDENTIALS = credentials('aws-simon')
+    AWS_CREDENTIALS = credentials('aws-alex')
     KIND_VERSION = "0.14.0"
   }
 
