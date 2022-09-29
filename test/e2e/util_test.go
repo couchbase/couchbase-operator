@@ -78,6 +78,8 @@ func registerTests() {
 		framework.NewTestDef(TestNegValidationCreateCouchbaseReplication).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidationCreateCouchbaseBackup).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidationCreateCouchbaseBackupRestore).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationCreateCouchbaseBackup).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationCreateCouchbaseBackupRestore).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseBackup).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseBackupRestore).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseScopesAndCollections).WithTags(TagSuiteValidation, TagSuitePlatform),
@@ -635,6 +637,7 @@ func registerTests() {
 		framework.NewTestDef(TestBackupAndRestoreS3WithIAMRole).WithTags(TagSuiteP1, TagFeatureBackup, TagSuitePlatform, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupAndForcedRestore).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestoreServices).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestBackupAndRestoreToSubPath).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestoreEphemeralVolume).WithTags(TagSuiteP1, TagFeatureBackup, TagFeatureBackupCloud),
 
 		// Synchronization tests.

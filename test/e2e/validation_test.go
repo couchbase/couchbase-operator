@@ -1259,6 +1259,11 @@ func TestValidationCreateCouchbaseBackup(t *testing.T) {
 			},
 			shouldFail: false,
 		},
+		{
+			name:       "TestValidateBackupS3BucketSubpath",
+			mutations:  patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/s3bucket", "s3://hello/beans")},
+			shouldFail: false,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1296,6 +1301,11 @@ func TestValidationCreateCouchbaseBackupRestore(t *testing.T) {
 						Secret: "test-example-gs",
 					}),
 			},
+			shouldFail: false,
+		},
+		{
+			name:       "TestValidateBackupS3BucketSubpath",
+			mutations:  patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/s3bucket", "s3://hello/beans")},
 			shouldFail: false,
 		},
 	}
