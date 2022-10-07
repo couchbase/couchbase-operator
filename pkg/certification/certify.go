@@ -1059,7 +1059,7 @@ func (o *certifyOptions) isParallelDefaulted() bool {
 	defaulted := true
 
 	for _, arg := range os.Args {
-		if arg == "--parallel" {
+		if strings.HasPrefix(arg, "--parallel") {
 			defaulted = false
 		}
 	}

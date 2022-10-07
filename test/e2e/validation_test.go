@@ -2843,6 +2843,12 @@ func TestRBACValidationLDAP(t *testing.T) {
 			expectedErrors: []string{"spec.security.ldap.tlsSecret"},
 		},
 		{
+			name:           "TestValidateCaCertNotRequiredRequired",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.1.0").Remove("/spec/security/ldap/tlsSecret")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.security.ldap.tlsSecret"},
+		},
+		{
 			name:           "TestValidateGroupRequired",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/security/ldap/groupsQuery")},
 			shouldFail:     true,

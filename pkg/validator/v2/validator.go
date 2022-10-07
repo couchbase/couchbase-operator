@@ -1058,6 +1058,24 @@ func checkConstraintLDAPAuthentication(v *types.Validator, cluster *couchbasev2.
 	return nil
 }
 
+func isTLSSecretRequired(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
+	requestedVersionString, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return false, fmt.Errorf("unsupported Couchbase version: %w", err)
+	}
+
+	requestedVersion, err := couchbaseutil.NewVersion(requestedVersionString)
+	if err != nil {
+		return false, fmt.Errorf("unsupported Couchbase version: %w", err)
+	}
+
+	minimumVersionNoSecret, _ := couchbaseutil.NewVersion("7.1.0")
+
+	return (requestedVersion.Less(minimumVersionNoSecret) ||
+		(requestedVersion.GreaterEqual(minimumVersionNoSecret) &&
+			len(cluster.Spec.Networking.TLS.RootCAs) == 0)), nil
+}
+
 // checkConstraintLDAPConnectionTLS checks that when enabled, the encryption type and
 // TLS secrets exists and is correctly formatted for LDAPS.
 func checkConstraintLDAPConnectionTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -1076,7 +1094,14 @@ func checkConstraintLDAPConnectionTLS(v *types.Validator, cluster *couchbasev2.C
 	}
 
 	tlsSecretName := cluster.Spec.Security.LDAP.TLSSecret
-	if tlsSecretName == "" {
+
+	secretRequired, err := isTLSSecretRequired(cluster)
+
+	if err != nil {
+		return err
+	}
+
+	if tlsSecretName == "" && secretRequired {
 		return errors.Required("spec.security.ldap.tlsSecret", "body", nil)
 	}
 
