@@ -1520,6 +1520,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 			FailureThreshold:    3,
 		},
 		Resources: resources,
+		Args:      []string{"--per-node-refresh", fmt.Sprintf("%d", cs.Monitoring.Prometheus.RefreshRate)},
 	}
 }
 

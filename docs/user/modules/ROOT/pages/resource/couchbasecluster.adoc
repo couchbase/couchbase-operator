@@ -136,6 +136,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-monitoring-prometheus-authorizationsecret,authorizationSecret>>: ""
       <<couchbaseclusters-spec-monitoring-prometheus-enabled,enabled>>: false
       <<couchbaseclusters-spec-monitoring-prometheus-image,image>>: ""
+      <<couchbaseclusters-spec-monitoring-prometheus-refreshrate,refreshRate>>: 60
       <<couchbaseclusters-spec-monitoring-prometheus-resources,resources>>: {}
   <<couchbaseclusters-spec-networking,networking>>:
     <<couchbaseclusters-spec-networking-addressfamily,addressFamily>>: ""
@@ -1804,6 +1805,21 @@ Enabled is a boolean that enables/disables the metrics sidecar container.
 
 Image is the metrics image to be used to collect metrics.
 No validation is carried out as this can be any arbitrary repo and tag.
+
+=== couchbaseclusters.spec.monitoring.prometheus.refreshRate
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `60`
+
+==== Description
+
+RefreshRate is the frequency in which cached statistics are updated in seconds.
+Shorter intervals will add additional resource overhead to clusters running Couchbase Server 7.0+ Default is 60 seconds, Maximum value is 600 seconds, and minimum value is 1 second.
 
 === couchbaseclusters.spec.monitoring.prometheus.resources
 

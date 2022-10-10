@@ -3481,6 +3481,14 @@ type CouchbaseClusterMonitoringPrometheusSpec struct {
 	// AuthorizationSecret is the name of a Kubernetes secret that contains a
 	// bearer token to authorize GET requests to the metrics endpoint
 	AuthorizationSecret *string `json:"authorizationSecret,omitempty"`
+
+	// RefreshRate is the frequency in which cached statistics are updated in seconds.
+	// Shorter intervals will add additional resource overhead to clusters running Couchbase Server 7.0+
+	// Default is 60 seconds, Maximum value is 600 seconds, and minimum value is 1 second.
+	// +kubebuilder:default=60
+	// +kubebuilder:Maximum=600
+	// +kubebuilder:Minimum=1
+	RefreshRate uint64 `json:"refreshRate"`
 }
 
 type CouchbaseClusterLoggingConfigurationSpec struct {
