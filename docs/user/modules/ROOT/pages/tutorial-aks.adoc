@@ -64,12 +64,12 @@ Also, the default virtual machine type is `Standard_DS2_v2` which supports a max
 
 [source,console]
 ----
-$ subnet_id=$(az network vnet show -g myResourceGroup -n myAKSVnet --query subnets[].id -o tsv)
+$ subnet_id=$(az network vnet show -g myResourceGroup -n myAKSVnet --query 'subnets[].id' -o tsv)
 ----
 
 [source,console]
 ----
-$ az aks create -g myResourceGroup -n myAKSCluster --node-count 3  --vnet-subnet-id $subnet_id --service-cidr 10.0.0.0/16 --dns-service-ip 10.0.0.10 --generate-ssh-keys   --location eastus  --network-plugin azure  --kubernetes-version 1.12.7
+$ az aks create -g myResourceGroup -n myAKSCluster --node-count 3  --vnet-subnet-id $subnet_id --service-cidr 10.0.0.0/16 --dns-service-ip 10.0.0.10 --generate-ssh-keys   --location eastus  --network-plugin azure  --kubernetes-version 1.24.6
 ----
 
 [NOTE]
@@ -78,7 +78,7 @@ To check that the `--kubernetes-version` exists within your AKS environment, run
 
 [source,console]
 ----
-$ az aks get-versions --location eastus --query orchestrators[].orchestratorVersion -o tsv`
+$ az aks get-versions --location eastus --query 'orchestrators[].orchestratorVersion' -o tsv`
 ----
 ====
 
@@ -110,14 +110,14 @@ To check if a new version is available for your cluster, use the `get-upgrades` 
 
 [source,console]
 ----
-$ az aks get-upgrades -g myResourceGroup -n myAKSCluster --query agentPoolProfiles[].upgrades -o tsv
+$ az aks get-upgrades -g myResourceGroup -n myAKSCluster --query 'agentPoolProfiles[].upgrades' -o tsv
 ----
 
 To proceed with an upgrade, simply run the `upgrade` command with the desired version:
 
 [source,console]
 ----
-$ az aks upgrade -g myResourceGroup -n myAKSCluster --kubernetes-version 1.13.5
+$ az aks upgrade -g myResourceGroup -n myAKSCluster --kubernetes-version 1.24.6
 ----
 
 == Next Steps
