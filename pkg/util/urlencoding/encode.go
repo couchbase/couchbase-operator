@@ -95,7 +95,7 @@ func (o tagOptions) contains(option string) bool {
 	return false
 }
 
-// Marshal takes an anonymous struct and returns a URL encoded key/value mapping.
+// Marshal takes an anonymous stru t and returns a URL encoded key/value mapping.
 // Much like json encoding the struct is tagged to indicate that the field should
 // be marshaled into a mapping.
 //
@@ -169,6 +169,10 @@ func marshal(m interface{}, data *url.Values) error {
 			continue
 		}
 
+		if options.contains("emptyisnull") && isEmptyValue(fv) {
+			data.Set(name, "")
+			continue
+		}
 		// Finally encode the struct value
 		encoded, err := encode(fv)
 		if err != nil {

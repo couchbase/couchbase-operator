@@ -1666,13 +1666,19 @@ func TestTLSEditSettings(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/disableUIOverHTTPS", true), time.Minute)
 	e2eutil.MustReceiveErrorValue(t, op3)
 
+	op4 := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.SecuritySettingsUpdatedEvent(cluster, k8sutil.SecuritySettingUpdated), time.Minute)
+	defer op4.Cancel()
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/uiSessionTimeout", 2), time.Minute)
+	e2eutil.MustReceiveErrorValue(t, op4)
+
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings edited
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{
-			Times:     3,
+			Times:     4,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdated},
 		},
 	}

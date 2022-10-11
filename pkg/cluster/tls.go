@@ -1630,11 +1630,12 @@ func (c *Cluster) updateSecuritySettings() error {
 	}
 
 	requestedSecuritySettings := &couchbaseutil.SecuritySettings{
-		DisableUIOverHTTP:      c.cluster.Spec.Networking.DisableUIOverHTTP,
-		DisableUIOverHTTPS:     c.cluster.Spec.Networking.DisableUIOverHTTPS,
-		TLSMinVersion:          couchbaseutil.TLS12,
-		HonorCipherOrder:       true, // This is plain stupid, I'm hard coding it for the good of humanity.
-		ClusterEncryptionLevel: securitySettings.ClusterEncryptionLevel,
+		DisableUIOverHTTP:       c.cluster.Spec.Networking.DisableUIOverHTTP,
+		DisableUIOverHTTPS:      c.cluster.Spec.Networking.DisableUIOverHTTPS,
+		UISessionTimeoutSeconds: couchbaseutil.UISessionTimeoutInt(c.cluster.Spec.UISessionTimeoutMinutes * 60),
+		TLSMinVersion:           couchbaseutil.TLS12,
+		HonorCipherOrder:        true, // This is plain stupid, I'm hard coding it for the good of humanity.
+		ClusterEncryptionLevel:  securitySettings.ClusterEncryptionLevel,
 	}
 
 	if c.cluster.Spec.Networking.TLS != nil {

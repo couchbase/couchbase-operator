@@ -20,7 +20,8 @@ import (
 // master (can't go killing Kubernetes can we).  This means we can pin the cluster to
 // that zone and do bad things to it, while allowing the operator to keep functioning,
 // and thus we can observe its behaviour.
-// nolint:unused
+
+// nolint:unused,nolintlint
 func mustGetNonMasterAvailabilityZone(t *testing.T, kubernetes *types.Cluster) string {
 	caps := clustercapabilities.MustNewCapabilities(t, kubernetes.KubeClient)
 

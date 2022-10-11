@@ -1200,6 +1200,58 @@ type SecuritySettings struct {
 
 	// Enable cluster level encryption.
 	ClusterEncryptionLevel ClusterEncryptionLevel `json:"clusterEncryptionLevel" url:"clusterEncryptionLevel,omitempty"`
+
+	// Configures how long (in seconds) before inactive user is signed out of Server's UI.
+	// This is actually an int but the API doesnt accept 0.
+	// Instead we have to send "" to unset the timeout.
+	UISessionTimeoutSeconds UISessionTimeoutInt `json:"uiSessionTimeout" url:"uiSessionTimeout,emptyisnull"`
+}
+
+// This is basically an int except 0 is sent as "" because couchbase api.
+type UISessionTimeoutInt uint
+
+func (timeout *UISessionTimeoutInt) UnmarshalJSON(b []byte) error {
+	if b[0] != '"' {
+		return json.Unmarshal(b, (*uint)(timeout))
+	}
+
+	var s string
+
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+
+	if s == "" {
+		*timeout = UISessionTimeoutInt(0)
+		return nil
+	}
+
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return err
+	}
+
+	*timeout = UISessionTimeoutInt(i)
+
+	return nil
+}
+
+func (timeout *UISessionTimeoutInt) MarshalJSON() ([]byte, error) {
+	var res []byte
+
+	var err error
+
+	if *timeout == UISessionTimeoutInt(0) {
+		res, err = json.Marshal("")
+	} else {
+		res, err = json.Marshal((*uint)(timeout))
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 // I'm not even going to comment on this...

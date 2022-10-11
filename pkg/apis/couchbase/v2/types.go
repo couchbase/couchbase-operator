@@ -2149,6 +2149,14 @@ type ClusterSpec struct {
 	// rolling upgrade procedure to create a new set of Pods for use with resized Volumes.
 	// More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims
 	EnableOnlineVolumeExpansion bool `json:"enableOnlineVolumeExpansion,omitempty"`
+
+	// UISessionTimeout sets how long, in minutes, before a user is declared inactive
+	// and signed out from the Couchbase Server UI.
+	// 0 represents no time out.
+	// +kubebuilder:default:0
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=16666
+	UISessionTimeoutMinutes uint `json:"uiSessionTimeout,omitempty"`
 }
 
 type PersistentVolumeClaimTemplate struct {
