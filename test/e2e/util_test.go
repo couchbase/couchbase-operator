@@ -185,6 +185,7 @@ func registerTests() {
 		framework.NewTestDef(TestMandatoryMutualTLSWithMultipleCAsAndRotateServerPKIWithOperatorDown).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKI).WithTags(TagSuiteP0, TagFeatureTLS, TagSuitePlatform),
 		framework.NewTestDef(TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKIWithOperatorDown).WithTags(TagSuiteP0, TagFeatureTLS),
+		framework.NewTestDef(TestTLSWithMultipleServerCerts).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestTLSScriptPassphrase).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestTLSRotateScriptPassphrase).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestTLSRotateAndChangeScriptPassphrase).WithTags(TagSuiteP0, TagFeatureTLS),

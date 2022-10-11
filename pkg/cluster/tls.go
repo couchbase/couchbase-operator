@@ -127,13 +127,7 @@ func (c *Cluster) getCAs() ([][]byte, error) {
 			return nil, fmt.Errorf("%w: TLS CA secret missing tls.crt", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
-		// We need to decode the PEM to separate into separate CAs
-		caPem := util_x509.DecodePEM(ca)
-		for _, caBlock := range caPem {
-			// Then re-encode and append to list of known CAs
-			caPem := pem.EncodeToMemory(caBlock)
-			rootCAs = append(rootCAs, caPem)
-		}
+		rootCAs = append(rootCAs, ca)
 	}
 
 	// The assumption is that this call will be made if TLS is enabled, and in
@@ -143,7 +137,20 @@ func (c *Cluster) getCAs() ([][]byte, error) {
 		return nil, fmt.Errorf("%w: No TLS CA certificates detected", errors.NewStackTracedError(errors.ErrResourceRequired))
 	}
 
-	return rootCAs, nil
+	// Finally we need to process each CA by
+	// decoding to separate multi PEM certificates
+	var processedRootCAs [][]byte
+
+	for _, ca := range rootCAs {
+		caPem := util_x509.DecodePEM(ca)
+		for _, caBlock := range caPem {
+			// Then re-encode and append to list of known CAs
+			caPem := pem.EncodeToMemory(caBlock)
+			processedRootCAs = append(processedRootCAs, caPem)
+		}
+	}
+
+	return processedRootCAs, nil
 }
 
 // refreshTLSClientSecret creates/updates a secret that contains tls certificates

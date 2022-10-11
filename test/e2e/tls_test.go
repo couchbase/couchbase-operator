@@ -1733,6 +1733,51 @@ func TestMandatoryMutualTLSWithSingleSecretMultipleCAsAndCertManagerSecrets(t *t
 	testMandatoryMutualTLSWithMultipleCAs(t, e2eutil.TLSSourceCertManagerSecret, true)
 }
 
+func TestTLSWithMultipleServerCerts(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Generate an initial TLS context
+	opts := e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret}
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &opts)
+
+	// Retrieve the server secret created by the context
+	secret := e2eutil.MustGetSecret(t, kubernetes, ctx.ClusterSecretName)
+
+	// Generate a random CA that was not used to sign the server sert
+	caCN := "amityville inc"
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	extraCA, err := e2eutil.NewCertificateAuthority(e2eutil.KeyTypeRSA, caCN, validFrom, validTo, e2eutil.CertTypeCA)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Combine the random CA to valid CA as the first PEM
+	secret.Data[pkgconstants.CertManagerCAKey] = append(extraCA.Certificate, ctx.CA.Certificate...)
+
+	// Patch the Secret with updated CA
+	e2eutil.MustUpdateSecret(t, kubernetes, secret)
+
+	// Create Cluster
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 // TestMultipleCAsAddAndRemove tests that addition and removal of CAs works, and is
 // independent of other operations.
 func TestMultipleCAsAddAndRemove(t *testing.T) {
