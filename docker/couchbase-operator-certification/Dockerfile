@@ -6,7 +6,7 @@ FROM golang:$GO_VERSION-alpine
 
 # Install whatever compression and archival stuff we need to stream off
 # the test archive (logs).
-RUN --mount=type=cache,target=/var/cache/apk apk add tar bzip2 libc6-compat
+RUN apk add --no-cache tar bzip2 libc6-compat
 
 ARG TARGET=kubernetes-linux-amd64
 
