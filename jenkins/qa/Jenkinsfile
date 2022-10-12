@@ -125,6 +125,7 @@ pipeline {
                 certify \
                 --image ${DOCKER_CREDENTIALS_USR}/couchbase-operator-certification:${GIT_COMMIT} \
                 --timeout 10m \
+                --parallel 8 \
                 --archive-name logs-${version} \
                 -- \
                 -suite validation \
