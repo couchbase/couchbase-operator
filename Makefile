@@ -573,6 +573,16 @@ image-artifacts: | $(ARTIFACTSDIR)
 	$(MAKE) image-artifact -e $(BUILD_ENV) IMAGE=couchbase-operator-certification TARGET=openshift-linux-arm64
 	tar czf $(IMAGE_ARTIFACT) -C $(BUILDDIR)/$(IMAGE_ARTIFACT_NAME) $(IMAGES)
 
+# a very stripped down build that ensures the code compiles.
+dist-lite:
+	mkdir -p ./build/bin/kubernetes-linux-amd64
+	docker build -f ./docker/couchbase-operator-lite-build/Dockerfile . -t couchbase/build-a-bear:v1
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/cao > build/bin/kubernetes-linux-amd64/cao
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/cbopinfo > build/bin/kubernetes-linux-amd64/cbopinfo
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/cbopcfg > build/bin/kubernetes-linux-amd64/cbopcfg
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/couchbase-operator > build/bin/kubernetes-linux-amd64/couchbase-operator
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/couchbase-admission-controller > build/bin/kubernetes-linux-amd64/couchbase-admission-controller
+
 # Interface used by build to trigger things it needs.
 # Here's where/why the build system is totally in need of some love...
 # Make should define a set of files to create, and these should depend on any

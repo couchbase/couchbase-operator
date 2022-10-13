@@ -45,7 +45,7 @@ pipeline {
     }
     stage('Build Release') {
       steps {
-        sh 'make dist'
+        sh 'make dist-lite'
       }
     }
     stage('Unit Test') {

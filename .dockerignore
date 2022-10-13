@@ -1,8 +1,9 @@
 # Ignore everything except that required to build every binary.
-* 
+*
 !cmd/*
 !pkg/*
 !go.*
 !test/*
 !Makefile
 !.git
+!scripts/*
