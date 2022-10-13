@@ -3570,8 +3570,8 @@ type CouchbaseClusterMonitoringPrometheusSpec struct {
 	// Shorter intervals will add additional resource overhead to clusters running Couchbase Server 7.0+
 	// Default is 60 seconds, Maximum value is 600 seconds, and minimum value is 1 second.
 	// +kubebuilder:default=60
-	// +kubebuilder:Maximum=600
-	// +kubebuilder:Minimum=1
+	// +kubebuilder:validation:Maximum=600
+	// +kubebuilder:validation:Minimum=1
 	RefreshRate uint64 `json:"refreshRate"`
 }
 

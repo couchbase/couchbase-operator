@@ -1514,7 +1514,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 	}
 
 	// Check for no value and set to 60
-	if cs.Monitoring.Prometheus.RefreshRate == 0 {
+	if cs.Monitoring.Prometheus.RefreshRate <= 0 {
 		cs.Monitoring.Prometheus.RefreshRate = 60
 	}
 

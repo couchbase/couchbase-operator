@@ -1825,6 +1825,10 @@ No validation is carried out as this can be any arbitrary repo and tag.
 
 *Default*: `60`
 
+*Minimum*: `1`
+
+*Maximum*: `600`
+
 ==== Description
 
 RefreshRate is the frequency in which cached statistics are updated in seconds.
