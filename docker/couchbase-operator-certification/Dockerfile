@@ -8,10 +8,10 @@ FROM golang:$GO_VERSION-alpine
 # the test archive (logs).
 RUN apk add --no-cache tar bzip2 libc6-compat
 
-ARG TARGET=kubernetes-linux-amd64
+ARG TARGETARCH
 
-COPY ${TARGET}/cao /
-COPY ${TARGET}/couchbase-operator-certification /
+COPY kubernetes-linux-${TARGETARCH}/cao /
+COPY kubernetes-linux-${TARGETARCH}/couchbase-operator-certification /
 COPY crd.yaml /
 
 COPY README.txt /
