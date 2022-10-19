@@ -89,7 +89,7 @@ pipeline {
         sh "mv kubectl ${env.WORKSPACE}/bin/"
 
         sh "wget -q https://releases.hashicorp.com/terraform/${params.terraform_version}/terraform_${params.terraform_version}_linux_amd64.zip"
-        sh "unzip terraform_${params.terraform_version}_linux_amd64.zip"
+        sh "unzip -o terraform_${params.terraform_version}_linux_amd64.zip"
         sh "mv terraform ${env.WORKSPACE}/bin"
 
         sh "wget -q https://github.com/istio/istio/releases/download/${params.istio_version}/istioctl-${params.istio_version}-linux-amd64.tar.gz"
