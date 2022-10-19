@@ -343,7 +343,7 @@ ObjectStore allows for backing up to a remote cloud storage.
 
 ==== Description
 
-ObjStoreSecret must contain two fields, access-key-id, secret-access-key and optionally region.
+ObjStoreSecret must contain two fields, access-key-id, secret-access-key and optionally either region or refresh-token.
 These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-backup.html#optional-2.
 
 === couchbasebackups.spec.objectStore.uri
@@ -352,7 +352,7 @@ These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/se
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(az|s3)://.\{3,}$`
+*Pattern (Regular Expression)*: `^(az|s3|gs)://.\{3,}$`
 
 ==== Description
 

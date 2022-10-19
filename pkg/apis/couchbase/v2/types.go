@@ -43,7 +43,7 @@ type S3BucketURI string
 // ObjectStoreURI is a reference to a remote object store.
 // This is the prefix of the object store and the bucket name.
 // i.e s3://bucket or az://bucket.
-// +kubebuilder:validation:Pattern="^(az|s3)://.{3,}$"
+// +kubebuilder:validation:Pattern="^(az|s3|gs)://.{3,}$"
 type ObjectStoreURI string
 
 // CouchbaseBucketCompressionMode defines the available compression modes for Couchbase
@@ -157,7 +157,7 @@ type ObjectStoreSpec struct {
 	// i.e s3://bucket, az://bucket or gs://bucket.
 	URI ObjectStoreURI `json:"uri,omitempty"`
 
-	// ObjStoreSecret must contain two fields, access-key-id, secret-access-key and optionally region.
+	// ObjStoreSecret must contain two fields, access-key-id, secret-access-key and optionally either region or refresh-token.
 	// These correspond to the fields used by cbbackupmgr
 	// https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-backup.html#optional-2
 	Secret string `json:"secret,omitempty"`

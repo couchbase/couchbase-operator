@@ -369,6 +369,9 @@ func configure() (err error) {
 		"Compression mode to use.  Either 'off', 'passive' or 'active'.")
 	flag.StringVar(&params.AZAccountName, "az-account-name", "", "Azure account name")
 	flag.StringVar(&params.AZAccountKey, "az-account-key", "", "Azure account key")
+	flag.StringVar(&params.GCPClientID, "gcp-client-id", "", "GCP Client ID")
+	flag.StringVar(&params.GCPClientSecret, "gcp-client-secret", "", "GCP Client Secret")
+	flag.StringVar(&params.GCPRefreshToken, "gcp-refresh-token", "", "GCP Refresh Token")
 	flag.StringVar(&params.S3Region, "s3-region",
 		"us-west-2",
 		"S3 region to use for backup.")
@@ -1161,6 +1164,14 @@ func (r *TestRequirement) HasS3Parameters() *TestRequirement {
 func (r *TestRequirement) HasAzureParameters() *TestRequirement {
 	if Global.AZAccountName == "" || Global.AZAccountKey == "" {
 		r.t.Skip("Azure Config parameters are not provided")
+	}
+
+	return r
+}
+
+func (r *TestRequirement) HasGCPParameters() *TestRequirement {
+	if Global.GCPClientID == "" || Global.GCPClientSecret == "" || Global.GCPRefreshToken == "" {
+		r.t.Skip("GCP Config parameters are not provided")
 	}
 
 	return r

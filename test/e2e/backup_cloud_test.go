@@ -22,24 +22,28 @@ import (
 func MustNewProvider(t *testing.T, kubernetes *types.Cluster, providerType cloud.ProviderType) cloud.Provider {
 	f := framework.Global
 
-	var creds *cloud.Credentials
+	var creds []string
 
 	switch providerType {
 	case cloud.CloudProviderAWS:
 		framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").HasS3Parameters()
 
-		creds = cloud.NewCloudCredentials(f.S3AccessKey, f.S3SecretID, f.S3Region)
+		creds = []string{f.S3AccessKey, f.S3SecretID, f.S3Region}
 
 	case cloud.CloudProviderAzure:
 		framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").HasAzureParameters()
 
-		creds = cloud.NewCloudCredentials(f.AZAccountName, f.AZAccountKey, "")
+		creds = []string{f.AZAccountName, f.AZAccountKey}
 
+	case cloud.CloudProviderGCP: //TODO: are these versions right?
+		framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").HasGCPParameters()
+
+		creds = []string{f.GCPClientID, f.GCPClientSecret, f.GCPRefreshToken}
 	default:
 		break
 	}
 
-	provider, err := cloud.NewProvider(providerType, creds)
+	provider, err := cloud.NewProvider(providerType, creds...)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}

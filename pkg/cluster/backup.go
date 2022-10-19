@@ -23,12 +23,14 @@ import (
 type CBBackupmgrAction string
 
 const (
-	Incremental          CBBackupmgrAction = "incremental"
-	Full                 CBBackupmgrAction = "full"
-	ObjEndpointCrtDir    string            = "/var/run/secrets/objectendpoint"
-	backupTLSMountDir    string            = "/var/run/secrets/couchbase.com/tls-mount"
-	StoreSecretAccessID  string            = "access-key-id"
-	StoreSecretAccessKey string            = "secret-access-key"
+	Incremental             CBBackupmgrAction = "incremental"
+	Full                    CBBackupmgrAction = "full"
+	ObjEndpointCrtDir       string            = "/var/run/secrets/objectendpoint"
+	backupTLSMountDir       string            = "/var/run/secrets/couchbase.com/tls-mount"
+	StoreSecretAccessID     string            = "access-key-id"
+	StoreSecretAccessKey    string            = "secret-access-key"
+	StoreSecretRegion       string            = "region"
+	StoreSecretRefreshToken string            = "refresh-token"
 )
 
 // backupResources contains all the resources required to create and manage a backup.
@@ -986,7 +988,7 @@ func (c *Cluster) applyObjStoreConfiguration(container *corev1.Container, storeS
 		return
 	}
 
-	if _, ok := secret.Data["region"]; ok {
+	if _, ok := secret.Data[StoreSecretRegion]; ok {
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name: "CB_OBJSTORE_REGION",
 			ValueFrom: &corev1.EnvVarSource{
@@ -994,7 +996,21 @@ func (c *Cluster) applyObjStoreConfiguration(container *corev1.Container, storeS
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: secretName,
 					},
-					Key: "region",
+					Key: StoreSecretRegion,
+				},
+			},
+		})
+	}
+
+	if _, ok := secret.Data[StoreSecretRefreshToken]; ok {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name: "CB_OBJSTORE_REFRESH_TOKEN",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: StoreSecretRefreshToken,
 				},
 			},
 		})

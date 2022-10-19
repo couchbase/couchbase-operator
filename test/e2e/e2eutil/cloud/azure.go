@@ -12,14 +12,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type AzureCredentials struct {
+	accountName string
+	accountKey  string
+}
 type AzureProvider struct {
 	client *azblob.ServiceClient
-	creds  *Credentials
+	creds  *AzureCredentials
 }
 
-func NewAzureProvider(creds *Credentials) (Provider, error) {
-	accountName := creds.accessKeyID
-	accountKey := creds.secretAccessKey
+func NewAzureProvider(creds ...string) (Provider, error) {
+	accountName := creds[0]
+	accountKey := creds[1]
+
+	azCreds := &AzureCredentials{
+		accountName: accountName,
+		accountKey:  accountKey,
+	}
 	cred, err := azblob.NewSharedKeyCredential(accountName, accountKey)
 
 	if err != nil {
@@ -33,7 +42,7 @@ func NewAzureProvider(creds *Credentials) (Provider, error) {
 		return nil, err
 	}
 
-	return &AzureProvider{client: client, creds: creds}, nil
+	return &AzureProvider{client: client, creds: azCreds}, nil
 }
 
 func (provider *AzureProvider) CreateBucket(bucketName string) error {
@@ -100,8 +109,8 @@ func (provider *AzureProvider) CreateSecret(cluster *types.Cluster) (*corev1.Sec
 			Name: s3secret,
 		},
 		Data: map[string][]byte{
-			"access-key-id":     []byte(provider.creds.accessKeyID),
-			"secret-access-key": []byte(provider.creds.secretAccessKey),
+			"access-key-id":     []byte(provider.creds.accountName),
+			"secret-access-key": []byte(provider.creds.accountKey),
 		},
 	}
 

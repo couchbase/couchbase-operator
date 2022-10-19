@@ -460,7 +460,7 @@ crd: $(CRD_FILE)
 .PHONY: lint
 lint: $(GENERATED_FILES)
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLINT_VERSION)
-	$(GOBIN)/golangci-lint run ./pkg/... ./cmd/... ./test/...
+	$(GOBIN)/golangci-lint run --timeout=10m ./pkg/... ./cmd/... ./test/...
 
 # Lint python scripts for dodgy code.
 .PHONY: lint-python

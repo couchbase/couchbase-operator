@@ -39,22 +39,29 @@ type Framework struct {
 	CompressionMode               couchbasev2.CouchbaseBucketCompressionMode
 	EnableIstio                   bool
 	IstioTLSMode                  string
-	S3Region                      string
-	S3AccessKey                   string
-	S3SecretID                    string
-	AZAccountName                 string
-	AZAccountKey                  string
-	MinioRegion                   string
-	MinioAccessKey                string
-	MinioSecretID                 string
-	AWSAccountID                  string
-	AWSOIDCProvider               string
-	IAMAccessKey                  string
-	IAMSecretID                   string
-	DocsCount                     int
-	LogLevel                      string
-	PodImagePullPolicy            PullPolicyFlag
-	CollectedLogLevel             int
+	// AWS Access
+	AWSAccountID    string
+	AWSOIDCProvider string
+	IAMAccessKey    string
+	IAMSecretID     string
+	S3Region        string
+	S3AccessKey     string
+	S3SecretID      string
+	// Azure Access
+	AZAccountName string
+	AZAccountKey  string
+	// GCP Access
+	GCPClientID     string
+	GCPClientSecret string
+	GCPRefreshToken string
+
+	MinioRegion        string
+	MinioAccessKey     string
+	MinioSecretID      string
+	DocsCount          int
+	LogLevel           string
+	PodImagePullPolicy PullPolicyFlag
+	CollectedLogLevel  int
 
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual

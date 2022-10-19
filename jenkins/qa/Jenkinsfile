@@ -51,6 +51,8 @@ pipeline {
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
     AWS_CREDENTIALS = credentials('aws-alex')
     AZURE_CREDENTIALS = credentials('azure-alex')
+    GCP_CREDENTIALS = credentials('gcp-operator')
+    GCP_REFRESH_TOKEN = credentials('gcp-refresh-token')
     KIND_VERSION = "0.14.0"
   }
 
@@ -186,7 +188,10 @@ pipeline {
             -s3-access-key \${AWS_CREDENTIALS_USR} \
             -s3-secret-id \${AWS_CREDENTIALS_PSW} \
             -az-account-name \${AZURE_CREDENTIALS_USR} \
-            -az-account-key \${AZURE_CREDENTIALS_PSW}"
+            -az-account-key \${AZURE_CREDENTIALS_PSW} \
+            -gcp-client-id \${GCP_CREDENTIALS_USR} \
+            -gcp-client-secret \${GCP_CREDENTIALS_PSW} \
+            -gcp-refresh-token \${GCP_REFRESH_TOKEN}"
         }
         sh 'tar xf logs.tar.bz2'
         sh 'tar xf results.tar.bz'

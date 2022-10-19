@@ -13,6 +13,7 @@ const (
 	NoCloudProvider = iota
 	CloudProviderAWS
 	CloudProviderAzure
+	CloudProviderGCP
 )
 
 type Provider interface {
@@ -24,26 +25,14 @@ type Provider interface {
 	PrefixBucket(string) string
 }
 
-type Credentials struct {
-	accessKeyID     string
-	secretAccessKey string
-	region          string
-}
-
-func NewCloudCredentials(accessKeyID string, secretAccessKey string, region string) *Credentials {
-	return &Credentials{
-		accessKeyID:     accessKeyID,
-		secretAccessKey: secretAccessKey,
-		region:          region,
-	}
-}
-
-func NewProvider(providerType ProviderType, creds *Credentials) (Provider, error) {
+func NewProvider(providerType ProviderType, creds ...string) (Provider, error) {
 	switch providerType {
 	case CloudProviderAWS:
-		return NewAWSProvider(creds)
+		return NewAWSProvider(creds...)
 	case CloudProviderAzure:
-		return NewAzureProvider(creds)
+		return NewAzureProvider(creds...)
+	case CloudProviderGCP:
+		return NewGCPProvider(creds...)
 	default:
 		return NewEmptyProvider()
 	}

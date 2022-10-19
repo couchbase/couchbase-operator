@@ -1431,6 +1431,66 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 	return nil
 }
 
+// checks that if the secret for the object store exists,
+// it contains the correct fields for access.
+func checkConstraintStoreSecret(v *types.Validator, store *couchbasev2.ObjectStoreSpec, namespace string) error {
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	// only validate the secret if it exists
+	if len(store.Secret) == 0 {
+		return nil
+	}
+
+	secretName := store.Secret
+
+	secret, found, err := v.Abstraction.GetSecret(namespace, secretName)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		// this should be already checked by the calling function to provide better context for the error.
+		return fmt.Errorf("secret %s referenced by objectStore.secret must exist", secretName)
+	}
+
+	// these always have to exist.
+	if _, ok := secret.Data[cbcluster.StoreSecretAccessID]; !ok {
+		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessID)
+	}
+
+	if _, ok := secret.Data[cbcluster.StoreSecretAccessKey]; !ok {
+		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessKey)
+	}
+
+	storeURI := string(store.URI)
+
+	switch {
+	case len(storeURI) == 0:
+		// no object store no validation
+		return nil
+	case strings.HasPrefix(storeURI, "gs://"):
+		// should contain refresh-token
+		if _, ok := secret.Data[cbcluster.StoreSecretRefreshToken]; !ok {
+			return fmt.Errorf("object store secret %s must contain key '%s' for Google Cloud buckets", secretName, cbcluster.StoreSecretRefreshToken)
+		}
+	case strings.HasPrefix(storeURI, "s3://"):
+		// should contain region
+		if _, ok := secret.Data[cbcluster.StoreSecretRegion]; !ok {
+			return fmt.Errorf("object store secret %s must contain key '%s' for AWS S3 buckets", secretName, cbcluster.StoreSecretRegion)
+		}
+	case strings.HasPrefix(storeURI, "az://"):
+		// doesn't need to contain any extra fields.
+		return nil
+	default:
+		// we shouldn't reach this because of crd validation.
+		return fmt.Errorf("secret %s is incompatible with unsupported object store %s", secretName, storeURI)
+	}
+
+	return nil
+}
+
 func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
 	if !v.Options.ValidateSecrets {
 		return nil
@@ -1446,7 +1506,7 @@ func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.
 
 	secretName := backup.Spec.ObjectStore.Secret
 
-	secret, found, err := v.Abstraction.GetSecret(backup.Namespace, secretName)
+	_, found, err := v.Abstraction.GetSecret(backup.Namespace, secretName)
 	if err != nil {
 		return err
 	}
@@ -1455,12 +1515,8 @@ func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.
 		return fmt.Errorf("secret %s referenced by spec.backup.storeSecret must exist", secretName)
 	}
 
-	if _, ok := secret.Data[cbcluster.StoreSecretAccessID]; !ok {
-		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessID)
-	}
-
-	if _, ok := secret.Data[cbcluster.StoreSecretAccessKey]; !ok {
-		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessKey)
+	if err = checkConstraintStoreSecret(v, backup.Spec.ObjectStore, backup.Namespace); err != nil {
+		return err
 	}
 
 	return nil
@@ -1482,7 +1538,7 @@ func checkConstaintBackupRestoreObjStoreSecret(v *types.Validator, restore *couc
 
 	secretName := restore.Spec.ObjectStore.Secret
 
-	secret, found, err := v.Abstraction.GetSecret(restore.Namespace, secretName)
+	_, found, err := v.Abstraction.GetSecret(restore.Namespace, secretName)
 	if err != nil {
 		return err
 	}
@@ -1491,12 +1547,8 @@ func checkConstaintBackupRestoreObjStoreSecret(v *types.Validator, restore *couc
 		return fmt.Errorf("secret %s referenced by spec.backup.storeSecret must exist", secretName)
 	}
 
-	if _, ok := secret.Data[cbcluster.StoreSecretAccessID]; !ok {
-		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessID)
-	}
-
-	if _, ok := secret.Data[cbcluster.StoreSecretAccessKey]; !ok {
-		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessKey)
+	if err = checkConstraintStoreSecret(v, restore.Spec.ObjectStore, restore.Namespace); err != nil {
+		return err
 	}
 
 	return nil

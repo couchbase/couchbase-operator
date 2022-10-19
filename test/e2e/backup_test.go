@@ -54,7 +54,7 @@ func testFullIncremental(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	// Expect the full backup to complete, followed by the the incremental.
@@ -86,6 +86,10 @@ func TestBackupFullIncrementalS3(t *testing.T) {
 
 func TestBackupFullIncrementalAzure(t *testing.T) {
 	testFullIncremental(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupFullIncrementalGCP(t *testing.T) {
+	testFullIncremental(t, cloud.CloudProviderGCP)
 }
 
 func testFullOnly(t *testing.T, providerType cloud.ProviderType) {
@@ -146,6 +150,10 @@ func TestBackupFullOnlyS3(t *testing.T) {
 }
 func TestBackupFullOnlyAzure(t *testing.T) {
 	testFullOnly(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupFullOnlyGCP(t *testing.T) {
+	testFullOnly(t, cloud.CloudProviderGCP)
 }
 
 // Cluster goes down during a backup (all pods go down)
@@ -239,6 +247,10 @@ func TestFailedBackupBehaviourAzure(t *testing.T) {
 	testFailedBackupBehaviour(t, cloud.CloudProviderAzure)
 }
 
+func TestFailedBackupBehaviourGCP(t *testing.T) {
+	testFailedBackupBehaviour(t, cloud.CloudProviderGCP)
+}
+
 // Make sure a new Backup PVC comes up if the Backup PVC is deleted (stupidly)
 // N.B. Obviously all old data on the old PVC is gone forever and cannot be recovered.
 func testBackupPVCReconcile(t *testing.T, providerType cloud.ProviderType) {
@@ -317,6 +329,10 @@ func TestBackupPVCReconcileS3(t *testing.T) {
 
 func TestBackupPVCReconcileAzure(t *testing.T) {
 	testBackupPVCReconcile(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupPVCReconcileGCP(t *testing.T) {
+	testBackupPVCReconcile(t, cloud.CloudProviderGCP)
 }
 
 // check that replacing a CouchbaseBackup works as expected
@@ -408,6 +424,10 @@ func TestReplaceFullOnlyBackupAzure(t *testing.T) {
 	testReplaceFullOnlyBackup(t, cloud.CloudProviderAzure)
 }
 
+func TestReplaceFullOnlyBackupGCP(t *testing.T) {
+	testReplaceFullOnlyBackup(t, cloud.CloudProviderGCP)
+}
+
 // check that replacing a CouchbaseBackup works as expected
 // delete CouchbaseBackup which should then delete Cronjobs and Jobs
 // create new full/incremental CouchbaseBackup
@@ -492,6 +512,10 @@ func TestReplaceFullIncrementalBackupS3(t *testing.T) {
 
 func TestReplaceFullIncrementalBackupAzure(t *testing.T) {
 	testReplaceFullIncrementalBackup(t, cloud.CloudProviderAzure)
+}
+
+func TestReplaceFullIncrementalBackupGCP(t *testing.T) {
+	testReplaceFullIncrementalBackup(t, cloud.CloudProviderGCP)
 }
 
 func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType) {
@@ -579,6 +603,10 @@ func TestBackupAndRestoreAzure(t *testing.T) {
 	testBackupAndRestore(t, cloud.CloudProviderAzure)
 }
 
+func TestBackupAndRestoreGCP(t *testing.T) {
+	testBackupAndRestore(t, cloud.CloudProviderGCP)
+}
+
 // Test that CouchbaseBackup Status fields update when the initial backup job is created
 // Archive, Repo, RepoList, LastRun, Running will be updated once the job is started
 // LastSuccess, RepoList and Duration fields will be updated once the job is finished.
@@ -651,6 +679,10 @@ func TestUpdateBackupStatusS3(t *testing.T) {
 
 func TestUpdateBackupStatusAzure(t *testing.T) {
 	testUpdateBackupStatus(t, cloud.CloudProviderAzure)
+}
+
+func TestUpdateBackupStatusGCP(t *testing.T) {
+	testUpdateBackupStatus(t, cloud.CloudProviderGCP)
 }
 
 func testMultipleBackups(t *testing.T, providerType cloud.ProviderType) {
@@ -726,6 +758,10 @@ func TestMultipleBackupsAzure(t *testing.T) {
 	testMultipleBackups(t, cloud.CloudProviderAzure)
 }
 
+func TestMultipleBackupsGCP(t *testing.T) {
+	testMultipleBackups(t, cloud.CloudProviderGCP)
+}
+
 func testFullIncrementalOverTLS(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
@@ -791,6 +827,10 @@ func TestBackupFullIncrementalOverTLSS3(t *testing.T) {
 
 func TestBackupFullIncrementalOverTLSAzure(t *testing.T) {
 	testFullIncrementalOverTLS(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupFullIncrementalOverTLSGCP(t *testing.T) {
+	testFullIncrementalOverTLS(t, cloud.CloudProviderGCP)
 }
 
 func TestBackupFullOnlyOverTLSKubernetes(t *testing.T) {
@@ -879,6 +919,13 @@ func TestBackupFullOnlyOverMandatoryMutualTLS(t *testing.T) {
 func TestBackupFullOnlyOverTLSS3(t *testing.T) {
 	testFullOnlyOverTLS(t, cloud.CloudProviderAWS, &e2eutil.TLSOpts{}, nil)
 }
+func TestBackupFullOnlyOverTLSAzure(t *testing.T) {
+	testFullOnlyOverTLS(t, cloud.CloudProviderAzure, &e2eutil.TLSOpts{}, nil)
+}
+
+func TestBackupFullOnlyOverTLSGCP(t *testing.T) {
+	testFullOnlyOverTLS(t, cloud.CloudProviderGCP, &e2eutil.TLSOpts{}, nil)
+}
 
 func TestBackupFullOnlyOverTLSS3Standard(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
@@ -887,15 +934,17 @@ func TestBackupFullOnlyOverTLSS3Standard(t *testing.T) {
 	testFullOnlyOverTLS(t, cloud.CloudProviderAWS, opts, nil)
 }
 
-func TestBackupFullOnlyOverTLSAzure(t *testing.T) {
-	testFullOnlyOverTLS(t, cloud.CloudProviderAzure, &e2eutil.TLSOpts{}, nil)
-}
-
 func TestBackupFullOnlyOverTLSAzureStandard(t *testing.T) {
 	keyEncoding := e2eutil.KeyEncodingPKCS8
 	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding}
-
 	testFullOnlyOverTLS(t, cloud.CloudProviderAzure, opts, nil)
+}
+
+func TestBackupFullOnlyOverTLSGCPStandard(t *testing.T) {
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	opts := &e2eutil.TLSOpts{Source: e2eutil.TLSSourceCertManagerSecret, KeyEncoding: &keyEncoding}
+
+	testFullOnlyOverTLS(t, cloud.CloudProviderGCP, opts, nil)
 }
 
 func testBackupRetention(t *testing.T, providerType cloud.ProviderType) {
@@ -946,6 +995,10 @@ func TestBackupRetentionS3(t *testing.T) {
 
 func TestBackupRetentionAzure(t *testing.T) {
 	testBackupRetention(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupRetentionGCP(t *testing.T) {
+	testBackupRetention(t, cloud.CloudProviderGCP)
 }
 
 // Manually editing the size of the PVC in a CouchbaseBackup should be reflected in the PVC and PV
@@ -1026,6 +1079,10 @@ func TestBackupPVCResizeS3(t *testing.T) {
 
 func TestBackupPVCResizeAzure(t *testing.T) {
 	testBackupPVCResize(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupPVCResizeGCP(t *testing.T) {
+	testBackupPVCResize(t, cloud.CloudProviderGCP)
 }
 
 // TestBackupAutoscaling populates the database with a load of data, then backs it up.
@@ -1207,6 +1264,10 @@ func TestBackupAndRestoreDisableEventingAzure(t *testing.T) {
 	testBackupAndRestoreDisableEventing(t, cloud.CloudProviderAzure)
 }
 
+func TestBackupAndRestoreDisableEventingGCP(t *testing.T) {
+	testBackupAndRestoreDisableEventing(t, cloud.CloudProviderGCP)
+}
+
 func testBackupAndRestoreDisableGSI(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
@@ -1306,6 +1367,10 @@ func TestBackupAndRestoreDisableGSIS3(t *testing.T) {
 
 func TestBackupAndRestoreDisableGSIAzure(t *testing.T) {
 	testBackupAndRestoreDisableGSI(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreDisableGSIGCP(t *testing.T) {
+	testBackupAndRestoreDisableGSI(t, cloud.CloudProviderGCP)
 }
 
 func testBackupAndRestoreDisableAnalytics(t *testing.T, providerType cloud.ProviderType) {
@@ -1421,6 +1486,10 @@ func TestBackupAndRestoreDisableAnalyticsAzure(t *testing.T) {
 	testBackupAndRestoreDisableAnalytics(t, cloud.CloudProviderAzure)
 }
 
+func TestBackupAndRestoreDisableAnalyticsGCP(t *testing.T) {
+	testBackupAndRestoreDisableAnalytics(t, cloud.CloudProviderGCP)
+}
+
 func testBackupAndRestoreDisableData(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
@@ -1505,6 +1574,10 @@ func TestBackupAndRestoreDisableDataS3(t *testing.T) {
 
 func TestBackupAndRestoreDisableDataAzure(t *testing.T) {
 	testBackupAndRestoreDisableData(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreDisableDataGCP(t *testing.T) {
+	testBackupAndRestoreDisableData(t, cloud.CloudProviderGCP)
 }
 
 func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.ProviderType) {
@@ -1601,6 +1674,10 @@ func TestBackupAndRestoreEnableBucketConfigAzure(t *testing.T) {
 	testBackupAndRestoreEnableBucketConfig(t, cloud.CloudProviderAzure)
 }
 
+func TestBackupAndRestoreEnableBucketConfigGCP(t *testing.T) {
+	testBackupAndRestoreEnableBucketConfig(t, cloud.CloudProviderGCP)
+}
+
 func testBackupAndRestoreMapBuckets(t *testing.T, providerType cloud.ProviderType) {
 	f := framework.Global
 
@@ -1680,6 +1757,10 @@ func TestBackupAndRestoreMapBucketsS3(t *testing.T) {
 
 func TestBackupAndRestoreMapBucketsAzure(t *testing.T) {
 	testBackupAndRestoreMapBuckets(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreMapBucketsGCP(t *testing.T) {
+	testBackupAndRestoreMapBuckets(t, cloud.CloudProviderGCP)
 }
 
 func testBackupAndRestoreIncludeBuckets(t *testing.T, providerType cloud.ProviderType) {
@@ -1771,6 +1852,10 @@ func TestBackupAndRestoreIncludeBucketsS3(t *testing.T) {
 
 func TestBackupAndRestoreIncludeBucketsAzure(t *testing.T) {
 	testBackupAndRestoreIncludeBuckets(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreIncludeBucketsGCP(t *testing.T) {
+	testBackupAndRestoreIncludeBuckets(t, cloud.CloudProviderGCP)
 }
 
 func testBackupAndRestoreExcludeBuckets(t *testing.T, providerType cloud.ProviderType) {
@@ -1865,6 +1950,10 @@ func TestBackupAndRestoreExcludeBucketsS3(t *testing.T) {
 
 func TestBackupAndRestoreExcludeBucketsAzure(t *testing.T) {
 	testBackupAndRestoreExcludeBuckets(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreExcludeBucketsGCP(t *testing.T) {
+	testBackupAndRestoreExcludeBuckets(t, cloud.CloudProviderGCP)
 }
 
 func testBackupAndRestoreNodeSelector(t *testing.T, providerType cloud.ProviderType) {
@@ -1969,6 +2058,10 @@ func TestBackupAndRestoreNodeSelectorS3(t *testing.T) {
 
 func TestBackupAndRestoreNodeSelectorAzure(t *testing.T) {
 	testBackupAndRestoreNodeSelector(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreNodeSelectorGCP(t *testing.T) {
+	testBackupAndRestoreNodeSelector(t, cloud.CloudProviderGCP)
 }
 
 // TestBackupBucketInclusion tests we can selectively include a bucket in the backup.
@@ -2094,7 +2187,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, providerType cloud.P
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, cluster)
 
 	// Create and wait for a backup
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
 	// delete bucket
@@ -2143,6 +2236,10 @@ func TestBackupAndRestoreScopesAndCollectionsS3(t *testing.T) {
 
 func TestBackupAndRestoreScopesAndCollectionsAzure(t *testing.T) {
 	testBackupAndRestoreScopesAndCollections(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreScopesAndCollectionsGCP(t *testing.T) {
+	testBackupAndRestoreScopesAndCollections(t, cloud.CloudProviderGCP)
 }
 
 // testBackupAndRestoreCollection tests data backup taken of a bucket
@@ -2251,6 +2348,10 @@ func TestBackupAndRestoreCollectionsAzure(t *testing.T) {
 	testBackupAndRestoreCollections(t, cloud.CloudProviderAzure)
 }
 
+func TestBackupAndRestoreCollectionsGCP(t *testing.T) {
+	testBackupAndRestoreCollections(t, cloud.CloudProviderGCP)
+}
+
 // testBackupAndRestoreScope tests data backup taken of a managed scope
 // is restored successfully in an unmanaged scope with the same name.
 func testBackupAndRestoreScope(t *testing.T, providerType cloud.ProviderType) {
@@ -2349,6 +2450,10 @@ func TestBackupAndRestoreScopeS3(t *testing.T) {
 
 func TestBackupAndRestoreScopeAzure(t *testing.T) {
 	testBackupAndRestoreScope(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreScopeGCP(t *testing.T) {
+	testBackupAndRestoreScope(t, cloud.CloudProviderGCP)
 }
 
 // testBackupAndRestoreCollection tests data backup taken of a managed collection
@@ -2451,6 +2556,10 @@ func TestBackupAndRestoreCollectionS3(t *testing.T) {
 
 func TestBackupAndRestoreCollectionAzure(t *testing.T) {
 	testBackupAndRestoreCollection(t, cloud.CloudProviderAzure)
+}
+
+func TestBackupAndRestoreCollectionGCP(t *testing.T) {
+	testBackupAndRestoreCollection(t, cloud.CloudProviderGCP)
 }
 
 // TestBackupThenDelete tests that a backup resource can be created

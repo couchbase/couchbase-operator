@@ -1198,6 +1198,17 @@ func TestValidationCreateCouchbaseBackup(t *testing.T) {
 			},
 			shouldFail: false,
 		},
+		{
+			name: "TestValidateBackupSecretGCP",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "gs://blah",
+						Secret: "test-example-gs",
+					}),
+			},
+			shouldFail: false,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1222,6 +1233,17 @@ func TestValidationCreateCouchbaseBackupRestore(t *testing.T) {
 					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
 						URI:    "az://blah",
 						Secret: "test-example-az",
+					}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateBackupRestoreSecretGCP",
+			mutations: patchMap{
+				"restore0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "gs://blah",
+						Secret: "test-example-gs",
 					}),
 			},
 			shouldFail: false,

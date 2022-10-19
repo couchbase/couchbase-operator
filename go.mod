@@ -3,6 +3,7 @@ module github.com/couchbase/couchbase-operator
 go 1.16
 
 require (
+	cloud.google.com/go/storage v1.10.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.4.1
 	github.com/Masterminds/semver v1.5.0
 	github.com/aws/aws-sdk-go v1.38.40
@@ -24,8 +25,10 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
-	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
+	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
+	google.golang.org/api v0.44.0
 	k8s.io/api v0.23.2
 	k8s.io/apiextensions-apiserver v0.23.2
 	k8s.io/apimachinery v0.23.2

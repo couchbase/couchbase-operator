@@ -11,23 +11,30 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
-	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type AWSCredentials struct {
+	accessKeyID     string
+	secretAccessKey string
+	region          string
+}
 type AWSProvider struct {
 	sess  *session.Session
 	s3    *s3.S3
-	creds *Credentials
+	creds *AWSCredentials
 }
 
-func NewAWSProvider(creds *Credentials) (Provider, error) {
-	region := creds.region
-	accessKeyID := creds.accessKeyID
-	secretAccessKey := creds.secretAccessKey
+func NewAWSProvider(creds ...string) (Provider, error) {
+	accessKeyID := creds[0]
+	secretAccessKey := creds[1]
+	region := creds[2]
 
+	awsCreds := &AWSCredentials{
+		accessKeyID: accessKeyID, secretAccessKey: secretAccessKey, region: region,
+	}
 	config := &aws.Config{
 		Region:      aws.String(region),
 		Credentials: credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
@@ -39,7 +46,7 @@ func NewAWSProvider(creds *Credentials) (Provider, error) {
 	}
 
 	s3Svc := s3.New(sess)
-	provider := AWSProvider{sess: sess, s3: s3Svc, creds: creds}
+	provider := AWSProvider{sess: sess, s3: s3Svc, creds: awsCreds}
 
 	return &provider, nil
 }
@@ -61,7 +68,7 @@ func (provider *AWSProvider) CreateBucket(bucket string) error {
 		ACL:    aws.String("private"),
 		Bucket: aws.String(bucket),
 		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: aws.String(*provider.sess.Config.Region),
+			LocationConstraint: aws.String(provider.creds.region),
 		},
 	})
 
@@ -143,17 +150,15 @@ func (provider *AWSProvider) DeleteBucket(bucket string) error {
 
 // creates the secret containing s3 credentials.
 func (provider *AWSProvider) CreateSecret(cluster *types.Cluster) (*corev1.Secret, error) {
-	f := framework.Global
-
 	s3secret := "s3-secret"
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s3secret,
 		},
 		Data: map[string][]byte{
-			"region":            []byte(f.S3Region),
-			"access-key-id":     []byte(f.S3AccessKey),
-			"secret-access-key": []byte(f.S3SecretID),
+			"region":            []byte(provider.creds.region),
+			"access-key-id":     []byte(provider.creds.accessKeyID),
+			"secret-access-key": []byte(provider.creds.secretAccessKey),
 		},
 	}
 
