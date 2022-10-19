@@ -25,8 +25,9 @@ func enableMonitoring(f *framework.Framework) *couchbasev2.CouchbaseClusterMonit
 	if imageName := strings.TrimSpace(f.CouchbaseExporterImage); imageName != "" {
 		monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
 			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-				Enabled: true,
-				Image:   imageName,
+				Enabled:     true,
+				Image:       imageName,
+				RefreshRate: 60,
 			},
 		}
 
@@ -35,7 +36,8 @@ func enableMonitoring(f *framework.Framework) *couchbasev2.CouchbaseClusterMonit
 
 	monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
 		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-			Enabled: true,
+			Enabled:     true,
+			RefreshRate: 60,
 		},
 	}
 
@@ -52,8 +54,9 @@ func testPrometheusMetrics(t *testing.T, kubernetes *types.Cluster, tls *e2eutil
 	if enabled {
 		cluster.Spec.Monitoring = &couchbasev2.CouchbaseClusterMonitoringSpec{
 			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-				Enabled: true,
-				Image:   framework.Global.CouchbaseExporterImage,
+				Enabled:     true,
+				Image:       framework.Global.CouchbaseExporterImage,
+				RefreshRate: 60,
 			},
 		}
 	}
