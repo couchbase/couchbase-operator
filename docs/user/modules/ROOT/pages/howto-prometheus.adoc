@@ -86,7 +86,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: cb-example-auth
-  namspace: monitoring
+  namespace: monitoring
 stringData:
   username: my-username
   password: my-password
