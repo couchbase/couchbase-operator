@@ -6,6 +6,32 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
+func TestCouchbaseVersion(t *testing.T) {
+	type test struct {
+		input string
+		want  string
+	}
+
+	tests := []test{
+		{input: "couchbase/server:7.0.3", want: "7.0.3"},
+		{input: "couchbase/server:community-7.1.1", want: "community-7.1.1"},
+		{input: "couchbase/server:enterprise-7.1.0-aarch64", want: "enterprise-7.1.0-aarch64"},
+		{input: "couchbase/exporter:1.0.6", want: "1.0.6"},
+		{input: "iamarebel/iusemyownrepo:41.90.980", want: "41.90.980"},
+	}
+
+	for _, tc := range tests {
+		got, err := CouchbaseVersion(tc.input)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got != tc.want {
+			t.Errorf("expected: %v, got: %v", tc.want, got)
+		}
+	}
+}
+
 func TestKubernetesVersion(t *testing.T) {
 	version, err := ParseKubernetesVersion("1", "9", "d283541654")
 	if err != nil {

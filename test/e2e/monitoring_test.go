@@ -22,41 +22,31 @@ import (
 
 // enableMonitoring enables monitoring.
 func enableMonitoring(f *framework.Framework) *couchbasev2.CouchbaseClusterMonitoringSpec {
-	if imageName := strings.TrimSpace(f.CouchbaseExporterImage); imageName != "" {
-		monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
-			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-				Enabled:     true,
-				Image:       imageName,
-				RefreshRate: 60,
-			},
-		}
-
-		return monitoring
-	}
-
 	monitoring := &couchbasev2.CouchbaseClusterMonitoringSpec{
 		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-			Enabled:     true,
-			RefreshRate: 60,
+			Enabled: true,
 		},
+	}
+
+	if imageName := strings.TrimSpace(f.CouchbaseExporterImage); imageName != "" {
+		monitoring.Prometheus.Image = imageName
 	}
 
 	return monitoring
 }
 
-func testPrometheusMetrics(t *testing.T, kubernetes *types.Cluster, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, enabled bool) {
+func testPrometheusMetrics(t *testing.T, kubernetes *types.Cluster, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, initiallyEnabled bool) {
 	// Static configuration.
 	clusterSize := 3
 
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, policy).Generate(kubernetes)
 
-	if enabled {
+	if initiallyEnabled {
 		cluster.Spec.Monitoring = &couchbasev2.CouchbaseClusterMonitoringSpec{
 			Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-				Enabled:     true,
-				Image:       framework.Global.CouchbaseExporterImage,
-				RefreshRate: 60,
+				Enabled: true,
+				Image:   framework.Global.CouchbaseExporterImage,
 			},
 		}
 	}
@@ -67,7 +57,7 @@ func testPrometheusMetrics(t *testing.T, kubernetes *types.Cluster, tls *e2eutil
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	if !enabled {
+	if !initiallyEnabled {
 		// Enable monitoring
 		monitoring := enableMonitoring(framework.Global)
 

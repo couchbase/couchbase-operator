@@ -460,8 +460,7 @@ func (o *ClusterOptions) WithAuditing(enableCleanup bool) *ClusterOptions {
 func (o *ClusterOptions) WithMonitoring() *ClusterOptions {
 	o.MonitoringConfiguration = &couchbasev2.CouchbaseClusterMonitoringSpec{
 		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-			Enabled:     true,
-			RefreshRate: 60,
+			Enabled: true,
 		},
 	}
 

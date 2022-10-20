@@ -1,6 +1,8 @@
 package k8sutil
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -67,5 +69,69 @@ func TestPathsForVolumeMountName(t *testing.T) {
 	path = pathForVolumeMountName(indexVolumeMount)
 	if path != CouchbaseVolumeMountIndexDir {
 		t.Fatalf(`invalid path for index volume: "%s", expected: "%s"`, path, CouchbaseVolumeMountIndexDir)
+	}
+}
+
+// Tests the metrics container created for scraping metrics from CB pods.
+func TestCreateMetricsContainer(t *testing.T) {
+	type test struct {
+		// inputs
+		expImage    string
+		promEnabled bool
+		refreshRate uint64
+
+		// outputs
+		readinessCheckURL string
+		containerArgs     []string
+	}
+
+	testcases := []test{
+		{
+			expImage:          "couchbase/exporter:1.0.0",
+			promEnabled:       true,
+			refreshRate:       20,
+			readinessCheckURL: "/metrics",
+			containerArgs:     []string{"--per-node-refresh", fmt.Sprintf("%d", 20)},
+		},
+		{
+			expImage:          "myrepo/my-malformed-format",
+			promEnabled:       true,
+			readinessCheckURL: "/metrics",
+			containerArgs:     []string{"--per-node-refresh", fmt.Sprintf("%d", 60)},
+		},
+		{
+			expImage:          "myrepo/myimage:1.0.8",
+			promEnabled:       true,
+			readinessCheckURL: "/readiness-probe",
+			containerArgs:     []string{"--per-node-refresh", fmt.Sprintf("%d", 60)},
+		},
+		{
+			expImage:          "myrepo/myimage:1.0.6",
+			promEnabled:       false,
+			readinessCheckURL: "/metrics",
+			containerArgs:     []string{"--per-node-refresh", fmt.Sprintf("%d", 60)},
+		},
+	}
+
+	for _, tc := range testcases {
+		cs := couchbasev2.ClusterSpec{
+			Monitoring: &couchbasev2.CouchbaseClusterMonitoringSpec{
+				Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
+					Enabled:     tc.promEnabled,
+					Image:       tc.expImage,
+					RefreshRate: tc.refreshRate,
+				},
+			},
+		}
+
+		c := createMetricsContainer(cs)
+
+		if tc.readinessCheckURL != c.ReadinessProbe.ProbeHandler.HTTPGet.Path {
+			t.Errorf("readiness check url: expected: %v, got: %v", tc.readinessCheckURL, c.ReadinessProbe.ProbeHandler.HTTPGet.Path)
+		}
+
+		if !reflect.DeepEqual(tc.containerArgs, c.Args) {
+			t.Errorf("metrics cpntainer args: expected: %v, got: %v", tc.containerArgs, c.Args)
+		}
 	}
 }

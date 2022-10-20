@@ -16,7 +16,7 @@ func TestCouchbaseVersionAfter(t *testing.T) {
 
 	testcases := []versionTest{
 		{
-			"1.0.0",
+			"hellome-1.0.0",
 			"0.9.0",
 			true,
 		},
@@ -40,6 +40,11 @@ func TestCouchbaseVersionAfter(t *testing.T) {
 			"05aad0f1d3a373b60dece893a9c185dcb0e0630aa6f0c0f310ad8767918fd2af",
 			"7.1.0",
 			false,
+		},
+		{
+			"community-1.0.8",
+			"1.0.6",
+			true,
 		},
 	}
 	for _, testcase := range testcases {

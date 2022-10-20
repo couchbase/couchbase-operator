@@ -3599,7 +3599,7 @@ type CouchbaseClusterMonitoringPrometheusSpec struct {
 	// +kubebuilder:default=60
 	// +kubebuilder:validation:Maximum=600
 	// +kubebuilder:validation:Minimum=1
-	RefreshRate uint64 `json:"refreshRate"`
+	RefreshRate uint64 `json:"refreshRate,omitempty"`
 }
 
 type CouchbaseClusterLoggingConfigurationSpec struct {

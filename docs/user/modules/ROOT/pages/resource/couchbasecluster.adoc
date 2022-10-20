@@ -1821,8 +1821,6 @@ No validation is carried out as this can be any arbitrary repo and tag.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `integer`
 
 *Default*: `60`

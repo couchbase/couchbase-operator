@@ -39,7 +39,8 @@ const (
 	defaultSubPathName                        = "default"
 	etcSubPathName                            = "etc"
 	prometheusPort                            = 9091
-	prometheusPath                            = "/metrics"
+	metricsEndpointPath                       = "/metrics"
+	readinessProbeEndpointPath                = "/readiness-probe"
 	tlsSecretMountPath                        = "/var/run/secrets/couchbase.com/couchbase-tls"
 	metricsTokenMountPath                     = "/var/run/secrets/couchbase.com/metrics-token"
 	MetricsContainerName                      = "metrics"
@@ -950,7 +951,7 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	loggingEnabled := cluster.Spec.Logging.Server != nil && cluster.Spec.Logging.Server.Enabled
 
 	// Set up the Prometheus exporter values as the defaults
-	metricsPath := prometheusPath
+	metricsPath := metricsEndpointPath
 	metricsPort := strconv.Itoa(int(prometheusPort))
 
 	// If we're using CBS 7 then assume it takes precedence over exporter
@@ -1518,6 +1519,19 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 		cs.Monitoring.Prometheus.RefreshRate = 60
 	}
 
+	readinessCheckURL := metricsEndpointPath
+
+	var expImgVerAft180 bool
+
+	expImgVer, err := CouchbaseVersion(cs.Monitoring.Prometheus.Image)
+	if err == nil {
+		expImgVerAft180, _ = couchbaseutil.VersionAfter(expImgVer, "1.0.8")
+	}
+
+	if cs.Monitoring.Prometheus.Enabled && expImgVerAft180 {
+		readinessCheckURL = readinessProbeEndpointPath
+	}
+
 	return v1.Container{
 		Name:  MetricsContainerName,
 		Image: cs.MetricsImage(),
@@ -1555,7 +1569,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 		ReadinessProbe: &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				HTTPGet: &v1.HTTPGetAction{
-					Path: prometheusPath,
+					Path: readinessCheckURL,
 					Port: intstr.IntOrString{
 						Type:   intstr.Int,
 						IntVal: prometheusPort,
