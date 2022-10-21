@@ -423,7 +423,7 @@ const (
 type Bucket struct {
 	BucketName           string                  `json:"name"`
 	BucketType           string                  `json:"type"`
-	BucketStorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
+	BucketStorageBackend CouchbaseStorageBackend `json:"storageBackend"`
 	BucketMemoryQuota    int64                   `json:"memoryQuota"`
 	BucketReplicas       int                     `json:"replicas"`
 	IoPriority           IoPriorityType          `json:"ioPriority"`
@@ -727,6 +727,11 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 		b.BucketType = "couchbase"
 	}
 
+	// For CB Server 7.1.0+
+	if status.StorageBackend != "" {
+		b.BucketStorageBackend = status.StorageBackend
+	}
+
 	if ramQuotaBytes, ok := status.Quota["rawRAM"]; ok {
 		b.BucketMemoryQuota = ramQuotaBytes >> 20
 	}
@@ -766,6 +771,11 @@ func (b *Bucket) FormEncode(update bool) []byte {
 	data.Set("name", b.BucketName)
 	data.Set("bucketType", b.BucketType)
 	data.Set("ramQuotaMB", strconv.Itoa(int(b.BucketMemoryQuota)))
+
+	// Adds storageBackend for CB Server 7.1.0 onwards.
+	if b.BucketStorageBackend != "" {
+		data.Set("storageBackend", string(b.BucketStorageBackend))
+	}
 
 	if b.BucketType != "memcached" {
 		data.Set("replicaNumber", strconv.Itoa(b.BucketReplicas))
