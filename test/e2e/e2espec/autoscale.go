@@ -51,7 +51,7 @@ const (
 	// Default value of 30 seconds for the Couchbase AutoscaleStabilizationPeriod.
 	// This defines how long after a rebalance the cluster must wait before
 	// accepting new scaling requests.
-	DefaultClusterStabilizationPeriod = 30
+	DefaultClusterStabilizationPeriod = 120
 
 	// Low Cluster Stabilization allows for cluster to go into
 	// maintenance mode only during rebalance without any wait after.

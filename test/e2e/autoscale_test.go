@@ -179,11 +179,11 @@ func TestAutoscaleUp(t *testing.T) {
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 1, 2), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 1, 2), 2*time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingUp, v1.ConditionTrue, cluster, time.Minute)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{
@@ -221,10 +221,10 @@ func TestAutoscaleUpMandatoryMutualTLS(t *testing.T) {
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 3, 4), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 3, 4), 2*time.Minute)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{
@@ -260,11 +260,11 @@ func TestAutoscaleDown(t *testing.T) {
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 2, 1), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 2, 1), 2*time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, cluster, time.Minute)
 
 	// Wait for rebalance after scale down
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling down
 	expectedEvents := []eventschema.Validatable{
@@ -303,10 +303,10 @@ func TestAutoscaleDownMandatoryMutualTLS(t *testing.T) {
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 4, 1), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 4, 1), 2*time.Minute)
 
 	// Wait for rebalance after scale down
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling down
 	expectedEvents := []eventschema.Validatable{
@@ -363,14 +363,14 @@ func TestAutoscaleMultiConfigs(t *testing.T) {
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 5*time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingUp, v1.ConditionTrue, cluster, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// Wait for scale down event from 2 -> 1 of query Pods
 	configName = cluster.Spec.Servers[1].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 2, 1), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 2, 1), 5*time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, cluster, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
@@ -417,7 +417,7 @@ func TestAutoscaleConflict(t *testing.T) {
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 5*time.Minute)
 
 	// Change CouchbaseAutoscaler size to 6 (max Pods) before cluster finishes scaling.
 	// This imitates behavior of HPA wanting to scale while rebalance is occurring.
@@ -425,7 +425,7 @@ func TestAutoscaleConflict(t *testing.T) {
 	e2eutil.MustUpdateScale(t, kubernetes, cluster.Namespace, autoscalerName, 6)
 
 	// Allow cluster to finish rebalancing
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
 
 	// Also Change CouchbaseCluster size to 2 before cluster finishes scaling.
 	// This would occur if user observes an autoscale happening but wanted to manually go
@@ -476,16 +476,18 @@ func TestAutoscaleEnabledAllowsStatefulTLS(t *testing.T) {
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 2*time.Minute)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// expected events for scaling up
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventAutoscalerCreated},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
 		eventschema.Event{Reason: k8sutil.EventAutoscaleUp},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
@@ -516,7 +518,7 @@ func TestAutoscaleVerifyMaintenanceMode(t *testing.T) {
 	cluster := hpaManager.CouchbaseCluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 1, 2), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 1, 2), 5*time.Minute)
 
 	// Autoscaler must be in Maintenance Mode after event is posted
 	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
@@ -524,7 +526,7 @@ func TestAutoscaleVerifyMaintenanceMode(t *testing.T) {
 	e2eutil.MustValidateAutoscaleReadyStatus(t, kubernetes, cluster.Namespace, cluster.Name, v1.ConditionFalse)
 
 	// Wait for rebalance after scale up
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 
 	// Remove Stabilization Period
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/autoscaleStabilizationPeriod"), time.Minute)
@@ -581,19 +583,19 @@ func TestAutoscaleManualMaintenanceMode(t *testing.T) {
 	cluster = e2eutil.MustResizeClusterNoWait(t, serverConfigIndex, 3, kubernetes, cluster)
 
 	// Once rebalance has started, the autoscaler should be in maintenance mode
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
 	e2eutil.MustValidateAutoscaleReadyStatus(t, kubernetes, cluster.Namespace, cluster.Name, v1.ConditionFalse)
 	e2eutil.MustValidateAutoscalerSize(t, kubernetes, cluster.Namespace, autoscalerName, 0)
 
 	// Wait for rebalance complete
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Expecting HPA to scale down cluster
 	configName := cluster.Spec.Servers[0].Name
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 3, 2), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleDownEvent(cluster, configName, 3, 2), 5*time.Minute)
 
 	// Wait for rebalance after scale down
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 2*time.Minute)

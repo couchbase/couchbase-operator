@@ -37,7 +37,7 @@ pipeline {
     string(name: 'backup_image', defaultValue: 'registry.gitlab.com/cb-vanilla/operator-backup:1.2.1-105')
     string(name: 'exporter_image', defaultValue: 'registry.gitlab.com/cb-vanilla/exporter:latest')
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.5')
-    string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-vanilla/fluent-bit:latest')
+    string(name: 'logging_image', defaultValue: 'registry.gitlab.com/cb-vanilla/fluent-bit:1.2.2-110')
     string(name: 'logging_image_upgrade', defaultValue: 'couchbase/fluent-bit:1.1.0')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:3.0.3-enterprise')
     string(name: 'kubernetes_version', defaultValue: '1.21')
