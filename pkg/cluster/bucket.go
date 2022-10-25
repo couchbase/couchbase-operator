@@ -46,8 +46,17 @@ func gatherCouchbaseBuckets(durablitySupported, storageBackendSupported bool, se
 			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
 		}
 
-		if storageBackendSupported {
-			// default is "couchstore" (validated).
+		if !storageBackendSupported && bucket.Spec.StorageBackend != "" {
+			// warning log for user why spec.StorageBackend is ignored.
+			log.Info("[WARN] spec.storageBackend ignored", "CB image version", "lesser than 7.1.0")
+		}
+
+		if storageBackendSupported && bucket.Spec.StorageBackend == "" {
+			// default is "couchstore"
+			b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackendCouchstore
+		}
+
+		if storageBackendSupported && bucket.Spec.StorageBackend != "" {
 			b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(bucket.Spec.StorageBackend)
 		}
 

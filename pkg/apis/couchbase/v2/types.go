@@ -1085,7 +1085,7 @@ type CouchbaseBucketSpec struct {
 	// This cannot be edited after bucket creation.
 	// Two different backend storage mechanisms can be used - "couchstore" or "magma".
 	// The value can be either of those, defaulting to "couchstore"
-	// +kubebuilder:default="couchstore"
+	// StorageBackend is only valid for Couchbase Server 7.1.0 onward.
 	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,

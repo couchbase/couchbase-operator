@@ -35,7 +35,7 @@ The following is an example resource, depicting the overall structure and any de
     - <<couchbasebuckets-spec-scopes-resources-kind,kind>>: CouchbaseScope
       <<couchbasebuckets-spec-scopes-resources-name,name>>: ""
     <<couchbasebuckets-spec-scopes-selector,selector>>: {}
-  <<couchbasebuckets-spec-storagebackend,storageBackend>>: couchstore
+  <<couchbasebuckets-spec-storagebackend,storageBackend>>: ""
 ----
 
 == couchbasebuckets.apiVersion
@@ -347,8 +347,6 @@ More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#
 
 *Type*: `string`
 
-*Default*: `couchstore`
-
 *Enumerations*: `couchstore, magma`
 
 ==== Description
@@ -356,4 +354,4 @@ More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#
 StorageBackend to be assigned to and used by the bucket.
 This cannot be edited after bucket creation.
 Two different backend storage mechanisms can be used - "couchstore" or "magma".
-The value can be either of those, defaulting to "couchstore".
+The value can be either of those, defaulting to "couchstore" StorageBackend is only valid for Couchbase Server 7.1.0 onward.
