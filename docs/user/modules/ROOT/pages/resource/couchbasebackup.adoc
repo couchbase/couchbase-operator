@@ -601,7 +601,7 @@ Amount of successful jobs to keep.
 
 *Default*: `1`
 
-*Minimum*: `1`
+*Minimum*: `0`
 
 ==== Description
 

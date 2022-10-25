@@ -256,7 +256,7 @@ type CouchbaseBackupSpec struct {
 
 	// How many threads to use during the backup.  This field defaults to 1.
 	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=0
 	Threads int `json:"threads,omitempty"`
 
 	// Services allows control over what services are included in the backup.
