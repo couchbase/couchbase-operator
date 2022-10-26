@@ -8,7 +8,7 @@ import (
 
 // checks cluster version is above minimum version requirement.
 func (c *Cluster) IsAtLeastVersion(v string) (bool, error) {
-	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.Image)
+	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return false, err
 	}

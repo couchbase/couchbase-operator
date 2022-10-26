@@ -356,7 +356,7 @@ func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Mem
 		constants.AnnotationVolumeMountPath:     mount.mountPath,
 		constants.AnnotationVolumeNodeConf:      config.Name,
 		constants.CouchbaseVersionAnnotationKey: version,
-		constants.PVCImageAnnotation:            cluster.Spec.Image,
+		constants.PVCImageAnnotation:            cluster.Spec.CouchbaseImage(),
 	}
 
 	// Merge our labels/annotations on top of any user defined ones.  We take
@@ -940,7 +940,7 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	// Are we using a version of Server that has its own metrics exporter
 	serverVersionPrometheus := false
 
-	tag, err := CouchbaseVersion(cluster.Spec.Image)
+	tag, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
 	if err != nil {
 		serverVersionPrometheus, _ = couchbaseutil.VersionAfter(tag, "7.0.0")
 	}
@@ -1668,7 +1668,7 @@ func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod
 	// In 7.1 the CA must be installed in the pod, and not injected over
 	// HTTP... which is a pain.  It must also *always* exist, as we need
 	// to install the CA before upgading to TLS.
-	tag, err := CouchbaseVersion(cluster.Spec.Image)
+	tag, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
 	if err != nil {
 		return err
 	}

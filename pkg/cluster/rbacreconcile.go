@@ -401,7 +401,7 @@ func (c *Cluster) handleRole(role couchbasev2.Role) ([]couchbaseutil.UserRole, e
 		return roles, nil
 	}
 
-	available, err := isVersionGreaterThan(c.cluster.Spec.Image, "7.0.0")
+	available, err := isVersionGreaterThan(c.cluster.Spec.CouchbaseImage(), "7.0.0")
 	if err != nil {
 		log.Error(err, "error during rbac reconciliation due to version check")
 		return roles, err
