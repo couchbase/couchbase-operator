@@ -350,22 +350,6 @@ func (c *Cluster) bucketExists(bucket string) bool {
 	return b != nil
 }
 
-func isVersionGreaterThan(image string, version string) (bool, error) {
-	tag, err := k8sutil.CouchbaseVersion(image)
-	if err != nil {
-		log.Info("error retrieving couchbase version", "tagged", tag, "version", version)
-		return false, err
-	}
-
-	available, err := couchbaseutil.VersionAfter(tag, version)
-	if err != nil {
-		log.Info("error comparing versions", "tagged", tag, "version", version)
-		return false, err
-	}
-
-	return available, nil
-}
-
 func (c *Cluster) handleRole(role couchbasev2.Role) ([]couchbaseutil.UserRole, error) {
 	roles := []couchbaseutil.UserRole{}
 
@@ -401,7 +385,7 @@ func (c *Cluster) handleRole(role couchbasev2.Role) ([]couchbaseutil.UserRole, e
 		return roles, nil
 	}
 
-	available, err := isVersionGreaterThan(c.cluster.Spec.CouchbaseImage(), "7.0.0")
+	available, err := c.IsAtLeastVersion("7.0.0")
 	if err != nil {
 		log.Error(err, "error during rbac reconciliation due to version check")
 		return roles, err
