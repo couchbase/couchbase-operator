@@ -79,6 +79,9 @@ type certifyOptions struct {
 
 	// SharedTestFlags are flags shared between the cao cli and test suite.
 	SharedTestFlags
+
+	// verifyFile is the certification output to verify checksum against
+	verifyFile string
 }
 
 // Shared test flags are flags which affect the behavior of both

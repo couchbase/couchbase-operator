@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -390,6 +392,9 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 
 	cmd.Flags().BoolVar(&o.debug, "debug", false, "Collect verbose tool information")
 	_ = cmd.Flags().MarkHidden("debug")
+
+	cmd.Flags().StringVar(&o.verifyFile, "verify", "", "Verify a certification output's checksum")
+	_ = cmd.Flags().MarkHidden(("verify"))
 
 	return cmd
 }
@@ -1067,7 +1072,7 @@ func (o *certifyOptions) isParallelDefaulted() bool {
 	return defaulted
 }
 
-func (o *certifyOptions) appendStdout() {
+func (o *certifyOptions) prepareOutput() {
 	util.PrintLine("Appending stdout to archive ...")
 
 	// get stdout lines and get ready
@@ -1087,17 +1092,19 @@ func (o *certifyOptions) appendStdout() {
 	}
 
 	// create temp file with stdout name
-	tempFile, err := os.CreateTemp("", "stdout-*")
+	tempFile, err := os.CreateTemp("", "stdout.txt")
 	if err != nil {
 		fmt.Println("Unable to create temporary file")
 	}
+
+	defer tempFile.Close()
 
 	if _, err := tempFile.Write([]byte(lines)); err != nil {
 		fmt.Println(err)
 	}
 
 	// Append file to archive
-	tempArchive, err := os.CreateTemp("", strings.ReplaceAll(o.archiveName.archiveName(), ".tar.bz2", "")+"-*.tar.bz2")
+	tempArchive, err := os.CreateTemp("", "results.tar.bz")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -1114,6 +1121,7 @@ func (o *certifyOptions) appendStdout() {
 		fmt.Println(err)
 	}
 
+	// create archive
 	format := archiver.CompressedArchive{
 		Compression: archiver.Bz2{},
 		Archival:    archiver.Tar{},
@@ -1146,10 +1154,178 @@ func (o *certifyOptions) appendStdout() {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	// let's add checksums
+	hash := sha256.New()
+	stdoutHash := sha256.New()
+	resultsHash := sha256.New()
+
+	fsys, err := archiver.FileSystem(o.archiveName.archiveName())
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	stdout, err := fsys.Open("stdout.txt")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	archive, err := fsys.Open("results.tar.bz")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	_, err = io.Copy(stdoutHash, stdout)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	_, err = io.Copy(resultsHash, archive)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Fprintf(hash, "%x %s \n", stdoutHash.Sum(nil), "stdout.txt")
+	fmt.Fprintf(hash, "%x %s \n", resultsHash.Sum(nil), "results.tar.bz")
+	// creating hash file to add to final archive
+	tempHashFile, err := os.CreateTemp("", "hash-*")
+	if err != nil {
+		fmt.Println("Unable to create temporary file")
+	}
+
+	defer tempHashFile.Close()
+
+	if _, err := tempHashFile.Write([]byte(base64.StdEncoding.EncodeToString(hash.Sum(nil)))); err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println("Results Checksum: " + base64.StdEncoding.EncodeToString(hash.Sum(nil)))
+
+	files, err = archiver.FilesFromDisk(nil, map[string]string{
+		tempFile.Name():     "stdout.txt",
+		tempArchive.Name():  "results.tar.bz",
+		tempHashFile.Name(): "checksum.txt",
+	})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	output, err = os.OpenFile(o.archiveName.archiveName(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = output.Truncate(0)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	_, err = output.Seek(0, 0)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = format.Archive(context.Background(), output, files)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+var (
+	ErrInvalidOutputArchive = fmt.Errorf("file to be verified is not a valid certification archive")
+	ErrMissingFile          = fmt.Errorf("error reading certification archive - files missing")
+	ErrNotValid             = fmt.Errorf("archive checksum was not able to be verified")
+)
+
+func (o *certifyOptions) verifyOutput() error {
+	if !strings.HasSuffix(o.verifyFile, "tar.bz2") {
+		return ErrInvalidOutputArchive
+	}
+
+	fsys, err := archiver.FileSystem(o.verifyFile)
+	if err != nil {
+		return err
+	}
+
+	if entries, err := fs.Glob(fsys, "stdout.txt"); err != nil || entries == nil {
+		return ErrMissingFile
+	}
+
+	if entries, err := fs.Glob(fsys, "results.tar.bz"); err != nil || entries == nil {
+		return ErrMissingFile
+	}
+
+	if entries, err := fs.Glob(fsys, "checksum.txt"); err != nil || entries == nil {
+		return ErrMissingFile
+	}
+
+	stdout, err := fsys.Open("stdout.txt")
+	if err != nil {
+		return err
+	}
+
+	archive, err := fsys.Open("results.tar.bz")
+	if err != nil {
+		return err
+	}
+
+	checksum, err := fsys.Open("checksum.txt")
+	if err != nil {
+		return err
+	}
+
+	f, err := checksum.Stat()
+	if err != nil {
+		return err
+	}
+
+	size := f.Size()
+	checksumBytes := make([]byte, size)
+
+	_, err = checksum.Read(checksumBytes)
+	if err != nil {
+		return err
+	}
+
+	checksumString := string(checksumBytes)
+	stdoutHash := sha256.New()
+	resultsHash := sha256.New()
+
+	_, err = io.Copy(stdoutHash, stdout)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(resultsHash, archive)
+	if err != nil {
+		return err
+	}
+
+	hash := sha256.New()
+
+	fmt.Fprintf(hash, "%x %s \n", stdoutHash.Sum(nil), "stdout.txt")
+	fmt.Fprintf(hash, "%x %s \n", resultsHash.Sum(nil), "results.tar.bz")
+
+	hashString := base64.StdEncoding.EncodeToString(hash.Sum(nil))
+
+	fmt.Println("Expected: " + checksumString)
+	fmt.Println("   Found: " + hashString)
+
+	if checksumString != hashString {
+		return ErrNotValid
+	}
+
+	fmt.Println("Archive checksum is valid.")
+
+	return nil
 }
 
 // certify runs the certification suite on the provided options.
 func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []string) error {
+	if o.verifyFile != "" {
+		return o.verifyOutput()
+	}
+
 	util.PrintLine(util.PrettyHeading("Pre-Run Parameter Checks"))
 
 	if o.isParallelDefaulted() {
@@ -1158,7 +1334,7 @@ func (o *certifyOptions) certify(flags *genericclioptions.ConfigFlags, args []st
 		util.PrintLine(fmt.Sprintf("Parallel = %d %s", o.parallel, util.PrettyResult(util.ResultTypePass)))
 	}
 
-	defer o.appendStdout()
+	defer o.prepareOutput()
 	// Create any runtime objects we need in the certification steps.
 	if err := o.initializeRuntime(flags); err != nil {
 		return err
