@@ -714,6 +714,10 @@ type TLSOpts struct {
 	ValidFrom *time.Time
 	// validTo is the valid to date for the certificate.  Defaults to 10 years from now.
 	ValidTo *time.Time
+	// ClientValidFrom overrides valid from date for the client certificate. Defaults to ValidFrom.
+	ClientValidFrom *time.Time
+	// ClientValidTo overrides valid to date for the client certificate.  Defaults to ValidTo.
+	ClientValidTo *time.Time
 	// caCertType sets the CA certificate type. Defaults to CertTypeCA.
 	CaCertType *CertType
 	// operatorCertType sets the operator certificate type.  Defaults to CertTypeClient.
@@ -829,7 +833,17 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(keyType, keyEncoding, operatorCertType, operatorReq)
 
-	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	clientValidFrom := validFrom
+	if opts.ClientValidFrom != nil {
+		clientValidFrom = *opts.ClientValidFrom
+	}
+
+	clientValidTo := validTo
+	if opts.ClientValidTo != nil {
+		clientValidTo = *opts.ClientValidTo
+	}
+
+	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, clientValidFrom, clientValidTo)
 	if err != nil {
 		return
 	}

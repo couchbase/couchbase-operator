@@ -198,6 +198,8 @@ func registerTests() {
 		framework.NewTestDef(TestTLSRotateScriptPassphrase).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestTLSRotateAndChangeScriptPassphrase).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestTLSRestPassphrase).WithTags(TagSuiteP0, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSRotateClientExpiring).WithTags(TagSuiteP0, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSRotateCAExpiring).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestTLSRotateRestToScriptPassphrase).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestXDCRCreateClusterLocal).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRCreateClusterLocalTLS).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureTLS, TagFeatureXDCR),

@@ -2326,3 +2326,94 @@ func TestTLSRotateRestToScriptPassphrase(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// Tests that user can recover connectivity to server after client certificates have expired.
+func TestMandatoryMutualTLSRotateClientExpiring(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Set the client certs to expire some time in the future
+	validFrom := time.Now().In(time.UTC)
+	validTo := time.Now().Add(3 * time.Minute)
+	opts := &e2eutil.TLSOpts{
+		ClientValidFrom: &validFrom,
+		ClientValidTo:   &validTo,
+	}
+
+	// Create tls cluster with mandatory client auth
+	clusterSize := constants.Size3
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).MustCreate(t, kubernetes)
+
+	// waiting additional time to ensure that the clients have expired
+	time.Sleep(2 * time.Minute)
+
+	// At this point the client is locked out but we should be able to rotate certs and proceed
+	e2eutil.MustRotateClientCertificate(t, ctx)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 2*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Client TLS updated
+	// * Cluster resized successfully
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
+		e2eutil.ClusterScaleUpSequence(1),
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestMandatoryMutualTLSRotateCAExpiring tests scenario where the root CA has expired
+// and we have to rotate the full TLS stack.
+func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Set the client certs to expire some time in the future
+	validFrom := time.Now().In(time.UTC)
+	validTo := time.Now().Add(3 * time.Minute)
+	opts := &e2eutil.TLSOpts{
+		ValidFrom: &validFrom,
+		ValidTo:   &validTo,
+	}
+
+	// Create tls cluster with mandatory client auth
+	clusterSize := constants.Size3
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).MustCreate(t, kubernetes)
+
+	// patch to allow rotation of expired server certificates
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/allowPlainTextCertReload", true), time.Minute)
+
+	// waiting additional time to ensure that the clients have expired
+	time.Sleep(2 * time.Minute)
+
+	// At this point the client is locked out but we should be able to rotate certs and proceed
+	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, ctx)
+
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 2*time.Minute)
+	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Client TLS updated
+	// * Cluster resized successfully
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
+		e2eutil.ClusterScaleUpSequence(1),
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

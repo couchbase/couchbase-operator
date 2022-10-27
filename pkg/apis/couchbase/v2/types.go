@@ -3253,6 +3253,14 @@ type TLSPolicy struct {
 	// rest endpoint. Private key encryption is only available on Couchbase Server
 	// versions 7.1 and greater.
 	PassphraseConfig PassphraseConfig `json:"passphrase,omitempty"`
+
+	// AllowPlainTextCertReload allows the reload of TLS certificates in plain text.
+	// This option should only be enabled as a means to recover connectivity with
+	// server in the event that any of the server certificates expire. When enabled
+	// the Operator only attempts plain text cert reloading when expired certificates
+	// are detected.
+	// +kubebuilder:default=false
+	AllowPlainTextCertReload bool `json:"allowPlainTextCertReload"`
 }
 
 type PassphraseType string

@@ -159,6 +159,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-networkplatform,networkPlatform>>: ""
     <<couchbaseclusters-spec-networking-serviceannotations,serviceAnnotations>>:
     <<couchbaseclusters-spec-networking-tls,tls>>:
+      <<couchbaseclusters-spec-networking-tls-allowplaintextcertreload,allowPlainTextCertReload>>: false
       <<couchbaseclusters-spec-networking-tls-ciphersuites,cipherSuites>>:
       - ""
       <<couchbaseclusters-spec-networking-tls-clientcertificatepaths,clientCertificatePaths>>:
@@ -2093,6 +2094,22 @@ Operator annotations are merged on top of these so have precedence as they are r
 ==== Description
 
 TLS defines the TLS configuration for the cluster including server and client certificate configuration, and TLS security policies.
+
+=== couchbaseclusters.spec.networking.tls.allowPlainTextCertReload
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+AllowPlainTextCertReload allows the reload of TLS certificates in plain text.
+This option should only be enabled as a means to recover connectivity with server in the event that any of the server certificates expire.
+When enabled the Operator only attempts plain text cert reloading when expired certificates are detected.
 
 === couchbaseclusters.spec.networking.tls.cipherSuites
 

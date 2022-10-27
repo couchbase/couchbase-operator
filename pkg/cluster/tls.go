@@ -186,14 +186,14 @@ func (c *Cluster) refreshTLSClientSecret() error {
 
 	// Set secret CA and cert/key to allow clients to easily
 	// host secure services on same network as couchbase.
-	requestedClientSecret.Data["ca.crt"] = caBundle
-	requestedClientSecret.Data["tls.crt"] = c.tlsCache.serverCert
-	requestedClientSecret.Data["tls.key"] = c.tlsCache.serverKey
+	requestedClientSecret.Data[constants.ClientSecretRootCA] = caBundle
+	requestedClientSecret.Data[constants.ClientSecretServerCert] = c.tlsCache.serverCert
+	requestedClientSecret.Data[constants.ClientSecretServerKey] = c.tlsCache.serverKey
 	// Provide client cert/keys when mtls is enabled so allow
 	// applications to communitcate securely with Couchbase.
 	if c.cluster.IsMutualTLSEnabled() {
-		requestedClientSecret.Data["mtls.crt"] = c.tlsCache.clientCert
-		requestedClientSecret.Data["mtls.key"] = c.tlsCache.clientKey
+		requestedClientSecret.Data[constants.ClientSecretMutualCert] = c.tlsCache.clientCert
+		requestedClientSecret.Data[constants.ClientSecretMutualKey] = c.tlsCache.clientKey
 	}
 
 	return c.reconcileTLSSecrets(requestedClientSecret)
@@ -771,7 +771,7 @@ func (c *Cluster) cleanCAs() error {
 	return nil
 }
 
-// reloadChain does an insecure reload of the TLS certificates and keys.
+// reloadChain does a reload of the TLS certificates and keys.
 func (c *Cluster) reloadChain(member couchbaseutil.Member) error {
 	settings, err := c.passphraseSettings()
 	if err != nil {
@@ -1187,6 +1187,10 @@ func (c *Cluster) updateTLS() error {
 		}
 	}
 
+	return c.updateClientCA()
+}
+
+func (c *Cluster) updateClientCA() error {
 	clientTLS := c.api.GetTLS()
 
 	newClientTLS := *clientTLS
@@ -1329,6 +1333,9 @@ func (c *Cluster) updateMutualTLS() error {
 	if !reflect.DeepEqual(clientTLS, &newClientTLS) {
 		log.Info("Reloading client certificate", "cluster", c.namespacedName())
 
+		// update both active client certs and the persistence state
+		newClientTLS.ClientAuth.Key = c.tlsCache.clientKey
+		newClientTLS.ClientAuth.Cert = c.tlsCache.clientCert
 		c.api.SetTLS(&newClientTLS)
 
 		if err := c.state.Update(persistence.ClientCertificate, string(c.tlsCache.clientCert)); err != nil {
@@ -1842,4 +1849,209 @@ func (c *Cluster) scriptPassphraseSettings() (*couchbaseutil.PrivateKeyPassphras
 	settings := &couchbaseutil.PrivateKeyPassphraseSettings{PrivateKeyPassphrase: scriptPassphrase}
 
 	return settings, nil
+}
+
+func (c *Cluster) checkCertExpiration(cert []byte) bool {
+	pem := util_x509.DecodePEM(cert)
+
+	// currently only single pem block client certs are supported
+	// but one day the operator may use a different cert per node
+	// and so it's best to check if any cert in the chain has expired.
+	for _, block := range pem {
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			log.Error(err, "Failed to parse TLS certificate ", "cluster", c.namespacedName())
+			return false
+		}
+
+		if time.Now().After(cert.NotAfter) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// shouldRotateExpiredRootCAs checks if the servers root CAs have expired
+// and if we should take action to rotate newly available CAs.
+func (c *Cluster) shouldRotateExpiredRootCAs() bool {
+	if !c.cluster.Spec.Networking.TLS.AllowPlainTextCertReload {
+		return false
+	}
+
+	// check if any of the root CAs have expired
+	clientTLS := c.api.GetTLS()
+	rootCAs := append(clientTLS.RootCAs, clientTLS.CACert)
+
+	for _, ca := range rootCAs {
+		if !c.checkCertExpiration(ca) {
+			continue
+		}
+
+		if !reflect.DeepEqual(clientTLS.RootCAs, &c.tlsCache.rootCAs) {
+			// Recommend rotation now that user has provided updated root CAs
+			return true
+		}
+
+		log.Error(errors.ErrCertificateInvalid, "The root CAs have expired and must be updated before proceeding. ", "cluster", c.namespacedName())
+
+		return false
+	}
+
+	return false
+}
+
+// rotateExpiredRootCAs ensures the new root CA is loaded onto a
+// server Pod and subsequently loads the CA into Couchbase over
+// PLAIN TEXT with auth credentials requires `allowPlainTextCertReload`.
+func (c *Cluster) rotateExpiredRootCAs() error {
+	// refresh the shadow ca since this is what
+	// actually gets mounted inside the server pods.
+	if err := c.refreshTLSShadowCASecret(); err != nil {
+		return err
+	}
+
+	// the new CA is loaded onto the Pod and now
+	// we need to load it into Couchbase
+	for _, member := range c.callableMembers {
+		ok, err := c.RunningVersionIsAtLeast("7.1.0")
+		if err != nil {
+			return err
+		}
+
+		var request *couchbaseutil.Request
+
+		if ok {
+			request = couchbaseutil.LoadCAs().InPlaintext()
+		} else {
+			request = couchbaseutil.SetClusterCACert(c.tlsCache.serverCA).InPlaintext()
+		}
+
+		// I've thought long and hard about my life
+		request.Authenticate = true
+		if err := request.On(c.api, member); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// shouldRotateExpiredServerCerts determines if the server cert should be rotated
+// if the current in use server cert has expired and new certs are provided.
+func (c *Cluster) shouldRotateExpiredServerCerts() bool {
+	if !c.cluster.Spec.Networking.TLS.AllowPlainTextCertReload {
+		return false
+	}
+
+	clientTLS := c.api.GetTLS()
+	if c.checkCertExpiration(clientTLS.CACert) {
+		if !reflect.DeepEqual(clientTLS.CACert, c.tlsCache.serverCA) {
+			return true
+		}
+
+		log.Error(errors.ErrCertificateInvalid, "The Couchbase Server Certificate(s) have expired and must be updated before proceeding", "cluster", c.namespacedName())
+	}
+
+	return false
+}
+
+func (c *Cluster) rotateExpiredServerCerts() error {
+	// refresh the shadow secret since this is what
+	// actually gets mounted inside the server pods.
+	if err := c.refreshTLSShadowSecret(); err != nil {
+		return err
+	}
+
+	if err := c.refreshTLSPassphraseResources(); err != nil {
+		return err
+	}
+
+	settings, err := c.passphraseSettings()
+	if err != nil {
+		return err
+	}
+
+	for _, member := range c.callableMembers {
+		// close your eyes kids
+		request := couchbaseutil.ReloadNodeCert(settings).InPlaintext()
+		request.Authenticate = true
+
+		if err := request.On(c.api, member); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// shouldRotateExpiredClientCerts checks the expiration date of the client cert
+// used during mtls and returns true if the date preceds the present.
+func (c *Cluster) shouldRotateExpiredClientCerts() bool {
+	tls := c.api.GetTLS()
+	if tls.ClientAuth != nil {
+		return c.checkCertExpiration(tls.ClientAuth.Cert)
+	}
+
+	return false
+}
+
+// rotateExpiredClientCerts first refreshes the Operators connection with server
+// then internally updates it's persisted state to use the newly provided certs.
+// This workflow assumes the user eventually provides us new certs to use,
+// otherwise there's really nothing we can do.
+func (c *Cluster) rotateExpiredClientCerts() error {
+	// If server root CA was rotated then we'll also need to update clients CA
+	clientTLS := c.api.GetTLS()
+	if !reflect.DeepEqual(clientTLS.CACert, c.tlsCache.serverCA) {
+		if err := c.updateClientCA(); err != nil {
+			return err
+		}
+	}
+
+	// compare provided certs with existing and update client on change
+	return c.updateMutualTLS()
+}
+
+// rotateExpiredCertificates attempts to rotate expired server and/or client certs.
+// rotation begins with root CA, then server certs,  and finally the client.
+func (c *Cluster) rotateExpiredCertificates() error {
+	// Rotation relies on cluster having some TLS state already persisted.
+	// However, this may not be the case if cluster is new or someone is
+	// upgrading from an old release with expired cert and...well, that's just too bad.
+	if c.api.GetTLS() == nil {
+		return fmt.Errorf("%w: Attempted to check if certifiates are expired but TLS was never initialized", errors.NewStackTracedError(errors.ErrTLSInvalid))
+	}
+
+	// Re-init the tls cache as this will contain any new certs the user
+	// is attempting to provide now that we're locked out of reconcile.
+	if err := c.initTLSCache(); err != nil {
+		return fmt.Errorf("%w: Failed to collect TLS configuration", err)
+	}
+
+	if c.shouldRotateExpiredRootCAs() {
+		log.Info(fmt.Sprintf("Rotating expired Root CAs"), "cluster", c.namespacedName())
+
+		if err := c.rotateExpiredRootCAs(); err != nil {
+			return err
+		}
+	}
+
+	if c.shouldRotateExpiredServerCerts() {
+		log.Info(fmt.Sprintf("Rotating expired server certs"), "cluster", c.namespacedName())
+
+		if err := c.rotateExpiredServerCerts(); err != nil {
+			return err
+		}
+	}
+
+	if c.shouldRotateExpiredClientCerts() {
+		log.Info(fmt.Sprintf("Rotating expired client certs"), "cluster", c.namespacedName())
+
+		if err := c.rotateExpiredClientCerts(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

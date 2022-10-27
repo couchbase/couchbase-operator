@@ -466,6 +466,12 @@ func (c *Cluster) runReconcile() {
 			}
 		}
 
+		// Now is the time to check if any of the active client/server certs have expired
+		// otherwise we're not going to be able to update members or do anything.
+		if err := c.rotateExpiredCertificates(); err != nil {
+			log.Error(err, "Failed to rotate expired certificates", "cluster", c.namespacedName())
+		}
+
 		return
 	}
 

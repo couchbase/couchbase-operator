@@ -74,6 +74,13 @@ var (
 	OperatorSecretClientCertKey = "couchbase-operator.crt"
 	OperatorSecretPrivateKeyKey = "couchbase-operator.key"
 	OperatorSecretCAKey         = "ca.crt"
+
+	// ClientSecret keys representing TLS resources for use by clients/sdks/sidecars.
+	ClientSecretRootCA     = "ca.crt"
+	ClientSecretServerCert = "tls.crt"
+	ClientSecretServerKey  = "tls.key"
+	ClientSecretMutualCert = "mtls.crt"
+	ClientSecretMutualKey  = "mtls.key"
 )
 
 // Label types added to pods.
