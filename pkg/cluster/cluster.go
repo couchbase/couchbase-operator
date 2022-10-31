@@ -36,10 +36,13 @@ var log = logf.Log.WithName("cluster")
 // Be very aggressive here.  If pods are deleted with volumes missing then
 // they stay Terminating forever.  This should emulate --grace-period=0 --force.
 // See: https://github.com/kubernetes/kubernetes/issues/51835.
-var podTerminationGracePeriod = int64(0)
+// Per K8S-2836 we now allow a PodDeleteDelay to be passed into config, this defaults
+// to 0 as well.
+// var podTerminationGracePeriod = int64(0)
 
 type Config struct {
 	PodCreateTimeout string
+	PodDeleteDelay   string
 }
 
 // Cluster is the core internal data type representing a Couchbase cluster.
@@ -460,7 +463,7 @@ func (c *Cluster) runReconcile() {
 
 			log.Info("Killing uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
 
-			if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, pod.Name, metav1.DeleteOptions{}); err != nil {
+			if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, pod.Name, c.config.GetDeleteOptions()); err != nil {
 				log.Error(err, "Failed to delete uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
 				continue
 			}

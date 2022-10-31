@@ -48,6 +48,7 @@ const (
 	TagFeatureNetwork           = "network"
 	TagFeatureCollections       = "collections"
 	TagFeatureSynchronization   = "synchronization"
+	TagFeatureDeleteDelay       = "deletedelay"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -551,6 +552,9 @@ func registerTests() {
 		framework.NewTestDef(TestStatusRecovery).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestStatusStability).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestLoggingMemoryBufferLimits).WithTags(TagSuiteP1, TagFeatureLogging),
+		framework.NewTestDef(TestPodDeleteDelayRespected).WithTags(TagSuiteP1, TagSuiteSystem, TagFeatureDeleteDelay),
+		framework.NewTestDef(TestNoPodDeleteDelayRespected).WithTags(TagSuiteP1, TagSuiteSystem, TagFeatureDeleteDelay),
+		framework.NewTestDef(TestPodDeletedAfterExpectedDelay).WithTags(TagSuiteP1, TagSuiteSystem, TagFeatureDeleteDelay),
 
 		// RBAC Tests
 		framework.NewTestDef(TestRBACRemoveUserFromBinding).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureRBAC),

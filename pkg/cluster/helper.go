@@ -1,9 +1,12 @@
 package cluster
 
 import (
+	"time"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // checks cluster version is above minimum version requirement.
@@ -51,4 +54,17 @@ func (c *Cluster) RunningVersionIsAtLeast(v string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (config *Config) GetDeleteOptions() metav1.DeleteOptions {
+	deleteDelay, err := time.ParseDuration(config.PodDeleteDelay)
+	if err != nil {
+		log.Error(err, "Error parsing delete delay")
+
+		deleteDelay = time.Duration(0)
+	}
+
+	deleteDelayInSeconds := int64(deleteDelay / time.Second)
+
+	return *metav1.NewDeleteOptions(deleteDelayInSeconds)
 }

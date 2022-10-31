@@ -229,3 +229,76 @@ func TestImageVersionEnvPrecedence(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestNoPodDeleteDelayRespected(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// static configuration
+	clusterSize := constants.Size2
+
+	// Create the cluster.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	_, err := e2eutil.ResizeCluster(t, 0, constants.Size1, kubernetes, cluster, 5*time.Minute)
+
+	if err != nil {
+		t.Errorf("TestNoPodDeleteDelayRespected should not timeout.")
+	}
+}
+
+func TestPodDeletedAfterExpectedDelay(t *testing.T) {
+	f := framework.Global
+	f.PodDeleteDelay = 2 * time.Minute
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// static configuration
+	clusterSize := constants.Size3
+
+	// Create the cluster.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	_, err := e2eutil.ResizeCluster(t, 0, constants.Size2, kubernetes, cluster, 1*time.Minute)
+	if err == nil {
+		t.Errorf("TestPodDeletedAfterExpectedDelay failed")
+	}
+
+	time.Sleep(2 * time.Minute)
+
+	_, err = e2eutil.ResizeCluster(t, 0, constants.Size1, kubernetes, cluster, 5*time.Minute)
+	if err != nil {
+		t.Errorf("TestPodDeletedAfterExpectedDelay should not timeout" + err.Error())
+	}
+}
+
+func TestPodDeleteDelayRespected(t *testing.T) {
+	f := framework.Global
+	f.PodDeleteDelay = 3 * time.Minute
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// static configuration
+	clusterSize := constants.Size2
+
+	// Create the cluster.
+	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	_, err := e2eutil.ResizeCluster(t, 0, constants.Size1, kubernetes, cluster, 1*time.Minute)
+	if err == nil {
+		t.Errorf("TestPodDeleteDelayRespected failed: " + err.Error())
+	}
+}

@@ -84,6 +84,10 @@ var (
 	// have been violated.  This is indicative that the user has either ignored the DAC
 	// or that there is some functionality missing from the DAC.
 	ErrConfigurationInvalid = errors.New("user configuration error")
+
+	// ErrDeleteDelayPreventsReconcile is an error that is surfaced when a pod is scheduled
+	// for deletion but has not reached the expiration of its delay.
+	ErrDeleteDelayPreventsReconcile = errors.New("pod not removed due to delete delay")
 )
 
 // CLI errors.

@@ -1075,6 +1075,13 @@ Memory requested for scheduling
 +
 How long to wait before declaring an error when provisioning a pod.
 
+--pod-delete-delay::
+*Type*: string
++
+*Default*: 0s
++
+How long to wait before performing a delete on a failed pod.
+
 --scope::
 *Type*: string
 +
@@ -1952,6 +1959,13 @@ Memory requested for scheduling
 *Default*: 10m0s
 +
 How long to wait before declaring an error when provisioning a pod.
+
+--pod-delete-delay::
+*Type*: string
++
+*Default*: 0s
++
+How long to wait before performing a delete on a failed pod.
 
 --scope::
 *Type*: string

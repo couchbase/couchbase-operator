@@ -276,7 +276,6 @@ func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 		return err
 	}
 
-	// Notify of deletion
 	if err := c.clusterRemoveMember(name); err != nil {
 		return err
 	}

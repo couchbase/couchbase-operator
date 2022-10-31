@@ -46,12 +46,9 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 }
 
 // Remove Pod and any volumes associated with pod if requested
-// ore volumes are associated with default claim.
+// or volumes are associated with default claim.
 func (c *Cluster) removePod(name string, removeVolumes bool) error {
-	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-
-	err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, *opts, removeVolumes)
-	if err != nil {
+	if err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, c.config.GetDeleteOptions(), removeVolumes); err != nil {
 		log.Error(err, "Pod deletion failed", "cluster", c.namespacedName())
 		return err
 	}
@@ -69,9 +66,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 		return fmt.Errorf("%w: config %s for pod does not exist", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), m.Config())
 	}
 
-	opts := metav1.NewDeleteOptions(podTerminationGracePeriod)
-
-	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name(), *opts); err != nil {
+	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name(), c.config.GetDeleteOptions()); err != nil {
 		return err
 	}
 
