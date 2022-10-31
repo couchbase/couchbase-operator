@@ -511,7 +511,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 	}
 
 	if c.cluster.Spec.AntiAffinity {
-		affinity = k8sutil.AntiAffinityForCluster(c.cluster.Name)
+		affinity.PodAntiAffinity = k8sutil.ApplyPodAntiAffinityForCluster(c.cluster.Name)
 	}
 
 	labels := k8sutil.LabelsForCluster(c.cluster)

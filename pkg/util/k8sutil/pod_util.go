@@ -857,7 +857,16 @@ func applyPodScheduling(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, serv
 	// If anti-affinity is set then ensure no two pods from the same cluster
 	// run on the same hosts.
 	if cluster.Spec.AntiAffinity {
-		pod.Spec.Affinity = AntiAffinityForCluster(cluster.Name)
+		// populate a new PodAntiAffinity enforcing no two cb pods on same node.
+		podAntiAffinity := ApplyPodAntiAffinityForCluster(cluster.Name)
+
+		if pod.Spec.Affinity.PodAntiAffinity == nil {
+			// add new
+			pod.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
+		}
+		// append to existing
+		pod.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution =
+			append(pod.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
 	}
 
 	// Add or override any scheduling operation.  Server group will be set when
@@ -1918,18 +1927,16 @@ func FlagPodReady(client *client.Client, name string) error {
 	return nil
 }
 
-func AntiAffinityForCluster(clusterName string) *v1.Affinity {
-	return &v1.Affinity{
-		PodAntiAffinity: &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-				{
-					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							constants.LabelCluster: clusterName,
-						},
+func ApplyPodAntiAffinityForCluster(clusterName string) *v1.PodAntiAffinity {
+	return &v1.PodAntiAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						constants.LabelCluster: clusterName,
 					},
-					TopologyKey: "kubernetes.io/hostname",
 				},
+				TopologyKey: "kubernetes.io/hostname",
 			},
 		},
 	}

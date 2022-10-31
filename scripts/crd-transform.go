@@ -175,11 +175,6 @@ var discard = pathMatcher{
 	{
 		group: "couchbase.com",
 		kind:  "CouchbaseCluster",
-		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.affinity",
-	},
-	{
-		group: "couchbase.com",
-		kind:  "CouchbaseCluster",
 		path:  ".spec.versions.schema.openAPIV3Schema.properties.spec.properties.servers.items.properties.pod.properties.spec.properties.hostAliases",
 	},
 	{
