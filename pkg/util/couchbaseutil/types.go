@@ -154,8 +154,8 @@ type IndexSettings struct {
 	StableSnapInterval  int              `url:"stableSnapshotInterval" json:"stableSnapshotInterval"`
 	MaxRollbackPoints   int              `url:"maxRollbackPoints" json:"maxRollbackPoints"`
 	LogLevel            IndexLogLevel    `url:"logLevel" json:"logLevel"`
-	NumberOfReplica     int              `url:"numReplica" json:"numReplica"`
-	RedistributeIndexes bool             `url:"redistributeIndexes" json:"redistributeIndexes"`
+	NumberOfReplica     int              `url:"numReplica,omitempty" json:"numReplica"`
+	RedistributeIndexes bool             `url:"redistributeIndexes,omitempty" json:"redistributeIndexes"`
 }
 
 type FailoverOnDiskFailureSettings struct {
